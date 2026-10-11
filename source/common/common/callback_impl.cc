@@ -11,33 +11,38 @@ CallbackHandlePtr ThreadSafeCallbackManager::add(Event::Dispatcher& dispatcher, 
   // Get the list iterator of added callback handle, which will be used to remove itself from
   // callbacks_ list.
   new_callback->it_ = (--callbacks_.end());
+  size_ = callbacks_.size();
   return new_callback;
 }
 
-void ThreadSafeCallbackManager::runCallbacks() {
+void ThreadSafeCallbackManager::runCallbacks(bool coalesce) {
   Thread::LockGuard lock(lock_);
   for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
     auto& [cb, cb_dispatcher, still_alive] = *(it++);
 
-    cb_dispatcher.post([cb = cb, still_alive = still_alive] {
+    if (coalesce && cb->scheduled_.exchange(true)) {
+      continue;
+    }
+    cb_dispatcher.post([cb = cb, still_alive = still_alive, coalesce] {
       // Once we're running on the thread that scheduled the callback, validate the
       // callback is still valid and execute. Even though 'expired()' is racy, because
       // we are on the scheduling thread, this should not race with destruction.
       if (!still_alive.expired()) {
+        if (coalesce) {
+          cb->scheduled_ = false;
+        }
         cb->cb_();
       }
     });
   }
 }
 
-size_t ThreadSafeCallbackManager::size() const noexcept {
-  Thread::LockGuard lock(lock_);
-  return callbacks_.size();
-}
+size_t ThreadSafeCallbackManager::size() const noexcept { return size_; }
 
 void ThreadSafeCallbackManager::remove(typename std::list<CallbackListEntry>::iterator& it) {
   Thread::LockGuard lock(lock_);
   callbacks_.erase(it);
+  size_ = callbacks_.size();
 }
 
 ThreadSafeCallbackManager::CallbackHolder::CallbackHolder(

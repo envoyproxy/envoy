@@ -409,6 +409,7 @@ envoy_cc_library(
         "//envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:basic_resource_lib",
+        "//source/common/common:callback_impl_lib",
     ],
 )
 
