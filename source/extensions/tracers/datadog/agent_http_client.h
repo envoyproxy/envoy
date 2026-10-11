@@ -3,9 +3,9 @@
 #include <string>
 
 #include "envoy/http/async_client.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/upstream/cluster_update_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "datadog/http_client.h"
@@ -51,6 +51,14 @@ public:
   AgentHTTPClient(Upstream::ClusterManager& cluster_manager, const std::string& cluster,
                   const std::string& reference_host, TracerStats& stats, TimeSource& time_source);
   ~AgentHTTPClient() override;
+
+  /**
+   * Cancel the requests in flight. Subsequent calls to \c post do not send
+   * anything. This is called when the thread
+   * local tracer that created this client is destroyed, after which the
+   * cluster manager of this thread might be torn down.
+   */
+  void shutdown();
 
   // datadog::tracing::HTTPClient
 
@@ -103,11 +111,15 @@ public:
 
 private:
   absl::flat_hash_map<Http::AsyncClient::Request*, Handlers> handlers_;
-  Upstream::ClusterUpdateTracker collector_cluster_;
+  // The collector cluster is looked up for every report rather than cached: a cached
+  // ThreadLocalCluster can outlive its cluster entry while the thread local cluster manager of a
+  // worker is destroyed.
+  Upstream::ClusterManager& cluster_manager_;
   const std::string cluster_;
   const std::string reference_host_;
   TracerStats& stats_;
   TimeSource& time_source_;
+  bool shut_down_{false};
 };
 
 } // namespace Datadog
