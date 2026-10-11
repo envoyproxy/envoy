@@ -53,7 +53,7 @@ public:
   static std::unique_ptr<Socket::Options> buildReusePortOptions();
   static std::unique_ptr<Socket::Options>
   buildReusePortBpfCpuSteeringOptions(absl::Span<const uint32_t> worker_cpus);
-  static std::unique_ptr<Socket::Options> buildUdpGroOptions();
+  static std::unique_ptr<Socket::Options> buildUdpGroOptions(bool enabled = true);
   static std::unique_ptr<Socket::Options> buildZeroSoLingerOptions();
   static std::unique_ptr<Socket::Options> buildIpRecvTosOptions();
   static std::unique_ptr<Socket::Options> buildBindAddressNoPort();

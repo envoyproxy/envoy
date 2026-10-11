@@ -662,6 +662,62 @@ filter_chains:
       "test_value");
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, UdpGroDisabledByDefault) {
+  if (!ENVOY_SOCKET_UDP_GRO.hasValue()) {
+    GTEST_SKIP();
+  }
+  ON_CALL(os_sys_calls_, supportsUdpGro()).WillByDefault(Return(true));
+  const auto listener = parseListenerFromV3Yaml(R"EOF(
+name: udp
+address:
+  socket_address: { protocol: UDP, address: 127.0.0.1, port_value: 0 }
+)EOF");
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, Network::Socket::Type::Datagram, _,
+                                 ListenerComponentFactory::BindType::ReusePort, _, 0));
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
+      .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
+  expectSetsockopt(ENVOY_SOCKET_UDP_GRO.level(), ENVOY_SOCKET_UDP_GRO.option(), 0);
+
+  EXPECT_TRUE(addOrUpdateListener(listener));
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, UdpGroDisabledOnUpdate) {
+  if (!ENVOY_SOCKET_UDP_GRO.hasValue()) {
+    GTEST_SKIP();
+  }
+  ON_CALL(os_sys_calls_, supportsUdpGro()).WillByDefault(Return(true));
+  auto listener = parseListenerFromV3Yaml(R"EOF(
+name: udp
+address:
+  socket_address: { protocol: UDP, address: 127.0.0.1, port_value: 0 }
+udp_listener_config:
+  downstream_socket_config:
+    prefer_gro: true
+)EOF");
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, Network::Socket::Type::Datagram, _,
+                                 ListenerComponentFactory::BindType::ReusePort, _, 0));
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
+      .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
+  expectSetsockopt(ENVOY_SOCKET_UDP_GRO.level(), ENVOY_SOCKET_UDP_GRO.option(), 1);
+  EXPECT_TRUE(addOrUpdateListener(listener));
+
+  // Reusing the old socket would leave GRO enabled with a reader that cannot split aggregates.
+  listener.mutable_udp_listener_config()
+      ->mutable_downstream_socket_config()
+      ->mutable_prefer_gro()
+      ->set_value(false);
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, Network::Socket::Type::Datagram, _,
+                                 ListenerComponentFactory::BindType::ReusePort, _, 0));
+  expectSetsockopt(ENVOY_SOCKET_UDP_GRO.level(), ENVOY_SOCKET_UDP_GRO.option(), 0);
+
+  EXPECT_TRUE(addOrUpdateListener(listener));
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_, _, _));
   EXPECT_FALSE(manager_->isWorkerStarted());

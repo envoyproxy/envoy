@@ -182,10 +182,10 @@ SocketOptionFactory::buildReusePortBpfCpuSteeringOptions(absl::Span<const uint32
   return options;
 }
 
-std::unique_ptr<Socket::Options> SocketOptionFactory::buildUdpGroOptions() {
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildUdpGroOptions(bool enabled) {
   std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<SocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SOCKET_UDP_GRO, 1));
+      envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_SOCKET_UDP_GRO, enabled ? 1 : 0));
   return options;
 }
 
