@@ -64,8 +64,9 @@ public:
     Server::GenericFactoryContextImpl generic_context(context_);
 
     auto config = std::make_shared<Filters::Common::SetFilterState::Config>(
-        proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-        generic_context, proto_config.clear_route_cache());
+        proto_config.on_request_headers(),
+        *SetFilterStateConfig::toFilterStateLifeSpan(proto_config.life_span()), generic_context,
+        proto_config.clear_route_cache());
     auto filter = std::make_shared<SetFilterState>(config);
 
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -80,13 +81,15 @@ public:
     envoy::extensions::filters::http::set_filter_state::v3::Config filter_proto_config;
     TestUtility::loadFromYaml(filter_yaml_config, filter_proto_config);
     auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-        filter_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+        filter_proto_config.on_request_headers(),
+        *SetFilterStateConfig::toFilterStateLifeSpan(filter_proto_config.life_span()),
         generic_context, filter_proto_config.clear_route_cache());
 
     envoy::extensions::filters::http::set_filter_state::v3::Config route_proto_config;
     TestUtility::loadFromYaml(per_route_yaml_config, route_proto_config);
     Filters::Common::SetFilterState::Config route_config(
-        route_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+        route_proto_config.on_request_headers(),
+        *SetFilterStateConfig::toFilterStateLifeSpan(route_proto_config.life_span()),
         generic_context, route_proto_config.clear_route_cache());
 
     EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
@@ -211,6 +214,102 @@ TEST_F(SetMetadataIntegrationTest, ClearRouteCache) {
       info_.filterState()->getDataReadOnly<Network::Address::InstanceAccessor>("envoy.client.ip");
   ASSERT_NE(nullptr, ip_address);
   EXPECT_EQ(ip_address->serializeAsString(), "127.0.0.1:0");
+}
+
+TEST_F(SetMetadataIntegrationTest, LifeSpanRequest) {
+  const std::string yaml_config = R"EOF(
+  on_request_headers:
+  - object_key: foo
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(test-header)%"
+  life_span: REQUEST
+  )EOF";
+  runFilter(yaml_config);
+  EXPECT_TRUE(
+      info_.filterState()->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::Request));
+  EXPECT_FALSE(
+      info_.filterState()->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::Connection));
+  const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("foo");
+  ASSERT_NE(nullptr, foo);
+  EXPECT_EQ(foo->serializeAsString(), "test-value");
+}
+
+TEST_F(SetMetadataIntegrationTest, LifeSpanConnection) {
+  const std::string yaml_config = R"EOF(
+  on_request_headers:
+  - object_key: foo
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(test-header)%"
+  life_span: CONNECTION
+  )EOF";
+  runFilter(yaml_config);
+  EXPECT_TRUE(
+      info_.filterState()->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::Connection));
+  const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("foo");
+  ASSERT_NE(nullptr, foo);
+  EXPECT_EQ(foo->serializeAsString(), "test-value");
+}
+
+TEST_F(SetMetadataIntegrationTest, RouteLevelLifeSpanOverride) {
+  const std::string filter_config = R"EOF(
+  on_request_headers:
+  - object_key: filter-only
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "filter"
+  life_span: FILTER_CHAIN
+  )EOF";
+  const std::string route_config = R"EOF(
+  on_request_headers:
+  - object_key: route-only
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "route"
+  life_span: REQUEST
+  )EOF";
+  runPerRouteFilter(filter_config, route_config);
+
+  EXPECT_TRUE(
+      info_.filterState()->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::Request));
+  EXPECT_FALSE(
+      info_.filterState()->hasDataAtOrAboveLifeSpan(StreamInfo::FilterState::LifeSpan::Connection));
+
+  const auto* filter = info_.filterState()->getDataReadOnly<Router::StringAccessor>("filter-only");
+  ASSERT_NE(nullptr, filter);
+  EXPECT_EQ(filter->serializeAsString(), "filter");
+  ASSERT_NE(nullptr, info_.filterState()->parent());
+  EXPECT_EQ(nullptr,
+            info_.filterState()->parent()->getDataReadOnly<Router::StringAccessor>("filter-only"));
+
+  const auto* route =
+      info_.filterState()->parent()->getDataReadOnly<Router::StringAccessor>("route-only");
+  ASSERT_NE(nullptr, route);
+  EXPECT_EQ(route->serializeAsString(), "route");
+}
+
+TEST_F(SetMetadataIntegrationTest, InvalidLifeSpan) {
+  const auto invalid_life_span =
+      static_cast<envoy::extensions::filters::http::set_filter_state::v3::Config::LifeSpan>(999);
+  auto status_or_life_span = SetFilterStateConfig::toFilterStateLifeSpan(invalid_life_span);
+  EXPECT_FALSE(status_or_life_span.ok());
+  EXPECT_EQ(status_or_life_span.status(), absl::InvalidArgumentError("Invalid LifeSpan"));
+
+  envoy::extensions::filters::http::set_filter_state::v3::Config proto_config;
+  proto_config.set_life_span(invalid_life_span);
+  SetFilterStateConfig factory;
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(proto_config, "", context_).IgnoreError(),
+      EnvoyException, "Proto constraint validation failed");
+  EXPECT_THROW_WITH_REGEX(
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context_.server_factory_context_,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .IgnoreError(),
+      EnvoyException, "Proto constraint validation failed");
 }
 
 } // namespace SetFilterState

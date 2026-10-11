@@ -213,6 +213,8 @@ areas:
     title: sds
   server:
     title: server
+  set_filter_state:
+    title: set_filter_state
   set_metadata_filter:
     title: set_metadata_filter
   sockets:
