@@ -310,6 +310,11 @@ protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnectFailed(Envoy::ConnectionPool::ActiveClient&) {}
 
+  // The eager preconnect floor to maintain per host. Returns 0 when
+  // envoy.reloadable_features.eager_preconnect_floor is disabled
+  // or the pool type does not support the floor yet (TCP, HTTP/3).
+  virtual uint32_t eagerPreconnectFloorToMaintain() const;
+
   enum class ConnectionResult {
     FailedToCreateConnection,
     CreatedNewConnection,
@@ -326,7 +331,8 @@ protected:
   // to avoid starving this pool.
   // Demand is determined either by perUpstreamPreconnectRatio() or global_preconnect_ratio
   // if this is called by maybePreconnect()
-  ConnectionResult tryCreateNewConnection(float global_preconnect_ratio = 0);
+  ConnectionResult tryCreateNewConnection(float global_preconnect_ratio = 0,
+                                          uint32_t eager_preconnect_floor = 0);
 
   // A helper function which determines if a canceled pending connection should
   // be closed as excess or not.
@@ -334,7 +340,8 @@ protected:
 
   // A helper function which determines if a new incoming stream should trigger
   // connection preconnect.
-  bool shouldCreateNewConnection(float global_preconnect_ratio) const;
+  bool shouldCreateNewConnection(float global_preconnect_ratio,
+                                 uint32_t eager_preconnect_floor = 0) const;
 
   float perUpstreamPreconnectRatio() const;
 
@@ -392,6 +399,12 @@ private:
   void drainClients(std::list<ActiveClientPtr>& clients);
 
   void assertCapacityCountsAreCorrect();
+
+  // Clients that count toward the eager preconnect floor: connecting, ready, and busy.
+  // Early-data (0-RTT) and draining clients are excluded.
+  size_t eagerPreconnectCount() const;
+  void maintainEagerPreconnectFloor(uint32_t floor);
+
   void updateQueueOverloadedGauge();
   void clearQueueOverloadedGauge();
   size_t pendingStreamCount() const;
@@ -416,6 +429,9 @@ private:
   // Whether the connection pool is currently in the process of closing
   // all connections so that it can be gracefully deleted.
   bool is_draining_for_deletion_{false};
+
+  // Whether all connections are being actively destroyed, so we do not create replacement clients.
+  bool is_destroying_all_connections_{false};
 
   // True iff this object is in the deferred delete list.
   bool deferred_deleting_{false};

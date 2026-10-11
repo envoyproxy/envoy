@@ -119,6 +119,7 @@ public:
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() override {
     return conn_pool_->socketOptions();
   }
+  bool hasReadyConnection() const override { return conn_pool_->hasReadyConnection(); }
 
   MOCK_METHOD(void, onConnReleasedForTest, ());
   MOCK_METHOD(void, onConnDestroyedForTest, ());
@@ -632,6 +633,35 @@ TEST_F(TcpConnPoolImplTest, MultipleRequestAndResponse) {
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(TcpConnPoolImplTest, HasReadyConnection) {
+  initialize();
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+
+  // Assign a request to the connection, making it busy.
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+
+  // Release the connection back to the pool, making it ready.
+  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
+  c1.releaseConn();
+  EXPECT_TRUE(conn_pool_->hasReadyConnection());
+
+  // Destroy the connection.
+  EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+}
+
+TEST_F(TcpConnPoolImplTest, EagerPreconnectFloorNotSupported) {
+  initialize();
+  ON_CALL(*cluster_, eagerPreconnectFloor).WillByDefault(Return(1));
+
+  EXPECT_FALSE(conn_pool_->maybePreconnect(0));
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_started_.value());
+  EXPECT_EQ(0, cluster_->traffic_stats_->upstream_cx_preconnect_blocked_.value());
 }
 
 /**

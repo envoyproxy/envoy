@@ -1092,6 +1092,27 @@ TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnection
   conn_pool_->expectAndRunUpstreamReady();
 }
 
+TEST_F(Http1ConnPoolImplTest, HasReadyConnection) {
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+
+  // Assign a request to the connection, making it busy.
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+
+  // Release the connection back to the pool, making it ready.
+  conn_pool_->expectEnableUpstreamReady();
+  r1.completeResponse(false);
+  EXPECT_TRUE(conn_pool_->hasReadyConnection());
+
+  // Destroy the connection.
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+  conn_pool_->expectAndRunUpstreamReady();
+  EXPECT_FALSE(conn_pool_->hasReadyConnection());
+}
+
 TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
   conn_pool_->expectClientCreate();
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);

@@ -169,6 +169,7 @@ public:
   bool maybePreconnect(float preconnect_ratio) override {
     return maybePreconnectImpl(preconnect_ratio);
   }
+  bool hasReadyConnection() const override { return !ready_clients_.empty(); }
   ConnectionPool::Cancellable* newPendingStream(Envoy::ConnectionPool::AttachContext& context,
                                                 bool can_send_early_data) override;
   Upstream::HostDescriptionConstSharedPtr host() const override {
@@ -187,6 +188,7 @@ public:
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnDestroyed() {}
+  uint32_t eagerPreconnectFloorToMaintain() const override { return 0; }
 
   std::optional<std::chrono::milliseconds> idle_timeout_;
 };

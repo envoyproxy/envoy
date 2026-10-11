@@ -27,6 +27,7 @@ envoy_cc_library(
     deps = [
         ":pending_stream_lib",
         "//envoy/stats:timespan_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:debug_recursion_checker_lib",
         "//source/common/common:linked_object",
         "//source/common/protobuf:message_validator_lib",
