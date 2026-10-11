@@ -98,13 +98,14 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
 
 TEST_P(QuicHttpIntegrationTest, GetPeerAndLocalCertsInfo) {
   // These are not implemented yet, but configuring them shouldn't cause crash.
-  useAccessLog("%DOWNSTREAM_PEER_CERT% %DOWNSTREAM_PEER_ISSUER% %DOWNSTREAM_PEER_SERIAL% "
+  useAccessLog("%DOWNSTREAM_PEER_CERT% %DOWNSTREAM_PEER_CERT_CHAIN% %DOWNSTREAM_PEER_ISSUER% "
+               "%DOWNSTREAM_PEER_SERIAL% "
                "%DOWNSTREAM_PEER_FINGERPRINT_1% %DOWNSTREAM_PEER_FINGERPRINT_256% "
                "%DOWNSTREAM_LOCAL_SUBJECT% %DOWNSTREAM_PEER_SUBJECT% %DOWNSTREAM_LOCAL_URI_SAN% "
                "%DOWNSTREAM_PEER_URI_SAN%");
   testRouterHeaderOnlyRequestAndResponse();
   std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_EQ("- - - - - - - - -", log);
+  EXPECT_EQ("- - - - - - - - - -", log);
 }
 
 TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {

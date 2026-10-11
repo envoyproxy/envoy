@@ -2698,6 +2698,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                        return info.urlEncodedPemEncodedPeerCertificate();
                                      });
                                }}},
+                             {"DOWNSTREAM_PEER_CERT_CHAIN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.urlEncodedPemEncodedPeerCertificateChain();
+                                     });
+                               }}},
                              {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
