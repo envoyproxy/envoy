@@ -103,6 +103,45 @@ typed_config:
             output_);
 }
 
+TEST_F(AccessLogImplTest, MultiValueHeader) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  log_format:
+    text_format_source:
+      inline_string: "[%START_TIME%] \"%REQ_MULTI(:METHOD)% %REQ_MULTI(UNKNOWN?SET-COOKIE)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_HEADER_MULTI(UNKNOWN?COOKIE)% %RESP_MULTI(CONTENT-TYPE)% %TRAILER_MULTI(TRAILER-X)%\n"
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
+  request_headers_.addCopy(Http::Headers::get().UserAgent, "user-agent-set");
+  request_headers_.addCopy(Http::Headers::get().RequestId, "id");
+  request_headers_.addCopy(Http::Headers::get().Host, "host");
+  request_headers_.addCopy(Http::Headers::get().ForwardedFor, "x.x.x.x");
+  response_headers_.addCopy(Http::Headers::get().ContentType, "application/json");
+
+  // add multi value request header
+  request_headers_.addCopy(Http::Headers::get().SetCookie, "cookie1");
+  request_headers_.addCopy(Http::Headers::get().SetCookie, "cookie2");
+
+  // add multi value response header
+  response_headers_.addCopy(Http::Headers::get().Cookie, "respCookie1");
+  response_headers_.addCopy(Http::Headers::get().Cookie, "respCookie2");
+
+  // add multi value trailers
+  response_trailers_.addCopy("trailer-x", "trailer1");
+  response_trailers_.addCopy("trailer-x", "trailer2");
+
+  log->log(formatter_context_, stream_info_);
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET cookie1set-cookiecookie2 HTTP/1.1\" 0 "
+            "respCookie1cookierespCookie2 application/json trailer1trailer-xtrailer2\n",
+            output_);
+}
+
 TEST_F(AccessLogImplTest, DownstreamDisconnect) {
   const std::string yaml = R"EOF(
 name: accesslog
