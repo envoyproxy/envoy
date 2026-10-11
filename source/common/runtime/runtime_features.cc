@@ -345,6 +345,13 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli
 // Do not turn this on if DnsFilter is used or until the race is fixed
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 
+// When an on-demand cluster discovery asks for a cluster its config source has already answered
+// as missing, answer the request immediately from that remembered answer instead of starting
+// another discovery and waiting for the response or the discovery timeout.
+// TODO(wbpcode): flip to true after deployments have had a few releases to adopt the behavior
+// change.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_odcds_missing_cluster_cache);
+
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT

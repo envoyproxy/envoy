@@ -8,8 +8,10 @@
 #include "source/common/config/xds_resource.h"
 
 #include "test/common/upstream/cluster_manager_impl_test_common.h"
+#include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/od_cds_api.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -28,6 +30,9 @@ public:
   void SetUp() override {
     create(defaultConfig());
     odcds_ = MockOdCdsApi::create();
+    // The cluster manager consults isKnownMissing() on every discovery request. Allow any number
+    // of such calls in all tests, answered with false.
+    ON_CALL(*odcds_, isKnownMissing(_)).WillByDefault(Return(false));
     odcds_handle_ = cluster_manager_->createOdCdsApiHandle(odcds_);
   }
 
@@ -300,6 +305,106 @@ TEST_F(ODCDTest, TestDestroyHandleFromWorkerThread) {
 
   worker_thread->join();
   EXPECT_TRUE(destruction_completed);
+}
+
+// Check that a request for a cluster the ODCDS source already knows to be missing is answered
+// immediately from that remembered answer, without starting another discovery and without
+// leaving anything pending.
+TEST_F(ODCDTest, TestKnownMissingClusterAnsweredImmediately) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.odcds_missing_cluster_cache", "true"}});
+
+  auto cb = createCallback(ClusterDiscoveryStatus::Missing);
+  EXPECT_CALL(*odcds_, isKnownMissing("cluster_foo")).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(*odcds_, recordKnownMissingAnswer()).Times(2);
+  EXPECT_CALL(*odcds_, updateOnDemand(_)).Times(0);
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 1);
+
+  // The request left nothing pending behind: later notifications about the cluster invoke
+  // nothing.
+  cluster_manager_->notifyMissingCluster("cluster_foo");
+  cluster_manager_->notifyExpiredDiscovery("cluster_foo");
+  EXPECT_EQ(callback_call_count_, 1);
+
+  // A repeated request is also answered immediately from the remembered answer.
+  auto cb2 = createCallback(ClusterDiscoveryStatus::Missing);
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
+  EXPECT_EQ(callback_call_count_, 2);
+}
+
+// Check that a source that doesn't know the cluster to be missing is asked as before, and the
+// discovery answer still reaches the callback.
+TEST_F(ODCDTest, TestNotKnownMissingClusterStartsDiscovery) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.odcds_missing_cluster_cache", "true"}});
+
+  auto cb = createCallback(ClusterDiscoveryStatus::Missing);
+  EXPECT_CALL(*odcds_, isKnownMissing("cluster_foo")).WillOnce(Return(false));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
+  cluster_manager_->notifyMissingCluster("cluster_foo");
+  EXPECT_EQ(callback_call_count_, 1);
+}
+
+// Check that the remembered answer is not consulted while the requested cluster is warming,
+// e.g. because another config source delivered it meanwhile: the discovery proceeds and the
+// cluster lifecycle callbacks answer Available once the warm-up completes.
+TEST_F(ODCDTest, TestKnownMissingClusterIgnoredWhileWarming) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.odcds_missing_cluster_cache", "true"}});
+
+  // Create a cluster that stays in the warming state: its initialization callback is captured
+  // and never invoked.
+  const std::string warming_cluster_yaml = R"EOF(
+    name: cluster_foo
+    connect_timeout: 0.250s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: static_cluster
+  )EOF";
+  const auto warming_cluster_config = parseClusterFromV3Yaml(warming_cluster_yaml);
+  std::shared_ptr<MockClusterMockPrioritySet> warming_cluster =
+      std::make_shared<testing::NiceMock<MockClusterMockPrioritySet>>();
+  warming_cluster->info_->name_ = "cluster_foo";
+  std::function<void()> cluster_init_callback;
+  EXPECT_CALL(*warming_cluster, initialize(_))
+      .WillOnce(testing::SaveArg<0>(&cluster_init_callback));
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
+      .WillOnce(Return(std::make_pair(warming_cluster, nullptr)));
+  ASSERT_OK(cluster_manager_->addOrUpdateCluster(warming_cluster_config, "version1"));
+
+  // Even if the source reports the cluster as missing, the request for a warming cluster is not
+  // answered from the remembered answer; it starts a discovery as before.
+  auto cb = createCallback();
+  EXPECT_CALL(*odcds_, isKnownMissing(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
+}
+
+// Check that with the runtime guard disabled, a request for a cluster the source reports as
+// missing is not answered from the remembered answer and calls into ODCDS again like it used to.
+TEST_F(ODCDTest, TestMissingClusterCacheDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.odcds_missing_cluster_cache", "false"}});
+
+  auto cb = createCallback();
+  EXPECT_CALL(*odcds_, isKnownMissing(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(*odcds_, updateOnDemand("cluster_foo"));
+  auto handle =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
 }
 
 } // namespace

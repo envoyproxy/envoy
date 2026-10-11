@@ -188,8 +188,10 @@ envoy_cc_test(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:xds_resource_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:od_cds_api_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

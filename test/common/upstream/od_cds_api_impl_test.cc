@@ -18,8 +18,10 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
+using ::testing::_;
 using ::testing::ElementsAre;
 using ::testing::InSequence;
+using ::testing::Return;
 using ::testing::UnorderedElementsAre;
 
 class OdCdsApiImplTest : public testing::Test {
@@ -189,6 +191,104 @@ TEST_F(OdCdsApiImplTest, NotifierNotUsed) {
   ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, removed, ""));
   ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, {}, ""));
   ASSERT_OK(odcds_callbacks_->onConfigUpdate(some_cluster2_resource.refvec_, removed2, ""));
+}
+
+// Check that a requested cluster the server answered with removed_resources is reported as
+// known-missing, and that a later update delivering the cluster withdraws the answer.
+TEST_F(OdCdsApiImplTest, KnownMissingTracksRequestedClusters) {
+  InSequence s;
+
+  odcds_->updateOnDemand("cluster");
+  EXPECT_FALSE(odcds_->isKnownMissing("cluster"));
+
+  EXPECT_CALL(notifier_, notifyMissingCluster("cluster"));
+  std::vector<std::string> v{"cluster"};
+  Protobuf::RepeatedPtrField<std::string> removed(v.begin(), v.end());
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, removed, ""));
+  EXPECT_TRUE(odcds_->isKnownMissing("cluster"));
+
+  // The cluster comes into existence, which withdraws the remembered answer.
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name("cluster");
+  const auto decoded_resources = TestUtility::decodeResources({cluster});
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, ""));
+  EXPECT_FALSE(odcds_->isKnownMissing("cluster"));
+}
+
+// Check that a name the server volunteered in removed_resources without a request is not
+// remembered as missing: no subscription interest guarantees pushes for it, so remembering it
+// could serve a permanently stale answer.
+TEST_F(OdCdsApiImplTest, UnrequestedRemovedClusterIsNotKnownMissing) {
+  InSequence s;
+
+  odcds_->updateOnDemand("cluster");
+  EXPECT_CALL(notifier_, notifyMissingCluster("unrequested_cluster"));
+  std::vector<std::string> v{"unrequested_cluster"};
+  Protobuf::RepeatedPtrField<std::string> removed(v.begin(), v.end());
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, removed, ""));
+  EXPECT_FALSE(odcds_->isKnownMissing("unrequested_cluster"));
+}
+
+// Check that a failed fetch doesn't mark requested clusters as known-missing: the next request
+// should retry instead of being answered from an answer the server never gave.
+TEST_F(OdCdsApiImplTest, FailedFetchIsNotKnownMissing) {
+  odcds_->updateOnDemand("cluster");
+  odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                         nullptr);
+  EXPECT_FALSE(odcds_->isKnownMissing("cluster"));
+}
+
+// Check that a requested cluster the server delivered and later removed becomes known-missing:
+// the remembered answer tracks the server's latest answer, not just the answer to the initial
+// request.
+TEST_F(OdCdsApiImplTest, DeliveredThenRemovedClusterIsKnownMissing) {
+  InSequence s;
+
+  odcds_->updateOnDemand("cluster");
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name("cluster");
+  const auto decoded_resources = TestUtility::decodeResources({cluster});
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, ""));
+  EXPECT_FALSE(odcds_->isKnownMissing("cluster"));
+
+  // The server removes the previously delivered cluster.
+  EXPECT_CALL(notifier_, notifyMissingCluster("cluster"));
+  std::vector<std::string> v{"cluster"};
+  Protobuf::RepeatedPtrField<std::string> removed(v.begin(), v.end());
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, removed, ""));
+  EXPECT_TRUE(odcds_->isKnownMissing("cluster"));
+}
+
+// Check that a rejected add still clears the remembered answer, so the next request
+// falls back to a full rediscovery instead of being answered locally.
+TEST_F(OdCdsApiImplTest, NackedAddClearsKnownMissing) {
+  InSequence s;
+
+  odcds_->updateOnDemand("cluster");
+  EXPECT_CALL(notifier_, notifyMissingCluster("cluster"));
+  std::vector<std::string> v{"cluster"};
+  Protobuf::RepeatedPtrField<std::string> removed(v.begin(), v.end());
+  ASSERT_OK(odcds_callbacks_->onConfigUpdate({}, removed, ""));
+  EXPECT_TRUE(odcds_->isKnownMissing("cluster"));
+
+  // The cluster is delivered, but the cluster manager rejects it.
+  EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _))
+      .WillOnce(Return(absl::InvalidArgumentError("rejected")));
+  envoy::config::cluster::v3::Cluster cluster;
+  cluster.set_name("cluster");
+  const auto decoded_resources = TestUtility::decodeResources({cluster});
+  EXPECT_FALSE(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
+  EXPECT_FALSE(odcds_->isKnownMissing("cluster"));
+}
+
+// Check that answers served from the remembered answer are recorded in the
+// cluster_manager.odcds.known_missing_answers counter.
+TEST_F(OdCdsApiImplTest, RecordKnownMissingAnswerIncrementsStat) {
+  odcds_->recordKnownMissingAnswer();
+  odcds_->recordKnownMissingAnswer();
+  EXPECT_EQ(
+      2UL,
+      TestUtility::findCounter(store_, "cluster_manager.odcds.known_missing_answers")->value());
 }
 
 } // namespace
