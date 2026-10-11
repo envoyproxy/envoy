@@ -90,7 +90,7 @@ public:
         allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                          transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                         *quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
+                         quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
     EXPECT_EQ(test_address_->ip()->port(), Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -100,7 +100,8 @@ public:
 
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::unique_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
+  // Shared with the pool, the way the cluster manager shares it.
+  std::shared_ptr<Quic::PersistentQuicInfoImpl> quic_info_;
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
@@ -152,7 +153,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), *quic_info_,
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
                        {observers_}, overload_manager_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -180,7 +181,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), *quic_info_,
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
                        {observers_}, overload_manager_);
 
   MockResponseDecoder decoder;
@@ -239,6 +240,24 @@ void Http3ConnPoolImplTest::createNewStream() {
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) { createNewStream(); }
+
+// The cluster that creates the persistent QUIC info can be removed while one of its HTTP/3 pools
+// still has active streams: the pool is only drained, and lives on until they end. Its connections
+// keep raw pointers into the info (clock, alarm factory, config), so the pool must keep the info
+// alive; otherwise the next write or alarm on such a connection is a use-after-free.
+TEST_F(Http3ConnPoolImplTest, PoolKeepsPersistentQuicInfoAliveAfterItsCreatorReleasesIt) {
+  std::weak_ptr<Http::PersistentQuicInfo> info = quic_info_;
+  initialize();
+
+  // The cluster goes away: its reference to the info is released. The pool, and so its
+  // connections, must still be able to use it.
+  quic_info_.reset();
+  EXPECT_FALSE(info.expired());
+
+  // Once the pool is gone, so is the info.
+  pool_.reset();
+  EXPECT_TRUE(info.expired());
+}
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewHappyEyeballsStream) {
   happy_eyeballs_ = true;

@@ -189,7 +189,7 @@ public:
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    HttpServerPropertiesCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
+                   Stats::Scope& scope, Http::PersistentQuicInfoPtr quic_info,
                    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
                    Server::OverloadManager& overload_manager);
   ~ConnectivityGrid() override;
@@ -293,7 +293,9 @@ private:
   // may be from the cluster config, or the request headers for auto-sni.
   HttpServerPropertiesCache::Origin origin_;
 
-  Http::PersistentQuicInfo& quic_info_;
+  // Shared with the cluster that created it and with the HTTP/3 pools this grid creates, so that it
+  // outlives them even if the cluster is removed first.
+  const Http::PersistentQuicInfoPtr quic_info_;
   Upstream::ResourcePriority priority_;
   Server::OverloadManager& overload_manager_;
 
