@@ -35,6 +35,7 @@ import (
 	"errors"
 	"runtime"
 	"strings"
+	"unicode/utf8"
 	"unsafe"
 
 	"google.golang.org/protobuf/proto"
@@ -417,6 +418,18 @@ func (c *httpCApiImpl) HttpGetDynamicMetadata(r unsafe.Pointer, filterName strin
 
 func (c *httpCApiImpl) HttpSetDynamicMetadata(r unsafe.Pointer, filterName string, key string, value interface{}) {
 	req := (*httpRequest)(r)
+	if s, ok := value.(string); ok {
+		// Metadata strings are proto3 string fields, which must be valid UTF-8.
+		if !utf8.ValidString(s) {
+			s = strings.ToValidUTF8(s, "\uFFFD")
+		}
+		res := C.envoyGoFilterHttpSetDynamicMetadataString(unsafe.Pointer(req.req),
+			unsafe.Pointer(unsafe.StringData(filterName)), C.int(len(filterName)),
+			unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
+			unsafe.Pointer(unsafe.StringData(s)), C.int(len(s)))
+		handleCApiStatus(res)
+		return
+	}
 	v, err := structpb.NewValue(value)
 	if err != nil {
 		panic(err)

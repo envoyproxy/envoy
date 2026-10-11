@@ -1411,41 +1411,44 @@ void Filter::populateSliceWithMetadata(const std::string& filter_name, uint64_t*
 
 CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
                                       absl::string_view buf) {
+  Protobuf::Value value;
+  std::ignore = value.ParseFromArray(buf.data(), buf.length());
+  return setDynamicMetadataValue(std::move(filter_name), std::move(key), std::move(value));
+}
+
+CAPIStatus Filter::setDynamicMetadataString(std::string filter_name, std::string key,
+                                            absl::string_view value) {
+  Protobuf::Value v;
+  v.set_string_value(value);
+  return setDynamicMetadataValue(std::move(filter_name), std::move(key), std::move(v));
+}
+
+CAPIStatus Filter::setDynamicMetadataValue(std::string filter_name, std::string key,
+                                           Protobuf::Value value) {
   if (hasDestroyed()) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
 
-  if (!isThreadSafe()) {
-    auto weak_ptr = weak_from_this();
-    // Since go only waits for the CAPI return code we need to create a deep copy
-    // of the buffer slice and pass that to the dispatcher.
-    auto buff_copy = std::string(buf);
-    getDispatcher().post([this, weak_ptr, filter_name, key, buff_copy] {
-      if (!weak_ptr.expired() && !hasDestroyed()) {
-        ASSERT(isThreadSafe());
-        setDynamicMetadataInternal(filter_name, key, buff_copy);
-      } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in setDynamicMetadata");
-      }
-    });
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())[key] = std::move(value);
+
+  if (isThreadSafe()) {
+    streamInfo().setDynamicMetadata(filter_name, metadata);
     return CAPIStatus::CAPIOK;
   }
 
-  // it's safe to do it here since we are in the safe envoy worker thread now.
-  setDynamicMetadataInternal(filter_name, key, buf);
+  auto weak_ptr = weak_from_this();
+  getDispatcher().post(
+      [this, weak_ptr, filter_name = std::move(filter_name), metadata = std::move(metadata)] {
+        if (!weak_ptr.expired() && !hasDestroyed()) {
+          ASSERT(isThreadSafe());
+          streamInfo().setDynamicMetadata(filter_name, metadata);
+        } else {
+          ENVOY_LOG(info, "golang filter has gone or destroyed in setDynamicMetadata");
+        }
+      });
   return CAPIStatus::CAPIOK;
-}
-
-void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key,
-                                        const absl::string_view& buf) {
-  Protobuf::Struct value;
-  Protobuf::Value v;
-  std::ignore = v.ParseFromArray(buf.data(), buf.length());
-
-  (*value.mutable_fields())[key] = v;
-
-  streamInfo().setDynamicMetadata(filter_name, value);
 }
 
 CAPIStatus Filter::setStringFilterState(absl::string_view key, absl::string_view value,

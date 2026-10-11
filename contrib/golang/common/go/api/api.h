@@ -115,6 +115,9 @@ CAPIStatus envoyGoFilterHttpGetDynamicMetadata(void* r, void* name_data, int nam
 CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name_data, int name_len,
                                                void* key_data, int key_len, void* buf_data,
                                                int buf_len);
+CAPIStatus envoyGoFilterHttpSetDynamicMetadataString(void* r, void* name_data, int name_len,
+                                                     void* key_data, int key_len, void* value_data,
+                                                     int value_len);
 void envoyGoFilterHttpFinalize(void* r, int reason);
 
 CAPIStatus envoyGoFilterHttpSetStringFilterState(void* r, void* key_data, int key_len,

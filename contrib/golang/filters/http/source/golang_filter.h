@@ -334,6 +334,8 @@ public:
 
   CAPIStatus getDynamicMetadata(const std::string& filter_name, uint64_t* buf_data, int* buf_len);
   CAPIStatus setDynamicMetadata(std::string filter_name, std::string key, absl::string_view buf);
+  CAPIStatus setDynamicMetadataString(std::string filter_name, std::string key,
+                                      absl::string_view value);
   CAPIStatus setStringFilterState(absl::string_view key, absl::string_view value, int state_type,
                                   int life_span, int stream_sharing);
   CAPIStatus getStringFilterState(absl::string_view key, uint64_t* value_data, int* value_len);
@@ -383,8 +385,8 @@ private:
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
-  void setDynamicMetadataInternal(std::string filter_name, std::string key,
-                                  const absl::string_view& buf);
+  CAPIStatus setDynamicMetadataValue(std::string filter_name, std::string key,
+                                     Protobuf::Value value);
 
   void populateSliceWithMetadata(const std::string& filter_name, uint64_t* buf_data, int* buf_len);
 

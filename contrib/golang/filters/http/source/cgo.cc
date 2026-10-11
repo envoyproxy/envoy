@@ -300,6 +300,20 @@ CAPIStatus envoyGoFilterHttpSetDynamicMetadata(void* r, void* name_data, int nam
                                      });
 }
 
+CAPIStatus envoyGoFilterHttpSetDynamicMetadataString(void* r, void* name_data, int name_len,
+                                                     void* key_data, int key_len, void* value_data,
+                                                     int value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r,
+      [name_data, name_len, key_data, key_len, value_data,
+       value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto name_str = copyStringFromGoPointer(name_data, name_len);
+        auto key_str = copyStringFromGoPointer(key_data, key_len);
+        auto value_str = stringViewFromGoPointer(value_data, value_len);
+        return filter->setDynamicMetadataString(name_str, key_str, value_str);
+      });
+}
+
 void envoyGoFilterHttpFinalize(void* r, int reason) {
   UNREFERENCED_PARAMETER(reason);
   // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize

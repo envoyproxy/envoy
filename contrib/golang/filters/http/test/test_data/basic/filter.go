@@ -171,6 +171,18 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		if fmt.Sprint(k) != "bar" {
 			return f.fail(f.callbacks.DecoderFilterCallbacks(), "Metadata foo has unexpected value %v", k)
 		}
+
+		// Invalid UTF-8 must not panic: it is stored with U+FFFD replacement characters.
+		md.Set("filter.go", "invalid_utf8", "a\xffb")
+		// Non-string values go through the generic structpb path.
+		md.Set("filter.go", "number", 1)
+		metadata = md.Get("filter.go")
+		if v := fmt.Sprint(metadata["invalid_utf8"]); v != "a\uFFFDb" {
+			return f.fail(f.callbacks.DecoderFilterCallbacks(), "Metadata invalid_utf8 has unexpected value %q", v)
+		}
+		if v, ok := metadata["number"].(float64); !ok || v != 1 {
+			return f.fail(f.callbacks.DecoderFilterCallbacks(), "Metadata number has unexpected value %v", metadata["number"])
+		}
 	}
 
 	fs := f.callbacks.StreamInfo().FilterState()
