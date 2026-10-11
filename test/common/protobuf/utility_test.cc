@@ -2517,4 +2517,27 @@ TEST_F(ProtobufUtilityTest, ValidateRecurseIntoAnyUnresolvableType) {
                           "Invalid type_url.*some.nonexistent.Type.*during traversal");
 }
 
+TEST_F(ProtobufUtilityTest, HasUnrecognizedFields) {
+  envoy::config::cluster::v3::Cluster cluster;
+  const absl::flat_hash_set<int> allowed_fields = {
+      envoy::config::cluster::v3::Cluster::kNameFieldNumber,
+      envoy::config::cluster::v3::Cluster::kAltStatNameFieldNumber,
+  };
+
+  // Empty message: no unrecognized fields.
+  EXPECT_FALSE(MessageUtil::hasUnrecognizedFields(cluster, allowed_fields));
+  EXPECT_FALSE(MessageUtil::hasUnrecognizedFieldsLite(cluster, allowed_fields));
+
+  // Only allowed fields set.
+  cluster.set_name("my_cluster");
+  cluster.set_alt_stat_name("my_alt_stat");
+  EXPECT_FALSE(MessageUtil::hasUnrecognizedFields(cluster, allowed_fields));
+  EXPECT_FALSE(MessageUtil::hasUnrecognizedFieldsLite(cluster, allowed_fields));
+
+  // Disallowed field set.
+  cluster.mutable_connect_timeout()->set_seconds(5);
+  EXPECT_TRUE(MessageUtil::hasUnrecognizedFields(cluster, allowed_fields));
+  EXPECT_TRUE(MessageUtil::hasUnrecognizedFieldsLite(cluster, allowed_fields));
+}
+
 } // namespace Envoy

@@ -29,7 +29,7 @@ namespace {
 
 // Validates that the max value of nanoseconds and seconds doesn't cause an
 // overflow in the protobuf time-util computations.
-absl::Status validateDurationNoThrow(const Protobuf::Duration& duration) {
+absl::Status validateDurationNoThrowHelper(const Protobuf::Duration& duration) {
   // Apply a strict max boundary to the `seconds` value to avoid overflow when
   // both seconds and nanoseconds are at their highest values.
   // Note that protobuf internally converts to the input's seconds and
@@ -55,7 +55,7 @@ absl::Status validateDurationNoThrow(const Protobuf::Duration& duration) {
 }
 
 void validateDuration(const Protobuf::Duration& duration) {
-  const absl::Status result = validateDurationNoThrow(duration);
+  const absl::Status result = validateDurationNoThrowHelper(duration);
   if (!result.ok()) {
     throwEnvoyExceptionOrPanic(std::string(result.message()));
   }
@@ -348,7 +348,7 @@ public:
       std::ignore = duration_message.MergeFromCord(message.SerializeAsCord());
 #endif
       // Validate the value of the duration.
-      RETURN_IF_NOT_OK(validateDurationNoThrow(duration_message));
+      RETURN_IF_NOT_OK(validateDurationNoThrowHelper(duration_message));
     }
     return absl::OkStatus();
   }
@@ -777,7 +777,7 @@ uint64_t DurationUtil::durationToMilliseconds(const Protobuf::Duration& duration
 
 absl::StatusOr<uint64_t>
 DurationUtil::durationToMillisecondsNoThrow(const Protobuf::Duration& duration) {
-  const absl::Status result = validateDurationNoThrow(duration);
+  const absl::Status result = validateDurationNoThrowHelper(duration);
   if (!result.ok()) {
     return result;
   }
@@ -787,6 +787,10 @@ DurationUtil::durationToMillisecondsNoThrow(const Protobuf::Duration& duration) 
 uint64_t DurationUtil::durationToSeconds(const Protobuf::Duration& duration) {
   validateDuration(duration);
   return Protobuf::util::TimeUtil::DurationToSeconds(duration);
+}
+
+absl::Status DurationUtil::validateDurationNoThrow(const Protobuf::Duration& duration) {
+  return validateDurationNoThrowHelper(duration);
 }
 
 void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
@@ -893,6 +897,41 @@ absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Messag
       absl::StrCat("Unable to parse file \"", path, "\" (type ", message.GetTypeName(), ")"));
 #endif
   return absl::OkStatus();
+}
+
+bool MessageUtil::hasUnrecognizedFields(const Protobuf::Message& message,
+                                        const absl::flat_hash_set<int>& allowed_field_numbers) {
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
+  const auto* reflection = message.GetReflection();
+  std::vector<const Protobuf::FieldDescriptor*> set_fields;
+  reflection->ListFields(message, &set_fields);
+  for (const auto* field : set_fields) {
+    if (!allowed_field_numbers.contains(field->number())) {
+      return true;
+    }
+  }
+  return false;
+#else
+  return hasUnrecognizedFieldsLite(message, allowed_field_numbers);
+#endif
+}
+
+bool MessageUtil::hasUnrecognizedFieldsLite(const Protobuf::MessageLite& message,
+                                            const absl::flat_hash_set<int>& allowed_field_numbers) {
+  std::string serialized = message.SerializeAsString();
+  Protobuf::io::CodedInputStream input(reinterpret_cast<const uint8_t*>(serialized.data()),
+                                       serialized.size());
+  uint32_t tag = 0;
+  while ((tag = input.ReadTag()) != 0) {
+    int field_number = Protobuf::internal::WireFormatLite::GetTagFieldNumber(tag);
+    if (!allowed_field_numbers.contains(field_number)) {
+      return true;
+    }
+    if (!Protobuf::internal::WireFormatLite::SkipField(&input, tag)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 } // namespace Envoy

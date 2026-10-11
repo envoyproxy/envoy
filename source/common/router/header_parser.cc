@@ -285,5 +285,29 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
   return transforms;
 }
 
+void HeaderParser::translateHeaderValueOption(
+    envoy::config::core::v3::HeaderValueOption& header_value_option) {
+  if (header_value_option.has_header() && !header_value_option.header().value().empty()) {
+    const std::string& value = header_value_option.header().value();
+    if (value.find('%') != std::string::npos) {
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.remove_legacy_route_formatter")) {
+        std::string final_header_value = HeaderParser::translateMetadataFormat(value);
+        final_header_value = HeaderParser::translatePerRequestState(final_header_value);
+        if (final_header_value != value) {
+          header_value_option.mutable_header()->set_value(final_header_value);
+        }
+      }
+    }
+  }
+}
+
+void HeaderParser::translateHeaderValueOptions(
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add) {
+  for (auto& header_value_option : headers_to_add) {
+    translateHeaderValueOption(header_value_option);
+  }
+}
+
 } // namespace Router
 } // namespace Envoy
