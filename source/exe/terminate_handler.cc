@@ -6,6 +6,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
+#include "source/common/coroutine/backtrace.h"
 #include "source/server/backtrace.h"
 
 #include "absl/strings/str_format.h"
@@ -19,6 +20,8 @@ std::terminate_handler TerminateHandler::logOnTerminate() const {
   return std::set_terminate([]() {
     logException(std::current_exception());
     BACKTRACE_LOG();
+    Coroutine::Backtrace co_backtrace;
+    co_backtrace.logTrace();
     std::abort();
   });
 }
