@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
+
+#include "envoy/buffer/buffer.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/http/message_impl.h"
@@ -21,6 +24,23 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
+namespace {
+
+// Lets a request body take ownership of a string without copying it.
+class StringBufferFragment : public Buffer::BufferFragment {
+public:
+  explicit StringBufferFragment(std::string&& data) : data_(std::move(data)) {}
+
+  // Buffer::BufferFragment
+  const void* data() const override { return data_.data(); }
+  size_t size() const override { return data_.size(); }
+  void done() override { delete this; }
+
+private:
+  const std::string data_;
+};
+
+} // namespace
 
 AgentHTTPClient::AgentHTTPClient(Upstream::ClusterManager& cluster_manager,
                                  const std::string& cluster, const std::string& reference_host,
@@ -61,7 +81,10 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   RequestHeaderWriter writer{message->headers()};
   set_headers(writer);
 
-  message->body().add(body);
+  // The body holds every trace collected since the last flush, which can be several megabytes.
+  if (!body.empty()) {
+    message->body().addBufferFragment(*new StringBufferFragment(std::move(body)));
+  }
 
   const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
       deadline - time_source_.monotonicTime());
@@ -78,7 +101,7 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   }
 
   ENVOY_LOG(debug, "submitting data to {} with payload size {} and {} ms timeout", url.path,
-            body.size(), timeout.count());
+            message->body().length(), timeout.count());
 
   Upstream::ThreadLocalCluster* collector_cluster =
       cluster_manager_.getThreadLocalCluster(cluster_);
