@@ -290,7 +290,8 @@ private:
 
   // The origin for this pool.
   // Note the host name here is based off of the host name used for SNI, which
-  // may be from the cluster config, or the request headers for auto-sni.
+  // may be from the cluster config, the upstream host's hostname, or the request
+  // headers for auto-sni.
   HttpServerPropertiesCache::Origin origin_;
 
   Http::PersistentQuicInfo& quic_info_;
