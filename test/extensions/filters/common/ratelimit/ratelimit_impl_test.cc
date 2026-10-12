@@ -38,19 +38,16 @@ public:
   void complete(LimitStatus status, DescriptorStatusListPtr&& descriptor_statuses,
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
                 Http::RequestHeaderMapPtr&& request_headers_to_add,
-                const std::string& response_body, DynamicMetadataPtr&& dynamic_metadata,
-                bool shadow_over_limit) override {
+                const std::string& response_body, DynamicMetadataPtr&& dynamic_metadata) override {
     complete_(status, descriptor_statuses.get(), response_headers_to_add.get(),
-              request_headers_to_add.get(), response_body, dynamic_metadata.get(),
-              shadow_over_limit);
+              request_headers_to_add.get(), response_body, dynamic_metadata.get());
   }
 
   MOCK_METHOD(void, complete_,
               (LimitStatus status, const DescriptorStatusList* descriptor_statuses,
                const Http::ResponseHeaderMap* response_headers_to_add,
                const Http::RequestHeaderMap* request_headers_to_add,
-               const std::string& response_body, const Protobuf::Struct* dynamic_metadata,
-               bool shadow_over_limit));
+               const std::string& response_body, const Protobuf::Struct* dynamic_metadata));
 };
 
 class RateLimitGrpcClientTest : public testing::Test {
@@ -95,7 +92,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     response = Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _, _, _, _, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _, _, _, _));
     client_.onSuccess(std::move(response), span_);
   }
 
@@ -114,7 +111,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     response = Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _));
     client_.onSuccess(std::move(response), span_);
   }
 
@@ -131,7 +128,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
                   Tracing::NullSpan::instance(), stream_info_);
 
     response = Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>();
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _, _, _, _, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _, _, _, _));
     client_.onFailure(Grpc::Status::Unknown, "", span_);
   }
 
@@ -154,7 +151,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     response = Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _));
     client_.onSuccess(std::move(response), span_);
   }
 }
@@ -198,7 +195,7 @@ TEST_F(RateLimitGrpcClientTest, RequestWithHitsAddend) {
   response = Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>();
   response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT);
   EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
-  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _, _, _, _, _));
+  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _, _, _, _));
   client_.onSuccess(std::move(response), span_);
 }
 
@@ -230,7 +227,7 @@ TEST_F(RateLimitGrpcClientTest, RequestWithPerDescriptorHitsAddend) {
   response = Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>();
   response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT);
   EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
-  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _, _, _, _, _));
+  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _, _, _, _));
   client_.onSuccess(std::move(response), span_);
 }
 
@@ -268,20 +265,7 @@ TEST_F(RateLimitGrpcClientTest, RequestWithPerDescriptorIsNegativeHits) {
   response = Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>();
   response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
   EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
-  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _, _));
-  client_.onSuccess(std::move(response), span_);
-}
-
-TEST_F(RateLimitGrpcClientTest, ShadowOverLimit) {
-  EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
-  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
-                stream_info_, 0);
-
-  auto response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
-  response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
-  response->set_shadow_over_limit(true);
-  EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
-  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _, true));
+  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _));
   client_.onSuccess(std::move(response), span_);
 }
 
@@ -310,7 +294,7 @@ TEST_F(RateLimitGrpcClientTest, SendRequestAndDetach) {
 
     response = Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>();
     response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _));
     client_.onSuccess(std::move(response), span_);
   }
 
@@ -332,7 +316,7 @@ TEST_F(RateLimitGrpcClientTest, SendRequestAndDetach) {
     client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
                   stream_info_, 0);
 
-    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _, _, _, _, _));
+    EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _, _, _, _));
     client_.onFailure(Grpc::Status::Unknown, "", span_);
 
     // Detach should be no-op since the request has already failed.

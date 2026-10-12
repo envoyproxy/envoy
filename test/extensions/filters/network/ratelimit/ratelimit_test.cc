@@ -148,7 +148,7 @@ TEST_F(RateLimitFilterTest, OK) {
 
   EXPECT_CALL(filter_callbacks_, continueReading());
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -159,7 +159,7 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
 }
 
-TEST_F(RateLimitFilterTest, ShadowOverLimit) {
+TEST_F(RateLimitFilterTest, ShadowModeDescriptor) {
   InSequence s;
   setUpTest(filter_config_);
 
@@ -173,8 +173,11 @@ TEST_F(RateLimitFilterTest, ShadowOverLimit) {
 
   EXPECT_CALL(filter_callbacks_, continueReading());
   EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
-                               nullptr, "", nullptr, true);
+  auto descriptor_statuses =
+      std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  (*descriptor_statuses)[1].set_shadow_over_limit(true);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
+                               std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);
 
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.shadow_over_limit").value());
@@ -208,7 +211,7 @@ TEST_F(RateLimitFilterTest, SubstitutionFormatterTest1) {
 
   EXPECT_CALL(filter_callbacks_, continueReading());
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -259,7 +262,7 @@ TEST_F(RateLimitFilterTest, SubstitutionFormatterTest2) {
 
   EXPECT_CALL(filter_callbacks_, continueReading());
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -287,7 +290,7 @@ TEST_F(RateLimitFilterTest, OverLimit) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*client_, cancel()).Times(0);
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -327,7 +330,7 @@ TEST_F(RateLimitFilterTest, OverLimitWithDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*client_, cancel()).Times(0);
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr, nullptr,
-                               nullptr, "", std::move(dynamic_metadata), false);
+                               nullptr, "", std::move(dynamic_metadata));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -356,7 +359,7 @@ TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
   EXPECT_CALL(*client_, cancel()).Times(0);
   EXPECT_CALL(filter_callbacks_, continueReading());
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -381,7 +384,7 @@ TEST_F(RateLimitFilterTest, Error) {
 
   EXPECT_CALL(filter_callbacks_, continueReading());
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -422,7 +425,7 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
           })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -446,7 +449,7 @@ TEST_F(RateLimitFilterTest, ImmediateError) {
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             callbacks.complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
           })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -489,7 +492,7 @@ TEST_F(RateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
-                               nullptr, "", nullptr, false);
+                               nullptr, "", nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -590,7 +593,7 @@ stat_prefix: name
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool)));
 
   request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
-                              nullptr, nullptr, "", nullptr, false);
+                              nullptr, nullptr, "", nullptr);
   conn_pool.poolReady(upstream_connection);
 
   Buffer::OwnedImpl buffer("hello");

@@ -55,7 +55,7 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message RateLimitResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitResponse";
@@ -143,7 +143,7 @@ message RateLimitResponse {
     string id = 3;
   }
 
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message DescriptorStatus {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.ratelimit.v2.RateLimitResponse.DescriptorStatus";
@@ -185,6 +185,12 @@ message RateLimitResponse {
     //    :ref:`overall_code <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code>`.
     // [#not-implemented-hide:]
     Quota quota = 5;
+
+    // Whether the descriptor exceeded its limit but the server did not enforce it because the
+    // limit is in shadow mode. When this is set, ``code`` is ``OK``. Informational only: the
+    // client increments the ``shadow_over_limit`` stat and does not change how it handles the
+    // request.
+    bool shadow_over_limit = 6;
   }
 
   // The overall response code which takes into account all of the descriptors that were passed
@@ -228,8 +234,4 @@ message RateLimitResponse {
   // the request will be treated as OVER_LIMIT.
   // [#not-implemented-hide:]
   Quota quota = 7;
-
-  // Whether any descriptor exceeded its limit but was not enforced because it is in shadow mode.
-  // Informational only and independent of ``overall_code``.
-  bool shadow_over_limit = 8;
 }

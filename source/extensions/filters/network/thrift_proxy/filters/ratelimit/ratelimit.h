@@ -80,8 +80,7 @@ public:
                 Http::ResponseHeaderMapPtr&& response_headers_to_add,
                 Http::RequestHeaderMapPtr&& request_headers_to_add,
                 const std::string& response_body,
-                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
-                bool shadow_over_limit) override;
+                Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) override;
 
 private:
   void initiateCall(const ThriftProxy::MessageMetadata& metadata);

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ratelimit/ratelimit.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -219,8 +220,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
                       Http::RequestHeaderMapPtr&& request_headers_to_add,
                       const std::string& response_body,
-                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata,
-                      bool shadow_over_limit) {
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
@@ -231,7 +231,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), *dynamic_metadata);
   }
 
-  if (shadow_over_limit) {
+  if (descriptor_statuses != nullptr &&
+      std::any_of(descriptor_statuses->begin(), descriptor_statuses->end(),
+                  [](const auto& descriptor_status) {
+                    return descriptor_status.shadow_over_limit();
+                  })) {
     cluster_->statsScope().counterFromStatName(stat_names.shadow_over_limit_).inc();
   }
 
@@ -390,7 +394,7 @@ void OnStreamDoneCallBack::complete(Filters::Common::RateLimit::LimitStatus,
                                     Filters::Common::RateLimit::DescriptorStatusListPtr&&,
                                     Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&,
                                     const std::string&,
-                                    Filters::Common::RateLimit::DynamicMetadataPtr&&, bool) {
+                                    Filters::Common::RateLimit::DynamicMetadataPtr&&) {
   self_.reset();
 }
 
