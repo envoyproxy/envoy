@@ -185,7 +185,7 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       filter_factories_.push_back(
           udp_session_filter_config_provider_manager_->createDynamicFilterConfigProvider(
               filter.config_discovery(), filter.name(), context.serverFactoryContext(), context,
-              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr));
+              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr, ""));
       continue;
     }
 
