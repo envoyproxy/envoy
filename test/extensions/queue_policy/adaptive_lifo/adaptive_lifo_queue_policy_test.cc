@@ -187,14 +187,14 @@ TEST_F(AdaptiveLifoQueueFactoryTest, RejectsInvalidWatermarkRelationships) {
 
 TEST_F(AdaptiveLifoQueueFactoryTest, RejectsMissingWatermarks) {
   AdaptiveLifoQueuePolicyConfig config;
-  EXPECT_THROW(createQueue(config), ProtoValidationException);
+  EXPECT_THROW(static_cast<void>(createQueue(config)), ProtoValidationException);
 }
 
 TEST_F(AdaptiveLifoQueueFactoryTest, RejectsPercentageAboveOneHundred) {
   AdaptiveLifoQueuePolicyConfig config;
   config.mutable_high_watermark()->set_value(101);
   config.mutable_low_watermark()->set_value(50);
-  EXPECT_THROW(createQueue(config), ProtoValidationException);
+  EXPECT_THROW(static_cast<void>(createQueue(config)), ProtoValidationException);
 }
 
 } // namespace

@@ -22,13 +22,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Requests are dequeued in FIFO order until the queue size reaches the high watermark. Requests
 // are then dequeued in LIFO order until the queue size reaches or falls below the low watermark.
-// [#next-free-field: 3]
 message AdaptiveLifoQueuePolicyConfig {
   // Percentage of the circuit breaker limit at which the queue switches from FIFO to LIFO
   // ordering. This must be greater than zero and greater than ``low_watermark``.
-  envoy.type.v3.Percent high_watermark = 1 [(validate.rules).message = {required: true}];
+  type.v3.Percent high_watermark = 1 [(validate.rules).message = {required: true}];
 
   // Percentage of the circuit breaker limit at or below which the queue switches from LIFO back to
   // FIFO ordering. This may be zero and must be less than ``high_watermark``.
-  envoy.type.v3.Percent low_watermark = 2 [(validate.rules).message = {required: true}];
+  type.v3.Percent low_watermark = 2 [(validate.rules).message = {required: true}];
 }
