@@ -17,26 +17,9 @@ namespace {
 class PriorityLoadShedIntegrationTest : public BaseOverloadIntegrationTest,
                                         public HttpProtocolIntegrationTest {
 protected:
-  void initializeOverloadManager(const envoy::config::overload::v3::OverloadManager& config) {
-    overload_manager_config_ = config;
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
-    });
-    initialize();
-    updateResource(0);
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(Protocols, PriorityLoadShedIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2,
-                              Http::CodecClient::Type::HTTP3},
-                             {FakeHttpConnection::Type::HTTP1})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-TEST_P(PriorityLoadShedIntegrationTest, UsesBucketLoadShedPoints) {
-  autonomous_upstream_ = true;
-  config_helper_.prependFilter(R"EOF(
+  // Priorities 0-15 map to the high priority bucket, 16-31 to the low priority bucket.
+  void initializeFilterAndOverloadManager() {
+    config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.priority_load_shed
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.priority_load_shed.v3.PriorityLoadShed
@@ -48,8 +31,8 @@ typed_config:
     load_shed_point: envoy.load_shed_points.priority.low
 )EOF");
 
-  initializeOverloadManager(
-      TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(R"EOF(
+    overload_manager_config_ =
+        TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(R"EOF(
       refresh_interval:
         seconds: 0
         nanos: 1000000
@@ -68,7 +51,25 @@ typed_config:
         - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
           threshold:
             value: 0.70
-    )EOF"));
+    )EOF");
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+    initialize();
+    updateResource(0);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, PriorityLoadShedIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2,
+                              Http::CodecClient::Type::HTTP3},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(PriorityLoadShedIntegrationTest, UsesBucketLoadShedPoints) {
+  autonomous_upstream_ = true;
+  initializeFilterAndOverloadManager();
 
   auto send_request_with_priority = [this](int priority) {
     auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -110,32 +111,7 @@ typed_config:
 
 TEST_P(PriorityLoadShedIntegrationTest, RejectsMissingHeader) {
   autonomous_upstream_ = true;
-  config_helper_.prependFilter(R"EOF(
-name: envoy.filters.http.priority_load_shed
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.priority_load_shed.v3.PriorityLoadShed
-  header_name: x-message-priority
-  buckets:
-  - value_range: { start: 0, end: 32 }
-    load_shed_point: envoy.load_shed_points.priority.high
-)EOF");
-
-  initializeOverloadManager(
-      TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(R"EOF(
-      refresh_interval:
-        seconds: 0
-        nanos: 1000000
-      resource_monitors:
-      - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-        typed_config:
-          "@type": type.googleapis.com/test.common.config.DummyConfig
-      loadshed_points:
-      - name: "envoy.load_shed_points.priority.high"
-        triggers:
-        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-          threshold:
-            value: 0.70
-    )EOF"));
+  initializeFilterAndOverloadManager();
 
   updateResource(0.95);
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
@@ -155,32 +131,7 @@ typed_config:
 
 TEST_P(PriorityLoadShedIntegrationTest, RejectsInvalidHeader) {
   autonomous_upstream_ = true;
-  config_helper_.prependFilter(R"EOF(
-name: envoy.filters.http.priority_load_shed
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.priority_load_shed.v3.PriorityLoadShed
-  header_name: x-message-priority
-  buckets:
-  - value_range: { start: 0, end: 32 }
-    load_shed_point: envoy.load_shed_points.priority.high
-)EOF");
-
-  initializeOverloadManager(
-      TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(R"EOF(
-      refresh_interval:
-        seconds: 0
-        nanos: 1000000
-      resource_monitors:
-      - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-        typed_config:
-          "@type": type.googleapis.com/test.common.config.DummyConfig
-      loadshed_points:
-      - name: "envoy.load_shed_points.priority.high"
-        triggers:
-        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
-          threshold:
-            value: 0.70
-    )EOF"));
+  initializeFilterAndOverloadManager();
 
   updateResource(0.95);
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent",
