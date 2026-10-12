@@ -621,7 +621,7 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
-                                tls, *api);
+                                tls, *api, dispatcher);
   EXPECT_TRUE(secret_reader.clientSecret().empty());
   EXPECT_TRUE(secret_reader.hmacSecret().empty());
 
@@ -704,6 +704,21 @@ TEST_F(OAuth2Test, SecretsNotReadyReturnsServiceUnavailable) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(1, config_->stats().oauth_failure_.value());
+}
+
+// A request with no :path header (for example a plain CONNECT tunnel request, which the connection
+// manager does not reject) must not cause a null dereference. The filter should fail closed with a
+// BadRequest local reply and stop iteration rather than dereferencing the null :path.
+TEST_F(OAuth2Test, MissingPathReturnsBadRequest) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Connect},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "", _, _, "oauth_missing_path"));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
 }
 
 TEST_F(OAuth2Test, TlsClientAuthDoesNotRequireClientSecret) {
@@ -2328,7 +2343,8 @@ TEST_F(OAuth2Test, SdsSecretReaderMultiEntrySecretProvidesKeyAndKeyId) {
   SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   // The PEM is reachable only as the signing key — never as an OAuth client secret, which the
   // non-JWT auth types would send to the token endpoint.
@@ -2348,7 +2364,8 @@ TEST_F(OAuth2Test, SdsSecretReaderSingleValueSecretHasNoKeyId) {
   SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   EXPECT_EQ("pem-data", reader.clientSecret());
   EXPECT_EQ("pem-data", reader.privateKey());
@@ -2362,7 +2379,8 @@ TEST_F(OAuth2Test, SdsSecretReaderMissingClientSecretProviderYieldsEmptyValues) 
   SDSSecretReader reader(nullptr,
                          std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
                          factory_context_.server_factory_context_.threadLocal(),
-                         factory_context_.server_factory_context_.api());
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
 
   EXPECT_EQ("", reader.clientSecret());
   EXPECT_EQ("", reader.privateKey());

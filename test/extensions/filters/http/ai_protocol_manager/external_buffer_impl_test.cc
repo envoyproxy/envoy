@@ -257,6 +257,37 @@ TEST_F(InMemoryExternalBufferTest, WriteWithEndStreamAcknowledged) {
   EXPECT_EQ(buffer_.length(), 5);
 }
 
+// The factory produces a usable buffer when created with an optional content length hint.
+TEST_F(InMemoryExternalBufferTest, FactoryCreatesUsableBufferWithContentLengthHint) {
+  InMemoryExternalBufferFactory factory;
+  ExternalBufferPtr buffer = factory.createBuffer(*dispatcher_, 1024);
+  ASSERT_NE(buffer, nullptr);
+
+  buffer->write(std::make_unique<Buffer::OwnedImpl>("via-hinted-factory"), false,
+                [](ExternalBufferStatus) {});
+  drain();
+  EXPECT_EQ(buffer->length(), 18);
+}
+
+class TestExternalBufferConfigFactory : public ExternalBufferConfigFactory {
+public:
+  ExternalBufferFactorySharedPtr
+  createExternalBufferFactory(const Protobuf::Message&,
+                              Server::Configuration::ServerFactoryContext&) override {
+    return std::make_shared<InMemoryExternalBufferFactory>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+
+  std::string name() const override { return "envoy.ai_protocol_manager.external_buffer.test"; }
+};
+
+// ExternalBufferConfigFactory exposes the expected extension category.
+TEST_F(InMemoryExternalBufferTest, ExternalBufferConfigFactoryCategoryMatches) {
+  TestExternalBufferConfigFactory config_factory;
+  EXPECT_EQ(config_factory.category(), "envoy.ai_protocol_manager.external_buffer");
+}
+
 } // namespace
 } // namespace AiProtocolManager
 } // namespace HttpFilters

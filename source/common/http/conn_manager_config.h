@@ -549,6 +549,11 @@ public:
    * header.
    */
   virtual bool shouldStripTrailingHostDot() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should record per stream route resolution histograms.
+   */
+  virtual bool recordRouteResolutionStats() const PURE;
   /**
    * @return maximum requests for downstream.
    */

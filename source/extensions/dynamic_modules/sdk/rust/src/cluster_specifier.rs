@@ -10,6 +10,7 @@ use crate::{
   abi, ffi_export, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
   EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::ffi::c_void;
 use std::ptr;
@@ -26,7 +27,7 @@ pub enum ResourcePriority {
 }
 
 impl ResourcePriority {
-  fn to_abi(self) -> abi::envoy_dynamic_module_type_resource_priority {
+  pub(crate) fn to_abi(self) -> abi::envoy_dynamic_module_type_resource_priority {
     match self {
       Self::Default => abi::envoy_dynamic_module_type_resource_priority::Default,
       Self::High => abi::envoy_dynamic_module_type_resource_priority::High,
@@ -68,25 +69,15 @@ impl ClusterSpecifierContext {
   ///
   /// Returns an empty vector when there are no headers.
   pub fn get_all_request_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let count = self.get_request_headers_count();
-    if count == 0 {
-      return Vec::new();
-    }
-    // Fill the pairs in place as ABI headers to avoid a second allocation.
-    let mut headers: Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> = Vec::with_capacity(count);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
-        self.envoy_ptr,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !success {
-      return Vec::new();
-    }
-    unsafe {
-      headers.set_len(count);
-    }
-    headers
+    crate::utility::collect_headers(
+      || self.get_request_headers_count(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
+          self.envoy_ptr,
+          headers,
+        )
+      },
+    )
   }
 
   /// Get the first value of the request header with the given key.
@@ -529,7 +520,7 @@ pub trait ClusterSpecifierConfig: Send + Sync {
 /// config creation and can be recorded at any point during selection.
 ///
 /// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyClusterSpecifierMetrics: Send + Sync {
   // -------------------------------------------------------------------------

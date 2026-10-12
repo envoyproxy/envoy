@@ -965,16 +965,17 @@ TEST_F(ExecInNetnsTest, Basic) {
   EXPECT_THAT(result, IsOkAndHolds("ns1"));
 
   // Make sure the netns reverted back to the netns the execInNetworkNamespace function was called
-  // from. When the netns was noted before making the jump, it used the fd of "/proc/self/ns/net"
-  // and that is what would show up for the test.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  // from. When the netns was noted before making the jump, it used the fd of the calling thread's
+  // own namespace, "/proc/thread-self/ns/net" (not "/proc/self/ns/net", which is the main
+  // thread's), and that is what would show up for the test.
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 
   // Try another netns.
   result = Utility::execInNetworkNamespace(func, "ns2");
   EXPECT_THAT(result, IsOkAndHolds("ns2"));
 
   // Make sure the netns reverted back.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 }
 
 TEST_F(ExecInNetnsTest, OpenFail) {

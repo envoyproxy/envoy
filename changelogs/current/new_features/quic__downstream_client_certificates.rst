@@ -8,9 +8,12 @@ and the handshake still succeeds if the client presents no certificate. Whenever
 presents a certificate, its fields are exposed to consumers such as ``x-forwarded-client-cert``,
 RBAC, and access logs, and it is validated against the trust anchor of the filter chain matched for
 the connection unless ``trust_chain_verification`` is ``ACCEPT_UNTRUSTED``. A filter chain that
-requires a client certificate must also configure ``validation_context.trusted_ca``. Session
-resumption and early data default to off on filter chains that configure a validation context,
-because QUIC does not re-validate the client certificate when a session is resumed.
+requires a client certificate must also configure a validation context that can act on the
+presented chain, that is one with a ``trusted_ca``, a ``custom_validator_config``, or
+``trust_chain_verification`` set to ``ACCEPT_UNTRUSTED``. The validation context may be delivered
+over SDS, in which case handshakes are rejected until the secret arrives. Session resumption and
+early data default to off on filter chains that configure an inline validation context, because
+QUIC does not re-validate the client certificate when a session is resumed.
 
 This behavior can be reverted by setting the runtime guard
 ``envoy.reloadable_features.quic_mtls_server_enabled`` to ``false``, which restores the previous

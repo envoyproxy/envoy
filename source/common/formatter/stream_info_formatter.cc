@@ -1070,60 +1070,71 @@ public:
   using FieldExtractor =
       std::function<std::optional<std::chrono::nanoseconds>(const StreamInfo::StreamInfo&)>;
 
-  StreamInfoDurationFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
+  StreamInfoDurationFormatterProvider(FieldExtractor f,
+                                      DurationPrecision precision = DurationPrecision::Milliseconds)
+      : field_extractor_(f), precision_(precision) {}
 
   // StreamInfoFormatterProvider
   std::optional<std::string> format(const Context&,
                                     const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return std::nullopt;
     }
 
-    return fmt::format_int(millis.value()).str();
+    return fmt::format_int(duration.value()).str();
   }
   bool formatTo(std::string& sink, const Context&,
                 const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return false;
     }
 
-    const fmt::format_int formatted(millis.value());
+    const fmt::format_int formatted(duration.value());
     sink.append(formatted.data(), formatted.size());
     return true;
   }
   Protobuf::Value formatValue(const Context&,
                               const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
 
-    return ValueUtil::numberValue(millis.value());
+    return ValueUtil::numberValue(duration.value());
   }
   void formatValueTo(ValueSink& sink, const Context&,
                      const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       // Keep the sink unmodified if no value is extracted and the caller can decide how to
       // handle the missing value.
       return;
     }
 
-    sink.addNumber(millis.value());
+    sink.addNumber(duration.value());
   }
 
 private:
-  std::optional<int64_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
+  std::optional<int64_t> extractDuration(const StreamInfo::StreamInfo& stream_info) const {
     const auto time = field_extractor_(stream_info);
-    if (time) {
-      return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
+    if (!time) {
+      return std::nullopt;
     }
-    return std::nullopt;
+    switch (precision_) {
+    case DurationPrecision::Milliseconds:
+      return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
+    case DurationPrecision::Microseconds:
+      return std::chrono::duration_cast<std::chrono::microseconds>(time.value()).count();
+    case DurationPrecision::Nanoseconds:
+      return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value()).count();
+    }
+    PANIC("Invalid duration precision");
   }
 
   FieldExtractor field_extractor_;
+  DurationPrecision precision_;
 };
 
 // StreamInfo uint64_t field extractor.
@@ -1723,6 +1734,27 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoDurationFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        return stream_info.currentDuration();
+                                     });
+                               }}},
+                             {"ROUTE_RESOLUTION_TIME_US",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<std::chrono::nanoseconds> {
+                                       if (stream_info.routeResolutionCount() == 0) {
+                                         return std::nullopt;
+                                       }
+                                       return stream_info.routeResolutionTime();
+                                     },
+                                     DurationPrecision::Microseconds);
+                               }}},
+                             {"ROUTE_RESOLUTION_COUNT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) -> uint64_t {
+                                       return stream_info.routeResolutionCount();
                                      });
                                }}},
                              {"COMMON_DURATION",

@@ -698,6 +698,78 @@ TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeadersAfterMutation) {
   EXPECT_EQ(headers.getContentLengthValue(), absl::StrCat(output.size()));
 }
 
+// Receives the request and passes it on without editing it.
+class ReadOnlyFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    EXPECT_EQ(req->json()["model"], "gpt-4");
+    co_return co_await std::move(propagate_request)(std::move(req));
+  }
+};
+
+class FilterManagerReserializationTest : public FilterManagerTest {
+public:
+  // Key order, spacing and number formatting that re-serialization does not reproduce.
+  static constexpr absl::string_view kReceived =
+      "{ \"model\" : \"gpt-4\",\n  \"z\": 1, \"a\": 2.50 }";
+
+  // Buffers the body as the AI Protocol Manager does before parsing it.
+  JsonWithExtBuf receive() {
+    Buffer::OwnedImpl data(kReceived);
+    buffer_manager_.onData(data);
+    buffer_manager_.endStream();
+    JsonWithExtBuf doc;
+    doc.setJson(nlohmann::json::parse(kReceived));
+    return doc;
+  }
+
+  absl::Status run(AiFilterSharedPtr filter, bool always_serialize) {
+    std::vector<AiFilterSharedPtr> filters;
+    filters.push_back(std::move(filter));
+    FilterManager manager(std::move(filters));
+    absl::Status status = absl::UnknownError("request did not complete");
+    manager.startRequest(
+        receive(), &buffer_manager_, *dispatcher_, stream_info_,
+        [&status](absl::Status s) { status = std::move(s); }, &headers_,
+        /*local_reply_fn=*/nullptr, always_serialize);
+    drain();
+    return status;
+  }
+
+  Http::TestRequestHeaderMapImpl headers_{{":method", "POST"},
+                                          {":path", "/chat/completions"},
+                                          {"content-length", absl::StrCat(kReceived.size())}};
+};
+
+TEST_F(FilterManagerReserializationTest, SerializesByDefault) {
+  ASSERT_OK(run(std::make_unique<ReadOnlyFilter>(), /*always_serialize=*/true));
+
+  const std::string output = bridge_.injected_.toString();
+  EXPECT_NE(output, kReceived);
+  EXPECT_EQ(nlohmann::json::parse(output), nlohmann::json::parse(kReceived));
+  EXPECT_EQ(headers_.getContentLengthValue(), absl::StrCat(output.size()));
+}
+
+TEST_F(FilterManagerReserializationTest, DisabledForwardsTheReceivedBody) {
+  ASSERT_OK(run(std::make_unique<ReadOnlyFilter>(), /*always_serialize=*/false));
+
+  EXPECT_EQ(bridge_.injected_.toString(), kReceived);
+  EXPECT_EQ(headers_.getContentLengthValue(), absl::StrCat(kReceived.size()));
+  auto* fs = stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
+      APMRequestPayloadIndex::kFilterStateKey);
+  ASSERT_NE(fs, nullptr);
+  EXPECT_EQ(fs->index().json()["model"], "gpt-4");
+}
+
+TEST_F(FilterManagerReserializationTest, DisabledDoesNotSendFilterEdits) {
+  ASSERT_OK(run(std::make_unique<TestMutationFilter>("gpt-4-turbo"), /*always_serialize=*/false));
+
+  EXPECT_EQ(bridge_.injected_.toString(), kReceived);
+}
+
 TEST_F(FilterManagerTest, DoesNotSetContentLengthWhenNotPreviouslyPresent) {
   JsonWithExtBuf doc;
   doc.setJson(nlohmann::json{{"model", "gpt-4"}});

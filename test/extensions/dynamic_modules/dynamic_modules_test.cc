@@ -15,6 +15,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/ascii.h"
@@ -137,6 +138,23 @@ TEST(DynamicModuleTestLanguages, LoadLibGlobally) {
   EXPECT_EQ(getSomeVariable.value()(), 42);
 }
 
+// By default the loader binds now (RTLD_NOW), resolving every referenced symbol at load. The
+// runtime guard reverts it to lazy binding (RTLD_LAZY). A self-contained module loads under both
+// bindings, so loading it in each mode exercises both branches of the binding-mode selection.
+TEST(DynamicModuleTestLanguages, RtldNowIsDefaultAndRuntimeGuardReverts) {
+  // Default: RTLD_NOW. A self-contained module resolves every symbol at load.
+  absl::StatusOr<DynamicModulePtr> now_module =
+      newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_OK(now_module);
+
+  // The runtime guard reverts the loader to RTLD_LAZY. The module still loads with lazy binding.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.dynamic_modules_rtld_now", "false"}});
+  absl::StatusOr<DynamicModulePtr> lazy_module =
+      newDynamicModule(testSharedObjectPath("no_op", "c"), false);
+  EXPECT_OK(lazy_module);
+}
+
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
   std::string language = GetParam();
   EXPECT_LOG_CONTAINS("error", "Failed to resolve symbol envoy_dynamic_module_on_program_init", {
@@ -158,11 +176,15 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 }
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
-  // We expect a warning log for ABI version mismatch but still load the module successfully.
+  // We expect a warning log for ABI version mismatch but still load the module successfully. The
+  // log carries the module version string, which confirms it was copied out of module memory. This
+  // module has a dedicated version so it is loaded fresh and on_program_init runs the check.
   std::string language = GetParam();
-  absl::StatusOr<DynamicModulePtr> result =
-      newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
-  EXPECT_OK(result);
+  EXPECT_LOG_CONTAINS("warn", "invalid-version-hash is deprecated", {
+    absl::StatusOr<DynamicModulePtr> result =
+        newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
+    EXPECT_OK(result);
+  });
 }
 
 TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathSet) {

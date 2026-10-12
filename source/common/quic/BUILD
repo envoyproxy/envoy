@@ -611,6 +611,7 @@ envoy_cc_library(
         "//source/common/tls:server_ssl_socket_lib",
         "@quiche//:quic_core_crypto_crypto_handshake_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ]),
     alwayslink = LEGACY_ALWAYSLINK,
 )

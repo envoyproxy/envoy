@@ -462,17 +462,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
   parent_.updateActiveStreamsOnEncode(*this);
-  ASSERT(parent_.allow_metadata_);
-  NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
-  auto sources_vec = metadata_encoder.createSources(metadata_map_vector);
-  for (auto& source : sources_vec) {
-    parent_.adapter_->SubmitMetadata(stream_id_, 16 * 1024, std::move(source));
-  }
-
-  if (parent_.sendPendingFramesAndHandleError()) {
-    // Intended to check through coverage that this error case is tested
-    return;
-  }
+  parent_.encodeMetadata(metadata_map_vector, stream_id_);
 }
 
 void ConnectionImpl::StreamImpl::processBufferedData() {
@@ -940,13 +930,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
                                               reasonToReset(reason, response_end_stream_sent)));
 }
 
-NewMetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
-  if (metadata_encoder_ == nullptr) {
-    metadata_encoder_ = std::make_unique<NewMetadataEncoder>();
-  }
-  return *metadata_encoder_;
-}
-
 MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
   if (metadata_decoder_ == nullptr) {
     auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
@@ -1053,6 +1036,24 @@ void ConnectionImpl::sendKeepalive() {
     return;
   }
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
+}
+
+void ConnectionImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector,
+                                    int32_t stream_id) {
+  if (!allow_metadata_) {
+    ENVOY_BUG(false, "metadata not allowed on this connection");
+    return;
+  }
+  NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
+  auto sources_vec = metadata_encoder.createSources(metadata_map_vector);
+  for (auto& source : sources_vec) {
+    adapter_->SubmitMetadata(stream_id, 16 * 1024, std::move(source));
+  }
+
+  if (sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
 }
 
 void ConnectionImpl::onKeepaliveResponse() {
@@ -1641,6 +1642,11 @@ Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
+  if (!stream_id) {
+    bool success = getMetadataDecoder().receiveMetadata(data, len);
+    return success ? 0 : ERR_CALLBACK_FAILURE;
+  }
+
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
     if (!stream) {
@@ -1657,6 +1663,11 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
 int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata) {
   ENVOY_CONN_LOG(trace, "recv METADATA frame on stream {}, end_metadata: {}", connection_,
                  stream_id, end_metadata);
+
+  if (!stream_id) {
+    bool success = getMetadataDecoder().onMetadataFrameComplete(end_metadata);
+    return success ? 0 : ERR_CALLBACK_FAILURE;
+  }
 
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
@@ -1907,7 +1918,9 @@ void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
   }
 }
 
-ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection) : connection_(connection) {}
+ConnectionImpl::Http2Visitor::Http2Visitor(ConnectionImpl* connection)
+    : connection_(connection), mask_continuation_flags_(Runtime::runtimeFeatureEnabled(
+                                   "envoy.reloadable_features.http2_mask_continuation_flags")) {}
 
 int64_t ConnectionImpl::Http2Visitor::OnReadyToSend(absl::string_view serialized) {
   return connection_->onSend(reinterpret_cast<const uint8_t*>(serialized.data()),
@@ -1976,7 +1989,14 @@ bool ConnectionImpl::Http2Visitor::OnFrameHeader(Http2StreamId stream_id, size_t
       return false;
     }
     current_frame_.length += length;
-    current_frame_.flags |= flags;
+    if (mask_continuation_flags_) {
+      // Retain only known flags per RFC 9113 §6.10 (only END_HEADERS is defined; all other flags
+      // are reserved and must be ignored per §4.1).
+      static constexpr uint8_t CONTINUATION_END_HEADERS_FLAG = 0x04;
+      current_frame_.flags |= (flags & CONTINUATION_END_HEADERS_FLAG);
+    } else {
+      current_frame_.flags |= flags;
+    }
   } else {
     current_frame_ = {stream_id, length, type, flags};
     padding_length_ = 0;
@@ -2408,10 +2428,12 @@ ClientConnectionImpl::ClientConnectionImpl(
   if (!use_oghttp2_library_) {
 #ifdef ENVOY_NGHTTP2
     adapter_ = http2_session_factory.create(base(), client_http2_options.options());
+    stats_.nghttp2_upstream_connections_.inc();
 #endif
   }
   if (!adapter_) {
     adapter_ = http2_session_factory.create(base(), client_http2_options.ogOptions());
+    stats_.oghttp2_upstream_connections_.inc();
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
@@ -2462,6 +2484,31 @@ StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
   return StreamResetReason::ProtocolError;
 }
 
+void ConnectionImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
+  if (metadata_map_ptr->empty()) {
+    ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", connection_);
+    return stats_.metadata_empty_frames_.inc();
+  }
+  callbacks().onMetadata(std::move(metadata_map_ptr));
+}
+
+NewMetadataEncoder& ConnectionImpl::getMetadataEncoder() {
+  if (metadata_encoder_ == nullptr) {
+    metadata_encoder_ = std::make_unique<NewMetadataEncoder>();
+  }
+  return *metadata_encoder_;
+}
+
+MetadataDecoder& ConnectionImpl::getMetadataDecoder() {
+  if (metadata_decoder_ == nullptr) {
+    auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
+      this->onMetadataDecoded(std::move(metadata_map_ptr));
+    };
+    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb, max_metadata_size_);
+  }
+  return *metadata_decoder_;
+}
+
 ServerConnectionImpl::ServerConnectionImpl(
     Network::Connection& connection, Http::ServerConnectionCallbacks& callbacks, CodecStats& stats,
     Random::RandomGenerator& random_generator,
@@ -2495,6 +2542,7 @@ ServerConnectionImpl::ServerConnectionImpl(
 #endif
     visitor_ = std::move(direct_visitor);
     adapter_ = http2::adapter::OgHttp2Adapter::Create(*visitor_, h2_options.ogOptions());
+    stats_.oghttp2_downstream_connections_.inc();
 #ifdef ENVOY_NGHTTP2
   } else {
     auto adapter =
@@ -2505,6 +2553,7 @@ ServerConnectionImpl::ServerConnectionImpl(
     direct_visitor->setStreamCloseListener(std::move(stream_close_listener));
     visitor_ = std::move(direct_visitor);
     adapter_ = std::move(adapter);
+    stats_.nghttp2_downstream_connections_.inc();
   }
 #endif
   sendSettings(http2_options, false);

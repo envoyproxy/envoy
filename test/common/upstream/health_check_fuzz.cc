@@ -142,8 +142,8 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   response_headers->setStatus(status);
 
   // Responding with http can cause client to close, if so create a new one.
-  const bool client_will_close =
-      Http::HeaderUtility::shouldCloseConnection(health_checker_->protocol(), *response_headers);
+  const bool client_will_close = Http::HeaderUtility::shouldCloseConnection(
+      health_checker_->configuredProtocol(), *response_headers);
 
   // Check if there is a response body.
   bool has_response_body = !respond.http_respond().body().empty();
@@ -209,7 +209,8 @@ void TcpHealthCheckFuzz::allocTcpHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<TcpHealthCheckerImpl>(
       *cluster_, config, context_.mainThreadDispatcher(), context_.runtime(),
-      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()),
+      Upstream::DefaultHealthFlagCallbacks::instance());
   ENVOY_LOG_MISC(trace, "Created Tcp Health Checker");
 }
 
@@ -325,7 +326,8 @@ void GrpcHealthCheckFuzz::allocGrpcHealthCheckerFromProto(
     const envoy::config::core::v3::HealthCheck& config) {
   health_checker_ = std::make_shared<NiceMock<TestGrpcHealthCheckerImpl>>(
       *cluster_, config, context_.mainThreadDispatcher(), context_.runtime(),
-      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+      context_.api().randomGenerator(), HealthCheckEventLoggerPtr(event_logger_storage_.release()),
+      Upstream::DefaultHealthFlagCallbacks::instance());
   ENVOY_LOG_MISC(trace, "Created Test Grpc Health Checker");
 }
 

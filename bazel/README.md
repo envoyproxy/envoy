@@ -95,32 +95,23 @@ for how to update or override dependencies.
     ### Linux
     Envoy uses a hermetic Clang toolchain that is automatically downloaded by Bazel, so you do not
     need to install Clang manually. Note that despite the toolchain being hermetic, `libxml2` must
-    be installed on the host (included in the package lists above). To use the hermetic toolchain,
-    add `--config=clang` to your build command:
+    be installed on the host (included in the package lists above). The hermetic toolchain is the
+    default and requires no compiler configuration flag:
     ```console
-    bazel build --config=clang envoy
+    bazel build envoy
     ```
 
-    If you want to make clang the default, add it to your `user.bazelrc`:
-    ```console
-    echo "build --config=clang" >> user.bazelrc
-    ```
-
-    Note: `libc++` is the recommended standard library for Envoy development and is automatically used with `--config=clang`.
+    Note: `libc++` is the recommended standard library for Envoy development and is automatically used with the default Clang toolchain.
 
     #### Compiler and Standard Library Configuration
     Envoy supports the following compiler toolchains:
 
-    - `--config=clang` (recommended): Uses `clang` compiler with `libc++` (LLVM standard library)
+    - No config flag (recommended): Uses the hermetic `clang` compiler with `libc++` (LLVM standard library)
     - `--config=gcc`: Uses `gcc` compiler with `libstdc++` (GNU standard library)
-    - No config flag: Uses system default compiler settings
 
-    Note: While it's possible to use `clang` with `libstdc++` by setting CC/CXX environment variables without a config flag, this combination is not tested or supported.
+    Note: The C++ standard library is derived from the compiler: clang (the default) and Apple builds use `libc++`, `--config=gcc` uses `libstdc++`. Other combinations such as clang with `libstdc++` are not supported or tested; if you need one, you will need to set up your own `cc_toolchain`.
 
-    For more granular control:
-    - `--config=clang-common`: Provides base clang configuration without standard library settings
-    - `--config=libc++`: Provides just the libc++ standard library flags
-    - `--config=libstdc++`: Provides just the libstdc++ standard library flags
+    The `--config=libc++` and `--config=libstdc++` configs are used internally (e.g. by `--config=gcc` and `bazel/setup_local_tsan.sh`) and are not intended for direct use.
 
 
     ### macOS
@@ -232,31 +223,26 @@ and Python). Downstream projects that embed Envoy may prefer to use the versions
 the build host instead. Under bzlmod this is done from the embedding project's own `MODULE.bazel`,
 by registering host toolchains so that they take precedence over Envoy's hermetic ones.
 
-To use a host-installed Clang/LLVM toolchain instead of the hermetic one downloaded
-by Bazel, add the following to your `user.bazelrc`:
+The CI-tested example in [`bazel/tests/codeql`](tests/codeql) shows how a downstream root module can
+select a host-installed Clang, libc++, and lld under bzlmod. It registers a `toolchains_llvm`
+toolchain rooted at the host installation and calls `envoy_llvm.host(...)` so Envoy targets that
+directly reference LLVM tools and libraries use the same installation. No Envoy `.bazelrc`
+compiler configuration is required.
 
-```
-build --repo_env=BAZEL_USE_HOST_SYSROOT=True
-build --repo_env=BAZEL_LLVM_PATH=/usr
-build --config=clang-local
-```
-
-`BAZEL_LLVM_PATH` should point to the root of your LLVM installation.
+The `envoy_llvm.host(path = ...)` extension detects the installed LLVM version by running
+`bin/clang --version`. Its optional `llvm_version` attribute can be set to cross-check the detected
+major version. This mechanism supports host LLVM versions other than 22; the separate
+`toolchains_llvm` toolchain's `llvm_version` must also match the installed host version.
 
 **Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
-hermetic toolchain versions are the only configuration tested in CI. Using host tools may result
-in build failures or unexpected behavior depending on the versions installed. This option is
-provided as a convenience for downstream repositories that build inside controlled environments
-(e.g. container-based CI) where tools are pre-installed at known versions. Upstream Envoy builds
-are unaffected when no host toolchains are registered.
+hermetic toolchain remains the supported default. Other host tools may fail depending on the build
+environment. Upstream Envoy builds are unaffected when no host toolchain is registered.
 
 ## Linking against libc++ on Linux
 
-When using `--config=clang`, Envoy is automatically linked against libc++. No additional configuration is needed.
+With the default Clang toolchain, Envoy is automatically linked against libc++. No additional configuration is needed.
 
 For remote execution or Docker sandbox builds, use `--config=remote-clang` or `--config=docker-clang` respectively.
-
-If you want to ensure clang with libc++ is always used by default, add `build --config=clang` to the `user.bazelrc` file in Envoy source root.
 
 ## Using a compiler toolchain in a non-standard location
 

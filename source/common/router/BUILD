@@ -42,6 +42,7 @@ envoy_cc_library(
         ":header_parser_lib",
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
+        ":path_rewrite_utility_lib",
         ":per_filter_config_lib",
         ":retry_policy_lib",
         ":retry_state_lib",
@@ -160,6 +161,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "path_rewrite_utility_lib",
+    srcs = ["path_rewrite_utility.cc"],
+    hdrs = ["path_rewrite_utility.h"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "//source/common/http:path_utility_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "config_utility_lib",
     srcs = ["config_utility.cc"],
     hdrs = ["config_utility.h"],
@@ -266,6 +278,7 @@ envoy_cc_library(
         "//envoy/router:route_config_provider_manager_interface",
         "//envoy/router:route_config_update_info_interface",
         "//source/common/router:route_config_update_impl_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -295,6 +308,7 @@ envoy_cc_library(
         "//source/common/rds:rds_lib",
         "//source/common/router:route_config_update_impl_lib",
         "//source/common/router:vhds_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

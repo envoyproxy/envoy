@@ -399,6 +399,12 @@ public:
         {"listener.admin.http.admin.downstream_rq_2xx",
          "listener.admin.http.downstream_rq_xx",
          {{hcm_prefix, "admin"}, {response_code_class, "2"}}},
+        // The router filter, `source/extensions/filters/http/router/config.cc`. It creates its
+        // stats in the server's scope with the connection manager's prefix in the name, rather
+        // than in the connection manager's scope, because its virtual host and route level stats
+        // are documented to live at the root. So the prefix tag comes from name extraction here.
+        {"http.config_test.no_route", "http.no_route", {{hcm_prefix, "config_test"}}},
+        {"http.config_test.rq_total", "http.rq_total", {{hcm_prefix, "config_test"}}},
         // The admin listener runs a connection manager too, with 'admin' as its stat prefix. As
         // with the listener address, the admin listener scope itself is not tagged.
         {"http.admin.downstream_rq_total", "http.downstream_rq_total", {{hcm_prefix, "admin"}}},

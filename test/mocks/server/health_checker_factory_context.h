@@ -33,6 +33,7 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(void, setEventLogger, (Upstream::HealthCheckEventLoggerPtr));
   MOCK_METHOD(Server::Configuration::ServerFactoryContext&, serverFactoryContext, ());
+  MOCK_METHOD(Upstream::HealthFlagCallbacks&, healthFlagCallbacks, ());
 
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     if (!event_logger_) {
@@ -49,6 +50,7 @@ public:
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   std::unique_ptr<testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>> event_logger_;
   testing::NiceMock<MockServerFactoryContext> server_context_;
+  Upstream::DefaultHealthFlagCallbacks default_health_flag_callbacks_;
 };
 
 } // namespace Configuration

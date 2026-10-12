@@ -1,14 +1,21 @@
 #include "source/extensions/http/ai_filters/request_info/filter.h"
 
+#include <cmath>
+#include <cstdint>
+#include <optional>
 #include <utility>
 
 #include "envoy/data/ai/v3/request_info.pb.h"
+#include "envoy/stream_info/filter_state.h"
 
-#include "source/common/coroutine/status_macros.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_conversion.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 #include "source/extensions/http/ai_filters/request_info/extractor.h"
 
+#include "absl/strings/string_view.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -17,10 +24,9 @@ namespace AiFilters {
 namespace RequestInfo {
 
 using HttpFilters::AiProtocolManager::AiFilterContext;
-using HttpFilters::AiProtocolManager::AiRequestPropagator;
-using HttpFilters::AiProtocolManager::AiRequestPtr;
-using HttpFilters::AiProtocolManager::AiRequestReceiver;
+using HttpFilters::AiProtocolManager::AiRequest;
 using HttpFilters::AiProtocolManager::LocalReplier;
+namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 
 namespace {
 
@@ -28,7 +34,7 @@ constexpr absl::string_view DefaultMetadataNamespace{"envoy.ai.request_info"};
 
 envoy::data::ai::v3::RequestInfo toProto(const RequestAttributes& attrs) {
   envoy::data::ai::v3::RequestInfo typed;
-  typed.set_input_api_protocol(HttpFilters::AiProtocolManager::protocolToProto(attrs.api_protocol));
+  typed.set_input_llm_protocol(HttpFilters::AiProtocolManager::protocolToProto(attrs.llm_protocol));
   typed.set_model(attrs.model);
   if (attrs.stream.has_value()) {
     typed.mutable_stream()->set_value(attrs.stream.value());
@@ -45,6 +51,12 @@ envoy::data::ai::v3::RequestInfo toProto(const RequestAttributes& attrs) {
   return typed;
 }
 
+// The payload is bounded by the manager's buffer limits and the ratio by 1.0, so the product
+// stays well inside the exactly-representable range.
+uint64_t estimateInputTokens(uint64_t payload_bytes, double tokens_per_byte) {
+  return static_cast<uint64_t>(std::ceil(static_cast<double>(payload_bytes) * tokens_per_byte));
+}
+
 } // namespace
 
 RequestInfoFilterConfig::RequestInfoFilterConfig(
@@ -53,21 +65,21 @@ RequestInfoFilterConfig::RequestInfoFilterConfig(
     : stats_(RequestInfoFilterStats{ALL_REQUEST_INFO_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "ai_protocol_manager.request_info."))}),
       metadata_namespace_(proto.metadata_namespace().empty() ? std::string(DefaultMetadataNamespace)
-                                                             : proto.metadata_namespace()) {}
+                                                             : proto.metadata_namespace()),
+      tokens_per_byte_(proto.has_token_estimation()
+                           ? std::make_optional(proto.token_estimation().tokens_per_byte())
+                           : std::nullopt) {}
 
 RequestInfoFilter::RequestInfoFilter(RequestInfoFilterConfigSharedPtr config,
                                      const AiFilterContext& context)
     : config_(std::move(config)), context_(context) {}
 
-Coroutine::Task<absl::Status> RequestInfoFilter::decode(AiRequestReceiver receive_request,
-                                                        AiRequestPropagator propagate_request,
-                                                        LocalReplier) {
-  ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
-  publish(request->json());
-  co_return co_await std::move(propagate_request)(std::move(request));
+absl::Status RequestInfoFilter::decodeSync(AiRequest& request, LocalReplier) {
+  publish(request);
+  return absl::OkStatus();
 }
 
-void RequestInfoFilter::publish(const nlohmann::json& json) {
+void RequestInfoFilter::publish(const AiRequest& request) {
   StreamInfo::StreamInfo& stream_info = context_.stream_info;
   if (stream_info.dynamicMetadata().typed_filter_metadata().contains(
           config_->metadataNamespace())) {
@@ -77,17 +89,34 @@ void RequestInfoFilter::publish(const nlohmann::json& json) {
     return;
   }
 
-  const RequestAttributes attrs = extractRequestAttributes(context_.request_protocol, json,
+  const RequestAttributes attrs = extractRequestAttributes(request.protocol(), request.json(),
                                                            context_.request_headers.getPathValue());
+  envoy::data::ai::v3::RequestInfo record = toProto(attrs);
+  if (config_->tokensPerByte().has_value()) {
+    record.mutable_estimated_input_tokens()->set_value(
+        estimateInputTokens(context_.request_payload_bytes, *config_->tokensPerByte()));
+  }
   Protobuf::Any typed_any;
-  MessageUtil::packFrom(typed_any, toProto(attrs));
+  MessageUtil::packFrom(typed_any, record);
   stream_info.setDynamicTypedMetadata(config_->metadataNamespace(), typed_any);
+  storeModel(attrs.model);
 
   config_->stats().published_.inc();
   if (attrs.malformed) {
     config_->stats().partial_.inc();
   }
   ENVOY_LOG(trace, "request_info: published to namespace {}", config_->metadataNamespace());
+}
+
+void RequestInfoFilter::storeModel(absl::string_view model) {
+  const StreamInfo::FilterStateSharedPtr& filter_state = context_.stream_info.filterState();
+  // A filter ahead may have set the object with another life span, which setData rejects.
+  if (model.empty() || filter_state->hasDataWithName(FilterStateKeys::ModelRequest)) {
+    return;
+  }
+  filter_state->setData(FilterStateKeys::ModelRequest,
+                        std::make_shared<Router::StringAccessorImpl>(model),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 } // namespace RequestInfo

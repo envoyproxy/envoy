@@ -104,6 +104,7 @@ std::optional<bool> SpanContextExtractor::extractSampled() {
 std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sampled) {
   // Try B3 single format first.
   if (ZipkinCoreConstants::get().B3.get(trace_context_).has_value()) {
+    b3_single_format_used_ = true;
     return extractSpanContextFromB3SingleFormat(is_sampled);
   }
 

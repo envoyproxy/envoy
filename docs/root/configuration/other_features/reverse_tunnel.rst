@@ -309,7 +309,7 @@ parameters.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 29-41
+    :lines: 29-40
     :linenos:
     :lineno-start: 29
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
@@ -346,9 +346,9 @@ tunnel lifecycle upstream network filter to the reverse connection cluster:
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 105-111
+    :lines: 104-110
     :linenos:
-    :lineno-start: 105
+    :lineno-start: 104
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 This filter copies the reverse-tunnel identifiers into the handed-off upstream connection's filter
@@ -358,9 +358,9 @@ reuses the same close reason.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 104-129
+    :lines: 103-128
     :linenos:
-    :lineno-start: 104
+    :lineno-start: 103
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 The reverse connection cluster configuration includes several key fields:
@@ -427,9 +427,9 @@ that identifies the target downstream node for each request.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 43-101
+    :lines: 42-100
     :linenos:
-    :lineno-start: 43
+    :lineno-start: 42
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 The example above demonstrates using a :ref:`Lua filter <config_http_filters_lua>` to implement flexible

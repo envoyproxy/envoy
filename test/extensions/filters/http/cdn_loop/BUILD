@@ -1,11 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -42,9 +41,10 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    extension_names = ["envoy.filters.http.cdn_loop"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/http:codes_interface",
@@ -55,9 +55,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "parser_test",
     srcs = ["parser_test.cc"],
+    extension_names = ["envoy.filters.http.cdn_loop"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cdn_loop:parser_lib",
@@ -65,10 +66,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "parser_fuzz_test",
     srcs = ["parser_fuzz_test.cc"],
     corpus = "parser_corpus",
+    extension_names = ["envoy.filters.http.cdn_loop"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:statusor_lib",
@@ -77,9 +79,10 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "utils_test",
     srcs = ["utils_test.cc"],
+    extension_names = ["envoy.filters.http.cdn_loop"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/cdn_loop:utils_lib",

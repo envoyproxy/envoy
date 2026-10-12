@@ -11,12 +11,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-class ApiProtocolAdapter;
+class LLMProtocolAdapter;
 
-// Internal mirror of :ref:`envoy.type.ai.v3.ApiProtocol`: the AI API
+// Internal mirror of :ref:`envoy.type.ai.v3.LLMProtocol`: the AI API
 // contract a payload speaks. The two OpenAI protocols share extraction
 // logic but differ in streaming event semantics and detection markers.
-enum class ApiProtocol {
+enum class LLMProtocol {
   Unspecified,
   OpenAiChatCompletions,
   OpenAiResponses,
@@ -24,9 +24,9 @@ enum class ApiProtocol {
   GeminiGenerateContent,
 };
 
-// The envoy.type.ai.v3.ApiProtocol enum-value name for a protocol
+// The envoy.type.ai.v3.LLMProtocol enum-value name for a protocol
 // (e.g. "OPENAI_CHAT_COMPLETIONS").
-absl::string_view apiProtocolName(ApiProtocol protocol);
+absl::string_view llmProtocolName(LLMProtocol protocol);
 
 // Normalized LLM token usage accumulated over a response. Every field is
 // optional: dialects report different subsets, across several events.
@@ -60,7 +60,7 @@ struct TokenUsage {
   // whether or not it agrees with the canonical sum.
   std::optional<uint64_t> provider_total_tokens;
   std::string model;
-  ApiProtocol api_protocol{ApiProtocol::Unspecified};
+  LLMProtocol llm_protocol{LLMProtocol::Unspecified};
 
   bool hasAny() const {
     return input_tokens.has_value() || output_tokens.has_value() || total_tokens.has_value() ||
@@ -78,9 +78,9 @@ struct TokenUsage {
   // adapter rewrites its dialect's native buckets onto the inclusive
   // contract, then the shared tail derives the canonical total and preserves
   // the provider-reported one. Must be called exactly once, after the last
-  // merge(), with the adapter for api_protocol; repeated calls are no-ops
+  // merge(), with the adapter for llm_protocol; repeated calls are no-ops
   // (the summation must not run twice) and assert in debug builds.
-  void finalize(const ApiProtocolAdapter& adapter);
+  void finalize(const LLMProtocolAdapter& adapter);
 
   // True when finalize() dropped a component or total whose sum exceeded the
   // exactly-representable double bound; the caller must publish the record as

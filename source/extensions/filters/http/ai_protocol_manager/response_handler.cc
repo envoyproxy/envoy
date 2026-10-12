@@ -76,13 +76,13 @@ bool ResponseHandler::processDocument(const nlohmann::json& json) {
     // error: skip it.
     return false;
   }
-  if (format_ == ApiProtocol::Unspecified) {
+  if (format_ == LLMProtocol::Unspecified) {
     format_ = AdapterRegistry::detect(json);
-    if (format_ == ApiProtocol::Unspecified) {
+    if (format_ == LLMProtocol::Unspecified) {
       return false; // Not discriminating; a later document may be.
     }
   }
-  const ApiProtocolAdapter& adapter = AdapterRegistry::get(format_);
+  const LLMProtocolAdapter& adapter = AdapterRegistry::get(format_);
   const ExtractionResult result = adapter.extractUsage(json);
   usage_.merge(result.usage);
   if (result.malformed) {
@@ -297,7 +297,7 @@ void SseResponseHandler::processSseEvent(absl::string_view event) {
   }
 }
 
-JsonResponseHandler::JsonResponseHandler(ApiProtocol format, uint32_t max_inspected_body_size,
+JsonResponseHandler::JsonResponseHandler(LLMProtocol format, uint32_t max_inspected_body_size,
                                          AiProtocolManagerStats& stats,
                                          const Buffer::BufferMemoryAccountSharedPtr& /*account*/)
     : ResponseHandler(format, stats), max_inspected_body_size_(max_inspected_body_size),

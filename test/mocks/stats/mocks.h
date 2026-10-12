@@ -149,10 +149,10 @@ public:
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(uint64_t, value, (), (const));
 
-  bool used_;
-  bool hidden_;
-  uint64_t value_;
-  uint64_t latch_;
+  bool used_ = false;
+  bool hidden_ = false;
+  uint64_t value_ = 0;
+  uint64_t latch_ = 0;
 };
 
 class MockGauge : public MockStatWithRefcount<Gauge> {
@@ -174,10 +174,10 @@ public:
   MOCK_METHOD(std::optional<bool>, cachedShouldImport, (), (const));
   MOCK_METHOD(ImportMode, importMode, (), (const));
 
-  bool used_;
-  bool hidden_;
-  uint64_t value_;
-  ImportMode import_mode_;
+  bool used_ = false;
+  bool hidden_ = false;
+  uint64_t value_ = 0;
+  ImportMode import_mode_ = ImportMode::Accumulate;
 };
 
 class MockHistogram : public MockMetric<Histogram> {
@@ -227,8 +227,8 @@ public:
   bool decRefCount() override { return refcount_helper_.decRefCount(); }
   uint32_t use_count() const override { return refcount_helper_.use_count(); }
 
-  bool used_;
-  bool hidden_;
+  bool used_ = false;
+  bool hidden_ = false;
   Unit unit_{Histogram::Unit::Unspecified};
   Store* store_{};
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
@@ -248,8 +248,8 @@ public:
   MOCK_METHOD(bool, hidden, (), (const));
   MOCK_METHOD(std::string, value, (), (const, override));
 
-  bool used_;
-  bool hidden_;
+  bool used_ = false;
+  bool hidden_ = false;
   std::string value_;
 };
 

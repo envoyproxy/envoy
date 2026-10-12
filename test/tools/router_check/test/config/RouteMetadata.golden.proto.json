@@ -1,0 +1,43 @@
+{
+  "tests": [
+    {
+      "test_name": "MetadataMatches",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/canary",
+        "method": "GET"
+      },
+      "validate": {
+        "route_metadata": [
+          {"namespace": "databricks.der", "key": "route_id", "value": "canary"}
+        ]
+      }
+    },
+    {
+      "test_name": "MetadataValueMismatch",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/canary",
+        "method": "GET"
+      },
+      "validate": {
+        "route_metadata": [
+          {"namespace": "databricks.der", "key": "route_id", "value": "stable"}
+        ]
+      }
+    },
+    {
+      "test_name": "MetadataNamespaceMissing",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/",
+        "method": "GET"
+      },
+      "validate": {
+        "route_metadata": [
+          {"namespace": "databricks.der", "key": "route_id", "value": "canary"}
+        ]
+      }
+    }
+  ]
+}

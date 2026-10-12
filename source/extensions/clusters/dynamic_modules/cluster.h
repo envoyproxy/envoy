@@ -188,6 +188,7 @@ public:
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
   Upstream::HostSharedPtr findHostByAddress(const std::string& address);
   void preInitComplete();
+  void usePersistentHostMap();
 
   /**
    * Called when an event is scheduled via DynamicModuleClusterScheduler::commit.
@@ -479,6 +480,23 @@ private:
   DynamicModuleAsyncHostSelectionRegistrySharedPtr registry_;
   envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_{nullptr};
 };
+
+/**
+ * Bounds the lifetime of the filter state views returned by the cluster load balancer callbacks.
+ * The serialized values are cleared when the outermost host selection callback returns so a module
+ * can hold several views during a single callback. The backing storage lives in abi_impl.cc.
+ */
+class ClusterLbFilterStateScratchGuard {
+public:
+  ClusterLbFilterStateScratchGuard();
+  ~ClusterLbFilterStateScratchGuard();
+  ClusterLbFilterStateScratchGuard(const ClusterLbFilterStateScratchGuard&) = delete;
+  ClusterLbFilterStateScratchGuard& operator=(const ClusterLbFilterStateScratchGuard&) = delete;
+};
+
+// Returns the number of retained cluster load balancer filter state values on this thread. Test
+// only.
+size_t clusterLbFilterStateScratchSizeForTest();
 
 /**
  * Load balancer that delegates to the dynamic module.

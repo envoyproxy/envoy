@@ -300,15 +300,15 @@ TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
   Stats::CounterOptConstRef counter =
       stats_store.findCounterByString("dynamicmodulescustom.streams_total");
   EXPECT_TRUE(counter.has_value());
-  EXPECT_EQ(counter->get().value(), 1);
+  EXPECT_EQ(counter->value(), 1);
   Stats::GaugeOptConstRef gauge =
       stats_store.findGaugeByString("dynamicmodulescustom.concurrent_streams");
   EXPECT_TRUE(gauge.has_value());
-  EXPECT_EQ(gauge->get().value(), 1);
+  EXPECT_EQ(gauge->value(), 1);
   Stats::GaugeOptConstRef magicNumberGauge =
       stats_store.findGaugeByString("dynamicmodulescustom.magic_number");
   EXPECT_TRUE(gauge.has_value());
-  EXPECT_EQ(magicNumberGauge->get().value(), 42);
+  EXPECT_EQ(magicNumberGauge->value(), 42);
   Stats::HistogramOptConstRef histogram =
       stats_store.findHistogramByString("dynamicmodulescustom.ones");
   EXPECT_TRUE(histogram.has_value());
@@ -317,19 +317,19 @@ TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
   Stats::CounterOptConstRef counter_vec_increment =
       stats_store.findCounterByString("dynamicmodulescustom.test_counter_vec.test_label.increment");
   EXPECT_TRUE(counter_vec_increment.has_value());
-  EXPECT_EQ(counter_vec_increment->get().value(), 1);
+  EXPECT_EQ(counter_vec_increment->value(), 1);
   Stats::GaugeOptConstRef gauge_vec_increase =
       stats_store.findGaugeByString("dynamicmodulescustom.test_gauge_vec.test_label.increase");
   EXPECT_TRUE(gauge_vec_increase.has_value());
-  EXPECT_EQ(gauge_vec_increase->get().value(), 1);
+  EXPECT_EQ(gauge_vec_increase->value(), 1);
   Stats::GaugeOptConstRef gauge_vec_decrease =
       stats_store.findGaugeByString("dynamicmodulescustom.test_gauge_vec.test_label.decrease");
   EXPECT_TRUE(gauge_vec_decrease.has_value());
-  EXPECT_EQ(gauge_vec_decrease->get().value(), 2);
+  EXPECT_EQ(gauge_vec_decrease->value(), 2);
   Stats::GaugeOptConstRef gauge_vec_set =
       stats_store.findGaugeByString("dynamicmodulescustom.test_gauge_vec.test_label.set");
   EXPECT_TRUE(gauge_vec_set.has_value());
-  EXPECT_EQ(gauge_vec_set->get().value(), 9001);
+  EXPECT_EQ(gauge_vec_set->value(), 9001);
   Stats::HistogramOptConstRef histogram_vec_record = stats_store.findHistogramByString(
       "dynamicmodulescustom.test_histogram_vec.test_label.record");
   EXPECT_TRUE(histogram_vec_record.has_value());
@@ -356,10 +356,10 @@ TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
   Stats::CounterOptConstRef counter_vec_header = stats_store.findCounterByString(
       "dynamicmodulescustom.test_counter_vec.test_label.header_value");
-  EXPECT_EQ(counter_vec_header->get().value(), 1);
+  EXPECT_EQ(counter_vec_header->value(), 1);
   Stats::GaugeOptConstRef gauge_vec_header =
       stats_store.findGaugeByString("dynamicmodulescustom.test_gauge_vec.test_label.header_value");
-  EXPECT_EQ(gauge_vec_header->get().value(), 1);
+  EXPECT_EQ(gauge_vec_header->value(), 1);
   Stats::HistogramOptConstRef histogram_vec_header = stats_store.findHistogramByString(
       "dynamicmodulescustom.test_histogram_vec.test_label.header_value");
   EXPECT_TRUE(histogram_vec_header.has_value());
@@ -370,22 +370,22 @@ TEST_P(DynamicModuleHttpLanguageTests, StatsCallbacks) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
-  EXPECT_EQ(counter->get().value(), 1);
-  EXPECT_EQ(gauge->get().value(), 1);
+  EXPECT_EQ(counter->value(), 1);
+  EXPECT_EQ(gauge->value(), 1);
   EXPECT_EQ(stats_store.histogramValues("dynamicmodulescustom.ones", false),
             (std::vector<uint64_t>{1}));
 
   filter->onStreamComplete();
-  EXPECT_EQ(counter->get().value(), 1);
-  EXPECT_EQ(gauge->get().value(), 0);
+  EXPECT_EQ(counter->value(), 1);
+  EXPECT_EQ(gauge->value(), 0);
   EXPECT_EQ(stats_store.histogramValues("dynamicmodulescustom.ones", false),
             (std::vector<uint64_t>{1}));
   Stats::CounterOptConstRef counter_vec_local_var =
       stats_store.findCounterByString("dynamicmodulescustom.test_counter_vec.test_label.local_var");
-  EXPECT_EQ(counter_vec_local_var->get().value(), 1);
+  EXPECT_EQ(counter_vec_local_var->value(), 1);
   Stats::GaugeOptConstRef gauge_vec_local_var =
       stats_store.findGaugeByString("dynamicmodulescustom.test_gauge_vec.test_label.local_var");
-  EXPECT_EQ(gauge_vec_local_var->get().value(), 1);
+  EXPECT_EQ(gauge_vec_local_var->value(), 1);
   Stats::HistogramOptConstRef histogram_vec_local_var = stats_store.findHistogramByString(
       "dynamicmodulescustom.test_histogram_vec.test_label.local_var");
   EXPECT_TRUE(histogram_vec_local_var.has_value());
@@ -2432,7 +2432,8 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
     const std::string route_filter_config_str = "router config";
     auto route_filter_config_or_status =
         Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()));
+            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()),
+            context.mainThreadDispatcher());
     EXPECT_OK(route_filter_config_or_status);
     auto route_filter_config = std::move(route_filter_config_or_status.value());
 
@@ -2456,6 +2457,41 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigLifetimes) {
                 ->value()
                 .getStringView(),
             "router config");
+}
+
+// A per-route configuration released off the main thread defers the module's destroy hook to the
+// main dispatcher, because the module may use configuration callbacks that require that thread.
+TEST_P(DynamicModuleHttpLanguageTests, HttpFilterPerRouteConfigDestroyedOnMainThread) {
+  const std::string filter_name = "per_route_config";
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::MockOptions> options;
+  ON_CALL(options, concurrency()).WillByDefault(testing::Return(1));
+  ON_CALL(context, options()).WillByDefault(testing::ReturnRef(options));
+  ScopedThreadLocalServerContextSetter setter(context);
+
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", GetParam()), false);
+  EXPECT_OK(dynamic_module);
+
+  ON_CALL(context.dispatcher_, isThreadSafe()).WillByDefault(testing::Return(false));
+
+  auto config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
+          filter_name, "router config", std::move(dynamic_module.value()),
+          context.mainThreadDispatcher());
+  EXPECT_OK(config_or_status);
+  auto config = std::move(config_or_status.value());
+
+  Event::PostCb posted;
+  EXPECT_CALL(context.dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  config.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  // Running the posted callback invokes the module's destroy hook on the main thread and then
+  // unloads the module.
+  posted();
 }
 
 TEST(HttpFilter, HeaderMapGetter) {

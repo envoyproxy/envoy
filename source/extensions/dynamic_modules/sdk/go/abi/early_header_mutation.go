@@ -13,6 +13,7 @@ import (
 	"unsafe"
 
 	sdk "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go"
+	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/recovery"
 	"github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared"
 )
 
@@ -306,7 +307,8 @@ func envoy_dynamic_module_on_early_header_mutation_config_new(
 	hostConfigPtr C.envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr,
 	name C.envoy_dynamic_module_type_envoy_buffer,
 	config C.envoy_dynamic_module_type_envoy_buffer,
-) C.envoy_dynamic_module_type_early_header_mutation_config_module_ptr {
+) (modulePtr C.envoy_dynamic_module_type_early_header_mutation_config_module_ptr) {
+	defer recovery.Export("envoy_dynamic_module_on_early_header_mutation_config_new", nil, &modulePtr)
 	nameString := envoyBufferToStringUnsafe(name)
 	configBytes := envoyBufferToBytesUnsafe(config)
 
@@ -334,6 +336,7 @@ func envoy_dynamic_module_on_early_header_mutation_config_new(
 func envoy_dynamic_module_on_early_header_mutation_config_destroy(
 	configPtr C.envoy_dynamic_module_type_early_header_mutation_config_module_ptr,
 ) {
+	defer recovery.ExportVoid("envoy_dynamic_module_on_early_header_mutation_config_destroy")
 	wrapper := earlyHeaderMutationConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		return
@@ -346,7 +349,8 @@ func envoy_dynamic_module_on_early_header_mutation_config_destroy(
 func envoy_dynamic_module_on_early_header_mutation_mutate(
 	configPtr C.envoy_dynamic_module_type_early_header_mutation_config_module_ptr,
 	hostPtr C.envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
-) C.bool {
+) (continueChain C.bool) {
+	defer recovery.Export("envoy_dynamic_module_on_early_header_mutation_mutate", C.bool(true), &continueChain)
 	wrapper := earlyHeaderMutationConfigManager.unwrap(unsafe.Pointer(configPtr))
 	if wrapper == nil {
 		// The return value selects chain continuation, not success, so a missing mutation must not

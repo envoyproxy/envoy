@@ -14,9 +14,10 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 
 #include "absl/strings/match.h"
@@ -107,7 +108,7 @@ bool contentEncodingIsIdentity(const Http::ResponseHeaderMap& headers) {
 // status-only and publishes as FAILED.
 envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degraded) {
   envoy::data::ai::v3::TokenUsage typed;
-  typed.set_api_protocol(protocolToProto(usage.api_protocol));
+  typed.set_llm_protocol(protocolToProto(usage.llm_protocol));
   if (!usage.model.empty()) {
     typed.set_model(usage.model);
   }
@@ -151,14 +152,17 @@ FilterConfig::FilterConfig(
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
       parse_unconfigured_routes_(proto.request_handling().parse_unconfigured_routes()),
+      always_serialize_request_(
+          proto.request_handling().reserialize_body() ==
+          envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS),
       inline_string_threshold_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto.request_handling().limits(), inline_string_threshold_bytes,
           JsonWithExtBufParser::kDefaultInlineStringThresholdBytes)),
       token_usage_enabled_(proto.response_handling().has_token_usage()),
       include_unconfigured_routes_(
           proto.response_handling().token_usage().include_unconfigured_routes()),
-      default_api_protocol_(
-          protocolFromProto(proto.response_handling().token_usage().default_api_protocol())),
+      default_llm_protocol_(
+          protocolFromProto(proto.response_handling().token_usage().default_llm_protocol())),
       metadata_namespace_(proto.response_handling().token_usage().metadata_namespace().empty()
                               ? std::string(DefaultTokenUsageNamespace)
                               : proto.response_handling().token_usage().metadata_namespace()),
@@ -243,10 +247,16 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
           Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(decoder_callbacks_);
       route_config != nullptr) {
     route_has_request_ = route_config->hasRequest();
-    route_request_protocol_ = route_config->requestProtocol();
+    request_protocol_ = route_config->requestProtocol();
+    route_response_protocol_ = route_config->responseProtocol();
     if (route_has_request_) {
-      ENVOY_LOG(debug, "ai_protocol_manager: route declares request API {}",
-                apiProtocolName(route_request_protocol_));
+      if (const LLMProtocol declared =
+              RequestLlmProtocol::fromFilterState(*decoder_callbacks_->streamInfo().filterState());
+          declared != LLMProtocol::Unspecified) {
+        request_protocol_ = declared;
+      }
+      ENVOY_LOG(debug, "ai_protocol_manager: AI endpoint with request API {}",
+                llmProtocolName(request_protocol_));
     }
   }
 
@@ -289,8 +299,7 @@ uint32_t AiProtocolManagerFilter::inlineStringThresholdBytes() const {
   // schema may pin its own, because what has to stay inline for the payload to
   // validate is a property of the wire API, not of the deployment.
   if (isAiEndpoint()) {
-    if (const PayloadSchema* payload_schema =
-            AdapterRegistry::get(route_request_protocol_).schema();
+    if (const PayloadSchema* payload_schema = AdapterRegistry::get(request_protocol_).schema();
         payload_schema != nullptr) {
       if (const std::optional<uint32_t> pinned =
               payload_schema->requestInlineStringThresholdBytes();
@@ -338,21 +347,6 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   if (end_stream) {
     request_json_ = request_parser_->takeDocument();
     request_parser_.reset();
-
-    if (isAiEndpoint()) {
-      // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
-      // streams and parses chunks, rejecting invalid fields early before end_stream.
-      if (const PayloadSchema* payload_schema =
-              AdapterRegistry::get(route_request_protocol_).schema();
-          payload_schema != nullptr) {
-        const absl::Status validation_status = payload_schema->validateRequest(request_json_);
-        if (!validation_status.ok()) {
-          config_->stats().request_schema_invalid_.inc();
-          rejectInvalidPayload(validation_status);
-          return false;
-        }
-      }
-    }
     config_->stats().request_parsed_.inc();
   }
   return true;
@@ -452,7 +446,8 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
-                                  route_request_protocol_};
+                                  request_protocol_, decode_manager_->length(),
+                                  route_response_protocol_};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
@@ -473,7 +468,8 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
           payload_rejected_ = true;
           decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
                                              "ai_protocol_manager_filter_rejected");
-        });
+        },
+        config_->alwaysSerializeRequest(), request_protocol_);
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }
@@ -568,9 +564,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     // The wire API to extract against, in precedence order: the route's declared
     // response API, the route's declared request API, the configured fallback;
     // Unspecified auto-detects from the response shape.
-    ApiProtocol protocol = config_->defaultApiProtocol();
+    LLMProtocol protocol = config_->defaultLLMProtocol();
     if (route_config != nullptr &&
-        route_config->effectiveResponseProtocol() != ApiProtocol::Unspecified) {
+        route_config->effectiveResponseProtocol() != LLMProtocol::Unspecified) {
       protocol = route_config->effectiveResponseProtocol();
     }
 
@@ -702,7 +698,7 @@ bool AiProtocolManagerFilter::finalizeResponseHandling() {
 
   // Convert the finalized accumulator once into the authoritative typed
   // record (envoy.data.ai.v3.TokenUsage). When extraction failed outright the
-  // record is status-only (api_protocol/model/extraction_status, no counts),
+  // record is status-only (llm_protocol/model/extraction_status, no counts),
   // letting consumers distinguish "failed to extract" from "no usage
   // supplied". Only typed metadata is published: consumers with full-fidelity
   // needs (ext_proc typed forwarding, filters reading typed metadata) share

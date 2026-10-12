@@ -264,7 +264,7 @@ void ActiveTcpSocket::newConnection() {
         obj) {
       network_namespace = obj->serializeAsString();
     }
-    new_listener.value().get().onAcceptWorker(std::move(socket_), false, false, network_namespace);
+    new_listener->onAcceptWorker(std::move(socket_), false, false, network_namespace);
   } else {
     // Set default transport protocol if none of the listener filters did it.
     if (socket_->detectedTransportProtocol().empty()) {

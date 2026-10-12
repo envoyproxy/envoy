@@ -14,8 +14,8 @@ namespace Extensions {
 namespace AiFilters {
 namespace RequestInfo {
 
-using HttpFilters::AiProtocolManager::ApiProtocol;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
+using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::MaxStringValueSize;
 using HttpFilters::AiProtocolManager::NullPolicy;
 using HttpFilters::AiProtocolManager::readArrayLength;
@@ -125,24 +125,24 @@ void readGeminiGenerateContent(const nlohmann::json& json, absl::string_view pat
 
 } // namespace
 
-RequestAttributes extractRequestAttributes(ApiProtocol protocol, const nlohmann::json& json,
+RequestAttributes extractRequestAttributes(LLMProtocol protocol, const nlohmann::json& json,
                                            absl::string_view path) {
   RequestAttributes attrs;
-  attrs.api_protocol = protocol;
+  attrs.llm_protocol = protocol;
   switch (protocol) {
-  case ApiProtocol::OpenAiChatCompletions:
+  case LLMProtocol::OpenAiChatCompletions:
     readOpenAiChatCompletions(json, attrs);
     break;
-  case ApiProtocol::OpenAiResponses:
+  case LLMProtocol::OpenAiResponses:
     readOpenAiResponses(json, attrs);
     break;
-  case ApiProtocol::AnthropicMessages:
+  case LLMProtocol::AnthropicMessages:
     readAnthropicMessages(json, attrs);
     break;
-  case ApiProtocol::GeminiGenerateContent:
+  case LLMProtocol::GeminiGenerateContent:
     readGeminiGenerateContent(json, path, attrs);
     break;
-  case ApiProtocol::Unspecified:
+  case LLMProtocol::Unspecified:
     readCommon(json, attrs);
     break;
   }

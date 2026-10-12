@@ -61,13 +61,7 @@ alias(
 
 alias(
     name = "librdkafka",
-    actual = "@librdkafka",
-    visibility = ["//visibility:public"],
-)
-
-cc_library(
-    name = "librdkafka_headers",
-    hdrs = ["@librdkafka//:headers"],
+    actual = "@librdkafka//:librdkafka_cpp",
     visibility = ["//visibility:public"],
 )
 
