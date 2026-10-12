@@ -9,6 +9,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/utility.h"
+#include "test/integration/websocket_handshake_test_utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -95,6 +96,9 @@ void WebsocketWithCompressorIntegrationTest::validateUpgradeRequestHeaders(
     proxied_request_headers.setContentLength(size_t(0));
   }
 
+  removeGeneratedWebSocketKey(proxied_request_headers, original_request_headers,
+                              upstreamProtocol() == Http::CodecType::HTTP1 ||
+                                  downstreamProtocol() == Http::CodecType::HTTP1);
   commonValidate(proxied_request_headers, original_request_headers);
   proxied_request_headers.removeRequestId();
 
@@ -174,7 +178,8 @@ void WebsocketWithCompressorIntegrationTest::performUpgrade(
   validateUpgradeRequestHeaders(upstream_request_->headers(), upgrade_request_headers);
 
   // Send the upgrade response
-  upstream_request_->encodeHeaders(upgrade_response_headers, false);
+  upstream_request_->encodeHeaders(
+      withWebSocketAccept(upstream_request_->headers(), upgrade_response_headers), false);
 
   // Verify the upgrade response was received downstream.
   response_->waitForHeaders();

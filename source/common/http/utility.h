@@ -320,12 +320,12 @@ bool isH2UpgradeRequest(const RequestHeaderMap& headers);
 bool isH3UpgradeRequest(const RequestHeaderMap& headers);
 
 /**
- * Determine whether this is a WebSocket Upgrade request.
+ * Determine whether this is a WebSocket Upgrade request or response.
  * This function returns true if the following HTTP headers and values are present:
  * - Connection: Upgrade
  * - Upgrade: websocket
  */
-bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
+bool isWebSocketUpgradeRequest(const RequestOrResponseHeaderMap& headers);
 
 /**
  * Removes tokens from `Upgrade` header matching one of the matchers. Removes the `Upgrade`

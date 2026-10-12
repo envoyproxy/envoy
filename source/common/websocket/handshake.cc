@@ -7,6 +7,7 @@
 #include <string>
 
 #include "source/common/common/base64.h"
+#include "source/common/common/random_generator.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -19,8 +20,9 @@ constexpr absl::string_view WebSocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B1
 
 } // namespace
 
-std::string generateKey(Random::RandomGenerator& random) {
-  const std::array<uint64_t, 2> nonce = {random.random(), random.random()};
+std::string generateKey() {
+  const std::array<uint64_t, 2> nonce = {Random::RandomUtility::random(),
+                                         Random::RandomUtility::random()};
   return Base64::encode(reinterpret_cast<const char*>(nonce.data()), sizeof(nonce));
 }
 

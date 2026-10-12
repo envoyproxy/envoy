@@ -26,8 +26,8 @@ envoy_cc_library(
     hdrs = ["handshake.h"],
     external_deps = ["ssl"],
     deps = [
-        "//envoy/common:random_generator_interface",
         "//source/common/common:base64_lib",
+        "//source/common/common:random_generator_lib",
         "@abseil-cpp//absl/strings",
     ],
 )
