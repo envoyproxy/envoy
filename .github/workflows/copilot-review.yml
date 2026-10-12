@@ -22,21 +22,63 @@ jobs:
       !contains(fromJSON('["dependabot[bot]","renovate[bot]","github-actions[bot]"]'), github.actor)
     runs-on: ubuntu-latest
     steps:
+    # The initial delay and retry loop avoid racing RepoKitteh's reviewer assignment,
+    # which also runs on `opened`/`ready_for_review` (see #48236).
     - name: Request Copilot review (once)
       env:
         GH_TOKEN: ${{ github.token }}
         PR: ${{ github.event.pull_request.number }}
         REPO: ${{ github.repository }}
+        EVENT_ACTION: ${{ github.event.action }}
       run: |
-        # already requested?
-        if gh api "repos/${REPO}/pulls/${PR}/requested_reviewers" \
-             --jq '.users[].login' | grep -qx 'copilot-pull-request-reviewer\[bot\]'; then
-          echo "already requested"; exit 0
+        set -euo pipefail
+        BOT='copilot-pull-request-reviewer[bot]'
+        MAX_ATTEMPTS=5
+
+        if [[ "$EVENT_ACTION" == "ready_for_review" || "$EVENT_ACTION" == "opened" ]]; then
+          echo "Waiting for other reviewer assignment to settle (${EVENT_ACTION})"
+          sleep 30
         fi
-        # already reviewed?
-        if gh api "repos/${REPO}/pulls/${PR}/reviews" --paginate \
-             --jq '.[].user.login' | grep -qx 'copilot-pull-request-reviewer\[bot\]'; then
-          echo "already reviewed"; exit 0
-        fi
-        gh api -X POST "repos/${REPO}/pulls/${PR}/requested_reviewers" \
-          -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+
+        # Returns 0 if done (requested, already requested or already reviewed), 1 on error.
+        request_review () {
+          local out
+          # already requested?
+          if ! out="$(gh api "repos/${REPO}/pulls/${PR}/requested_reviewers" --jq '.users[].login' 2>&1)"; then
+            echo "Failed to fetch requested reviewers: ${out}"
+            return 1
+          fi
+          if grep -qxF "$BOT" <<< "$out"; then
+            echo "already requested"
+            return 0
+          fi
+          # already reviewed?
+          if ! out="$(gh api "repos/${REPO}/pulls/${PR}/reviews" --paginate --jq '.[].user.login' 2>&1)"; then
+            echo "Failed to fetch reviews: ${out}"
+            return 1
+          fi
+          if grep -qxF "$BOT" <<< "$out"; then
+            echo "already reviewed"
+            return 0
+          fi
+          if ! out="$(gh api -X POST "repos/${REPO}/pulls/${PR}/requested_reviewers" \
+                        -f "reviewers[]=${BOT}" 2>&1)"; then
+            echo "Failed to request review: ${out}"
+            return 1
+          fi
+          echo "requested review from ${BOT}"
+        }
+
+        for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+          echo "Attempt ${attempt}/${MAX_ATTEMPTS}"
+          if request_review; then
+            exit 0
+          fi
+          if [[ "$attempt" -lt "$MAX_ATTEMPTS" ]]; then
+            delay=$((attempt * 10))
+            echo "Retrying in ${delay}s"
+            sleep "$delay"
+          fi
+        done
+        echo "::error::Failed to request Copilot review after ${MAX_ATTEMPTS} attempts"
+        exit 1
