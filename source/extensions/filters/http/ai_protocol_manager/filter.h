@@ -62,9 +62,6 @@ public:
   uint32_t maxJsonBodySize() const { return max_json_body_size_; }
   uint32_t maxParsedSseEvents() const { return max_parsed_sse_events_; }
   AiProtocolManagerStats& stats() const { return stats_; }
-  // Shared by every stream. Held here rather than by the filter factory callback,
-  // which a filter config update can destroy while streams it created are still in
-  // flight.
   ExternalBufferFactory& bufferFactory() const { return *buffer_factory_; }
 
 private:
