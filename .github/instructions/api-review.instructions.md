@@ -273,7 +273,8 @@ In addition, the following conventions should be followed:
   must not reject a resource that sets both. This lets a management server send a single resource
   that both old and new clients accept. Do not add `oneof` to new fields; enforce mutual exclusion
   in code if needed. Bootstrap-only configuration may be stricter, since a rejection there is
-  visible at startup.
+  visible at startup. This applies to old and new spellings of the same setting; fields with
+  genuinely contradictory meanings should be rejected at config load rather than silently ignored.
 
 * Boolean fields should enable rather than disable behavior, with the simpler behavior as the
   default. Avoid names that use implementation terminology or repeat context implied by the
@@ -323,61 +324,6 @@ e.g. `envoy.service.route.v3` contains RDS, `envoy.service.listener.v3` contains
 
 Extensions should use the regular hierarchy. For example, configuration for network filters belongs
 in a package under `envoy.extensions.filter.network`.
-
-## Adding an extension configuration to the API
-
-Extensions must currently be added as v3 APIs following the [package
-organization](#package-organization) above.
-To add an extension config to the API, the steps below should be followed:
-
-1. Place the v3 extension configuration `.proto` in `api/envoy/extensions` or `api/contrib/envoy/extensions`, e.g.
-   `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
-   ```bazel
-   load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
-
-   licenses(["notice"])  # Apache 2
-
-   api_proto_package(
-       deps = ["@xds//udpa/annotations:pkg"],
-   )
-   ```
-1. If this is still WiP and subject to breaking changes, please tag it
-   `option (xds.annotations.v3.file_status).work_in_progress = true;` and
-   optionally hide it from the docs (`[#not-implemented-hide:]`).
-1. Make sure your proto imports the v3 extension config proto (`import "udpa/annotations/status.proto";`)
-1. Make sure your proto is tracked as ready to be used
-   (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
-   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
-1. Add a reference to the v3 extension config in [api/BUILD](BUILD) under `v3_protos`.
-1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml) or [contrib/extensions_metadata.yaml](../contrib/extensions_metadata.yaml)
-   with the category, [security posture, and status](../EXTENSION_POLICY.md#extension-stability-and-security-posture).
-   * Any extension category added to `extensions_metadata.yaml` should be annotated in precisely one proto file, associated with a field of a proto message. e.g.
-     ```proto
-     message SomeMessage {
-       // An ordered list of http filters
-       // [#extension-category: envoy.http.filters]
-       repeated core.v3.TypedExtensionConfig http_filter_extensions = 1;
-     }
-     ```
-   * Each extension added to `extensions_metadata.yaml` should have precisely one proto file annotated with the extension name. e.g.
-     ```proto
-     // [#protodoc-title: Your New Filter]
-     // [#extension: envoy.http.filters.your_new_filter]
-
-     // YourFilterConfig is the configuration for a YourFilter (write real documentation here).
-     message YourFilterConfig {
-     }
-     ```
-1. If you introduce a new extension category, you'll also need to add its name
-   under `categories` in: [tools/extensions/extensions_schema.yaml](../tools/extensions/extensions_schema.yaml).
-1. Update
-   [source/extensions/extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl) or [contrib/contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
-   to include the new extension.
-1. If the extension is not hidden, find or create a docs file with a toctree
-   and reference your proto to make sure users can navigate to it from the API docs
-   (and to not break the docs build), like [docs/root/api-v3/admin/admin.rst](../docs/root/api-v3/admin/admin.rst).
-1. Run `./tools/proto_format/proto_format.sh fix`. **Before running the script**, you will need to **commit your local changes**. By adding the commit, the tool will recognize the change, and will regenerate the `BUILD` file and reformat `foobar.proto` as needed. If you have not followed any of the above steps correctly `proto_format.sh` may remove some of the files that you added. If that is the case you can revert to the committed state, and try again once any issues are resolved.
-1. See the [key-value-store PR](https://github.com/envoyproxy/envoy/pull/17745/files) for an example of adding a new extension point to common.
 
 ## API annotations
 
@@ -497,7 +443,8 @@ consider the answers to these questions before sending a PR.
 - If a new field supersedes an existing one, can a management server set both
   so that old and new clients accept the same resource? The new field should
   take precedence, and setting both should not be rejected.
-- Conversely, are there combinations of fields with contradictory meanings?
+- Conversely, are there combinations of fields with genuinely contradictory
+  meanings, as opposed to old and new spellings of the same setting?
   These should be rejected at config load rather than silently ignored.
 
 ## Feature Enablement

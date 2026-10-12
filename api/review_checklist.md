@@ -21,7 +21,8 @@ consider the answers to these questions before sending a PR.
 - If a new field supersedes an existing one, can a management server set both
   so that old and new clients accept the same resource? The new field should
   take precedence, and setting both should not be rejected.
-- Conversely, are there combinations of fields with contradictory meanings?
+- Conversely, are there combinations of fields with genuinely contradictory
+  meanings, as opposed to old and new spellings of the same setting?
   These should be rejected at config load rather than silently ignored.
 
 ## Feature Enablement

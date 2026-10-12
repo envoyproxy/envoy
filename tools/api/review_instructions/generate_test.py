@@ -25,14 +25,36 @@ class RenderTest(unittest.TestCase):
             generate.render('# Review\n', [])
 
 
+class DropSectionsTest(unittest.TestCase):
+
+    def test_drops_named_section_up_to_next_heading(self):
+        content = (
+            '# Doc\n\nIntro.\n\n## Recipe\n\nStep.\n\n### Detail\n\nMore.\n\n'
+            '## Rules\n\nRule.\n')
+        self.assertEqual(
+            '# Doc\n\nIntro.\n\n## Rules\n\nRule.\n', generate.drop_sections(content, ['Recipe']))
+
+    def test_headings_inside_code_fences_do_not_end_a_section(self):
+        content = '## Recipe\n\n```\n# not a heading\n## nor this\n```\n\n## Rules\n'
+        self.assertEqual('## Rules\n', generate.drop_sections(content, ['Recipe']))
+
+    def test_missing_section_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'Recipe'):
+            generate.drop_sections('## Rules\n', ['Recipe'])
+
+
 class MainTest(unittest.TestCase):
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = pathlib.Path(self._tmp.name)
         paths = generate.repo_paths(self.root)
-        for path, content in [(paths.header, HEADER)] + [(source, f'# {source.name}\n')
-                                                          for source in paths.sources]:
+        files = [(paths.header, HEADER)]
+        for source in paths.sources:
+            files.append((
+                source.path, f'# {source.path.name}\n' +
+                ''.join(f'\n## {title}\n\nProcedure.\n' for title in source.excluded_sections)))
+        for path, content in files:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content)
         paths.output.parent.mkdir(parents=True)
@@ -54,12 +76,23 @@ class MainTest(unittest.TestCase):
 
         self.assertEqual((0, ''), self.run_main('fix'))
         self.assertEqual(generate.generate(self.root), self.output.read_text())
+        self.assertNotIn('Procedure.', self.output.read_text())
         self.assertEqual((0, ''), self.run_main('check'))
 
     def test_check_fails_after_source_edit(self):
         self.run_main('fix')
-        (self.root / 'api/STYLE.md').write_text('# Changed\n')
+        style = self.root / 'api/STYLE.md'
+        # Insert after the title, since appended text would land in the excluded section.
+        style.write_text(style.read_text().replace('\n', '\nNew rule.\n', 1))
         self.assertEqual(1, self.run_main('check')[0])
+
+    def test_renamed_excluded_section_is_reported(self):
+        (self.root / 'api/STYLE.md').write_text('# Style\n')
+        for mode in ['check', 'fix']:
+            status, stderr = self.run_main(mode)
+            self.assertEqual(1, status)
+            self.assertIn('sections not found', stderr)
+        self.assertFalse(self.output.exists())
 
 
 if __name__ == '__main__':

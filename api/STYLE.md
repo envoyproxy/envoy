@@ -116,7 +116,8 @@ In addition, the following conventions should be followed:
   must not reject a resource that sets both. This lets a management server send a single resource
   that both old and new clients accept. Do not add `oneof` to new fields; enforce mutual exclusion
   in code if needed. Bootstrap-only configuration may be stricter, since a rejection there is
-  visible at startup.
+  visible at startup. This applies to old and new spellings of the same setting; fields with
+  genuinely contradictory meanings should be rejected at config load rather than silently ignored.
 
 * Boolean fields should enable rather than disable behavior, with the simpler behavior as the
   default. Avoid names that use implementation terminology or repeat context implied by the

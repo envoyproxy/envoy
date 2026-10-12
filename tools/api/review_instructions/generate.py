@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
+"""Assemble the Copilot code review instructions for the xDS API.
 
-# Assemble the Copilot code review instructions for the xDS API. Usage:
-#
-# bazel run //tools/api/review_instructions:generate -- --mode=<check|fix>
-#
-# Copilot code review cannot follow links from its instructions file, so the canonical API docs
-# under api/ are inlined after a hand-written, review-specific header. Edit those docs or
-# header.md, never the generated file.
+Usage: bazel run //tools/api/review_instructions:generate -- --mode=<check|fix>
+
+Copilot code review may not reliably follow links from its instructions file, so the canonical API
+docs under api/ are inlined after a hand-written, review-specific header. Sections that are
+procedural rather than review criteria are left out. Edit those docs or header.md, never the
+generated file.
+"""
 
 import argparse
 import os
@@ -15,9 +16,15 @@ import sys
 from typing import NamedTuple, Sequence
 
 
+class Source(NamedTuple):
+    path: pathlib.Path
+    # Titles of "## " sections to leave out of the review instructions.
+    excluded_sections: Sequence[str] = ()
+
+
 class Paths(NamedTuple):
     header: pathlib.Path
-    sources: Sequence[pathlib.Path]
+    sources: Sequence[Source]
     output: pathlib.Path
 
 
@@ -25,11 +32,39 @@ def repo_paths(root: pathlib.Path) -> Paths:
     return Paths(
         header=root / 'tools/api/review_instructions/header.md',
         sources=[
-            root / 'api/API_VERSIONING.md',
-            root / 'api/STYLE.md',
-            root / 'api/review_checklist.md',
+            Source(root / 'api/API_VERSIONING.md'),
+            Source(
+                root / 'api/STYLE.md',
+                excluded_sections=['Adding an extension configuration to the API']),
+            Source(root / 'api/review_checklist.md'),
         ],
         output=root / '.github/instructions/api-review.instructions.md')
+
+
+def drop_sections(content: str, titles: Sequence[str]) -> str:
+    """Return content without the "## <title>" sections named in titles.
+
+    A section runs until the next "# " or "## " heading outside a fenced code block. A title that
+    is not found is an error, so renaming a section cannot silently change the output.
+    """
+    kept = []
+    found = set()
+    dropping = False
+    in_fence = False
+    for line in content.splitlines(keepends=True):
+        if line.startswith('```'):
+            in_fence = not in_fence
+        elif not in_fence and (line.startswith('# ') or line.startswith('## ')):
+            title = line[3:].strip() if line.startswith('## ') else None
+            dropping = title in titles
+            if dropping:
+                found.add(title)
+        if not dropping:
+            kept.append(line)
+    missing = [title for title in titles if title not in found]
+    if missing:
+        raise ValueError(f'sections not found: {", ".join(missing)}')
+    return ''.join(kept)
 
 
 def render(header: str, sources: Sequence[tuple[str, str]]) -> str:
@@ -57,7 +92,9 @@ def generate(root: pathlib.Path) -> str:
     paths = repo_paths(root)
     return render(
         paths.header.read_text(),
-        [(str(path.relative_to(root)), path.read_text()) for path in paths.sources])
+        [(str(source.path.relative_to(root)),
+          drop_sections(source.path.read_text(), source.excluded_sections))
+         for source in paths.sources])
 
 
 def main(argv: Sequence[str]) -> int:
@@ -71,7 +108,11 @@ def main(argv: Sequence[str]) -> int:
     args = parser.parse_args(argv)
 
     output = repo_paths(args.root).output
-    expected = generate(args.root)
+    try:
+        expected = generate(args.root)
+    except ValueError as e:
+        print(f'Cannot generate {output.relative_to(args.root)}: {e}', file=sys.stderr)
+        return 1
     actual = output.read_text() if output.exists() else ''
     if actual == expected:
         return 0

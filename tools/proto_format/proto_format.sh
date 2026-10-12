@@ -29,7 +29,8 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
     -- "--mode=${PROTO_SYNC_CMD}" \
        --ci
 
-# Copilot code review cannot follow links, so its API review instructions inline the API docs.
+# Copilot code review may not reliably follow links, so its API review instructions inline the API
+# docs.
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
     //tools/api/review_instructions:generate \
     -- "--mode=${PROTO_SYNC_CMD}"
