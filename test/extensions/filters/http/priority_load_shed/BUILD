@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/priority_load_shed:config",
         "//source/extensions/filters/http/priority_load_shed:filter_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",

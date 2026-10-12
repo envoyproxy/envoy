@@ -6,10 +6,12 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/stream_info/utility.h"
+#include "source/extensions/filters/http/priority_load_shed/config.h"
 #include "source/extensions/filters/http/priority_load_shed/filter.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/test_common/utility.h"
 
@@ -436,6 +438,27 @@ buckets:
                                                         *stats_store_.rootScope());
   EXPECT_FALSE(config_or.ok());
   EXPECT_THAT(absl::StrCat(config_or.status()), HasSubstr("bucket ranges overlap"));
+}
+
+// A listener that bypasses the overload manager gets the null overload manager, which never
+// resolves a load shed point. The factory must reject that up front.
+TEST(PriorityLoadShedFilterFactoryTest, RejectsListenerBypassingOverloadManager) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  ON_CALL(context, shouldBypassOverloadManager()).WillByDefault(Return(true));
+
+  ProtoConfig config;
+  TestUtility::loadFromYaml(R"EOF(
+header_name: "x-message-priority"
+buckets:
+- value_range: { start: 0, end: 16 }
+  load_shed_point: "envoy.load_shed_points.priority.high"
+)EOF",
+                            config);
+
+  PriorityLoadShedFilterFactory factory;
+  auto factory_or = factory.createFilterFactoryFromProto(config, "prefix.", context);
+  EXPECT_FALSE(factory_or.ok());
+  EXPECT_THAT(absl::StrCat(factory_or.status()), HasSubstr("this listener bypasses it"));
 }
 
 } // namespace
