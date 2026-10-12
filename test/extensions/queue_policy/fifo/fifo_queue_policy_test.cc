@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <type_traits>
 #include <vector>
 
@@ -90,7 +91,8 @@ TEST_F(FifoQueueFactoryTest, CanConstructFactory) {
 TEST_F(FifoQueueFactoryTest, CreateQueuePolicyReturnsValidPtr) {
   FifoQueuePolicyConfig config;
   auto result = factory_.createQueuePolicy(config, "test_prefix",
-                                           ProtobufMessage::getStrictValidationVisitor());
+                                           ProtobufMessage::getStrictValidationVisitor(),
+                                           []() -> uint64_t { return 1024; });
   EXPECT_TRUE(result.ok());
   EXPECT_NE(result.value(), nullptr);
 }

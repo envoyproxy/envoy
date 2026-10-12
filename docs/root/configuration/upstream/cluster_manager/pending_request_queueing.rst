@@ -30,14 +30,17 @@ Adaptive LIFO
 
 The :ref:`adaptive LIFO queue policy
 <envoy_v3_api_msg_extensions.queue_policy.adaptive_lifo.v3.AdaptiveLifoQueuePolicyConfig>` uses FIFO
-ordering while the queue size is below the configured threshold. When the queue size reaches the
-threshold, it selects the most recently queued request until the queue size falls below the
-threshold again.
+ordering until the queue size reaches the configured high watermark. It then selects the most
+recently queued request until the queue size reaches or falls below the low watermark. The
+watermarks are percentages of the priority-specific ``max_pending_requests`` circuit breaker
+limit. Each connection pool applies the resulting thresholds to its own pending request queue.
+Separate watermarks prevent the policy from repeatedly switching order near the overload boundary.
 
 Adaptive LIFO prioritizes newer requests during overload. Older requests may wait longer, and under
 sustained overload they may time out before being selected.
 
-The following cluster fragment configures adaptive LIFO with a threshold of 100 pending requests:
+The following cluster fragment configures adaptive LIFO to enter LIFO mode at 80% of the pending
+request circuit breaker limit and return to FIFO mode at or below 60%:
 
 .. code-block:: yaml
 
@@ -46,7 +49,10 @@ The following cluster fragment configures adaptive LIFO with a threshold of 100 
       name: envoy.queue_policy.adaptive_lifo
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.queue_policy.adaptive_lifo.v3.AdaptiveLifoQueuePolicyConfig
-        lifo_switch_threshold: 100
+        high_watermark:
+          value: 80
+        low_watermark:
+          value: 60
 
 Observability
 -------------

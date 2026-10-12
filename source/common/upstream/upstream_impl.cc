@@ -114,8 +114,11 @@ resolvePendingRqQueuePolicy(
   RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(queue_policy_config.typed_config(),
                                                           server_context.messageValidationVisitor(),
                                                           *factory_config));
+  // This instance is only used to run factory-specific validation. Connection pools provide the
+  // live priority-specific limit when they create their queue instances.
   auto queue = factory->createQueuePolicy(*factory_config, stat_prefix,
-                                          server_context.messageValidationVisitor());
+                                          server_context.messageValidationVisitor(),
+                                          []() -> uint64_t { return 1; });
   RETURN_IF_NOT_OK(queue.status());
 
   auto policy = std::make_unique<ClusterInfo::PendingRqQueuePolicy>();
