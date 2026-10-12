@@ -37,9 +37,9 @@ public:
   QuicValidateResultCallback(Event::Dispatcher& dispatcher,
                              std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback,
                              const std::string& hostname, absl::string_view leaf_cert,
-                             bool accept_untrusted)
+                             bool verify_hostname)
       : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)), hostname_(hostname),
-        leaf_cert_(leaf_cert), accept_untrusted_(accept_untrusted) {}
+        leaf_cert_(leaf_cert), verify_hostname_(verify_hostname) {}
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -48,7 +48,7 @@ public:
     std::string error;
     if (!succeeded) {
       error = error_details;
-    } else if (!accept_untrusted_) {
+    } else if (verify_hostname_) {
       std::unique_ptr<quic::CertificateView> cert_view =
           quic::CertificateView::ParseSingleCertificate(leaf_cert_);
       succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);
@@ -64,10 +64,23 @@ private:
   const std::string hostname_;
   // Leaf cert needs to be retained in case of asynchronous validation.
   std::string leaf_cert_;
-  const bool accept_untrusted_;
+  // Whether the leaf certificate must carry a DNS SAN matching the hostname once the chain has
+  // been validated.
+  const bool verify_hostname_;
 };
 
 } // namespace
+
+bool EnvoyQuicProofVerifier::hasExplicitIdentityCheck(
+    const Envoy::Ssl::CertificateValidationContextConfig* validation_context) {
+  if (validation_context == nullptr || validation_context->autoSniSanMatch()) {
+    return false;
+  }
+  return !validation_context->subjectAltNameMatchers().empty() ||
+         !validation_context->verifyCertificateHashList().empty() ||
+         !validation_context->verifyCertificateSpkiList().empty() ||
+         validation_context->customValidatorConfig().has_value();
+}
 
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& hostname, const uint16_t /*port*/,
@@ -103,9 +116,23 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_FAILURE;
   }
 
+  // Once the chain is validated the leaf certificate must carry a DNS SAN matching the hostname
+  // (the SNI), unless untrusted certificates are accepted, or the operator configured an explicit
+  // identity check (SAN matchers, certificate pins or a custom validator, either in the validation
+  // context or as a per-connection SAN override) which replaces the SNI-derived check the same way
+  // it does for the TLS client on TCP.
+  const bool explicit_identity_check =
+      explicit_identity_check_ ||
+      (verify_context->transportSocketOptions() != nullptr &&
+       !verify_context->transportSocketOptions()->verifySubjectAltNameListOverride().empty());
+  const bool verify_hostname =
+      !accept_untrusted_ &&
+      !(explicit_identity_check &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_hostname_check_deferred_to_explicit_san_match"));
   auto envoy_callback = std::make_unique<QuicValidateResultCallback>(
       verify_context->dispatcher(), std::move(callback), hostname, std::string(certs[0]),
-      accept_untrusted_);
+      verify_hostname);
   ASSERT(dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get()) !=
          nullptr);
   // We down cast rather than add customVerifyCertChainForQuic to Envoy::Ssl::Context because
@@ -121,7 +148,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_PENDING;
   }
   if (result.status == ValidationResults::ValidationStatus::Successful) {
-    if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
+    if (!verify_hostname || verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
       // Hand the verifier-built chain (not the peer-sent list) to the details so the connection
       // info can report the validated issuer.
       *details = std::make_unique<CertVerifyResult>(true, std::move(result.validated_chain));

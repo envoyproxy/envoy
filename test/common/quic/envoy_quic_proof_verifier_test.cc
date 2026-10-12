@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <memory>
 
+#include "source/common/common/hex.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/tls/client_context_impl.h"
@@ -19,6 +20,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/x509.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/test_tools/test_certificates.h"
 
@@ -79,16 +81,50 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, subjectAltNameMatchers())
         .WillRepeatedly(ReturnRef(san_matchers_));
     EXPECT_CALL(cert_validation_ctx_config_, verifyCertificateHashList())
-        .WillRepeatedly(ReturnRef(empty_string_list_));
+        .WillRepeatedly(ReturnRef(verify_certificate_hash_list_));
     EXPECT_CALL(cert_validation_ctx_config_, verifyCertificateSpkiList())
-        .WillRepeatedly(ReturnRef(empty_string_list_));
+        .WillRepeatedly(ReturnRef(verify_certificate_spki_list_));
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
-    EXPECT_CALL(cert_validation_ctx_config_, autoSniSanMatch()).WillRepeatedly(Return(false));
+    EXPECT_CALL(cert_validation_ctx_config_, autoSniSanMatch())
+        .WillRepeatedly(Return(auto_sni_san_match_));
     auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
     THROW_IF_NOT_OK_REF(context_or_error.status());
-    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error));
+    // Derive the explicit identity check flag from the validation context the same way
+    // QuicClientTransportSocketFactory does.
+    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(
+        std::move(*context_or_error), /*accept_untrusted=*/false,
+        EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&cert_validation_ctx_config_));
+  }
+
+  // Adds a DNS SAN matcher for one of the SANs of the QUICHE test leaf certificate, so chain
+  // validation with the matcher succeeds regardless of the hostname handed to the verifier.
+  void addMatchingDnsSanMatcher() {
+    auto& matcher = san_matchers_.emplace_back();
+    matcher.set_san_type(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+    matcher.mutable_matcher()->set_exact("www.example.org");
+  }
+
+  // Hex-encoded SHA-256 of the DER leaf certificate, as configured in verify_certificate_hash.
+  std::string leafCertHash() const {
+    const auto* der = reinterpret_cast<const uint8_t*>(leaf_cert_.data());
+    bssl::UniquePtr<X509> cert(d2i_X509(nullptr, &der, leaf_cert_.size()));
+    RELEASE_ASSERT(cert != nullptr, "");
+    std::vector<uint8_t> digest(EVP_MAX_MD_SIZE);
+    unsigned int len = 0;
+    RELEASE_ASSERT(X509_digest(cert.get(), EVP_sha256(), digest.data(), &len) == 1, "");
+    digest.resize(len);
+    return Hex::encode(digest);
+  }
+
+  quic::QuicAsyncStatus verifySync(const std::string& hostname, std::string& error_details,
+                                   std::unique_ptr<quic::ProofVerifyDetails>& verify_details) {
+    const std::string ocsp_response;
+    const std::string cert_sct;
+    return verifier_->VerifyCertChain(hostname, 54321, {leaf_cert_}, ocsp_response, cert_sct,
+                                      &verify_context_, &error_details, &verify_details, nullptr,
+                                      nullptr);
   }
 
 protected:
@@ -96,8 +132,10 @@ protected:
   const std::string cert_name_{"some_cert_name"};
   const std::string alpn_{"h2,http/1.1"};
   const std::string sig_algs_{"rsa_pss_rsae_sha256"};
-  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
-      san_matchers_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
+  std::vector<std::string> verify_certificate_hash_list_;
+  std::vector<std::string> verify_certificate_spki_list_;
+  bool auto_sni_san_match_{false};
   const std::string empty_string_;
   const std::vector<std::string> empty_string_list_;
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
@@ -247,7 +285,12 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
   EXPECT_EQ("Leaf certificate doesn't match hostname: unknown.org", error_details);
 }
 
+// A custom validator is an explicit identity check, so the SNI-derived hostname check only runs
+// on the async path when the runtime guard deferring it is disabled.
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainFailureInvalidHost) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_hostname_check_deferred_to_explicit_san_match", "false"}});
   custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
   TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
 name: "envoy.tls.cert_validator.timed_cert_validator"
@@ -278,6 +321,149 @@ typed_config:
             EXPECT_NE(verify_details, nullptr);
             auto details = std::unique_ptr<quic::ProofVerifyDetails>((*verify_details)->Clone());
             EXPECT_FALSE(static_cast<CertVerifyResult&>(*details).isValid());
+          }));
+  verify_timer->invokeCallback();
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, HasExplicitIdentityCheck) {
+  EXPECT_FALSE(EnvoyQuicProofVerifier::hasExplicitIdentityCheck(nullptr));
+
+  NiceMock<Ssl::MockCertificateValidationContextConfig> config;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> matchers;
+  std::vector<std::string> hashes;
+  std::vector<std::string> spkis;
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator;
+  ON_CALL(config, subjectAltNameMatchers()).WillByDefault(ReturnRef(matchers));
+  ON_CALL(config, verifyCertificateHashList()).WillByDefault(ReturnRef(hashes));
+  ON_CALL(config, verifyCertificateSpkiList()).WillByDefault(ReturnRef(spkis));
+  ON_CALL(config, customValidatorConfig()).WillByDefault(ReturnRef(custom_validator));
+  ON_CALL(config, autoSniSanMatch()).WillByDefault(Return(false));
+
+  // A bare trusted CA is not an identity check.
+  EXPECT_FALSE(EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&config));
+
+  matchers.emplace_back();
+  EXPECT_TRUE(EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&config));
+  // Requesting the SNI to be matched against a DNS SAN keeps the hostname check.
+  ON_CALL(config, autoSniSanMatch()).WillByDefault(Return(true));
+  EXPECT_FALSE(EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&config));
+  ON_CALL(config, autoSniSanMatch()).WillByDefault(Return(false));
+  matchers.clear();
+
+  hashes.emplace_back("deadbeef");
+  EXPECT_TRUE(EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&config));
+  hashes.clear();
+
+  spkis.emplace_back("deadbeef");
+  EXPECT_TRUE(EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&config));
+  spkis.clear();
+
+  custom_validator = envoy::config::core::v3::TypedExtensionConfig();
+  EXPECT_TRUE(EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&config));
+}
+
+// With a SAN matcher configured the leaf certificate does not additionally have to carry a DNS SAN
+// matching the hostname, mirroring the TLS client on TCP.
+TEST_F(EnvoyQuicProofVerifierTest, SanMatcherSkipsHostnameCheck) {
+  addMatchingDnsSanMatcher();
+  configCertVerificationDetails(true);
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_SUCCESS, verifySync("unknown.org", error_details, verify_details))
+      << error_details;
+  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+// The SAN matcher itself is still enforced.
+TEST_F(EnvoyQuicProofVerifierTest, SanMatcherMismatchFails) {
+  auto& matcher = san_matchers_.emplace_back();
+  matcher.set_san_type(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+  matcher.mutable_matcher()->set_exact("unknown.org");
+  configCertVerificationDetails(true);
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_FAILURE, verifySync("unknown.org", error_details, verify_details));
+  EXPECT_THAT(error_details, testing::HasSubstr("verify cert failed: SAN matcher"));
+  EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, SanMatcherHostnameCheckWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_hostname_check_deferred_to_explicit_san_match", "false"}});
+  addMatchingDnsSanMatcher();
+  configCertVerificationDetails(true);
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_FAILURE, verifySync("unknown.org", error_details, verify_details));
+  EXPECT_EQ("Leaf certificate doesn't match hostname: unknown.org", error_details);
+}
+
+// auto_sni_san_validation asks for the SNI to be matched against a DNS SAN, so a SAN matcher does
+// not lift the hostname requirement.
+TEST_F(EnvoyQuicProofVerifierTest, AutoSniSanMatchKeepsHostnameCheck) {
+  auto_sni_san_match_ = true;
+  addMatchingDnsSanMatcher();
+  configCertVerificationDetails(true);
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  // The validator matches the SNI against the DNS SANs in place of the configured matcher.
+  EXPECT_EQ(quic::QUIC_FAILURE, verifySync("unknown.org", error_details, verify_details));
+  EXPECT_THAT(error_details, testing::HasSubstr("verify cert failed: SAN matcher"));
+  EXPECT_EQ(quic::QUIC_SUCCESS, verifySync("www.example.org", error_details, verify_details))
+      << error_details;
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, CertificateHashPinSkipsHostnameCheck) {
+  verify_certificate_hash_list_.push_back(leafCertHash());
+  configCertVerificationDetails(true);
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_SUCCESS, verifySync("unknown.org", error_details, verify_details))
+      << error_details;
+  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+// A per-connection SAN list override is an explicit identity check as well.
+TEST_F(EnvoyQuicProofVerifierTest, SubjectAltNameListOverrideSkipsHostnameCheck) {
+  // NOLINTNEXTLINE(modernize-make-shared)
+  transport_socket_options_.reset(new Network::TransportSocketOptionsImpl("", {"www.example.org"}));
+  configCertVerificationDetails(true);
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_SUCCESS, verifySync("unknown.org", error_details, verify_details))
+      << error_details;
+  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+// Async validation through a custom validator: the validator owns the identity check.
+TEST_F(EnvoyQuicProofVerifierTest, AsyncCustomValidatorSkipsHostnameCheck) {
+  custom_validator_config_ = envoy::config::core::v3::TypedExtensionConfig();
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+name: "envoy.tls.cert_validator.timed_cert_validator"
+typed_config:
+  "@type": type.googleapis.com/test.common.config.DummyConfig
+  )EOF"),
+                            custom_validator_config_.value());
+
+  configCertVerificationDetails(true);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  auto* quic_verify_callback = new MockProofVerifierCallback();
+  Event::MockTimer* verify_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_EQ(
+      quic::QUIC_PENDING,
+      verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
+                                 &verify_context_, &error_details, &verify_details, nullptr,
+                                 std::unique_ptr<MockProofVerifierCallback>(quic_verify_callback)));
+  EXPECT_TRUE(verify_timer->enabled());
+
+  EXPECT_CALL(*quic_verify_callback, Run(true, "", _))
+      .WillOnce(Invoke(
+          [](bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>* verify_details) {
+            EXPECT_TRUE(static_cast<CertVerifyResult&>(**verify_details).isValid());
           }));
   verify_timer->invokeCallback();
 }

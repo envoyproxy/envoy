@@ -654,7 +654,7 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::DownstreamTransportSocketFactoryPtr
+  virtual Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   std::unique_ptr<ThreadLocal::MockInstance> thread_local_storage_;
   std::unique_ptr<Server::Configuration::MockGenericFactoryContext> factory_context_storage_;
