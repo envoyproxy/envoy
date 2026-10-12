@@ -85,15 +85,20 @@ private:
 
   void onSlotTimer(int slot_index);
 
-  // Logs the thread ID of a traced thread at the configured log level.
-  void logThreadId(int64_t tid);
+  // Logs the given backtrace for the thread with the given ID at the
+  // configured log level.
+  void logBacktrace(int64_t tid, void* const* frames, int depth);
+
+  // Logs a message at the configured log level. The logging macros require
+  // the level as a compile-time token, so dispatch on the runtime level here.
+  void logMessage(const std::string& message);
 
   static BacktraceActionStats generateStats(Stats::Scope& scope);
 
   // Minimum amount of time between backtraces for a given thread.
   std::chrono::milliseconds cooldown_duration_;
 
-  // Log level used for the backtrace and thread ID logs.
+  // Log level used for the backtrace logs.
   const spdlog::level::level_enum log_level_;
 
   BacktraceActionStats stats_;

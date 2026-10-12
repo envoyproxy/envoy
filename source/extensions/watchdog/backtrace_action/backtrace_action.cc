@@ -2,6 +2,8 @@
 
 #include <unistd.h>
 
+#include <sstream>
+
 #include "envoy/thread/thread.h"
 
 #include "source/common/common/assert.h"
@@ -72,9 +74,7 @@ void BacktraceAction::onSlotTimer(int slot_index) {
   case SlotState::Ready: {
     // The handler finished writing the backtrace and it's safe to read.
     // Log it and free the slot for future use.
-    logThreadId(slot.tid.load(std::memory_order_relaxed));
-    BackwardsTrace tracer(slot.trace.frames, slot.trace.depth);
-    tracer.logTrace(log_level_);
+    logBacktrace(slot.tid.load(std::memory_order_relaxed), slot.trace.frames, slot.trace.depth);
     stats_.backtraces_logged_.inc();
     slot.state.store(SlotState::Free, std::memory_order_release);
     break;
@@ -105,26 +105,39 @@ void BacktraceAction::onSlotTimer(int slot_index) {
   }
 }
 
-void BacktraceAction::logThreadId(int64_t tid) {
+void BacktraceAction::logBacktrace(int64_t tid, void* const* frames, int depth) {
+  BackwardsTrace tracer(frames, depth);
+  std::ostringstream os;
+  os << "Backtrace Action: backtrace for thread " << tid << ":\n";
+  tracer.printTrace(os);
+  std::string message = os.str();
+  // Drop the trailing newline added by printTrace.
+  if (!message.empty() && message.back() == '\n') {
+    message.pop_back();
+  }
+  logMessage(message);
+}
+
+void BacktraceAction::logMessage(const std::string& message) {
   switch (log_level_) {
   case spdlog::level::trace:
-    ENVOY_LOG_MISC(trace, "Backtrace Action: backtrace for thread {}:", tid);
+    ENVOY_LOG_MISC(trace, "{}", message);
     return;
   case spdlog::level::debug:
-    ENVOY_LOG_MISC(debug, "Backtrace Action: backtrace for thread {}:", tid);
+    ENVOY_LOG_MISC(debug, "{}", message);
     return;
   case spdlog::level::info:
-    ENVOY_LOG_MISC(info, "Backtrace Action: backtrace for thread {}:", tid);
+    ENVOY_LOG_MISC(info, "{}", message);
     return;
   case spdlog::level::warn:
-    ENVOY_LOG_MISC(warn, "Backtrace Action: backtrace for thread {}:", tid);
+    ENVOY_LOG_MISC(warn, "{}", message);
     return;
   case spdlog::level::err:
-    ENVOY_LOG_MISC(error, "Backtrace Action: backtrace for thread {}:", tid);
+    ENVOY_LOG_MISC(error, "{}", message);
     return;
   case spdlog::level::critical:
   default:
-    ENVOY_LOG_MISC(critical, "Backtrace Action: backtrace for thread {}:", tid);
+    ENVOY_LOG_MISC(critical, "{}", message);
     return;
   }
 }
