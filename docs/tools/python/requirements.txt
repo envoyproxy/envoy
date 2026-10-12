@@ -459,9 +459,9 @@ envoy-base-utils==0.6.12 \
     #   -r tools/python/requirements.in
     #   envoy-code-check
     #   envoy-docs-sphinx-runner
-envoy-code-check==0.6.9 \
-    --hash=sha256:9a212107476b4a36b3743fb550eacad3ede72b3cdbf825dc944c25e48e4e1eb6 \
-    --hash=sha256:9ded56211e8e81ffc27c97b923e17dd7a6dd60e72454755f07bb1555ca019279
+envoy-code-check==0.6.10 \
+    --hash=sha256:4d76314c019af45d23d7fe004a76e24e8f009040a5743a4a82db2de066a08eb6 \
+    --hash=sha256:f0357c197427b2e5c88ddade4a9abef1a35bf86d90ce2b522acdde2288085ff7
     # via -r tools/python/requirements.in
 envoy-docs-sphinx-runner==0.3.2 \
     --hash=sha256:76ca59da2237b6aabc453ed067808aa7d603913e1de0ad8b2db3dddee99190be \
