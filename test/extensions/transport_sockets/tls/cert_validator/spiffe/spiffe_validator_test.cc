@@ -70,7 +70,10 @@ public:
 
     // Initialize SPIFFEValidator with mocked context and stats
     absl::Status creation_status = absl::OkStatus();
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+    const auto message = TestUtility::anyConvert<
+        envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig>(
+        typed_conf.typed_config());
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), message, stats_, factory_context_,
                                                    *store_.rootScope(), creation_status);
     return creation_status;
   }
@@ -125,7 +128,10 @@ public:
     }
 
     absl::Status creation_status = absl::OkStatus();
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+    const auto message = TestUtility::anyConvert<
+        envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig>(
+        typed_conf.typed_config());
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), message, stats_, factory_context_,
                                                    *store_.rootScope(), creation_status);
     return creation_status;
   }

@@ -142,21 +142,14 @@ parseTrustBundles(absl::string_view trust_bundle_mapping_str) {
 SINGLETON_MANAGER_REGISTRATION(spiffe_trust_bundles);
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                 SslStats& stats,
+                                 const SPIFFEConfig& message, SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Stats::Scope& scope, absl::Status& creation_status)
-    : stats_(stats), time_source_(context.timeSource()) {
+    : allow_optional_client_certificate_(message.allow_optional_client_certificate()),
+      stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
   suppress_client_ca_list_ = config->suppressClientCaList();
-
-  SPIFFEConfig message;
-  SET_AND_RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
-                               config->customValidatorConfig().value().typed_config(),
-                               ProtobufMessage::getStrictValidationVisitor(), message),
-                           creation_status);
-
-  allow_optional_client_certificate_ = message.allow_optional_client_certificate();
 
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
@@ -578,9 +571,14 @@ public:
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context,
                       Stats::Scope& scope) override {
+    ASSERT(config != nullptr);
+    SPIFFEConfig message;
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        config->customValidatorConfig().value().typed_config(),
+        ProtobufMessage::getStrictValidationVisitor(), message));
     absl::Status creation_status = absl::OkStatus();
     auto validator =
-        std::make_unique<SPIFFEValidator>(config, stats, context, scope, creation_status);
+        std::make_unique<SPIFFEValidator>(config, message, stats, context, scope, creation_status);
     RETURN_IF_NOT_OK(creation_status);
     return validator;
   }
