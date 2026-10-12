@@ -167,6 +167,15 @@ inline void on_coroutine_resume(PromiseBase& promise) {
   current_coroutine.store(&promise, std::memory_order_relaxed);
 }
 
+// Temporarily clear current coroutine handle, resume another coroutine and then restore the handle.
+// Use when coroutine is/could be resumed from another coroutine via the handle, without co_await
+// to preserve backtrace stack. It is safe to call from both sync and async functions.
+inline void resume_handle(std::coroutine_handle<> handle) {
+  PromiseBase* promise_ = current_coroutine.exchange(nullptr, std::memory_order_relaxed);
+  handle.resume();
+  current_coroutine.store(promise_, std::memory_order_relaxed);
+}
+
 // ---------------------------------------------------------------------------
 // Promise machinery shared by every coroutine type (Task<T> and the detached
 // RootTask). Holds the two things propagated down the chain -- the context and
