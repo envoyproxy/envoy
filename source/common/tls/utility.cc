@@ -273,19 +273,19 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(str)), ASN1_STRING_length(str));
     break;
   case GEN_IPADD: {
-    if (general_name->d.ip->length == 4) {
+    if (ASN1_STRING_length(general_name->d.ip) == 4) {
       sockaddr_in sin;
       memset(&sin, 0, sizeof(sin));
       sin.sin_port = 0;
       sin.sin_family = AF_INET;
-      safeMemcpyUnsafeSrc(&sin.sin_addr, general_name->d.ip->data);
+      safeMemcpyUnsafeSrc(&sin.sin_addr, ASN1_STRING_get0_data(general_name->d.ip));
       san = Network::Address::Ipv4Instance::sockaddrToString(sin);
-    } else if (general_name->d.ip->length == 16) {
+    } else if (ASN1_STRING_length(general_name->d.ip) == 16) {
       sockaddr_in6 sin6;
       memset(&sin6, 0, sizeof(sin6));
       sin6.sin6_port = 0;
       sin6.sin6_family = AF_INET6;
-      safeMemcpyUnsafeSrc(&sin6.sin6_addr, general_name->d.ip->data);
+      safeMemcpyUnsafeSrc(&sin6.sin6_addr, ASN1_STRING_get0_data(general_name->d.ip));
       san = Network::Address::Ipv6Instance::sockaddrToString(sin6);
     }
     break;

@@ -965,7 +965,7 @@ proxy-wasm-rust-sdk:
   project_desc: "WebAssembly for Proxies (Rust SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk"
   apparent_name: proxy-wasm-rust-sdk
-  release_date: "2025-10-01"
+  release_date: "2026-05-20"
   use_category:
   - test_only
   license: "Apache-2.0"
@@ -1465,7 +1465,7 @@ zstd:
   project_name: "zstd"
   project_desc: "zstd compression library"
   project_url: "https://facebook.github.io/zstd"
-  release_date: "2026-09-22"
+  release_date: "2026-10-06"
   use_category:
   - dataplane_ext
   extensions:

@@ -456,6 +456,12 @@ EXTENSIONS = {
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 
     #
+    # TLS handshakers
+    #
+
+    "envoy.tls.handshakers.dynamic_modules":             "//source/extensions/transport_sockets/tls/handshakers/dynamic_modules:config",
+
+    #
     # HTTP header formatters
     #
 

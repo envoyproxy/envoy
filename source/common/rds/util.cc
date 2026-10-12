@@ -3,10 +3,8 @@
 namespace Envoy {
 namespace Rds {
 
-ArenaWrappedProto<Protobuf::Message> cloneProto(ProtoTraits& proto_traits,
-                                                const Protobuf::Message& rc) {
-  auto empty = proto_traits.createEmptyProto();
-  ArenaWrappedProto<Protobuf::Message> clone(std::move(empty));
+ProtobufTypes::MessagePtr cloneProto(ProtoTraits& proto_traits, const Protobuf::Message& rc) {
+  auto clone = proto_traits.createEmptyProto();
   clone->CheckTypeAndMergeFrom(rc);
   return clone;
 }

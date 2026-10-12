@@ -910,6 +910,20 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       "ns_req_header_typed",
       &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02],
     );
+    let (type_url, value) = envoy_filter
+      .get_typed_metadata(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "ns_req_header_typed",
+      )
+      .unwrap();
+    assert_eq!(type_url.as_slice(), b"t/x");
+    assert_eq!(value.as_slice(), &[0x01, 0x02]);
+    assert!(envoy_filter
+      .get_typed_metadata(
+        abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+        "missing"
+      )
+      .is_none());
 
     // Try getting metadata from rotuer cluster and host.
     let metadata = envoy_filter.get_metadata_string(
@@ -1222,7 +1236,11 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
     let ok = envoy_filter.set_filter_state_typed(b"no.such.factory", b"value");
     assert!(!ok);
 
+    assert!(envoy_filter.has_filter_state(b"envoy.test.http_typed_object_for_rust"));
+    assert!(!envoy_filter.has_filter_state(b"nonexistent_key"));
+
     envoy_filter.set_filter_state_bytes(b"req_header_key", b"req_header_value");
+    assert!(envoy_filter.has_filter_state(b"req_header_key"));
     let filter_state = envoy_filter.get_filter_state_bytes(b"req_header_key");
     assert!(filter_state.is_some());
     assert_eq!(filter_state.unwrap().as_slice(), b"req_header_value");
@@ -1399,9 +1417,7 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
         envoy_filter.get_received_response_body()
       };
 
-      if optional_vec.is_some() {
-        let received_vec = optional_vec.unwrap();
-
+      if let Some(received_vec) = optional_vec {
         let buffer_bytes = received_vec
           .iter()
           .map(|buf| buf.as_slice().len())
@@ -1420,9 +1436,7 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
         envoy_filter.get_buffered_response_body()
       };
 
-      if optional_vec.is_some() {
-        let buffered_vec = optional_vec.unwrap();
-
+      if let Some(buffered_vec) = optional_vec {
         let buffer_bytes = buffered_vec
           .iter()
           .map(|buf| buf.as_slice().len())
@@ -1479,8 +1493,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading new received request body.
       let body = envoy_filter.get_received_request_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
         self.request_body.borrow_mut().extend_from_slice(&buf[..n]);
@@ -1498,8 +1512,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading old buffered request body.
       let body = envoy_filter.get_buffered_request_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
         self.request_body.borrow_mut().extend_from_slice(&buf[..n]);
@@ -1526,8 +1540,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading new received response body.
       let body = envoy_filter.get_received_response_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buffer = Vec::new();
         std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
         self.response_body.borrow_mut().extend_from_slice(&buffer);
@@ -1545,8 +1559,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     {
       // Test reading old buffered response body.
       let body = envoy_filter.get_buffered_response_body();
-      if body.is_some() {
-        let mut reader = BodyReader::new(body.unwrap());
+      if let Some(body) = body {
+        let mut reader = BodyReader::new(body);
         let mut buffer = Vec::new();
         std::io::Read::read_to_end(&mut reader, &mut buffer).unwrap();
         self.response_body.borrow_mut().extend_from_slice(&buffer);

@@ -5,7 +5,9 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.validate.h"
 
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/listener_manager/fcds_api.h"
 #include "source/common/protobuf/utility.h"
 
@@ -14,6 +16,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -74,7 +77,7 @@ public:
     absl::Status creation_status;
     fcds_api_ = std::make_unique<FcdsApiImpl>(fcds_config.config_source(), filter_chain_name,
                                               callbacks_, cluster_manager_, scope_,
-                                              validation_visitor_, creation_status);
+                                              resource_type_helper_, creation_status);
     EXPECT_OK(creation_status);
     init_manager_.add(fcds_api_->initTarget());
     init_manager_.initialize(init_watcher_);
@@ -86,6 +89,7 @@ public:
   NiceMock<MockFilterChainUpdateCallbacks> callbacks_;
   Config::SubscriptionCallbacks* fcds_callbacks_{};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  Config::ResourceTypeHelper<FilterChainProto> resource_type_helper_{validation_visitor_, "name"};
   NiceMock<Init::MockManager> init_manager_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
@@ -115,8 +119,19 @@ TEST_F(FcdsApiTest, OnConfigUpdateDecodesAndPropagates) {
   // Still warming.
   EXPECT_EQ(fcds_api_->filterChain(), nullptr);
 
-  // Ensure the idempotent update does not trigger a callback.
-  EXPECT_OK(fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
+  // Ensure the idempotent update is skipped via the config hash.
+  EXPECT_LOG_CONTAINS("debug", "fcds: skip update for name chain-1", {
+    EXPECT_OK(fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, removed_resources, "v1"));
+  });
+
+  // A changed config has a different hash and is applied rather than skipped.
+  filter_chain.add_filters()->set_name("tcp");
+  EXPECT_CALL(callbacks_, onFilterChainUpdated(testing::Property(
+                              &envoy::config::listener::v3::FilterChain::name, "chain-1")))
+      .WillOnce(Return(absl::OkStatus()));
+  const auto changed_resources = TestUtility::decodeResources({filter_chain});
+  EXPECT_OK(fcds_callbacks_->onConfigUpdate(changed_resources.refvec_, removed_resources, "v2"));
+  EXPECT_EQ(fcds_api_->versionInfo(), "v2");
 
   // Destruction unblocks the watcher.
   EXPECT_CALL(init_watcher_, ready());

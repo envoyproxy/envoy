@@ -1259,6 +1259,45 @@ TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseEmitsConnectionReset) {
   EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
 }
 
+TEST_F(IoHandleImplTest, ShutdownWriteFollowedByPeerCloseEmitsEof) {
+  // This handle half-closes its write side.
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+  EXPECT_TRUE(io_handle_peer_->hasReceivedEof());
+
+  // Peer then closes its connection.
+  io_handle_peer_->close();
+
+  // Since this handle already sent EOF (shutdown(WR)), peer's close completes an orderly shutdown.
+  // The subsequent read on this handle must return clean EOF, not ECONNRESET.
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(0, read_res.return_value_);
+  EXPECT_EQ(nullptr, read_res.err_);
+}
+
+TEST_F(IoHandleImplTest, ShutdownWriteFollowedByPeerWriteAndCloseEmitsDataThenEof) {
+  // This handle half-closes its write side.
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+
+  // Peer writes response data and then closes.
+  Buffer::OwnedImpl buf_to_write("response");
+  io_handle_peer_->write(buf_to_write);
+  io_handle_peer_->close();
+
+  // This handle should read the pending data first, then clean EOF.
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(8, read_res.return_value_);
+  EXPECT_EQ("response", read_buf.toString());
+
+  auto eof_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(eof_res.ok());
+  EXPECT_EQ(0, eof_res.return_value_);
+  EXPECT_EQ(nullptr, eof_res.err_);
+}
+
 TEST_F(IoHandleImplTest, PeerCloseEmitsEofGuardDisabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(

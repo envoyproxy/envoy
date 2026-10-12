@@ -236,6 +236,47 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerShutdownWritePreser
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
+
+// Feature on: shutdown(WR) (write with end_stream=true), followed by peer calling close(). The
+// peer's close completes a graceful four-way shutdown (bothSidesHalfClosed()). The connection
+// terminates with RemoteClose and DetectedCloseType::Normal.
+TEST_F(InternalClientConnectionImplTest,
+       HalfCloseEnabledShutdownWriteThenPeerCloseEmitsCleanRemoteClose) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->enableHalfClose(true);
+  auto read_filter = std::make_shared<NiceMock<Network::MockReadFilter>>();
+  client_->addReadFilter(read_filter);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Client half-closes its write side.
+  Buffer::OwnedImpl empty_buf;
+  client_->write(empty_buf, /*end_stream=*/true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(io_handle_peer_->hasReceivedEof());
+
+  // Peer then fully closes. Because client already sent EOF, this completes the graceful
+  // four-way shutdown. The connection must fire RemoteClose with DetectedCloseType::Normal.
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  io_handle_peer_->close();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, client_->detectedCloseType());
+}
 } // namespace
 } // namespace UserSpace
 } // namespace IoSocket

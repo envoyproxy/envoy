@@ -355,19 +355,31 @@ struct ClusterHostCounts {
 };
 
 /**
- * A snapshot of stream timing information. The request start time is a Unix timestamp in
- * nanoseconds. All other fields are durations from the monotonic request start time. Unavailable
- * values are -1.
+ * Stream timing from Envoy. start_time_unix_ns is a Unix timestamp in nanoseconds; all other fields
+ * are nanosecond offsets from the monotonic request start. Unavailable values are std::nullopt;
+ * zero is valid. Connection and handshake offsets can be negative when the connection predates the
+ * request.
  */
 struct TimingInfo {
-  int64_t start_time_unix_ns;
-  int64_t request_complete_duration_ns;
-  int64_t first_upstream_tx_byte_sent_ns;
-  int64_t last_upstream_tx_byte_sent_ns;
-  int64_t first_upstream_rx_byte_received_ns;
-  int64_t last_upstream_rx_byte_received_ns;
-  int64_t first_downstream_tx_byte_sent_ns;
-  int64_t last_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> start_time_unix_ns;
+  std::optional<int64_t> downstream_connection_begin_ns;
+  std::optional<int64_t> downstream_handshake_start_ns;
+  std::optional<int64_t> downstream_handshake_complete_ns;
+  std::optional<int64_t> last_downstream_header_rx_byte_received_ns;
+  std::optional<int64_t> last_downstream_rx_byte_received_ns;
+  std::optional<int64_t> upstream_connect_start_ns;
+  std::optional<int64_t> upstream_connect_complete_ns;
+  std::optional<int64_t> upstream_handshake_complete_ns;
+  std::optional<int64_t> first_upstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_upstream_tx_byte_sent_ns;
+  std::optional<int64_t> first_upstream_rx_byte_received_ns;
+  std::optional<int64_t> first_upstream_rx_body_byte_received_ns;
+  std::optional<int64_t> last_upstream_rx_byte_received_ns;
+  std::optional<int64_t> first_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_downstream_ack_received_ns;
+  std::optional<int64_t> request_complete_duration_ns;
+  std::optional<int64_t> downstream_connection_end_ns;
 };
 
 class ChildSpan;
@@ -472,6 +484,16 @@ public:
    * @return The bool value if found, otherwise nullopt.
    */
   virtual std::optional<bool> getMetadataBool(std::string_view ns, std::string_view key) = 0;
+
+  /**
+   * Retrieves the type URL and serialized message payload of typed dynamic metadata.
+   * The returned views are valid until the end of the current event hook unless a setter modifies
+   * the metadata.
+   * @param ns The typed metadata namespace.
+   * @return The type URL and payload if found, otherwise nullopt. Empty fields are valid results.
+   */
+  virtual std::optional<std::pair<std::string_view, std::string_view>>
+  getTypedMetadata(std::string_view ns) = 0;
 
   /**
    * Retrieves all keys in a metadata namespace.
@@ -739,6 +761,14 @@ public:
    * @return true if the value was stored successfully.
    */
   virtual bool setFilterStateTyped(std::string_view key, std::string_view value) = 0;
+
+  /**
+   * Checks whether a filter state entry with the given key exists, regardless of its type. Unlike
+   * the getter methods, this does not read or serialize the stored object.
+   * @param key The filter state key.
+   * @return true if the key exists.
+   */
+  virtual bool hasFilterState(std::string_view key) = 0;
 
   /**
    * Returns the worker index assigned to the current filter instance.

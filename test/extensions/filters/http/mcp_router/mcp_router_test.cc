@@ -137,6 +137,49 @@ TEST_F(McpRouterConfigTest, DefaultMetadataNamespace) {
   EXPECT_EQ(config.metadataNamespace(), "envoy.filters.http.mcp");
 }
 
+// Verifies that when header_forwarding is not set on a backend, the resulting policy is
+// secure-by-default: forward_all is false and no headers beyond the router's own synthesized
+// ones are forwarded. Core behavioral requirement of issue #46525.
+TEST_F(McpRouterConfigTest, HeaderForwardingDefaultsToSecurePolicyWhenUnset) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+
+  const McpBackendConfig* backend = config.findBackend("test");
+  ASSERT_NE(backend, nullptr);
+  EXPECT_FALSE(backend->header_forwarding.forward_all);
+  EXPECT_TRUE(backend->header_forwarding.allowed_headers.empty());
+  EXPECT_TRUE(backend->header_forwarding.disallowed_headers.empty());
+  EXPECT_FALSE(headerCanBeForwarded("authorization", backend->header_forwarding));
+}
+
+// Verifies forward_all and allowed/disallowed_headers on McpRouter.McpBackend are parsed into
+// the backend's HeaderForwardingPolicy correctly.
+TEST_F(McpRouterConfigTest, HeaderForwardingParsesForwardAllAndMatchers) {
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter proto_config;
+
+  auto* server = proto_config.add_servers();
+  server->set_name("test");
+  server->mutable_mcp_cluster()->set_cluster("test_cluster");
+  auto* header_forwarding = server->mutable_header_forwarding();
+  header_forwarding->set_forward_all(true);
+  header_forwarding->mutable_disallowed_headers()->add_patterns()->set_exact("authorization");
+
+  McpRouterConfigImpl config(proto_config, "test.", *store_.rootScope(),
+                             factory_context_.server_factory_context_);
+
+  const McpBackendConfig* backend = config.findBackend("test");
+  ASSERT_NE(backend, nullptr);
+  EXPECT_TRUE(backend->header_forwarding.forward_all);
+  EXPECT_TRUE(headerCanBeForwarded("x-anything", backend->header_forwarding));
+  EXPECT_FALSE(headerCanBeForwarded("authorization", backend->header_forwarding));
+}
+
 // Verifies McpRouterClusterConfigImpl parses ClusterConfig proto correctly.
 TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
   envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig proto_config;
@@ -161,6 +204,33 @@ TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesProto) {
   EXPECT_EQ(backend->cluster_name, "target_cluster");
   EXPECT_EQ(backend->path, "/custom_mcp");
   EXPECT_EQ(backend->timeout, std::chrono::milliseconds(10000));
+  // Same secure-by-default requirement applies to mcp_multicluster's independent
+  // ClusterConfig.McpBackend.HeaderForwarding message.
+  EXPECT_FALSE(backend->header_forwarding.forward_all);
+  EXPECT_FALSE(headerCanBeForwarded("authorization", backend->header_forwarding));
+}
+
+// Verifies forward_all and allowed/disallowed_headers on mcp_multicluster's
+// ClusterConfig.McpBackend are parsed into the backend's HeaderForwardingPolicy correctly --
+// this is a separate proto message from McpRouter.McpBackend's, so needs its own coverage.
+TEST_F(McpRouterConfigTest, McpRouterClusterConfigImplParsesHeaderForwarding) {
+  envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig proto_config;
+  auto* server = proto_config.add_servers();
+  server->set_name("cluster_backend");
+  server->mutable_mcp_cluster()->set_cluster("target_cluster");
+  auto* header_forwarding = server->mutable_header_forwarding();
+  header_forwarding->mutable_allowed_headers()->add_patterns()->set_exact("x-trace-id");
+
+  envoy::extensions::filters::http::mcp_router::v3::McpRouter base_proto;
+  auto base_config = std::make_shared<McpRouterConfigImpl>(
+      base_proto, "test.", *store_.rootScope(), factory_context_.server_factory_context_);
+
+  McpRouterClusterConfigImpl cluster_config(proto_config, base_config);
+
+  const McpBackendConfig* backend = cluster_config.findBackend("cluster_backend");
+  ASSERT_NE(backend, nullptr);
+  EXPECT_TRUE(headerCanBeForwarded("x-trace-id", backend->header_forwarding));
+  EXPECT_FALSE(headerCanBeForwarded("authorization", backend->header_forwarding));
 }
 
 class BackendStreamCallbacksTest : public testing::Test {};

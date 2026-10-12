@@ -108,6 +108,8 @@ cbor
 CDN
 CDS
 CEL
+COMDAT
+COFF
 CWND
 DLE
 DPE
@@ -458,6 +460,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+PSK
 Postgre
 Postgres
 Prereq
@@ -976,6 +979,7 @@ hackery
 hacky
 handoff
 handshaker
+handshakers
 hardcode
 hardcoded
 hardcodes
@@ -1037,6 +1041,7 @@ ints
 invariance
 invariants
 invoker
+Invocable
 iov
 iovcnt
 iovec

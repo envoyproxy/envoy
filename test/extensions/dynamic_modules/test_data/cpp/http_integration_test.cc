@@ -1228,8 +1228,40 @@ public:
 
   void onStreamComplete() override {
     const TimingInfo timing = handle_.getTimingInfo();
-    assertTrue(timing.start_time_unix_ns > 0, "start time");
-    assertTrue(timing.request_complete_duration_ns >= 0, "request complete duration");
+    assertTrue(timing.start_time_unix_ns.value() > 0, "start time");
+    assertTrue(timing.downstream_connection_begin_ns.has_value(), "downstream connection accepted");
+    assertTrue(!timing.downstream_handshake_start_ns.has_value(),
+               "no downstream TLS handshake start");
+    assertTrue(!timing.downstream_handshake_complete_ns.has_value(),
+               "no downstream TLS handshake completion");
+    assertTrue(timing.last_downstream_header_rx_byte_received_ns.value() >= 0,
+               "request headers received");
+    assertTrue(timing.last_downstream_rx_byte_received_ns.value() >=
+                   timing.last_downstream_header_rx_byte_received_ns.value(),
+               "request received");
+    assertTrue(timing.upstream_connect_start_ns.value() >= 0, "upstream connect start");
+    assertTrue(timing.upstream_connect_complete_ns.value() >=
+                   timing.upstream_connect_start_ns.value(),
+               "upstream connect complete");
+    assertTrue(!timing.upstream_handshake_complete_ns.has_value(), "no upstream TLS handshake");
+    assertTrue(timing.first_upstream_tx_byte_sent_ns.value() >= 0, "upstream request start");
+    assertTrue(timing.last_upstream_tx_byte_sent_ns.value() >=
+                   timing.first_upstream_tx_byte_sent_ns.value(),
+               "upstream request complete");
+    assertTrue(timing.first_upstream_rx_byte_received_ns.value() >= 0, "upstream response start");
+    assertTrue(timing.first_upstream_rx_body_byte_received_ns.value() >=
+                   timing.first_upstream_rx_byte_received_ns.value(),
+               "upstream response body start");
+    assertTrue(timing.last_upstream_rx_byte_received_ns.value() >=
+                   timing.first_upstream_rx_body_byte_received_ns.value(),
+               "upstream response complete");
+    assertTrue(timing.first_downstream_tx_byte_sent_ns.value() >= 0, "downstream response start");
+    assertTrue(timing.last_downstream_tx_byte_sent_ns.value() >=
+                   timing.first_downstream_tx_byte_sent_ns.value(),
+               "downstream response complete");
+    assertTrue(!timing.last_downstream_ack_received_ns.has_value(), "no TCP final ACK marker");
+    assertTrue(timing.request_complete_duration_ns.value() >= 0, "request complete duration");
+    assertTrue(!timing.downstream_connection_end_ns.has_value(), "connection remains open");
     assertEq(static_cast<size_t>(handle_.incrementCounterValue(timing_observed_total_, 1)),
              static_cast<size_t>(MetricsResult::Success), "timing counter");
   }

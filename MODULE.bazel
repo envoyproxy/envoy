@@ -19,7 +19,7 @@ bazel_dep(name = "boringssl", version = "0.20260929.0")
 bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy")
 bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
-bazel_dep(name = "brotli", version = "1.2.0.bcr.3")
+bazel_dep(name = "brotli", version = "1.2.0-260930-42a2ed4.envoy")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", repo_name = "buildifier")
 bazel_dep(name = "c-ares", version = "1.34.6.bcr.1")
 bazel_dep(name = "cel-cpp", version = "0.16.1.envoy")
@@ -29,8 +29,8 @@ bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.2.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.2.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.3.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.3.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -77,11 +77,11 @@ bazel_dep(name = "proto-field-extraction", version = "0.0.0-240710-d5d39f0.envoy
 bazel_dep(name = "proto-processing", version = "0.0.0-250110-279353c.envoy")
 bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
 bazel_dep(name = "proxy-wasm-cpp-sdk", version = "0.0.0-250925-e5256b0.envoy")
-bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.4-251205-5283e57.envoy")
+bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.5")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
 bazel_dep(name = "qatlib", version = "26.02.0.envoy")
 bazel_dep(name = "qatzip", version = "2.0.0.envoy")
-bazel_dep(name = "quiche", version = "0.0.0-260922-7f07dc4.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-261006-9e60ac2.envoy")
 bazel_dep(name = "ragel", version = "7.0.4-211228-d4577c9.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
 bazel_dep(name = "rules_apple", version = "5.1.0")
@@ -370,6 +370,7 @@ go_sdk.download(
         "linux_arm64": ("go1.27.1.linux-arm64.tar.gz", "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"),
         "darwin_arm64": ("go1.27.1.darwin-arm64.tar.gz", "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"),
         "darwin_amd64": ("go1.27.1.darwin-amd64.tar.gz", "8f8f52c6649542cf027bbc9b9c68d1ec042f9f34808a40413f0b8b3f66f3caa4"),
+        "windows_amd64": ("go1.27.1.windows-amd64.zip", "a3911b5e0e1b1053f25ed0675f4c1c6aad1e2bfcf253df2b9be4caabd2edd95d"),
     },
     version = "1.27.1",
 )
@@ -408,7 +409,7 @@ rust.repository_set(
     name = "rust_linux_s390x",
     edition = "2018",
     exec_triple = "s390x-unknown-linux-gnu",
-    versions = ["1.88.0"],
+    versions = ["1.97.1"],
 )
 rust.toolchain(
     edition = "2018",
@@ -418,8 +419,8 @@ rust.toolchain(
         "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
     ],
-    rustfmt_version = "1.88.0",
-    versions = ["1.88.0"],
+    rustfmt_version = "1.97.1",
+    versions = ["1.97.1"],
 )
 use_repo(rust, "rust_toolchains")
 
@@ -437,17 +438,7 @@ crate.from_cargo(
     lockfile = "//:Cargo.Bazel.envoy.lock",
     manifests = ["//:Cargo.toml"],
 )
-crate.from_cargo(
-    name = "dynamic_modules_rust_sdk_crate_index",
-    cargo_lockfile = "//:Cargo.lock",
-    lockfile = "//:Cargo.Bazel.dynamic_modules.lock",
-    manifests = ["//:Cargo.toml"],
-)
-use_repo(
-    crate,
-    "dynamic_modules_rust_sdk_crate_index",
-    "envoy_rust_crate_index",
-)
+use_repo(crate, "envoy_rust_crate_index")
 
 wasm_cargo = use_extension("//bazel:extensions.bzl", "wasm_cargo")
 use_repo(
@@ -460,9 +451,13 @@ crates_deps = use_extension("@proxy-wasm-rust-sdk//bazel:extensions.bzl", "crate
 use_repo(
     crates_deps,
     "crates_vendor",
-    "crates_vendor__hashbrown-0.16.0",
-    "crates_vendor__log-0.4.27",
+    "crates_vendor__hashbrown-0.16.1",
+    "crates_vendor__log-0.4.29",
 )
+
+# The vendored crate BUILD files of @proxy-wasm-rust-sdk reference @platforms, which the module
+# does not depend on.
+inject_repo(crates_deps, "platforms")
 
 # Proto/buf
 buf = use_extension("@rules_buf//buf:extensions.bzl", "buf")

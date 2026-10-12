@@ -1,10 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -53,10 +53,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "xray_fuzz_test",
     srcs = ["fuzz_test.cc"],
     corpus = "wildcard_matcher_corpus",
+    extension_names = ["envoy.tracers.xray"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/xray:xray_lib",

@@ -380,7 +380,7 @@ bool McpFilter::canEarlyTerminate() {
          !config_->propagateBaggage().has_value();
 }
 
-bool McpFilter::needsBody() const {
+bool McpFilter::needsBody() {
   if (config_->attributeSource() != envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS) {
     return true;
   }
@@ -389,6 +389,12 @@ bool McpFilter::needsBody() const {
   // new protocol. Legacy requests fall back to body parsing even when
   // attribute_source is HEADERS.
   if (!use_new_spec_semantics_) {
+    return true;
+  }
+
+  // 2026-07-28 requests must carry params._meta fields that are only visible in
+  // the body, so REJECT_NO_MCP always parses it to enforce them.
+  if (use_new_spec_semantics_ && shouldRejectRequest()) {
     return true;
   }
 
@@ -741,6 +747,11 @@ void McpFilter::sendUnsupportedProtocolVersionReply(absl::string_view requested_
 }
 
 void McpFilter::sendHeaderMismatchReply(absl::string_view error_msg) {
+  sendJsonRpcErrorReply(Filters::Common::Mcp::McpConstants::MCP_HEADER_MISMATCH_ERROR_CODE,
+                        error_msg);
+}
+
+void McpFilter::sendJsonRpcErrorReply(int error_code, absl::string_view error_msg) {
   const auto status = Filters::Common::Mcp::Status::NotJsonRpc;
   recordErrorState(error_msg, status);
 
@@ -763,7 +774,7 @@ void McpFilter::sendHeaderMismatchReply(absl::string_view error_msg) {
 
   auto* error = (*reply.mutable_fields())["error"].mutable_struct_value();
 
-  (*error->mutable_fields())["code"].set_number_value(-32020);
+  (*error->mutable_fields())["code"].set_number_value(error_code);
   (*error->mutable_fields())["message"].set_string_value(error_msg);
 
   const std::string body = MessageUtil::getJsonStringFromMessageOrError(reply);
@@ -814,6 +825,19 @@ bool McpFilter::verifyHeaderAttributes() const {
   }
 
   return headerAttributesMatch();
+}
+
+bool McpFilter::hasRequiredClientCapabilities() const {
+  if (!use_new_spec_semantics_ || parser_->isResponse() ||
+      parser_->getNestedValue(Filters::Common::Mcp::McpConstants::ID_FIELD) == nullptr) {
+    return true;
+  }
+
+  const Protobuf::Value* meta =
+      parser_->getNestedValue(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META);
+  return meta != nullptr && meta->kind_case() == Protobuf::Value::kStructValue &&
+         meta->struct_value().fields().contains(
+             std::string(Filters::Common::Mcp::McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD));
 }
 
 McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() const {
@@ -894,6 +918,14 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
+  }
+
+  if (shouldRejectRequest() && !hasRequiredClientCapabilities()) {
+    sendJsonRpcErrorReply(
+        Filters::Common::Mcp::McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE,
+        absl::StrCat("Missing required params._meta field: ",
+                     Filters::Common::Mcp::McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD));
+    return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   if (config_->attributeSource() == envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS &&
