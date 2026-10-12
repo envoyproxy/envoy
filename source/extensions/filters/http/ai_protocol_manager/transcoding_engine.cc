@@ -2806,9 +2806,8 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
       return status;
     }
   }
-  // Rendered before validation, so what is validated is the body the upstream gets. A dialect with
-  // an envelope names the model in the path alone, so the body loses it; one without keeps it in
-  // the body, and an instruction's pattern only adds the path.
+  // Finish modifying `json` (moving `model` and `stream` out to the URL path for APIs like
+  // Gemini) before validating the final request body.
   std::optional<std::string> path;
   if (const UriPattern* pattern = patternFor(ctx.response_uri_pattern, envelope)) {
     absl::StatusOr<std::string> rendered =

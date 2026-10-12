@@ -538,28 +538,22 @@ struct TranscodeStreamState {
 // no headers and no clocks itself; the caller passes in what it has and applies what comes back.
 struct TranscodeContext {
   // Inputs.
-  // The request's `:path`, from which a request `ToIr` leg reads what its dialect names in the path
-  // rather than the body (see `DialectTranscodePack::envelope`).
+  // Some APIs (e.g. Gemini) put `model` and `stream` in the URL instead of the JSON body, so
+  // request `ToIr` legs read `request_path` to copy them into the IR body.
   absl::string_view request_path{};
-  // Instructions a filter ahead of the transcoder set for this request (see
-  // `FilterStateKeys`); each is followed when set, and the dialect's own layout applies otherwise.
-  //
-  // The pattern `request_path` follows, which a request `ToIr` leg lifts the model and streaming
-  // mode from.
+
+  // Custom incoming URL pattern so request `ToIr` legs can extract `model` and `stream` from it
   const UriPattern* request_uri_pattern{nullptr};
-  // The pattern of the path the upstream expects, which a request `FromIr` leg renders into
-  // `rewritten_path`.
+  // Custom upstream URL pattern so request `FromIr` legs can format `rewritten_path` for the
+  // target backend.
   const UriPattern* response_uri_pattern{nullptr};
-  // The model to send upstream in place of the one the request names. A request `FromIr` leg
-  // writes it into the IR `model` before converting, so it reaches the body and the rewritten
-  // path alike. The response still echoes the model the client asked for (`ir_model`); which
-  // backend the gateway chose stays with the gateway.
+  // Model override for the outbound request (e.g. from a model router) so request `FromIr` legs
+  // send the model name the upstream backend expects to run.
   absl::string_view resolved_model{};
-  // The model the client asked for, which a response reports as its `model` (see
-  // `TranscodeRule::ContextField::RequestModel`).
+  // The model that the client asked for
   absl::string_view request_model{};
-  // The current time, for a response the IR requires a `created` timestamp on but the dialect
-  // does not carry one (see `TranscodeRule::ContextField::NowUnixSeconds`).
+  // The current time, used as a response's `created` when the dialect carries no timestamp (the
+  // IR requires one).
   int64_t now_unix_seconds{0};
   // The stream's memory: required on `StreamEvent` legs, whose stream-state and
   // usage-accumulation rules read and write it.
@@ -714,15 +708,11 @@ struct DialectTranscodePack {
   LegRules response{};
   // Streamed response events.
   StreamGrammars stream{};
-  // Where the dialect's API names the request's `model` and `stream` in the request path rather
-  // than the body, if it does. Gemini calls a custom method on the model:
-  // `/v1beta/models/{model}:generateContent`, or `:streamGenerateContent` to stream the response.
-  //
-  // A request `ToIr` leg lifts what `TranscodeContext::request_path` names into the body, unless
-  // the body names it itself. A request `FromIr` leg moves it out of the body into
-  // `TranscodeContext::rewritten_path`. An instruction set ahead of the transcoder
-  // (`TranscodeContext::request_uri_pattern` / `response_uri_pattern`) takes the envelope's place
-  // for one request.
+  // Not all APIs put `model` and `stream` in the URL (e.g. OpenAI and Anthropic keep them in the
+  // JSON body, so this is `std::nullopt`). For APIs whose URL does carry `model` and `stream`
+  // (e.g. Gemini's `/v1beta/models/{model}:{generateContent|streamGenerateContent}`), `ToIr`
+  // extracts them from the URL into the IR body, and `FromIr` moves them from the IR body back
+  // into the outgoing URL.
   std::optional<UriPattern> envelope{};
   const PayloadSchema* dialect_schema{nullptr};
   const PayloadSchema* ir_schema{nullptr};
