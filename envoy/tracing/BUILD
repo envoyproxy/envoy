@@ -36,7 +36,9 @@ envoy_cc_library(
     hdrs = ["trace_driver.h"],
     deps = [
         ":trace_config_interface",
+        ":trace_context_interface",
         "//envoy/stream_info:stream_info_interface",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
