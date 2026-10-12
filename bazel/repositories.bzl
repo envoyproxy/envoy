@@ -588,7 +588,7 @@ def _cel_cpp():
         ],
         repo_mapping = {
             "@com_google_absl": "@abseil-cpp",
-            "@com_google_cel_spec": "@cel-spec",
+            "@com_google_cel_spec": "@dev_cel",
             "@com_github_google_flatbuffers": "@flatbuffers",
             "@com_googlesource_code_re2": "@re2",
         },
