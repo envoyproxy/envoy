@@ -336,6 +336,11 @@ bool ClientContextImpl::scopeUpstreamTlsSessionCacheBySni() const {
       "envoy.reloadable_features.scope_upstream_tls_session_cache_by_sni");
 }
 
+bool ClientContextImpl::skipsCertVerification() const {
+  ASSERT(!tls_contexts_.empty());
+  return SSL_CTX_get_verify_mode(tls_contexts_[0].ssl_ctx_.get()) == SSL_VERIFY_NONE;
+}
+
 // This callback should return 1 on success, 0 on internal error, and negative number
 // on failure or pause a handshake.
 int ClientContextImpl::selectTlsContext(SSL* ssl) {

@@ -65,6 +65,10 @@ public:
 
   int selectTlsContext(SSL*);
 
+  // True if peer certificate validation is skipped entirely (SSL_VERIFY_NONE). Used by the QUIC
+  // proof verifier to skip the leaf hostname check, matching the TCP path.
+  bool skipsCertVerification() const;
+
 protected:
   ClientContextImpl(
       Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,

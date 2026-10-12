@@ -61,15 +61,18 @@ public:
 
   // Since this cert chain contains an expired cert, we can flip allow_expired_cert to test the code
   // paths for BoringSSL cert verification success and failure.
-  void configCertVerificationDetails(bool allow_expired_cert) {
+  void configCertVerificationDetails(bool allow_expired_cert, bool accept_untrusted = false) {
     // Getting the last cert in the chain as the root CA cert.
     EXPECT_CALL(cert_validation_ctx_config_, caCert()).WillRepeatedly(ReturnRef(root_ca_cert_));
     EXPECT_CALL(cert_validation_ctx_config_, caCertPath()).WillRepeatedly(ReturnRef(path_string_));
     EXPECT_CALL(cert_validation_ctx_config_, caCertName()).WillRepeatedly(ReturnRef(cert_name_));
 
     EXPECT_CALL(cert_validation_ctx_config_, trustChainVerification)
-        .WillRepeatedly(Return(envoy::extensions::transport_sockets::tls::v3::
-                                   CertificateValidationContext::VERIFY_TRUST_CHAIN));
+        .WillRepeatedly(Return(accept_untrusted
+                                   ? envoy::extensions::transport_sockets::tls::v3::
+                                         CertificateValidationContext::ACCEPT_UNTRUSTED
+                                   : envoy::extensions::transport_sockets::tls::v3::
+                                         CertificateValidationContext::VERIFY_TRUST_CHAIN));
     EXPECT_CALL(cert_validation_ctx_config_, allowExpiredCertificate())
         .WillRepeatedly(Return(allow_expired_cert));
     EXPECT_CALL(cert_validation_ctx_config_, certificateRevocationList())
@@ -85,6 +88,16 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
     EXPECT_CALL(cert_validation_ctx_config_, autoSniSanMatch()).WillRepeatedly(Return(false));
+    auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
+        *store_.rootScope(), client_context_config_, factory_context_);
+    THROW_IF_NOT_OK_REF(context_or_error.status());
+    verifier_ =
+        std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error), accept_untrusted);
+  }
+
+  // Builds a verifier over a context with no validation context, i.e. SSL_VERIFY_NONE.
+  void configNoCertVerification() {
+    ON_CALL(client_context_config_, certificateValidationContext()).WillByDefault(Return(nullptr));
     auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
     THROW_IF_NOT_OK_REF(context_or_error.status());
@@ -240,6 +253,45 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidHost) {
                                        nullptr))
       << error_details;
   EXPECT_EQ("Leaf certificate doesn't match hostname: unknown.org", error_details);
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainAcceptUntrustedSkipsHostnameCheck) {
+  configCertVerificationDetails(true, /*accept_untrusted=*/true);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_SUCCESS,
+            verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr))
+      << error_details;
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainAcceptUntrustedWithoutSniSucceeds) {
+  configCertVerificationDetails(true, /*accept_untrusted=*/true);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_SUCCESS,
+            verifier_->VerifyCertChain("", 54321, {leaf_cert_}, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr))
+      << error_details;
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainVerifyNoneSkipsHostnameCheck) {
+  configNoCertVerification();
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_SUCCESS,
+            verifier_->VerifyCertChain("unknown.org", 54321, {leaf_cert_}, ocsp_response, cert_sct,
+                                       &verify_context_, &error_details, &verify_details, nullptr,
+                                       nullptr))
+      << error_details;
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainFailureInvalidHost) {

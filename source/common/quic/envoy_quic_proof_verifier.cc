@@ -121,7 +121,12 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     return quic::QUIC_PENDING;
   }
   if (result.status == ValidationResults::ValidationStatus::Successful) {
-    if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
+    // Skip the hostname check for ACCEPT_UNTRUSTED or verify-none, as the TCP path does.
+    const bool skip_hostname_check =
+        accept_untrusted_ ||
+        static_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get())
+            ->skipsCertVerification();
+    if (skip_hostname_check || verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
       *details = std::make_unique<CertVerifyResult>(true);
       return quic::QUIC_SUCCESS;
     }
