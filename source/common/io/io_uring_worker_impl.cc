@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Io {
 
@@ -166,6 +168,19 @@ IoUringSocketEntry& IoUringWorkerImpl::addSocket(IoUringSocketEntryPtr&& socket)
   return *sockets_.back();
 }
 
+void IoUringWorkerImpl::prepareAndSubmit(absl::FunctionRef<IoUringResult()> prepare,
+                                         absl::string_view operation) {
+  if (prepare() == IoUringResult::Failed) {
+    // The kernel frees submission queue entries only when they are submitted, so submit now even
+    // if submission is delayed until the end of the completion loop.
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    io_uring_->submit();
+    const IoUringResult res = prepare();
+    RELEASE_ASSERT(res == IoUringResult::Ok, absl::StrCat("unable to prepare ", operation));
+  }
+  submit();
+}
+
 Request*
 IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
                                         const Network::Address::InstanceConstSharedPtr& address) {
@@ -173,14 +188,8 @@ IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
 
   ENVOY_LOG(trace, "submit connect request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareConnect(socket.fd(), address, req);
-  if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    submit();
-    res = io_uring_->prepareConnect(socket.fd(), address, req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare connect");
-  }
-  submit();
+  prepareAndSubmit([&]() { return io_uring_->prepareConnect(socket.fd(), address, req); },
+                   "connect");
   return req;
 }
 
@@ -193,14 +202,8 @@ Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, uint32_t re
 
   ENVOY_LOG(trace, "submit read request, fd = {}, read req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareReadv(socket.fd(), &req->iov_, 1, 0, req);
-  if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    submit();
-    res = io_uring_->prepareReadv(socket.fd(), &req->iov_, 1, 0, req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare readv");
-  }
-  submit();
+  prepareAndSubmit([&]() { return io_uring_->prepareReadv(socket.fd(), &req->iov_, 1, 0, req); },
+                   "readv");
   return req;
 }
 
@@ -209,14 +212,8 @@ Request* IoUringWorkerImpl::submitReadMultishotRequest(IoUringSocket& socket) {
 
   ENVOY_LOG(trace, "submit read multishot request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareReadMultishot(socket.fd(), req);
-  if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    submit();
-    res = io_uring_->prepareReadMultishot(socket.fd(), req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare read multishot");
-  }
-  submit();
+  prepareAndSubmit([&]() { return io_uring_->prepareReadMultishot(socket.fd(), req); },
+                   "read multishot");
   return req;
 }
 
@@ -226,14 +223,11 @@ Request* IoUringWorkerImpl::submitWriteRequest(IoUringSocket& socket,
 
   ENVOY_LOG(trace, "submit write request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareWritev(socket.fd(), req->iov_.data(), slices.size(), 0, req);
-  if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    submit();
-    res = io_uring_->prepareWritev(socket.fd(), req->iov_.data(), slices.size(), 0, req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare writev");
-  }
-  submit();
+  prepareAndSubmit(
+      [&]() {
+        return io_uring_->prepareWritev(socket.fd(), req->iov_.data(), slices.size(), 0, req);
+      },
+      "writev");
   return req;
 }
 
@@ -242,14 +236,7 @@ Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
 
   ENVOY_LOG(trace, "submit close request, fd = {}, close req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_->prepareClose(socket.fd(), req);
-  if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    submit();
-    res = io_uring_->prepareClose(socket.fd(), req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare close");
-  }
-  submit();
+  prepareAndSubmit([&]() { return io_uring_->prepareClose(socket.fd(), req); }, "close");
   return req;
 }
 
@@ -259,14 +246,7 @@ Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* 
   ENVOY_LOG(trace, "submit cancel request, fd = {}, cancel req = {}, req to cancel = {}",
             socket.fd(), fmt::ptr(req), fmt::ptr(request_to_cancel));
 
-  auto res = io_uring_->prepareCancel(request_to_cancel, req);
-  if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    submit();
-    res = io_uring_->prepareCancel(request_to_cancel, req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare cancel");
-  }
-  submit();
+  prepareAndSubmit([&]() { return io_uring_->prepareCancel(request_to_cancel, req); }, "cancel");
   return req;
 }
 
@@ -276,20 +256,14 @@ Request* IoUringWorkerImpl::submitShutdownRequest(IoUringSocket& socket, int how
   ENVOY_LOG(trace, "submit shutdown request, fd = {}, shutdown req = {}", socket.fd(),
             fmt::ptr(req));
 
-  auto res = io_uring_->prepareShutdown(socket.fd(), how, req);
-  if (res == IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    submit();
-    res = io_uring_->prepareShutdown(socket.fd(), how, req);
-    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare shutdown");
-  }
-  submit();
+  prepareAndSubmit([&]() { return io_uring_->prepareShutdown(socket.fd(), how, req); }, "shutdown");
   return req;
 }
 
 IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
-  // Remove all the injection completion for this socket.
-  io_uring_->removeInjectedCompletion(socket.fd());
+  // Remove all the injected completions for this socket, keyed by the socket rather than the fd
+  // since the fd may already have been reused by a newly accepted socket.
+  io_uring_->removeInjectedCompletion(socket);
   return socket.removeFromList(sockets_);
 }
 
@@ -409,7 +383,8 @@ void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
     return;
   }
 
-  if (read_req_ != nullptr) {
+  // A read cancel may already be in flight from read backpressure, so do not submit a second one.
+  if (read_req_ != nullptr && read_cancel_req_ == nullptr) {
     ENVOY_LOG(trace, "cancel the read request, fd = {}", fd_);
     read_cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
   }
@@ -686,9 +661,16 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       submitReadRequest();
     }
   } else if (status_ == ReadDisabled) {
-    // Since error in a disabled socket will not be handled by the handler, stop submit read
-    // request if there is any error.
-    if (!read_error_.has_value()) {
+    // Apply read-side backpressure. While the handler is not reading, stop pulling data from the
+    // kernel once the buffered data reaches the read buffer size, so the kernel receive buffer
+    // fills and the peer's TCP window closes instead of read_buf_ growing without bound. A readv
+    // read is simply not re-armed, while a kernel-armed `multishot` read is canceled.
+    if (read_buf_.length() >= parent_.readBufferSize()) {
+      if (read_is_multishot_ && read_req_ != nullptr && read_cancel_req_ == nullptr) {
+        ENVOY_LOG(trace, "cancel multishot read to apply read backpressure, fd = {}", fd_);
+        read_cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
+      }
+    } else if (!read_error_.has_value()) {
       // Submit a read request for monitoring the remote close event, otherwise there is no
       // way to know the connection is closed by the remote.
       submitReadRequest();
@@ -728,6 +710,13 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     write_buf_.drain(result);
     ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
     checkWriteWatermarks();
+    // The write made progress, so restart the write timeout. The epoll delayed close timer is
+    // inactivity based and re-armed on progress, and the kernel send buffer survives close(2). Here
+    // the unsent data lives in user space, so without this restart a peer that keeps reading would
+    // lose the tail of a response that takes longer than one write_timeout_ms to flush.
+    if (status_ == Closed && write_timeout_timer_ != nullptr && write_buf_.length() > 0) {
+      write_timeout_timer_->enableTimer(std::chrono::milliseconds(write_timeout_ms_));
+    }
   } else {
     // A cancellation can race with a successful partial write. Discard the remaining data now that
     // the request no longer references it, rather than submitting another write while closing.

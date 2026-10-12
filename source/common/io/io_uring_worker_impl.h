@@ -8,6 +8,8 @@
 #include "source/common/io/io_uring_impl.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/functional/function_ref.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Io {
@@ -89,6 +91,9 @@ protected:
   IoUringSocketEntry& addSocket(IoUringSocketEntryPtr&& socket);
   void onFileEvent();
   void submit();
+  // Prepare a request with the given function, which returns IoUringResult::Failed while the
+  // submission queue is full, and submit it unless submission is delayed.
+  void prepareAndSubmit(absl::FunctionRef<IoUringResult()> prepare, absl::string_view operation);
 
   // The iouring instance.
   IoUringPtr io_uring_;

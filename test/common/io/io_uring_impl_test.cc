@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 
+#include <array>
 #include <functional>
 
 #include "source/common/io/io_uring_impl.h"
@@ -228,11 +229,57 @@ TEST_F(IoUringImplTest, RemoveInjectCompletion) {
 
   io_uring_->injectCompletion(fd, &request, -11);
   io_uring_->injectCompletion(fd2, request2, -22);
-  io_uring_->removeInjectedCompletion(fd2);
+  io_uring_->removeInjectedCompletion(request2->mock_io_uring_socket_);
   EXPECT_EQ(-1, data2);
   file_event->activate(Event::FileReadyType::Read);
 
   waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 1; });
+}
+
+// Injected completions are keyed by the owning socket, not the fd. `IORING_OP_CLOSE` frees the fd
+// at submit, so a newly accepted socket can reuse the number before the close completion is reaped.
+// Removing one socket's completions must leave the reused-fd socket's injection intact.
+TEST_F(IoUringImplTest, RemoveInjectedCompletionKeyedBySocket) {
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+
+  const os_fd_t shared_fd = 11;
+  os_fd_t event_fd = io_uring_->registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+
+  // The closing socket's injection is heap allocated so removal can delete it.
+  int closing_data = 1;
+  TestRequest* closing_req = new TestRequest(closing_data);
+  EXPECT_CALL(closing_req->mock_io_uring_socket_, fd()).WillRepeatedly(testing::Return(shared_fd));
+  // The reused-fd socket's injection must survive, so it is on the stack.
+  int reused_data = 2;
+  TestRequest reused_req(reused_data);
+  EXPECT_CALL(reused_req.mock_io_uring_socket_, fd()).WillRepeatedly(testing::Return(shared_fd));
+
+  int32_t completions_nr = 0;
+  const Request* delivered = nullptr;
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [this, &completions_nr, &delivered](uint32_t) {
+        io_uring_->forEveryCompletion(
+            [&completions_nr, &delivered](Request* user_data, int32_t, bool) {
+              delivered = user_data;
+              completions_nr++;
+            });
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read);
+
+  io_uring_->injectCompletion(shared_fd, closing_req, -11);
+  io_uring_->injectCompletion(shared_fd, &reused_req, -22);
+
+  // Removing the closing socket deletes only its own injection, even though both share the fd.
+  io_uring_->removeInjectedCompletion(closing_req->mock_io_uring_socket_);
+  EXPECT_EQ(-1, closing_data);
+  EXPECT_EQ(2, reused_data);
+
+  file_event->activate(Event::FileReadyType::Read);
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 1; });
+  EXPECT_EQ(&reused_req, delivered);
 }
 
 TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
@@ -250,22 +297,22 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
 
   auto file_event = dispatcher->createFileEvent(
       event_fd,
-      [this, &fd2, &completions_nr, &data2](uint32_t) {
-        io_uring_->forEveryCompletion(
-            [this, &fd2, &completions_nr, &data2](Request* user_data, int32_t res, bool injected) {
-              EXPECT_TRUE(injected);
-              if (completions_nr == 0) {
-                EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
-                EXPECT_EQ(-11, res);
-              } else {
-                io_uring_->removeInjectedCompletion(fd2);
-                EXPECT_EQ(2, data2);
-                // Simulate deletion in IoUringWorkerImpl
-                delete user_data;
-                EXPECT_EQ(-1, data2);
-              }
-              completions_nr++;
-            });
+      [this, &request2, &completions_nr, &data2](uint32_t) {
+        io_uring_->forEveryCompletion([this, &request2, &completions_nr,
+                                       &data2](Request* user_data, int32_t res, bool injected) {
+          EXPECT_TRUE(injected);
+          if (completions_nr == 0) {
+            EXPECT_EQ(1, dynamic_cast<TestRequest*>(user_data)->data_);
+            EXPECT_EQ(-11, res);
+          } else {
+            io_uring_->removeInjectedCompletion(request2->mock_io_uring_socket_);
+            EXPECT_EQ(2, data2);
+            // Simulate deletion in IoUringWorkerImpl.
+            delete user_data;
+            EXPECT_EQ(-1, data2);
+          }
+          completions_nr++;
+        });
         return absl::OkStatus();
       },
       trigger, Event::FileReadyType::Read);
@@ -444,6 +491,36 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
 
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[0], 'e');
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[1], 'f');
+}
+
+// The SQPOLL kernel thread consumes submission queue entries asynchronously. submit() waits until
+// an entry is free, so a prepare right after submitting a full queue succeeds.
+TEST_F(IoUringImplTest, SubmitWithSubmissionQueuePollingFreesAnEntry) {
+  struct io_uring_params params{};
+  params.flags = IORING_SETUP_SQPOLL;
+  struct io_uring probe_ring;
+  if (io_uring_queue_init_params(2, &probe_ring, &params) != 0) {
+    GTEST_SKIP() << "io_uring submission queue polling is unavailable";
+  }
+  io_uring_queue_exit(&probe_ring);
+
+  // Declared before the ring so the buffer outlives the reads still in flight at teardown.
+  std::array<uint8_t, 1> buffer{};
+  struct iovec iov{buffer.data(), buffer.size()};
+  std::array<int, 2> pipe_fds;
+  ASSERT_EQ(0, pipe(pipe_fds.data()));
+  {
+    IoUringImpl io_uring(2, true, false, 0);
+    for (int i = 0; i < 100; i++) {
+      // Reads from an empty pipe stay in flight, so only submission frees queue entries.
+      while (io_uring.prepareReadv(pipe_fds[0], &iov, 1, 0, nullptr) == IoUringResult::Ok) {
+      }
+      EXPECT_EQ(IoUringResult::Ok, io_uring.submit());
+      ASSERT_EQ(IoUringResult::Ok, io_uring.prepareReadv(pipe_fds[0], &iov, 1, 0, nullptr));
+    }
+  }
+  close(pipe_fds[0]);
+  close(pipe_fds[1]);
 }
 
 TEST_F(IoUringImplTest, MultishotDisabledHasNoBufferPool) {

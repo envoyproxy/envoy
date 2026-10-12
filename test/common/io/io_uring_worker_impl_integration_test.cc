@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 
+#include <array>
 #include <queue>
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -243,6 +244,56 @@ TEST_F(IoUringWorkerIntegrationTest, WorkerShutdownWithBlockedWrite) {
   EXPECT_EQ(errno, EBADF);
   server_socket_ = INVALID_SOCKET;
   cleanup();
+}
+
+// Each read completion re-arms its read and writes back, so one completion pass prepares more
+// requests than the two entry submission queue holds. The worker must submit the queue inside the
+// pass instead of aborting.
+TEST_F(IoUringWorkerIntegrationTest, CompletionPassPreparesMoreRequestsThanSubmissionQueue) {
+  api_ = Api::createApiForTest(time_system_);
+  dispatcher_ = api_->allocateDispatcher("test_thread");
+  io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
+      std::make_unique<IoUringImpl>(2, false, false, 0), *dispatcher_);
+
+  constexpr int num_sockets = 3;
+  std::array<os_fd_t, num_sockets> peer_fds;
+  std::array<OptRef<IoUringSocket>, num_sockets> sockets;
+  for (int i = 0; i < num_sockets; i++) {
+    int fds[2];
+    ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+    peer_fds[i] = fds[1];
+    sockets[i] = io_uring_worker_->addServerSocket(
+        fds[0],
+        [&sockets, i](uint32_t events) {
+          if (events & Event::FileReadyType::Read) {
+            sockets[i]->write(sockets[i]->getReadParam()->buf_);
+          }
+          return absl::OkStatus();
+        },
+        false);
+  }
+
+  for (const os_fd_t peer_fd : peer_fds) {
+    ASSERT_EQ(1, Api::OsSysCallsSingleton::get().write(peer_fd, "a", 1).return_value_);
+  }
+  for (const os_fd_t peer_fd : peer_fds) {
+    char echoed = 0;
+    while (Api::OsSysCallsSingleton::get().recv(peer_fd, &echoed, 1, MSG_DONTWAIT).return_value_ !=
+           1) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    EXPECT_EQ('a', echoed);
+  }
+
+  for (auto& socket : sockets) {
+    socket->close(false);
+  }
+  while (io_uring_worker_->getNumOfSockets() > 0) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  for (const os_fd_t peer_fd : peer_fds) {
+    Api::OsSysCallsSingleton::get().close(peer_fd);
+  }
 }
 
 TEST_F(IoUringWorkerIntegrationTest, Injection) {
@@ -498,6 +549,58 @@ TEST_F(IoUringWorkerIntegrationTest, ServerSocketDisable) {
   }
 
   EXPECT_EQ(result.value(), write_data.length() - 5);
+
+  socket->close(false);
+  runToClose(server_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+// A read-disabled socket must stop draining the kernel once its buffer reaches the read buffer
+// size, so a flooding peer cannot grow the read buffer without bound.
+TEST_F(IoUringWorkerIntegrationTest, ReadDisabledAppliesBackpressure) {
+  initialize();
+  createListenerAndConnectedSocketPair();
+
+  // Keep the kernel buffers small so the peer blocks quickly once reading stops.
+  const int kernel_buffer_size = 65536;
+  ASSERT_EQ(setsockopt(server_socket_, SOL_SOCKET, SO_RCVBUF, &kernel_buffer_size,
+                       sizeof(kernel_buffer_size)),
+            0);
+  ASSERT_EQ(setsockopt(client_socket_, SOL_SOCKET, SO_SNDBUF, &kernel_buffer_size,
+                       sizeof(kernel_buffer_size)),
+            0);
+  int flags = fcntl(client_socket_, F_GETFL);
+  ASSERT_EQ(fcntl(client_socket_, F_SETFL, flags | O_NONBLOCK), 0);
+
+  OptRef<IoUringSocket> socket;
+  socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) { return absl::OkStatus(); }, false);
+  socket->disableRead();
+
+  // Flood the disabled socket. The peer eventually blocks because the read buffer stops draining
+  // the kernel, which fills and closes the receive window.
+  const std::string chunk(65536, 'a');
+  uint64_t total_sent = 0;
+  for (int i = 0; i < 200; i++) {
+    bool peer_blocked = false;
+    while (!peer_blocked) {
+      auto result =
+          Api::OsSysCallsSingleton::get().write(client_socket_, chunk.data(), chunk.size());
+      if (result.return_value_ > 0) {
+        total_sent += result.return_value_;
+      } else {
+        peer_blocked = true;
+      }
+    }
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // The read buffer is bounded by the read buffer size plus a single in-flight adaptive read, far
+  // below the total the peer attempted to send.
+  auto& server_socket = dynamic_cast<IoUringServerSocket&>(socket.ref());
+  EXPECT_LT(server_socket.getReadBuffer().length(), 1024 * 1024);
+  EXPECT_LT(total_sent, 4 * 1024 * 1024);
 
   socket->close(false);
   runToClose(server_socket_);

@@ -148,6 +148,72 @@ TEST_F(IoUringSocketHandleTest, WritevBackpressureReturnsEagain) {
   EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
 }
 
+// A client socket reports its connect result only through the write event that delivers it.
+// Outside that event, for example when a TLS read probes for a reset after the peer closed,
+// SO_ERROR must come from the kernel.
+TEST_F(IoUringSocketHandleTest, ClientSocketErrorOutsideWriteEventComesFromKernel) {
+  testing::NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  IoUringSocketHandleTestImpl impl(factory_, false);
+  EXPECT_CALL(worker_, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));
+  EXPECT_CALL(factory_, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
+  impl.initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+
+  OptRef<Io::WriteParam> no_write_param;
+  EXPECT_CALL(socket_, getWriteParam()).WillRepeatedly(testing::ReturnRef(no_write_param));
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, SOL_SOCKET, SO_ERROR, _, _))
+      .WillOnce(testing::Return(0));
+  int error = -1;
+  socklen_t error_size = sizeof(error);
+  EXPECT_EQ(0, impl.getOption(SOL_SOCKET, SO_ERROR, &error, &error_size).return_value_);
+  EXPECT_EQ(0, error);
+}
+
+// resetFileEvents() must detach the handler callback, matching the epoll handle which destroys its
+// file event. Otherwise a completion after a reset would call into an owner that is being torn
+// down.
+TEST_F(IoUringSocketHandleTest, ResetFileEventsDetachesCallback) {
+  IoUringSocketHandleTestImpl impl(factory_, true);
+  EXPECT_CALL(worker_, addServerSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));
+  EXPECT_CALL(factory_, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
+  impl.initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+
+  EXPECT_CALL(socket_, disableRead());
+  EXPECT_CALL(socket_, enableCloseEvent(false));
+  // The callback is replaced with a no-op so a later completion cannot reach the released owner.
+  EXPECT_CALL(socket_, setFileReadyCb(_));
+  impl.resetFileEvents();
+}
+
+// During worker shutdown the io_uring worker thread is no longer registered, but the owning
+// IoUringServerSocket still closes the fd through `IORING_OP_CLOSE`. The handle destructor must not
+// also raw close the fd, which could hit a number already reused by another worker's accept.
+TEST_F(IoUringSocketHandleTest, DestructorDoesNotRawCloseFdOwnedByIoUringSocket) {
+  const os_fd_t fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(fd, 0);
+  {
+    IoUringSocketHandleImpl impl(factory_, fd, false, std::nullopt, true);
+    EXPECT_CALL(worker_, addServerSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));
+    EXPECT_CALL(factory_, getIoUringWorker())
+        .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
+    impl.initializeFileEvent(
+        dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+        Event::FileReadyType::Read);
+
+    // The worker thread is being torn down, so the io_uring socket, not the handle, owns the fd.
+    EXPECT_CALL(factory_, currentThreadRegistered()).WillRepeatedly(testing::Return(false));
+  }
+  // The handle did not close the fd, so it is still open here.
+  EXPECT_EQ(0, fcntl(fd, F_GETFD));
+  ::close(fd);
+}
+
 TEST_F(IoUringSocketHandleTest, SendmsgNotSupported) {
   IoUringSocketHandleTestImpl impl(factory_, true);
 
