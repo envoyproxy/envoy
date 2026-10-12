@@ -716,7 +716,7 @@ envoy.filters.http.original_src:
 envoy.filters.http.priority_load_shed:
   categories:
   - envoy.filters.http
-  security_posture: unknown
+  security_posture: requires_trusted_downstream_and_upstream
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.priority_load_shed.v3.PriorityLoadShed
