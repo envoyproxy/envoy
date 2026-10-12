@@ -190,13 +190,31 @@ absl::string_view secureAttribute(absl::string_view cookie_name) {
                                                                                     : "";
 }
 
-std::string chunkCountCookieName(absl::string_view cookie_name) {
-  return absl::StrCat(cookie_name, "_chunks");
-}
+// Builds the chunk cookie names of a token, "<name>_chunks" and "<name>_<index>", in one reused
+// buffer. A returned view is valid until the next call.
+class TokenCookieNameBuilder {
+public:
+  // A chunk index has at most two digits, fewer than "chunks", so every name fits in the first
+  // allocation.
+  explicit TokenCookieNameBuilder(absl::string_view cookie_name)
+      : buffer_(absl::StrCat(cookie_name, "_chunks")), prefix_size_(cookie_name.size() + 1) {}
 
-std::string chunkCookieName(absl::string_view cookie_name, size_t index) {
-  return absl::StrCat(cookie_name, "_", index);
-}
+  absl::string_view chunks() {
+    buffer_.resize(prefix_size_);
+    buffer_.append("chunks");
+    return buffer_;
+  }
+
+  absl::string_view chunk(size_t index) {
+    buffer_.resize(prefix_size_);
+    absl::StrAppend(&buffer_, index);
+    return buffer_;
+  }
+
+private:
+  std::string buffer_;
+  const size_t prefix_size_;
+};
 
 // Envoy only splits a token that does not fit in one cookie, so a valid count is at least 2.
 std::optional<size_t> parseChunkCount(absl::string_view value) {
@@ -216,8 +234,9 @@ struct TokenCookie {
 TokenCookie readTokenCookie(const absl::flat_hash_map<std::string, std::string>& cookies,
                             absl::string_view cookie_name) {
   TokenCookie result;
+  TokenCookieNameBuilder names(cookie_name);
   const auto single_it = cookies.find(cookie_name);
-  const auto count_it = cookies.find(chunkCountCookieName(cookie_name));
+  const auto count_it = cookies.find(names.chunks());
   result.state_.single_ = single_it != cookies.end();
   result.state_.chunks_ = count_it != cookies.end();
 
@@ -225,7 +244,7 @@ TokenCookie readTokenCookie(const absl::flat_hash_map<std::string, std::string>&
     const std::optional<size_t> count = parseChunkCount(count_it->second);
     std::string value;
     for (size_t index = 0; count.has_value() && index < count.value(); ++index) {
-      const auto chunk_it = cookies.find(chunkCookieName(cookie_name, index));
+      const auto chunk_it = cookies.find(names.chunk(index));
       if (chunk_it == cookies.end()) {
         value.clear();
         break;
@@ -248,7 +267,7 @@ TokenCookie readTokenCookie(const absl::flat_hash_map<std::string, std::string>&
 
 // The chunk indexes that may be present. A malformed set has no count to trust, so every index
 // a chunk can use is included.
-size_t chunkIndexesInUse(const TokenCookieState& state) {
+size_t chunkIndexesInUse(TokenCookieState state) {
   if (!state.chunks_) {
     return 0;
   }
@@ -256,15 +275,17 @@ size_t chunkIndexesInUse(const TokenCookieState& state) {
 }
 
 void eraseTokenCookies(absl::flat_hash_map<std::string, std::string>& cookies,
-                       absl::string_view cookie_name, const TokenCookieState& state) {
+                       absl::string_view cookie_name, TokenCookieState state) {
   if (state.single_) {
     cookies.erase(cookie_name);
   }
+  TokenCookieNameBuilder names(cookie_name);
   if (state.chunks_) {
-    cookies.erase(chunkCountCookieName(cookie_name));
+    cookies.erase(names.chunks());
   }
-  for (size_t index = 0; index < chunkIndexesInUse(state); ++index) {
-    cookies.erase(chunkCookieName(cookie_name, index));
+  const size_t chunk_indexes = chunkIndexesInUse(state);
+  for (size_t index = 0; index < chunk_indexes; ++index) {
+    cookies.erase(names.chunk(index));
   }
 }
 
@@ -779,6 +800,8 @@ FilterConfig::FilterConfig(
       allow_failed_header_matchers_(headerMatchers(proto_config.allow_failed_matcher(), context)),
       cookie_names_(proto_config.credentials().cookie_names()),
       cookie_domain_(proto_config.credentials().cookie_domain()),
+      cookie_domain_attribute_(
+          cookie_domain_.empty() ? "" : fmt::format(CookieDomainFormatString, cookie_domain_)),
       auth_type_(getAuthType(proto_config.auth_type())),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
@@ -1878,7 +1901,7 @@ bool OAuth2Filter::tokenCookiesFit() const {
 }
 
 void OAuth2Filter::setTokenCookie(Http::ResponseHeaderMap& headers, absl::string_view cookie_name,
-                                  const TokenCookieState& state, absl::string_view token,
+                                  TokenCookieState state, absl::string_view token,
                                   const FilterConfig::CookieSettings& settings,
                                   absl::string_view expires_time) const {
   if (token.empty()) {
@@ -1902,29 +1925,29 @@ void OAuth2Filter::setTokenCookie(Http::ResponseHeaderMap& headers, absl::string
 
   const size_t capacity = tokenChunkCapacity(cookie_name.size(), cookie_tail.size(),
                                              config_->tokenCookieChunking()->max_cookie_size_);
+  const absl::string_view value_view = value;
+  TokenCookieNameBuilder names(cookie_name);
   for (size_t index = 0; index < cookie_count; ++index) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(chunkCookieName(cookie_name, index), "=",
-                                         value.substr(index * capacity, capacity), cookie_tail));
+                            absl::StrCat(names.chunk(index), "=",
+                                         value_view.substr(index * capacity, capacity),
+                                         cookie_tail));
   }
-  headers.addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(chunkCountCookieName(cookie_name), "=", cookie_count, cookie_tail));
+  headers.addReferenceKey(Http::Headers::get().SetCookie,
+                          absl::StrCat(names.chunks(), "=", cookie_count, cookie_tail));
   config_->stats().oauth_token_cookie_chunked_.inc();
 }
 
 void OAuth2Filter::deleteStaleTokenCookies(Http::ResponseHeaderMap& headers,
-                                           absl::string_view cookie_name,
-                                           const TokenCookieState& state, size_t new_cookie_count,
+                                           absl::string_view cookie_name, TokenCookieState state,
+                                           size_t new_cookie_count,
                                            absl::string_view cookie_path) const {
-  std::string cookie_domain;
-  if (!config_->cookieDomain().empty()) {
-    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
-  }
+  // Chunk names share the token cookie name's prefix, so they need the same Secure attribute.
+  const absl::string_view secure_attribute = secureAttribute(cookie_name);
   const auto delete_cookie = [&](absl::string_view name) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(fmt::format(CookieDeleteFormatString, name, cookie_path),
-                                         cookie_domain, secureAttribute(name)));
+                                         config_->cookieDomainAttribute(), secure_attribute));
   };
 
   // A new single cookie overwrites the single cookie, and new chunks overwrite the count cookie
@@ -1932,12 +1955,14 @@ void OAuth2Filter::deleteStaleTokenCookies(Http::ResponseHeaderMap& headers,
   if (state.single_ && new_cookie_count != 1) {
     delete_cookie(cookie_name);
   }
+  TokenCookieNameBuilder names(cookie_name);
   if (state.chunks_ && new_cookie_count <= 1) {
-    delete_cookie(chunkCountCookieName(cookie_name));
+    delete_cookie(names.chunks());
   }
   const size_t first_stale_chunk = new_cookie_count > 1 ? new_cookie_count : 0;
-  for (size_t index = first_stale_chunk; index < chunkIndexesInUse(state); ++index) {
-    delete_cookie(chunkCookieName(cookie_name, index));
+  const size_t chunk_indexes = chunkIndexesInUse(state);
+  for (size_t index = first_stale_chunk; index < chunk_indexes; ++index) {
+    delete_cookie(names.chunk(index));
   }
 }
 

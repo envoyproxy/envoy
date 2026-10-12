@@ -270,6 +270,8 @@ public:
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const std::string& cookieDomain() const { return cookie_domain_; }
+  // The ";domain=<cookie_domain>" cookie attribute, or empty when no cookie domain is configured.
+  const std::string& cookieDomainAttribute() const { return cookie_domain_attribute_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
@@ -356,6 +358,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderDataPtr> allow_failed_header_matchers_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
+  const std::string cookie_domain_attribute_;
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
@@ -559,13 +562,13 @@ private:
   // Writes the token as a single cookie or as chunks, or deletes the request's cookies for it when
   // the token is empty.
   void setTokenCookie(Http::ResponseHeaderMap& headers, absl::string_view cookie_name,
-                      const TokenCookieState& state, absl::string_view token,
+                      TokenCookieState state, absl::string_view token,
                       const FilterConfig::CookieSettings& settings,
                       absl::string_view expires_time) const;
   // Deletes the forms of a token cookie found on the request that a new value written as
   // new_cookie_count cookies does not overwrite. new_cookie_count is 0 when there is no new value.
   void deleteStaleTokenCookies(Http::ResponseHeaderMap& headers, absl::string_view cookie_name,
-                               const TokenCookieState& state, size_t new_cookie_count,
+                               TokenCookieState state, size_t new_cookie_count,
                                absl::string_view cookie_path) const;
   void addFlowCookieDeletionHeaders(Http::ResponseHeaderMap& headers,
                                     absl::string_view flow_id) const;
