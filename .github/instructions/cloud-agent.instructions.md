@@ -1,6 +1,11 @@
+---
+applyTo: "**"
+excludeAgent: "code-review"
+---
+
 # GitHub Copilot instructions for envoyproxy/envoy
 
-**Note:** These instructions are specifically for GitHub Copilot's agent/workspace environment, not for developers using Copilot in VS Code or other IDEs. For general development setup, see [DEVELOPER.md](https://github.com/envoyproxy/envoy/blob/main/DEVELOPER.md).
+**Note:** These instructions are specifically for GitHub Copilot's cloud agent environment, not for developers using Copilot in VS Code or other IDEs, and are excluded from Copilot code review (see `api-review.instructions.md`). For general development setup, see [DEVELOPER.md](https://github.com/envoyproxy/envoy/blob/main/DEVELOPER.md).
 
 ## Repository overview
 
