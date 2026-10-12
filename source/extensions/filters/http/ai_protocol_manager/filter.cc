@@ -146,7 +146,8 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-    Stats::Scope& scope, AiFilterFactories ai_filter_factories)
+    Stats::Scope& scope, AiFilterFactories ai_filter_factories,
+    ExternalBufferFactorySharedPtr buffer_factory)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
@@ -177,11 +178,15 @@ FilterConfig::FilterConfig(
       max_parsed_sse_events_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_parsed_sse_events, DefaultMaxParsedSseEvents)),
-      ai_filter_factories_(std::move(ai_filter_factories)) {}
+      ai_filter_factories_(std::move(ai_filter_factories)),
+      buffer_factory_(std::move(buffer_factory)) {
+  ASSERT(buffer_factory_ != nullptr);
+}
 
 absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+    ExternalBufferFactorySharedPtr buffer_factory) {
   if (proto.filters_size() > 0 && !proto.has_request_handling()) {
     return absl::InvalidArgumentError("ai_protocol_manager: filters require request_handling");
   }
@@ -201,7 +206,8 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     RETURN_IF_NOT_OK_REF(cb.status());
     factories.push_back(std::move(cb.value()));
   }
-  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories));
+  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories),
+                                              std::move(buffer_factory));
 }
 
 void AiProtocolManagerFilter::onDestroy() {
@@ -276,7 +282,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // replayed from there, so it costs no storage IO at all. Past that the chain would have pushed
   // back, which is exactly the point at which offloading starts to pay for itself.
   decode_manager_ = std::make_shared<BufferManager>(
-      BufferManager::Config{decoder_callbacks_->decoderBufferLimit()}, buffer_factory_,
+      BufferManager::Config{decoder_callbacks_->decoderBufferLimit()}, config_->bufferFactory(),
       *decode_bridge_);
 
   // Pin the headers so routing and admission filters do not act on them before
@@ -555,15 +561,15 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     encode_bridge_ = std::make_unique<EncoderFilterChainBridge>(
         *encoder_callbacks_, *decoder_callbacks_, config_->stats());
     encode_manager_ = std::make_shared<BufferManager>(
-        BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, buffer_factory_,
+        BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, config_->bufferFactory(),
         *encode_bridge_);
     if (is_sse) {
       filter_manager_->startSseResponse(
-          buffer_factory_, *encode_bridge_, *encode_manager_,
+          config_->bufferFactory(), *encode_bridge_, *encode_manager_,
           [this](absl::Status status) { onEncodeComplete(std::move(status)); });
     } else if (is_json) {
       filter_manager_->startUnaryResponse(
-          buffer_factory_, *encode_bridge_, *encode_manager_,
+          config_->bufferFactory(), *encode_bridge_, *encode_manager_,
           [this](absl::Status status) { onEncodeComplete(std::move(status)); });
     }
   }

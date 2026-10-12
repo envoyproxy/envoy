@@ -16,6 +16,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: In-memory External Buffer]
 // [#extension: envoy.ai_protocol_manager.external_buffer.in_memory]
 
-// Configuration for the in-memory external buffer.
+// Configuration for the in-memory external buffer, which holds the offloaded
+// payload in memory for the life of the stream and does not bound its size.
+// It has no settings.
 message InMemory {
 }

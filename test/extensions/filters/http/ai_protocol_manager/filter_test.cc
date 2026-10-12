@@ -144,9 +144,8 @@ public:
           ->mutable_inline_string_threshold_bytes()
           ->set_value(inline_string_threshold_bytes);
     }
-    filter_ = std::make_unique<AiProtocolManagerFilter>(
-        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
-                                                       AiFilterFactories{}));
+    filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
+        proto, *stats_store_.rootScope(), AiFilterFactories{}, factory_));
     filter_->setDecoderFilterCallbacks(callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -163,9 +162,8 @@ public:
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
     proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
     proto.mutable_request_handling()->set_reserialize_body(reserialize_body);
-    filter_ = std::make_unique<AiProtocolManagerFilter>(
-        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
-                                                       std::move(ai_filter_factories)));
+    filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
+        proto, *stats_store_.rootScope(), std::move(ai_filter_factories), factory_));
     filter_->setDecoderFilterCallbacks(callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -237,7 +235,7 @@ public:
 
   std::deque<Event::PostCb> posted_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  InMemoryExternalBufferFactory factory_;
+  ExternalBufferFactorySharedPtr factory_{std::make_shared<InMemoryExternalBufferFactory>()};
   FilterConfigSharedPtr config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -531,8 +529,8 @@ public:
     metadata_writes_.clear();
     typed_metadata_writes_.clear();
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                             AiFilterFactories{});
-    filter_ = std::make_unique<AiProtocolManagerFilter>(factory_, config_);
+                                             AiFilterFactories{}, factory_);
+    filter_ = std::make_unique<AiProtocolManagerFilter>(config_);
     // A stream filter receives both callback sets in production; encode-path
     // code may rely on the decoder callbacks (e.g. the buffer memory account).
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -600,7 +598,7 @@ public:
   LogLevelSetter log_level_setter_{spdlog::level::trace};
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  InMemoryExternalBufferFactory factory_;
+  ExternalBufferFactorySharedPtr factory_{std::make_shared<InMemoryExternalBufferFactory>()};
   FilterConfigSharedPtr config_;
   std::unique_ptr<RouteConfig> route_config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -2320,12 +2318,12 @@ TEST_F(AiProtocolManagerFilterTest,
       ->mutable_limits()
       ->mutable_max_json_body_size()
       ->set_value(128);
-  filter_ = std::make_unique<AiProtocolManagerFilter>(
-      factory_, std::make_shared<const FilterConfig>(
-                    proto, *stats_store_.rootScope(),
-                    AiFilterFactories{[](const AiFilterContext&) -> AiFilterSharedPtr {
-                      return std::make_shared<UnaryTaggingAiFilter>("tagged");
-                    }}));
+  filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
+      proto, *stats_store_.rootScope(),
+      AiFilterFactories{[](const AiFilterContext&) -> AiFilterSharedPtr {
+        return std::make_shared<UnaryTaggingAiFilter>("tagged");
+      }},
+      factory_));
   filter_->setDecoderFilterCallbacks(callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 

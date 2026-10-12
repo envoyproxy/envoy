@@ -451,9 +451,12 @@ envoy_cc_extension(
         ":external_buffer_impl_lib",
         ":external_buffer_interface",
         ":filter_lib",
+        "//envoy/common:exception_lib",
         "//envoy/registry",
+        "//source/common/config:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
     ],
 )

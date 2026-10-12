@@ -318,6 +318,7 @@ envoy_extension_cc_test(
         "//envoy/registry",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:config",
+        "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
