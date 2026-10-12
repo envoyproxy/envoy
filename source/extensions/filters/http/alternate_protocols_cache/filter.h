@@ -24,10 +24,12 @@ public:
   Http::HttpServerPropertiesCacheManager& alternateProtocolCacheManager() {
     return alternate_protocol_cache_manager_;
   }
+  bool stripAltSvc() const { return strip_alt_svc_; }
 
 private:
   Http::HttpServerPropertiesCacheManager& alternate_protocol_cache_manager_;
   TimeSource& time_source_;
+  const bool strip_alt_svc_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -47,6 +49,10 @@ public:
   void onDestroy() override;
 
 private:
+  // Parses the alt-svc header values and records them into the cache of the upstream cluster,
+  // if it has one.
+  void recordAltSvc(const Http::HeaderMap::GetResult& alt_svc);
+
   FilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
 };

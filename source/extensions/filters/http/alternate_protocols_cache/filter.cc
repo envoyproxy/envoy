@@ -20,7 +20,8 @@ using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig& config,
     Http::HttpServerPropertiesCacheManager& cache_manager, TimeSource& time_source)
-    : alternate_protocol_cache_manager_(cache_manager), time_source_(time_source) {
+    : alternate_protocol_cache_manager_(cache_manager), time_source_(time_source),
+      strip_alt_svc_(config.strip_alt_svc()) {
   if (config.has_alternate_protocols_cache_options()) {
     ENVOY_LOG_MISC(warn, "Using deprecated and ignored alternate_protocols_cache_options in "
                          "alternate_protocols_cache config.");
@@ -37,6 +38,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   if (alt_svc.empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
+  recordAltSvc(alt_svc);
+  if (config_->stripAltSvc()) {
+    headers.remove(Http::CustomHeaders::get().AltSvc);
+  }
+  return Http::FilterHeadersStatus::Continue;
+}
+
+void Filter::recordAltSvc(const Http::HeaderMap::GetResult& alt_svc) {
   Http::HttpServerPropertiesCacheSharedPtr cache;
   const auto info = encoder_callbacks_->streamInfo().upstreamClusterInfo();
   if (info) {
@@ -46,7 +55,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     }
   }
   if (!cache) {
-    return Http::FilterHeadersStatus::Continue;
+    return;
   }
 
   std::vector<Http::HttpServerPropertiesCache::AlternateProtocol> protocols;
@@ -57,7 +66,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     if (advertised_protocols.empty()) {
       ENVOY_LOG(trace, "Invalid Alt-Svc header received: '{}'",
                 alt_svc[i]->value().getStringView());
-      return Http::FilterHeadersStatus::Continue;
+      return;
     }
     protocols.insert(protocols.end(), std::make_move_iterator(advertised_protocols.begin()),
                      std::make_move_iterator(advertised_protocols.end()));
@@ -81,7 +90,6 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   Http::HttpServerPropertiesCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,
                                                  port);
   cache->setAlternatives(origin, protocols);
-  return Http::FilterHeadersStatus::Continue;
 }
 
 } // namespace AlternateProtocolsCache

@@ -17,6 +17,16 @@ namespace HttpFilters {
 namespace AlternateProtocolsCache {
 namespace {
 
+std::string dumpOrigin(const Http::HttpServerPropertiesCache::Origin& origin) {
+  return "{ scheme: '" + origin.scheme_ + "' host: '" + origin.hostname_ +
+         "' port: " + absl::StrCat(origin.port_) + " }\n";
+}
+
+std::string dumpAlternative(const Http::HttpServerPropertiesCache::AlternateProtocol& origin) {
+  return "{ alpn: '" + origin.alpn_ + "' host: '" + origin.hostname_ +
+         "' port: " + absl::StrCat(origin.port_) + " }\n";
+}
+
 class FilterTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   FilterTest()
@@ -26,8 +36,9 @@ public:
     initialize(true);
   }
 
-  void initialize(bool populate_config) {
+  void initialize(bool populate_config, bool strip_alt_svc = false) {
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+    proto_config.set_strip_alt_svc(strip_alt_svc);
     if (populate_config) {
       EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
           .Times(testing::AnyNumber())
@@ -39,6 +50,44 @@ public:
     filter_->setEncoderFilterCallbacks(callbacks_);
   }
 
+  // Sets up the cluster info, upstream host and cache mocks so that encodeHeaders() records
+  // the parsed alt-svc entries for https://host1:443 into the cache.
+  void expectAltSvcRecorded(
+      const std::vector<Http::HttpServerPropertiesCache::AlternateProtocol>& expected_protocols) {
+    Http::HttpServerPropertiesCache::Origin expected_origin("https", "host1", 443);
+    envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+    auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+    callbacks_.stream_info_.upstream_cluster_info_ = info;
+    info->alternate_protocols_cache_options_.emplace(
+        proto_config.alternate_protocols_cache_options());
+    EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
+        .Times(testing::AnyNumber())
+        .WillOnce(Return(alternate_protocols_cache_));
+
+    EXPECT_CALL(callbacks_, streamInfo())
+        .Times(testing::AtLeast(1))
+        .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
+    EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
+    EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
+    std::shared_ptr<const Upstream::MockHostDescription> hd =
+        std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
+            callbacks_.stream_info_.upstreamInfo()->upstreamHost());
+    EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname_));
+    EXPECT_CALL(*hd, address()).WillOnce(Return(address_));
+    EXPECT_CALL(*address_, ip()).WillOnce(Return(&ip_));
+    EXPECT_CALL(ip_, port()).WillOnce(Return(443));
+    EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _))
+        .WillOnce(
+            testing::DoAll(testing::WithArg<0>(Invoke([expected_origin](auto& actual_origin) {
+                             EXPECT_EQ(expected_origin, actual_origin)
+                                 << dumpOrigin(expected_origin) << dumpOrigin(actual_origin);
+                           })),
+                           testing::WithArg<1>(Invoke([expected_protocols](auto& actual_protocols) {
+                             EXPECT_EQ(expected_protocols, actual_protocols)
+                                 << dumpAlternative(actual_protocols[0]);
+                           }))));
+  }
+
   Event::MockDispatcher dispatcher_;
   std::shared_ptr<Http::MockHttpServerPropertiesCacheManager> alternate_protocols_cache_manager_;
   std::shared_ptr<Http::MockHttpServerPropertiesCache> alternate_protocols_cache_;
@@ -46,17 +95,11 @@ public:
   std::unique_ptr<Filter> filter_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
+  std::shared_ptr<Network::MockResolvedAddress> address_ =
+      std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443", "1.2.3.4:443");
+  Network::MockIp ip_;
+  std::string hostname_ = "host1";
 };
-
-std::string dumpOrigin(const Http::HttpServerPropertiesCache::Origin& origin) {
-  return "{ scheme: '" + origin.scheme_ + "' host: '" + origin.hostname_ +
-         "' port: " + absl::StrCat(origin.port_) + " }\n";
-}
-
-std::string dumpAlternative(const Http::HttpServerPropertiesCache::AlternateProtocol& origin) {
-  return "{ alpn: '" + origin.alpn_ + "' host: '" + origin.hostname_ +
-         "' port: " + absl::StrCat(origin.port_) + " }\n";
-}
 
 TEST_F(FilterTest, NoCache) {
   initialize(false);
@@ -99,56 +142,17 @@ TEST_F(FilterTest, InvalidAltSvc) {
 TEST_F(FilterTest, ValidAltSvc) {
   Http::TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
-  Http::HttpServerPropertiesCache::Origin expected_origin("https", "host1", 443);
   MonotonicTime now = simTime().monotonicTime();
-  const std::vector<Http::HttpServerPropertiesCache::AlternateProtocol> expected_protocols = {
+  expectAltSvcRecorded({
       Http::HttpServerPropertiesCache::AlternateProtocol("h3-29", "", 443,
                                                          now + std::chrono::seconds(86400)),
       Http::HttpServerPropertiesCache::AlternateProtocol("h3", "", 443,
                                                          now + std::chrono::seconds(60)),
-  };
-
-  std::shared_ptr<Network::MockResolvedAddress> address =
-      std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443", "1.2.3.4:443");
-  Network::MockIp ip;
-  std::string hostname = "host1";
-
-  // Set up the cluster info correctly to have a cache configuration.
-  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
-  auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  callbacks_.stream_info_.upstream_cluster_info_ = info;
-  info->alternate_protocols_cache_options_.emplace(
-      proto_config.alternate_protocols_cache_options());
-  EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
-      .Times(testing::AnyNumber())
-      .WillOnce(Return(alternate_protocols_cache_));
-
-  EXPECT_CALL(callbacks_, streamInfo())
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
-  callbacks_.stream_info_.upstream_cluster_info_ = info;
-  EXPECT_CALL(callbacks_.stream_info_, upstreamClusterInfo()).Times(testing::AtLeast(1));
-  EXPECT_CALL(callbacks_.stream_info_, upstreamInfo()).Times(testing::AtLeast(1));
-  // Get the pointer to MockHostDescription.
-  std::shared_ptr<const Upstream::MockHostDescription> hd =
-      std::dynamic_pointer_cast<const Upstream::MockHostDescription>(
-          callbacks_.stream_info_.upstreamInfo()->upstreamHost());
-  EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
-  EXPECT_CALL(*hd, address()).WillOnce(Return(address));
-  EXPECT_CALL(*address, ip()).WillOnce(Return(&ip));
-  EXPECT_CALL(ip, port()).WillOnce(Return(443));
-  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([expected_origin](auto& actual_origin) {
-            EXPECT_EQ(expected_origin, actual_origin)
-                << dumpOrigin(expected_origin) << dumpOrigin(actual_origin);
-          })),
-          testing::WithArg<1>(Invoke([expected_protocols](auto& actual_protocols) {
-            EXPECT_EQ(expected_protocols, actual_protocols) << dumpAlternative(actual_protocols[0]);
-            ;
-          }))));
+  });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  // By default the header is passed through to the downstream.
+  EXPECT_TRUE(headers.has("alt-svc"));
   filter_->onDestroy();
 }
 
@@ -202,6 +206,55 @@ TEST_F(FilterTest, ValidAltSvcMissingPort) {
           }))));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  filter_->onDestroy();
+}
+
+TEST_F(FilterTest, StripAltSvcNoCache) {
+  initialize(/*populate_config=*/false, /*strip_alt_svc=*/true);
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
+
+  // The header is stripped even though nothing was recorded.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_FALSE(headers.has("alt-svc"));
+  filter_->onDestroy();
+}
+
+TEST_F(FilterTest, StripAltSvcInvalid) {
+  initialize(/*populate_config=*/true, /*strip_alt_svc=*/true);
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"alt-svc", "garbage"}};
+
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  auto info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  callbacks_.stream_info_.upstream_cluster_info_ = info;
+  info->alternate_protocols_cache_options_.emplace(
+      proto_config.alternate_protocols_cache_options());
+  EXPECT_CALL(callbacks_, streamInfo())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(ReturnRef(callbacks_.stream_info_));
+  EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _)).Times(0);
+
+  // An unparseable header is still stripped.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_FALSE(headers.has("alt-svc"));
+  filter_->onDestroy();
+}
+
+TEST_F(FilterTest, StripAltSvcValid) {
+  initialize(/*populate_config=*/true, /*strip_alt_svc=*/true);
+  Http::TestResponseHeaderMapImpl headers{
+      {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
+  MonotonicTime now = simTime().monotonicTime();
+  expectAltSvcRecorded({
+      Http::HttpServerPropertiesCache::AlternateProtocol("h3-29", "", 443,
+                                                         now + std::chrono::seconds(86400)),
+      Http::HttpServerPropertiesCache::AlternateProtocol("h3", "", 443,
+                                                         now + std::chrono::seconds(60)),
+  });
+
+  // The entries are recorded in the cache and the header is removed from the response.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_FALSE(headers.has("alt-svc"));
   filter_->onDestroy();
 }
 
