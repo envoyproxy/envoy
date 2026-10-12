@@ -30,9 +30,9 @@ public:
   virtual std::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
 
   /**
-   * @return certificate details conforming to proto admin.v2alpha.certs.
+   * @return certificate details for each trusted CA certificate.
    */
-  virtual CertificateDetailsPtr getCaCertInformation() const PURE;
+  virtual std::vector<CertificateDetailsPtr> getCaCertInformation() const PURE;
 
   /**
    * @return certificate details conforming to proto admin.v2alpha.certs.

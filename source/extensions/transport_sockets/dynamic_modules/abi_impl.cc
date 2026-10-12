@@ -5,6 +5,7 @@
 #include "envoy/event/file_event.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/extensions/transport_sockets/dynamic_modules/transport_socket.h"
 
@@ -18,6 +19,35 @@ namespace {
 DynamicModuleTransportSocket*
 toSocket(envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr) {
   return static_cast<DynamicModuleTransportSocket*>(transport_socket_envoy_ptr);
+}
+
+// Converts the result of a buffer I/O call to the ABI status and records a peer reset.
+envoy_dynamic_module_type_transport_socket_io_status
+toIoStatus(DynamicModuleTransportSocket& socket, const Api::IoCallUint64Result& result,
+           size_t* bytes_transferred) {
+  if (result.ok()) {
+    *bytes_transferred = result.return_value_;
+    return envoy_dynamic_module_type_transport_socket_io_status_Success;
+  }
+  const Api::IoError::IoErrorCode error_code = result.err_->getErrorCode();
+  if (error_code == Api::IoError::IoErrorCode::Again) {
+    return envoy_dynamic_module_type_transport_socket_io_status_Again;
+  }
+  if (error_code == Api::IoError::IoErrorCode::ConnectionReset) {
+    socket.onPeerReset();
+  }
+  return envoy_dynamic_module_type_transport_socket_io_status_Error;
+}
+
+// Returns nullptr within on_set_callbacks, where the stream info of a client connection does not
+// exist yet.
+StreamInfo::StreamInfo* connectionStreamInfo(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr) {
+  DynamicModuleTransportSocket* socket = toSocket(transport_socket_envoy_ptr);
+  if (socket->callbacks() == nullptr || socket->inSetCallbacks()) {
+    return nullptr;
+  }
+  return &socket->callbacks()->connection().streamInfo();
 }
 
 // Fills the address string and port from an IP address. Returns false for null or non-IP addresses.
@@ -78,6 +108,35 @@ envoy_dynamic_module_callback_transport_socket_io_write(
     return envoy_dynamic_module_type_transport_socket_io_status_Again;
   }
   return envoy_dynamic_module_type_transport_socket_io_status_Error;
+}
+
+envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    size_t max_length, size_t* bytes_read) {
+  *bytes_read = 0;
+  DynamicModuleTransportSocket* socket = toSocket(transport_socket_envoy_ptr);
+  Buffer::Instance* buffer = socket->currentReadBuffer();
+  if (socket->callbacks() == nullptr || buffer == nullptr) {
+    return envoy_dynamic_module_type_transport_socket_io_status_Error;
+  }
+  return toIoStatus(*socket, socket->callbacks()->ioHandle().read(*buffer, max_length), bytes_read);
+}
+
+envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    size_t* bytes_written) {
+  *bytes_written = 0;
+  DynamicModuleTransportSocket* socket = toSocket(transport_socket_envoy_ptr);
+  Buffer::Instance* buffer = socket->currentWriteBuffer();
+  if (socket->callbacks() == nullptr || buffer == nullptr) {
+    return envoy_dynamic_module_type_transport_socket_io_status_Error;
+  }
+  if (buffer->length() == 0) {
+    return envoy_dynamic_module_type_transport_socket_io_status_Success;
+  }
+  return toIoStatus(*socket, socket->callbacks()->ioHandle().write(*buffer), bytes_written);
 }
 
 void envoy_dynamic_module_callback_transport_socket_io_shutdown_write(
@@ -183,7 +242,8 @@ bool envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(
 void envoy_dynamic_module_callback_transport_socket_set_is_readable(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr) {
   Network::TransportSocketCallbacks* callbacks = toSocket(transport_socket_envoy_ptr)->callbacks();
-  if (callbacks == nullptr) {
+  if (callbacks == nullptr || !callbacks->ioHandle().isOpen() ||
+      callbacks->connection().connecting()) {
     return;
   }
   callbacks->setTransportSocketIsReadable();
@@ -192,7 +252,8 @@ void envoy_dynamic_module_callback_transport_socket_set_is_readable(
 void envoy_dynamic_module_callback_transport_socket_set_is_writable(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr) {
   Network::TransportSocketCallbacks* callbacks = toSocket(transport_socket_envoy_ptr)->callbacks();
-  if (callbacks == nullptr) {
+  if (callbacks == nullptr || !callbacks->ioHandle().isOpen() ||
+      callbacks->connection().connecting()) {
     return;
   }
   // TransportSocketCallbacks has no `writability` setter, so re-arm the write event directly.
@@ -230,6 +291,56 @@ bool envoy_dynamic_module_callback_transport_socket_get_local_address(
   }
   return fillIpAddress(callbacks->connection().connectionInfoProvider().localAddress(), address_out,
                        port_out);
+}
+
+bool envoy_dynamic_module_callback_transport_socket_get_connection_id(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t* connection_id_out) {
+  Network::TransportSocketCallbacks* callbacks = toSocket(transport_socket_envoy_ptr)->callbacks();
+  if (callbacks == nullptr) {
+    return false;
+  }
+  *connection_id_out = callbacks->connection().id();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t* connection_id_out) {
+  StreamInfo::StreamInfo* stream_info = connectionStreamInfo(transport_socket_envoy_ptr);
+  if (stream_info == nullptr) {
+    return false;
+  }
+  const auto upstream_info = stream_info->upstreamInfo();
+  if (upstream_info == nullptr || !upstream_info->upstreamConnectionId().has_value()) {
+    return false;
+  }
+  *connection_id_out = upstream_info->upstreamConnectionId().value();
+  return true;
+}
+
+void envoy_dynamic_module_callback_transport_socket_add_wire_bytes(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t bytes_received, uint64_t bytes_sent) {
+  StreamInfo::StreamInfo* stream_info = connectionStreamInfo(transport_socket_envoy_ptr);
+  if (stream_info == nullptr) {
+    return;
+  }
+  stream_info->addBytesReceived(bytes_received);
+  stream_info->addBytesSent(bytes_sent);
+  const StreamInfo::BytesMeterSharedPtr& downstream_bytes_meter =
+      stream_info->getDownstreamBytesMeter();
+  if (downstream_bytes_meter == nullptr) {
+    return;
+  }
+  downstream_bytes_meter->addWireBytesReceived(bytes_received);
+  downstream_bytes_meter->addWireBytesSent(bytes_sent);
+  const StreamInfo::BytesMeterSharedPtr& upstream_bytes_meter =
+      stream_info->getUpstreamBytesMeter();
+  if (upstream_bytes_meter != nullptr) {
+    upstream_bytes_meter->addWireBytesSent(bytes_received);
+    upstream_bytes_meter->addWireBytesReceived(bytes_sent);
+  }
 }
 
 } // extern "C"

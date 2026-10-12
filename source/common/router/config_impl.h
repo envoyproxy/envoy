@@ -182,11 +182,10 @@ public:
    * @param stream_info supplies the stream info for the request.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
-   * @return RouteConstSharedPtr if input matches this object, nullptr otherwise.
+   * @return true if input matches this object, false otherwise.
    */
-  virtual RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                                      const StreamInfo::StreamInfo& stream_info,
-                                      uint64_t random_value) const PURE;
+  virtual bool matches(const RouteMatchContext& route_match_context,
+                       const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const PURE;
 
   // By default, matchers do not support null Path headers.
   virtual bool supportsPathlessHeaders() const { return false; }
@@ -220,6 +219,28 @@ public:
 
 class CommonVirtualHostImpl;
 using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
+
+/**
+ * Builds routes of a virtual host for the route specifiers configured on it.
+ */
+class RouteBuilderImpl : public RouteBuilder {
+public:
+  RouteBuilderImpl(const CommonVirtualHostSharedPtr& vhost,
+                   Server::Configuration::ServerFactoryContext& factory_context,
+                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager)
+      : vhost_(vhost), factory_context_(factory_context), validator_(validator),
+        init_manager_(init_manager) {}
+
+  // Router::RouteBuilder
+  absl::StatusOr<MatchableRouteConstSharedPtr> build(const envoy::config::route::v3::Route& route,
+                                                     bool validate_clusters) override;
+
+private:
+  const CommonVirtualHostSharedPtr vhost_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
+  Init::Manager& init_manager_;
+};
 
 class SslRedirectRoute : public Route {
 public:
@@ -363,7 +384,6 @@ public:
     return HeaderParser::defaultParser();
   }
   std::optional<bool> filterDisabled(absl::string_view config_name) const;
-  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -461,7 +481,6 @@ private:
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
-  RouteSpecifierList route_specifiers_;
   const std::optional<uint32_t> per_request_buffer_limit_;
   const std::optional<uint64_t> request_body_buffer_limit_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
@@ -471,18 +490,16 @@ private:
 };
 
 /**
- * The outcome of route matching within a single virtual host: the matched route and the route
- * level specifier chain of the entry that produced it. Both are empty when nothing matched, and
- * `route_specifiers` alone is empty for the synthetic SSL redirect route, which has no configured
- * route entry behind it.
+ * The outcome of route matching within a single virtual host: the resolved route and whether the
+ * route specifier chains already ran on it. The chains of all three levels run on a route entry
+ * as soon as it matched.
  *
- * Borrowing the chain rather than holding its owner is safe: the route entries are owned by the
- * virtual host, either through `routes_` or through the match tree, whose actions are built once
- * at config time. Both outlive any request routed through the configuration.
+ * `route` may be nullptr while `specifiers_applied` is true: the specifiers accepted the match and
+ * dropped the route, which leaves the request with no route for good.
  */
 struct VirtualHostMatchResult {
   RouteConstSharedPtr route;
-  RouteSpecifierSpan route_specifiers;
+  bool specifiers_applied{false};
 };
 
 /**
@@ -507,12 +524,14 @@ public:
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
   VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
-  RouteSpecifierSpan routeSpecifiers() const { return shared_virtual_host_->routeSpecifiers(); }
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
   CommonVirtualHostSharedPtr shared_virtual_host_;
+  // Created after the shared virtual host so that the specifiers can build routes in it.
+  RouteSpecifierList route_specifiers_;
 
   std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
   SslRequirements ssl_requirements_;
@@ -614,6 +633,11 @@ class RouteTracingImpl : public RouteTracing {
 public:
   explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
 
+  // Builds a RouteTracingImpl, returning an error instead of throwing when an operation formatter
+  // is invalid, so a caller that must not throw can validate the configuration.
+  static absl::StatusOr<std::unique_ptr<RouteTracingImpl>>
+  create(const envoy::config::route::v3::Tracing& tracing);
+
   // RouteTracing
   const envoy::type::v3::FractionalPercent& getClientSampling() const override;
   const envoy::type::v3::FractionalPercent& getRandomSampling() const override;
@@ -713,6 +737,11 @@ public:
                   const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
   absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
   RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
+  // Resolves the route of a request that matched this entry, which is the entry itself unless a
+  // cluster specifier plugin is configured.
+  RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   uint64_t random_value) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -903,9 +932,6 @@ protected:
   std::unique_ptr<ConnectConfig> connect_config_;
 
   bool case_sensitive() const { return case_sensitive_; }
-  RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
-                                   const StreamInfo::StreamInfo& stream_info,
-                                   uint64_t random_value) const;
 
   // Common logic for rewritePathHeader() of DirectResponseEntry.
   void finalizePathHeaderForRedirect(Http::RequestHeaderMap& headers,
@@ -1065,9 +1091,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Template; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1100,9 +1125,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1135,9 +1159,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1170,9 +1193,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1205,9 +1227,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::None; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
@@ -1238,9 +1259,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,

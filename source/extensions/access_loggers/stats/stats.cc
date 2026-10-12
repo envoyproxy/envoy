@@ -144,14 +144,14 @@ void GaugeKey::makeOwned() {
   ASSERT(!(borrowed_tags_.has_value() && owned_tags_.has_value()),
          "Both borrowed and owned tags are present in GaugeKey::makeOwned");
   if (borrowed_tags_.has_value() && !owned_tags_.has_value()) {
-    owned_tags_ = borrowed_tags_.value().get();
+    owned_tags_ = *borrowed_tags_;
     borrowed_tags_ = std::nullopt;
   }
 }
 
 Stats::StatNameTagVectorOptConstRef GaugeKey::tags() const {
   if (owned_tags_.has_value()) {
-    return std::cref(owned_tags_.value());
+    return owned_tags_.value();
   }
   return borrowed_tags_;
 }
@@ -165,7 +165,7 @@ bool GaugeKey::operator==(const GaugeKey& rhs) const {
   if (lhs_tags.has_value() != rhs_tags.has_value()) {
     return false;
   }
-  return !lhs_tags.has_value() || lhs_tags.value().get() == rhs_tags.value().get();
+  return !lhs_tags.has_value() || *lhs_tags == *rhs_tags;
 }
 
 StatsAccessLog::StatsAccessLog(const envoy::extensions::access_loggers::stats::v3::Config& config,

@@ -57,7 +57,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   descriptors_.clear();
-  populateRateLimitDescriptors(descriptors_, headers, false);
+  // Request-time population: the response has not been produced yet, so no response headers are
+  // available to the formatter (%RESP()% resolves empty here, as before).
+  populateRateLimitDescriptors(descriptors_, headers, /*response_headers=*/nullptr, false);
   ENVOY_LOG(debug, "rate limit descriptors size: {}", descriptors_.size());
   if (!descriptors_.empty()) {
     state_ = State::Calling;
@@ -70,6 +72,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
 void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                           const Http::RequestHeaderMap& headers,
+                                          const Http::ResponseHeaderMap* response_headers,
                                           bool on_stream_done) {
   if (!on_stream_done) {
     // To use the exact same context for both request and on_stream_done rate limiting descriptors,
@@ -93,14 +96,15 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   // The the embedded rate limits is set in the typed_per_filter_config, use it and ignore the
   // rate limits of route.
   if (route_config_ != nullptr && route_config_->hasRateLimitConfigs()) {
-    route_config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors,
-                                       on_stream_done);
+    route_config_->populateDescriptors(headers, response_headers, callbacks_->streamInfo(),
+                                       descriptors, on_stream_done);
     return;
   }
 
   // Rate Limit config in typed_per_filter_config takes precedence over route's rate limit.
   if (config_->hasRateLimitConfigs()) {
-    config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors, on_stream_done);
+    config_->populateDescriptors(headers, response_headers, callbacks_->streamInfo(), descriptors,
+                                 on_stream_done);
     return;
   }
 
@@ -170,6 +174,10 @@ Http::Filter1xxHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) 
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+  // Capture the response headers so a stream-done (apply_on_stream_done) descriptor can resolve
+  // %RESP()% in hits_addend.format. Safe as a raw pointer: the response header map is owned by the
+  // ActiveStream and outlives filter destruction (onDestroy), just like request_headers_.
+  response_headers_ = &headers;
   populateResponseHeaders(headers, /*from_local_reply=*/false);
   return Http::FilterHeadersStatus::Continue;
 }
@@ -194,7 +202,7 @@ void Filter::onDestroy() {
     client_->cancel();
   } else if (client_ != nullptr && request_headers_ != nullptr) {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
-    populateRateLimitDescriptors(descriptors, *request_headers_, true);
+    populateRateLimitDescriptors(descriptors, *request_headers_, response_headers_, true);
     if (!descriptors.empty()) {
       // If the limit() call fails directly then the callback and client will be destroyed
       // when calling the limit() function. To make sure we can call the detach() function

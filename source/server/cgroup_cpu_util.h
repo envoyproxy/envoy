@@ -117,6 +117,15 @@ public:
   static std::optional<uint32_t> getCpuLimit(Filesystem::Instance& fs,
                                              CgroupDetectionDiagnostic* diag = nullptr);
 
+  /**
+   * Resolves the calling process's own `cgroup` directory by combining the `cgroup` mount from
+   * `/proc/self/mountinfo` with the path from `/proc/self/cgroup`. The mount point alone is the
+   * `cgroup` root when the process shares the host `cgroup` namespace.
+   * @param fs Filesystem instance for file operations.
+   * @return CgroupInfo with the directory and version, nullopt if it cannot be determined.
+   */
+  static std::optional<CgroupInfo> getCurrentCgroupInfo(Filesystem::Instance& fs);
+
 private:
   /**
    * Reads CPU limit from specific `cgroup` `v1` paths.

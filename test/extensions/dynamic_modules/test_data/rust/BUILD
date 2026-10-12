@@ -19,6 +19,7 @@ package(default_visibility = [
     "//test/extensions/http/early_header_mutation/dynamic_modules:__pkg__",
     "//test/extensions/http/header_formatters/dynamic_modules:__pkg__",
     "//test/extensions/router/cluster_specifiers/dynamic_modules:__pkg__",
+    "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
 ])
@@ -47,6 +48,8 @@ test_program(name = "bootstrap_integration_test")
 
 test_program(name = "bootstrap_stats_test")
 
+test_program(name = "bootstrap_iterate_panic_test")
+
 test_program(name = "bootstrap_function_registry_test")
 
 test_program(name = "bootstrap_shared_data_test")
@@ -62,6 +65,8 @@ test_program(name = "bootstrap_file_watcher_test")
 test_program(name = "bootstrap_admin_handler_test")
 
 test_program(name = "bootstrap_cluster_lifecycle_test")
+
+test_program(name = "bootstrap_config_names_test")
 
 test_program(name = "bootstrap_listener_lifecycle_test")
 
@@ -81,6 +86,10 @@ test_program(name = "upstream_http_tcp_bridge")
 
 test_program(name = "cluster_specifier_integration_test")
 
+test_program(name = "route_specifier_integration_test")
+
+test_program(name = "route_specifier_shadow")
+
 test_program(name = "cluster_integration_test")
 
 test_program(name = "cluster_filter_state_test")
@@ -90,6 +99,8 @@ test_program(name = "cluster_dynamic_metadata_test")
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "transport_socket_integration_test")
+
+test_program(name = "transport_socket_splice")
 
 test_program(name = "early_header_mutation_integration_test")
 

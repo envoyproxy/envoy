@@ -44,6 +44,8 @@ class NvdDownloader(runner.Runner):
 
     @property
     def end_date(self):
+        if self.args.end.month == 12:
+            return datetime(self.args.end.year + 1, 1, 1)
         return datetime(self.args.end.year, self.args.end.month + 1, 1)
 
     @property

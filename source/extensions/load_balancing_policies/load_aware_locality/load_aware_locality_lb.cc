@@ -66,6 +66,12 @@ LoadAwareLocalityLoadBalancer::LoadAwareLocalityLoadBalancer(
 
   weight_update_timer_ = typed_config->mainThreadDispatcher().createTimer(
       [this]() { computeLocalityRoutingWeights(); });
+
+  if (typed_config->enableOobLoadReport()) {
+    orca_oob_manager_ = std::make_unique<Common::ProdOrcaOobManager>(
+        typed_config->oobManagerConfig(), priority_set, typed_config->mainThreadDispatcher(),
+        random, cluster_info.statsScope());
+  }
 }
 
 LoadAwareLocalityLoadBalancer::~LoadAwareLocalityLoadBalancer() = default;
@@ -97,6 +103,10 @@ absl::Status LoadAwareLocalityLoadBalancer::initialize() {
       });
 
   computeLocalityRoutingWeights();
+
+  if (orca_oob_manager_ != nullptr) {
+    RETURN_IF_NOT_OK(orca_oob_manager_->initialize());
+  }
   return absl::OkStatus();
 }
 

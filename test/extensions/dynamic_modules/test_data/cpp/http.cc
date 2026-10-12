@@ -702,6 +702,12 @@ public:
     static constexpr char serialized_any[] = {0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02};
     handle_.setTypedMetadata("ns_req_header_typed",
                              std::string_view(serialized_any, sizeof(serialized_any)));
+    auto typed_metadata = handle_.getTypedMetadata("ns_req_header_typed");
+    if (!typed_metadata.has_value() || typed_metadata->first != "t/x" ||
+        typed_metadata->second != std::string_view("\x01\x02", 2) ||
+        handle_.getTypedMetadata("missing").has_value()) {
+      std::abort();
+    }
 
     // Try getting metadata from router, cluster, and host.
     // In C++ SDK namespaces like "envoy.filters.http.router" are needed if mapped directly,

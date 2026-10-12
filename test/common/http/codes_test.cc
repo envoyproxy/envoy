@@ -407,8 +407,8 @@ public:
                             const std::string& tag_extracted_name, TagPairs tags, uint64_t value) {
     Stats::CounterOptConstRef counter = store.findCounterByString(name);
     ASSERT_TRUE(counter.has_value()) << "no counter named '" << name << "'";
-    EXPECT_EQ(counter->get().value(), value) << " for stat '" << name << "'";
-    expectMetric(counter->get(), name, tag_extracted_name, std::move(tags));
+    EXPECT_EQ(counter->value(), value) << " for stat '" << name << "'";
+    expectMetric(counter.ref(), name, tag_extracted_name, std::move(tags));
   }
 
   static void expectHistogram(Stats::TestUtil::TestStore& store, const std::string& name,
@@ -417,7 +417,7 @@ public:
     Stats::HistogramOptConstRef histogram = store.findHistogramByString(name);
     ASSERT_TRUE(histogram.has_value()) << "no histogram named '" << name << "'";
     EXPECT_EQ(store.histogramValues(name, false), values) << " for stat '" << name << "'";
-    expectMetric(histogram->get(), name, tag_extracted_name, std::move(tags));
+    expectMetric(histogram.ref(), name, tag_extracted_name, std::move(tags));
   }
 
   const std::string& response_code_tag_{Config::TagNames::get().RESPONSE_CODE};
@@ -727,7 +727,7 @@ TEST(CodeStatsParityTest, TagsMatchTheDefaultTagProducer) {
     for (const std::string& name : store->histogramNames()) {
       Stats::HistogramOptConstRef histogram = store->findHistogramByString(name);
       ASSERT_TRUE(histogram.has_value()) << "no histogram named '" << name << "'";
-      check(histogram->get());
+      check(histogram.ref());
     }
   }
   EXPECT_LT(0U, checked);

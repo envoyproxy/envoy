@@ -5112,6 +5112,10 @@ TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideNormal) {
   performStandAloneModeOverrideNormal(ProcessingMode::STREAMED);
 }
 
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithHeaderDelay) {
+  performStandAloneModeOverrideNormal(ProcessingMode::STREAMED, /*delay_header_response=*/true);
+}
+
 TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideNormalWithInitialBodyModeNone) {
   performStandAloneModeOverrideNormal(ProcessingMode::NONE);
 }

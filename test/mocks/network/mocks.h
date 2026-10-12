@@ -162,6 +162,7 @@ public:
   MOCK_METHOD(const ConnectionSocket&, socket, ());
   MOCK_METHOD(void, continueReading, ());
   MOCK_METHOD(void, injectReadDataToFilterChain, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(OptRef<Buffer::Instance>, readBuffer, ());
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, ());
   MOCK_METHOD(void, upstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(bool, startUpstreamSecureTransport, ());
@@ -469,7 +470,7 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Network::SocketSharedPtr, getListenSocket, (uint32_t));
   MOCK_METHOD(bool, reusePort, (), (const));
-  MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
+  MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (uint32_t), (const));
   MOCK_METHOD(void, closeAllSockets, ());
   MOCK_METHOD(absl::Status, doFinalPreWorkerInit, ());
 };
@@ -610,7 +611,9 @@ class MockNonDispatchedUdpPacketHandler : public NonDispatchedUdpPacketHandler {
 public:
   ~MockNonDispatchedUdpPacketHandler() override;
 
-  MOCK_METHOD(void, handle, (uint32_t worker_index, const UdpRecvData& packet));
+  MOCK_METHOD(void, handle,
+              (uint32_t worker_index, const Address::Instance& listener_address,
+               const UdpRecvData& packet));
 };
 
 class MockIp : public Address::Ip {

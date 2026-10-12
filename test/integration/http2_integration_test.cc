@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -18,6 +20,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/socket_option_impl.h"
 
+#include "test/integration/fake_upstream.h"
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/utility.h"
@@ -27,6 +30,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/mutex.h"
@@ -155,6 +159,112 @@ public:
       EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
     }
     tcp_client_->close();
+  }
+
+protected:
+  static uint32_t rstStreamErrorCode(const Http2Frame& frame) {
+    EXPECT_EQ(Http2Frame::Type::RstStream, frame.type());
+    EXPECT_EQ(Http2Frame::HeaderSize + 4, frame.size());
+    if (frame.size() < Http2Frame::HeaderSize + 4) {
+      return 0;
+    }
+    const uint8_t* p = frame.data() + Http2Frame::HeaderSize;
+    return (static_cast<uint32_t>(p[0]) << 24) | (static_cast<uint32_t>(p[1]) << 16) |
+           (static_cast<uint32_t>(p[2]) << 8) | static_cast<uint32_t>(p[3]);
+  }
+
+  // Returns the first RST_STREAM frame for `stream_id` in `data`, which holds the raw bytes written
+  // by an HTTP/2 client starting with the connection preface. Returns an empty frame if there is no
+  // such frame yet.
+  static Http2Frame findRstStreamFrame(absl::string_view data, uint32_t stream_id) {
+    constexpr size_t kPrefaceSize = sizeof(Http2Frame::Preamble) - 1;
+    if (data.size() < kPrefaceSize) {
+      return {};
+    }
+    data.remove_prefix(kPrefaceSize);
+    while (data.size() >= Http2Frame::HeaderSize) {
+      Http2Frame frame;
+      frame.setHeader(data);
+      const size_t frame_size = Http2Frame::HeaderSize + frame.payloadSize();
+      if (data.size() < frame_size) {
+        break;
+      }
+      if (frame.payloadSize() > 0) {
+        frame.setPayload(data.substr(Http2Frame::HeaderSize));
+      }
+      if (frame.type() == Http2Frame::Type::RstStream && frame.streamId() == stream_id) {
+        return frame;
+      }
+      data.remove_prefix(frame_size);
+    }
+    return {};
+  }
+
+  // Returns the next frame other than SETTINGS, WINDOW_UPDATE or PING, or an empty frame if the
+  // connection is closed before such a frame arrives.
+  Http2Frame readNextStreamOrGoAwayFrame() {
+    while (true) {
+      // This may return early without data if the connection is closed.
+      (void)tcp_client_->waitForData(Http2Frame::HeaderSize);
+      if (tcp_client_->data().size() < Http2Frame::HeaderSize) {
+        return {};
+      }
+      Http2Frame frame = readFrame();
+      if (frame.type() != Http2Frame::Type::Settings &&
+          frame.type() != Http2Frame::Type::WindowUpdate &&
+          frame.type() != Http2Frame::Type::Ping) {
+        return frame;
+      }
+    }
+  }
+
+  // Verifies that a frame sent by the downstream client on `stream_id` after END_STREAM was
+  // rejected. nghttp2 treats such a frame as a connection error. oghttp2 resets only the offending
+  // stream with RST_STREAM(STREAM_CLOSED), as permitted by RFC 9113 Section 5.1; oghttp2 versions
+  // without that check deliver the frame to the codec, which then treats it as a connection error.
+  void expectDownstreamFrameAfterEndStreamRejected(uint32_t stream_id) {
+    const Http2Frame frame = readNextStreamOrGoAwayFrame();
+    if (!frame.empty() && frame.type() == Http2Frame::Type::RstStream) {
+      EXPECT_EQ(Http2Impl::Oghttp2, GetParam().http2_implementation);
+      EXPECT_EQ(stream_id, frame.streamId());
+      EXPECT_EQ(static_cast<uint32_t>(Http2Frame::ErrorCode::StreamClosed),
+                rstStreamErrorCode(frame));
+      // Only the stream is reset; the connection stays open.
+      EXPECT_TRUE(tcp_client_->connected());
+      EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_protocol_error")->value());
+      tcp_client_->close();
+      return;
+    }
+    if (!frame.empty()) {
+      EXPECT_EQ(Http2Frame::Type::GoAway, frame.type());
+    }
+    tcp_client_->waitForDisconnect();
+    test_server_->waitForCounter("http.config_test.downstream_cx_protocol_error", Ge(1));
+  }
+
+  // Verifies that a frame sent by the fake upstream on `stream_id` after END_STREAM was rejected.
+  // See expectDownstreamFrameAfterEndStreamRejected() for the expected behavior of each codec.
+  void expectUpstreamFrameAfterEndStreamRejected(FakeRawConnection& upstream, uint32_t stream_id) {
+    const std::string protocol_error_counter = "cluster.cluster_0.upstream_cx_protocol_error";
+    Http2Frame frame;
+    const auto received_reset = [&frame, stream_id](const std::string& data) {
+      frame = findRstStreamFrame(data, stream_id);
+      return !frame.empty();
+    };
+    // Wait for either the stream to be reset or the connection to be closed with an error.
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    while (bound.withinBound() &&
+           !upstream.waitForData(received_reset, nullptr, std::chrono::milliseconds(10)) &&
+           test_server_->counter(protocol_error_counter)->value() == 0) {
+    }
+    if (!frame.empty()) {
+      EXPECT_EQ(Http2Impl::Oghttp2, GetParam().http2_implementation);
+      EXPECT_EQ(static_cast<uint32_t>(Http2Frame::ErrorCode::StreamClosed),
+                rstStreamErrorCode(frame));
+      EXPECT_EQ(0, test_server_->counter(protocol_error_counter)->value());
+      return;
+    }
+    test_server_->waitForCounter(protocol_error_counter, Ge(1));
   }
 };
 
@@ -400,8 +510,19 @@ TEST_P(Http2FrameIntegrationTest, DownstreamHeadersAfterEndStream) {
   extra_headers.adjustPayloadSize();
   sendFrame(extra_headers);
 
-  tcp_client_->waitForDisconnect();
-  test_server_->waitForCounter("http.config_test.downstream_cx_protocol_error", Ge(1));
+  expectDownstreamFrameAfterEndStreamRejected(1);
+}
+
+// As above, but the offending frame is a second request HEADERS frame.
+TEST_P(Http2FrameIntegrationTest, DownstreamRequestHeadersAfterEndStream) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_reject_frames_after_end_stream", "true");
+  beginSession();
+
+  sendFrame(Http2Frame::makeRequest(1, "host", "/"));
+  sendFrame(Http2Frame::makeRequest(1, "host", "/second"));
+
+  expectDownstreamFrameAfterEndStreamRejected(1);
 }
 
 // As above, but the offending frame is a DATA frame.
@@ -413,8 +534,7 @@ TEST_P(Http2FrameIntegrationTest, DownstreamDataAfterEndStream) {
   sendFrame(Http2Frame::makeRequest(1, "host", "/"));
   sendFrame(Http2Frame::makeDataFrame(1, "unexpected data"));
 
-  tcp_client_->waitForDisconnect();
-  test_server_->waitForCounter("http.config_test.downstream_cx_protocol_error", Ge(1));
+  expectDownstreamFrameAfterEndStreamRejected(1);
 }
 
 // Regression test for a use-after-free of the upstream response decoder.
@@ -454,7 +574,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamHeadersAfterEndStream) {
   test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
 
   // Upstream -> Envoy: another HEADERS frame on the completed stream. This is the frame that used
-  // to be dispatched to the freed decoder; it must now be rejected as a protocol error.
+  // to be dispatched to the freed decoder; it must now be rejected.
   Http2Frame extra_headers = Http2Frame::makeEmptyHeadersFrame(
       stream_id, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
                      Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
@@ -462,7 +582,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamHeadersAfterEndStream) {
   extra_headers.adjustPayloadSize();
   ASSERT_TRUE(upstream->write(std::string(extra_headers)));
 
-  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_protocol_error", Ge(1));
+  expectUpstreamFrameAfterEndStreamRejected(*upstream, stream_id);
 
   tcp_client_->close();
   if (upstream->connected()) {
@@ -955,6 +1075,103 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
   tcp_client_->close();
 }
 
+// Verifies that the HCM accepts a connection-level (stream 0) METADATA frame without tearing down
+// the connection: a subsequent request still round-trips with a normal response.
+TEST_P(Http2FrameIntegrationTest, ConnectionMetadataFrameAccepted) {
+  // Allow metadata usage on both upstream and downstream.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  beginSession();
+
+  std::string buffer;
+  // A normal request on stream 1.
+  auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(0), "a", "/",
+                                             {{"no_trailers", "1"}});
+  absl::StrAppend(&buffer, std::string(request));
+  // Connection-level metadata on stream 0, interleaved with the request.
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  auto metadata = Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+  absl::StrAppend(&buffer, std::string(metadata));
+  // End the request stream.
+  auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(0), "",
+                                        Http2Frame::DataFlags::EndStream);
+  absl::StrAppend(&buffer, std::string(data));
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+  upstream_request->encodeHeaders(default_response_headers_, true);
+
+  // The connection must stay open: a normal response is received (no GOAWAY).
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
+  ASSERT_TRUE(tcp_client_->connected());
+  tcp_client_->close();
+}
+
+// Verifies that an empty connection-level (stream 0) METADATA frame is not delivered but is counted
+// by the http2.metadata_empty_frames stat.
+TEST_P(Http2FrameIntegrationTest, ConnectionMetadataEmptyFrameCounted) {
+  // Allow metadata usage on both upstream and downstream.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_explicit_http_config()
+        ->mutable_http2_protocol_options()
+        ->set_allow_metadata(true);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  beginSession();
+
+  std::string buffer;
+  auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(0), "a", "/",
+                                             {{"no_trailers", "1"}});
+  absl::StrAppend(&buffer, std::string(request));
+  // An empty connection-level METADATA frame on stream 0.
+  const Http::MetadataMap empty_metadata_map;
+  auto metadata = Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, empty_metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+  absl::StrAppend(&buffer, std::string(metadata));
+  auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(0), "",
+                                        Http2Frame::DataFlags::EndStream);
+  absl::StrAppend(&buffer, std::string(data));
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+  upstream_request->encodeHeaders(default_response_headers_, true);
+
+  auto frame = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
+
+  EXPECT_EQ(1, test_server_->counter("http2.metadata_empty_frames")->value());
+  tcp_client_->close();
+}
+
 // Validate the request completion during processing of deferred list works.
 TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
   const int kRequestsSentPerIOCycle = 20;
@@ -1213,6 +1430,92 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
   // Make the timeout longer to accommodate non optimized builds
   test_server_->waitForCounter("http.config_test.downstream_rq_rx_reset",
                                Eq(kRequestsSentPerIOCycle), TestUtility::DefaultTimeout * 10);
+}
+
+// Verifies that reserved flag bits on CONTINUATION frames (e.g. 0x01) are ignored and do
+// not prematurely end the stream or cause an assertion failure when follow-up trailers arrive.
+TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsIgnored) {
+  beginSession();
+
+  const uint32_t sid = Http2Frame::makeClientStreamId(0);
+
+  // HEADERS, flags=0x00 (no END_STREAM, no END_HEADERS), routable pseudo-headers.
+  Http2Frame headers = Http2Frame::makeEmptyHeadersFrame(sid, Http2Frame::HeadersFlags::None);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodGet);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::Path);
+  headers.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "host");
+  headers.adjustPayloadSize();
+
+  // CONTINUATION, flags=0x05 (END_HEADERS | reserved bit 0x01), empty payload.
+  // RFC 9113 §6.10 defines only END_HEADERS for CONTINUATION; all other bits are
+  // reserved and MUST be ignored on receipt according to §4.1.
+  Http2Frame cont =
+      Http2Frame::makeEmptyContinuationFrame(sid, static_cast<Http2Frame::HeadersFlags>(0x05));
+
+  // Trailers HEADERS, flags=END_STREAM|END_HEADERS.
+  Http2Frame trailers = Http2Frame::makeEmptyHeadersFrame(
+      sid, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+               Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+  trailers.appendHeaderWithoutIndexing(Http2Frame::Header("foo", "bar"));
+  trailers.adjustPayloadSize();
+
+  std::string wire;
+  wire.append(static_cast<std::string>(headers));
+  wire.append(static_cast<std::string>(cont));
+  wire.append(static_cast<std::string>(trailers));
+  ASSERT_TRUE(tcp_client_->write(wire, false, false));
+
+  // With the reserved bit masked off, the request is decoded with
+  // end_stream=false after HEADERS+CONTINUATION and the follow-up trailers are
+  // delivered normally through the filter chain.
+  waitForNextUpstreamRequest();
+  ASSERT_NE(nullptr, upstream_request_->trailers());
+  EXPECT_EQ(
+      "bar",
+      upstream_request_->trailers()->get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  auto response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
+  tcp_client_->close();
+}
+
+// With the guard disabled the reserved 0x01 bit on the CONTINUATION frame
+// aliases END_STREAM, so Envoy treats the request as complete after
+// HEADERS+CONTINUATION alone and forwards it upstream as a header-only request.
+// The follow-up trailers frame that triggers the debug ASSERT is intentionally
+// omitted here so the legacy behavior can be observed without crashing.
+TEST_P(Http2FrameIntegrationTest, ContinuationReservedFlagsLegacy) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_mask_continuation_flags",
+                                    "false");
+  autonomous_upstream_ = true;
+  beginSession();
+
+  const uint32_t sid = Http2Frame::makeClientStreamId(0);
+
+  Http2Frame headers = Http2Frame::makeEmptyHeadersFrame(sid, Http2Frame::HeadersFlags::None);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::MethodGet);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::SchemeHttps);
+  headers.appendStaticHeader(Http2Frame::StaticHeaderIndex::Path);
+  headers.appendHeaderWithoutIndexing(Http2Frame::StaticHeaderIndex::Authority, "host");
+  headers.adjustPayloadSize();
+
+  Http2Frame cont =
+      Http2Frame::makeEmptyContinuationFrame(sid, static_cast<Http2Frame::HeadersFlags>(0x05));
+
+  std::string wire;
+  wire.append(static_cast<std::string>(headers));
+  wire.append(static_cast<std::string>(cont));
+  ASSERT_TRUE(tcp_client_->write(wire, false, false));
+
+  // Legacy behavior: request is treated as end_stream=true and proxied
+  // immediately; the autonomous upstream replies with 200.
+  auto response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
+  tcp_client_->close();
 }
 
 // Tests sending an empty metadata map from downstream.

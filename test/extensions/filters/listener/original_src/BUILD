@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -64,10 +64,11 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "original_src_fuzz_test",
     srcs = ["original_src_fuzz_test.cc"],
     corpus = "original_src_corpus",
+    extension_names = ["envoy.filters.listener.original_src"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":original_src_fuzz_test_proto_cc_proto",

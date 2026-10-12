@@ -757,6 +757,36 @@ TEST_F(FilterTest, RouteConfigOverrideForwarding) {
   EXPECT_FALSE(request_headers.has("authorization"));
 }
 
+TEST_F(FilterTest, HideCredentialsNoPathWithQueryKeySource) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+  - key: key1
+    client: user1
+  key_sources:
+  - header: "Authorization"
+  - query: "api_key"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: true
+  )EOF";
+
+  setup(config_yaml, {});
+
+  // CONNECT request with no ":path". The key is supplied via the Authorization header, but the
+  // query key source is also configured and removeKey() iterates every source, including the query
+  // one, which must not dereference the (absent) path.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "CONNECT"}, {":authority", "host"}, {"Authorization", "Bearer key1"}};
+
+  // Must not crash and the request should be authenticated.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+  EXPECT_EQ(request_headers.get_("x-client-id"), "user1");
+  // The Authorization header should be removed and no path should have been added.
+  EXPECT_FALSE(request_headers.has("authorization"));
+  EXPECT_EQ(request_headers.Path(), nullptr);
+}
+
 } // namespace ApiKeyAuth
 } // namespace HttpFilters
 } // namespace Extensions

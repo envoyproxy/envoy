@@ -108,6 +108,8 @@ cbor
 CDN
 CDS
 CEL
+COMDAT
+COFF
 CWND
 DLE
 DPE
@@ -129,6 +131,7 @@ FIXME
 decrypted
 decrypts
 gperf
+gperftools
 HEXDIG
 HEXDIGIT
 HPE
@@ -457,6 +460,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+PSK
 Postgre
 Postgres
 Prereq
@@ -975,6 +979,7 @@ hackery
 hacky
 handoff
 handshaker
+handshakers
 hardcode
 hardcoded
 hardcodes
@@ -1036,6 +1041,7 @@ ints
 invariance
 invariants
 invoker
+Invocable
 iov
 iovcnt
 iovec
@@ -1829,3 +1835,6 @@ MLKEM
 PQC
 quantum
 X25519MLKEM768
+cpaths
+SynchronousFeedbackResourceMonitor
+bernoulli

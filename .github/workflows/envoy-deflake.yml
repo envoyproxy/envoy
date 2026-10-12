@@ -17,8 +17,7 @@ on:
       bazel-args:
         description: Toolchain/test type
         type: string
-        default: >-
-          --config=clang
+        default: ''
       runs:
         description: 'Number of runs to test'
         type: number

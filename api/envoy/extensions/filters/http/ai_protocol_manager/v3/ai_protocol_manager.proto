@@ -59,6 +59,18 @@ message AiProtocolManager {
 // well-formed JSON is rejected with a 400 rather than forwarded for the
 // upstream to interpret differently.
 message RequestHandling {
+  // How the request body is written out once the :ref:`AI filters
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.filters>`
+  // finish.
+  enum BodyReserialization {
+    // Re-serialize the parsed document, so the edits AI filters make to it reach the upstream.
+    ALWAYS = 0;
+
+    // Forward the received body byte for byte. Edits AI filters make to the parsed document are
+    // not sent, so use this only with AI filters that read the request, such as request info.
+    DISABLE = 1;
+  }
+
   // Attempt best-effort JSON parsing on routes without a per-route
   // configuration.
   //
@@ -76,6 +88,10 @@ message RequestHandling {
 
   // Request-path parsing limits. Defaults apply when unset.
   RequestParsingLimits limits = 2;
+
+  // Whether the parsed request is re-serialized once the AI filters finish. Defaults to ``ALWAYS``.
+  // Requests that run no AI filters are forwarded as received either way.
+  BodyReserialization reserialize_body = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Per-stream limits for request payload parsing.
@@ -90,8 +106,9 @@ message RequestParsingLimits {
   // conversation content goes to the buffer.
   //
   // Keep it above the longest ``model`` name in use. Values over the threshold
-  // are offloaded, and on a declared AI endpoint the payload schema requires
-  // ``model`` inline, so an offloaded one is rejected with a 400.
+  // are offloaded, and the :ref:`schema validation AI filter
+  // <envoy_v3_api_msg_extensions.http.ai_filters.schema_validation.v3.SchemaValidation>`
+  // requires ``model`` inline, so it rejects an offloaded one with a 400.
   google.protobuf.UInt32Value inline_string_threshold_bytes = 1
       [(validate.rules).uint32 = {lte: 1048576 gte: 64}];
 }
@@ -224,11 +241,12 @@ message AiProtocolManagerPerRoute {
 message RequestPerRoute {
   // The wire API a request payload on this route follows.
   // ``LLM_PROTOCOL_UNSPECIFIED`` declares the endpoint without naming its
-  // API.
+  // API. The ``envoy.ai.llm_protocol.request`` filter state object, when it
+  // names one, takes precedence.
   //
-  // Payloads are validated against the declared API's schema when one is
-  // defined (currently OpenAI Chat Completions); a schema-invalid payload is
-  // rejected with a 400.
+  // The :ref:`schema validation AI filter
+  // <envoy_v3_api_msg_extensions.http.ai_filters.schema_validation.v3.SchemaValidation>`
+  // holds a payload to its API's schema.
   //
   // [#comment: Normalization is not implemented yet; a normalization knob
   // will be added here once the transformation and its output contract

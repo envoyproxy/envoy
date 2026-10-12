@@ -39,6 +39,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl OPENSSL_sk_pop \
   --uncomment-func-decl OPENSSL_sk_new_null \
   --uncomment-func-decl OPENSSL_sk_value \
+  --uncomment-func-decl OPENSSL_sk_last \
   --uncomment-func-decl OPENSSL_sk_set \
   --uncomment-func-decl OPENSSL_sk_free \
   --uncomment-func-decl OPENSSL_sk_delete \

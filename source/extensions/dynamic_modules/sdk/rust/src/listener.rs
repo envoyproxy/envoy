@@ -4,12 +4,13 @@ use crate::{
   EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId, NewListenerFilterConfigFunction,
   NEW_LISTENER_FILTER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 
 /// The trait that represents the Envoy listener filter configuration.
 /// This is used in [`NewListenerFilterConfigFunction`] to pass the Envoy filter configuration
 /// to the dynamic module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyListenerFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
   fn define_counter(
@@ -167,7 +168,7 @@ pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
 
 /// The trait that represents the Envoy listener filter.
 /// This is used in [`ListenerFilter`] to interact with the underlying Envoy listener filter object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyListenerFilter {
   /// Get the current buffer chunk available for reading.
@@ -506,7 +507,7 @@ pub trait EnvoyListenerFilter {
 /// the [`Box<dyn EnvoyListenerFilterScheduler>`] can be sent across threads.
 ///
 /// It is also safe to be called concurrently, so it is marked as `Sync` as well.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyListenerFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`ListenerFilter`] is running.
   ///
@@ -558,7 +559,7 @@ impl EnvoyListenerFilterScheduler for Box<dyn EnvoyListenerFilterScheduler> {
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
 /// Envoy listener filter config on the main thread.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyListenerFilterConfigScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -218,10 +219,6 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
         ca_cert_cache->getOrCreate(config_->caCert(), config_->caCertPath());
     RETURN_IF_NOT_OK_REF(ca_certs_or_error.status());
     shared_ca_certs_ = std::move(*ca_certs_or_error);
-
-    // The cache guarantees at least one certificate. Keep a reference to the
-    // first one for `getCaCertInformation()`.
-    ca_cert_ = bssl::UpRef(shared_ca_certs_->certs[0]);
 
     for (auto& ctx : contexts) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx);
@@ -741,25 +738,49 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
   return absl::OkStatus();
 }
 
-Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() const {
-  if (ca_cert_ == nullptr) {
-    return nullptr;
+std::vector<Envoy::Ssl::CertificateDetailsPtr> DefaultCertValidator::getCaCertInformation() const {
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> ca_details;
+  if (shared_ca_certs_ == nullptr) {
+    return ca_details;
   }
-  return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), context_.timeSource());
+  for (const auto& cert : shared_ca_certs_->certs) {
+    ca_details.push_back(
+        Utility::certificateDetails(cert.get(), getCaFileName(), context_.timeSource()));
+  }
+  return ca_details;
 }
 
 void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
-  // Early return if no config
   if (config_ == nullptr) {
     return;
   }
 
+  std::chrono::seconds earliest_expiration = std::chrono::seconds::max();
+  if (shared_ca_certs_ != nullptr) {
+    for (const auto& cert : shared_ca_certs_->certs) {
+      earliest_expiration =
+          std::min(earliest_expiration, Utility::getExpirationUnixTime(cert.get()));
+    }
+  }
   Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(scope, config_->caCertName());
-  expiration_gauge.set(Utility::getExpirationUnixTime(ca_cert_.get()).count());
+  expiration_gauge.set(earliest_expiration.count());
 }
 
 std::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
-  return Utility::getDaysUntilExpiration(ca_cert_.get(), context_.timeSource());
+  if (shared_ca_certs_ == nullptr) {
+    return Utility::getDaysUntilExpiration(nullptr, context_.timeSource());
+  }
+  std::optional<uint32_t> ret = std::make_optional(std::numeric_limits<uint32_t>::max());
+  for (const auto& cert : shared_ca_certs_->certs) {
+    const std::optional<uint32_t> tmp =
+        Utility::getDaysUntilExpiration(cert.get(), context_.timeSource());
+    if (!tmp.has_value()) {
+      return std::nullopt;
+    } else if (tmp.value() < ret.value()) {
+      ret = tmp;
+    }
+  }
+  return ret;
 }
 
 class DefaultCertValidatorFactory : public CertValidatorFactory {

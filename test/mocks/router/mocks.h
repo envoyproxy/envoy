@@ -193,6 +193,8 @@ public:
   MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(bool, isCrossSchemeRedirectAllowed, (), (const));
   MOCK_METHOD(const std::vector<Http::LowerCaseString>&, responseHeadersToCopy, (), (const));
+
+  std::vector<Http::LowerCaseString> response_headers_to_copy_;
 };
 
 class MockInternalRedirectPredicate : public InternalRedirectPredicate {
@@ -661,7 +663,8 @@ public:
   // Router::RouteSpecifier
   MOCK_METHOD(OnRouteResult, onRoute,
               (RouteConstSharedPtr route, const Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo& stream_info, uint64_t random_value),
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
+               OnRouteInputStatus input_status),
               (const));
 };
 

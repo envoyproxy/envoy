@@ -127,7 +127,8 @@ protected:
 
     health_checker_ = std::make_shared<TestUdpHealthCheckerImpl>(
         *cluster_, health_check, udp_config, dispatcher_, runtime_, random_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_storage_.release()));
+        Upstream::HealthCheckEventLoggerPtr(event_logger_storage_.release()),
+        Upstream::DefaultHealthFlagCallbacks::instance());
 
     envoy::config::endpoint::v3::Endpoint::HealthCheckConfig health_check_config;
     auto* socket_address = health_check_config.mutable_address()->mutable_socket_address();

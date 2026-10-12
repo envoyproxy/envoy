@@ -170,17 +170,85 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigInvalidCount
                                 testing::HasSubstr("Invalid connection count")));
 }
 
-// Test extraction with zero connection count.
+// A zero connection count is rejected since the supported range is [1, 1024].
 TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigZeroCount) {
   std::string address_str =
       createReverseConnectionAddress("node-123", "cluster-456", "tenant-789", "remote-cluster", 0);
   auto socket_address = createSocketAddress(address_str);
 
   auto result = extractReverseConnectionConfig(socket_address);
-  EXPECT_OK(result);
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("outside the supported range")));
+}
 
-  const auto& config = result.value();
-  EXPECT_EQ(config.connection_count, 0);
+// A connection count above 1024 is rejected so one tick cannot dial an unbounded number inline.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigCountTooHigh) {
+  auto socket_address = createSocketAddress(
+      createReverseConnectionAddress("node", "cluster", "tenant", "remote-cluster", 1025));
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("outside the supported range")));
+}
+
+// An empty remote cluster name is rejected.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigEmptyClusterName) {
+  auto socket_address = createSocketAddress("rc://node:cluster:tenant@:5");
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("Remote cluster name cannot be empty")));
+}
+
+// An identifier longer than 255 bytes is rejected so stat names and log fields stay bounded.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigIdentifierTooLong) {
+  const std::string long_id(256, 'a');
+  auto socket_address = createSocketAddress(
+      createReverseConnectionAddress(long_id, "cluster", "tenant", "remote-cluster", 5));
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("exceeds the 255-byte limit")));
+}
+
+// An identifier that cannot be carried in an HTTP header value is rejected.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigIdentifierInvalidChar) {
+  auto socket_address = createSocketAddress("rc://node:cluster:ten\rant@remote-cluster:5");
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                testing::HasSubstr("invalid in an HTTP header value")));
+}
+
+// The lower bound of the supported connection count range is accepted.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigCountMin) {
+  auto socket_address = createSocketAddress(
+      createReverseConnectionAddress("node", "cluster", "tenant", "remote-cluster", 1));
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_OK(result);
+  EXPECT_EQ(result.value().connection_count, 1);
+}
+
+// The upper bound of the supported connection count range is accepted.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigCountMax) {
+  auto socket_address = createSocketAddress(
+      createReverseConnectionAddress("node", "cluster", "tenant", "remote-cluster", 1024));
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_OK(result);
+  EXPECT_EQ(result.value().connection_count, 1024);
+}
+
+// A 255-byte identifier sits on the limit and is accepted.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigIdentifierAtLimit) {
+  const std::string max_id(255, 'a');
+  auto socket_address = createSocketAddress(
+      createReverseConnectionAddress(max_id, "cluster", "tenant", "remote-cluster", 5));
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_OK(result);
+  EXPECT_EQ(result.value().src_node_id, max_id);
 }
 
 } // namespace ReverseConnection
