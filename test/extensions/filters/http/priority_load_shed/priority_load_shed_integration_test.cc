@@ -107,6 +107,21 @@ TEST_P(PriorityLoadShedIntegrationTest, UsesBucketLoadShedPoints) {
   test_server_->waitForGauge("overload.envoy.load_shed_points.priority.low.scale_percent", Eq(100));
   EXPECT_EQ("503", send_request_with_priority(5));
   EXPECT_EQ("503", send_request_with_priority(20));
+
+  // Pressure recedes below the high priority threshold: high priority traffic is served again
+  // while low priority traffic is still shed.
+  updateResource(0.75);
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent", Eq(0));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.low.scale_percent", Eq(100));
+  EXPECT_EQ("200", send_request_with_priority(5));
+  EXPECT_EQ("503", send_request_with_priority(20));
+
+  // Pressure recedes below both thresholds: shedding stops entirely.
+  updateResource(0.65);
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.high.scale_percent", Eq(0));
+  test_server_->waitForGauge("overload.envoy.load_shed_points.priority.low.scale_percent", Eq(0));
+  EXPECT_EQ("200", send_request_with_priority(5));
+  EXPECT_EQ("200", send_request_with_priority(20));
 }
 
 TEST_P(PriorityLoadShedIntegrationTest, RejectsMissingHeader) {
