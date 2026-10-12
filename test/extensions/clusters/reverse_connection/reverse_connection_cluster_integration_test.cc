@@ -60,6 +60,11 @@ typed_config:
     HttpIntegrationTest::initialize();
   }
 
+  void TearDown() override {
+    cleanupLdsConnection();
+    cleanupUpstreamAndDownstream();
+  }
+
 protected:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 
@@ -126,6 +131,13 @@ protected:
   // discovery requests (e.g. a NACK) on the fake upstream thread, so destroying the FakeStream
   // without this races with that thread.
   void cleanupLdsConnection() {
+    // Return early if no LDS connection or stream was created, or if already cleaned up. This
+    // ensures idempotency when called from both test bodies and TearDown(), avoids compounding
+    // sleep overhead from advanceTimeWait() in real time across non-LDS tests, and prevents
+    // advancing simulated clocks when there are no LDS worker closures to drain.
+    if (lds_upstream_info_.stream_ == nullptr && lds_upstream_info_.connection_ == nullptr) {
+      return;
+    }
     if (lds_upstream_info_.stream_) {
       lds_upstream_info_.stream_->finishGrpcStream(Grpc::Status::Ok);
     }
@@ -1521,6 +1533,7 @@ TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListe
   });
 
   cleanupLdsConnection();
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace
