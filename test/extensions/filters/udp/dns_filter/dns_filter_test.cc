@@ -2856,6 +2856,31 @@ server_config:
             "envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig");
 }
 
+// The stats carry the stat prefix as an explicit tag.
+TEST_F(DnsFilterTest, StatsAreTagged) {
+  // The tags of a stat as (name, value) pairs.
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  setup(forward_query_off_config);
+
+  const Stats::Counter& queries = config_->stats().downstream_rx_queries_;
+  EXPECT_EQ("dns_scope.dns_filter.my_prefix.downstream_rx_queries", queries.name());
+  EXPECT_EQ("dns_scope.dns_filter.downstream_rx_queries", queries.tagExtractedName());
+  EXPECT_THAT(tags_of(queries),
+              testing::UnorderedElementsAre(testing::Pair("envoy.dns_filter_prefix", "my_prefix")));
+  const Stats::Histogram& latency = config_->stats().downstream_rx_query_latency_;
+  EXPECT_EQ("dns_scope.dns_filter.my_prefix.downstream_rx_query_latency", latency.name());
+  EXPECT_EQ("dns_scope.dns_filter.downstream_rx_query_latency", latency.tagExtractedName());
+  EXPECT_THAT(tags_of(latency),
+              testing::UnorderedElementsAre(testing::Pair("envoy.dns_filter_prefix", "my_prefix")));
+}
+
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters

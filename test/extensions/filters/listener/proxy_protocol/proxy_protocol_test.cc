@@ -3063,6 +3063,47 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   EXPECT_NE(dynamic_cast<ProxyProtocol::Filter*>(added_filter.get()), nullptr);
 }
 
+// The stats carry the stat prefix and the proxy protocol version as explicit tags, and the
+// tag-extracted name drops both segments.
+TEST(ConfigTest, StatsAreTagged) {
+  // The tags of a stat as (name, value) pairs.
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  Stats::TestUtil::TestStore stats_store;
+  const ProxyProtocolStats stats =
+      ProxyProtocolStats::create(*stats_store.rootScope(), "test_stat_prefix");
+  EXPECT_EQ("downstream_cx_proxy_proto_error",
+            stats.legacy_.downstream_cx_proxy_proto_error_.name());
+  EXPECT_TRUE(stats.legacy_.downstream_cx_proxy_proto_error_.tags().empty());
+  EXPECT_EQ("proxy_proto.test_stat_prefix.not_found_allowed",
+            stats.general_.not_found_allowed_.name());
+  EXPECT_EQ("proxy_proto.not_found_allowed", stats.general_.not_found_allowed_.tagExtractedName());
+  EXPECT_THAT(tags_of(stats.general_.not_found_allowed_),
+              UnorderedElementsAre(Pair("envoy.proxy_protocol_prefix", "test_stat_prefix")));
+  EXPECT_EQ("proxy_proto.test_stat_prefix.versions.v2.error", stats.v2_.error_.name());
+  EXPECT_EQ("proxy_proto.error", stats.v2_.error_.tagExtractedName());
+  EXPECT_THAT(tags_of(stats.v2_.error_),
+              UnorderedElementsAre(Pair("envoy.proxy_protocol_prefix", "test_stat_prefix"),
+                                   Pair("envoy.proxy_protocol_version", "2")));
+
+  // Without a stat prefix only the version is a tag.
+  const ProxyProtocolStats plain_stats = ProxyProtocolStats::create(*stats_store.rootScope(), "");
+  EXPECT_EQ("proxy_proto.not_found_disallowed", plain_stats.general_.not_found_disallowed_.name());
+  EXPECT_EQ("proxy_proto.not_found_disallowed",
+            plain_stats.general_.not_found_disallowed_.tagExtractedName());
+  EXPECT_TRUE(plain_stats.general_.not_found_disallowed_.tags().empty());
+  EXPECT_EQ("proxy_proto.versions.v1.found", plain_stats.v1_.found_.name());
+  EXPECT_EQ("proxy_proto.found", plain_stats.v1_.found_.tagExtractedName());
+  EXPECT_THAT(tags_of(plain_stats.v1_.found_),
+              UnorderedElementsAre(Pair("envoy.proxy_protocol_version", "1")));
+}
+
 } // namespace
 } // namespace ProxyProtocol
 } // namespace ListenerFilters

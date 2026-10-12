@@ -107,6 +107,8 @@ envoy_extension_cc_test(
         "//envoy/server:filter_config_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/network:listen_socket_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/extensions/filters/udp/udp_proxy/session_filters:buffer_filter_config_lib",
         "//test/extensions/filters/udp/udp_proxy/session_filters:buffer_filter_proto_cc_proto",
