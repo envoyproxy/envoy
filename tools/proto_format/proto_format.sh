@@ -29,6 +29,11 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
     -- "--mode=${PROTO_SYNC_CMD}" \
        --ci
 
+# Copilot code review cannot follow links, so its API review instructions inline the API docs.
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
+    //tools/api/review_instructions:generate \
+    -- "--mode=${PROTO_SYNC_CMD}"
+
 # Dont run this in git hooks by default
 if [[ -n "$CI_BRANCH" ]] || [[ "${FORCE_PROTO_FORMAT}" == "yes" ]]; then
     echo "Run buf tests"
