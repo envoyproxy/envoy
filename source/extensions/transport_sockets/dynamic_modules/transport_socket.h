@@ -118,6 +118,8 @@ public:
   Network::TransportSocketCallbacks* callbacks() const { return callbacks_; }
   Buffer::Instance* currentReadBuffer() const { return current_read_buffer_; }
   Buffer::Instance* currentWriteBuffer() const { return current_write_buffer_; }
+  bool inSetCallbacks() const { return in_set_callbacks_; }
+  void onPeerReset() { peer_reset_ = true; }
 
 private:
   const DynamicModuleTransportSocketConfigSharedPtr config_;
@@ -127,6 +129,10 @@ private:
   // that the buffer callbacks can reach the right buffer, and reset afterwards.
   Buffer::Instance* current_read_buffer_ = nullptr;
   Buffer::Instance* current_write_buffer_ = nullptr;
+  // A client connection constructs its stream info only after on_set_callbacks returns.
+  bool in_set_callbacks_ = false;
+  // Whether a buffer I/O callback saw the peer reset the connection.
+  bool peer_reset_ = false;
   // Backing store for the string view returned by failureReason.
   mutable std::string failure_reason_;
 };

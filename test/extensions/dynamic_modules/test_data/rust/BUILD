@@ -100,6 +100,8 @@ test_program(name = "stat_sink_integration_test")
 
 test_program(name = "transport_socket_integration_test")
 
+test_program(name = "transport_socket_splice")
+
 test_program(name = "early_header_mutation_integration_test")
 
 test_program(name = "header_formatter_integration_test")

@@ -2772,6 +2772,16 @@ WEAK_STUB(envoy_dynamic_module_type_transport_socket_io_status,
           envoy_dynamic_module_type_transport_socket_io_status_Error,
           envoy_dynamic_module_type_transport_socket_envoy_ptr, const char*, size_t, size_t*)
 
+WEAK_STUB(envoy_dynamic_module_type_transport_socket_io_status,
+          envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer,
+          envoy_dynamic_module_type_transport_socket_io_status_Error,
+          envoy_dynamic_module_type_transport_socket_envoy_ptr, size_t, size_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_transport_socket_io_status,
+          envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer,
+          envoy_dynamic_module_type_transport_socket_io_status_Error,
+          envoy_dynamic_module_type_transport_socket_envoy_ptr, size_t*)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_io_shutdown_write,
                envoy_dynamic_module_type_transport_socket_envoy_ptr)
 
@@ -2814,6 +2824,15 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_transport_socket_get_remote_addres
 WEAK_STUB(bool, envoy_dynamic_module_callback_transport_socket_get_local_address, false,
           envoy_dynamic_module_type_transport_socket_envoy_ptr,
           envoy_dynamic_module_type_envoy_buffer*, uint32_t*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_transport_socket_get_connection_id, false,
+          envoy_dynamic_module_type_transport_socket_envoy_ptr, uint64_t*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id, false,
+          envoy_dynamic_module_type_transport_socket_envoy_ptr, uint64_t*)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_add_wire_bytes,
+               envoy_dynamic_module_type_transport_socket_envoy_ptr, uint64_t, uint64_t)
 
 // Stats sink snapshot callbacks. Real implementations live in
 // source/extensions/stat_sinks/dynamic_modules/abi_impl.cc when the stats sink extension is linked.
