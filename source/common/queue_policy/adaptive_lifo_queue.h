@@ -64,31 +64,37 @@ public:
   }
 
   void forEach(absl::FunctionRef<bool(ItemType&)> cb) override {
-    updateMode();
-    if (!lifo_mode_) {
-      for (auto it = items_.begin(); it != items_.end();) {
-        ItemType& item = **it;
-        ++it;
-        if (!cb(item)) {
-          return;
-        }
-      }
+    if (items_.empty()) {
       return;
     }
 
-    auto current = items_.end();
-    --current;
-    while (true) {
-      const bool is_first = current == items_.begin();
-      auto next = current;
-      if (!is_first) {
-        --next;
+    size_t remaining = items_.size();
+    ItemType* next_fifo = items_.front();
+    ItemType* next_lifo = items_.back();
+    while (remaining > 0) {
+      updateMode();
+      const bool use_lifo = lifo_mode_;
+      ItemType* item = use_lifo ? next_lifo : next_fifo;
+      auto entry = item_index_.find(item);
+      ASSERT(entry != item_index_.end());
+
+      --remaining;
+      if (remaining > 0) {
+        auto next = entry->second;
+        if (use_lifo) {
+          ASSERT(next != items_.begin());
+          --next;
+          next_lifo = *next;
+        } else {
+          ++next;
+          ASSERT(next != items_.end());
+          next_fifo = *next;
+        }
       }
-      ItemType& item = **current;
-      if (!cb(item) || is_first) {
+
+      if (!cb(*item)) {
         return;
       }
-      current = next;
     }
   }
 

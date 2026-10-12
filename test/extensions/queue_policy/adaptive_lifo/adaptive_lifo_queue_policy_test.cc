@@ -93,6 +93,28 @@ TEST(AdaptiveLifoQueueTest, ForEachUsesCurrentDequeueOrder) {
   EXPECT_EQ(queue.peek().value(), 3);
 }
 
+TEST(AdaptiveLifoQueueTest, ForEachTracksDequeueOrderAcrossModeChange) {
+  std::vector<TestQueueItem> items;
+  for (int value = 1; value <= 8; ++value) {
+    items.emplace_back(value);
+  }
+
+  AdaptiveLifoQueue<TestQueueItem> queue(100, 75, []() -> uint64_t { return 8; });
+  for (TestQueueItem& item : items) {
+    queue.add(item, {MonotonicTime{}});
+  }
+
+  std::vector<int> visited;
+  queue.forEach([&queue, &visited](TestQueueItem& item) -> bool {
+    visited.push_back(item.value());
+    queue.remove(item);
+    return true;
+  });
+
+  EXPECT_EQ(visited, (std::vector<int>{8, 7, 1, 2, 3, 4, 5, 6}));
+  EXPECT_TRUE(queue.empty());
+}
+
 TEST(AdaptiveLifoQueueTest, ForEachStopsEarly) {
   TestQueueItem first(1);
   TestQueueItem second(2);
