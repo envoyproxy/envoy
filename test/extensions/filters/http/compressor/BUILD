@@ -140,6 +140,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/compressor:config",
         "//test/integration:http_protocol_integration_lib",
+        "//test/integration:websocket_handshake_test_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

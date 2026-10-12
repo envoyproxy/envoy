@@ -108,6 +108,7 @@ protected:
   bool is_tcp_tunneling_ : 1 = false;
   bool is_response_to_head_request_ : 1 = false;
   bool is_response_to_connect_request_ : 1 = false;
+  std::string generated_websocket_key_;
 
 private:
   /**
@@ -197,6 +198,7 @@ public:
   bool upgradeRequest() const { return upgrade_request_; }
   bool headRequest() const { return head_request_; }
   bool connectRequest() const { return connect_request_; }
+  absl::string_view generatedWebsocketKey() const { return generated_websocket_key_; }
 
   // Http::RequestEncoder
   Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
@@ -621,6 +623,8 @@ private:
   }
   Status onMessageBeginBase() override { return okStatus(); }
   Envoy::StatusOr<CallbackResult> onHeadersCompleteBase() override;
+  static bool hasValidWebsocketHandshake(const ResponseHeaderMap& headers,
+                                         absl::string_view websocket_key);
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
   CallbackResult onMessageCompleteBase() override;

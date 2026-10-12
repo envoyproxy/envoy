@@ -74,8 +74,9 @@ TEST_P(GolangWebsocketIntegrationTest, WebsocketGolangFilterChain) {
 
   // Send upgrade request without CL and TE headers
   ASSERT_TRUE(tcp_client->write(
-      "GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n", false,
-      false));
+      "GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: websocket\r\n"
+      "sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n",
+      false, false));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
