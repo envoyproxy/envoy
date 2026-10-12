@@ -1,1 +1,3 @@
-Added support for memory optimization in QUIC by resetting the internal SSL object after the handshake finishes. This can be enabled by setting the runtime guard ``envoy.reloadable_features.quic_enable_reset_ssl_after_handshake`` to ``true``.
+Added support for memory optimization in QUIC by resetting the internal SSL object after the
+handshake finishes. This can be enabled by setting the runtime guard
+``envoy.reloadable_features.quic_enable_reset_ssl_after_handshake`` to ``true``.
