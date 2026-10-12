@@ -11,5 +11,6 @@ defined during configuration and recorded during selection, and are emitted unde
 ``metrics_namespace`` prefix of ``DynamicModuleConfig``. The Rust SDK exposes this through the
 ``cluster_specifier`` module and the ``cluster_specifier:`` arm of ``declare_all_init_functions!``.
 See
-:ref:`DynamicModuleClusterSpecifier <envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier>`
+:ref:`DynamicModuleClusterSpecifier
+<envoy_v3_api_msg_extensions.router.cluster_specifiers.dynamic_modules.v3.DynamicModuleClusterSpecifier>`
 for configuration details.
