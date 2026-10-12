@@ -857,6 +857,49 @@ TEST_P(Http11ConnectTest, FragmentedConnectResponse) {
   connect_socket_->doRead(buffer);
 }
 
+TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceEndpointAndLocalityMetadata) {
+  // When the proxy address is present in both the endpoint and the locality metadata, a
+  // single CONNECT request must be emitted.
+  std::string address_string =
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
+
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  envoy::config::core::v3::Address addr_proto;
+  addr_proto.mutable_socket_address()->set_address("www.foo.com");
+  addr_proto.mutable_socket_address()->set_port_value(1234);
+  Protobuf::Any anypb;
+  std::ignore = anypb.PackFrom(addr_proto);
+  metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(
+      Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR, anypb));
+
+  auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  EXPECT_CALL(*host, metadata()).Times(AnyNumber()).WillRepeatedly(Return(metadata));
+  EXPECT_CALL(*host, localityMetadata()).Times(AnyNumber()).WillRepeatedly(Return(metadata));
+  static const std::string empty_hostname;
+  EXPECT_CALL(*host, hostname()).Times(AnyNumber()).WillRepeatedly(ReturnRef(empty_hostname));
+  EXPECT_CALL(*host, address()).Times(AnyNumber()).WillRepeatedly(Return(address));
+
+  options_ = std::make_shared<const Network::TransportSocketOptionsImpl>(
+      "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+      std::nullopt, nullptr, nullptr);
+  auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
+  inner_socket_ = inner_socket.get();
+  EXPECT_CALL(*inner_socket_, ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(Const(*inner_socket_), ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
+  ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
+
+  connect_data_ = Buffer::OwnedImpl{fmt::format("CONNECT {} HTTP/1.1\r\nHost: {}\r\n\r\n",
+                                                address->asStringView(), address->asStringView())};
+  connect_socket_ = std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options_,
+                                                                  host, std::nullopt);
+  connect_socket_->setTransportSocketCallbacks(transport_callbacks_);
+  connect_socket_->onConnected();
+
+  injectHeaderOnceTest();
+}
+
 } // namespace
 } // namespace Http11Connect
 } // namespace TransportSockets
