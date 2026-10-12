@@ -6004,6 +6004,149 @@ TEST_P(ExtProcIntegrationTest, PackRequestTrailersWithResponseTrailersFailOpen) 
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, StreamedBodyChunking) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_max_streamed_body_chunk_size()->set_value(5);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("123456789012", std::nullopt);
+
+  processRequestBodyMessage(*grpc_upstreams_[0], true, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_EQ(body.body(), "12345");
+    EXPECT_FALSE(body.end_of_stream());
+    return true;
+  });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_EQ(body.body(), "67890");
+        EXPECT_FALSE(body.end_of_stream());
+        body_resp.mutable_response()->mutable_body_mutation()->set_body("ABCDE");
+        return true;
+      });
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_EQ(body.body(), "12");
+    EXPECT_TRUE(body.end_of_stream());
+    return true;
+  });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(upstream_request_->body().toString(), "12345ABCDE12");
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  Buffer::OwnedImpl resp_data("abcdefghijkl");
+  upstream_request_->encodeData(resp_data, true);
+
+  processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_EQ(body.body(), "abcde");
+    EXPECT_FALSE(body.end_of_stream());
+    return true;
+  });
+  processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_EQ(body.body(), "fghij");
+    EXPECT_FALSE(body.end_of_stream());
+    return true;
+  });
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_EQ(body.body(), "kl");
+        EXPECT_TRUE(body.end_of_stream());
+        body_resp.mutable_response()->mutable_body_mutation()->set_body("KL!");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(response->body(), "abcdefghijKL!");
+}
+
+TEST_P(ExtProcIntegrationTest, FullDuplexStreamedBodyChunking) {
+  auto* processing_mode = proto_config_.mutable_processing_mode();
+  processing_mode->set_request_header_mode(ProcessingMode::SEND);
+  processing_mode->set_response_header_mode(ProcessingMode::SEND);
+  processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
+  processing_mode->set_response_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_max_streamed_body_chunk_size()->set_value(5);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("123456789012", std::nullopt);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
+
+  ProcessingRequest req;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, req));
+  ASSERT_TRUE(req.has_request_body());
+  EXPECT_EQ(req.request_body().body(), "12345");
+  EXPECT_FALSE(req.request_body().end_of_stream());
+
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, req));
+  ASSERT_TRUE(req.has_request_body());
+  EXPECT_EQ(req.request_body().body(), "67890");
+  EXPECT_FALSE(req.request_body().end_of_stream());
+
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, req));
+  ASSERT_TRUE(req.has_request_body());
+  EXPECT_EQ(req.request_body().body(), "12");
+  EXPECT_TRUE(req.request_body().end_of_stream());
+
+  ProcessingResponse req_body_resp;
+  auto* req_streamed = req_body_resp.mutable_request_body()
+                           ->mutable_response()
+                           ->mutable_body_mutation()
+                           ->mutable_streamed_response();
+  req_streamed->set_body("mutated_request");
+  req_streamed->set_end_of_stream(true);
+  processor_stream_->sendGrpcMessage(req_body_resp);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(upstream_request_->body().toString(), "mutated_request");
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  Buffer::OwnedImpl resp_data("abcdefghijkl");
+  upstream_request_->encodeData(resp_data, true);
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
+
+  ProcessingRequest resp_req;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, resp_req));
+  ASSERT_TRUE(resp_req.has_response_body());
+  EXPECT_EQ(resp_req.response_body().body(), "abcde");
+  EXPECT_FALSE(resp_req.response_body().end_of_stream());
+
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, resp_req));
+  ASSERT_TRUE(resp_req.has_response_body());
+  EXPECT_EQ(resp_req.response_body().body(), "fghij");
+  EXPECT_FALSE(resp_req.response_body().end_of_stream());
+
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, resp_req));
+  ASSERT_TRUE(resp_req.has_response_body());
+  EXPECT_EQ(resp_req.response_body().body(), "kl");
+  EXPECT_TRUE(resp_req.response_body().end_of_stream());
+
+  ProcessingResponse resp_body_resp;
+  auto* resp_streamed = resp_body_resp.mutable_response_body()
+                            ->mutable_response()
+                            ->mutable_body_mutation()
+                            ->mutable_streamed_response();
+  resp_streamed->set_body("mutated_response");
+  resp_streamed->set_end_of_stream(true);
+  processor_stream_->sendGrpcMessage(resp_body_resp);
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(response->body(), "mutated_response");
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

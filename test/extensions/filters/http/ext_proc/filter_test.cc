@@ -1,7 +1,9 @@
 // Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
 // generally should not change or remove existing tests.
 
-#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -10,6 +12,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/registry/registry.h"
+#include "envoy/router/router.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/http/conn_manager_impl.h"
@@ -304,7 +307,10 @@ protected:
     (*dynamic_metadata_.mutable_typed_filter_metadata())[ns] = val;
   };
 
-  void doSend(ProcessingRequest&& request, Unused) { last_request_ = std::move(request); }
+  void doSend(ProcessingRequest&& request, Unused) {
+    last_request_ = request;
+    sent_requests_.push_back(request);
+  }
 
   bool doSendClose() { return !server_closed_stream_; }
 
@@ -760,7 +766,556 @@ protected:
   envoy::config::core::v3::Metadata dynamic_metadata_;
   testing::NiceMock<Network::MockConnection> connection_;
   DoStartOption do_start_option_ = DEFAULT;
+  std::vector<ProcessingRequest> sent_requests_;
 };
+
+TEST_F(HttpFilterTest, StreamedChunkBodyTest) {
+  // Configured to chunk at 5 bytes for both request and response in STREAMED
+  // mode.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SKIP"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+  max_streamed_body_chunk_size: 5
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl got_request_body;
+  std::vector<bool> got_req_end_streams;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
+      .WillRepeatedly([&got_request_body, &got_req_end_streams](Buffer::Instance& data, bool eos) {
+        got_request_body.move(data);
+        got_req_end_streams.push_back(eos);
+      });
+
+  Buffer::OwnedImpl first_chunk("123456789012");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(first_chunk, false));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+
+  // Should have sent 3 request body chunks (5 bytes, 5 bytes, 2 bytes).
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_FALSE(sent_requests_[2].request_body().end_of_stream());
+
+  // Process all 3 request BodyResponses, mutating the 2nd chunk.
+  processRequestBody(std::nullopt, false);
+  processRequestBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& body_resp) {
+        body_resp.mutable_response()->mutable_body_mutation()->set_body("ABCDE");
+      },
+      false);
+  processRequestBody(std::nullopt, true);
+  EXPECT_EQ(got_request_body.toString(), "12345ABCDE12");
+  EXPECT_THAT(got_req_end_streams, ElementsAre(false, false, false));
+
+  // Now test response body in STREAMED mode with end_stream = true.
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  Buffer::OwnedImpl got_response_body;
+  std::vector<bool> got_resp_end_streams;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(
+          [&got_response_body, &got_resp_end_streams](Buffer::Instance& data, bool eos) {
+            got_response_body.move(data);
+            got_resp_end_streams.push_back(eos);
+          });
+
+  Buffer::OwnedImpl resp_chunk("abcdefghijkl");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, true));
+
+  ASSERT_EQ(sent_requests_.size(), 6);
+  EXPECT_EQ(sent_requests_[3].response_body().body(), "abcde");
+  EXPECT_FALSE(sent_requests_[3].response_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[4].response_body().body(), "fghij");
+  EXPECT_FALSE(sent_requests_[4].response_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[5].response_body().body(), "kl");
+  EXPECT_TRUE(sent_requests_[5].response_body().end_of_stream());
+
+  // Process all 3 response BodyResponses, mutating the 3rd chunk.
+  processResponseBody(std::nullopt, false);
+  processResponseBody(std::nullopt, false);
+  processResponseBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& body_resp) {
+        body_resp.mutable_response()->mutable_body_mutation()->set_body("KL!");
+      },
+      true);
+  EXPECT_EQ(got_response_body.toString(), "abcdefghijKL!");
+  EXPECT_THAT(got_resp_end_streams, ElementsAre(false, false, true));
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  max_streamed_body_chunk_size: 5
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(true, std::nullopt);
+  sent_requests_.clear();
+
+  Buffer::OwnedImpl got_request_body;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
+      .WillRepeatedly(
+          [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); });
+
+  Buffer::OwnedImpl req_chunk("123456789012");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk, true));
+  EXPECT_EQ(req_chunk.length(), 0);
+
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_TRUE(sent_requests_[2].request_body().end_of_stream());
+
+  processRequestBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* streamed =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed->set_body("mutated_request");
+        streamed->set_end_of_stream(true);
+      },
+      true);
+  EXPECT_EQ(got_request_body.toString(), "mutated_request");
+  EXPECT_EQ(getExtProcLoggingInfo()->requestBodySentCount(), 3);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, std::nullopt);
+  sent_requests_.clear();
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); });
+
+  Buffer::OwnedImpl resp_chunk("abcdefghijk");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
+  EXPECT_EQ(resp_chunk.length(), 0);
+
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].response_body().body(), "abcde");
+  EXPECT_FALSE(sent_requests_[0].response_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].response_body().body(), "fghij");
+  EXPECT_FALSE(sent_requests_[1].response_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[2].response_body().body(), "k");
+  EXPECT_FALSE(sent_requests_[2].response_body().end_of_stream());
+
+  processResponseBodyHelper("mutated_response", want_response_body,
+                            /*end_of_stream=*/false,
+                            /*should_continue=*/false);
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
+  processResponseTrailers(std::nullopt, true);
+  EXPECT_EQ(got_response_body.toString(), want_response_body.toString());
+  EXPECT_EQ(getExtProcLoggingInfo()->responseBodySentCount(), 3);
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, StreamedChunkBodyPerRouteOverrideTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
+  max_streamed_body_chunk_size: 10
+  )EOF");
+
+  ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(4);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(filter_->maxStreamedBodyChunkSize(), 4);
+  processRequestHeaders(false, std::nullopt);
+  sent_requests_.clear();
+
+  Buffer::OwnedImpl req_chunk("0123456789");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk, true));
+
+  // Per-route limit (4) overrides filter-level limit (10): 10 bytes -> 4, 4, 2.
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "0123");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "4567");
+  EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[2].request_body().body(), "89");
+  EXPECT_TRUE(sent_requests_[2].request_body().end_of_stream());
+
+  processRequestBody(std::nullopt, false);
+  processRequestBody(std::nullopt, false);
+  processRequestBody(std::nullopt, true);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, std::nullopt);
+  sent_requests_.clear();
+
+  Buffer::OwnedImpl resp_chunk("abcdefghi");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, true));
+
+  // Per-route limit (4) also applies to FULL_DUPLEX_STREAMED response: 9 bytes
+  // -> 4, 4, 1.
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].response_body().body(), "abcd");
+  EXPECT_FALSE(sent_requests_[0].response_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].response_body().body(), "efgh");
+  EXPECT_FALSE(sent_requests_[1].response_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[2].response_body().body(), "i");
+  EXPECT_TRUE(sent_requests_[2].response_body().end_of_stream());
+
+  Buffer::OwnedImpl want_response_body;
+  processResponseBodyHelper("done", want_response_body, /*end_of_stream=*/true,
+                            /*should_continue=*/true);
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, StreamedChunkBodyEdgeCasesTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+    request_body_mode: "STREAMED"
+    response_body_mode: "NONE"
+  max_streamed_body_chunk_size: 5
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  sent_requests_.clear();
+
+  // Body data arriving while waiting for HeadersResponse should still be
+  // chunked.
+  Buffer::OwnedImpl buffered_request_data;
+  setUpDecodingBuffering(buffered_request_data, true);
+  Buffer::OwnedImpl early_chunk("123456789012");
+  buffered_request_data.add(early_chunk);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(early_chunk, false));
+  EXPECT_TRUE(sent_requests_.empty());
+
+  processRequestHeaders(false, std::nullopt);
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  processRequestBody(std::nullopt, false);
+  processRequestBody(std::nullopt, false);
+  processRequestBody(std::nullopt, false);
+  sent_requests_.clear();
+
+  // Body data is exact multiple of max_streamed_body_chunk_size (10 == 2 * 5).
+  Buffer::OwnedImpl exact_multiple("abcdefghij");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(exact_multiple, false));
+  ASSERT_EQ(sent_requests_.size(), 2);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "abcde");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "fghij");
+  EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
+  processRequestBody(std::nullopt, false);
+  processRequestBody(std::nullopt, false);
+  sent_requests_.clear();
+
+  // Body data is smaller than max_streamed_body_chunk_size (3 < 5).
+  Buffer::OwnedImpl smaller_chunk("xyz");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(smaller_chunk, false));
+  ASSERT_EQ(sent_requests_.size(), 1);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "xyz");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  processRequestBody(std::nullopt, false);
+  sent_requests_.clear();
+
+  // Empty body.
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty_chunk, true));
+  ASSERT_EQ(sent_requests_.size(), 1);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "");
+  EXPECT_TRUE(sent_requests_[0].request_body().end_of_stream());
+  processRequestBody(std::nullopt, true);
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyEdgeCasesTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  max_streamed_body_chunk_size: 5
+  )EOF");
+
+  Buffer::OwnedImpl got_request_body;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
+      .WillRepeatedly(
+          [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  sent_requests_.clear();
+
+  // Body data arriving while HeadersCallback is still pending is sent
+  // immediately in chunks with CallbackState::HeadersCallback.
+  Buffer::OwnedImpl early_req_chunk("123456789012");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(early_req_chunk, false));
+  EXPECT_EQ(early_req_chunk.length(), 0);
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_FALSE(sent_requests_[2].request_body().end_of_stream());
+  sent_requests_.clear();
+
+  // Receiving HeadersResponse transitions state to StreamedBodyCallback.
+  auto req_headers_resp = std::make_unique<ProcessingResponse>();
+  req_headers_resp->mutable_request_headers();
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+  stream_callbacks_->onReceiveMessage(std::move(req_headers_resp));
+
+  // Exact multiple of max_streamed_body_chunk_size (10 == 2 * 5).
+  Buffer::OwnedImpl exact_multiple("abcdefghij");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(exact_multiple, false));
+  ASSERT_EQ(sent_requests_.size(), 2);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "abcde");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "fghij");
+  EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
+  sent_requests_.clear();
+
+  // Smaller than max_streamed_body_chunk_size (3 < 5).
+  Buffer::OwnedImpl smaller_chunk("xyz");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(smaller_chunk, false));
+  ASSERT_EQ(sent_requests_.size(), 1);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "xyz");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  sent_requests_.clear();
+
+  // Empty body chunk with end_stream = true.
+  Buffer::OwnedImpl empty_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty_chunk, true));
+  ASSERT_EQ(sent_requests_.size(), 1);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "");
+  EXPECT_TRUE(sent_requests_[0].request_body().end_of_stream());
+  sent_requests_.clear();
+
+  processRequestBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* streamed =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed->set_body("request_ok");
+        streamed->set_end_of_stream(true);
+      },
+      true);
+  EXPECT_EQ(got_request_body.toString(), "request_ok");
+
+  // Response side: send exact multiple with end_stream = true while
+  // HeadersCallback is still pending, then verify that when HeadersResponse
+  // arrives with an empty encodingBuffer(), eosSentToServerWithBody()
+  // suppresses sending a duplicate empty end_stream chunk.
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  Buffer::OwnedImpl empty_encoding_buffer;
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&empty_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
+      .WillRepeatedly(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); });
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  sent_requests_.clear();
+
+  Buffer::OwnedImpl resp_exact("ABCDEFGHIJ");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_exact, true));
+  ASSERT_EQ(sent_requests_.size(), 2);
+  EXPECT_EQ(sent_requests_[0].response_body().body(), "ABCDE");
+  EXPECT_FALSE(sent_requests_[0].response_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].response_body().body(), "FGHIJ");
+  EXPECT_TRUE(sent_requests_[1].response_body().end_of_stream());
+
+  // Receiving HeadersResponse when complete_body_available_ is true and
+  // encodingBuffer() is non-null (but empty) should not send a duplicate empty
+  // chunk because end_of_stream was already sent with the body above.
+  processResponseHeadersAfterTrailer(std::nullopt);
+  EXPECT_EQ(sent_requests_.size(), 2);
+
+  processResponseBodyHelper("response_ok", want_response_body,
+                            /*end_of_stream=*/true, /*should_continue=*/true);
+  EXPECT_EQ(got_response_body.toString(), "response_ok");
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyStandaloneModeOverrideTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+    request_body_mode: "STREAMED"
+    response_body_mode: "NONE"
+  allow_mode_override: true
+  max_streamed_body_chunk_size: 5
+  )EOF");
+
+  Buffer::OwnedImpl got_request_body;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
+      .WillRepeatedly(
+          [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  sent_requests_.clear();
+
+  // Buffer complete body while waiting for HeadersResponse in STREAMED mode.
+  Buffer::OwnedImpl buffered_request_data;
+  setUpDecodingBuffering(buffered_request_data, true);
+  Buffer::OwnedImpl early_chunk("123456789012");
+  buffered_request_data.add(early_chunk);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(early_chunk, true));
+  EXPECT_TRUE(sent_requests_.empty());
+
+  // Server sends standalone mode_override switching request_body_mode to
+  // FULL_DUPLEX_STREAMED and request_trailer_mode to SEND.
+  auto standalone_override = std::make_unique<ProcessingResponse>();
+  standalone_override->mutable_mode_override()->set_request_body_mode(
+      ProcessingMode::FULL_DUPLEX_STREAMED);
+  standalone_override->mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+  stream_callbacks_->onReceiveMessage(std::move(standalone_override));
+
+  // handleStandaloneModeOverride() should flush and chunk the buffered body.
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_TRUE(sent_requests_[2].request_body().end_of_stream());
+  EXPECT_EQ(buffered_request_data.length(), 0);
+
+  // Server now sends HeadersResponse followed by streamed BodyResponse.
+  auto headers_resp = std::make_unique<ProcessingResponse>();
+  headers_resp->mutable_request_headers();
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+  stream_callbacks_->onReceiveMessage(std::move(headers_resp));
+
+  processRequestBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* streamed =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed->set_body("standalone_override_ok");
+        streamed->set_end_of_stream(true);
+      },
+      true);
+  EXPECT_EQ(got_request_body.toString(), "standalone_override_ok");
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyHeadersModeOverrideTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+    request_body_mode: "BUFFERED"
+    response_body_mode: "NONE"
+  allow_mode_override: true
+  max_streamed_body_chunk_size: 5
+  )EOF");
+
+  Buffer::OwnedImpl got_request_body;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, _))
+      .WillRepeatedly(
+          [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  sent_requests_.clear();
+
+  // Buffer complete body while waiting for HeadersResponse in BUFFERED mode.
+  Buffer::OwnedImpl buffered_request_data;
+  setUpDecodingBuffering(buffered_request_data, true);
+  Buffer::OwnedImpl early_chunk("123456789012");
+  buffered_request_data.add(early_chunk);
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(early_chunk, true));
+  EXPECT_TRUE(sent_requests_.empty());
+
+  // Server sends HeadersResponse with mode_override to FULL_DUPLEX_STREAMED.
+  processRequestHeaders(true, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+  });
+
+  // handleCompleteBodyAvailable() -> sendBufferedDataInStreamedMode() should
+  // chunk the buffered body and drain it without enqueueing in chunk_queue_.
+  ASSERT_EQ(sent_requests_.size(), 3);
+  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
+  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_TRUE(sent_requests_[2].request_body().end_of_stream());
+  EXPECT_EQ(buffered_request_data.length(), 0);
+  EXPECT_TRUE(FilterAccessor::decodingState(*filter_).chunkQueue().empty());
+
+  processRequestBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* streamed =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed->set_body("headers_override_ok");
+        streamed->set_end_of_stream(true);
+      },
+      true);
+  EXPECT_EQ(got_request_body.toString(), "headers_override_ok");
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
+
+  filter_->onDestroy();
+}
 
 // Using the default configuration, test the filter with a processor that
 // replies to the request_headers message with an empty response
@@ -1031,10 +1586,10 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
                                                  Eq(std::nullopt), "Got_a_bad_request"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
@@ -1144,10 +1699,10 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
                                                  Eq(std::nullopt), "Got_a_bad_request"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp2 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp2->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
@@ -1193,10 +1748,10 @@ TEST_F(HttpFilterTest, RespondImmediatelyWithBinaryBody) {
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::BadRequest, "non-utf-8 compliant field\x80\x81",
                              _, Eq(std::nullopt), "Got_a_bad_request"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp2 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp2->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
@@ -1859,10 +2414,10 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error message");
   EXPECT_EQ(Grpc::Status::Ok, getExtProcLoggingInfo()->getGrpcStatusBeforeFirstCall());
@@ -1917,10 +2472,10 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error message");
   // Sending 40 more chunks of data. No more gRPC calls.
@@ -1967,10 +2522,10 @@ TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error message");
 
@@ -2576,10 +3131,10 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::OK, "", _, Eq(std::nullopt), ""))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   resp1->mutable_immediate_response();
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -2613,10 +3168,10 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::Forbidden, "", _, Eq(999), ""))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::Forbidden);
@@ -2656,10 +3211,10 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error message");
 
@@ -2709,10 +3264,10 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error message");
 
@@ -3969,6 +4524,28 @@ TEST_F(OverrideTest, EmitClientSpanMerge) {
   EXPECT_FALSE(*merged_inherited.emitClientSpan());
 }
 
+TEST_F(OverrideTest, MaxStreamedBodyChunkSizeMerge) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(10);
+
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(5);
+
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
+  FilterConfigPerRoute merged_route(route1, route2);
+
+  ASSERT_TRUE(merged_route.maxStreamedBodyChunkSize().has_value());
+  EXPECT_EQ(*merged_route.maxStreamedBodyChunkSize(), 5);
+
+  // Empty more specific inherits from less specific.
+  ExtProcPerRoute empty_cfg;
+  FilterConfigPerRoute empty_route(empty_cfg, builder_, factory_context_);
+  FilterConfigPerRoute merged_inherited(route1, empty_route);
+  ASSERT_TRUE(merged_inherited.maxStreamedBodyChunkSize().has_value());
+  EXPECT_EQ(*merged_inherited.maxStreamedBodyChunkSize(), 10);
+}
+
 // Verify that attempts to change headers that are not allowed to be changed
 // are ignored and a counter is incremented.
 TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
@@ -4024,10 +4601,10 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, _, _, Eq(std::nullopt), _))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto headers_mut =
       resp1->mutable_request_headers()->mutable_response()->mutable_header_mutation();
@@ -5106,10 +5683,10 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
                                                  Eq(std::nullopt), "Got_a_bad_request"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
@@ -5625,10 +6202,10 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
                                                  Eq(std::nullopt), "Got_a_bad_request"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
@@ -5737,10 +6314,10 @@ TEST_F(HttpFilterTest, DontSaveImmediateResponse) {
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
                                                  Eq(std::nullopt), "Got_a_bad_request"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce(
+          Invoke([&immediate_response_headers](
+                     Unused, Unused, std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                     Unused, Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
