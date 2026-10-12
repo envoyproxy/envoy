@@ -616,6 +616,8 @@ public:
   setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
   void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                      envoy::service::ext_proc::v3::ProcessingRequest& req);
+  void sendBody(ProcessorState& state, Buffer::Instance& data,
+                ProcessorState::CallbackState new_state, bool end_stream);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
                     bool observability_mode = false);

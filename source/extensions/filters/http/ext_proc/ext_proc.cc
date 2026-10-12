@@ -1005,19 +1005,11 @@ FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffe
     break;
   }
 
-  ProcessingRequest req = setupBodyChunk(state, data, end_stream);
-  if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
-    state.enqueueStreamingChunk(data, end_stream);
-  } else {
-    // For FULL_DUPLEX_STREAMED mode, just drain the data.
-    data.drain(data.length());
-  }
   // If the current state is HeadersCallback, stays in that state.
-  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
-  } else {
-    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
-  }
+  auto cb_state = state.callbackState() == ProcessorState::CallbackState::HeadersCallback
+                      ? ProcessorState::CallbackState::HeadersCallback
+                      : ProcessorState::CallbackState::StreamedBodyCallback;
+  sendBody(state, data, cb_state, end_stream);
   return state.getBodyCallbackResultInStreamedMode(end_stream);
 }
 
@@ -1465,6 +1457,18 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
                              new_state, true);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
+}
+
+void Filter::sendBody(ProcessorState& state, Buffer::Instance& data,
+                      ProcessorState::CallbackState new_state, bool end_stream) {
+  auto req = setupBodyChunk(state, data, end_stream);
+  if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
+    state.enqueueStreamingChunk(data, end_stream);
+  } else {
+    // For FULL_DUPLEX_STREAMED mode, just drain the data.
+    data.drain(data.length());
+  }
+  sendBodyChunk(state, new_state, req);
 }
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
