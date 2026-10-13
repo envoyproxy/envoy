@@ -48,6 +48,15 @@ TEST_F(IoUringWorkerFactoryImplTest, RejectsNonPowerOfTwoProvidedBufferCount) {
   EXPECT_THROW(socket_interface.createBootstrapExtension(config, context_), EnvoyException);
 }
 
+TEST_F(IoUringWorkerFactoryImplTest, RejectsDeferredTaskrunWithSubmissionPolling) {
+  envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+  auto* options = config.mutable_io_uring_options();
+  options->set_enable_deferred_taskrun(true);
+  options->set_enable_submission_queue_polling(true);
+  Network::SocketInterfaceImpl socket_interface;
+  EXPECT_THROW(socket_interface.createBootstrapExtension(config, context_), EnvoyException);
+}
+
 TEST_F(IoUringWorkerFactoryImplTest, InitializesWorkerWithReceiveTuningOptions) {
   envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
   auto* options = config.mutable_io_uring_options();
@@ -55,6 +64,7 @@ TEST_F(IoUringWorkerFactoryImplTest, InitializesWorkerWithReceiveTuningOptions) 
   options->mutable_read_buffer_size()->set_value(64);
   options->mutable_provided_buffer_count()->set_value(128);
   options->set_enable_multishot_receive(true);
+  options->set_enable_deferred_taskrun(true);
   Network::SocketInterfaceImpl socket_interface;
   auto extension = socket_interface.createBootstrapExtension(config, context_);
   ASSERT_NE(nullptr, extension);

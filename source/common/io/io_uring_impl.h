@@ -29,7 +29,7 @@ class IoUringImpl : public IoUring,
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
               bool enable_multishot_receive, uint32_t multishot_buffer_size,
-              uint32_t provided_buffer_count = 0);
+              uint32_t provided_buffer_count = 0, bool enable_deferred_taskrun = false);
   ~IoUringImpl() override;
 
   os_fd_t registerEventfd() override;

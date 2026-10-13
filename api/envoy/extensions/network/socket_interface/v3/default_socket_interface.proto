@@ -40,7 +40,7 @@ message DefaultSocketInterface {
 //   ``io_uring`` support is experimental and its performance characteristics depend heavily on
 //   the kernel version.
 //
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message IoUringOptions {
   // The number of entries in the ``io_uring`` submission queue (SQ). Each in-flight I/O
   // operation requires one SQE. The completion queue (CQ) is sized at ``2x`` this value
@@ -99,4 +99,10 @@ message IoUringOptions {
   // If omitted, uses ``io_uring_size`` rounded up to a power of two and capped at 4096.
   google.protobuf.UInt32Value provided_buffer_count = 8
       [(validate.rules).uint32 = {gte: 128, lte: 4096}];
+
+  // Defer kernel task work until the worker explicitly reaps completions. This may
+  // improve batching for read-heavy workloads. Requires Linux 6.1 or later and cannot
+  // be combined with ``enable_submission_queue_polling``. Unsupported kernels reject
+  // ring initialization. If omitted, defaults to false.
+  bool enable_deferred_taskrun = 9;
 }
