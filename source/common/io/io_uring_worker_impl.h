@@ -210,6 +210,8 @@ protected:
   Event::FileReadyCb cb_;
 };
 
+class IoUringPausedCloseWatch;
+
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
@@ -226,6 +228,7 @@ public:
   void cancelWriteOnWorkerShutdown() override;
   void enableRead() override;
   void disableRead() override;
+  void enableCloseEvent(bool enable) override;
   void write(Buffer::Instance& data) override;
   uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   void shutdown(int how) override;
@@ -293,6 +296,9 @@ protected:
   // Whether the write buffer is above the high watermark and backpressure is being applied.
   bool above_write_high_watermark_{false};
 
+  std::shared_ptr<IoUringPausedCloseWatch> paused_close_watch_;
+
+  void armPausedCloseWatch();
   void closeInternal();
   void submitReadRequest();
   void submitWriteOrShutdownRequest();

@@ -1,15 +1,32 @@
 #include "source/common/io/io_uring_worker_impl.h"
 
 #include <algorithm>
+#include <limits>
+
+#include "source/common/api/os_sys_calls_impl.h"
 
 namespace Envoy {
 namespace Io {
+
+class IoUringPausedCloseWatch {
+public:
+  Event::FileEventPtr event_;
+  bool close_observed_{false};
+  bool early_close_pending_{false};
+};
 
 // The adaptive read buffer grows up to this multiple of the configured read buffer size so large
 // transfers use fewer, larger reads while small responses keep using small buffers.
 constexpr uint32_t MaxReadBufferSizeMultiplier = 16;
 
 namespace {
+// The cancellation acknowledgment can arrive before the receive terminates.
+class PersistentReadRequest final : public Request {
+public:
+  explicit PersistentReadRequest(IoUringSocket& socket) : Request(RequestType::Read, socket) {}
+  bool cancellation_requested_{false};
+};
+
 // A negative provided buffer id would index the pool out of bounds. Flag the bug and let the caller
 // skip the buffer when that happens.
 bool multishotBufferIdValid(int32_t buffer_id) {
@@ -205,7 +222,7 @@ Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, uint32_t re
 }
 
 Request* IoUringWorkerImpl::submitReadMultishotRequest(IoUringSocket& socket) {
-  Request* req = new Request(Request::RequestType::Read, socket);
+  Request* req = new PersistentReadRequest(socket);
 
   ENVOY_LOG(trace, "submit read multishot request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
@@ -400,25 +417,36 @@ IoUringServerSocket::~IoUringServerSocket() {
 void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
   ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, static_cast<int>(status_));
 
+  paused_close_watch_.reset();
   IoUringSocketEntry::close(keep_fd_open, cb);
   keep_fd_open_ = keep_fd_open;
+  const bool pause_enabled = parent_.isMultishotEnabled();
 
   // Delay close until read request and write (or shutdown) request are drained.
-  if (read_req_ == nullptr && write_or_shutdown_req_ == nullptr) {
+  if (read_req_ == nullptr && write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
+      write_or_shutdown_cancel_req_ == nullptr) {
     closeInternal();
     return;
   }
 
-  if (read_req_ != nullptr) {
+  if (read_req_ != nullptr &&
+      (!pause_enabled ||
+       (read_cancel_req_ == nullptr &&
+        (!read_is_multishot_ || read_req_->type() != Request::RequestType::Read ||
+         !static_cast<PersistentReadRequest*>(read_req_)->cancellation_requested_)))) {
     ENVOY_LOG(trace, "cancel the read request, fd = {}", fd_);
+    if (pause_enabled && read_is_multishot_ && read_req_->type() == Request::RequestType::Read) {
+      static_cast<PersistentReadRequest*>(read_req_)->cancellation_requested_ = true;
+    }
     read_cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
   }
 
   if (write_or_shutdown_req_ != nullptr) {
     ENVOY_LOG(trace, "delay cancel the write request, fd = {}", fd_);
     if (write_timeout_ms_ > 0) {
-      write_timeout_timer_ = parent_.dispatcher().createTimer([this]() {
-        if (write_or_shutdown_req_ != nullptr) {
+      write_timeout_timer_ = parent_.dispatcher().createTimer([this, pause_enabled]() {
+        if (write_or_shutdown_req_ != nullptr &&
+            (!pause_enabled || write_or_shutdown_cancel_req_ == nullptr)) {
           ENVOY_LOG(trace, "cancel the write or shutdown request, fd = {}", fd_);
           write_cancellation_requested_ = true;
           write_or_shutdown_cancel_req_ =
@@ -441,6 +469,20 @@ void IoUringServerSocket::cancelWriteOnWorkerShutdown() {
 }
 
 void IoUringServerSocket::enableRead() {
+  if (parent_.isMultishotEnabled()) {
+    paused_close_watch_.reset();
+    if (status_ == Closed) {
+      return;
+    }
+    if (status_ == RemoteClosed) {
+      // EOF already notified the handler while reading was disabled. Retained payload must still
+      // be drainable, without a second close notification or a new receive after terminal EOF.
+      if (read_buf_.length() > 0) {
+        injectCompletion(Request::RequestType::Read);
+      }
+      return;
+    }
+  }
   IoUringSocketEntry::enableRead();
   ENVOY_LOG(trace, "enable read, fd = {}", fd_);
 
@@ -454,7 +496,87 @@ void IoUringServerSocket::enableRead() {
   submitReadRequest();
 }
 
-void IoUringServerSocket::disableRead() { IoUringSocketEntry::disableRead(); }
+void IoUringServerSocket::disableRead() {
+  if (!parent_.isMultishotEnabled()) {
+    IoUringSocketEntry::disableRead();
+    return;
+  }
+  if (status_ == Closed || status_ == RemoteClosed) {
+    return;
+  }
+  IoUringSocketEntry::disableRead();
+  // A persistent receive continues consuming TCP data after the handler is disabled. Cancel it
+  // once, retaining already-published positive completions until the handler can drain them.
+  // read_req_ and read_cancel_req_ form a barrier: neither resume nor close may bypass either
+  // `CQE`.
+  if (read_is_multishot_ && read_req_ != nullptr &&
+      read_req_->type() == Request::RequestType::Read && read_cancel_req_ == nullptr &&
+      !static_cast<PersistentReadRequest*>(read_req_)->cancellation_requested_) {
+    static_cast<PersistentReadRequest*>(read_req_)->cancellation_requested_ = true;
+    read_cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
+  }
+  if (read_req_ == nullptr && read_cancel_req_ == nullptr) {
+    submitReadRequest();
+  }
+}
+
+void IoUringServerSocket::enableCloseEvent(bool enable) {
+  IoUringSocketEntry::enableCloseEvent(enable);
+  if (enable && status_ == ReadDisabled && paused_close_watch_ &&
+      paused_close_watch_->close_observed_) {
+    paused_close_watch_->early_close_pending_ = true;
+    injectCompletion(Request::RequestType::Read);
+  }
+}
+
+void IoUringServerSocket::armPausedCloseWatch() {
+  if (paused_close_watch_ || read_error_.has_value() || status_ != ReadDisabled ||
+      read_req_ != nullptr || read_cancel_req_ != nullptr) {
+    return;
+  }
+  auto watch = std::make_shared<IoUringPausedCloseWatch>();
+  paused_close_watch_ = watch;
+  watch->event_ = parent_.dispatcher().createFileEvent(
+      fd_,
+      [this, weak_watch = std::weak_ptr<IoUringPausedCloseWatch>(watch)](uint32_t events) {
+        const auto watch = weak_watch.lock();
+        // Check the ticket before touching this: after close or handoff the socket can already
+        // have been destroyed, and resume invalidates the old ticket before re-arming receive.
+        if (!watch) {
+          return absl::OkStatus();
+        }
+        if (paused_close_watch_ != watch || status_ != ReadDisabled || read_req_ != nullptr ||
+            read_cancel_req_ != nullptr || watch->close_observed_ ||
+            !(events & Event::FileReadyType::Closed)) {
+          return absl::OkStatus();
+        }
+        // `RDHUP` with unread data is persistent. Disable the watch before peeking so it cannot
+        // loop on that data; only resume may consume it or arm a new watch for a later pause.
+        watch->event_->setEnabled(0);
+        watch->close_observed_ = true;
+        char byte;
+        Api::SysCallSizeResult peek =
+            Api::OsSysCallsSingleton::get().recv(fd_, &byte, 1, MSG_PEEK | MSG_DONTWAIT);
+        if (peek.return_value_ < 0 && peek.errno_ == EINTR) {
+          // One bounded retry. A transient failure is not EOF and must not become Read(0).
+          peek = Api::OsSysCallsSingleton::get().recv(fd_, &byte, 1, MSG_PEEK | MSG_DONTWAIT);
+        }
+        if (peek.return_value_ == 0) {
+          read_error_ = 0;
+        } else if (peek.return_value_ < 0 && peek.errno_ != EAGAIN && peek.errno_ != EWOULDBLOCK &&
+                   peek.errno_ != EINTR && peek.errno_ != 0) {
+          read_error_ = -peek.errno_;
+        }
+        // Closed is an early-close hint in Envoy: when enabled, unread payload need not drain
+        // first. Half-close connections omit Closed; retain only proven EOF/error for resume.
+        if (enable_close_event_) {
+          watch->early_close_pending_ = true;
+          injectCompletion(Request::RequestType::Read);
+        }
+        return absl::OkStatus();
+      },
+      Event::PlatformDefaultTriggerType, Event::FileReadyType::Closed);
+}
 
 void IoUringServerSocket::write(Buffer::Instance& data) {
   ENVOY_LOG(trace, "write, buffer size = {}, fd = {}", data.length(), fd_);
@@ -510,8 +632,17 @@ void IoUringServerSocket::onClose(Request* req, int32_t result, bool injected) {
 void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onCancel(req, result, injected);
   ASSERT(!injected);
-  if (read_cancel_req_ == req) {
+  const bool pause_enabled = parent_.isMultishotEnabled();
+  const bool canceled_read = read_cancel_req_ == req;
+  if (canceled_read) {
     read_cancel_req_ = nullptr;
+    if (pause_enabled && result != 0 && result != -ENOENT && read_req_ != nullptr &&
+        read_is_multishot_ && read_req_->type() == Request::RequestType::Read) {
+      static_cast<PersistentReadRequest*>(read_req_)->cancellation_requested_ = false;
+    }
+    if (pause_enabled && result != 0 && result != -ENOENT && result != -EALREADY) {
+      ENVOY_LOG(warn, "unable to cancel read request, fd = {}, result = {}", fd_, result);
+    }
   }
   if (write_or_shutdown_cancel_req_ == req) {
     write_or_shutdown_cancel_req_ = nullptr;
@@ -519,6 +650,16 @@ void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) 
   if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_req_ == nullptr &&
       read_cancel_req_ == nullptr && write_or_shutdown_cancel_req_ == nullptr) {
     closeInternal();
+    return;
+  }
+  // The target may finish before the cancel acknowledgment, or vice versa. Re-enable buffered
+  // delivery/re-arm only after both have completed, and only if the handler has resumed reading.
+  if (pause_enabled && canceled_read && read_req_ == nullptr) {
+    if (status_ == ReadEnabled) {
+      enableRead();
+    } else if (status_ == ReadDisabled) {
+      submitReadRequest();
+    }
   }
 }
 
@@ -564,6 +705,7 @@ void IoUringServerSocket::onReadCompleted(int32_t result) {
 // performance in the next iteration.
 void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onRead(req, result, injected);
+  const bool pause_enabled = parent_.isMultishotEnabled();
 
   ENVOY_LOG(trace,
             "onRead with result {}, fd = {}, injected = {}, status_ = {}, enable_close_event = {}",
@@ -614,15 +756,36 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
       }
     }
   } else if (result == -ENOBUFS) {
-    // The provided buffer pool is exhausted, which ends the `multishot` read. Fall back to a readv
-    // for the next read so progress continues until buffers are recycled.
+    // Provided buffer pool exhaustion can temporarily use a readv until buffers are recycled.
     multishot_fallback_ = true;
   } else if (read_is_multishot_ && (result == -EINVAL || result == -EOPNOTSUPP)) {
-    // The kernel registered the provided buffer ring but does not support `multishot` recv, which
-    // needs Linux 6.0. Disable `multishot` for this socket and use readv from now on.
     multishot_disabled_ = true;
-  } else if (result != -ECANCELED) {
+  } else if (result != -ECANCELED && !(pause_enabled && injected && result == -EAGAIN)) {
+    // A synthetic resume notification must not overwrite a retained kernel error or EOF.
     read_error_ = result;
+  }
+
+  if (pause_enabled && injected && paused_close_watch_ &&
+      paused_close_watch_->early_close_pending_) {
+    paused_close_watch_->early_close_pending_ = false;
+    if (status_ == ReadDisabled && enable_close_event_) {
+      // Notify only through the worker CQ. Resume clears the ticket and cancels the early-close
+      // hint, allowing its unread TCP data to be received normally; close removes injected CQEs.
+      paused_close_watch_.reset();
+      status_ = RemoteClosed;
+      IoUringSocketEntry::onRemoteClose();
+      return;
+    }
+  }
+
+  if (pause_enabled && injected && status_ == RemoteClosed) {
+    // A synthetic resume may drain payload retained before an already-observed terminal EOF.
+    // Keep RemoteClosed so callbacks cannot accidentally re-arm the receive.
+    if (read_buf_.length() > 0) {
+      onReadCompleted(static_cast<int32_t>(
+          std::min<uint64_t>(read_buf_.length(), std::numeric_limits<int32_t>::max())));
+    }
+    return;
   }
 
   // Discard calling back since the socket is not ready or closed.
@@ -630,11 +793,32 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     return;
   }
 
+  // A cancellation racing with kernel execution can report -EALREADY. If another positive `CQE`
+  // proves the persistent receive stayed armed, retry once after that progress, never while a
+  // previous cancellation is still outstanding.
+  if (pause_enabled && !injected && result > 0 && req->moreCompletions() &&
+      status_ == ReadDisabled && read_cancel_req_ == nullptr) {
+    disableRead();
+  }
+
   // If the socket is enabled and there are bytes to read, notify the handler.
+  bool made_read_progress = false;
   if (status_ == ReadEnabled) {
     if (read_buf_.length() > 0) {
-      onReadCompleted(static_cast<int32_t>(read_buf_.length()));
+      const uint64_t previous_read_length = read_buf_.length();
+      // Reads may remain buffered while the handler is disabled. Keep a large aggregate length
+      // positive rather than wrapping it into the negative range reserved for kernel errors.
+      onReadCompleted(static_cast<int32_t>(
+          std::min<uint64_t>(read_buf_.length(), std::numeric_limits<int32_t>::max())));
+      made_read_progress = read_buf_.length() < previous_read_length;
     } else if (read_error_.has_value() && read_error_ < 0) {
+      if (pause_enabled) {
+        const int32_t error = read_error_.value();
+        read_error_.reset();
+        status_ = RemoteClosed;
+        onReadCompleted(error);
+        return;
+      }
       onReadCompleted(read_error_.value());
       read_error_.reset();
     }
@@ -644,12 +828,31 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
     // * events & (Read)         : Callback Read,
     // * events & (Closed)       : Callback Closed,
     // * ...else                 : Callback Write.
-    if (read_error_.has_value() && read_error_ == 0 && !enable_close_event_) {
+    if (read_error_.has_value() && read_error_ == 0 && !enable_close_event_ &&
+        (!pause_enabled || (status_ == ReadEnabled && read_buf_.length() == 0))) {
       ENVOY_LOG(trace, "read remote closed from socket, fd = {}", fd_);
-      onReadCompleted(read_error_.value());
-      read_error_.reset();
+      if (pause_enabled) {
+        // EOF ends receive, but leaves writes available for TCP half-close. Set the terminal
+        // state before notifying the handler so a reentrant enable cannot re-arm receive.
+        status_ = RemoteClosed;
+        read_error_.reset();
+        onReadCompleted(0);
+      } else {
+        onReadCompleted(read_error_.value());
+        read_error_.reset();
+      }
       return;
     }
+  }
+
+  if (pause_enabled && read_error_.has_value() && read_error_ == 0 && !enable_close_event_) {
+    // A disabled half-close connection does not listen for Closed. Keep EOF pending until read
+    // resumes and every preceding byte has been consumed. Converting it to Write(0) loses the
+    // read half-close and strands buffered payload behind RemoteClosed.
+    if (status_ == ReadEnabled && made_read_progress) {
+      injectCompletion(Request::RequestType::Read);
+    }
+    return;
   }
 
   // If `enable_close_event_` is true, then deliver the remote close as close event.
@@ -680,9 +883,13 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 
   // The socket may be not readable during handler onRead callback, check it again here.
   if (status_ == ReadEnabled) {
-    // If the read error is zero, it means remote close, then needn't new request.
-    if (!read_error_.has_value() || read_error_.value() != 0) {
-      // Submit a read request for the next read.
+    if (pause_enabled && read_error_.has_value()) {
+      // Deliver a retained terminal result after the data preceding it has been consumed. A new
+      // receive can otherwise leave that result stranded when cancellation has paused the ring.
+      if (read_buf_.length() == 0 || made_read_progress) {
+        injectCompletion(Request::RequestType::Read);
+      }
+    } else if (!read_error_.has_value() || read_error_.value() != 0) {
       submitReadRequest();
     }
   } else if (status_ == ReadDisabled) {
@@ -785,6 +992,16 @@ void IoUringServerSocket::closeInternal() {
 
 void IoUringServerSocket::submitReadRequest() {
   if (read_req_) {
+    return;
+  }
+  const bool pause_enabled = parent_.isMultishotEnabled();
+  if (pause_enabled && read_cancel_req_ != nullptr) {
+    return;
+  }
+  if (pause_enabled && status_ == ReadDisabled && parent_.isMultishotEnabled()) {
+    // Stop the readv fallback too: otherwise provided-buffer exhaustion defeats backpressure and
+    // keeps accumulating owned data. enableRead resumes after the two-`CQE` cancellation barrier.
+    armPausedCloseWatch();
     return;
   }
   // Prefer a `multishot` read when available so the kernel keeps delivering data without a new
