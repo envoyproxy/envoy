@@ -407,6 +407,43 @@ TEST_F(ODCDTest, TestMissingClusterCacheDisabled) {
   EXPECT_EQ(callback_call_count_, 0);
 }
 
+TEST_F(ODCDTest, TestKnownMissingAnswerFlushesQueuedCallbacks) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.odcds_missing_cluster_cache", "true"}});
+
+  EXPECT_CALL(*odcds_, isKnownMissing("cluster_foo")).Times(2).WillRepeatedly(Return(true));
+  EXPECT_CALL(*odcds_, recordKnownMissingAnswer()).Times(2);
+  EXPECT_CALL(*odcds_, updateOnDemand(_)).Times(0);
+
+  // Capture the answer posted back to the worker instead of running it inline; later posts fall
+  // through to the inline-run default.
+  Event::PostCb captured_answer;
+  EXPECT_CALL(factory_.tls_.dispatcher_, post(_)).WillRepeatedly([](Event::PostCb cb) { cb(); });
+  EXPECT_CALL(factory_.tls_.dispatcher_, post(_))
+      .WillOnce([&captured_answer](Event::PostCb cb) { captured_answer = std::move(cb); })
+      .RetiresOnSaturation();
+
+  auto cb1 = createCallback(ClusterDiscoveryStatus::Missing);
+  auto handle1 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb1), timeout_);
+  // Queues behind the in-flight request on this worker, does not post to the main thread.
+  auto cb2 = createCallback(ClusterDiscoveryStatus::Missing);
+  auto handle2 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
+  EXPECT_EQ(callback_call_count_, 0);
+
+  ASSERT_TRUE(captured_answer != nullptr);
+  captured_answer();
+  EXPECT_EQ(callback_call_count_, 2);
+
+  // The worker's callback list was emptied, so a new request posts to the main thread and gets
+  // answered anew.
+  auto cb3 = createCallback(ClusterDiscoveryStatus::Missing);
+  auto handle3 =
+      odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb3), timeout_);
+  EXPECT_EQ(callback_call_count_, 3);
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
