@@ -5,5 +5,5 @@ in a client context, for
 :ref:`custom_tls_certificate_selector
 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
 is explicitly defined with
-:ref:`max_sesion_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.max_session_keys>`
-set to 0.
+:ref:`max_session_keys <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.max_session_keys>`
+set to ``0``.

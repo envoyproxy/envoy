@@ -1,4 +1,4 @@
-ext_authz: added
+Added support for
 :ref:`emit_client_span <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_client_span>`
 and per-route
 :ref:`emit_client_span <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.emit_client_span>`
