@@ -1,3 +1,0 @@
-Fixed MCP JSON parser path tracking for object-valued keys containing ``.``, which could cause
-subsequent fields such as ``params.name``, ``params._meta``, or ``id`` to be omitted from extracted
-metadata.
