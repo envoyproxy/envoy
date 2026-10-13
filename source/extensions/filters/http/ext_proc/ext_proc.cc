@@ -715,11 +715,15 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
   if (!filter_state->hasData<ExtProcLoggingInfo>(callbacks.filterConfigName())) {
-    filter_state->setData(callbacks.filterConfigName(),
-                          std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata()),
+    // Retain shared ownership of the logging info object so it remains valid for the lifetime of
+    // this filter even if another filter later overwrites the FilterState entry at the same key.
+    logging_info_ = std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata());
+    filter_state->setData(callbacks.filterConfigName(), logging_info_,
                           Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  } else {
+    logging_info_ = std::dynamic_pointer_cast<ExtProcLoggingInfo>(
+        filter_state->getDataSharedMutableGeneric(callbacks.filterConfigName()));
   }
-  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(callbacks.filterConfigName());
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -751,7 +755,9 @@ void Filter::onComplete(ProcessingResponse& response) {
 
 void Filter::logFailOpen() {
   stats_.failure_mode_allowed_.inc();
-  logging_info_->setFailedOpen();
+  if (logging_info_ != nullptr) {
+    logging_info_->setFailedOpen();
+  }
 }
 
 void Filter::onError() {
@@ -1965,7 +1971,9 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     processing_status = handleStreamingImmediateResponse(response->streamed_immediate_response());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-    logging_info_->setReceivedImmediateResponse();
+    if (logging_info_ != nullptr) {
+      logging_info_->setReceivedImmediateResponse();
+    }
     if (config_->disableImmediateResponse()) {
       ENVOY_STREAM_LOG(debug, "Filter has disable_immediate_response configured. ",
                        *decoder_callbacks_,
