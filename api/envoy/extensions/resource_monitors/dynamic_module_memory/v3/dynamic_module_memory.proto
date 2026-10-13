@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package envoy.extensions.resource_monitors.dynamic_module_memory.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.dynamic_module_memory.v3";
+option java_outer_classname = "DynamicModuleMemoryProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/dynamic_module_memory/v3;dynamic_module_memoryv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic module memory]
+// [#extension: envoy.resource_monitors.dynamic_module_memory]
+
+// The dynamic module memory resource monitor reports the memory pressure of a
+// :ref:`dynamic module <arch_overview_dynamic_modules>`, computed as the heap memory allocated by
+// the module divided by a statically configured heap size.
+//
+// A module that implements ``envoy_dynamic_module_on_program_get_memory_usage`` reports its heap
+// memory itself. The Rust SDK implements it with ``declare_tracking_allocator!``, which counts the
+// memory allocated through the global allocator of the module. Memory that such a module allocates
+// otherwise, such as through ``malloc`` in C code that it links, is not counted.
+//
+// The heap memory of any other module is estimated from the samples of the tcmalloc heap profile,
+// which record the allocation stacks of live allocations. A sample is attributed to the module when
+// the innermost frame of its stack within the code of any loaded module lies within the code of
+// this module. Memory that Envoy allocates while running an ABI callback invoked by the module is
+// not attributed to the module when Envoy is built with clang, which is the default.
+//
+// The estimate is statistical, since tcmalloc samples about one allocation per 2 MiB allocated. It
+// is within about 10 percent for a few hundred MiB and is not reliable below about 16 MiB.
+//
+// .. note::
+//
+//   The estimate requires Envoy to be built with tcmalloc on Linux, which is the default, rather
+//   than gperftools. It is not available for a statically linked module, which has to report its
+//   heap memory itself, and it does not include memory that a module allocates without the C
+//   allocator, such as the heap of a module written in Go. Allocation stacks are recorded through
+//   frame pointers, so memory that a module allocates through a shared library built without them,
+//   such as a dynamically linked ``libstdc++``, may not be attributed to the module. The resource
+//   monitor fails to update while the estimate is not available.
+message DynamicModuleMemoryConfig {
+  // The name of the monitored module, as set in the :ref:`name
+  // <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.name>` of the dynamic
+  // module configurations that load it. A module loaded from :ref:`module
+  // <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>` is only
+  // monitored when its name is set as well. The pressure is zero while no module with this name is
+  // loaded.
+  string module_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The heap size of the module in bytes at which its pressure reaches 100 percent. Must be greater
+  // than ``0``.
+  uint64 max_heap_size_bytes = 2 [(validate.rules).uint64 = {gt: 0}];
+}

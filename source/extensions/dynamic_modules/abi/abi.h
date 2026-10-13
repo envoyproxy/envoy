@@ -132,6 +132,12 @@ const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
 #include <stdint.h>
 #endif
 
+// When built with clang, functions declared here never end in a tail call, so that the memory that
+// Envoy allocates in a callback is not attributed to the module that called it.
+#if defined(__clang__)
+#pragma clang attribute push(__attribute__((disable_tail_calls)), apply_to = function)
+#endif
+
 // =============================================================================
 // ==================================== Common =================================
 // =============================================================================
@@ -611,6 +617,19 @@ typedef enum envoy_dynamic_module_type_socket_direction {
  * was built against. Null means the error and the module will be unloaded immediately.
  */
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
+
+/**
+ * envoy_dynamic_module_on_program_get_memory_usage is called by Envoy on the main thread to get the
+ * heap memory allocated by the module, for example by the dynamic module memory resource monitor.
+ *
+ * Implementing this is optional. When a module does not implement it, Envoy estimates the heap
+ * memory of the module from the heap profile instead. The function must not block or call back into
+ * Envoy, and it may run while other threads of the module allocate and free memory, so the value is
+ * allowed to be slightly out of date.
+ *
+ * @return the number of bytes the module has allocated and not yet freed.
+ */
+uint64_t envoy_dynamic_module_on_program_get_memory_usage(void);
 
 // =============================================================================
 // Common Callbacks
@@ -18460,6 +18479,10 @@ bool envoy_dynamic_module_on_header_formatter_format(
     envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr,
     envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_module_buffer* result);
+
+#if defined(__clang__)
+#pragma clang attribute pop
+#endif
 
 #ifdef __cplusplus
 }

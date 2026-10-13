@@ -1,9 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/extensions/dynamic_modules/v3/dynamic_modules.pb.h"
@@ -12,7 +15,9 @@
 #include "envoy/stats/scope.h"
 
 #include "source/extensions/common/wasm/remote_async_datasource.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 
+#include "absl/functional/function_ref.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
@@ -21,6 +26,14 @@ namespace Extensions {
 namespace DynamicModules {
 
 using ProtoDynamicModuleConfig = envoy::extensions::dynamic_modules::v3::DynamicModuleConfig;
+
+/**
+ * A half-open range of virtual addresses.
+ */
+struct AddressRange {
+  uintptr_t begin;
+  uintptr_t end;
+};
 
 /**
  * A class for loading and managing dynamic modules. This corresponds to a single dlopen handle
@@ -32,13 +45,38 @@ using ProtoDynamicModuleConfig = envoy::extensions::dynamic_modules::v3::Dynamic
  */
 class DynamicModule {
 public:
-  // Constructor for a dynamically loaded module (via dlopen).
-  explicit DynamicModule(void* handle) : handle_(handle) {}
+  // Constructor for a dynamically loaded module (via dlopen). The name is the one the module was
+  // loaded with and is empty for a module loaded from a file without a name.
+  DynamicModule(void* handle, absl::string_view name);
   // Constructor for a statically linked module. Symbols are resolved via dlsym(RTLD_DEFAULT)
   // with the module name used as a prefix: "<static_module_name>_<symbol>".
-  explicit DynamicModule(absl::string_view static_module_name)
-      : handle_(nullptr), static_module_name_(static_module_name) {}
+  explicit DynamicModule(absl::string_view static_module_name);
   ~DynamicModule();
+
+  DynamicModule(const DynamicModule&) = delete;
+  DynamicModule& operator=(const DynamicModule&) = delete;
+
+  /**
+   * @return the name the module was loaded with.
+   */
+  absl::string_view name() const { return name_; }
+
+  /**
+   * @return the address ranges of the executable segments of the shared object of the module.
+   * Empty for a statically linked module and on platforms other than Linux.
+   */
+  const std::vector<AddressRange>& codeRanges() const { return code_ranges_; }
+
+  /**
+   * @return the heap memory that the module reports through
+   * envoy_dynamic_module_on_program_get_memory_usage, or std::nullopt if it does not implement it.
+   */
+  std::optional<uint64_t> reportedMemoryUsage() const {
+    if (get_memory_usage_ == nullptr) {
+      return std::nullopt;
+    }
+    return get_memory_usage_();
+  }
 
   /**
    * Get a function pointer from the dynamic module with a specific type.
@@ -59,6 +97,8 @@ public:
   }
 
 private:
+  friend void forEachLoadedModule(absl::FunctionRef<void(const DynamicModule&)> fn);
+
   /**
    * Get a symbol from the dynamic module.
    * @param symbol_ref the symbol to look up.
@@ -68,12 +108,26 @@ private:
 
   // The raw dlopen handle that can be used to look up symbols. nullptr for static modules.
   void* handle_;
-  // Non-empty for statically linked modules. When set, getSymbol() looks up
-  // "<static_module_name>_<symbol>" via dlsym(RTLD_DEFAULT) instead of using handle_.
-  const std::string static_module_name_;
+  // The name the module was loaded with. For statically linked modules, getSymbol() looks up
+  // "<name_>_<symbol>" via dlsym(RTLD_DEFAULT) instead of using handle_.
+  const std::string name_;
+  const std::vector<AddressRange> code_ranges_;
+  const decltype(&envoy_dynamic_module_on_program_get_memory_usage) get_memory_usage_ =
+      getFunctionPointer<decltype(&envoy_dynamic_module_on_program_get_memory_usage)>(
+          "envoy_dynamic_module_on_program_get_memory_usage")
+          .value_or(nullptr);
 };
 
 using DynamicModulePtr = std::unique_ptr<DynamicModule>;
+
+/**
+ * Calls the given function for every module that finished loading. A module loaded by several
+ * configurations with the same name is visited once. The function runs while the registry of
+ * loaded modules is locked, which keeps the modules loaded, so it must return quickly and must not
+ * load or unload modules.
+ * @param fn the function to call with each module.
+ */
+void forEachLoadedModule(absl::FunctionRef<void(const DynamicModule&)> fn);
 
 /**
  * Creates a new DynamicModule. This is mainly exposed for testing purposes. Use
@@ -86,6 +140,7 @@ using DynamicModulePtr = std::unique_ptr<DynamicModule>;
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
+ * @param name the name the module is loaded with. Empty for a module loaded without a name.
  *
  * The binding mode is not a parameter: the loader binds now (RTLD_NOW) by default and falls back to
  * lazy binding (RTLD_LAZY) when the ``envoy.reloadable_features.dynamic_modules_rtld_now`` runtime
@@ -93,7 +148,7 @@ using DynamicModulePtr = std::unique_ptr<DynamicModule>;
  */
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
-                 const bool load_globally = false);
+                 const bool load_globally = false, absl::string_view name = {});
 
 /**
  * Creates a new DynamicModule by name under the search path specified by the environment variable
@@ -146,11 +201,13 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
  * @param load_globally if true, the dlopen will be called with RTLD_GLOBAL, so the loaded object
  * can share symbols with other dynamically loaded modules. This is useful for modules that need to
  * share symbols with other modules.
+ * @param name the name the module is loaded with. Empty for a module loaded without a name.
  */
 absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
                                                            const absl::string_view sha256,
                                                            const bool do_not_close,
-                                                           const bool load_globally = false);
+                                                           const bool load_globally = false,
+                                                           absl::string_view name = {});
 
 /**
  * Writes module bytes to disk at the canonical cache path for the given SHA256.

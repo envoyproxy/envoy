@@ -207,6 +207,39 @@ factory context and therefore cannot increment the ``module_load_error`` counter
 only signal when a module referenced from the bootstrap configuration fails to load, because Envoy
 exits before its statistics can be scraped.
 
+Memory
+---------------------------
+
+Modules allocate memory from the heap of the Envoy process, except for the heap of the Go runtime of
+a module written in Go. The :ref:`dynamic module memory resource monitor
+<envoy_v3_api_msg_extensions.resource_monitors.dynamic_module_memory.v3.DynamicModuleMemoryConfig>`
+reports the heap memory of a module to the :ref:`overload manager <config_overload_manager>`, which
+can then act when the module exceeds its budget. Each monitored module needs a resource monitor of
+its own with a unique name. The following configuration reports the pressure of the module
+``my_module`` against a budget of 1 GiB in the ``overload.my_module_memory.pressure`` gauge.
+
+.. code-block:: yaml
+
+  overload_manager:
+    refresh_interval: 1s
+    resource_monitors:
+    - name: my_module_memory
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.resource_monitors.dynamic_module_memory.v3.DynamicModuleMemoryConfig
+        module_name: my_module
+        max_heap_size_bytes: 1073741824
+
+By default the heap memory of a module is estimated from the tcmalloc heap profile. A module can
+instead report its heap memory itself by implementing
+``envoy_dynamic_module_on_program_get_memory_usage``. In the Rust SDK, a module does so by declaring
+an allocator that counts the memory allocated through it, which keeps the module loaded as if
+:ref:`do_not_close
+<envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.do_not_close>` were set.
+
+.. code-block:: rust
+
+  envoy_proxy_dynamic_modules_rust_sdk::declare_tracking_allocator!();
+
 Secrets
 ---------------------------
 

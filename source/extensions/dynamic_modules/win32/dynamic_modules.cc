@@ -16,13 +16,20 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
+DynamicModule::DynamicModule(void* handle, absl::string_view name) : handle_(handle), name_(name) {}
+
+DynamicModule::DynamicModule(absl::string_view static_module_name)
+    : handle_(nullptr), name_(static_module_name) {}
+
 DynamicModule::~DynamicModule() {}
 
 void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const { return nullptr; }
 
+void forEachLoadedModule(absl::FunctionRef<void(const DynamicModule&)> fn) {}
+
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
-                 const bool load_globally) {
+                 const bool load_globally, absl::string_view name) {
   return absl::UnimplementedError("Dynamic modules on Windows are not supported yet.");
 }
 
@@ -53,7 +60,8 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
 absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
                                                            const absl::string_view sha256,
                                                            const bool do_not_close,
-                                                           const bool load_globally) {
+                                                           const bool load_globally,
+                                                           absl::string_view name) {
   return absl::UnimplementedError("Dynamic modules on Windows are not supported yet.");
 }
 
