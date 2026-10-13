@@ -28,6 +28,9 @@ envoy_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:filter_lib",
+        "//contrib/kafka/filters/network/source/mesh:shared_consumer_manager_impl_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:fetch_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:fetch_record_converter_lib",
         "//test/mocks/network:network_mocks",
     ],
 )
