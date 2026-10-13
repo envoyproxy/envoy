@@ -28,7 +28,8 @@ class IoUringImpl : public IoUring,
                     protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-              bool enable_multishot_receive, uint32_t multishot_buffer_size);
+              bool enable_multishot_receive, uint32_t multishot_buffer_size,
+              uint32_t provided_buffer_count = 0);
   ~IoUringImpl() override;
 
   os_fd_t registerEventfd() override;
@@ -55,6 +56,8 @@ public:
   void removeInjectedCompletion(os_fd_t fd) override;
 
 private:
+  friend class IoUringImplTestPeer;
+
   // Logs a warning when the completion queue has overflowed. The kernel parks the extra completions
   // in a backlog and flushes them on the next submission, so they are reaped on a later pass.
   void checkCqOverflow();

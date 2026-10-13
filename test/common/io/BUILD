@@ -76,6 +76,8 @@ envoy_cc_test(
     }),
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:exception_lib",
+        "//source/common/network:default_socket_interface_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
