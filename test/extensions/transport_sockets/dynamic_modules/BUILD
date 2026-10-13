@@ -17,6 +17,7 @@ envoy_extension_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/rust:transport_socket_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:transport_socket_splice",
     ],
     extension_names = ["envoy.transport_sockets.dynamic_modules"],
     rbe_pool = "linux_x64_small",
@@ -47,6 +48,7 @@ envoy_extension_cc_dyn_module_test(
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:transport_socket_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:transport_socket_splice",
     ],
     extension_names = ["envoy.transport_sockets.dynamic_modules"],
     rbe_pool = "linux_x64_small",
@@ -56,6 +58,7 @@ envoy_extension_cc_dyn_module_test(
         "//source/extensions/transport_sockets/dynamic_modules:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/integration:integration_lib",
+        "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/dynamic_modules/v3:pkg_cc_proto",
     ],

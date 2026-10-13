@@ -2836,6 +2836,35 @@ typedef enum envoy_dynamic_module_type_filter_state_life_span {
   envoy_dynamic_module_type_filter_state_life_span_Connection = 2,
 } envoy_dynamic_module_type_filter_state_life_span;
 
+// Upstream connection sharing options for a filter state entry. Mirrors
+// StreamInfo::StreamSharingMayImpactPooling.
+typedef enum envoy_dynamic_module_type_filter_state_stream_sharing {
+  envoy_dynamic_module_type_filter_state_stream_sharing_None = 0,
+  envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnection = 1,
+  envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnectionOnce = 2,
+} envoy_dynamic_module_type_filter_state_stream_sharing;
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_value is called by the module to set the
+ * bytes value of the filter state with the given key, lifespan, and upstream sharing options. If
+ * the filter state is not accessible, this returns false. If the key does not exist, it will be
+ * created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
+ * @param life_span is the lifespan of the filter state entry.
+ * @param stream_sharing is the upstream connection sharing option of the filter state entry.
+ * @return true if the operation is successful, false otherwise. Different from setting metadata,
+ * this could fail if the same key already exists at a conflicting life_span.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_value(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_filter_state_life_span life_span,
+    envoy_dynamic_module_type_filter_state_stream_sharing stream_sharing);
+
 // OWNERSHIP: module-owned opaque object stored in filter state. Envoy never dereferences it; it
 // calls the supplied destructor exactly once when the entry is destroyed. THREADING: created and
 // accessed on the worker thread owning the stream.
@@ -3720,6 +3749,18 @@ uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
  * @return true if the upstream remote address is available, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_get_upstream_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream socket peer address, including the port, before XFF processing.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param result is the pointer to store the address. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the downstream direct remote address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
 
@@ -14676,11 +14717,14 @@ typedef const void* envoy_dynamic_module_type_transport_socket_module_ptr;
 
 /**
  * envoy_dynamic_module_type_transport_socket_post_io_action specifies what should happen on the
- * connection after an I/O operation. This corresponds to Network::PostIoAction in Envoy.
+ * connection after an I/O operation. This corresponds to Network::PostIoAction in Envoy, with Reset
+ * mapping to Close and the ConnectionReset error code of Network::IoResult.
  */
 typedef enum envoy_dynamic_module_type_transport_socket_post_io_action {
   envoy_dynamic_module_type_transport_socket_post_io_action_KeepOpen,
   envoy_dynamic_module_type_transport_socket_post_io_action_Close,
+  // Closes the connection as reset by the peer.
+  envoy_dynamic_module_type_transport_socket_post_io_action_Reset,
 } envoy_dynamic_module_type_transport_socket_post_io_action;
 
 /**
@@ -14699,11 +14743,11 @@ typedef struct envoy_dynamic_module_type_transport_socket_io_result {
 
 /**
  * envoy_dynamic_module_type_transport_socket_io_status is the outcome of a raw socket read or write
- * performed via the io_read and io_write callbacks.
+ * performed via the transport socket I/O callbacks.
  */
 typedef enum envoy_dynamic_module_type_transport_socket_io_status {
-  // The operation transferred bytes. For io_read, a transfer of zero bytes means the peer closed
-  // the read side.
+  // The operation transferred bytes. For a read, a transfer of zero bytes means the peer closed the
+  // read side.
   envoy_dynamic_module_type_transport_socket_io_status_Success,
   // The socket would block. No bytes were transferred and the caller should stop and retry later.
   envoy_dynamic_module_type_transport_socket_io_status_Again,
@@ -14930,6 +14974,39 @@ envoy_dynamic_module_callback_transport_socket_io_write(
     const char* buffer, size_t length, size_t* bytes_written);
 
 /**
+ * envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer reads raw bytes from the
+ * underlying socket into the connection read buffer without an intermediate copy. This is only
+ * valid within do_read.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param max_length is the maximum number of bytes to read.
+ * @param bytes_read is set to the number of bytes actually read. Must not be null. When max_length
+ * is non-zero, a value of zero with a Success status means the peer closed the read side.
+ * @return the status of the read operation. When the peer reset the connection, the status is Error
+ * and a Close returned afterwards closes the connection as reset by the peer.
+ */
+envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    size_t max_length, size_t* bytes_read);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer writes bytes from the
+ * connection write buffer to the underlying socket and drains the bytes written. This is only valid
+ * within do_write.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param bytes_written is set to the number of bytes actually written. Must not be null. It is zero
+ * with a Success status when the write buffer is empty.
+ * @return the status of the write operation. When the peer reset the connection, the status is
+ * Error and a Close returned afterwards closes the connection as reset by the peer.
+ */
+envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    size_t* bytes_written);
+
+/**
  * envoy_dynamic_module_callback_transport_socket_io_shutdown_write shuts down the write side of the
  * underlying socket so the peer observes end of stream. This is typically called from within
  * do_write once all data has been written and end_stream was requested.
@@ -15025,7 +15102,8 @@ bool envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(
 
 /**
  * envoy_dynamic_module_callback_transport_socket_set_is_readable marks the transport socket as
- * readable so that a read will be scheduled on a future event loop iteration.
+ * readable so that a read will be scheduled on a future event loop iteration. It is a no-op while
+ * the connection is connecting or once it is closed.
  *
  * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
  */
@@ -15036,7 +15114,8 @@ void envoy_dynamic_module_callback_transport_socket_set_is_readable(
  * envoy_dynamic_module_callback_transport_socket_set_is_writable schedules another write on a
  * future event loop iteration. A module calls this when it defers buffered bytes for its own
  * reasons rather than because the socket reported it would block. After a write reports it would
- * block, Envoy re-arms the writable notification on its own, so this call is not needed then.
+ * block, Envoy re-arms the writable notification on its own, so this call is not needed then. It
+ * is a no-op while the connection is connecting or once it is closed.
  *
  * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
  */
@@ -15078,6 +15157,49 @@ bool envoy_dynamic_module_callback_transport_socket_get_remote_address(
 bool envoy_dynamic_module_callback_transport_socket_get_local_address(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_get_connection_id gets the unique ID of the
+ * connection.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param connection_id_out is the output pointer to the connection ID.
+ * @return true if the connection ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_get_connection_id(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t* connection_id_out);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id gets the ID of the
+ * upstream connection recorded in the stream info of the connection. The TCP proxy records it on
+ * the downstream connection once the upstream connection is ready. When the TCP proxy tunnels over
+ * HTTP, that connection also carries HTTP framing and other streams. When it races several upstream
+ * addresses, the ID belongs to the connection that wraps the attempts.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param connection_id_out is the output pointer to the upstream connection ID.
+ * @return true if an upstream connection ID is recorded, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t* connection_id_out);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_add_wire_bytes adds bytes that the module moved
+ * through the underlying socket outside the read and write buffers, for example with splice(2), to
+ * the stream info of the connection. On a TCP proxy downstream connection they also count as
+ * downstream wire bytes and, in the other direction, as upstream wire bytes, like the bytes the TCP
+ * proxy relays. A module also reports these bytes in bytes_processed, which feeds the connection
+ * stats and, for writes, resets the TCP proxy idle timer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param bytes_received is the number of bytes received from the socket.
+ * @param bytes_sent is the number of bytes sent to the socket.
+ */
+void envoy_dynamic_module_callback_transport_socket_add_wire_bytes(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t bytes_received, uint64_t bytes_sent);
 
 // =============================================================================
 // ============================== Stats Sink ===================================

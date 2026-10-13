@@ -1,1 +1,2 @@
-* compressor: added support for ``content_type_matcher`` in ``CommonDirectionConfig``, allowing fine-grained MIME type matching via string matchers.
+* compressor: added support for ``content_type_matcher`` in ``CommonDirectionConfig``, allowing
+  fine-grained MIME type matching via string matchers.

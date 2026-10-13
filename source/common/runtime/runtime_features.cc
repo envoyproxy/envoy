@@ -48,11 +48,15 @@ RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_re
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
+RUNTIME_GUARD(envoy_reloadable_features_disallow_redirect_prefix_rewrite_with_path_match_policy);
 // When enabled, which is the default, dynamic modules are loaded with RTLD_NOW so that every
 // referenced symbol is resolved at load time instead of lazily on first use. A module that
 // references a symbol the main program does not provide then fails to load rather than crashing
 // later when the symbol is first reached. Disable to restore the previous RTLD_LAZY behavior.
 RUNTIME_GUARD(envoy_reloadable_features_dynamic_modules_rtld_now);
+// When enabled, the filter factory of an ECDS HTTP filter uses the stats prefix of its parent
+// (e.g. "http.<stat_prefix>.") rather than "extension_config_discovery.<type>.<name>.".
+RUNTIME_GUARD(envoy_reloadable_features_ecds_filter_use_parent_stats_prefix);
 // When enabled, per-priority host updates that arrive during a main-thread batch host update are
 // posted to the worker threads as a single batched cross-thread update at the end of the batch,
 // instead of one post per priority. Combined with
@@ -73,6 +77,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_inject_data_with_state_update);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_not_send_empty_data_with_false_eos);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_report_client_creation_error);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_return_stop_iteration);
 // Notify the connections of a draining filter chain (an in-place listener filter chain update or
@@ -97,6 +102,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_fix_goaway_loadshed_point);
 RUNTIME_GUARD(envoy_reloadable_features_http2_flood_protection_active_streams);
 RUNTIME_GUARD(envoy_reloadable_features_http2_include_cookies_in_limits);
+RUNTIME_GUARD(envoy_reloadable_features_http2_mask_continuation_flags);
 RUNTIME_GUARD(envoy_reloadable_features_http2_reject_frames_after_end_stream);
 RUNTIME_GUARD(envoy_reloadable_features_http2_track_size_of_dropped_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http3_fix_goaway_loadshed_point);
@@ -159,6 +165,7 @@ RUNTIME_GUARD(envoy_reloadable_features_rbac_match_headers_individually);
 RUNTIME_GUARD(envoy_reloadable_features_rbac_respect_ignore_path_parameters);
 RUNTIME_GUARD(envoy_reloadable_features_re2_use_latin1_mode);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_for_non_zero_stats);
+RUNTIME_GUARD(envoy_reloadable_features_response_headers_to_remove_on_1xx);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_html_stats_names);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_upstream_stream_duration_header);
 RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);
@@ -194,6 +201,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 // they read is empty, instead of passing that prefix as a string and relying on every filter to
 // prepend it to its stat names itself.
 RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
+// When an on-demand VHDS request asks for an alias the server has already answered (including
+// with an empty resource meaning the virtual host doesn't exist), answer it from the published
+// route configuration instead of sending another VHDS request and waiting for the response.
+RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);

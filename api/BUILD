@@ -5,6 +5,12 @@ load("@rules_proto//proto:defs.bzl", "proto_descriptor_set")
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    ".bazelrc",
+    "MODULE.bazel",
+    "MODULE.bazel.lock",
+])
+
 proto_library(
     name = "v2_protos",
     visibility = ["//visibility:public"],

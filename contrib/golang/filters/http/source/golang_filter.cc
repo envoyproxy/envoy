@@ -1034,10 +1034,10 @@ CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_v
     // dispatch a callback to write header in the envoy safe thread, to make the write operation
     // safety. otherwise, there might be race between reading in the envoy worker thread and writing
     // in the Go thread.
-    state.getDispatcher().post([this, s, weak_ptr, host_str] {
+    state.getDispatcher().post([this, s, weak_ptr, host_str, strict] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
         s->setUpstreamOverrideHost(
-            Upstream::LoadBalancerContext::OverrideHost{std::string(host_str), false});
+            Upstream::LoadBalancerContext::OverrideHost{std::string(host_str), strict});
       } else {
         ENVOY_LOG(debug, "golang filter has gone or destroyed in setUpstreamOverrideHost");
       }
@@ -1953,7 +1953,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
 }
 
 uint64_t FilterConfigPerRoute::getPluginConfigId(uint64_t parent_id,
-                                                 std::string plugin_name) const {
+                                                 const std::string& plugin_name) const {
   auto it = plugins_config_.find(plugin_name);
   if (it != plugins_config_.end()) {
     return it->second->getMergedConfigId(parent_id);
