@@ -1239,6 +1239,15 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsQuery) {
+  EXPECT_TRUE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "QUERY"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "POST"}}));
+  // Methods are case-sensitive.
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "query"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{}));
+}
+
 TEST(HeaderIsValidTest, IsConnectUdpRequest) {
   EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
       Http::TestRequestHeaderMapImpl{{"upgrade", "connect-udp"}}));
@@ -1586,6 +1595,17 @@ TEST(ValidateHeaders, ModifyAcceptEncodingHeader) {
 
   // Add encoding to an empty header
   EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("", "one"), "one");
+}
+
+TEST(HeaderIsValidTest, IsSpecial1xx) {
+  // A response map without a :status header must not crash and must return false.
+  EXPECT_FALSE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{}));
+
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "100"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "102"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "103"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "104"}}));
+  EXPECT_FALSE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "200"}}));
 }
 
 } // namespace Http

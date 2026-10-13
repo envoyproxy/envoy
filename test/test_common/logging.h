@@ -80,10 +80,10 @@ private:
 class LogExpectation {
 public:
   LogExpectation(LogRecordingSink& sink,
-                 absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log);
+                 absl::AnyInvocable<void(Logger::Levels, const std::string&)> on_log);
   ~LogExpectation();
   LogRecordingSink& sink_;
-  absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log_;
+  absl::AnyInvocable<void(Logger::Levels, const std::string&)> on_log_;
 };
 
 // Initializes the global log environment and must be called prior to execution of Envoy code.

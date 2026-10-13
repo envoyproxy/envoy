@@ -32,6 +32,9 @@ public:
   // Used by both the initiator (request `Upgrade:` header) and responder (`101` response).
   static constexpr absl::string_view REVERSE_TUNNEL_UPGRADE_PROTOCOL = "reverse-tunnel";
 
+  // Historical default for the host re-check when ``maintain_interval`` is unset.
+  static constexpr uint64_t kDefaultMaintainIntervalMs{10000};
+
   struct TenantScopedIdentifierView {
     absl::string_view tenant;
     absl::string_view identifier;
@@ -123,6 +126,23 @@ inline const Http::LowerCaseString& reverseTunnelUpstreamClusterNameHeader() {
 inline const Http::LowerCaseString& reverseTunnelInitiationTimeHeader() {
   static const Http::LowerCaseString kHeader{
       absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-initiation-time")};
+  return kHeader;
+}
+
+// Identifies the initiator worker thread that opened the tunnel (the worker dispatcher name, e.g.
+// "worker_2"). Distinguishes tunnels originating from different workers of the same initiator.
+inline const Http::LowerCaseString& reverseTunnelWorkerIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-worker-id")};
+  return kHeader;
+}
+
+// The initiator's per-connection identifier (Envoy's monotonic connection id) for the outbound
+// handshake connection. Combined with the worker id, distinguishes individual tunnels from the
+// same initiator instance.
+inline const Http::LowerCaseString& reverseTunnelConnectionIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-connection-id")};
   return kHeader;
 }
 

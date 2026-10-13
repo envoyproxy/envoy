@@ -1,10 +1,10 @@
 #pragma once
 
-#include <functional>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "envoy/common/optref.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
@@ -31,7 +31,7 @@ using TagVector = std::vector<Tag>;
 
 using StatNameTag = std::pair<StatName, StatName>;
 using StatNameTagVector = std::vector<StatNameTag>;
-using StatNameTagVectorOptConstRef = std::optional<std::reference_wrapper<const StatNameTagVector>>;
+using StatNameTagVectorOptConstRef = OptRef<const StatNameTagVector>;
 
 using StatNameTagSpan = absl::Span<const StatNameTag>;
 using StatNameTagVec = absl::InlinedVector<StatNameTag, 6>;

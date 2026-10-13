@@ -151,7 +151,8 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     ENVOY_LOG_MISC(debug, "cleaned route config: {}", cleaned_route_config.DebugString());
     std::shared_ptr<ConfigImpl> config =
         THROW_OR_RETURN_VALUE(ConfigImpl::create(cleaned_route_config, factory_context,
-                                                 ProtobufMessage::getNullValidationVisitor(), true),
+                                                 ProtobufMessage::getNullValidationVisitor(),
+                                                 factory_context.initManager(), true),
                               std::shared_ptr<ConfigImpl>);
     auto headers = Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.headers());
     const Formatter::Context formatter_context{&headers};

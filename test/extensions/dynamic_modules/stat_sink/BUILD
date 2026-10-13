@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_dyn_module_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -63,16 +64,18 @@ envoy_cc_test(
     srcs = ["abi_impl_test.cc"],
     deps = [
         ":test_util_lib",
+        "//source/common/stats:histogram_lib",
         "//source/extensions/dynamic_modules/abi",
         "//source/extensions/stat_sinks/dynamic_modules:abi_impl",
         "//source/extensions/stat_sinks/dynamic_modules:sink_config_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+        "@libcircllhist",
     ],
 )
 
-envoy_cc_test(
+envoy_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -84,6 +87,7 @@ envoy_cc_test(
         "GODEBUG": "cgocheck=0",
     },
     deps = [
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/stat_sinks/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",

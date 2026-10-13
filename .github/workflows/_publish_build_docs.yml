@@ -1,0 +1,106 @@
+name: Publish (build docs)
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      dockerhub-token:
+      gcp-key:
+    inputs:
+      docs:
+        type: boolean
+        default: true
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: >-
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.event.workflow.id }}-publish-build-docs
+  cancel-in-progress: true
+
+
+jobs:
+  docs:
+    if: inputs.docs
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    name: Docs
+    uses: ./.github/workflows/_run.yml
+    with:
+      target: docs
+      rbe: true
+      bazel-extra: --config=rbe --config=docs-ci
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -docs
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}
+      timeout-minutes: 90
+      error-match: |
+        ERROR
+        error:
+        Error:
+        FAILED
+        FAIL:
+      source: |
+        ${{ !fromJSON(inputs.request).request.version.dev && 'export DOCS_BUILD_RELEASE=1' || '' }}
+        DOCS_VERSION_MAJOR=${{ fromJSON(inputs.request).request.version.major }}
+        DOCS_VERSION_MINOR=${{ fromJSON(inputs.request).request.version.minor }}
+        DOCS_VERSION_PATCH=${{ fromJSON(inputs.request).request.version.patch }}
+        export BUILD_DOCS_TAG="v${DOCS_VERSION_MAJOR}.${DOCS_VERSION_MINOR}.${DOCS_VERSION_PATCH}"
+        export BUILD_DOCS_SHA="${{ fromJSON(inputs.request).request.sha }}"
+      uploads: |
+        docs: generated/docs
+      steps-post: |
+        - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+          with:
+            output-path: generated/docs/gcs-metadata.json
+            input-format: yaml
+            input: |
+              sha: ${{ fromJSON(inputs.request).request.sha }}
+              path_upload: docs
+              bucket: ${{ vars.GCS_ARTIFACT_BUCKET_PRE }}
+              redirect: >-
+                ${{ vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+                }}${{ fromJSON(inputs.request).request.pr
+                      || fromJSON(inputs.request).request.target-branch }}
+              archive-bucket: ${{ vars.GCS_DOCS_ARCHIVE_BUCKET }}
+              version: >-
+                ${{ format(
+                    'v{0}.{1}.{2}',
+                    fromJSON(inputs.request).request.version.major,
+                    fromJSON(inputs.request).request.version.minor,
+                    fromJSON(inputs.request).request.version.patch
+                ) }}
+        - shell: bash
+          run: |
+            ln -sf %{{ github.workspace }}/generated %{{ runner.temp }}/generated
+
+  docs-preview:
+    if: >-
+      inputs.docs
+      && !inputs.trusted
+    permissions:
+      actions: read
+      contents: read
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
+    needs: docs
+    uses: ./.github/workflows/_upload_gcs.yml
+    with:
+      artifacts: '["docs"]'
+      layout: sha
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}

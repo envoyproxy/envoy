@@ -6,12 +6,14 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/macros.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/secret/secret_manager_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/extensions/filters/http/oauth2/filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -24,8 +26,19 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::HasSubstr;
+using testing::Key;
+using testing::Not;
+using testing::Pair;
+using testing::SizeIs;
+using testing::StartsWith;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -103,22 +116,32 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 class PEMSecretReader : public SecretReader {
 public:
+  explicit PEMSecretReader(std::string key_id = "") : key_id_(std::move(key_id)) {}
   const std::string& clientSecret() const override { return TEST_RSA_PRIVATE_KEY_PEM; }
   const std::string& hmacSecret() const override { return TEST_HMAC_SECRET; }
+  const std::string& privateKey() const override { return TEST_RSA_PRIVATE_KEY_PEM; }
+  const std::string& keyId() const override { return key_id_; }
+
+private:
+  const std::string key_id_;
 };
 
 class MockSecretReader : public SecretReader {
 public:
   MockSecretReader(std::string client_secret = "asdf_client_secret_fdsa",
-                   std::string hmac_secret = TEST_HMAC_SECRET)
-      : client_secret_(std::move(client_secret)), hmac_secret_(std::move(hmac_secret)) {}
+                   std::string hmac_secret = TEST_HMAC_SECRET, std::string key_id = "")
+      : client_secret_(std::move(client_secret)), hmac_secret_(std::move(hmac_secret)),
+        key_id_(std::move(key_id)) {}
 
   const std::string& clientSecret() const override { return client_secret_; }
   const std::string& hmacSecret() const override { return hmac_secret_; }
+  const std::string& privateKey() const override { return client_secret_; }
+  const std::string& keyId() const override { return key_id_; }
 
 private:
   const std::string client_secret_;
   const std::string hmac_secret_;
+  const std::string key_id_;
 };
 
 class MockOAuth2CookieValidator : public CookieValidator {
@@ -130,7 +153,7 @@ public:
 
   MOCK_METHOD(bool, canUpdateTokenByRefreshToken, (), (const));
   MOCK_METHOD(bool, isValid, (), (const));
-  MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, const std::string& secret));
+  MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, absl::string_view secret));
 };
 
 class MockOAuth2Client : public OAuth2Client {
@@ -413,6 +436,34 @@ public:
     return makeFilterConfig(p, secret_reader).value();
   }
 
+  // Builds a minimal valid config whose retry_policy carries `retry_on` and three retries. Used to
+  // pin down which retry conditions the OAuth server requests end up with.
+  FilterConfigSharedPtr getConfigWithRetryPolicy(const std::string& retry_on) {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+
+    auto* retry_policy = p.mutable_retry_policy();
+    retry_policy->mutable_num_retries()->set_value(3);
+    retry_policy->set_retry_on(retry_on);
+
+    auto credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    return makeFilterConfig(p, secret_reader).value();
+  }
+
   // Test helpers exposing private OAuth2Filter methods. OAuth2Filter declares
   // `friend class OAuth2Test`, but `TEST_F(OAuth2Test, ...)` expands to a class
   // *derived* from OAuth2Test, and C++ friendship is not inherited — so the
@@ -439,6 +490,105 @@ public:
   std::string decryptTokenForTest(const std::string& ct) const {
     primeActiveConfigForTest();
     return filter_->decryptToken(ct);
+  }
+
+  // Builds a minimal config for the token cookie chunking tests.
+  // max_cookie_size and max_chunks are left unset when 0.
+  FilterConfigSharedPtr getChunkingConfig(bool enable_chunking,
+                                          bool disable_token_encryption = true,
+                                          const std::string& bearer_token_path = "",
+                                          bool set_cookie_domain = false,
+                                          const std::string& bearer_token_cookie_name = "",
+                                          uint32_t max_cookie_size = 0, uint32_t max_chunks = 0) {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    endpoint->mutable_timeout()->set_seconds(1);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.set_stat_prefix("my_prefix");
+    p.mutable_use_refresh_token()->set_value(true);
+    p.set_disable_token_encryption(disable_token_encryption);
+    if (enable_chunking) {
+      auto* chunking = p.mutable_token_cookie_chunking();
+      if (max_cookie_size != 0) {
+        chunking->mutable_max_cookie_size()->set_value(max_cookie_size);
+      }
+      if (max_chunks != 0) {
+        chunking->mutable_max_chunks()->set_value(max_chunks);
+      }
+    }
+    if (!bearer_token_path.empty()) {
+      p.mutable_cookie_configs()->mutable_bearer_token_cookie_config()->set_path(bearer_token_path);
+    }
+
+    auto* credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+    if (set_cookie_domain) {
+      credentials->set_cookie_domain("example.com");
+    }
+    if (!bearer_token_cookie_name.empty()) {
+      credentials->mutable_cookie_names()->set_bearer_token(bearer_token_cookie_name);
+    }
+
+    MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+    return makeFilterConfig(p, std::make_shared<MockSecretReader>()).value();
+  }
+
+  // Like init(), but validates cookies with the production validator instead of the mock.
+  void initWithRealValidator(FilterConfigSharedPtr config) {
+    init(config);
+    filter_->validator_factory_ = [](TimeSource& time_source, const FilterConfig& config) {
+      return std::make_shared<OAuth2CookieValidator>(time_source, config.cookieNames(),
+                                                     config.cookieDomain());
+    };
+  }
+
+  // Processes the request cookies as decodeHeaders() does before a token flow completes.
+  void startTokenFlowForTest(Http::RequestHeaderMap& headers) {
+    primeActiveConfigForTest();
+    filter_->host_ = std::string(headers.getHostValue());
+    filter_->request_headers_ = &headers;
+    filter_->decryptAndUpdateOAuthTokenCookies(headers);
+  }
+
+  // Completes a login with the given tokens and returns the redirect response.
+  Http::TestResponseHeaderMapImpl loginForTest(Http::RequestHeaderMap& request_headers,
+                                               const std::string& access_token,
+                                               const std::string& id_token = "") {
+    startTokenFlowForTest(request_headers);
+    Http::TestResponseHeaderMapImpl response;
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke(
+            [&response](Http::ResponseHeaderMap& headers, bool) { response.copyFrom(headers); }));
+    filter_->onGetAccessTokenSuccess(access_token, id_token, "", std::chrono::seconds(600));
+    return response;
+  }
+
+  static std::vector<std::string> setCookies(const Http::ResponseHeaderMap& headers) {
+    std::vector<std::string> values;
+    const auto entries = headers.get(Http::Headers::get().SetCookie);
+    for (size_t i = 0; i < entries.size(); ++i) {
+      values.emplace_back(entries[i]->value().getStringView());
+    }
+    return values;
+  }
+
+  // The Cookie header a browser sends after storing the response's Set-Cookie headers.
+  static std::string cookieHeaderFromSetCookies(const Http::ResponseHeaderMap& headers) {
+    std::vector<std::string> cookies;
+    for (const std::string& set_cookie : setCookies(headers)) {
+      const std::string name_value = std::vector<std::string>(absl::StrSplit(set_cookie, ';'))[0];
+      if (!absl::EndsWith(name_value, "=deleted")) {
+        cookies.push_back(name_value);
+      }
+    }
+    return absl::StrJoin(cookies, "; ");
   }
 
   // Validates the behavior of the cookie validator.
@@ -567,17 +717,17 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
       }));
 
   auto client_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, "client", secret_context.server_context_, init_manager);
+      config_source, "client", secret_context.server_context_, init_manager, true);
   auto client_callback =
       secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
   auto token_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, "token", secret_context.server_context_, init_manager);
+      config_source, "token", secret_context.server_context_, init_manager, true);
   auto token_callback =
       secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
 
   NiceMock<ThreadLocal::MockInstance> tls;
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
-                                tls, *api);
+                                tls, *api, dispatcher);
   EXPECT_TRUE(secret_reader.clientSecret().empty());
   EXPECT_TRUE(secret_reader.hmacSecret().empty());
 
@@ -662,6 +812,21 @@ TEST_F(OAuth2Test, SecretsNotReadyReturnsServiceUnavailable) {
   EXPECT_EQ(1, config_->stats().oauth_failure_.value());
 }
 
+// A request with no :path header (for example a plain CONNECT tunnel request, which the connection
+// manager does not reject) must not cause a null dereference. The filter should fail closed with a
+// BadRequest local reply and stop iteration rather than dereferencing the null :path.
+TEST_F(OAuth2Test, MissingPathReturnsBadRequest) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Connect},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "", _, _, "oauth_missing_path"));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
 TEST_F(OAuth2Test, TlsClientAuthDoesNotRequireClientSecret) {
   auto secret_reader = std::make_shared<MockSecretReader>("", TEST_HMAC_SECRET);
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
@@ -720,6 +885,40 @@ TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
   EXPECT_THAT(makeFilterConfig(p, secret_reader),
               StatusHelpers::HasStatusMessage(
                   "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config."));
+}
+
+// A configured retry_on reaches the parsed policy instead of being overridden by the filter.
+TEST_F(OAuth2Test, RetryPolicyRespectsConfiguredRetryOn) {
+  auto config = getConfigWithRetryPolicy("connect-failure,refused-stream");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE |
+                                                  Router::RetryPolicy::RETRY_ON_REFUSED_STREAM);
+  EXPECT_EQ(config->retryPolicy()->numRetries(), 3);
+}
+
+// With the guard off, the legacy hardcoded conditions still override the configured retry_on.
+TEST_F(OAuth2Test, RetryPolicyLegacyRetryOnOverride) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.oauth2_client_retries_respect_user_retry_on", "false"}});
+
+  auto config = getConfigWithRetryPolicy("connect-failure,refused-stream");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), Router::RetryPolicy::RETRY_ON_5XX |
+                                                  Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR |
+                                                  Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE |
+                                                  Router::RetryPolicy::RETRY_ON_RESET);
+}
+
+// A retry_policy that omits retry_on no longer inherits the legacy conditions, so nothing is
+// retried: num_retries on its own does not enable retries.
+TEST_F(OAuth2Test, RetryPolicyWithoutRetryOnRetriesNothing) {
+  auto config = getConfigWithRetryPolicy("");
+
+  ASSERT_NE(config->retryPolicy(), nullptr);
+  EXPECT_EQ(config->retryPolicy()->retryOn(), 0);
 }
 
 // Verifies that the OAuth config is created with a default value for auth_scopes field when it is
@@ -800,20 +999,48 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
 }
 
 TEST_F(OAuth2Test, OnDestroyCancelsOAuthClient) {
+  // The OAuth client is created lazily, so drive a request that actually reaches the token
+  // endpoint before checking that onDestroy() cancels it.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken(_, _, _, _, _, _));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(*oauth_client_, cancel());
+  filter_->onDestroy();
+}
+
+// The OAuth client is only created when the filter actually needs to talk to the token endpoint;
+// a request that is served straight from a valid cookie must not create one.
+TEST_F(OAuth2Test, OAuthClientNotCreatedWhenNotNeeded) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
-      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
-      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
-      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=some_oauth_nonce_value"},
-      {Http::Headers::get().Cookie.get(),
-       "CodeVerifier.00000000075bcd15=some_code_verifier_value"}};
+  };
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
-  EXPECT_CALL(*oauth_client_, cancel());
+  // No client was created, so there is nothing to cancel on teardown.
+  EXPECT_CALL(*oauth_client_, cancel()).Times(0);
   filter_->onDestroy();
 }
 
@@ -1454,6 +1681,59 @@ TEST_F(OAuth2Test, OAuthOkPass) {
 }
 
 /**
+ * Scenario: a request carrying a stream request id is processed by the filter.
+ *
+ * Expected behavior: the OAuth2 filter's application log lines include a RequestId tag whose value
+ * matches the stream's request id (the same value as the access log %STREAM_ID% / x-request-id), so
+ * application logs can be correlated with access logs on a per-request basis.
+ */
+TEST_F(OAuth2Test, LogsRequestIdTag) {
+  const std::string request_id = "a765d063-2c3d-4b19-92d4-4486a16e7f50";
+  StreamInfo::StreamIdProviderImpl id_provider{std::string(request_id)};
+  EXPECT_CALL(decoder_callbacks_.stream_info_, getStreamIdProvider())
+      .WillRepeatedly(Return(makeOptRef<const StreamInfo::StreamIdProvider>(id_provider)));
+
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // Take the valid-HMAC-cookie path, which emits "skipping oauth flow due to valid hmac cookie".
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  EXPECT_LOG_CONTAINS("debug", absl::StrCat("\"RequestId\":\"", request_id, "\""),
+                      { filter_->decodeHeaders(mock_request_headers, false); });
+}
+
+/**
+ * Scenario: the filter processes a request whose stream has no request id provider.
+ *
+ * Expected behavior: the OAuth2 filter still logs, but the log line carries no RequestId tag.
+ */
+TEST_F(OAuth2Test, NoRequestIdTagWhenProviderAbsent) {
+  // The default MockStreamInfo returns an empty StreamIdProvider, so no RequestId is emitted.
+  Http::TestRequestHeaderMapImpl mock_request_headers{
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  EXPECT_LOG_NOT_CONTAINS("debug", "RequestId",
+                          { filter_->decodeHeaders(mock_request_headers, false); });
+}
+
+/**
  * Scenario: forward_id_token is configured with the Authorization header and the request carries
  * valid OAuth cookies.
  *
@@ -1911,6 +2191,306 @@ TEST_F(OAuth2Test, PrivateKeyJwtInvalidKeyReturnsError) {
   // The filter should fail to create the JWT assertion because the key is not valid PEM.
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(OAuth2Test, PrivateKeyJwtAudienceDefaultsToTokenEndpoint) {
+  // When assertion_audience is not set, it should default to the token endpoint URL.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_forward_bearer_token(false);
+  p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                      OAuth2Config_AuthType_PRIVATE_KEY_JWT);
+  p.mutable_private_key_jwt_config()->set_signing_algorithm(
+      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
+  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
+  // Do NOT set assertion_audience — it should default.
+  auto* credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
+
+  EXPECT_EQ(config->jwtAssertionAudience(), "auth.example.com/_oauth");
+}
+
+TEST_F(OAuth2Test, PrivateKeyJwtAudienceFromConfig) {
+  // When assertion_audience is explicitly set, it should be used as-is.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_forward_bearer_token(false);
+  p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                      OAuth2Config_AuthType_PRIVATE_KEY_JWT);
+  p.mutable_private_key_jwt_config()->set_signing_algorithm(
+      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
+  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
+  p.mutable_private_key_jwt_config()->set_assertion_audience("https://issuer.example.com");
+  auto* credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
+
+  EXPECT_EQ(config->jwtAssertionAudience(), "https://issuer.example.com");
+}
+
+TEST_F(OAuth2Test, PrivateKeyJwtUsesCustomAudienceInAssertion) {
+  // Build proto config with a custom assertion_audience.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_forward_bearer_token(false);
+  p.mutable_use_refresh_token()->set_value(true);
+  p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                      OAuth2Config_AuthType_PRIVATE_KEY_JWT);
+  p.mutable_private_key_jwt_config()->set_signing_algorithm(
+      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
+  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
+  p.mutable_private_key_jwt_config()->set_assertion_audience("https://issuer.example.com");
+  p.add_auth_scopes("user");
+  auto* credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+  auto secret_reader = std::make_shared<PEMSecretReader>();
+  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
+  init(config);
+
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Capture the client_assertion (3rd arg) so we can verify the aud claim.
+  std::string captured_assertion;
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, _,
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::PrivateKeyJwt))
+      .WillOnce(testing::SaveArg<2>(&captured_assertion));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+
+  // Decode the JWT assertion and verify the aud claim is the custom audience.
+  std::vector<absl::string_view> jwt_parts = absl::StrSplit(captured_assertion, '.');
+  ASSERT_EQ(jwt_parts.size(), 3);
+  std::string payload = Base64Url::decode(std::string(jwt_parts[1]));
+  EXPECT_NE(std::string::npos, payload.find("\"aud\":\"https://issuer.example.com\""));
+}
+
+TEST_F(OAuth2Test, PrivateKeyJwtKeyIdFromSecretIncludedInAssertionHeader) {
+  // Verify that when the secret carries a key ID, the JWT header includes the kid claim.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_forward_bearer_token(false);
+  p.mutable_use_refresh_token()->set_value(true);
+  p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                      OAuth2Config_AuthType_PRIVATE_KEY_JWT);
+  p.mutable_private_key_jwt_config()->set_signing_algorithm(
+      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
+  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
+  p.add_auth_scopes("user");
+  auto* credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+  auto secret_reader = std::make_shared<PEMSecretReader>("test-kid-456");
+  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
+  init(config);
+
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  std::string captured_assertion;
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, _,
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::PrivateKeyJwt))
+      .WillOnce(testing::SaveArg<2>(&captured_assertion));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+
+  // Decode the JWT header and verify the kid claim is present.
+  std::vector<absl::string_view> jwt_parts = absl::StrSplit(captured_assertion, '.');
+  ASSERT_EQ(jwt_parts.size(), 3);
+  std::string header = Base64Url::decode(std::string(jwt_parts[0]));
+  EXPECT_NE(std::string::npos, header.find("\"kid\":\"test-kid-456\""));
+}
+
+TEST_F(OAuth2Test, PrivateKeyJwtNoKeyIdOmitsKidFromHeader) {
+  // Verify that when the secret carries no key ID, the JWT header does not include a kid claim.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  p.set_forward_bearer_token(false);
+  p.mutable_use_refresh_token()->set_value(true);
+  p.set_auth_type(::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                      OAuth2Config_AuthType_PRIVATE_KEY_JWT);
+  p.mutable_private_key_jwt_config()->set_signing_algorithm(
+      ::envoy::extensions::filters::http::oauth2::v3::PrivateKeyJwtConfig::RS256);
+  p.mutable_private_key_jwt_config()->mutable_assertion_lifetime()->set_seconds(60);
+  // Do NOT set key_id.
+  p.add_auth_scopes("user");
+  auto* credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
+
+  auto secret_reader = std::make_shared<PEMSecretReader>();
+  FilterConfigSharedPtr config = makeFilterConfig(p, secret_reader).value();
+  init(config);
+
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce.00000000075bcd15=" + TEST_CSRF_TOKEN},
+      {Http::Headers::get().Cookie.get(),
+       "CodeVerifier.00000000075bcd15=" + TEST_ENCRYPTED_CODE_VERIFIER},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  std::string captured_assertion;
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, _,
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  TEST_CODE_VERIFIER, AuthType::PrivateKeyJwt))
+      .WillOnce(testing::SaveArg<2>(&captured_assertion));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(request_headers, false));
+
+  // Decode the JWT header and verify no kid claim is present.
+  std::vector<absl::string_view> jwt_parts = absl::StrSplit(captured_assertion, '.');
+  ASSERT_EQ(jwt_parts.size(), 3);
+  std::string header = Base64Url::decode(std::string(jwt_parts[0]));
+  EXPECT_EQ(std::string::npos, header.find("kid"));
+}
+
+TEST_F(OAuth2Test, SdsSecretReaderMultiEntrySecretProvidesKeyAndKeyId) {
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret client_secret;
+  (*client_secret.mutable_secrets())[std::string(PrivateKeySecretEntry)].set_inline_string(
+      "pem-data");
+  (*client_secret.mutable_secrets())[std::string(KeyIdSecretEntry)].set_inline_string("my-key-id");
+
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret hmac_secret;
+  hmac_secret.mutable_secret()->set_inline_string("hmac");
+
+  SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
+                         std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
+                         factory_context_.server_factory_context_.threadLocal(),
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
+
+  // The PEM is reachable only as the signing key — never as an OAuth client secret, which the
+  // non-JWT auth types would send to the token endpoint.
+  EXPECT_EQ("", reader.clientSecret());
+  EXPECT_EQ("pem-data", reader.privateKey());
+  EXPECT_EQ("my-key-id", reader.keyId());
+  EXPECT_EQ("hmac", reader.hmacSecret());
+}
+
+TEST_F(OAuth2Test, SdsSecretReaderSingleValueSecretHasNoKeyId) {
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret client_secret;
+  client_secret.mutable_secret()->set_inline_string("pem-data");
+
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret hmac_secret;
+  hmac_secret.mutable_secret()->set_inline_string("hmac");
+
+  SDSSecretReader reader(std::make_shared<Secret::GenericSecretConfigProviderImpl>(client_secret),
+                         std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
+                         factory_context_.server_factory_context_.threadLocal(),
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
+
+  EXPECT_EQ("pem-data", reader.clientSecret());
+  EXPECT_EQ("pem-data", reader.privateKey());
+  EXPECT_EQ("", reader.keyId());
+}
+
+TEST_F(OAuth2Test, SdsSecretReaderMissingClientSecretProviderYieldsEmptyValues) {
+  envoy::extensions::transport_sockets::tls::v3::GenericSecret hmac_secret;
+  hmac_secret.mutable_secret()->set_inline_string("hmac");
+
+  SDSSecretReader reader(nullptr,
+                         std::make_shared<Secret::GenericSecretConfigProviderImpl>(hmac_secret),
+                         factory_context_.server_factory_context_.threadLocal(),
+                         factory_context_.server_factory_context_.api(),
+                         factory_context_.server_factory_context_.mainThreadDispatcher());
+
+  EXPECT_EQ("", reader.clientSecret());
+  EXPECT_EQ("", reader.privateKey());
+  EXPECT_EQ("", reader.keyId());
 }
 
 TEST_F(OAuth2Test, RefreshTokenWithPrivateKeyJwt) {
@@ -4809,11 +5389,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // When a refresh flow succeeds, but a new refresh token isn't received from the OAuth server, the
@@ -4885,11 +5461,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenNoNewRefreshToken) 
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
@@ -4975,11 +5547,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   EXPECT_EQ(cookies.at("IdToken"), "idToken");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // Test all cookies with STRICT SameSite
@@ -5508,11 +6076,7 @@ TEST_F(OAuth2Test, CookiesDecryptedBeforeForwarding) {
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
 
   // OAuth flow cookies should be removed before forwarding the request
-  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
-  EXPECT_EQ(cookies.contains("OauthExpires"), false);
-  EXPECT_EQ(cookies.contains("RefreshToken"), false);
-  EXPECT_EQ(cookies.contains("OauthNonce"), false);
-  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+  EXPECT_THAT(cookies, UnorderedElementsAre(Key("BearerToken"), Key("IdToken")));
 }
 
 // Verifies that requests matching the pass_through_matcher configuration are not modified by the
@@ -5769,12 +6333,12 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     bool found_nonce = false, found_code_verifier = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthNonce.00000000075bcd15=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/auth/callback;"))
             << "OauthNonce should have path=/auth/callback, got: " << cookie;
         found_nonce = true;
       }
       if (cookie.find("CodeVerifier.00000000075bcd15=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/auth/callback;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/auth/callback;"))
             << "CodeVerifier should have path=/auth/callback, got: " << cookie;
         found_code_verifier = true;
       }
@@ -5836,17 +6400,17 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
     bool found_hmac = false, found_bearer = false, found_expires = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthHMAC=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "OauthHMAC should have path=/app, got: " << cookie;
         found_hmac = true;
       }
       if (cookie.find("BearerToken=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "BearerToken should have path=/app, got: " << cookie;
         found_bearer = true;
       }
       if (cookie.find("OauthExpires=") != std::string::npos) {
-        EXPECT_NE(cookie.find(";path=/app;"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr(";path=/app;"))
             << "OauthExpires should have path=/app, got: " << cookie;
         found_expires = true;
       }
@@ -5902,22 +6466,22 @@ TEST_F(OAuth2Test, OAuthTestCustomCookiePaths) {
          found_expires_delete = false;
     for (const auto& cookie : cookies) {
       if (cookie.find("OauthHMAC=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/app"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/app"))
             << "OauthHMAC deletion should have path=/app, got: " << cookie;
         found_hmac_delete = true;
       }
       if (cookie.find("OauthExpires=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/app"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/app"))
             << "OauthExpires deletion should have path=/app, got: " << cookie;
         found_expires_delete = true;
       }
       if (cookie.find("OauthNonce.00000000075bcd15=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/auth/callback"))
             << "OauthNonce deletion should have path=/auth/callback, got: " << cookie;
         found_nonce_delete = true;
       }
       if (cookie.find("CodeVerifier.00000000075bcd15=deleted") != std::string::npos) {
-        EXPECT_NE(cookie.find("path=/auth/callback"), std::string::npos)
+        EXPECT_THAT(cookie, HasSubstr("path=/auth/callback"))
             << "CodeVerifier deletion should have path=/auth/callback, got: " << cookie;
         found_code_verifier_delete = true;
       }
@@ -6020,12 +6584,7 @@ TEST_F(OAuth2Test, AllowFailedWithInvalidRefreshTokenAsyncFailure) {
 
   // Verify OAuth token and flow cookies were removed
   auto cookies = Http::Utility::parseCookies(request_headers);
-  EXPECT_TRUE(cookies.find("BearerToken") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthHMAC") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthExpires") == cookies.end());
-  EXPECT_TRUE(cookies.find("RefreshToken") == cookies.end());
-  EXPECT_TRUE(cookies.find("OauthNonce.00000000075bcd15") == cookies.end());
-  EXPECT_TRUE(cookies.find("CodeVerifier.00000000075bcd15") == cookies.end());
+  EXPECT_THAT(cookies, UnorderedElementsAre());
 
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_allow_failed_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_refreshtoken_failure").value(), 1);
@@ -6702,6 +7261,333 @@ TEST_F(OAuth2Test, PostMigrationConfigRejectsCbcCiphertext) {
   // Rejection path (no marker + compat off) must not tick the legacy CBC counter: nothing was
   // decrypted, just refused.
   EXPECT_EQ(0, config_->stats().oauth_legacy_cbc_decrypt_.value());
+}
+
+// The Set-Cookie tail of a bearer token cookie with the default settings and a 600s lifetime.
+static const std::string TEST_BEARER_COOKIE_TAIL = ";path=/;Max-Age=600;secure;HttpOnly";
+
+// A token too large for one cookie is written as chunks and a chunk count, each one a cookie the
+// browser stores.
+TEST_F(OAuth2Test, LargeTokenCookieIsChunked) {
+  init(getChunkingConfig(true));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"}};
+  const std::string token(9000, 't');
+
+  const auto response = loginForTest(request_headers, token);
+
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_chunks"), "3");
+  EXPECT_EQ(absl::StrCat(Http::Utility::parseSetCookieValue(response, "BearerToken_0"),
+                         Http::Utility::parseSetCookieValue(response, "BearerToken_1"),
+                         Http::Utility::parseSetCookieValue(response, "BearerToken_2")),
+            token);
+  EXPECT_THAT(setCookies(response), Not(Contains(StartsWith("BearerToken="))));
+  for (const std::string& set_cookie : setCookies(response)) {
+    EXPECT_LE(set_cookie.size(), DefaultMaxTokenCookieSize);
+  }
+  EXPECT_EQ(config_->stats().oauth_token_cookie_chunked_.value(), 1);
+}
+
+// Without token_cookie_chunking a large token is still written as one cookie.
+TEST_F(OAuth2Test, LargeTokenCookieIsNotChunkedWhenDisabled) {
+  init(getChunkingConfig(false));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"}};
+  const std::string token(9000, 't');
+
+  const auto response = loginForTest(request_headers, token);
+
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken"), token);
+  EXPECT_THAT(setCookies(response), Not(Contains(StartsWith("BearerToken_"))));
+  EXPECT_EQ(config_->stats().oauth_token_cookie_chunked_.value(), 0);
+}
+
+// A token cookie of exactly max_cookie_size bytes is written as one cookie, one byte more is
+// chunked.
+TEST_F(OAuth2Test, TokenCookieChunkingThreshold) {
+  const size_t largest_single_token = DefaultMaxTokenCookieSize -
+                                      std::string("BearerToken=").size() -
+                                      TEST_BEARER_COOKIE_TAIL.size();
+  {
+    init(getChunkingConfig(true));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"}};
+    const std::string token(largest_single_token, 't');
+    const auto response = loginForTest(request_headers, token);
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken"), token);
+    EXPECT_THAT(setCookies(response),
+                Contains(absl::StrCat("BearerToken=", token, TEST_BEARER_COOKIE_TAIL)));
+    EXPECT_THAT(setCookies(response), Contains(SizeIs(DefaultMaxTokenCookieSize)));
+  }
+  {
+    init(getChunkingConfig(true));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"}};
+    const auto response = loginForTest(request_headers, std::string(largest_single_token + 1, 't'));
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_chunks"), "2");
+  }
+}
+
+// A token that does not fit in max_chunks chunks is refused before any cookie is written.
+TEST_F(OAuth2Test, OversizedTokenIsRefused) {
+  struct TestCase {
+    std::string bearer_token_path;
+    size_t token_size;
+  };
+  const std::vector<TestCase> test_cases{
+      // More data than all chunks hold.
+      {"", DefaultMaxTokenCookieChunks * DefaultMaxTokenCookieSize},
+      // A cookie path so long that a chunk has no room for data.
+      {absl::StrCat("/", std::string(DefaultMaxTokenCookieSize, 'p')), 10},
+  };
+  for (const auto& test_case : test_cases) {
+    init(getChunkingConfig(true, true, test_case.bearer_token_path));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"}};
+    startTokenFlowForTest(request_headers);
+
+    // The local reply is the only response, and it sets no cookies.
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false))
+        .WillOnce(Invoke([](Http::ResponseHeaderMap& headers, bool) {
+          EXPECT_EQ(headers.getStatusValue(), "503");
+          EXPECT_THAT(setCookies(headers), testing::IsEmpty());
+        }));
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Http::Code::ServiceUnavailable, "Service Unavailable", _, _,
+                               "OAuth token exceeds the cookie chunk limit"));
+    filter_->onGetAccessTokenSuccess(std::string(test_case.token_size, 't'), "", "",
+                                     std::chrono::seconds(600));
+  }
+  EXPECT_EQ(config_->stats().oauth_token_cookie_oversized_.value(), 2);
+}
+
+// max_cookie_size and max_chunks bound the chunks Envoy writes.
+TEST_F(OAuth2Test, TokenCookieChunkingHonorsConfiguredLimits) {
+  constexpr uint32_t max_cookie_size = 1024;
+  constexpr uint32_t max_chunks = 3;
+  // "BearerToken_<index>=" plus the default cookie tail.
+  const size_t chunk_capacity =
+      max_cookie_size - std::string("BearerToken_0=").size() - 1 - TEST_BEARER_COOKIE_TAIL.size();
+  {
+    init(getChunkingConfig(true, true, "", false, "", max_cookie_size, max_chunks));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"}};
+    const auto response =
+        loginForTest(request_headers, std::string(max_chunks * chunk_capacity, 't'));
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_chunks"), "3");
+    for (const std::string& set_cookie : setCookies(response)) {
+      EXPECT_LE(set_cookie.size(), max_cookie_size);
+    }
+  }
+  {
+    init(getChunkingConfig(true, true, "", false, "", max_cookie_size, max_chunks));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"}};
+    startTokenFlowForTest(request_headers);
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false));
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Http::Code::ServiceUnavailable, "Service Unavailable", _, _,
+                               "OAuth token exceeds the cookie chunk limit"));
+    filter_->onGetAccessTokenSuccess(std::string(max_chunks * chunk_capacity + 1, 't'), "", "",
+                                     std::chrono::seconds(600));
+  }
+}
+
+// A refresh that returns an oversized token is refused rather than forwarded upstream.
+TEST_F(OAuth2Test, OversizedTokenIsRefusedOnRefresh) {
+  init(getChunkingConfig(true));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=refresh"}};
+  startTokenFlowForTest(request_headers);
+  filter_->updateTokens(std::string(DefaultMaxTokenCookieChunks * DefaultMaxTokenCookieSize, 't'),
+                        "", "", std::chrono::seconds(600));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable, "Service Unavailable", _, _,
+                             "OAuth token exceeds the cookie chunk limit"));
+  filter_->finishRefreshAccessTokenFlow();
+  EXPECT_EQ(config_->stats().oauth_token_cookie_oversized_.value(), 1);
+}
+
+// Chunks are rejoined and decrypted before the cookies are validated and forwarded, also when
+// token_cookie_chunking is not set, so removing it keeps existing sessions.
+TEST_F(OAuth2Test, ChunkedTokenCookieIsRejoinedAndDecrypted) {
+  init(getChunkingConfig(false, false));
+  const std::string token(6000, 't');
+  const std::string encrypted = encryptTokenForTest(token);
+  const size_t half = encrypted.size() / 2;
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Path.get(), "/resource"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "BearerToken_1=" + encrypted.substr(half)},
+      {Http::Headers::get().Cookie.get(), "BearerToken_0=" + encrypted.substr(0, half)},
+      {Http::Headers::get().Cookie.get(), "BearerToken_chunks=2"},
+      {Http::Headers::get().Cookie.get(), "Other=1"},
+  };
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_THAT(Http::Utility::parseCookies(request_headers),
+              UnorderedElementsAre(Pair("BearerToken", token), Pair("Other", "1")));
+  EXPECT_EQ(config_->stats().oauth_token_cookie_reassembled_.value(), 1);
+}
+
+// A malformed chunk set is dropped and the single cookie, if any, is used instead.
+TEST_F(OAuth2Test, MalformedChunkedTokenCookieFallsBackToSingleCookie) {
+  const std::vector<std::vector<std::string>> malformed_chunk_sets{
+      // A count below 2 is never written.
+      {"BearerToken_chunks=1", "BearerToken_0=chunk"},
+      // A count above the API limit is never written.
+      {"BearerToken_chunks=17", "BearerToken_0=chunk"},
+      {"BearerToken_chunks=two", "BearerToken_0=chunk"},
+      // A counted chunk is missing.
+      {"BearerToken_chunks=2", "BearerToken_0=chunk"},
+      // The chunks are empty.
+      {"BearerToken_chunks=2", "BearerToken_0=", "BearerToken_1="},
+  };
+  for (const auto& chunk_set : malformed_chunk_sets) {
+    init(getChunkingConfig(false));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "a.example.com"},
+        {Http::Headers::get().Path.get(), "/resource"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+        {Http::Headers::get().Cookie.get(), "BearerToken=single"},
+    };
+    for (const std::string& cookie : chunk_set) {
+      request_headers.addCopy(Http::Headers::get().Cookie, cookie);
+    }
+    EXPECT_CALL(*validator_, setParams(_, _));
+    EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+    EXPECT_THAT(Http::Utility::parseCookies(request_headers),
+                UnorderedElementsAre(Pair("BearerToken", "single")));
+  }
+  EXPECT_EQ(config_->stats().oauth_token_cookie_malformed_chunks_.value(),
+            malformed_chunk_sets.size());
+  EXPECT_EQ(config_->stats().oauth_token_cookie_reassembled_.value(), 0);
+}
+
+// Sign out deletes every chunk a token cookie may have, with the domain and Secure attributes the
+// browser needs to accept the deletion.
+TEST_F(OAuth2Test, SignOutDeletesChunkedTokenCookies) {
+  init(getChunkingConfig(false, true, "", true, "__Secure-BearerToken"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "__Secure-BearerToken_0=a"},
+      {Http::Headers::get().Cookie.get(), "__Secure-BearerToken_1=b"},
+      {Http::Headers::get().Cookie.get(), "__Secure-BearerToken_chunks=2"},
+      // A malformed count leaves every chunk index to delete.
+      {Http::Headers::get().Cookie.get(), "IdToken_chunks=malformed"},
+  };
+  std::vector<std::string> set_cookies;
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+      .WillOnce(Invoke([&set_cookies](Http::ResponseHeaderMap& headers, bool) {
+        set_cookies = setCookies(headers);
+      }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  const std::string deleted =
+      "=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;domain=example.com";
+  for (const std::string name : {"__Secure-BearerToken", "__Secure-BearerToken_0",
+                                 "__Secure-BearerToken_1", "__Secure-BearerToken_chunks"}) {
+    EXPECT_THAT(set_cookies, Contains(absl::StrCat(name, deleted, "; Secure")));
+  }
+  EXPECT_THAT(set_cookies, Not(Contains(StartsWith("__Secure-BearerToken_2="))));
+  for (size_t index = 0; index < MaxTokenCookieChunks; ++index) {
+    EXPECT_THAT(set_cookies, Contains(absl::StrCat("IdToken_", index, deleted)));
+  }
+  EXPECT_THAT(set_cookies, Contains(absl::StrCat("IdToken_chunks", deleted)));
+  EXPECT_THAT(set_cookies,
+              Not(Contains(StartsWith(absl::StrCat("IdToken_", MaxTokenCookieChunks)))));
+}
+
+// On refresh, each token cookie replaces the form the client has: stale chunks and a single
+// cookie superseded by chunks are deleted, and a rejoined refresh token is kept as one cookie.
+TEST_F(OAuth2Test, RefreshReplacesTokenCookieForms) {
+  init(getChunkingConfig(true));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_0=a"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_1=b"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_2=c"},
+      {Http::Headers::get().Cookie.get(), "BearerToken_chunks=3"},
+      {Http::Headers::get().Cookie.get(), "IdToken=id"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken_0=refresh"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken_1=-token"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken_chunks=2"},
+  };
+  startTokenFlowForTest(request_headers);
+  // The provider returns no new refresh token, so the client's one is kept.
+  filter_->updateTokens(std::string(5000, 'a'), std::string(5000, 'i'), "",
+                        std::chrono::seconds(600));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  filter_->finishRefreshAccessTokenFlow();
+
+  Http::TestResponseHeaderMapImpl response;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response, false));
+
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_chunks"), "2");
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "BearerToken_2"), "deleted");
+  EXPECT_THAT(setCookies(response), Not(Contains(StartsWith("BearerToken="))));
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "IdToken_chunks"), "2");
+  EXPECT_EQ(Http::Utility::parseSetCookieValue(response, "IdToken"), "deleted");
+  EXPECT_THAT(setCookies(response), Contains(StartsWith("RefreshToken=refresh-token;")));
+  for (const std::string name : {"RefreshToken_0", "RefreshToken_1", "RefreshToken_chunks"}) {
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, name), "deleted");
+  }
+}
+
+// A token the provider no longer returns has every form of its cookie deleted.
+TEST_F(OAuth2Test, MissingTokenDeletesItsChunkedCookies) {
+  init(getChunkingConfig(true));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Cookie.get(), "IdToken=id"},
+      {Http::Headers::get().Cookie.get(), "IdToken_0=a"},
+      {Http::Headers::get().Cookie.get(), "IdToken_1=b"},
+      {Http::Headers::get().Cookie.get(), "IdToken_chunks=2"},
+  };
+
+  const auto response = loginForTest(request_headers, "access", /*id_token=*/"");
+
+  for (const std::string name : {"IdToken", "IdToken_0", "IdToken_1", "IdToken_chunks"}) {
+    EXPECT_EQ(Http::Utility::parseSetCookieValue(response, name), "deleted");
+  }
+}
+
+// Chunked cookies written at login pass HMAC validation when the browser sends them back.
+TEST_F(OAuth2Test, ChunkedTokenCookiesRoundTripThroughValidator) {
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  const FilterConfigSharedPtr config = getChunkingConfig(true, false);
+  const std::string access_token(6000, 'a');
+  initWithRealValidator(config);
+  Http::TestRequestHeaderMapImpl login_headers{{Http::Headers::get().Host.get(), "a.example.com"}};
+  const auto login_response = loginForTest(login_headers, access_token, std::string(6000, 'i'));
+  EXPECT_EQ(config->stats().oauth_token_cookie_chunked_.value(), 2);
+
+  initWithRealValidator(config);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "a.example.com"},
+      {Http::Headers::get().Path.get(), "/resource"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), cookieHeaderFromSetCookies(login_response)},
+  };
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::Utility::parseCookieValue(request_headers, "BearerToken"), access_token);
+  EXPECT_EQ(config->stats().oauth_token_cookie_reassembled_.value(), 2);
 }
 
 } // namespace Oauth2

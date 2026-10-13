@@ -70,6 +70,7 @@ envoy_cc_library(
     hdrs = ["decoded_resource_impl.h"],
     deps = [
         "//envoy/config:subscription_interface",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@xds//xds/core/v3:pkg_cc_proto",
@@ -101,14 +102,17 @@ envoy_cc_library(
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/registry",
         "//envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/shared_pool:shared_pool_lib",
+        "@abseil-cpp//absl/status:statusor",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
     ],
@@ -119,6 +123,7 @@ envoy_cc_library(
     hdrs = ["opaque_resource_decoder_impl.h"],
     deps = [
         "//envoy/config:subscription_interface",
+        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -276,6 +281,7 @@ envoy_cc_library(
         "//envoy/config:custom_config_validators_interface",
         "//envoy/server:instance_interface",
         "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

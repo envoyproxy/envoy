@@ -178,8 +178,8 @@ void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
                      handoff = config_->handOffRestoredDestinationConnections()]() {
     auto balanced_handler = tcp_conn_handler.getBalancedHandlerByTag(tag, *address);
     if (balanced_handler.has_value()) {
-      balanced_handler->get().onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true,
-                                             address->networkNamespace());
+      balanced_handler->onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true,
+                                       address->networkNamespace());
       return;
     }
   });

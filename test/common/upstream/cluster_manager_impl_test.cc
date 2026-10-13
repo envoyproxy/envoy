@@ -105,7 +105,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterAlpn) {
   create(parseBootstrapFromV3Yaml(yaml));
 }
 
-TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
+TEST_F(ClusterManagerImplTest, MultipleHealthCheckSuccess) {
   const std::string yaml = R"EOF(
  static_resources:
   clusters:
@@ -114,16 +114,48 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
     health_checks:
       - timeout: 1s
         interval: 1s
+        unhealthy_threshold: 1
+        healthy_threshold: 1
+        name: first
         http_health_check:
           path: "/blah"
       - timeout: 1s
         interval: 1s
+        unhealthy_threshold: 1
+        healthy_threshold: 1
+        name: second
+        http_health_check:
+          path: "/"
+  )EOF";
+
+  create(parseBootstrapFromV3Yaml(yaml));
+}
+
+TEST_F(ClusterManagerImplTest, MultipleHealthCheckMissingName) {
+  const std::string yaml = R"EOF(
+ static_resources:
+  clusters:
+  - name: service_google
+    connect_timeout: 0.25s
+    health_checks:
+      - timeout: 1s
+        interval: 1s
+        name: this one has a name but the other does not
+        unhealthy_threshold: 1
+        healthy_threshold: 1
+        http_health_check:
+          path: "/blah"
+      - timeout: 1s
+        interval: 1s
+        unhealthy_threshold: 1
+        healthy_threshold: 1
         http_health_check:
           path: "/"
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-                            "Multiple health checks not supported");
+                            "health check at index 1 is missing a name; all health checks "
+                            "must have a name when multiple health checks are configured");
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
@@ -697,7 +729,7 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   create(parseBootstrapFromV3Yaml(yaml));
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, std::nullopt);
-  EXPECT_TRUE(cluster->get().info()->loadBalancerConfig().has_value());
+  EXPECT_TRUE(cluster->info()->loadBalancerConfig().has_value());
 }
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {

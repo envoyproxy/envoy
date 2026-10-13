@@ -1235,6 +1235,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                                    {"x-envoy-upstream-alt-stat-name", "foo"},
                                    {"x-envoy-upstream-rq-timeout-alt-response", "204"},
                                    {"x-envoy-upstream-rq-timeout-ms", "foo"},
+                                   {"x-envoy-upstream-stream-duration-ms", "1"},
                                    {"x-envoy-expected-rq-timeout-ms", "10"},
                                    {"x-envoy-ip-tags", "bar"},
                                    {"x-envoy-original-url", "my_url"},
@@ -1255,6 +1256,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-upstream-alt-stat-name"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-alt-response"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+  EXPECT_FALSE(headers.has("x-envoy-upstream-stream-duration-ms"));
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
   EXPECT_FALSE(headers.has("x-envoy-original-url"));
@@ -1280,6 +1282,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
                                    {"x-envoy-upstream-alt-stat-name", "foo"},
                                    {"x-envoy-upstream-rq-timeout-alt-response", "204"},
                                    {"x-envoy-upstream-rq-timeout-ms", "foo"},
+                                   {"x-envoy-upstream-stream-duration-ms", "1"},
                                    {"x-envoy-expected-rq-timeout-ms", "10"},
                                    {"x-envoy-ip-tags", "bar"},
                                    {"x-envoy-original-url", "my_url"},
@@ -1303,10 +1306,39 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
   EXPECT_FALSE(headers.has("x-envoy-upstream-alt-stat-name"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-alt-response"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+  EXPECT_FALSE(headers.has("x-envoy-upstream-stream-duration-ms"));
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
   EXPECT_FALSE(headers.has("x-envoy-original-url"));
   EXPECT_FALSE(headers.has("custom_header"));
+}
+
+// x-envoy-upstream-stream-duration-ms is preserved for external requests when the runtime guard is
+// disabled.
+TEST_F(ConnectionManagerUtilityTest, ExternalRequestUpstreamStreamDurationRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.sanitize_upstream_stream_duration_header", "false"}});
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1"));
+  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
+  TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-duration-ms", "1"}};
+
+  EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("1", headers.get_("x-envoy-upstream-stream-duration-ms"));
+}
+
+// x-envoy-upstream-stream-duration-ms is preserved for internal requests.
+TEST_F(ConnectionManagerUtilityTest, InternalRequestPreservesUpstreamStreamDuration) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-duration-ms", "1"}};
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("1", headers.get_("x-envoy-upstream-stream-duration-ms"));
 }
 
 // Verify that if XFF is invalid we fall back to remote address, even if it is a pipe.
@@ -1699,6 +1731,35 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
       headers.get_("x-forwarded-client-cert"));
 }
 
+// Verify the Issuer of the client cert is forwarded in the XFCC header when requested.
+TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertWithIssuer) {
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  std::string peer_subject("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com");
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
+  std::string peer_issuer("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test CA");
+  EXPECT_CALL(*ssl, issuerPeerCertificate()).WillOnce(ReturnRef(peer_issuer));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  std::vector<Http::ClientCertDetailsType> details = {Http::ClientCertDetailsType::Subject,
+                                                      Http::ClientCertDetailsType::Issuer};
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+  TestRequestHeaderMapImpl headers;
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
+  EXPECT_EQ("By=test://foo.com/be;Hash=abcdefg;Subject=\"/C=US/ST=CA/L=San "
+            "Francisco/OU=Lyft/CN=test.lyft.com\";Issuer=\"/C=US/ST=CA/L=San "
+            "Francisco/OU=Lyft/CN=Test CA\"",
+            headers.get_("x-forwarded-client-cert"));
+}
+
 // This test assumes the following scenario:
 // The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
@@ -1947,6 +2008,35 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonFormat) {
   EXPECT_EQ(R"([{"by":["test://foo.com/be","http://backend.foo.com"],"hash":"abcdefg",)"
             R"("subject":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com",)"
             R"("uri":["test://foo.com/fe","http://frontend.foo.com"],"dns":["www.example.com"]}])",
+            headers.get_("x-forwarded-client-cert"));
+}
+
+// JSON format: the Issuer of the client cert is forwarded as the "issuer" field.
+TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertJsonFormatWithIssuer) {
+  auto ssl = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl, peerCertificatePresented()).WillByDefault(Return(true));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
+  std::string expected_sha("abcdefg");
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
+  std::string peer_subject("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com");
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(ReturnRef(peer_subject));
+  std::string peer_issuer("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test CA");
+  EXPECT_CALL(*ssl, issuerPeerCertificate()).WillOnce(ReturnRef(peer_issuer));
+  ON_CALL(connection_, ssl()).WillByDefault(Return(ssl));
+  ON_CALL(config_, forwardClientCert())
+      .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
+  ON_CALL(config_, clientCertFormat()).WillByDefault(Return(Http::ClientCertFormat::Json));
+  std::vector<Http::ClientCertDetailsType> details = {Http::ClientCertDetailsType::Subject,
+                                                      Http::ClientCertDetailsType::Issuer};
+  ON_CALL(config_, setCurrentClientCertDetails()).WillByDefault(ReturnRef(details));
+  TestRequestHeaderMapImpl headers;
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(R"([{"by":["test://foo.com/be"],"hash":"abcdefg",)"
+            R"("subject":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com",)"
+            R"("issuer":"/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test CA"}])",
             headers.get_("x-forwarded-client-cert"));
 }
 
@@ -2628,6 +2718,50 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDotsDecoded) {
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.getPathValue(), "/abc");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePathWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/..;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/abc");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizeDotSegmentsWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/.;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/abc");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizeDotAndDotDotSegmentsWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath(
+      "/.;aa=bb/..;/xyz/.;foo=bar/abc/.;fff,bbb/remove;me=yes/.;skip/..;try=again/lastone;true/.;");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/abc/lastone;true/");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePathWithParametersDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_dotdot_segments_with_parameters", "false"}});
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/..;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/..;foo=bar/abc");
 }
 
 // Verify that %25 is NOT decoded as the % character per

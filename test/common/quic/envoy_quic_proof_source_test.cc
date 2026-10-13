@@ -222,6 +222,7 @@ public:
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
         std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
     EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
+    EXPECT_CALL(tls_cert_config_, tlsParams()).WillRepeatedly(Return(nullptr));
     EXPECT_CALL(tls_cert_config_, pkcs12()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, certificateChainPath()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(tls_cert_config_, certificateName()).WillRepeatedly(ReturnRef(EMPTY_STRING));
@@ -258,7 +259,7 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  Server::Configuration::MockServerFactoryContext factory_context_;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{factory_context_};
   Ssl::MockServerContextConfig* mock_context_config_;
   std::function<absl::Status()> secret_update_callback_;

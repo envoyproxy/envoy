@@ -989,6 +989,28 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   quic_session_.OnDatagramReceived(datagram_fragment_);
 }
 
+TEST_F(EnvoyQuicServerStreamTest, DropDatagramAfterStreamRecreation) {
+  auto valid_indicator = std::make_shared<bool>(true);
+  std::weak_ptr<bool> weak_ind = valid_indicator;
+
+  EXPECT_CALL(stream_decoder_, getRequestDecoderHandle()).WillRepeatedly(Invoke([weak_ind, this]() {
+    auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+    ON_CALL(*handle, get()).WillByDefault(Invoke([weak_ind, this]() {
+      if (weak_ind.expired())
+        return OptRef<Http::RequestDecoder>();
+      return OptRef<Http::RequestDecoder>(stream_decoder_);
+    }));
+    return handle;
+  }));
+
+  setUpCapsuleProtocol(true, false);
+
+  valid_indicator.reset();
+
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
+}
+
 // A WebTransport CONNECT stream is header-only at the HTTP layer; trailers/METADATA/body are not
 // part of WebTransport. EnvoyQuicServerStream::resetIfWebTransport() resets such a stream so the
 // offending frame is never proxied upstream. (Body never reaches OnBodyAvailable because QUICHE
@@ -1182,6 +1204,32 @@ TEST_F(EnvoyQuicServerStreamTest, InconsistentContentLengthHeadersOnlyDisabled) 
 
   // Fully close the stream by sending response headers with FIN
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, OnCloseDoesNotUnderflowBytesToSendWithUnreportedBufferedBytes) {
+  // make WritevData consume nothing so bytes stay buffered in the QUIC send buffer.
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .WillRepeatedly(Invoke(
+          [](quic::QuicStreamId, size_t, quic::QuicStreamOffset, quic::StreamSendingState, bool,
+             std::optional<quic::EncryptionLevel>) { return quic::QuicConsumedData{0, false}; }));
+
+  // simulate QUICHE writing bytes directly to the stream send buffer without going through
+  // ScopedWatermarkBufferUpdater.
+  std::string fake_settings_payload(41, '\0');
+  quic_stream_->WriteOrBufferData(fake_settings_payload, false, nullptr);
+  EXPECT_EQ(41u, quic_stream_->BufferedDataBytes());
+  EXPECT_EQ(0u, quic_session_.bytesToSend());
+
+  // deliver a request with FIN so that OnClose() is triggered on encodeHeaders end_stream=true.
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+
+  EXPECT_LOG_NOT_CONTAINS("error", "Underflowed",
+                          quic_stream_->encodeHeaders(response_headers_, true));
+
+  // confirm no underflow: headers buffered bytes_to_send_ is positive not wrapped to near
+  // UINT64_MAX.
+  EXPECT_GT(quic_session_.bytesToSend(), 0u);
+  EXPECT_LT(quic_session_.bytesToSend(), 1000u);
 }
 
 } // namespace Quic

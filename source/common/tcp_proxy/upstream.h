@@ -181,7 +181,8 @@ private:
 class TcpUpstream : public GenericUpstream {
 public:
   TcpUpstream(Tcp::ConnectionPool::ConnectionDataPtr&& data,
-              Tcp::ConnectionPool::UpstreamCallbacks& callbacks);
+              Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+              StreamInfo::StreamInfo& downstream_info);
 
   // GenericUpstream
   bool readDisable(bool disable) override;
@@ -196,6 +197,7 @@ public:
 
 private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  StreamInfo::StreamInfo& downstream_info_;
 };
 
 class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {

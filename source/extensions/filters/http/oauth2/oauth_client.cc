@@ -107,7 +107,8 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 
   request->body().add(body);
   request->headers().setContentLength(body.length());
-  ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for access token.", *decoder_callbacks_);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Dispatching OAuth request for access token.");
   dispatchRequest(std::move(request));
 }
 
@@ -134,8 +135,9 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
     const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
     request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
                                   basic_auth_header_value);
-    body = fmt::format(UrlBodyTemplateWithoutCredentialsForRefreshToken,
-                       Http::Utility::PercentEncoding::encode(refresh_token));
+    body = fmt::format(
+        UrlBodyTemplateWithoutCredentialsForRefreshToken,
+        Http::Utility::PercentEncoding::encode(refresh_token, WwwFormUrlEncodedReservedCharacters));
     break;
   }
   case AuthType::TlsClientAuth:
@@ -158,8 +160,8 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
 
   request->body().add(body);
   request->headers().setContentLength(body.length());
-  ENVOY_STREAM_LOG(debug, "Dispatching OAuth request for update access token by refresh token.",
-                   *decoder_callbacks_);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "Dispatching OAuth request for update access token by refresh token.");
   dispatchRequest(std::move(request));
 }
 
@@ -235,17 +237,19 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   state_ = OAuthState::Idle;
 
   // Check that the auth cluster returned a happy response.
-  const auto response_code = message->headers().Status()->value().getStringView();
+  const absl::string_view response_code = message->headers().getStatusValue();
 
   if (response_code != "200") {
-    ENVOY_STREAM_LOG(debug, "Oauth response code: {}", *decoder_callbacks_, response_code);
-    ENVOY_STREAM_LOG(debug, "Oauth response body: {}", *decoder_callbacks_,
-                     message->bodyAsString());
+    const std::string response_body = message->bodyAsString();
+    ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "Oauth response code: {}", response_code);
+    ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                            "Oauth response body: {}", response_body);
     switch (oldState) {
     case OAuthState::PendingAccessToken:
-      handleOAuthFailure(is_request_dispatched, "Failed to get access token",
-                         fmt::format("response code: {}, response body: {}", response_code,
-                                     message->bodyAsString()));
+      handleOAuthFailure(
+          is_request_dispatched, "Failed to get access token",
+          fmt::format("response code: {}, response body: {}", response_code, response_body));
       break;
     case OAuthState::PendingAccessTokenByRefreshToken:
       handleRefreshTokenFailure(is_request_dispatched);
@@ -317,7 +321,8 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
     return;
   }
 
-  ENVOY_STREAM_LOG(debug, "OAuth request failed.", *decoder_callbacks_);
+  ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                          "OAuth request failed.");
   const OAuthState oldState = state_;
   state_ = OAuthState::Idle;
 

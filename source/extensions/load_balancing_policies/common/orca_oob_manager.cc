@@ -13,6 +13,7 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/upstream/host_utility.h"
 
 #include "xds/service/orca/v3/orca.pb.h"
 
@@ -71,19 +72,18 @@ void applyOrcaOobConnectionOverrides(
 OrcaOobManager::OrcaOobManager(OrcaOobManagerConfig config,
                                const Upstream::PrioritySet& priority_set,
                                Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                               Stats::Scope& stats_scope,
-                               OrcaLoadReportHandlerSharedPtr report_handler)
+                               Stats::Scope& stats_scope)
     : dispatcher_(dispatcher), random_(random), config_(sanitizeConfig(std::move(config))),
-      priority_set_(priority_set), report_handler_(std::move(report_handler)),
-      oob_stats_(generateOrcaOobStats(stats_scope)) {}
+      priority_set_(priority_set), oob_stats_(generateOrcaOobStats(stats_scope)) {}
 
 OrcaOobManager::~OrcaOobManager() {
+  const size_t session_count = oob_sessions_.size();
   for (auto& [host, session] : oob_sessions_) {
     session->disarm();
     dispatcher_.deferredDelete(std::move(session));
   }
   oob_sessions_.clear();
-  oob_stats_.active_sessions_.set(0);
+  oob_stats_.active_sessions_.sub(session_count);
 }
 
 absl::Status OrcaOobManager::initialize() {
@@ -116,8 +116,8 @@ void OrcaOobManager::onHostsAdded(const Upstream::HostVector& hosts) {
     const std::chrono::milliseconds initial_delay(random_.random() % period_ms);
     it->second = std::make_unique<OobSession>(*this, host, initial_delay);
   }
-  if (oob_sessions_.size() != prior_size) {
-    oob_stats_.active_sessions_.set(oob_sessions_.size());
+  if (oob_sessions_.size() > prior_size) {
+    oob_stats_.active_sessions_.add(oob_sessions_.size() - prior_size);
   }
 }
 
@@ -132,8 +132,8 @@ void OrcaOobManager::onHostsRemoved(const Upstream::HostVector& hosts) {
     dispatcher_.deferredDelete(std::move(it->second));
     oob_sessions_.erase(it);
   }
-  if (oob_sessions_.size() != prior_size) {
-    oob_stats_.active_sessions_.set(oob_sessions_.size());
+  if (oob_sessions_.size() < prior_size) {
+    oob_stats_.active_sessions_.sub(prior_size - oob_sessions_.size());
   }
 }
 
@@ -142,7 +142,7 @@ void OrcaOobManager::onSessionTerminated(OobSession* session) {
   ASSERT(it != oob_sessions_.end() && it->second.get() == session);
   dispatcher_.deferredDelete(std::move(it->second));
   oob_sessions_.erase(it);
-  oob_stats_.active_sessions_.set(oob_sessions_.size());
+  oob_stats_.active_sessions_.dec();
 }
 
 OrcaOobManager::OobSession::OobSession(OrcaOobManager& parent, Upstream::HostConstSharedPtr host,
@@ -385,14 +385,22 @@ void OrcaOobManager::OobSession::onReport(const xds::data::orca::v3::OrcaLoadRep
   parent_.oob_stats_.reports_received_.inc();
   backoff_->reset();
   inactivity_timer_->enableTimer(parent_.config_.reporting_period * kInactivityWatchdogMultiplier);
-  auto data_opt = host_->typedLbPolicyData<OrcaHostLbPolicyData>();
-  if (!data_opt.has_value()) {
-    parent_.oob_stats_.report_errors_.inc();
-    return;
-  }
-  const absl::Status status =
-      parent_.report_handler_->updateClientSideDataFromOrcaLoadReport(report, *data_opt);
-  if (!status.ok()) {
+  // Deliver to every ORCA-interested HostLbPolicyData (empty stream_info; OOB has no downstream
+  // stream). No recipient, or any recipient rejecting, counts as a report error.
+  bool had_recipient = false;
+  bool apply_failed = false;
+  Upstream::HostUtility::forEachOrcaLoadReportRecipient(
+      *host_, [&](Upstream::HostLbPolicyData& data) {
+        had_recipient = true;
+        const absl::Status status = data.onOrcaLoadReport(report, std::nullopt);
+        if (!status.ok()) {
+          apply_failed = true;
+          ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                             "OOB onOrcaLoadReport failed: {} for host {}", status.message(),
+                             host_->address()->asString());
+        }
+      });
+  if (!had_recipient || apply_failed) {
     parent_.oob_stats_.report_errors_.inc();
   }
 }

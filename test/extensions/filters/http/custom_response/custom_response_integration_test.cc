@@ -83,7 +83,15 @@ constexpr absl::string_view kAcceptJsonRedirectConfig = R"EOF(
 
 class CustomResponseIntegrationTest : public HttpProtocolIntegrationTest {
 public:
+  // The stat names asserted below must be the same whether or not the HTTP filters are created
+  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
+  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
   void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
 
@@ -361,6 +369,41 @@ json_format:
   EXPECT_EQ(
       "x-bar",
       response->headers().get(::Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
+}
+
+// Verify that a local response policy can format the body of an existing local reply.
+TEST_P(CustomResponseIntegrationTest, ExistingLocalReplyBodyWithFormatter) {
+  custom_response_filter_config_ = TestUtility::parseYaml<CustomResponse>(R"EOF(
+custom_response_matcher:
+  matcher_list:
+    matchers:
+    - predicate:
+        single_predicate:
+          input:
+            name: local_reply
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseLocalReplyMatchInput
+          value_match:
+            exact: "true"
+      on_match:
+        action:
+          name: action
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+            body_format:
+              text_format_source:
+                inline_string: "formatted: %LOCAL_REPLY_BODY%"
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("default.host");
+  default_request_headers_.setPath("/default");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("201", response->headers().getStatusValue());
+  EXPECT_EQ("formatted: Response body", response->body());
 }
 
 // Verify we get the correct custom response using the redirect policy.
@@ -1011,10 +1054,9 @@ TEST_P(CustomResponseIntegrationTest, LocalReplyMatcherIgnoresUpstreamResponse) 
   EXPECT_TRUE(response->headers().get(::Envoy::Http::LowerCaseString("x-local-reply")).empty());
 }
 
-// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, CustomResponseIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace CustomResponse
 } // namespace HttpFilters

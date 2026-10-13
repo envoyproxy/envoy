@@ -64,7 +64,7 @@ public:
   NetworkConfigurationFilterTest()
       : connectivity_manager_(std::make_shared<NiceMock<MockConnectivityManager>>()),
         proxy_settings_(std::make_shared<Network::ProxySettings>("127.0.0.1", 82)),
-        filter_(connectivity_manager_, false, false) {
+        filter_(connectivity_manager_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, getRequestHeaders())
         .WillByDefault(Return(&default_request_headers_));

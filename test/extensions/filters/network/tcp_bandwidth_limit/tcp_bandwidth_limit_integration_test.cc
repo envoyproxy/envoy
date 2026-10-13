@@ -1,4 +1,5 @@
 #include "test/integration/integration.h"
+#include "test/test_common/simulated_time_system.h"
 
 using testing::Eq;
 using testing::Ge;

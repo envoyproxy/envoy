@@ -121,9 +121,9 @@ public:
         Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
     mock_local_client_ = new MockRateLimitClient();
-    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
-                                                     absl::WrapUnique(mock_local_client_),
-                                                     config_with_hash_key, match_tree_);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(
+        filter_config_, context_.serverFactoryContext(), context_.messageValidationVisitor(),
+        absl::WrapUnique(mock_local_client_), config_with_hash_key, match_tree_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -164,7 +164,8 @@ public:
 
     RateLimitQuotaValidationVisitor visitor = {};
     // Generate the bucket ids.
-    auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
+    auto ret = match_action->generateBucketId(filter_->matchingData(),
+                                              context_.messageValidationVisitor(), visitor);
     // Asserts that the bucket id generation succeeded and then retrieve the
     // bucket ids.
     ASSERT_OK(ret);
@@ -287,7 +288,8 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
 
   RateLimitQuotaValidationVisitor visitor = {};
   // Generate the bucket ids.
-  auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
+  auto ret = match_action->generateBucketId(filter_->matchingData(),
+                                            context_.messageValidationVisitor(), visitor);
   // Bucket id generation is expected to fail, which is due to no support for
   // dynamic id generation (i.e., via custom_value with for on_no_match case.
   EXPECT_THAT(ret, HasStatusMessage("Failed to generate the id from custom value config."));
@@ -984,9 +986,9 @@ bucket_matchers:
       Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
   mock_local_client_ = new MockRateLimitClient();
-  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
-                                                   absl::WrapUnique(mock_local_client_),
-                                                   config_with_hash_key, match_tree_);
+  filter_ = std::make_unique<RateLimitQuotaFilter>(
+      filter_config_, context_.serverFactoryContext(), context_.messageValidationVisitor(),
+      absl::WrapUnique(mock_local_client_), config_with_hash_key, match_tree_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
   // Build headers that match the config
@@ -1159,9 +1161,9 @@ matcher_list:
       Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
   mock_local_client_ = new MockRateLimitClient();
-  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
-                                                   absl::WrapUnique(mock_local_client_),
-                                                   config_with_hash_key, match_tree_);
+  filter_ = std::make_unique<RateLimitQuotaFilter>(
+      filter_config_, context_.serverFactoryContext(), context_.messageValidationVisitor(),
+      absl::WrapUnique(mock_local_client_), config_with_hash_key, match_tree_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
   // Build headers that match the config

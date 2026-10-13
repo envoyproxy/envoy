@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         "//envoy/formatter:substitution_formatter_interface",
         "//source/common/common:assert_lib",
+        "//source/common/formatter:serializer_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:abi_impl",

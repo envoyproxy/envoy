@@ -4,6 +4,7 @@ set -euo pipefail
 
 uncomment.sh "$1" --comment \
   --uncomment-regex '#include' \
+  --comment-regex '#include "\.\./mem_internal\.h"' \
   --uncomment-func-impl CBB_zero \
   --uncomment-func-impl cbb_init \
   --uncomment-func-impl CBB_init \
@@ -17,6 +18,8 @@ uncomment.sh "$1" --comment \
   --uncomment-func-impl CBB_len \
   --uncomment-static-func-impl cbb_add_child \
   --uncomment-func-impl add_base128_integer \
+  --uncomment-func-impl cbb_add_decimal_ascii \
+  --sed 's/^int bssl::cbb_add_decimal_ascii(/namespace bssl {\nint cbb_add_decimal_ascii(CBB *out, uint64_t v);\n}\n\n&/' \
   --uncomment-func-impl CBB_add_asn1 \
   --uncomment-func-impl CBB_add_bytes \
   --uncomment-func-impl CBB_add_space \

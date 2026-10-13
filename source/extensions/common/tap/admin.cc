@@ -91,7 +91,7 @@ Http::Code AdminHandler::badRequest(Buffer::Instance& response, absl::string_vie
 
 void AdminHandler::registerConfig(ExtensionConfig& config, const std::string& config_id) {
   ASSERT(!config_id.empty());
-  ASSERT(config_id_map_[config_id].count(&config) == 0);
+  ASSERT(!config_id_map_[config_id].contains(&config));
   config_id_map_[config_id].insert(&config);
   if (attached_request_ != nullptr && attached_request_->id() == config_id) {
     config.newTapConfig(attached_request_->config(), this);

@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:subscription_interface",
         "//envoy/filter:config_provider_manager_interface",
+        "//envoy/server:filter_config_interface",
         "//envoy/singleton:instance_interface",
         "//envoy/stats:stats_macros",
         "//envoy/thread_local:thread_local_interface",
@@ -26,6 +27,7 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

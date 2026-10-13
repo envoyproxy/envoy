@@ -1,3 +1,5 @@
+#include <format>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/compression/zstd/decompressor/zstd_decompressor_impl.h"
@@ -84,7 +86,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(QatzstdConfigTest, LoadConfigAndVerifyWithDecompressor) {
   std::tuple<int, int, bool, int> config_value_tuple = GetParam();
-  std::string json{fmt::format(R"EOF({{
+  std::string json{std::format(R"EOF({{
   "compression_level": {},
   "chunk_size": {},
   "enable_qat_zstd": {},

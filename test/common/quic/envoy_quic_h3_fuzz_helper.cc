@@ -83,7 +83,7 @@ std::string H3Serializer::serialize(bool unidirectional, uint32_t type, uint32_t
   char buffer[kMaxPacketSize];
   quiche::QuicheDataWriter dw(kMaxPacketSize, buffer);
   if (unidirectional) {
-    if (open_unidirectional_streams_.find(id) == open_unidirectional_streams_.end()) {
+    if (!open_unidirectional_streams_.contains(id)) {
       dw.WriteVarInt62(static_cast<uint64_t>(type));
       open_unidirectional_streams_.insert(id);
     }

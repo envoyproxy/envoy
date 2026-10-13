@@ -215,6 +215,8 @@ public:
                const std::string& hash = {}, bool expect_alpn = true);
   void testJA4(const std::string& expected_ja4, const std::string& sni = "",
                const std::string& alpn = "");
+  void testJA4(testing::Matcher<absl::string_view> expected_ja4_matcher,
+               const std::string& sni = "", const std::string& alpn = "");
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
@@ -737,6 +739,11 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
 
 void TlsInspectorTest::testJA4(const std::string& expected_ja4, const std::string& sni,
                                const std::string& alpn) {
+  testJA4(testing::Matcher<absl::string_view>(expected_ja4), sni, alpn);
+}
+
+void TlsInspectorTest::testJA4(testing::Matcher<absl::string_view> expected_ja4_matcher,
+                               const std::string& sni, const std::string& alpn) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
@@ -747,7 +754,7 @@ void TlsInspectorTest::testJA4(const std::string& expected_ja4, const std::strin
   init();
   mockSysCallForPeek(client_hello);
 
-  EXPECT_CALL(socket_, setJA4Hash(absl::string_view(expected_ja4)));
+  EXPECT_CALL(socket_, setJA4Hash(expected_ja4_matcher));
 
   if (!sni.empty()) {
     EXPECT_CALL(socket_, setRequestedServerName(absl::string_view(sni)));
@@ -859,11 +866,15 @@ TEST_P(TlsInspectorTest, JA4WithSNIAndALPN) {
   const uint16_t min_version = std::get<0>(GetParam());
   const uint16_t max_version = std::get<1>(GetParam());
 
-  std::string expected_value = (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
-                                max_version == Config::TLS_MAX_SUPPORTED_VERSION)
-                                   ? SSL_SELECT("t13d1312h2_f57a46bbacb6_ef7df7f74e48",
-                                                "t13d5511h2_54f589121d70_3cecfd2c111c")
-                                   : alpn_sni_test_version_to_ja4_.at(min_version);
+  testing::Matcher<absl::string_view> expected_value =
+      (min_version == Config::TLS_MIN_SUPPORTED_VERSION &&
+       max_version == Config::TLS_MAX_SUPPORTED_VERSION)
+          ? SSL_SELECT(testing::Matcher<absl::string_view>(
+                           testing::AnyOf(testing::Eq("t13d1312h2_f57a46bbacb6_ef7df7f74e48"),
+                                          testing::Eq("t13d1311h2_f57a46bbacb6_78e6aca7449b"))),
+                       testing::Matcher<absl::string_view>(
+                           testing::Eq("t13d5511h2_54f589121d70_3cecfd2c111c")))
+          : alpn_sni_test_version_to_ja4_.at(min_version);
 
   testJA4(expected_value, "example.com", "\x02h2\x08http/1.1");
 }

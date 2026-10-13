@@ -6,6 +6,7 @@
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_integration.h"
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -16,6 +17,7 @@ namespace Aws {
 namespace {
 
 using testing::Ge;
+using testing::NiceMock;
 using testing::Return;
 
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4 = R"EOF(

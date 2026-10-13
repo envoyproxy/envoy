@@ -146,8 +146,14 @@ inline DetachedHandle startRoot(RootTask root, std::shared_ptr<Executor> exec, S
 /**
  * Start `task` on `exec` from non-coroutine code. `on_done` is invoked with the
  * task's result when the chain completes (including after a cancellation, which
- * delivers an aborted result). Returns a `DetachedHandle` that owns the frame and
- * can `cancel()` it.
+ * delivers an aborted result). Returns a `DetachedHandle` that can `cancel()` it.
+ *
+ * NOTE: The launched root coroutine is self-owning and manages its own lifetime.
+ * Callers and tasks must be careful when capturing raw pointers, references, or
+ * member methods (`this`): if the object owning those resources is destroyed while
+ * the coroutine is suspended (or before `on_done` runs), accessing them will cause a
+ * use-after-free. Use `std::weak_ptr` / `std::shared_ptr` or ensure strict lifecycle
+ * synchronization via `DetachedHandle::cancel()`.
  *
  * `exec` is taken as a `shared_ptr` so the coroutine context can keep it alive.
  * TODO(penguingao): revert to `Executor&` once the executor is guaranteed to

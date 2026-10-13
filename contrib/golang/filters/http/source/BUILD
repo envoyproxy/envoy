@@ -67,6 +67,7 @@ envoy_cc_contrib_extension(
         "//envoy/server:filter_config_interface",
         "//envoy/server:lifecycle_notifier_interface",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg_cc_proto",
     ],
 )

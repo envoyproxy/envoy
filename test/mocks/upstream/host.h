@@ -77,6 +77,19 @@ public:
   MOCK_METHOD(void, setUnhealthy, (UnhealthyType));
 };
 
+class MockHostLbPolicyData : public HostLbPolicyData {
+public:
+  explicit MockHostLbPolicyData(bool receives_orca_load_report = true);
+  ~MockHostLbPolicyData() override;
+
+  bool receivesOrcaLoadReport() const override { return receives_orca_load_report_; }
+  MOCK_METHOD(absl::Status, onOrcaLoadReport,
+              (const OrcaLoadReport& report, OptRef<const StreamInfo::StreamInfo> stream_info),
+              (override));
+
+  const bool receives_orca_load_report_;
+};
+
 class MockHostDescription : public HostDescription {
 public:
   MockHostDescription();

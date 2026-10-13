@@ -9,6 +9,7 @@ HTTP filters
   a2a_filter
   adaptive_concurrency_filter
   admission_control_filter
+  aws_eventstream_parser_filter
   ai_protocol_manager_filter
   aws_lambda_filter
   api_key_auth_filter
@@ -21,6 +22,7 @@ HTTP filters
   cache_v2_filter
   cdn_loop_filter
   checksum_filter
+  client_cert_filter
   compressor_filter
   composite_filter
   connect_grpc_bridge_filter
@@ -71,6 +73,7 @@ HTTP filters
   router_filter
   set_filter_state
   set_metadata_filter
+  body_size_limit_filter
   sse_to_metadata_filter
   stateful_session_filter
   sxg_filter

@@ -14,6 +14,8 @@ namespace Hyperscan {
 
 class EngineTest : public ::testing::Test {
 protected:
+  EngineTest() { instance_.registerThread(dispatcher_, true); }
+
   void setup() { engine_ = std::make_shared<HyperscanEngine>(dispatcher_, instance_); }
 
   void TearDown() override {
@@ -21,7 +23,7 @@ protected:
     ::testing::Test::TearDown();
   }
 
-  Event::MockDispatcher dispatcher_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   ThreadLocal::InstanceImpl instance_;
   std::shared_ptr<HyperscanEngine> engine_;
 };

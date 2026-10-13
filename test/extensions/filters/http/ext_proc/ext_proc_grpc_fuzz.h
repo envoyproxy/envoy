@@ -1,4 +1,6 @@
 #pragma once
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
 
 // TODO(ikepolinsky): Major action items to improve this fuzzer
 // 1. Move external process from separate thread to have test all in one thread

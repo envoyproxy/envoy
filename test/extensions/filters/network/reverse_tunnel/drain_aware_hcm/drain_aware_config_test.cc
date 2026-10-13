@@ -280,7 +280,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
   auto tunnel_handle =
       std::make_unique<Bootstrap::ReverseConnection::DownstreamReverseConnectionIOHandle>(
           std::make_unique<NiceMock<Network::MockConnectionSocket>>(), parent.get(),
-          "10.0.0.1:5000");
+          "10.0.0.1:5000", /*connection_id=*/0);
   auto outer_mock = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
   ON_CALL(*outer_mock, ioHandle()).WillByDefault(ReturnRef(*tunnel_handle));
   ON_CALL(testing::Const(*outer_mock), ioHandle()).WillByDefault(ReturnRef(*tunnel_handle));

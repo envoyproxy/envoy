@@ -53,7 +53,8 @@ LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_
   const std::vector<std::string> paused_xds_types{
       Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
       Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
-      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>(),
+      Config::getTypeUrl<envoy::config::listener::v3::FilterChain>()};
   Config::ScopedResume resume_rds_sds = xds_manager_.pause(paused_xds_types);
 
   bool any_applied = false;

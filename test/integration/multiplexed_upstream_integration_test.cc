@@ -5,6 +5,11 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/http/header_map_impl.h"
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
+
+#include "quiche/quic/core/tls_server_handshaker.h"
+#endif
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_protocol_integration.h"

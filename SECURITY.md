@@ -486,3 +486,4 @@ and security team to ensure they still qualify for inclusion on the list.
 | Spotify       | Yes      | 02/21       |
 | Netflix       | Yes      | 07/24       |
 | Slack         | Yes      | 07/24       |
+| Datadog       | Yes      | 07/26       |

@@ -31,6 +31,14 @@ void MockConnectionBase::raiseEvent(Network::ConnectionEvent event) {
   }
 }
 
+void MockConnectionBase::raiseConnectionDrain(Network::ConnectionDrainEvent event) {
+  for (Network::ConnectionCallbacks* callbacks : callbacks_) {
+    if (callbacks) {
+      callbacks->onDrain(event);
+    }
+  }
+}
+
 void MockConnectionBase::raiseBytesSentCallbacks(uint64_t num_bytes) {
   for (Network::Connection::BytesSentCb& cb : bytes_sent_callbacks_) {
     cb(num_bytes);

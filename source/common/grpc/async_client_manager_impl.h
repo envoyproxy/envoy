@@ -90,7 +90,7 @@ public:
 
 private:
   Server::Configuration::CommonFactoryContext& context_;
-  ThreadLocal::SlotPtr google_tls_slot_;
+  ThreadLocal::SlotSharedPtr google_tls_slot_;
   const StatNames& stat_names_;
   ThreadLocal::TypedSlot<RawAsyncClientCache> raw_async_client_cache_;
 };

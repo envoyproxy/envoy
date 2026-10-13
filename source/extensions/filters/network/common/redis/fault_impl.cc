@@ -129,7 +129,7 @@ const Fault* FaultManagerImpl::getFaultForCommandInternal(const std::string& com
 
 const Fault* FaultManagerImpl::getFaultForCommand(const std::string& command) const {
   if (!fault_map_.empty()) {
-    if (fault_map_.count(command) > 0) {
+    if (fault_map_.contains(command)) {
       return getFaultForCommandInternal(command);
     } else {
       return getFaultForCommandInternal(FaultManagerKeyNames::get().AllKey);

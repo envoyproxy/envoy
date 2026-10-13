@@ -10,6 +10,7 @@
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/header_validator.h"
@@ -216,6 +217,7 @@ public:
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
   bool shouldStripTrailingHostDot() const override { return strip_trailing_host_dot_; }
+  bool recordRouteResolutionStats() const override { return record_route_resolution_stats_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -291,7 +293,7 @@ public:
   NiceMock<Router::MockScopedRouteConfigProvider> scoped_route_config_provider_;
   Router::MockScopeKeyBuilder scope_key_builder_;
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::IsolatedStoreImpl fake_stats_;
+  Stats::TestUtil::TestStore fake_stats_;
   Http::ContextImpl http_context_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
@@ -306,6 +308,13 @@ public:
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))};
   NiceMock<Network::MockDrainDecision> drain_close_;
+  // The drain type of the listener owning the connection, served to the connection manager via
+  // `listener_info_`. DEFAULT means /healthcheck/fail drain-closes; tests that exercise the health
+  // check path flip this before calling setup().
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  std::shared_ptr<NiceMock<Network::MockListenerInfo>> listener_info_{
+      std::make_shared<NiceMock<Network::MockListenerInfo>>()};
   std::unique_ptr<ConnectionManagerImpl> conn_manager_;
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
@@ -378,6 +387,7 @@ public:
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
               KEEP_UNCHANGED};
   bool strip_trailing_host_dot_ = false;
+  bool record_route_resolution_stats_ = false;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   NiceMock<MockHeaderValidatorFactory> header_validator_factory_;
   NiceMock<MockHeaderValidatorStats> header_validator_stats_;

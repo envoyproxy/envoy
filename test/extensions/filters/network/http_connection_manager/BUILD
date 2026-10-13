@@ -44,7 +44,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.http_connection_manager"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":config_cc_proto",
         ":config_test_base",
@@ -55,6 +55,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/http/early_header_mutation/header_mutation:config",
         "//source/extensions/http/original_ip_detection/custom_header:config",
+        "//test/common/http:header_formatter_test_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/network:network_mocks",
@@ -76,7 +77,7 @@ envoy_extension_cc_test(
     name = "config_filter_chain_test",
     srcs = ["config_filter_chain_test.cc"],
     extension_names = ["envoy.filters.network.http_connection_manager"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":config_cc_proto",
         ":config_test_base",
@@ -92,7 +93,7 @@ envoy_extension_cc_test(
     name = "config_filter_dependencies_test",
     srcs = ["config_filter_dependencies_test.cc"],
     extension_names = ["envoy.filters.network.http_connection_manager"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":config_cc_proto",
         ":config_test_base",

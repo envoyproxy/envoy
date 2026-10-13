@@ -54,10 +54,10 @@ public:
 protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  std::unique_ptr<OpenTelemetryHttpTraceExporter> trace_exporter_;
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
   NiceMock<Stats::MockIsolatedStatsStore>& mock_scope_ = context_.server_factory_context_.store_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  std::unique_ptr<OpenTelemetryHttpTraceExporter> trace_exporter_;
 };
 
 // Test exporting an OTLP message via HTTP containing one span

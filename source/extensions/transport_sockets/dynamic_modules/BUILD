@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["transport_socket.cc"],
     hdrs = ["transport_socket.h"],
     deps = [
+        "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
@@ -41,6 +42,7 @@ envoy_cc_library(
         "//envoy/network:address_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules/abi",
     ],

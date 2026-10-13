@@ -1,5 +1,6 @@
 #include "contrib/dynamo/filters/http/source/dynamo_stats.h"
 
+#include <format>
 #include <memory>
 #include <string>
 
@@ -34,8 +35,8 @@ DynamoStats::DynamoStats(Stats::Scope& scope, const std::string& prefix)
   upstream_rq_total_groups_[0] = stat_name_set_->add("upstream_rq_total_unknown");
   upstream_rq_time_groups_[0] = stat_name_set_->add("upstream_rq_time_unknown");
   for (size_t i = 1; i < DynamoStats::NumGroupEntries; ++i) {
-    upstream_rq_total_groups_[i] = stat_name_set_->add(fmt::format("upstream_rq_total_{}xx", i));
-    upstream_rq_time_groups_[i] = stat_name_set_->add(fmt::format("upstream_rq_time_{}xx", i));
+    upstream_rq_total_groups_[i] = stat_name_set_->add(std::format("upstream_rq_total_{}xx", i));
+    upstream_rq_time_groups_[i] = stat_name_set_->add(std::format("upstream_rq_time_{}xx", i));
   }
   RequestParser::forEachStatString(
       [this](const std::string& str) { stat_name_set_->rememberBuiltin(str); });

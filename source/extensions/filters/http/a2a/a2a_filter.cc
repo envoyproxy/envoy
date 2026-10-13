@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/a2a/a2a_filter.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
@@ -12,6 +13,8 @@ namespace HttpFilters {
 namespace A2a {
 
 namespace {
+constexpr absl::string_view A2aWellKnownAgentCardPath = "/.well-known/agent-card.json";
+
 A2aFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = absl::StrCat(prefix, "a2a.");
   return A2aFilterStats{A2A_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -26,13 +29,16 @@ A2aFilterConfig::A2aFilterConfig(const envoy::extensions::filters::http::a2a::v3
       parser_config_(A2aParserConfig::createDefault()), stats_(generateStats(stats_prefix, scope)) {
 }
 
-// A2A support three discovery strategies with GET requests: 1) Well-Known URI 2) Curated Registries
-// 3) Private Discovery
-// Well-Known URI is recommended for public agents or agents intended for broad discovery
-// within a specific domain
+// A2A discovery standardizes GET requests for the Agent Card well-known URI. Registry and
+// private discovery paths are deployment-specific and cannot be inferred by the filter.
 // See: https://a2a-protocol.org/latest/topics/agent-discovery/#discovery-strategies
 bool A2aFilter::isValidA2aGetRequest(const Http::RequestHeaderMap& headers) const {
-  return headers.getMethodValue() == Http::Headers::get().MethodValues.Get;
+  if (headers.getMethodValue() != Http::Headers::get().MethodValues.Get) {
+    return false;
+  }
+
+  return Http::PathUtil::removeQueryAndFragment(headers.getPathValue()) ==
+         A2aWellKnownAgentCardPath;
 }
 
 bool A2aFilter::isValidA2aPostRequest(const Http::RequestHeaderMap& headers) const {

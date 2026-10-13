@@ -769,8 +769,10 @@ not json
   delete (raw_metadata_fetcher_);
 }
 
-// Tests ASAN failure when cancel wrapper is not used
-TEST_F(InstanceProfileCredentialsProviderTest, CancelWrapperPreventsUseAfterFree) {
+// setCredentialsToAllThreads() leaves an all-threads-complete callback outstanding, which may run
+// after the provider is gone. It captures a weak_ptr, so firing it then must be a no-op rather than
+// a use-after-free (this test fails under ASAN if the callback captures the provider directly).
+TEST_F(InstanceProfileCredentialsProviderTest, DeferredCompletionCallbackSafeAfterDestruction) {
   std::function<void()> captured_callback;
 
   EXPECT_CALL(context_.thread_local_, runOnAllThreads(testing::_, testing::_))

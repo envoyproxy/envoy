@@ -305,18 +305,18 @@ Envoy::Protobuf::Struct convertWorkloadMetadataToStruct(const WorkloadMetadataOb
 }
 
 // Convert struct to a metadata object.
-std::unique_ptr<WorkloadMetadataObject>
+WorkloadMetadataObjectConstSharedPtr
 convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata) {
   return convertStructToWorkloadMetadata(metadata, {});
 }
 
-std::unique_ptr<WorkloadMetadataObject>
+WorkloadMetadataObjectConstSharedPtr
 convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
                                 const absl::flat_hash_set<std::string>& additional_labels) {
   return convertStructToWorkloadMetadata(metadata, additional_labels, {});
 }
 
-std::unique_ptr<WorkloadMetadataObject>
+WorkloadMetadataObjectConstSharedPtr
 convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
                                 const absl::flat_hash_set<std::string>& additional_labels,
                                 const std::optional<envoy::config::core::v3::Locality> locality) {
@@ -376,7 +376,7 @@ convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
       locality_zone = locality->zone();
     }
   }
-  auto obj = std::make_unique<WorkloadMetadataObject>(
+  auto obj = std::make_shared<WorkloadMetadataObject>(
       instance, cluster, namespace_name, workload, canonical_name, canonical_revision, app_name,
       app_version, parseOwner(owner, workload), identity, locality_region, locality_zone);
   obj->setLabels(labels);
@@ -450,13 +450,12 @@ WorkloadMetadataObject::getField(absl::string_view field_name) const {
   return {};
 }
 
-std::unique_ptr<WorkloadMetadataObject>
-convertBaggageToWorkloadMetadata(absl::string_view baggage) {
+WorkloadMetadataObjectConstSharedPtr convertBaggageToWorkloadMetadata(absl::string_view baggage) {
   return convertBaggageToWorkloadMetadata(baggage, "");
 }
 
-std::unique_ptr<WorkloadMetadataObject>
-convertBaggageToWorkloadMetadata(absl::string_view data, absl::string_view identity) {
+WorkloadMetadataObjectConstSharedPtr convertBaggageToWorkloadMetadata(absl::string_view data,
+                                                                      absl::string_view identity) {
   absl::string_view instance;
   absl::string_view cluster;
   absl::string_view workload;
@@ -528,7 +527,7 @@ convertBaggageToWorkloadMetadata(absl::string_view data, absl::string_view ident
       }
     }
   }
-  return std::make_unique<WorkloadMetadataObject>(
+  return std::make_shared<const WorkloadMetadataObject>(
       instance, cluster, namespace_name, workload, canonical_name, canonical_revision, app_name,
       app_version, workload_type, identity, region, zone);
 }

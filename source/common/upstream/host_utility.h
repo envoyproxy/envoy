@@ -6,6 +6,8 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
+#include "absl/functional/function_ref.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -52,14 +54,22 @@ public:
    * @return OverrideHostSelectionResult containing the selected host, whether strict mode was
    *         requested, and the reason for the selection outcome.
    */
-  static OverrideHostSelectionResult
-  selectOverrideHost(const HostMap* host_map, HostStatusSet status, LoadBalancerContext* context);
+  static OverrideHostSelectionResult selectOverrideHost(const HostLookupMap* host_map,
+                                                        HostStatusSet status,
+                                                        LoadBalancerContext* context);
 
   // Iterate over all per-endpoint metrics, for clusters with `per_endpoint_stats` enabled.
   static void
   forEachHostMetric(const ClusterManager& cluster_manager,
                     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
                     const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb);
+
+  /**
+   * Invokes `callback(HostLbPolicyData&)` for each load-balancing-policy data entry on `host` whose
+   * receivesOrcaLoadReport() is true.
+   */
+  static void forEachOrcaLoadReportRecipient(const HostDescription& host,
+                                             absl::FunctionRef<void(HostLbPolicyData&)> callback);
 };
 
 } // namespace Upstream

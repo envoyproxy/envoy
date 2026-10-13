@@ -3,13 +3,6 @@
 HTTP/3 overview
 ===============
 
-.. warning::
-
-  While HTTP/3 **downstream support is deemed ready for production use**, improvements are ongoing,
-  tracked in the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
-
-  HTTP/3 upstream support is alpha - key features are implemented but have not been tested at scale.
-
 .. _arch_overview_http3_downstream:
 
 HTTP/3 downstream

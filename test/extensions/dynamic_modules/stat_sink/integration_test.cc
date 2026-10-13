@@ -93,8 +93,8 @@ TEST_P(DynamicModulesStatsSinkIntegrationTest, BasicFlush) {
       {"info", "stat sink integration test: flush called"},
       {"info", "stat sink integration test: found gauge server.uptime"},
   };
-  if (language() == "rust") {
-    // Only the Rust SDK exposes the tag callbacks. The "reconstructed tagged gauge" marker proves
+  if (language() == "rust" || language() == "go") {
+    // The Rust and Go SDKs expose the tag callbacks. The "reconstructed tagged gauge" marker proves
     // the module read the tag-extracted name and the "envoy.cluster_name" tag of the always-present
     // cluster.membership_total gauge and rebuilt the dimensional name a Prometheus-style sink would
     // emit.
@@ -138,6 +138,26 @@ TEST_P(DynamicModulesStatsSinkIntegrationTest, OffThreadAggregationPublishesGaug
   // The gauge name has no prefix, so the published value is the sum of the flush snapshot counter
   // values, which becomes non-zero as Envoy increments counters.
   test_server_->waitForGauge("integration_aggregated_counters", testing::Ge(1));
+}
+
+// The Rust and Go modules read each histogram's cumulative buckets through the snapshot API and log
+// a marker only when the last bucket count equals the sample count, proving the buckets decode in
+// the cumulative form Envoy produces. The C module does not exercise the bucket getters.
+TEST_P(DynamicModulesStatsSinkIntegrationTest, HistogramBucketsDecodeCumulatively) {
+  if (language() == "c") {
+    GTEST_SKIP() << "histogram bucket decoding is only exercised by the Rust and Go test modules";
+  }
+  auto body = [this]() {
+    addStatSinkAndInitialize();
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+    auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+    EXPECT_TRUE(response->complete());
+    timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(500));
+  };
+  EXPECT_LOG_CONTAINS("info", "stat sink integration test: histogram buckets cumulative for",
+                      body());
 }
 
 } // namespace

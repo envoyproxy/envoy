@@ -24,6 +24,7 @@ envoy_cc_library(
     ],
     deps = [
         ":rds_config_interface",
+        "//envoy/init:manager_interface",
         "//envoy/server:factory_context_interface",
     ],
 )

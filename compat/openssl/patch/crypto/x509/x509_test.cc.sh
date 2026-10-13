@@ -21,6 +21,7 @@ uncomment.sh "$1" --comment \
   --uncomment-gtest-func X509Test VerifyThreads \
   --uncomment-gtest-func X509Test ManyNamesAndConstraints \
   --uncomment-static-func-impl MakeGeneralName \
+  --uncomment-regex 'static const uint64_t kTestCertSerial =' \
   --uncomment-static-func-impl MakeTestCert \
   --uncomment-gtest-func-skip X509Test NameConstraints \
   --uncomment-gtest-func X509Test TestPSSBadParameters \

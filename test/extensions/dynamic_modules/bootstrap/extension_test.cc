@@ -40,7 +40,7 @@ TEST_F(ExtensionTest, NullInModuleExtension) {
   auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
 
   // initializeInModuleExtension will call extension_new which returns nullptr.
-  extension->initializeInModuleExtension();
+  EXPECT_FALSE(extension->initializeInModuleExtension());
 
   // These should not crash due to the null checks in the implementation.
   NiceMock<Server::MockInstance> instance;

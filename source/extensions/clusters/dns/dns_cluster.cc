@@ -359,8 +359,13 @@ void DnsClusterImpl::ResolveTarget::updateLogicalDnsHosts(
 void DnsClusterImpl::ResolveTarget::updateStrictDnsHosts(const ParsedHosts& new_hosts) {
   HostVector hosts_added;
   HostVector hosts_removed;
-  if (parent_.updateDynamicHostList(new_hosts.hosts, hosts_, hosts_added, hosts_removed, all_hosts_,
-                                    new_hosts.host_addresses)) {
+  if (parent_.updateDynamicHostList(
+          new_hosts.hosts, hosts_, hosts_added, hosts_removed,
+          [this](const std::string& address) -> HostSharedPtr {
+            const auto it = all_hosts_.find(address);
+            return it != all_hosts_.end() ? it->second : nullptr;
+          },
+          new_hosts.host_addresses)) {
     ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
     ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
       return host->priority() == locality_lb_endpoints_.priority();

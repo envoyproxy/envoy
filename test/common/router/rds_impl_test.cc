@@ -104,8 +104,10 @@ public:
     switch (config.route_specifier_case()) {
     case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         RouteSpecifierCase::kRouteConfig:
+      // The inline route configuration inherits the init manager of its owner, i.e. of the HTTP
+      // connection manager.
       return route_config_provider_manager.createStaticRouteConfigProvider(
-          config.route_config(), factory_context, validator);
+          config.route_config(), factory_context, init_manager, validator);
     case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         RouteSpecifierCase::kRds:
       return route_config_provider_manager.createRdsRouteConfigProvider(
@@ -156,6 +158,60 @@ http_filters:
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
     headers.addCopy("x-forwarded-proto", "http");
     return rds_->configCast()->route(headers, stream_info, 0);
+  }
+
+  // A VHDS delta response adding one virtual host.
+  static Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
+  vhdsResources(const std::string& name, const std::string& domain) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+    auto* added = resources.Add();
+    added->set_name(name);
+    added->set_version("1");
+    std::ignore = added->mutable_resource()->PackFrom(
+        TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(fmt::format(R"EOF(
+name: {}
+domains: ["{}"]
+routes:
+- match: {{ prefix: "/" }}
+  route: {{ cluster: "foo" }}
+)EOF",
+                                                                                  name, domain)));
+    return resources;
+  }
+
+  // An RDS response for foo_route_config that configures VHDS. The VHDS configuration is the same
+  // for every version, so that a test can change the route configuration without changing it.
+  static std::string vhdsRdsConfigJson(absl::string_view version,
+                                       absl::string_view vhost_name = "foo") {
+    return fmt::format(R"EOF(
+{{
+  "version_info": "{0}",
+  "resources": [
+    {{
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {{
+          "name": "{1}",
+          "domains": ["{1}"],
+          "routes": [{{"match": {{"prefix": "/{1}"}}, "route": {{"cluster": "foo"}}}}]
+        }}
+      ],
+      "vhds": {{
+        "config_source": {{
+          "resource_api_version": "V3",
+          "api_config_source": {{
+            "api_type": "DELTA_GRPC",
+            "transport_api_version": "V3",
+            "grpc_services": {{"envoy_grpc": {{"cluster_name": "xds_cluster"}}}}
+          }}
+        }}
+      }}
+    }}
+  ]
+}}
+)EOF",
+                       version, vhost_name);
   }
 
   NiceMock<Server::MockInstance> server_;
@@ -621,11 +677,207 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
-  EXPECT_CALL(init_watcher_, ready());
+  // The route configuration configures VHDS, so it isn't published until the initial VHDS fetch
+  // has landed, and this subscription stays unready until then.
+  EXPECT_CALL(init_watcher_, ready()).Times(0);
   EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
+  EXPECT_FALSE(rds_->configCast()->usesVhds());
+  ::testing::Mock::VerifyAndClearExpectations(&init_watcher_);
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
+      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(rds_callbacks_, vhds_callbacks);
+
+  // Landing the initial VHDS fetch publishes the route configuration.
+  const auto vhds_resources = vhdsResources("bar", "bar");
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(vhds_resources);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+
+  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
+                       ->routeEntry()
+                       ->clusterName());
+}
+
+// VHDS added by an RDS update to a route configuration that didn't have it before starts the VHDS
+// subscription.
+TEST_F(RdsImplTest, VHDSAddedByALaterRDSUpdate) {
+  setup();
+
+  const std::string without_vhds_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": [
+        {
+          "name": "foo",
+          "domains": ["foo"],
+          "routes": [{"match": {"prefix": "/foo"}, "route": {"cluster": "foo"}}]
+        }
+      ]
+    }
+  ]
+}
+)EOF";
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(without_vhds_json);
+  const auto decoded_resources_1 =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources_1.refvec_, response1.version_info()));
+  EXPECT_FALSE(rds_->configCast()->usesVhds());
+  // No VHDS subscription yet, so the RDS one is still the most recently created subscription.
+  EXPECT_EQ(rds_callbacks_,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+
+  auto response2 = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+      vhdsRdsConfigJson("2"));
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()));
+
+  // The VHDS subscription was created, so it is now the most recently created subscription. This
+  // subscription has already published a route configuration, so the update goes live right away
+  // and the VHDS subscription warms up with a throwaway init manager rather than holding the live
+  // route configuration back until its initial fetch lands.
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
+      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  EXPECT_NE(rds_callbacks_, vhds_callbacks);
   EXPECT_TRUE(rds_->configCast()->usesVhds());
 
-  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
+  const auto vhds_resources = vhdsResources("bar", "bar");
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(vhds_resources);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
+  EXPECT_TRUE(rds_->configCast()->usesVhds());
+}
+
+// A VHDS update publishes through the RDS publishing path, so that everything that hangs off it -
+// the route config provider, the update callbacks that scoped RDS registers - sees the rebuilt
+// route configuration. It must not re-create the VHDS subscription that is delivering the update.
+TEST_F(RdsImplTest, VhdsUpdatePublishesWithoutRecreatingTheVhdsSubscription) {
+  setup();
+
+  auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+      vhdsRdsConfigJson("1"));
+  const auto decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
+
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(
+      rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
+  // Not published yet: the route configuration waits for the initial VHDS fetch.
+  EXPECT_EQ(0UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+
+  // The RDS update created the VHDS subscription, so the subscription factory now hands out its
+  // callbacks.
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
+      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+  ASSERT_NE(rds_callbacks_, vhds_callbacks);
+
+  // The initial VHDS fetch publishes the route configuration that was waiting for it.
+  const auto first_vhds_resources = vhdsResources("bar", "bar");
+  const auto first_decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(first_vhds_resources);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(first_decoded_vhds_resources.refvec_, {}, "2"));
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+
+  // Deliver a second VHDS update through the same subscription.
+  const auto second_vhds_resources = vhdsResources("baz", "baz");
+  const auto second_decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(second_vhds_resources);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(second_decoded_vhds_resources.refvec_, {}, "3"));
+
+  // The VhdsSubscription survived delivering its own updates, i.e. it wasn't re-created and
+  // destroyed while its onConfigUpdate() was on the stack.
+  EXPECT_EQ(2UL, scope_.counter("foo.rds.vhds.foo_route_config.config_reload").value());
+  EXPECT_EQ(vhds_callbacks,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+  // The RDS publishing path ran for each VHDS update, which is what propagates the rebuilt route
+  // configuration to the update callbacks.
+  EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "bar"}, {":path", "/"}})
+                       ->routeEntry()
+                       ->clusterName());
+}
+
+// An RDS update that leaves the VHDS configuration unchanged keeps the VHDS subscription that is
+// already running: that subscription is the one delivering the virtual hosts of the route
+// configuration that is being updated.
+TEST_F(RdsImplTest, RdsUpdateWithUnchangedVhdsKeepsTheVhdsSubscription) {
+  setup();
+
+  // Exactly one VHDS subscription is created for all of the RDS updates below, i.e. the first one
+  // creates it and the later ones neither re-create nor drop it.
+  EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _));
+
+  auto first_rds_response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+          vhdsRdsConfigJson("1"));
+  const auto first_decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(
+          first_rds_response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(first_decoded_rds_resources.refvec_,
+                                           first_rds_response.version_info()));
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks =
+      server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  ASSERT_NE(nullptr, vhds_callbacks);
+  ASSERT_NE(rds_callbacks_, vhds_callbacks);
+
+  // The initial VHDS fetch publishes the route configuration that was waiting for it.
+  const auto vhds_resources = vhdsResources("bar", "bar");
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(vhds_resources);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+  EXPECT_EQ(1UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+
+  // A second RDS update changes the virtual hosts of the route configuration but not its VHDS
+  // configuration, so the VHDS subscription of the first update is kept.
+  auto second_rds_response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+          vhdsRdsConfigJson("2", "baz"));
+  const auto second_decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(
+          second_rds_response);
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(second_decoded_rds_resources.refvec_,
+                                           second_rds_response.version_info()));
+  EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_EQ(vhds_callbacks,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+
+  // A third one behaves the same way. If the second update had dropped the subscription, this one
+  // would have had to create a new one, because a route configuration that configures VHDS without
+  // a subscription to deliver its virtual hosts is never updated again.
+  auto third_rds_response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+          vhdsRdsConfigJson("3", "qux"));
+  const auto third_decoded_rds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(
+          third_rds_response);
+  EXPECT_OK(rds_callbacks_->onConfigUpdate(third_decoded_rds_resources.refvec_,
+                                           third_rds_response.version_info()));
+  EXPECT_EQ(3UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_EQ(vhds_callbacks,
+            server_factory_context_.cluster_manager_.subscription_factory_.callbacks_);
+
+  // The virtual host that VHDS delivered is still merged into the route configuration of the last
+  // RDS update.
+  EXPECT_TRUE(rds_->configCast()->usesVhds());
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "qux"}, {":path", "/qux"}})
+                       ->routeEntry()
+                       ->clusterName());
+  EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "bar"}, {":path", "/"}})
                        ->routeEntry()
                        ->clusterName());
 }
@@ -701,44 +953,6 @@ public:
   RouteConfigProviderManagerImplPtr route_config_provider_manager_;
 };
 
-// Verifies that maybeCreateInitManager() creates a noop init manager if the main init manager is in
-// Initialized state already
-TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
-  const std::string rds_config = R"EOF(
-  route_config_name: my_route
-  config_source:
-    api_config_source:
-      api_type: GRPC
-      grpc_services:
-        envoy_grpc:
-          cluster_name: xds_cluster
-)EOF";
-  const auto rds =
-      TestUtility::parseYaml<envoy::extensions::filters::network::http_connection_manager::v3::Rds>(
-          rds_config);
-  const auto route_config_provider = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds, server_factory_context_, "stat_prefix", outer_init_manager_);
-  RdsRouteConfigSubscription& subscription =
-      (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
-  init_watcher_.expectReady(); // The parent_init_target_ will call once.
-  outer_init_manager_.initialize(init_watcher_);
-  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
-  std::unique_ptr<Cleanup> init_vhds;
-  subscription.maybeCreateInitManager("version_info", noop_init_manager, init_vhds);
-  // local_init_manager_ is not ready yet as the local_init_target_ is not ready.
-  EXPECT_EQ(init_vhds, nullptr);
-  EXPECT_EQ(noop_init_manager, nullptr);
-  // Now mark local_init_target_ ready by forcing an update failure.
-  auto* rds_callbacks_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-  EnvoyException e("test");
-  rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
-                                       &e);
-  // Now noop init manager will be created as local_init_manager_ is initialized.
-  subscription.maybeCreateInitManager("version_info", noop_init_manager, init_vhds);
-  EXPECT_NE(init_vhds, nullptr);
-  EXPECT_NE(noop_init_manager, nullptr);
-}
-
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
 public:
   void setup() {
@@ -806,7 +1020,7 @@ virtual_hosts:
   RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV3Yaml(config_yaml), server_factory_context_,
-          validation_visitor_);
+          outer_init_manager_, validation_visitor_);
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
       universal_name_matcher);
   const auto& route_config_dump2 =
@@ -1190,6 +1404,277 @@ virtual_hosts:
   EXPECT_EQ(1UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
                      ->dynamic_route_configs()
                      .size());
+}
+
+class RdsVhdsOnDemandTest : public RdsImplTest {
+public:
+  // Applies an RDS update that configures VHDS and returns the VHDS subscription callbacks.
+  Envoy::Config::SubscriptionCallbacks* setupWithVhds() {
+    setup();
+    auto rds_response = TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(
+        vhdsRdsConfigJson("1"));
+    const auto decoded_rds_resources =
+        TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(rds_response);
+    EXPECT_CALL(init_watcher_, ready());
+    EXPECT_OK(
+        rds_callbacks_->onConfigUpdate(decoded_rds_resources.refvec_, rds_response.version_info()));
+    return server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  }
+
+  // A VHDS delta response resolving the alias for `domain` to a virtual host serving it.
+  static Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
+  aliasedVhdsResources(const std::string& name, const std::string& domain) {
+    auto resources = vhdsResources(name, domain);
+    resources.Mutable(0)->add_aliases("foo_route_config/" + domain);
+    return resources;
+  }
+
+  // A VHDS delta response answering that the virtual host of the aliased domain doesn't exist.
+  static Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
+  emptyVhdsResource(const std::string& domain) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+    resources.Add()->set_name("foo_route_config/" + domain);
+    return resources;
+  }
+
+  Envoy::Config::MockSubscription& vhdsSubscription() {
+    return *server_factory_context_.cluster_manager_.subscription_factory_.subscription_;
+  }
+
+  testing::NiceMock<Event::MockDispatcher> local_thread_dispatcher_;
+  testing::MockFunction<void(bool)> mock_callback_;
+  std::shared_ptr<Http::RouteConfigUpdatedCallback> callback_holder_{
+      std::make_shared<Http::RouteConfigUpdatedCallback>(mock_callback_.AsStdFunction())};
+};
+
+// An on-demand request for an alias the server has already answered to an earlier request is
+// answered from the published route configuration, without another round trip through VHDS.
+TEST_F(RdsVhdsOnDemandTest, AnsweredAliasIsAnsweredLocally) {
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Land the initial fetch, which is what publishes the route configuration: the alias of a
+  // request is built from the published configuration's name, which is empty before the first
+  // publish. In production a worker can't reach the provider that early, because the initial
+  // fetch gates initialization.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_initial", "initial.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
+  // The first request for 'bar.com' goes to the server and is queued.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // The server resolves the alias of 'bar.com' to the virtual host 'vhost_bar', which answers
+  // the queued request.
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // A repeated request for the answered alias doesn't go back to the server and is answered with
+  // the existence of the virtual host in the published configuration. Both dispatcher mocks run
+  // their posted callbacks inline.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(true));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// A name or alias the server volunteered without a request never enters the answered cache: the
+// first request for such an alias still goes to the server, so that the alias becomes part of
+// the subscription interest and survives a stream reconnect. Answering it locally instead would
+// serve data the server has no obligation to ever update.
+TEST_F(RdsVhdsOnDemandTest, UnrequestedAliasIsNotAnsweredLocally) {
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // The server pushes 'vhost_bar' with the alias of 'bar.com' unsolicited.
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+
+  // The first request for 'bar.com' is not answered locally.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// An alias the server answered with an empty resource (the virtual host doesn't exist) is
+// answered locally with 'false' on a repeated request instead of asking the server again.
+TEST_F(RdsVhdsOnDemandTest, AnsweredEmptyAliasIsAnsweredLocally) {
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Land the initial fetch, which is what publishes the route configuration.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
+  // The first request for an unanswered domain goes to the server.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(absl::flat_hash_set<std::string>{
+                                      "foo_route_config/unknown.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("unknown.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // The server answers with an empty resource: the virtual host doesn't exist. That answers the
+  // queued request with 'false'.
+  const auto decoded_empty_resource =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          emptyVhdsResource("unknown.com"));
+  EXPECT_CALL(mock_callback_, Call(false));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_empty_resource.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // A repeated request for the same domain is answered locally with 'false', without going back
+  // to the server.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(false));
+  rds_->requestVirtualHostsUpdate("unknown.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// A callback that is queued although its alias is already answered (this happens when the
+// request arrives while the answering update is still warming, or when the update that carried
+// the alias is superseded before it is published) is resolved at the next publish, even though
+// that update doesn't carry the alias among its own resource ids.
+TEST_F(RdsVhdsOnDemandTest, QueuedCallbackForAnsweredAliasResolvesOnNextPublish) {
+  TestScopedRuntime scoped_runtime;
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Land the initial fetch first: a request made before the first publish can't build its alias,
+  // because the published route configuration's name is still empty.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_initial", "initial.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
+  // The first request for 'bar.com' goes to the server, which resolves the alias and answers it.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // Queue a callback for the answered alias by disabling the cache for the request. This stands
+  // in for the warming window, which a unit test can't hold open: a request that arrives while
+  // the answering update is warming is queued the same way.
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_answered_alias_cache", "false"}});
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+
+  // With the cache enabled again, the next publish resolves the queued callback, although the
+  // update carries only an unrelated virtual host.
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_answered_alias_cache", "true"}});
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto decoded_other_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_baz", "baz.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_other_resources.refvec_, {}, "3"));
+}
+
+// With the runtime guard disabled, even an answered alias goes back to the server.
+TEST_F(RdsVhdsOnDemandTest, AnsweredAliasCacheDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_answered_alias_cache", "false"}});
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "1"));
+
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// A virtual host that answered an alias and was later removed by the server stays answered: the
+// published configuration now answers that the virtual host doesn't exist, so a repeated request
+// is answered locally with 'false' instead of going back to the server.
+TEST_F(RdsVhdsOnDemandTest, RemovedAnsweredVirtualHostIsAnsweredLocallyWithFalse) {
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Land the initial fetch, which is what publishes the route configuration.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_initial", "initial.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
+  // The first request for 'bar.com' goes to the server, which answers it with 'vhost_bar'.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  EXPECT_CALL(mock_callback_, Call(true));
+  const auto decoded_vhds_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          aliasedVhdsResources("vhost_bar", "bar.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "2"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // The server removes 'vhost_bar' on its own.
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  *removed_resources.Add() = "vhost_bar";
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> nothing_added;
+  const auto decoded_nothing_added =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_nothing_added.refvec_, removed_resources, "3"));
+
+  // A repeated request for 'bar.com' is answered locally with 'false': the subscription to the
+  // alias stays, so the server pushes an update on its own if the virtual host comes back.
+  EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(mock_callback_, Call(false));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+}
+
+// With the runtime guard disabled, a publish whose update carries no resource ids returns before
+// walking the queued callbacks, which is the legacy behavior: a callback whose alias isn't among
+// the resource ids of a subsequent update stays queued.
+TEST_F(RdsVhdsOnDemandTest, AnsweredAliasCacheDisabledPublishWithoutAliasesLeavesCallbacksQueued) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_answered_alias_cache", "false"}});
+
+  Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
+  ASSERT_NE(nullptr, vhds_callbacks);
+
+  // Land the initial fetch, which is what publishes the route configuration.
+  const auto initial_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          vhdsResources("vhost_initial", "initial.com"));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(initial_resources.refvec_, {}, "1"));
+
+  // A request for 'bar.com' goes to the server and is queued.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+
+  // A removal-only update publishes with no resource ids, so the queued callback stays queued.
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  *removed_resources.Add() = "vhost_initial";
+  const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> nothing_added;
+  const auto decoded_nothing_added =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_nothing_added.refvec_, removed_resources, "2"));
 }
 
 } // namespace

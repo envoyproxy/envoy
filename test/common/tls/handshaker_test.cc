@@ -1,13 +1,17 @@
 #include <openssl/ssl3.h>
 
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/handshaker.h"
+#include "envoy/ssl/tls_certificate_config.h"
 
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/context_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
 
 #include "test/common/tls/ssl_certs_test.h"
 #include "test/mocks/network/connection.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -318,6 +322,94 @@ TEST_F(HandshakerTest, ValidateResultCallbackStoresErrorDetails) {
   EXPECT_EQ(error_details, extended_info->certificateValidationError());
   EXPECT_EQ(Ssl::ClientValidationStatus::Failed, extended_info->certificateValidationStatus());
   EXPECT_EQ(SSL_AD_UNKNOWN_CA, extended_info->certificateValidationAlert());
+}
+
+using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+
+// Covers the certificate-level tls_params that the handshaker applies to the connection once a
+// certificate is selected.
+class CertSelectionTlsParamsTest : public HandshakerTest {
+protected:
+  Ssl::CertificateSelectionStatus selectCertificate(const Ssl::TlsParams& params,
+                                                    bool provides_ciphers_and_curves = false,
+                                                    bool provides_sigalgs = false) {
+    ON_CALL(handshake_callbacks_, connection()).WillByDefault(ReturnRef(mock_connection_));
+    // Selection completes at most once per connection, so each call needs its own SSL.
+    selection_callback_.reset();
+    handshaker_ = std::make_unique<SslHandshakerImpl>(
+        bssl::UniquePtr<SSL>(SSL_new(server_ctx_.get())), 0, &handshake_callbacks_);
+    selected_ctx_ = std::make_unique<Ssl::TlsContext>();
+    selected_ctx_->ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
+    selected_ctx_->tls_params_ = params;
+    selected_ctx_->provides_ciphers_and_curves_ = provides_ciphers_and_curves;
+    selected_ctx_->provides_sigalgs_ = provides_sigalgs;
+
+    auto* extended_info =
+        reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker_->ssl(), 0));
+    selection_callback_ = extended_info->createCertificateSelectionCallback();
+    extended_info->onCertificateSelectionCompleted(
+        makeOptRef<const Ssl::TlsContext>(*selected_ctx_),
+        /*staple=*/false, /*async=*/false);
+    return extended_info->certificateSelectionResult();
+  }
+
+  SSL* ssl() { return handshaker_->ssl(); }
+
+  NiceMock<Network::MockConnection> mock_connection_;
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks_;
+  std::unique_ptr<SslHandshakerImpl> handshaker_;
+  std::unique_ptr<Ssl::TlsContext> selected_ctx_;
+  Ssl::CertificateSelectionCallbackPtr selection_callback_;
+};
+
+TEST_F(CertSelectionTlsParamsTest, ParamsAppliedToConnection) {
+  const Ssl::TlsParams params{
+      .min_protocol_version = TlsProto::TLSv1_2,
+      .max_protocol_version = TlsProto::TLSv1_2,
+      .cipher_suites = "ECDHE-RSA-AES128-GCM-SHA256",
+      .ecdh_curves = "P-256",
+      .signature_algorithms = "rsa_pss_rsae_sha256",
+  };
+  EXPECT_EQ(Ssl::CertificateSelectionStatus::Successful, selectCertificate(params));
+  EXPECT_EQ(TLS1_2_VERSION, SSL_get_min_proto_version(ssl()));
+  EXPECT_EQ(TLS1_2_VERSION, SSL_get_max_proto_version(ssl()));
+}
+
+TEST_F(CertSelectionTlsParamsTest, CompliancePolicyAppliedToConnection) {
+  EXPECT_EQ(Ssl::CertificateSelectionStatus::Successful,
+            selectCertificate({.compliance_policy = TlsProto::FIPS_202205}));
+  EXPECT_EQ(ssl_compliance_policy_fips_202205, SSL_get_compliance_policy(ssl()));
+}
+
+// Fields a custom handshaker owns are left to it, so even unusable values are not an error.
+TEST_F(CertSelectionTlsParamsTest, HandshakerOwnedParamsSkipped) {
+  const Ssl::TlsParams params{
+      .cipher_suites = "not-a-cipher",
+      .ecdh_curves = "not-a-curve",
+      .signature_algorithms = "not-a-sigalg",
+  };
+  EXPECT_EQ(Ssl::CertificateSelectionStatus::Successful,
+            selectCertificate(params, /*provides_ciphers_and_curves=*/true,
+                              /*provides_sigalgs=*/true));
+}
+
+// Params that BoringSSL rejects fail selection instead of leaving the connection with the settings
+// it inherited from the context it was created from.
+TEST_F(CertSelectionTlsParamsTest, UnsupportedParamsFailSelection) {
+  EXPECT_LOG_CONTAINS("warn", "Failed to set per-cert cipher suites",
+                      EXPECT_EQ(Ssl::CertificateSelectionStatus::Failed,
+                                selectCertificate({.cipher_suites = "not-a-cipher"})));
+  EXPECT_LOG_CONTAINS("warn", "Failed to set per-cert ECDH curves",
+                      EXPECT_EQ(Ssl::CertificateSelectionStatus::Failed,
+                                selectCertificate({.ecdh_curves = "not-a-curve"})));
+  EXPECT_LOG_CONTAINS("warn", "Failed to set per-cert signature algorithms",
+                      EXPECT_EQ(Ssl::CertificateSelectionStatus::Failed,
+                                selectCertificate({.signature_algorithms = "not-a-sigalg"})));
+  EXPECT_LOG_CONTAINS(
+      "warn", "Unknown compliance policy: 1234",
+      EXPECT_EQ(
+          Ssl::CertificateSelectionStatus::Failed,
+          selectCertificate({.compliance_policy = static_cast<TlsProto::CompliancePolicy>(1234)})));
 }
 
 } // namespace

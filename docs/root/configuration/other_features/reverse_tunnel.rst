@@ -103,6 +103,9 @@ The identifiers serve the following purposes:
   ``Service`` with 2 replicas) with ``connection_count: 4`` establishes 8 connections in total, 4 to
   each endpoint, not 4 shared across the cluster. Size your socket budget accordingly.
 
+  ``connection_count`` must be between ``0`` and ``1024``. A count of ``0`` keeps the listener idle,
+  dialing nothing until a listener update raises the count.
+
 The ``downstream-service`` cluster in the example refers to the service behind the initiator Envoy that will be accessed via reverse tunnels from services behind the responder Envoy.
 
 .. literalinclude:: /_configs/reverse_connection/initiator-envoy.yaml
@@ -262,8 +265,11 @@ The lifecycle logger emits the following event names:
 * ``idle_ping_timeout`` – the idle connection is being closed because the peer failed to respond to ``RPING`` probes.
 
 The dynamic metadata namespace is ``envoy.reverse_tunnel.lifecycle``. The emitted fields are
-``event``, ``node_id``, ``cluster_id``, ``tenant_id``, ``worker``, ``fd``, ``socket_state``,
-and, when relevant, ``handoff_kind`` or ``close_reason``.
+``event``, ``node_id``, ``cluster_id``, ``tenant_id``, ``worker``, ``initiator_worker_id``,
+``initiator_connection_id``, ``fd``, ``socket_state``, and, when relevant, ``handoff_kind`` or
+``close_reason``. ``worker`` is the acceptor's own worker thread, while ``initiator_worker_id`` and
+``initiator_connection_id`` are the worker and connection identifiers advertised by the initiator in
+the handshake (empty when the initiator does not advertise them).
 
 **Socket state values** (the ``socket_state`` field):
 
@@ -291,6 +297,8 @@ The same identifiers are also copied into connection filter state under these ke
 * ``envoy.reverse_tunnel.cluster_id``
 * ``envoy.reverse_tunnel.tenant_id``
 * ``envoy.reverse_tunnel.worker``
+* ``envoy.reverse_tunnel.initiator_worker_id`` (only when advertised by the initiator)
+* ``envoy.reverse_tunnel.initiator_connection_id`` (only when advertised by the initiator)
 * ``envoy.reverse_tunnel.fd``
 
 .. _config_reverse_tunnel_network_filter:
@@ -304,7 +312,7 @@ parameters.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 29-41
+    :lines: 29-40
     :linenos:
     :lineno-start: 29
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
@@ -341,9 +349,9 @@ tunnel lifecycle upstream network filter to the reverse connection cluster:
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 105-111
+    :lines: 104-110
     :linenos:
-    :lineno-start: 105
+    :lineno-start: 104
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 This filter copies the reverse-tunnel identifiers into the handed-off upstream connection's filter
@@ -353,9 +361,9 @@ reuses the same close reason.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 104-129
+    :lines: 103-128
     :linenos:
-    :lineno-start: 104
+    :lineno-start: 103
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 The reverse connection cluster configuration includes several key fields:
@@ -422,9 +430,9 @@ that identifies the target downstream node for each request.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
-    :lines: 43-101
+    :lines: 42-100
     :linenos:
-    :lineno-start: 43
+    :lineno-start: 42
     :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 The example above demonstrates using a :ref:`Lua filter <config_http_filters_lua>` to implement flexible
@@ -571,6 +579,14 @@ metadata namespace and can be referenced using the ``%DYNAMIC_METADATA(envoy.rev
      - string
      - A unique identifier for this specific reverse tunnel connection instance. Useful for
        correlating handshake and close events for the same connection.
+   * - ``worker_id``
+     - string
+     - The initiator worker thread that opened this connection, as the worker dispatcher name
+       (e.g. ``worker_2``). Distinguishes tunnels originating from different workers.
+   * - ``connection_id``
+     - string
+     - The initiator's per-connection identifier for this connection. Combined with ``worker_id``,
+       distinguishes individual tunnels from the same initiator instance.
    * - ``error``
      - string
      - The error message describing the failure reason. Empty string on non-failure events.

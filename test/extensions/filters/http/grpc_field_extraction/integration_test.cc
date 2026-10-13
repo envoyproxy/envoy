@@ -49,9 +49,13 @@ typed_config:
     apikeys.ApiKeys.CreateApiKey:
       request_field_extractions:
         parent:
+        key.name:
+          metadata_key: api_key_name
     apikeys.ApiKeys.CreateApiKeyInStream:
       request_field_extractions:
         parent:
+        key.name:
+          metadata_key: api_key_name
 )EOF",
                            TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"));
   }
@@ -59,6 +63,7 @@ typed_config:
 
 CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
       parent: "project-id"
+      key { name: "api-key-name" }
     )pb") {
   CreateApiKeyRequest request;
   std::ignore = Protobuf::TextFormat::ParseFromString(pb, &request);
@@ -85,7 +90,9 @@ TEST_P(IntegrationTest, Unary) {
   // Send response.
   sendResponse(response.get());
 
-  EXPECT_THAT(waitForAccessLog(access_log_name_), R"({"parent":["project-id"]})");
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::AllOf(testing::HasSubstr(R"("parent":["project-id"])"),
+                             testing::HasSubstr(R"("api_key_name":["api-key-name"])")));
 }
 
 TEST_P(IntegrationTest, Streaming) {
@@ -100,16 +107,19 @@ TEST_P(IntegrationTest, Streaming) {
   CreateApiKeyRequest request1 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req1"
+      key { name: "key-from-req1" }
 )pb");
   Envoy::Buffer::InstancePtr request_data1 = Envoy::Grpc::Common::serializeToGrpcFrame(request1);
   CreateApiKeyRequest request2 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req2"
+      key { name: "key-from-req2" }
 )pb");
   Envoy::Buffer::InstancePtr request_data2 = Envoy::Grpc::Common::serializeToGrpcFrame(request2);
   CreateApiKeyRequest request3 = makeCreateApiKeyRequest(
       R"pb(
       parent: "from-req3"
+      key { name: "key-from-req3" }
 )pb");
   Envoy::Buffer::InstancePtr request_data3 = Envoy::Grpc::Common::serializeToGrpcFrame(request3);
 
@@ -134,7 +144,9 @@ TEST_P(IntegrationTest, Streaming) {
   // Send response.
   sendResponse(response.get());
 
-  EXPECT_THAT(waitForAccessLog(access_log_name_), R"({"parent":["from-req1"]})");
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::AllOf(testing::HasSubstr(R"("parent":["from-req1"])"),
+                             testing::HasSubstr(R"("api_key_name":["key-from-req1"])")));
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationTest,

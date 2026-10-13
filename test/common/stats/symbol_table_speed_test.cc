@@ -5,6 +5,7 @@
 
 #include <array>
 #include <bit>
+#include <memory>
 
 #include "source/common/common/hash.h"
 #include "source/common/stats/isolated_store_impl.h"
@@ -15,6 +16,8 @@
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "benchmark/benchmark.h"
 
@@ -676,3 +679,116 @@ static void bmEncodingSizeBytes_ClzMixed(benchmark::State& state) {
   }
 }
 BENCHMARK(bmEncodingSizeBytes_ClzMixed);
+
+// Compares the three ways to assemble a temporary joined stat-name:
+//
+//   join()            -- the original: always a heap allocation, ownership returned.
+//   inlineJoin(names) -- returns InlineStorage by value; no allocation unless the joined bytes
+//                        overflow the inline buffer.
+//
+// plus StatNameJoiner, which is built on inlineJoin() and additionally elides a join whose inputs
+// hold at most one non-empty name.
+//
+// Each is measured over the shapes that tell them apart: a join that fits inline, one that
+// spills onto the heap anyway, and one that is a no-op. The "Dense" variants repeat the
+// fits-inline shape against a symbol table holding thousands of symbols, where symbol ids no
+// longer fit in a single encoded byte -- which is what a real Envoy looks like.
+namespace {
+
+using Envoy::Stats::StatName;
+using Envoy::Stats::StatNameJoiner;
+using Envoy::Stats::StatNamePool;
+using Envoy::Stats::SymbolTable;
+using Envoy::Stats::SymbolTableImpl;
+
+// Bench fixtures own the symbol table and the pool that keep the joined names alive.
+struct JoinFixture {
+  SymbolTableImpl symbol_table_;
+  StatNamePool pool_{symbol_table_};
+  std::vector<StatName> names_;
+
+  // Burns through `count` symbol ids so that the names added afterwards encode to multi-byte
+  // symbols, as they do in an Envoy with a non-trivial configuration.
+  void padSymbols(uint32_t count) {
+    for (uint32_t i = 0; i < count; ++i) {
+      pool_.add(absl::StrCat("pad", i));
+    }
+  }
+};
+
+// A join whose result fits in SymbolTable::InlineStorage: 3 tokens, a few bytes.
+std::unique_ptr<JoinFixture> shortFixture() {
+  auto fixture = std::make_unique<JoinFixture>();
+  fixture->names_ = {fixture->pool_.add("cluster.upstream_rq"), fixture->pool_.add("200")};
+  return fixture;
+}
+
+// The same shape, but against a symbol table large enough that each token costs two bytes.
+std::unique_ptr<JoinFixture> denseFixture() {
+  auto fixture = std::make_unique<JoinFixture>();
+  fixture->padSymbols(4096);
+  fixture->names_ = {fixture->pool_.add("cluster.some_service.upstream_rq"),
+                     fixture->pool_.add("200")};
+  return fixture;
+}
+
+// A join whose result does not fit inline, so inlineJoin() allocates as join() does.
+std::unique_ptr<JoinFixture> longFixture() {
+  auto fixture = std::make_unique<JoinFixture>();
+  std::vector<std::string> tokens;
+  for (uint32_t i = 0; i < 64; ++i) {
+    tokens.push_back(absl::StrCat("token", i));
+  }
+  fixture->names_ = {fixture->pool_.add(absl::StrJoin(tokens, ".")), fixture->pool_.add("200")};
+  return fixture;
+}
+
+// A join with one non-empty name: the bytes are identical to that name, which is what the
+// joiner's elision exploits and what inlineJoin() copies.
+std::unique_ptr<JoinFixture> noOpFixture() {
+  auto fixture = std::make_unique<JoinFixture>();
+  fixture->names_ = {StatName(), fixture->pool_.add("cluster.upstream_rq_200")};
+  return fixture;
+}
+
+} // namespace
+
+#define JOIN_BENCHMARKS(SUFFIX, FIXTURE)                                                           \
+  /* NOLINTNEXTLINE(readability-identifier-naming) */                                              \
+  static void bmJoin##SUFFIX(benchmark::State& state) {                                            \
+    const std::unique_ptr<JoinFixture> fixture = FIXTURE();                                        \
+    for (auto _ : state) {                                                                         \
+      UNREFERENCED_PARAMETER(_);                                                                   \
+      const SymbolTable::StoragePtr joined = fixture->symbol_table_.join(fixture->names_);         \
+      benchmark::DoNotOptimize(StatName(joined.get()).dataIncludingSize());                        \
+    }                                                                                              \
+  }                                                                                                \
+  BENCHMARK(bmJoin##SUFFIX);                                                                       \
+                                                                                                   \
+  /* NOLINTNEXTLINE(readability-identifier-naming) */                                              \
+  static void bmInlineJoin##SUFFIX(benchmark::State& state) {                                      \
+    const std::unique_ptr<JoinFixture> fixture = FIXTURE();                                        \
+    for (auto _ : state) {                                                                         \
+      UNREFERENCED_PARAMETER(_);                                                                   \
+      const SymbolTable::InlineStorage joined =                                                    \
+          fixture->symbol_table_.inlineJoin(fixture->names_);                                      \
+      benchmark::DoNotOptimize(joined.statName().dataIncludingSize());                             \
+    }                                                                                              \
+  }                                                                                                \
+  BENCHMARK(bmInlineJoin##SUFFIX);                                                                 \
+                                                                                                   \
+  /* NOLINTNEXTLINE(readability-identifier-naming) */                                              \
+  static void bmJoiner##SUFFIX(benchmark::State& state) {                                          \
+    const std::unique_ptr<JoinFixture> fixture = FIXTURE();                                        \
+    for (auto _ : state) {                                                                         \
+      UNREFERENCED_PARAMETER(_);                                                                   \
+      const StatNameJoiner joiner(fixture->names_, fixture->symbol_table_);                        \
+      benchmark::DoNotOptimize(joiner.statName().dataIncludingSize());                             \
+    }                                                                                              \
+  }                                                                                                \
+  BENCHMARK(bmJoiner##SUFFIX)
+
+JOIN_BENCHMARKS(Short, shortFixture);
+JOIN_BENCHMARKS(Dense, denseFixture);
+JOIN_BENCHMARKS(Long, longFixture);
+JOIN_BENCHMARKS(NoOp, noOpFixture);

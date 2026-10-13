@@ -122,7 +122,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 #else
   spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-  if (headers.Method()->value() == "HEAD") {
+  if (headers.getMethodValue() == "HEAD") {
     sent_head_request_ = true;
   }
 #endif
@@ -502,14 +502,6 @@ void EnvoyQuicClientStream::OnClose() {
   clearWatermarkBuffer();
 }
 
-void EnvoyQuicClientStream::clearWatermarkBuffer() {
-  if (BufferedDataBytes() > 0) {
-    // If the stream is closed without sending out all buffered data, regard
-    // them as sent now and adjust connection buffer book keeping.
-    updateBytesBuffered(BufferedDataBytes(), 0);
-  }
-}
-
 void EnvoyQuicClientStream::OnCanWrite() {
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   quic::QuicSpdyClientStream::OnCanWrite();
@@ -573,7 +565,8 @@ bool EnvoyQuicClientStream::useCapsuleProtocol() {
     return false;
   }
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  http_datagram_handler_->setStreamDecoder(getResponseDecoder());
+  http_datagram_handler_->setStreamDecoderProvider(
+      [this]() -> Http::StreamDecoder* { return getResponseDecoder(); });
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
   return true;
 }

@@ -19,7 +19,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "//test/mocks/http:http_mocks",
@@ -36,7 +36,7 @@ envoy_extension_cc_test(
     name = "http_body_utils_test",
     srcs = ["http_body_utils_test.cc"],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -50,7 +50,7 @@ envoy_extension_cc_test(
     name = "transcoder_input_stream_test",
     srcs = ["transcoder_input_stream_test.cc"],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:transcoder_input_stream_lib",
@@ -67,7 +67,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     tags = [
         "cpu:3",
     ],
@@ -90,7 +90,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:config",
         "//test/mocks/server:factory_context_mocks",
@@ -107,7 +107,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:utility_lib",
         "//source/common/protobuf",

@@ -293,14 +293,7 @@ Http2FloodMitigationTest::prefillOutboundUpstreamQueue(uint32_t frame_count) {
   return response;
 }
 
-void Http2FloodMitigationTest::triggerListenerDrain() {
-  absl::Notification drain_sequence_started;
-  test_server_->server().dispatcher().post([this, &drain_sequence_started]() {
-    test_server_->drainManager().startDrainSequence(Network::DrainDirection::All, [] {});
-    drain_sequence_started.Notify();
-  });
-  drain_sequence_started.WaitForNotification();
-}
+void Http2FloodMitigationTest::triggerListenerDrain() { startServerDrain(); }
 
 TEST_P(Http2FloodMitigationTest, Ping) {
   setNetworkConnectionBufferSize();
@@ -764,6 +757,11 @@ TEST_P(Http2FloodMitigationTest, DownstreamConnectionDurationTimeoutTriggersFloo
 // Verify detection of frame flood when sending GOAWAY frame during processing of response headers
 // on a draining listener.
 TEST_P(Http2FloodMitigationTest, GoawayOverflowDuringResponseWhenDraining) {
+  // The test needs the next response to drain-close the connection. Under the default gradual
+  // strategy the drain-close probability ramps from zero over the drain window, so ask for an
+  // immediate drain instead of racing the ramp.
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+
   // pre-fill one away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
 
@@ -805,6 +803,10 @@ typed_config:
         auto size = hcm.http_filters_size();
         hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
       });
+
+  // As in GoawayOverflowDuringResponseWhenDraining, drain immediately so that the next response
+  // reliably drain-closes the connection.
+  drain_strategy_ = Server::DrainStrategy::Immediate;
 
   // pre-fill one away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
@@ -1180,6 +1182,124 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateFloodRollbackVerified) {
 
   // Verify that no flood was detected.
   EXPECT_EQ(0, test_server_->counter("http2.inbound_window_update_frames_flood")->value());
+}
+
+// Models a well-behaved client downloading a large response:
+//   1. The client advertises SETTINGS_MAX_FRAME_SIZE = 1 MiB and an initial stream window of 0
+//      (it is not ready to read yet), so Envoy buffers the whole 1 MiB response.
+//   2. The client opens its receive window (stream and connection) to 1 MiB and Envoy flushes the
+//      buffered body. How it is framed depends on the codec:
+//        - nghttp2 caps DATA frames at 16 KiB (NGHTTP2_DATA_PAYLOADLEN) => 64 DATA frames.
+//        - oghttp2 honors the peer's SETTINGS_MAX_FRAME_SIZE          =>  1 DATA frame.
+//   3. The application consumes the body in 4 KiB reads and the client replenishes Envoy's send
+//      window with a WINDOW_UPDATE after every read (256 WINDOW_UPDATE frames).
+//
+// ProtocolConstraints allows 5 + 2 * (streams + 10 * outbound_data_frames) inbound WINDOW_UPDATE
+// frames, i.e. ~1285 for nghttp2 but only ~25 for oghttp2, so with oghttp2 legitimate flow-control
+// replenishment is misclassified as a WINDOW_UPDATE flood and the connection is terminated.
+TEST_P(Http2FloodMitigationTest, WindowUpdateAfterLargeResponseRealisticClient) {
+  constexpr uint32_t kResponseSize = 1024 * 1024; // 1 MiB response body.
+
+  // Let Envoy buffer the entire response without hitting watermarks, so that DATA frame sizing is
+  // determined only by the codec and the client's advertised flow-control windows.
+  config_helper_.setBufferLimits(/*upstream_buffer_limit=*/kResponseSize,
+                                 /*downstream_buffer_limit=*/kResponseSize);
+  autonomous_upstream_ = true;
+
+  // Client advertises SETTINGS_MAX_FRAME_SIZE = 1 MiB.
+  beginSession(Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None,
+      {{static_cast<uint16_t>(Http2Frame::Setting::MaxFrameSize), kResponseSize},
+       {static_cast<uint16_t>(Http2Frame::Setting::InitialWindowSize), 0}}));
+
+  // Envoy proxies the client's request (headers included) to the upstream.
+  // The extra headers are test-only instructions for the autonomous (fake) upstream.
+  const uint32_t stream_id = Http2Frame::makeClientStreamId(0);
+  sendFrame(Http2Frame::makeRequest(
+      stream_id, "host", "/",
+      {Http2Frame::Header(AutonomousStream::RESPONSE_SIZE_BYTES, absl::StrCat(kResponseSize)),
+       Http2Frame::Header(AutonomousStream::NO_TRAILERS, "1")}));
+
+  // Response HEADERS are not subject to flow control.
+  Http2Frame headers = readFrame();
+  ASSERT_EQ(Http2Frame::Type::Headers, headers.type());
+  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers.responseStatus());
+  EXPECT_FALSE(headers.endStream());
+
+  // Wait until the whole response has arrived from upstream, i.e. the full 1 MiB body is sitting
+  // in the downstream codec's send buffer waiting for the client's window to open.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_completed", Ge(1));
+
+  // The client is ready to read: grow the connection window (65,535 bytes initially per RFC 9113)
+  // and open the stream window to 1 MiB.
+  sendFrame(Http2Frame::makeWindowUpdateFrame(0, kResponseSize));
+  sendFrame(Http2Frame::makeWindowUpdateFrame(stream_id, kResponseSize));
+
+  // Receive the response body as framed by Envoy's codec.
+  uint32_t data_frames = 0;
+  uint64_t body_bytes = 0;
+  bool end_stream = false;
+
+  // Client's HTTP/2 layer receives DATA frames until END_STREAM, recording how Envoy framed the
+  // body. The application hasn't consumed anything yet, so no WINDOW_UPDATE frames are sent here.
+  while (!end_stream) {
+    ASSERT_TRUE(tcp_client_->waitForData(Http2Frame::HeaderSize));
+    Http2Frame frame = readFrame();
+    ASSERT_EQ(Http2Frame::Type::Data, frame.type());
+    ++data_frames;
+    body_bytes += frame.payloadSize();
+    end_stream = frame.endStream();
+    ASSERT_LE(body_bytes, kResponseSize);
+  }
+  // Client asked for max 1 MiB, Envoy sent 1 MiB.
+  EXPECT_EQ(kResponseSize, body_bytes);
+
+  const bool is_oghttp2 = std::get<1>(GetParam()) == Http2Impl::Oghttp2;
+  if (is_oghttp2) {
+    // Frame size = min(connection window, stream window, peer SETTINGS_MAX_FRAME_SIZE) = 1 MiB.
+    EXPECT_EQ(1, data_frames);
+  } else {
+    // The peer's SETTINGS_MAX_FRAME_SIZE is ignored; DATA frames are capped at 16 KiB.
+    EXPECT_EQ(kResponseSize / (16 * 1024), data_frames);
+  }
+
+  // Verify the connection is still open, as seen by both the client and Envoy.
+  EXPECT_TRUE(tcp_client_->connected());
+  EXPECT_EQ(1, test_server_->gauge("http.config_test.downstream_cx_active")->value());
+  // Verify the stream is closed.
+  test_server_->waitForGauge("http2.streams_active", Eq(0));
+
+  constexpr uint32_t kClientReadSize = 4 * 1024; // Application consumes 4 KiB per read.
+
+  // The application consumes the body 4 KiB at a time. After each read the client returns the
+  // consumed bytes to Envoy with a connection-level WINDOW_UPDATE (the stream is already closed so
+  // there is no stream-level window left to replenish).
+  const std::string window_update(Http2Frame::makeWindowUpdateFrame(0, kClientReadSize));
+  for (uint32_t i = 0; i < (kResponseSize / kClientReadSize) && tcp_client_->connected(); ++i) {
+    if (!tcp_client_->write(window_update, false, false)) {
+      break;
+    }
+  }
+
+  if (is_oghttp2) {
+    // Legitimate flow-control replenishment is misclassified as a WINDOW_UPDATE flood and Envoy
+    // terminates the connection.
+    tcp_client_->waitForDisconnect();
+    EXPECT_EQ(1, test_server_->counter("http2.inbound_window_update_frames_flood")->value());
+    test_server_->waitForCounter("http.config_test.downstream_cx_delayed_close_timeout", Eq(1));
+  } else {
+    // The connection stays healthy: another request on the same connection succeeds.
+    sendFrame(
+        Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "host", "/",
+                                {Http2Frame::Header(AutonomousStream::RESPONSE_DATA_BLOCKS, "0"),
+                                 Http2Frame::Header(AutonomousStream::NO_TRAILERS, "1")}));
+    auto response = readFrame();
+    EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+    EXPECT_TRUE(response.endStream());
+    EXPECT_TRUE(tcp_client_->connected());
+    EXPECT_EQ(0, test_server_->counter("http2.inbound_window_update_frames_flood")->value());
+    tcp_client_->close();
+  }
 }
 
 TEST_P(Http2FloodMitigationTest, WindowUpdate) {

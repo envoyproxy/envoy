@@ -282,7 +282,7 @@ private:
   virtual typename GrpcAccessLogger::SharedPtr createLogger(const ConfigProto& config,
                                                             Event::Dispatcher& dispatcher) PURE;
 
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::SlotSharedPtr tls_slot_;
 };
 
 } // namespace Common

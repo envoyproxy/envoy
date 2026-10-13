@@ -132,8 +132,7 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
     orca_oob_manager_ =
         std::make_unique<Extensions::LoadBalancingPolicies::Common::ProdOrcaOobManager>(
             typed_lb_config->oob_manager_config, priority_set,
-            typed_lb_config->main_thread_dispatcher_, random, cluster_info.statsScope(),
-            orca_weight_manager_->reportHandler());
+            typed_lb_config->main_thread_dispatcher_, random, cluster_info.statsScope());
   }
 }
 

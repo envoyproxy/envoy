@@ -85,6 +85,7 @@ actual mechanics of the release itself.
 | 2026 Q1 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 | 2026 Q2 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 | 2026 Q3 | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))    | Yan Avlasov ([yanavlasov](https://github.com/yanavlasov))                |
+| 2026 Q4 | Jonh Wendell ([jwendell](https://github.com/jwendell))    | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))                |
 
 ## Major release schedule
 

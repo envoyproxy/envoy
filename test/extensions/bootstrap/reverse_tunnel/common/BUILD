@@ -18,7 +18,9 @@ envoy_cc_test(
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "//test/common/tls:mock_ssl_handshaker_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
     ],
@@ -32,5 +34,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/common:rping_interceptor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
     ],
 )

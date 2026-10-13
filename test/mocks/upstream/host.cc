@@ -2,6 +2,8 @@
 
 #include "source/common/network/utility.h"
 
+// NOLINT: cache-bust for corrupt RBE artifact, remove this on any change to this file.
+
 using testing::_;
 using testing::Invoke;
 using testing::Return;
@@ -29,6 +31,10 @@ MockDetector::~MockDetector() = default;
 
 MockHealthCheckHostMonitor::MockHealthCheckHostMonitor() = default;
 MockHealthCheckHostMonitor::~MockHealthCheckHostMonitor() = default;
+
+MockHostLbPolicyData::MockHostLbPolicyData(bool receives_orca_load_report)
+    : receives_orca_load_report_(receives_orca_load_report) {}
+MockHostLbPolicyData::~MockHostLbPolicyData() = default;
 
 MockHostDescription::MockHostDescription()
     : address_(*Network::Utility::resolveUrl("tcp://10.0.0.1:443")),

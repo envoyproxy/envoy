@@ -14,6 +14,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
+#include "envoy/init/manager.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/router.h"
@@ -38,6 +39,7 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/per_filter_config.h"
 #include "source/common/router/retry_policy_impl.h"
+#include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
@@ -90,7 +92,14 @@ public:
 
   absl::string_view sanitizedPath() const {
     if (!sanitized_path_computed_) {
-      sanitized_path_ = ignore_path_params_ ? stripPathParams(path()) : path();
+      sanitized_path_ = path();
+      if (ignore_path_params_) {
+        std::optional<std::string> modified_path = stripPathParams(path());
+        if (modified_path.has_value()) {
+          sanitized_path_storage_ = std::move(modified_path).value();
+          sanitized_path_ = sanitized_path_storage_;
+        }
+      }
       sanitized_path_computed_ = true;
     }
     return sanitized_path_;
@@ -98,8 +107,14 @@ public:
 
   absl::string_view sanitizedPathWithoutQuery() const {
     if (!sanitized_path_without_query_computed_) {
-      sanitized_path_without_query_ =
-          ignore_path_params_ ? stripPathParams(pathWithoutQuery()) : pathWithoutQuery();
+      sanitized_path_without_query_ = pathWithoutQuery();
+      if (ignore_path_params_) {
+        std::optional<std::string> modified_path = stripPathParams(pathWithoutQuery());
+        if (modified_path.has_value()) {
+          sanitized_path_without_query_storage_ = std::move(modified_path).value();
+          sanitized_path_without_query_ = sanitized_path_without_query_storage_;
+        }
+      }
       sanitized_path_without_query_computed_ = true;
     }
     return sanitized_path_without_query_;
@@ -129,13 +144,14 @@ public:
     return cookies_;
   }
 
-private:
-  static absl::string_view stripPathParams(absl::string_view path) {
-    const auto pos = path.find(';');
-    return pos != absl::string_view::npos ? path.substr(0, pos) : path;
-  }
+  // Strip parameters from URL path. Return modified path or nullopt if path was
+  // not modified.
+  static std::optional<std::string> stripPathParams(absl::string_view path);
 
+private:
   const Http::RequestHeaderMap& headers_;
+  mutable std::string sanitized_path_storage_;
+  mutable std::string sanitized_path_without_query_storage_;
   mutable absl::string_view path_without_query_;
   mutable absl::string_view sanitized_path_;
   mutable absl::string_view sanitized_path_without_query_;
@@ -166,11 +182,10 @@ public:
    * @param stream_info supplies the stream info for the request.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
-   * @return RouteConstSharedPtr if input matches this object, nullptr otherwise.
+   * @return true if input matches this object, false otherwise.
    */
-  virtual RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                                      const StreamInfo::StreamInfo& stream_info,
-                                      uint64_t random_value) const PURE;
+  virtual bool matches(const RouteMatchContext& route_match_context,
+                       const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const PURE;
 
   // By default, matchers do not support null Path headers.
   virtual bool supportsPathlessHeaders() const { return false; }
@@ -204,6 +219,28 @@ public:
 
 class CommonVirtualHostImpl;
 using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
+
+/**
+ * Builds routes of a virtual host for the route specifiers configured on it.
+ */
+class RouteBuilderImpl : public RouteBuilder {
+public:
+  RouteBuilderImpl(const CommonVirtualHostSharedPtr& vhost,
+                   Server::Configuration::ServerFactoryContext& factory_context,
+                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager)
+      : vhost_(vhost), factory_context_(factory_context), validator_(validator),
+        init_manager_(init_manager) {}
+
+  // Router::RouteBuilder
+  absl::StatusOr<MatchableRouteConstSharedPtr> build(const envoy::config::route::v3::Route& route,
+                                                     bool validate_clusters) override;
+
+private:
+  const CommonVirtualHostSharedPtr vhost_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
+  Init::Manager& init_manager_;
+};
 
 class SslRedirectRoute : public Route {
 public:
@@ -330,7 +367,7 @@ public:
   create(const envoy::config::route::v3::VirtualHost& virtual_host,
          const CommonConfigSharedPtr& global_route_config,
          Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-         ProtobufMessage::ValidationVisitor& validator);
+         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager);
 
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const CommonConfigImpl& globalRouteConfig() const { return *global_route_config_; }
@@ -386,7 +423,7 @@ private:
                         const CommonConfigSharedPtr& global_route_config,
                         Server::Configuration::ServerFactoryContext& factory_context,
                         Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
-                        absl::Status& creation_status);
+                        Init::Manager& init_manager, absl::Status& creation_status);
   struct StatNameProvider {
     StatNameProvider(absl::string_view name, Stats::SymbolTable& symbol_table)
         : stat_name_storage_(name, symbol_table) {}
@@ -453,6 +490,19 @@ private:
 };
 
 /**
+ * The outcome of route matching within a single virtual host: the resolved route and whether the
+ * route specifier chains already ran on it. The chains of all three levels run on a route entry
+ * as soon as it matched.
+ *
+ * `route` may be nullptr while `specifiers_applied` is true: the specifiers accepted the match and
+ * dropped the route, which leaves the request with no route for good.
+ */
+struct VirtualHostMatchResult {
+  RouteConstSharedPtr route;
+  bool specifiers_applied{false};
+};
+
+/**
  * Virtual host that holds a collection of routes.
  */
 class VirtualHostImpl : Logger::Loggable<Logger::Id::router> {
@@ -460,25 +510,28 @@ public:
   VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                   const CommonConfigSharedPtr& global_route_config,
                   Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-                  ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
-                  absl::Status& creation_status);
+                  ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                  bool validate_clusters, absl::Status& creation_status);
 
-  RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
-                                          const Http::RequestHeaderMap& headers,
-                                          const StreamInfo::StreamInfo& stream_info,
-                                          uint64_t random_value) const;
+  VirtualHostMatchResult getRouteFromEntries(const RouteCallback& cb,
+                                             const Http::RequestHeaderMap& headers,
+                                             const StreamInfo::StreamInfo& stream_info,
+                                             uint64_t random_value) const;
 
-  RouteConstSharedPtr
+  VirtualHostMatchResult
   getRouteFromRoutes(const RouteCallback& cb, const RouteMatchContext& route_match_context,
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
   VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
   CommonVirtualHostSharedPtr shared_virtual_host_;
+  // Created after the shared virtual host so that the specifiers can build routes in it.
+  RouteSpecifierList route_specifiers_;
 
   std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
   SslRequirements ssl_requirements_;
@@ -580,6 +633,11 @@ class RouteTracingImpl : public RouteTracing {
 public:
   explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
 
+  // Builds a RouteTracingImpl, returning an error instead of throwing when an operation formatter
+  // is invalid, so a caller that must not throw can validate the configuration.
+  static absl::StatusOr<std::unique_ptr<RouteTracingImpl>>
+  create(const envoy::config::route::v3::Tracing& tracing);
+
   // RouteTracing
   const envoy::type::v3::FractionalPercent& getClientSampling() const override;
   const envoy::type::v3::FractionalPercent& getRandomSampling() const override;
@@ -667,7 +725,8 @@ protected:
   RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
-                     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
+                     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                     absl::Status& creation_status);
 
 public:
   bool isDirectResponse() const { return direct_response_code_.has_value(); }
@@ -677,6 +736,12 @@ public:
   bool matchRoute(const RouteMatchContext& route_match_context,
                   const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
   absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
+  // Resolves the route of a request that matched this entry, which is the entry itself unless a
+  // cluster specifier plugin is configured.
+  RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   uint64_t random_value) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -845,7 +910,7 @@ public:
 
   // Sanitizes the |path| before passing it to PathMatcher, if configured, this method makes the
   // path matching to ignore the path-parameters.
-  absl::string_view sanitizePathBeforePathMatching(const absl::string_view path) const;
+  std::string sanitizePathBeforePathMatching(const absl::string_view path) const;
 
 protected:
   const PathMatcherSharedPtr path_matcher_;
@@ -867,9 +932,6 @@ protected:
   std::unique_ptr<ConnectConfig> connect_config_;
 
   bool case_sensitive() const { return case_sensitive_; }
-  RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
-                                   const StreamInfo::StreamInfo& stream_info,
-                                   uint64_t random_value) const;
 
   // Common logic for rewritePathHeader() of DirectResponseEntry.
   void finalizePathHeaderForRedirect(Http::RequestHeaderMap& headers,
@@ -1000,6 +1062,7 @@ private:
   Envoy::Config::DataSource::DataSourceProviderPtr<std::string> direct_response_body_provider_;
   Formatter::FormatterPtr direct_response_body_formatter_;
   std::string direct_response_content_type_;
+  RouteSpecifierList route_specifiers_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
@@ -1028,9 +1091,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Template; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1047,7 +1109,7 @@ public:
                                    const envoy::config::route::v3::Route& route,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    ProtobufMessage::ValidationVisitor& validator,
-                                   absl::Status& creation_status);
+                                   Init::Manager& init_manager, absl::Status& creation_status);
 
 private:
   const std::string uri_template_;
@@ -1063,9 +1125,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1081,7 +1142,7 @@ public:
   PrefixRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                        const envoy::config::route::v3::Route& route,
                        Server::Configuration::ServerFactoryContext& factory_context,
-                       ProtobufMessage::ValidationVisitor& validator,
+                       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
                        absl::Status& creation_status);
 
 private:
@@ -1098,9 +1159,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1116,7 +1176,8 @@ public:
   PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                      const envoy::config::route::v3::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
-                     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
+                     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                     absl::Status& creation_status);
 
 private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
@@ -1132,9 +1193,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1150,7 +1210,8 @@ public:
   RegexRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                       const envoy::config::route::v3::Route& route,
                       Server::Configuration::ServerFactoryContext& factory_context,
-                      ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
+                      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                      absl::Status& creation_status);
 
 private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
@@ -1166,9 +1227,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::None; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
@@ -1185,7 +1245,7 @@ public:
   ConnectRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                         const envoy::config::route::v3::Route& route,
                         Server::Configuration::ServerFactoryContext& factory_context,
-                        ProtobufMessage::ValidationVisitor& validator,
+                        ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
                         absl::Status& creation_status);
 };
 
@@ -1199,9 +1259,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1218,7 +1277,7 @@ public:
                                     const envoy::config::route::v3::Route& route,
                                     Server::Configuration::ServerFactoryContext& factory_context,
                                     ProtobufMessage::ValidationVisitor& validator,
-                                    absl::Status& creation_status);
+                                    Init::Manager& init_manager, absl::Status& creation_status);
 
 private:
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
@@ -1228,6 +1287,9 @@ private:
 struct RouteActionContext {
   const CommonVirtualHostSharedPtr& vhost;
   Server::Configuration::ServerFactoryContext& factory_context;
+  // Init manager that the routes created by the match tree should use to warm up their resources.
+  // This is only valid while the route configuration is being constructed and must never be stored.
+  Init::Manager& init_manager;
 };
 
 // Action used with the matching tree to specify route to use for an incoming stream.
@@ -1291,7 +1353,8 @@ public:
   create(const envoy::config::route::v3::RouteConfiguration& config,
          const CommonConfigSharedPtr& global_route_config,
          Server::Configuration::ServerFactoryContext& factory_context,
-         ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
+         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+         bool validate_clusters);
 
   VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                          const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
@@ -1302,8 +1365,8 @@ private:
   RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
                const CommonConfigSharedPtr& global_route_config,
                Server::Configuration::ServerFactoryContext& factory_context,
-               ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
-               absl::Status& creation_status);
+               ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+               bool validate_clusters, absl::Status& creation_status);
 
   using WildcardVirtualHosts =
       std::map<int64_t, absl::flat_hash_map<std::string, VirtualHostImplSharedPtr>, std::greater<>>;
@@ -1313,6 +1376,9 @@ private:
                                                  SubstringFunction substring_function) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
+  // Keeps the shared part of the route config alive and gives access to the route configuration
+  // level extensions, which run even when no virtual host matches.
+  const CommonConfigSharedPtr global_route_config_;
   Stats::ScopeSharedPtr vhost_scope_;
   absl::flat_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
@@ -1340,7 +1406,7 @@ public:
   static absl::StatusOr<std::shared_ptr<CommonConfigImpl>>
   create(const envoy::config::route::v3::RouteConfiguration& config,
          Server::Configuration::ServerFactoryContext& factory_context,
-         ProtobufMessage::ValidationVisitor& validator);
+         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager);
 
   const HeaderParser& requestHeaderParser() const {
     if (request_headers_parser_ != nullptr) {
@@ -1361,6 +1427,7 @@ public:
   std::optional<bool> filterDisabled(absl::string_view config_name) const {
     return per_filter_configs_->disabled(config_name);
   }
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
   // Router::CommonConfig
   const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
@@ -1377,7 +1444,7 @@ public:
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
   absl::StatusOr<ClusterSpecifierPluginSharedPtr>
   clusterSpecifierPlugin(absl::string_view provider) const;
-  bool ignorePathParametersInPathMatching() const {
+  bool ignorePathParametersInPathMatching() const override {
     return ignore_path_parameters_in_path_matching_;
   }
   const envoy::config::core::v3::Metadata& metadata() const override;
@@ -1386,7 +1453,8 @@ public:
 private:
   CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                    Server::Configuration::ServerFactoryContext& factory_context,
-                   ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
+                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                   absl::Status& creation_status);
   std::vector<Http::LowerCaseString> internal_only_headers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
@@ -1397,6 +1465,7 @@ private:
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   RouteMetadataPackPtr metadata_;
+  RouteSpecifierList route_specifiers_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_direct_response_body_size_bytes_;
   const bool uses_vhds_ : 1;
@@ -1409,10 +1478,17 @@ private:
  */
 class ConfigImpl : public Config {
 public:
+  /**
+   * @param init_manager the init manager that the resources owned by the new route
+   * configuration, such as the route level filter configurations, should use to warm up. The route
+   * configuration is only warmed up and published when the init manager is initialized. The init
+   * manager is only valid for the duration of this call and must never be stored.
+   */
   static absl::StatusOr<std::shared_ptr<ConfigImpl>>
   create(const envoy::config::route::v3::RouteConfiguration& config,
          Server::Configuration::ServerFactoryContext& factory_context,
-         ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default);
+         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+         bool validate_clusters_default);
 
   bool virtualHostExists(const Http::RequestHeaderMap& headers) const {
     return route_matcher_->findVirtualHost(headers) != nullptr;
@@ -1441,7 +1517,7 @@ public:
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const {
     return shared_config_->shadowPolicies();
   }
-  bool ignorePathParametersInPathMatching() const {
+  bool ignorePathParametersInPathMatching() const override {
     return shared_config_->ignorePathParametersInPathMatching();
   }
   const envoy::config::core::v3::Metadata& metadata() const override {
@@ -1454,8 +1530,8 @@ public:
 protected:
   ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
              Server::Configuration::ServerFactoryContext& factory_context,
-             ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default,
-             absl::Status& creation_status);
+             ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+             bool validate_clusters_default, absl::Status& creation_status);
 
 private:
   CommonConfigSharedPtr shared_config_;
@@ -1488,6 +1564,7 @@ public:
   uint32_t maxDirectResponseBodySizeBytes() const override { return 0; }
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
+  bool ignorePathParametersInPathMatching() const override { return false; }
 
 private:
   std::vector<Http::LowerCaseString> internal_only_headers_;

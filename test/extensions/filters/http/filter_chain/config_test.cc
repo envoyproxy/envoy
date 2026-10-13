@@ -101,11 +101,11 @@ TEST(FilterChainFilterFactoryTest, FilterChainFilterRouteSpecificConfigWithFilte
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml_string, *proto_config);
 
+  const std::string empty_stats_prefix;
+  Server::Configuration::ExtraFactoryContext extra_context{
+      ProtobufMessage::getNullValidationVisitor(), empty_stats_prefix};
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      factory
-          .createRouteSpecificFilterConfig(*proto_config, factory_context,
-                                           ProtobufMessage::getNullValidationVisitor())
-          .value();
+      factory.createHttpFilterRouteConfig(*proto_config, factory_context, extra_context).value();
   EXPECT_TRUE(route_config.get());
 
   const auto* inflated = dynamic_cast<const FilterChainPerRouteConfig*>(route_config.get());
@@ -137,8 +137,11 @@ TEST(FilterChainFilterFactoryTest,
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   TestUtility::loadFromYaml(yaml_string, *proto_config);
 
-  auto route_config = factory.createRouteSpecificFilterConfig(
-      *proto_config, factory_context, ProtobufMessage::getNullValidationVisitor());
+  const std::string empty_stats_prefix;
+  Server::Configuration::ExtraFactoryContext extra_context{
+      ProtobufMessage::getNullValidationVisitor(), empty_stats_prefix};
+  auto route_config =
+      factory.createHttpFilterRouteConfig(*proto_config, factory_context, extra_context);
   EXPECT_THAT(route_config, HasStatus(absl::StatusCode::kInvalidArgument,
                                       "FilterChain filter cannot be configured recursively."));
 }

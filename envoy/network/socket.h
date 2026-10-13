@@ -290,6 +290,7 @@ public:
 
   /**
    * @return roundTripTime of the connection
+   * TODO(wbpcode): support better precision for round trip time, e.g. std::chrono::nanoseconds.
    */
   virtual const std::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
 
@@ -443,6 +444,11 @@ public:
    * @return the IP version used by the socket if address type is IP, std::nullopt otherwise
    */
   virtual std::optional<Address::IpVersion> ipVersion() const PURE;
+
+  /**
+   * Request RST on a subsequent close().
+   */
+  virtual void setAbortiveClose() PURE;
 
   /**
    * Close the underlying socket.
@@ -606,7 +612,7 @@ public:
 
 using SocketPtr = std::unique_ptr<Socket>;
 using SocketSharedPtr = std::shared_ptr<Socket>;
-using SocketOptRef = std::optional<std::reference_wrapper<Socket>>;
+using SocketOptRef = OptRef<Socket>;
 
 } // namespace Network
 } // namespace Envoy

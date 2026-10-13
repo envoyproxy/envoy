@@ -52,7 +52,10 @@ public:
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   static void shutdownAll();
 
-  void shutdown() { shutdown_ = true; }
+  void shutdown() {
+    shutdown_ = true;
+    xds_config_tracker_.reset();
+  }
 
   void start() override;
 
@@ -65,9 +68,6 @@ public:
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoderSharedPtr resource_decoder,
                            const SubscriptionOptions& options) override;
-
-  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-  }
 
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());
@@ -160,6 +160,11 @@ private:
       updateResources(resources);
       parent_.queueDiscoveryRequest(type_url_);
     }
+
+    // On-demand and glob watch interest are only supported by the delta muxes; this legacy
+    // state-of-the-world mux does not implement them.
+    void append(const absl::flat_hash_set<std::string>&) override {}
+    void accept(const absl::flat_hash_set<std::string>&) override {}
 
     // Maintain deterministic wire ordering via ordered std::set.
     std::set<std::string> resources_;

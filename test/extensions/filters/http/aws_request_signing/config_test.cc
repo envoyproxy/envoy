@@ -769,9 +769,11 @@ match_excluded_headers:
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsRequestSigningFilterFactory factory;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
 
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(proto_config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);

@@ -14,20 +14,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CdnLoop {
 
-class CdnLoopFilterFactory : public Common::ExceptionFreeFactoryBase<
+class CdnLoopFilterFactory : public Common::UnifiedFactoryBase<
                                  envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig> {
 public:
-  CdnLoopFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.cdn_loop") {}
+  CdnLoopFilterFactory() : UnifiedFactoryBase("envoy.filters.http.cdn_loop") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace CdnLoop
