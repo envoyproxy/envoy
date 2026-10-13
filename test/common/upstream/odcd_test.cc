@@ -117,8 +117,8 @@ TEST_F(ODCDTest, TestRequestRepeated) {
   auto handle2 =
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
   EXPECT_EQ(callback_call_count_, 0);
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds_success").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds.discovery_success").value());
 }
 
 // Check if requesting an unknown cluster calls into ODCDS, even after the successful discovery of
@@ -131,15 +131,15 @@ TEST_F(ODCDTest, TestClusterRediscovered) {
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1"));
   EXPECT_EQ(callback_call_count_, 1);
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_success").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_success").value());
   handle.reset();
   cluster_manager_->removeCluster("cluster_foo");
   cb = createCallback();
   handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   EXPECT_EQ(callback_call_count_, 1);
-  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_success").value());
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_success").value());
 }
 
 // Check if requesting an unknown cluster calls into ODCDS, even after the expired discovery of the
@@ -151,14 +151,14 @@ TEST_F(ODCDTest, TestClusterRediscoveredAfterExpiration) {
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   cluster_manager_->notifyExpiredDiscovery("cluster_foo");
   EXPECT_EQ(callback_call_count_, 1);
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds_success").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_timeout").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds.discovery_success").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_timeout").value());
   handle.reset();
   cb = createCallback();
   handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   EXPECT_EQ(callback_call_count_, 1);
-  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
 }
 
 // Check if requesting an unknown cluster calls into ODCDS, even after
@@ -172,14 +172,14 @@ TEST_F(ODCDTest, TestClusterRediscoveredAfterMissing) {
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   cluster_manager_->notifyMissingCluster("cluster_foo");
   EXPECT_EQ(callback_call_count_, 1);
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds_success").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_missing").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds.discovery_success").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_missing").value());
   handle.reset();
   cb = createCallback();
   handle = odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   EXPECT_EQ(callback_call_count_, 1);
-  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
 }
 
 // Check that we do nothing if we get a notification about irrelevant
@@ -191,7 +191,7 @@ TEST_F(ODCDTest, TestIrrelevantNotifyMissingCluster) {
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   cluster_manager_->notifyMissingCluster("cluster_bar");
   EXPECT_EQ(callback_call_count_, 0);
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds_missing").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds.discovery_missing").value());
 }
 
 // Check that the callback is not called when some other cluster is added.
@@ -204,7 +204,7 @@ TEST_F(ODCDTest, TestDiscoveryManagerIgnoresIrrelevantClusters) {
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   ASSERT_OK(
       cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_irrelevant"), "version1"));
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds_success").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds.discovery_success").value());
 }
 
 // Start a couple of discoveries and drop the discovery handles in different order, make sure no
@@ -266,8 +266,8 @@ TEST_F(ODCDTest, TestHandles) {
 
   ASSERT_OK(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster_foo"), "version1"));
   EXPECT_EQ(callback_call_count_, 2);
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_success").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_success").value());
 }
 
 // Check if callback is invoked when trying to discover a cluster we already know about. It should
@@ -279,8 +279,8 @@ TEST_F(ODCDTest, TestCallbackWithExistingCluster) {
   auto handle =
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb), timeout_);
   EXPECT_EQ(callback_call_count_, 1);
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds_success").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.odcds.discovery_success").value());
 }
 
 // Checks that the cluster manager detects that a thread has requested a cluster that some other
@@ -294,7 +294,7 @@ TEST_F(ODCDTest, TestMainThreadDiscoveryInProgressDetection) {
   auto cdm = cluster_manager_->createAndSwapClusterDiscoveryManager("another_fake_thread");
   auto handle2 =
       odcds_handle_->requestOnDemandClusterDiscovery("cluster_foo", std::move(cb2), timeout_);
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds_attempt").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.odcds.discovery_attempt").value());
 }
 
 // Test that destroying an OdCdsApiHandle from a worker thread does not cause SIGABRT.

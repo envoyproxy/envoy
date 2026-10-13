@@ -201,10 +201,6 @@ private:
   COUNTER(cluster_removed)                                                                         \
   COUNTER(cluster_updated)                                                                         \
   COUNTER(cluster_updated_via_merge)                                                               \
-  COUNTER(odcds_attempt)                                                                           \
-  COUNTER(odcds_missing)                                                                           \
-  COUNTER(odcds_success)                                                                           \
-  COUNTER(odcds_timeout)                                                                           \
   COUNTER(update_merge_cancelled)                                                                  \
   COUNTER(update_out_of_merge_window)                                                              \
   GAUGE(active_clusters, NeverImport)                                                              \
@@ -215,6 +211,19 @@ private:
  */
 struct ClusterManagerStats {
   ALL_CLUSTER_MANAGER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * On-demand cluster discovery outcome stats. @see stats_macros.h
+ */
+#define ALL_ODCDS_DISCOVERY_STATS(COUNTER)                                                         \
+  COUNTER(discovery_attempt)                                                                       \
+  COUNTER(discovery_missing)                                                                       \
+  COUNTER(discovery_success)                                                                       \
+  COUNTER(discovery_timeout)
+
+struct OdCdsDiscoveryStats {
+  ALL_ODCDS_DISCOVERY_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
@@ -938,6 +947,7 @@ private:
                       const uint64_t timeout);
   ProtobufTypes::MessagePtr dumpClusterConfigs(const Matchers::StringMatcher& name_matcher);
   static ClusterManagerStats generateStats(Stats::Scope& scope);
+  static OdCdsDiscoveryStats generateOdCdsDiscoveryStats(Stats::Scope& scope);
 
   /**
    * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
@@ -1000,6 +1010,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
+  OdCdsDiscoveryStats odcds_discovery_stats_;
   ClusterManagerInitHelper init_helper_;
   // Temporarily saved resume cds callback from updateClusterCounts invocation.
   Config::ScopedResume resume_cds_;

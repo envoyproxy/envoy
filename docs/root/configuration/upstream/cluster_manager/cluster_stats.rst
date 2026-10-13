@@ -23,14 +23,28 @@ upstreams and control plane xDS clusters.
   cluster_removed, Counter, Total clusters removed (via CDS)
   cluster_updated, Counter, Total cluster updates
   cluster_updated_via_merge, Counter, Total cluster updates applied as merged updates
-  odcds_attempt, Counter, On-demand cluster discoveries started
-  odcds_missing, Counter, On-demand cluster discoveries completed because the requested cluster was missing
-  odcds_success, Counter, On-demand cluster discoveries completed when the requested cluster became available
-  odcds_timeout, Counter, On-demand cluster discoveries that timed out
   update_merge_cancelled, Counter, Total merged updates that got cancelled and delivered early
   update_out_of_merge_window, Counter, Total updates which arrived out of a merge window
   active_clusters, Gauge, Number of currently active (warmed) clusters
   warming_clusters, Gauge, Number of currently warming (not active) clusters
+
+.. _config_cluster_manager_odcds_stats:
+
+On-demand CDS
+-------------
+
+On-demand cluster discovery statistics are rooted at *cluster_manager.odcds.*. The discovery
+counters increment once per discovery, even when multiple requests wait for its result. The
+subscription statistics on this prefix count xDS stream updates instead.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  discovery_attempt, Counter, On-demand cluster discoveries started
+  discovery_missing, Counter, On-demand cluster discoveries completed because the requested cluster was missing
+  discovery_success, Counter, On-demand cluster discoveries completed when the requested cluster became available
+  discovery_timeout, Counter, On-demand cluster discoveries that timed out
 
 
 In addition to the cluster manager stats, there are per worker thread local
