@@ -27,6 +27,7 @@ envoy_extension_cc_test(
         "//source/common/common:hex_lib",
         "//source/common/ssl:ssl_lib",
         "//source/extensions/filters/listener/tls_inspector:ja4_fingerprint_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

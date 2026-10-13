@@ -4,6 +4,7 @@
 #include "source/common/ssl/ssl.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
@@ -138,6 +139,32 @@ TEST(JA4Fingerprinter, GreaseValueFilteredFromSignatureAlgorithms) {
   hello_with_grease.extensions_len = exts_with_grease.size();
 
   EXPECT_EQ(JA4Fingerprinter::create(&hello_no_grease),
+            JA4Fingerprinter::create(&hello_with_grease));
+}
+
+TEST(JA4Fingerprinter, GreaseValueInSignatureAlgorithmsOldBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ja4_filter_grease_signature_algorithms", "false"}});
+
+  const auto exts_no_grease =
+      buildExtensionsWithSigAlgs(buildSigAlgsExtensionBody({0x0403, 0x0804}));
+  const auto exts_with_grease =
+      buildExtensionsWithSigAlgs(buildSigAlgsExtensionBody({0x0a0a, 0x0403, 0x0804}));
+  const std::vector<uint8_t> ciphers = {0xc0, 0x2f, 0xc0, 0x30};
+
+  SSL_CLIENT_HELLO hello_no_grease{};
+  hello_no_grease.version = TLS1_2_VERSION;
+  hello_no_grease.cipher_suites = ciphers.data();
+  hello_no_grease.cipher_suites_len = ciphers.size();
+  hello_no_grease.extensions = exts_no_grease.data();
+  hello_no_grease.extensions_len = exts_no_grease.size();
+
+  SSL_CLIENT_HELLO hello_with_grease = hello_no_grease;
+  hello_with_grease.extensions = exts_with_grease.data();
+  hello_with_grease.extensions_len = exts_with_grease.size();
+
+  EXPECT_NE(JA4Fingerprinter::create(&hello_no_grease),
             JA4Fingerprinter::create(&hello_with_grease));
 }
 
