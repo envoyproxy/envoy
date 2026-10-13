@@ -168,6 +168,8 @@ resources:
       RELEASE_ASSERT(result, result.message());
       fake_grpc_connection_.reset();
     }
+    // The streams' connection is closed, so the fake upstream no longer calls into them.
+    grpc_requests_.clear();
     cleanupUpstreamAndDownstream();
   }
 
@@ -181,7 +183,7 @@ resources:
           fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_grpc_connection_);
       RELEASE_ASSERT(result, result.message());
     }
-    FakeStreamPtr grpc_request;
+    FakeStreamPtr& grpc_request = grpc_requests_.emplace_back();
     AssertionResult result = fake_grpc_connection_->waitForNewStream(*dispatcher_, grpc_request);
     RELEASE_ASSERT(result, result.message());
     helloworld::HelloRequest hello_request;
@@ -209,6 +211,9 @@ resources:
   }
 
   FakeHttpConnectionPtr fake_grpc_connection_;
+  // The gRPC client may reset a stream after the test is done with it, which the fake upstream
+  // delivers on its own thread, so the streams are kept until their connection is closed.
+  std::vector<FakeStreamPtr> grpc_requests_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcServiceInitialMetadataIntegrationTest,
