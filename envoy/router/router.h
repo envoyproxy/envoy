@@ -553,6 +553,26 @@ public:
 using RetryStatePtr = std::unique_ptr<RetryState>;
 
 /**
+ * All mirror policy stats. @see stats_macro.h
+ */
+#define ALL_SHADOW_POLICY_STATS(COUNTER)                                                           \
+  COUNTER(rq_cancelled)                                                                            \
+  COUNTER(rq_failure)                                                                              \
+  COUNTER(rq_no_cluster)                                                                           \
+  COUNTER(rq_sampled)                                                                              \
+  COUNTER(rq_started)                                                                              \
+  COUNTER(rq_success)
+
+/**
+ * Struct definition for all mirror policy stats. @see stats_macro.h
+ */
+struct ShadowPolicyStats {
+  ALL_SHADOW_POLICY_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+using ShadowPolicyStatsSharedPtr = std::shared_ptr<const ShadowPolicyStats>;
+
+/**
  * Per route policy for request shadowing.
  */
 class ShadowPolicy {
@@ -606,6 +626,13 @@ public:
    * @return the literal value to rewrite the host header with, or empty if no rewrite.
    */
   virtual absl::string_view hostRewriteLiteral() const PURE;
+
+  /**
+   * @return the stats of this policy, or nullptr if the policy has no stat prefix. The returned
+   *         pointer keeps the stats alive, so it can be held by a mirror request that outlives
+   *         the route configuration.
+   */
+  virtual const ShadowPolicyStatsSharedPtr& stats() const PURE;
 };
 
 using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;

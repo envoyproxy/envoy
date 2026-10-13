@@ -535,11 +535,15 @@ envoy_cc_library(
     srcs = ["shadow_writer_impl.cc"],
     hdrs = ["shadow_writer_impl.h"],
     deps = [
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/http:codes_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
     ],
 )
 

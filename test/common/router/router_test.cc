@@ -6036,6 +6036,19 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
                                std::shared_ptr<ShadowPolicyImpl>);
 }
 
+std::shared_ptr<ShadowPolicyImpl>
+makeShadowPolicyWithStats(Server::Configuration::MockServerFactoryContext& factory_context,
+                          std::string cluster, std::string cluster_header,
+                          std::string runtime_key) {
+  envoy::config::route::v3::RouteAction::RequestMirrorPolicy policy;
+  policy.set_cluster(cluster);
+  policy.set_cluster_header(cluster_header);
+  policy.mutable_runtime_fraction()->set_runtime_key(runtime_key);
+  policy.set_stat_prefix("test_mirror");
+  return THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(policy, factory_context),
+                               std::shared_ptr<ShadowPolicyImpl>);
+}
+
 } // namespace
 
 class RouterShadowingTest : public RouterTest, public testing::WithParamInterface<bool> {
@@ -6497,6 +6510,134 @@ TEST_P(RouterShadowingTest, ShadowRequestForwardsDynamicMetadataToAllPolicies) {
   EXPECT_CALL(foo_request, cancel());
   EXPECT_CALL(fizz_request, removeWatermarkCallbacks());
   EXPECT_CALL(fizz_request, cancel());
+
+  router_->onDestroy();
+}
+
+TEST_P(RouterShadowingTest, ShadowStatsSampledAndPassedToWriter) {
+  std::shared_ptr<ShadowPolicyImpl> policy =
+      makeShadowPolicyWithStats(factory_context_, "foo", "", "bar");
+  ASSERT_NE(nullptr, policy->stats());
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _)).WillOnce(Return(&foo_request));
+
+  router_->decodeHeaders(headers, false);
+  EXPECT_EQ(policy->stats(), shadow_writer_->last_stats_);
+  EXPECT_EQ(1U, factory_context_.store_.counterFromString("mirror.test_mirror.rq_sampled").value());
+  EXPECT_EQ(0U,
+            factory_context_.store_.counterFromString("mirror.test_mirror.rq_no_cluster").value());
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+
+  router_->onDestroy();
+}
+
+TEST_P(RouterShadowingTest, ShadowStatsNotSampled) {
+  std::shared_ptr<ShadowPolicyImpl> policy =
+      makeShadowPolicyWithStats(factory_context_, "foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(false));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(*shadow_writer_, streamingShadow_(_, _, _)).Times(0);
+
+  router_->decodeHeaders(headers, false);
+  EXPECT_EQ(0U, factory_context_.store_.counterFromString("mirror.test_mirror.rq_sampled").value());
+
+  router_->onDestroy();
+}
+
+TEST_P(RouterShadowingTest, ShadowStatsNoClusterInHeader) {
+  std::shared_ptr<ShadowPolicyImpl> policy =
+      makeShadowPolicyWithStats(factory_context_, "", "some_header", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(*shadow_writer_, streamingShadow_(_, _, _)).Times(0);
+
+  router_->decodeHeaders(headers, false);
+  EXPECT_EQ(1U, factory_context_.store_.counterFromString("mirror.test_mirror.rq_sampled").value());
+  EXPECT_EQ(1U,
+            factory_context_.store_.counterFromString("mirror.test_mirror.rq_no_cluster").value());
+
+  router_->onDestroy();
+}
+
+// A mirror selected for a request that gets a local reply is counted as sampled but never reaches
+// the shadow writer.
+TEST_P(RouterShadowingTest, ShadowStatsSkippedOnLocalReply) {
+  std::shared_ptr<ShadowPolicyImpl> policy =
+      makeShadowPolicyWithStats(factory_context_, "foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_(_, _, _)).Times(0);
+  EXPECT_CALL(*shadow_writer_, shadow_(_, _, _)).Times(0);
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
+      .WillOnce(InvokeWithoutArgs([] {}));
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([this](const Http::RequestHeaderMap&, bool) -> Http::Status {
+        callbacks_.sendLocalReply(Http::Code::ServiceUnavailable, "", {}, std::nullopt,
+                                  "rejected_immediately");
+        Http::StreamFilterBase::LocalReplyData local_reply_data{
+            Http::Code::ServiceUnavailable, std::nullopt, "rejected_immediately", false};
+        router_->onLocalReply(local_reply_data);
+        return Http::okStatus();
+      }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U, factory_context_.store_.counterFromString("mirror.test_mirror.rq_sampled").value());
+  EXPECT_EQ(0U,
+            factory_context_.store_.counterFromString("mirror.test_mirror.rq_no_cluster").value());
 
   router_->onDestroy();
 }

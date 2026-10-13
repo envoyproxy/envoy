@@ -298,7 +298,9 @@ public:
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-              const Http::AsyncClient::RequestOptions& options) override {
+              const Http::AsyncClient::RequestOptions& options,
+              const ShadowPolicyStatsSharedPtr& stats) override {
+    last_stats_ = stats;
     shadow_(cluster, request, options);
   }
 
@@ -308,12 +310,17 @@ public:
 
   Http::AsyncClient::OngoingRequest*
   streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& request,
-                  const Http::AsyncClient::RequestOptions& options) override {
+                  const Http::AsyncClient::RequestOptions& options,
+                  const ShadowPolicyStatsSharedPtr& stats) override {
+    last_stats_ = stats;
     return streamingShadow_(cluster, request, options);
   }
   MOCK_METHOD(Http::AsyncClient::OngoingRequest*, streamingShadow_,
               (const std::string& cluster, Http::RequestHeaderMapPtr& request,
                const Http::AsyncClient::RequestOptions& options));
+
+  // The stats passed to the last shadow() or streamingShadow() call.
+  ShadowPolicyStatsSharedPtr last_stats_;
 };
 
 class TestVirtualCluster : public VirtualCluster {

@@ -894,7 +894,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing doesn't support HTTP CONNECT and upgrades.
-  // [#next-free-field: 9]
+  // [#next-free-field: 10]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -962,6 +962,14 @@ message RouteAction {
     // is implicitly enabled if this field is set.
     string host_rewrite_literal = 8
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // The human readable prefix to use when emitting statistics for this mirror policy. The
+    // statistics are rooted at ``mirror.<stat_prefix>.`` and count how many requests were
+    // selected for mirroring, how many mirrors were started, and how each mirror ended. See
+    // :ref:`mirror policy statistics <config_http_filters_router_mirror_stats>`.
+    //
+    // If empty, no per policy statistics are emitted.
+    string stat_prefix = 9;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer

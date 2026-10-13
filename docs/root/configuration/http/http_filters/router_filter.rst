@@ -478,6 +478,32 @@ statistics:
    they are counted in ``cluster.<name>.retry.upstream_rq_<*>`` instead. See
    :ref:`cluster retry statistics <config_cluster_manager_cluster_stats_retry>` for details.
 
+.. _config_http_filters_router_mirror_stats:
+
+Mirror policies
+^^^^^^^^^^^^^^^
+
+A :ref:`request mirror policy <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`
+with a :ref:`stat_prefix
+<envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.stat_prefix>` outputs
+statistics in the ``mirror.<stat_prefix>.`` namespace:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  rq_sampled, Counter, Total requests selected for mirroring by the policy runtime fraction
+  rq_no_cluster, Counter, Total selected requests not mirrored because the mirror cluster did not exist or the cluster header was missing
+  rq_started, Counter, Total mirror requests started
+  rq_success, Counter, Total mirror requests that received a 2xx response
+  rq_failure, Counter, Total mirror requests that received a non-2xx response or failed without a response
+  rq_cancelled, Counter, Total mirror requests cancelled because the primary request was destroyed before the request was fully sent
+
+``rq_sampled`` minus ``rq_no_cluster`` minus ``rq_started`` counts the selected requests that were
+not mirrored because the primary request was answered locally before reaching an upstream.
+``rq_started`` minus ``rq_success``, ``rq_failure`` and ``rq_cancelled`` counts the mirror requests
+still in flight.
+
 Runtime
 -------
 

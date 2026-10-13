@@ -565,8 +565,16 @@ public:
   }
   const Http::HeaderEvaluator& headerEvaluator() const override;
   absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
+  const ShadowPolicyStatsSharedPtr& stats() const override { return stats_; }
 
 private:
+  struct ShadowPolicyStatsHolder {
+    explicit ShadowPolicyStatsHolder(Stats::ScopeSharedPtr scope);
+
+    const Stats::ScopeSharedPtr scope_;
+    const ShadowPolicyStats stats_;
+  };
+
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config,
                             Server::Configuration::CommonFactoryContext& factory_context,
                             absl::Status& creation_status);
@@ -579,6 +587,7 @@ private:
   const bool disable_shadow_host_suffix_append_;
   const std::string host_rewrite_literal_;
   HeaderMutationsPtr request_headers_mutations_;
+  ShadowPolicyStatsSharedPtr stats_;
 };
 
 /**

@@ -4900,6 +4900,50 @@ virtual_hosts:
   EXPECT_EQ("foo", bar_shadow_policies[0]->runtimeKey());
 }
 
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesStatPrefix) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+          stat_prefix: foo_mirror
+        - cluster: some_cluster
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2", "some_cluster"}, {});
+  ShadowPolicyStatsSharedPtr stats;
+  {
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+    const auto& shadow_policies =
+        config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+    ASSERT_EQ(2, shadow_policies.size());
+    EXPECT_EQ(nullptr, shadow_policies[1]->stats());
+    stats = shadow_policies[0]->stats();
+    ASSERT_NE(nullptr, stats);
+  }
+
+  // The stats outlive the route configuration so that in-flight mirrors can still record them.
+  stats->rq_sampled_.inc();
+  stats->rq_no_cluster_.inc();
+  stats->rq_started_.inc();
+  stats->rq_success_.inc();
+  stats->rq_failure_.inc();
+  stats->rq_cancelled_.inc();
+  for (const std::string name :
+       {"rq_sampled", "rq_no_cluster", "rq_started", "rq_success", "rq_failure", "rq_cancelled"}) {
+    EXPECT_EQ(1U, factory_context_.store_.counterFromString("mirror.foo_mirror." + name).value())
+        << name;
+  }
+}
+
 // Test for request mirror policies with headers - verifies header mutations are applied correctly.
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithHeaders) {
   const std::string yaml = R"EOF(

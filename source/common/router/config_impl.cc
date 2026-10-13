@@ -408,7 +408,17 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
     SET_AND_RETURN_IF_NOT_OK(mutations_or_error.status(), creation_status);
     request_headers_mutations_ = std::move(mutations_or_error.value());
   }
+
+  if (!config.stat_prefix().empty()) {
+    auto holder = std::make_shared<ShadowPolicyStatsHolder>(
+        factory_context.scope().createScope(absl::StrCat("mirror.", config.stat_prefix(), ".")));
+    // Share ownership with the holder so that the scope outlives in-flight mirror requests.
+    stats_ = ShadowPolicyStatsSharedPtr(holder, &holder->stats_);
+  }
 }
+
+ShadowPolicyImpl::ShadowPolicyStatsHolder::ShadowPolicyStatsHolder(Stats::ScopeSharedPtr scope)
+    : scope_(std::move(scope)), stats_{ALL_SHADOW_POLICY_STATS(POOL_COUNTER(*scope_))} {}
 
 const Http::HeaderEvaluator& ShadowPolicyImpl::headerEvaluator() const {
   if (request_headers_mutations_) {

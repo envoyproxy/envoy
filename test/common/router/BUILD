@@ -550,6 +550,9 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/router:shadow_writer_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
     ],
 )
