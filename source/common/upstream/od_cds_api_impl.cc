@@ -123,10 +123,11 @@ void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
 
 // A class that maintains all the od-cds xDS-TP based singleton subscriptions,
 // and update the cluster-manager when the resources are updated.
-// The object will only be accessed by the main thread. It should also be a
-// singleton object that is used by all the filters that need to access od-cds
-// over xdstp-based config sources, and will only be allocated for the first
-// occurrence of the filter.
+// The object will only be accessed by the main thread. For xdstp-based config
+// sources it is a singleton object that is used by all the filters that need to
+// access od-cds over these config sources, and will only be allocated for the
+// first occurrence of the filter. For other (ADS or regular) config sources, an
+// object is allocated per config source.
 class XdstpOdCdsApiImpl::XdstpOdcdsSubscriptionsManager : public Singleton::Instance,
                                                           Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -170,7 +171,8 @@ public:
     notifier_.notifyMissingCluster(resource_name);
   }
 
-  void addSubscription(absl::string_view resource_name, bool old_ads) {
+  void addSubscription(absl::string_view resource_name,
+                       OptRef<const envoy::config::core::v3::ConfigSource> config_source) {
     if (subscriptions_.contains(resource_name)) {
       ENVOY_LOG(debug, "ODCDS-manager: resource {} is already subscribed to, skipping",
                 resource_name);
@@ -180,7 +182,7 @@ public:
     // Subscribe using the xds-manager.
     auto subscription =
         std::make_unique<PerSubscriptionData>(*this, resource_name, validation_visitor_);
-    absl::Status status = subscription->initializeSubscription(old_ads);
+    absl::Status status = subscription->initializeSubscription(config_source);
     if (status.ok()) {
       subscriptions_.emplace(std::string(resource_name), std::move(subscription));
     } else {
@@ -204,19 +206,16 @@ private:
         : parent_(parent), resource_name_(resource_name),
           resource_type_helper_(validation_visitor, "name") {}
 
-    absl::Status initializeSubscription(bool old_ads) {
+    absl::Status
+    initializeSubscription(OptRef<const envoy::config::core::v3::ConfigSource> config_source) {
       const auto resource_type = resource_type_helper_.getResourceName();
-      // If old_ads is set, creates a subscription using the staticAdsConfigSource.
-      // Otherwise, the subscribeToSingletonResource will take care of
-      // subscription via the ADS source.
+      // If config_source is set (ADS or a regular config source), the subscription is created
+      // using it. Otherwise, the subscribeToSingletonResource will take care of subscription via
+      // the xDS-TP config sources.
       absl::StatusOr<Config::SubscriptionPtr> subscription_or_error =
           parent_.xds_manager_.subscribeToSingletonResource(
-              resource_name_,
-              old_ads
-                  ? makeOptRef<const envoy::config::core::v3::ConfigSource>(staticAdsConfigSource())
-                  : std::nullopt,
-              Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this,
-              resource_type_helper_.resourceDecoder(), {});
+              resource_name_, config_source, Grpc::Common::typeUrl(resource_type), *parent_.scope_,
+              *this, resource_type_helper_.resourceDecoder(), {});
       RETURN_IF_NOT_OK_REF(subscription_or_error.status());
       subscription_ = std::move(subscription_or_error.value());
       subscription_->start({resource_name_});
@@ -224,15 +223,6 @@ private:
     }
 
   private:
-    const envoy::config::core::v3::ConfigSource& staticAdsConfigSource() {
-      CONSTRUCT_ON_FIRST_USE(envoy::config::core::v3::ConfigSource,
-                             []() -> envoy::config::core::v3::ConfigSource {
-                               envoy::config::core::v3::ConfigSource ads;
-                               ads.mutable_ads();
-                               return ads;
-                             }());
-    }
-
     // Config::SubscriptionCallbacks
     absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                 const std::string& version_info) override {
@@ -309,30 +299,41 @@ XdstpOdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& config_so
                           ProtobufMessage::ValidationVisitor& validation_visitor,
                           Server::Configuration::ServerFactoryContext& server_factory_context) {
   absl::Status creation_status = absl::OkStatus();
-  // TODO(adisuissa): convert the config_source to optional.
-  const bool old_ads = config_source.config_source_specifier_case() ==
-                       envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds;
-  auto ret = OdCdsApiSharedPtr(new XdstpOdCdsApiImpl(xds_manager, cm, notifier, scope,
-                                                     server_factory_context, old_ads,
+  auto ret = OdCdsApiSharedPtr(new XdstpOdCdsApiImpl(config_source, xds_manager, cm, notifier,
+                                                     scope, server_factory_context,
                                                      validation_visitor, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-XdstpOdCdsApiImpl::XdstpOdCdsApiImpl(Config::XdsManager& xds_manager, ClusterManager& cm,
+XdstpOdCdsApiImpl::XdstpOdCdsApiImpl(const envoy::config::core::v3::ConfigSource& config_source,
+                                     Config::XdsManager& xds_manager, ClusterManager& cm,
                                      MissingClusterNotifier& notifier, Stats::Scope& scope,
                                      Server::Configuration::ServerFactoryContext& server_context,
-                                     bool old_ads,
                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                     absl::Status& creation_status)
-    : old_ads_(old_ads) {
-  // Create a singleton xdstp-based od-cds handler. This will be accessed by
-  // the main thread and used by all the filters that need to access od-cds
-  // over xdstp-based config sources.
-  // The singleton object will handle all the subscriptions to OD-CDS
-  // resources, and will apply the updates to the cluster-manager.
-  subscriptions_manager_ =
-      subscriptionsManager(server_context, xds_manager, cm, notifier, scope, validation_visitor);
+                                     absl::Status& creation_status) {
+  // TODO(adisuissa): convert the config_source to optional.
+  if (config_source.config_source_specifier_case() ==
+      envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::
+          CONFIG_SOURCE_SPECIFIER_NOT_SET) {
+    // xDS-TP based resources: the config source will be resolved from the resource name.
+    // Create a singleton xdstp-based od-cds handler. This will be accessed by
+    // the main thread and used by all the filters that need to access od-cds
+    // over xdstp-based config sources.
+    // The singleton object will handle all the subscriptions to OD-CDS
+    // resources, and will apply the updates to the cluster-manager.
+    subscriptions_manager_ =
+        subscriptionsManager(server_context, xds_manager, cm, notifier, scope, validation_visitor);
+  } else {
+    // An ADS or regular config source. The subscriptions made over it are specific to this
+    // config source (including fields such as initial_fetch_timeout), so they are not shared with
+    // other config sources through the singleton subscriptions manager. Note that the cluster
+    // manager already shares a single OdCdsApi instance among all the users of the same config
+    // source.
+    config_source_ = config_source;
+    subscriptions_manager_ = std::make_shared<XdstpOdcdsSubscriptionsManager>(
+        xds_manager, cm, notifier, scope, validation_visitor);
+  }
   // This will always succeed as the xDS-TP config-source matching the resource name
   // will only be known when that resource is subscribed to.
   creation_status = absl::OkStatus();
@@ -352,7 +353,10 @@ XdstpOdCdsApiImpl::subscriptionsManager(Server::Configuration::ServerFactoryCont
 }
 
 void XdstpOdCdsApiImpl::updateOnDemand(std::string cluster_name) {
-  subscriptions_manager_->addSubscription(cluster_name, old_ads_);
+  subscriptions_manager_->addSubscription(
+      cluster_name, config_source_.has_value()
+                        ? makeOptRef<const envoy::config::core::v3::ConfigSource>(*config_source_)
+                        : std::nullopt);
 }
 } // namespace Upstream
 } // namespace Envoy

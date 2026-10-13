@@ -342,6 +342,152 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterRemovalViaDeltaUpdate) {
   EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
   EXPECT_OK(odcds_callbacks_->onConfigUpdate({}, removed_resources, version2));
 }
+
+// Tests that an ADS config source is passed to the per-resource subscriptions.
+TEST_F(XdstpOdCdsApiImplTest, AdsConfigSourceSubscription) {
+  envoy::config::core::v3::ConfigSource ads_config_source;
+  ads_config_source.mutable_ads();
+  OptRef<xds::core::v3::ResourceLocator> null_locator;
+  auto odcds =
+      *XdstpOdCdsApiImpl::create(ads_config_source, null_locator, xds_manager_, cm_, notifier_,
+                                 *store_.rootScope(), validation_visitor_, server_factory_context_);
+
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource("fake_cluster", _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource> config_source,
+              absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks&,
+              Config::OpaqueResourceDecoderSharedPtr,
+              const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+            EXPECT_TRUE(config_source.has_value());
+            EXPECT_THAT(config_source.ref(), ProtoEq(ads_config_source));
+            return std::make_unique<NiceMock<Config::MockSubscription>>();
+          }));
+  odcds->updateOnDemand("fake_cluster");
+}
+
+// Tests that a regular (non-ADS) config source is passed to the per-resource subscriptions, that
+// the updates are applied, and that different config sources do not share the subscriptions.
+TEST_F(XdstpOdCdsApiImplTest, RegularConfigSourceSubscriptions) {
+  InSequence s;
+
+  const auto config_source1 = TestUtility::parseYaml<envoy::config::core::v3::ConfigSource>(R"EOF(
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster1
+  )EOF");
+  const auto config_source2 = TestUtility::parseYaml<envoy::config::core::v3::ConfigSource>(R"EOF(
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster2
+  )EOF");
+  OptRef<xds::core::v3::ResourceLocator> null_locator;
+  auto odcds1 =
+      *XdstpOdCdsApiImpl::create(config_source1, null_locator, xds_manager_, cm_, notifier_,
+                                 *store_.rootScope(), validation_visitor_, server_factory_context_);
+  auto odcds2 =
+      *XdstpOdCdsApiImpl::create(config_source2, null_locator, xds_manager_, cm_, notifier_,
+                                 *store_.rootScope(), validation_visitor_, server_factory_context_);
+
+  const std::string cluster_name = "fake_cluster";
+  auto expect_subscription = [&](const envoy::config::core::v3::ConfigSource& expected_config) {
+    EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name, _, _, _, _, _, _))
+        .WillOnce(Invoke(
+            [this, &expected_config](
+                absl::string_view,
+                OptRef<const envoy::config::core::v3::ConfigSource> config_source,
+                absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                Config::OpaqueResourceDecoderSharedPtr,
+                const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+              EXPECT_TRUE(config_source.has_value());
+              EXPECT_THAT(config_source.ref(), ProtoEq(expected_config));
+              odcds_callbacks_ = &callbacks;
+              return std::make_unique<NiceMock<Config::MockSubscription>>();
+            }));
+  };
+
+  expect_subscription(config_source1);
+  odcds1->updateOnDemand(cluster_name);
+  ASSERT_NE(odcds_callbacks_, nullptr);
+  Config::SubscriptionCallbacks* callbacks1 = odcds_callbacks_;
+
+  // The same resource over the same config source is not subscribed to again.
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  odcds1->updateOnDemand(cluster_name);
+
+  // The same resource over a different config source gets its own subscription.
+  expect_subscription(config_source2);
+  odcds2->updateOnDemand(cluster_name);
+
+  // Updates received on the subscription are applied to the cluster manager.
+  const auto cluster =
+      TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
+    name: {}
+    connect_timeout: 1.250s
+    lb_policy: ROUND_ROBIN
+    type: STATIC
+  )EOF",
+                                                                              cluster_name));
+  const std::string version = "v1";
+  EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(cluster), version, false));
+  Config::DecodedResourceImpl decoded_resource(
+      std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), cluster_name, {}, version);
+  std::vector<Config::DecodedResourceRef> resources;
+  resources.emplace_back(decoded_resource);
+  EXPECT_OK(callbacks1->onConfigUpdate(resources, {}, version));
+}
+
+// Tests that the fields of an ADS config source (e.g., initial_fetch_timeout) are honored, and that
+// ADS config sources with different fields do not share the subscriptions.
+TEST_F(XdstpOdCdsApiImplTest, AdsConfigSourceHonored) {
+  InSequence s;
+
+  const auto config_source1 = TestUtility::parseYaml<envoy::config::core::v3::ConfigSource>(R"EOF(
+    ads: {}
+    initial_fetch_timeout: 1s
+  )EOF");
+  const auto config_source2 = TestUtility::parseYaml<envoy::config::core::v3::ConfigSource>(R"EOF(
+    ads: {}
+    initial_fetch_timeout: 2s
+  )EOF");
+  OptRef<xds::core::v3::ResourceLocator> null_locator;
+  auto odcds1 =
+      *XdstpOdCdsApiImpl::create(config_source1, null_locator, xds_manager_, cm_, notifier_,
+                                 *store_.rootScope(), validation_visitor_, server_factory_context_);
+  auto odcds2 =
+      *XdstpOdCdsApiImpl::create(config_source2, null_locator, xds_manager_, cm_, notifier_,
+                                 *store_.rootScope(), validation_visitor_, server_factory_context_);
+
+  const std::string cluster_name = "fake_cluster";
+  auto expect_subscription = [&](const envoy::config::core::v3::ConfigSource& expected_config) {
+    EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name, _, _, _, _, _, _))
+        .WillOnce(Invoke(
+            [&expected_config](
+                absl::string_view,
+                OptRef<const envoy::config::core::v3::ConfigSource> config_source,
+                absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks&,
+                Config::OpaqueResourceDecoderSharedPtr,
+                const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+              EXPECT_TRUE(config_source.has_value());
+              EXPECT_THAT(config_source.ref(), ProtoEq(expected_config));
+              return std::make_unique<NiceMock<Config::MockSubscription>>();
+            }));
+  };
+
+  expect_subscription(config_source1);
+  odcds1->updateOnDemand(cluster_name);
+
+  // The same resource over the same config source is not subscribed to again.
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  odcds1->updateOnDemand(cluster_name);
+
+  // The same resource over an ADS config source with different fields gets its own subscription.
+  expect_subscription(config_source2);
+  odcds2->updateOnDemand(cluster_name);
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -109,8 +109,18 @@ OnDemandConfig::OnDemandConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand& on_demand_message,
     Server::Configuration::FactoryContext& context, Stats::Scope& scope)
     : odcds_([&]() -> Upstream::OdCdsApiHandlePtr {
-        if (on_demand_message.odcds_config().config_source_specifier_case() ==
-            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
+        const auto specifier_case = on_demand_message.odcds_config().config_source_specifier_case();
+        const bool is_ads = specifier_case ==
+                            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds;
+        // TODO(wbpcode): once the
+        // "envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source" runtime flag
+        // is removed, remove is_ads and simplify this condition to
+        // "specifier_case != CONFIG_SOURCE_SPECIFIER_NOT_SET".
+        if (is_ads ||
+            (specifier_case != envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::
+                                   CONFIG_SOURCE_SPECIFIER_NOT_SET &&
+             Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source"))) {
           return THROW_OR_RETURN_VALUE(
               context.serverFactoryContext().clusterManager().allocateOdCdsApi(
                   &Upstream::XdstpOdCdsApiImpl::create, on_demand_message.odcds_config(),

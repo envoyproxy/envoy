@@ -589,5 +589,44 @@ TEST_P(TcpProxyOdcdsAdsIntegrationTest, NoCdsConfigOnDemandDiscoveryTwoListeners
   test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_success", Ge(2));
 }
 
+// Verify the on-demand cluster discovery over a regular config source with singleton
+// subscriptions enabled.
+TEST_P(TcpProxyOdcdsIntegrationTest, SingleTcpClientWithSingletonSubscriptions) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source", "true");
+  initialize();
+
+  // Establish a tcp request to the Envoy.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The on-demand CDS stream is established.
+  auto result = fake_upstreams_.front()->waitForHttpConnection(*dispatcher_, xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+  test_server_->waitForCounter("tcp.tcpproxy_stats.on_demand_cluster_attempt", Eq(1));
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_.back()->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(fake_upstream_connection->write("hello"));
+  tcp_client->waitForData("hello");
+
+  ASSERT_TRUE(tcp_client->write("world"));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+  ASSERT_TRUE(assertOnDemandCounters(1, 0, 0));
+}
 } // namespace
 } // namespace Envoy

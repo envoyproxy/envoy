@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "source/common/http/header_map_impl.h"
+#include "source/common/upstream/od_cds_api_impl.h"
 #include "source/extensions/filters/http/on_demand/on_demand_update.h"
 
 #include "test/mocks/http/mocks.h"
@@ -539,6 +540,75 @@ TEST(OnDemandConfigTest, Basic) {
   absl::Status status4 = absl::OkStatus();
   OnDemandFilterConfig config4(config, cm, visitor, status4);
   EXPECT_THAT(status4, IsOk());
+}
+
+// Verifies which ODCDS implementation the given creation function is.
+void expectOdCdsCreationFunction(
+    const Upstream::ClusterManager::OdCdsCreationFunction& creation_function,
+    decltype(&Upstream::OdCdsApiImpl::create) expected) {
+  const auto* target = creation_function.target<decltype(&Upstream::OdCdsApiImpl::create)>();
+  ASSERT_NE(target, nullptr);
+  EXPECT_EQ(*target, expected);
+}
+
+// With singleton subscriptions for regular config sources disabled, on-demand CDS over a regular
+// config source uses the legacy OdCdsApiImpl.
+TEST(OnDemandConfigTest, RegularConfigSourceWithSingletonSubscriptionsDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source", "false"}});
+  NiceMock<Upstream::MockClusterManager> cm;
+  ProtobufMessage::StrictValidationVisitorImpl visitor;
+  const auto config =
+      TestUtility::parseYaml<envoy::extensions::filters::http::on_demand::v3::OnDemand>(R"EOF(
+    odcds:
+      source:
+        api_config_source:
+          api_type: DELTA_GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: xds_cluster
+  )EOF");
+
+  EXPECT_CALL(cm, allocateOdCdsApi(_, _, _, _))
+      .WillOnce(
+          Invoke([](Upstream::ClusterManager::OdCdsCreationFunction creation_function,
+                    const envoy::config::core::v3::ConfigSource&,
+                    OptRef<xds::core::v3::ResourceLocator>, ProtobufMessage::ValidationVisitor&) {
+            expectOdCdsCreationFunction(creation_function, &Upstream::OdCdsApiImpl::create);
+            return Upstream::MockOdCdsApiHandle::create();
+          }));
+  absl::Status status = absl::OkStatus();
+  OnDemandFilterConfig filter_config(config, cm, visitor, status);
+  EXPECT_THAT(status, IsOk());
+}
+
+// With singleton subscriptions for regular config sources disabled, on-demand CDS over ADS still
+// uses the XdstpOdCdsApiImpl.
+TEST(OnDemandConfigTest, AdsConfigSourceWithSingletonSubscriptionsDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.odcds_singleton_subscriptions_for_config_source", "false"}});
+  NiceMock<Upstream::MockClusterManager> cm;
+  ProtobufMessage::StrictValidationVisitorImpl visitor;
+  const auto config =
+      TestUtility::parseYaml<envoy::extensions::filters::http::on_demand::v3::OnDemand>(R"EOF(
+    odcds:
+      source:
+        ads: {}
+  )EOF");
+
+  EXPECT_CALL(cm, allocateOdCdsApi(_, _, _, _))
+      .WillOnce(
+          Invoke([](Upstream::ClusterManager::OdCdsCreationFunction creation_function,
+                    const envoy::config::core::v3::ConfigSource&,
+                    OptRef<xds::core::v3::ResourceLocator>, ProtobufMessage::ValidationVisitor&) {
+            expectOdCdsCreationFunction(creation_function, &Upstream::XdstpOdCdsApiImpl::create);
+            return Upstream::MockOdCdsApiHandle::create();
+          }));
+  absl::Status status = absl::OkStatus();
+  OnDemandFilterConfig filter_config(config, cm, visitor, status);
+  EXPECT_THAT(status, IsOk());
 }
 
 } // namespace OnDemand

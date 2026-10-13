@@ -29,6 +29,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:od_cds_api_lib",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/router:router_mocks",
