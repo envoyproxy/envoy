@@ -9,13 +9,14 @@ IoUringWorkerFactoryImpl::IoUringWorkerFactoryImpl(
     uint32_t io_uring_size, bool use_submission_queue_polling, bool enable_multishot_receive,
     uint32_t read_buffer_size, uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
     uint32_t write_low_watermark_bytes, ThreadLocal::SlotAllocator& tls,
-    uint32_t provided_buffer_count, bool enable_deferred_taskrun)
+    uint32_t provided_buffer_count, bool enable_deferred_taskrun, bool enable_receive_batching)
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
       enable_multishot_receive_(enable_multishot_receive), read_buffer_size_(read_buffer_size),
       write_timeout_ms_(write_timeout_ms), write_high_watermark_bytes_(write_high_watermark_bytes),
       write_low_watermark_bytes_(write_low_watermark_bytes),
       provided_buffer_count_(provided_buffer_count),
-      enable_deferred_taskrun_(enable_deferred_taskrun), tls_(tls) {}
+      enable_deferred_taskrun_(enable_deferred_taskrun),
+      enable_receive_batching_(enable_receive_batching), tls_(tls) {}
 
 OptRef<IoUringWorker> IoUringWorkerFactoryImpl::getIoUringWorker() {
   auto ret = tls_.get();
@@ -33,11 +34,12 @@ void IoUringWorkerFactoryImpl::onWorkerThreadInitialized() {
             write_high_watermark_bytes = write_high_watermark_bytes_,
             write_low_watermark_bytes = write_low_watermark_bytes_,
             provided_buffer_count = provided_buffer_count_,
-            enable_deferred_taskrun = enable_deferred_taskrun_](Event::Dispatcher& dispatcher) {
+            enable_deferred_taskrun = enable_deferred_taskrun_,
+            enable_receive_batching = enable_receive_batching_](Event::Dispatcher& dispatcher) {
     return std::make_shared<IoUringWorkerImpl>(
         io_uring_size, use_submission_queue_polling, enable_multishot_receive, read_buffer_size,
         write_timeout_ms, write_high_watermark_bytes, write_low_watermark_bytes, dispatcher,
-        provided_buffer_count, enable_deferred_taskrun);
+        provided_buffer_count, enable_deferred_taskrun, enable_receive_batching);
   });
 }
 
