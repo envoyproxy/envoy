@@ -10,7 +10,6 @@
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.h"
 #include "test/extensions/filters/http/ext_proc/tracer_test_filter.pb.validate.h"
 
-#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
