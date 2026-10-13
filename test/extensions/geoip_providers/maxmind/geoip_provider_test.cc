@@ -278,6 +278,7 @@ TEST_F(GeoipProviderTest, CityDbExtendedFieldsLookup) {
         region_geoname_id: "x-geo-region-geoname-id"
         country_geoname_id: "x-geo-country-geoname-id"
         continent_geoname_id: "x-geo-continent-geoname-id"
+        country_name: "x-geo-country-name"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml, cb_added_nullopt);
@@ -289,9 +290,10 @@ TEST_F(GeoipProviderTest, CityDbExtendedFieldsLookup) {
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
   // country, region, city + city_geoname_id, latitude, longitude, time_zone,
-  // region_name, region_geoname_id, country_geoname_id, continent_geoname_id = 11
-  ASSERT_EQ(11, captured_lookup_response_.size());
+  // region_name, region_geoname_id, country_geoname_id, continent_geoname_id, country_name = 12
+  ASSERT_EQ(12, captured_lookup_response_.size());
   EXPECT_EQ("SE", captured_lookup_response_["x-geo-country"]);
+  EXPECT_EQ("Sweden", captured_lookup_response_["x-geo-country-name"]);
   EXPECT_EQ("E", captured_lookup_response_["x-geo-region"]);
   EXPECT_EQ("Link\xc3\xb6ping", captured_lookup_response_["x-geo-city"]);
   EXPECT_EQ("2694762", captured_lookup_response_["x-geo-city-geoname-id"]);
@@ -312,6 +314,7 @@ TEST_F(GeoipProviderTest, CountryDbExtendedFieldsLookup) {
         country: "x-geo-country"
         country_geoname_id: "x-geo-country-geoname-id"
         continent_geoname_id: "x-geo-continent-geoname-id"
+        country_name: "x-geo-country-name"
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml, cb_added_nullopt);
@@ -322,8 +325,9 @@ TEST_F(GeoipProviderTest, CountryDbExtendedFieldsLookup) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  ASSERT_EQ(3, captured_lookup_response_.size());
+  ASSERT_EQ(4, captured_lookup_response_.size());
   EXPECT_EQ("SE", captured_lookup_response_["x-geo-country"]);
+  EXPECT_EQ("Sweden", captured_lookup_response_["x-geo-country-name"]);
   EXPECT_EQ("2661886", captured_lookup_response_["x-geo-country-geoname-id"]);
   EXPECT_EQ("6255148", captured_lookup_response_["x-geo-continent-geoname-id"]);
   expectStats("country_db");
@@ -336,6 +340,7 @@ TEST_F(GeoipProviderTest, CountryGeonameIdFallbackToCityDb) {
       geo_field_keys:
         country_geoname_id: "x-geo-country-geoname-id"
         continent_geoname_id: "x-geo-continent-geoname-id"
+        country_name: "x-geo-country-name"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml, cb_added_nullopt);
@@ -346,7 +351,8 @@ TEST_F(GeoipProviderTest, CountryGeonameIdFallbackToCityDb) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  ASSERT_EQ(2, captured_lookup_response_.size());
+  ASSERT_EQ(3, captured_lookup_response_.size());
+  EXPECT_EQ("Sweden", captured_lookup_response_["x-geo-country-name"]);
   EXPECT_EQ("2661886", captured_lookup_response_["x-geo-country-geoname-id"]);
   EXPECT_EQ("6255148", captured_lookup_response_["x-geo-continent-geoname-id"]);
   expectStats("city_db");

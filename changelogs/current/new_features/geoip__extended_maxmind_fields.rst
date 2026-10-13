@@ -18,6 +18,8 @@ configuration: :ref:`city_geoname_id
 :ref:`country_geoname_id
 <envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys.country_geoname_id>`,
 :ref:`continent_geoname_id
-<envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys.continent_geoname_id>` and
+<envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys.continent_geoname_id>`,
 :ref:`metro_code
-<envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys.metro_code>`.
+<envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys.metro_code>` and
+:ref:`country_name
+<envoy_v3_api_field_extensions.geoip_providers.common.v3.CommonGeoipProviderConfig.GeolocationFieldKeys.country_name>`.

@@ -108,7 +108,8 @@ The following lists the filter state object keys used by the Envoy extensions to
   * ``subregion_geoname_id``: GeoNames ID of the subregion;
   * ``country_geoname_id``: GeoNames ID of the country;
   * ``continent_geoname_id``: GeoNames ID of the continent;
-  * ``metro_code``: metro/DMA code (US only).
+  * ``metro_code``: metro/DMA code (US only);
+  * ``country_name``: English name of the country.
 
 ``envoy.filters.http.mcp.request``
   :ref:`MCP filter <config_http_filters_mcp>` stores parsed MCP (Model Context Protocol) JSON-RPC
