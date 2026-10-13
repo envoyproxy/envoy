@@ -1,4 +1,4 @@
-ai_protocol_manager: added :ref:`usage_signal
+Added support for :ref:`usage_signal
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.usage_signal>`
 to :ref:`TokenUsageExtraction
 <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction>`.

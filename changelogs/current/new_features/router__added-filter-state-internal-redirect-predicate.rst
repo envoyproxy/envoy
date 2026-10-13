@@ -3,5 +3,5 @@ Added :ref:`filter_state
 an internal redirect predicate that gates redirect decisions on a boolean filter-state
 object set earlier in the request lifecycle (for example by a Lua filter, ext_proc,
 ``set_filter_state``, or a dynamic module). The predicate follows the redirect when the
-boolean value is true, enabling per-request redirect control without changing route
+boolean value is ``true``, enabling per-request redirect control without changing route
 matching.
