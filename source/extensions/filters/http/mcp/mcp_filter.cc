@@ -35,13 +35,13 @@
 #include "source/extensions/tracers/opentelemetry/span_context.h"
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
-#include "absl/base/nullability.h"
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -176,39 +176,209 @@ void injectBaggage(const Protobuf::Map<std::string, Protobuf::Value>& meta_field
   }
 }
 
-// Extract a mutable pointer to the traceparent field located at
-// `params._meta.traceparent`.
-absl::StatusOr<std::string * absl_nonnull> findParamsMetaTraceparent(Protobuf::Struct& body) {
-  auto& fields = *body.mutable_fields();
+class TraceparentRewriter : public nlohmann::json::json_sax_t {
+public:
+  explicit TraceparentRewriter(absl::string_view new_parent_id) : new_parent_id_(new_parent_id) {}
 
-  auto params_it = fields.find(Filters::Common::Mcp::McpConstants::PARAMS_FIELD);
-  if (params_it == fields.end()) {
-    return absl::InvalidArgumentError("Failed to find params field");
-  }
-  if (!params_it->second.has_struct_value()) {
-    return absl::InvalidArgumentError("Failed to parse params field to JSON");
-  }
-  Protobuf::Struct& params = *params_it->second.mutable_struct_value();
-
-  auto meta_it = params.mutable_fields()->find(Filters::Common::Mcp::McpConstants::META_FIELD);
-  if (meta_it == params.fields().end()) {
-    return absl::InvalidArgumentError("Failed to find _meta in params");
-  }
-  if (!meta_it->second.has_struct_value()) {
-    return absl::InvalidArgumentError("Failed to parse _meta field to JSON");
+  bool null() override {
+    if (!beginValue(/*is_object=*/false, /*is_string=*/false)) {
+      return false;
+    }
+    output_ += "null";
+    return true;
   }
 
-  Protobuf::Struct& meta = *meta_it->second.mutable_struct_value();
-  auto traceparent_it =
-      meta.mutable_fields()->find(Filters::Common::Mcp::McpConstants::TRACEPARENT_FIELD);
-  if (traceparent_it == meta.fields().end()) {
-    return absl::InvalidArgumentError("Failed to find traceparent in _meta");
+  bool boolean(bool val) override {
+    if (!beginValue(/*is_object=*/false, /*is_string=*/false)) {
+      return false;
+    }
+    output_ += val ? "true" : "false";
+    return true;
   }
-  if (!traceparent_it->second.has_string_value()) {
-    return absl::InvalidArgumentError("Failed to parse traceparent field to string");
+
+  bool number_integer(number_integer_t val) override {
+    if (!beginValue(/*is_object=*/false, /*is_string=*/false)) {
+      return false;
+    }
+    absl::StrAppend(&output_, val);
+    return true;
   }
-  return traceparent_it->second.mutable_string_value();
-}
+
+  bool number_unsigned(number_unsigned_t val) override {
+    if (!beginValue(/*is_object=*/false, /*is_string=*/false)) {
+      return false;
+    }
+    absl::StrAppend(&output_, val);
+    return true;
+  }
+
+  bool number_float(number_float_t, const string_t& s) override {
+    if (!beginValue(/*is_object=*/false, /*is_string=*/false)) {
+      return false;
+    }
+    output_ += s;
+    return true;
+  }
+
+  bool string(string_t& val) override {
+    const bool is_traceparent = isAtParamsMetaTraceparent();
+    if (!beginValue(/*is_object=*/false, /*is_string=*/true)) {
+      return false;
+    }
+    if (is_traceparent) {
+      absl::StatusOr<SpanContext> parsed_traceparent =
+          SpanContextExtractor::parseTraceparent(val, "");
+      if (!parsed_traceparent.ok()) {
+        status_ = parsed_traceparent.status();
+        return false;
+      }
+      parsed_traceparent->setSpanId(std::string(new_parent_id_));
+      const std::string new_traceparent =
+          SpanContextExtractor::serializeTraceparent(*parsed_traceparent);
+      output_ += nlohmann::json(new_traceparent).dump();
+      return true;
+    }
+    output_ += nlohmann::json(val).dump();
+    return true;
+  }
+
+  bool binary(binary_t&) override { return false; }
+
+  bool start_object(std::size_t) override {
+    if (!beginValue(/*is_object=*/true, /*is_string=*/false)) {
+      return false;
+    }
+    output_.push_back('{');
+    stack_.push_back(Scope{/*is_object=*/true});
+    return true;
+  }
+
+  bool key(string_t& val) override {
+    Scope& scope = stack_.back();
+    if (!scope.first_element) {
+      output_.push_back(',');
+    }
+    scope.first_element = false;
+    scope.current_key = val;
+    output_ += nlohmann::json(val).dump();
+    output_.push_back(':');
+    return true;
+  }
+
+  bool end_object() override {
+    stack_.pop_back();
+    output_.push_back('}');
+    return true;
+  }
+
+  bool start_array(std::size_t) override {
+    if (!beginValue(/*is_object=*/false, /*is_string=*/false)) {
+      return false;
+    }
+    output_.push_back('[');
+    stack_.push_back(Scope{/*is_object=*/false});
+    return true;
+  }
+
+  bool end_array() override {
+    stack_.pop_back();
+    output_.push_back(']');
+    return true;
+  }
+
+  bool parse_error(std::size_t, const std::string&, const nlohmann::json::exception& ex) override {
+    status_ = absl::InvalidArgumentError(ex.what());
+    return false;
+  }
+
+  absl::StatusOr<std::string> finish(bool parse_ok) && {
+    if (!status_.ok()) {
+      return status_;
+    }
+    if (!parse_ok) {
+      return absl::InvalidArgumentError("Failed to parse body to JSON");
+    }
+    if (!found_params_) {
+      return absl::InvalidArgumentError("Failed to find params field");
+    }
+    if (!found_meta_) {
+      return absl::InvalidArgumentError("Failed to find _meta in params");
+    }
+    if (!found_traceparent_) {
+      return absl::InvalidArgumentError("Failed to find traceparent in _meta");
+    }
+    return std::move(output_);
+  }
+
+private:
+  struct Scope {
+    bool is_object;
+    bool first_element = true;
+    std::string current_key;
+  };
+
+  bool isAtParams() const {
+    return stack_.size() == 1 && stack_[0].is_object &&
+           stack_[0].current_key == Filters::Common::Mcp::McpConstants::PARAMS_FIELD;
+  }
+
+  bool isAtParamsMeta() const {
+    return stack_.size() == 2 && stack_[0].is_object &&
+           stack_[0].current_key == Filters::Common::Mcp::McpConstants::PARAMS_FIELD &&
+           stack_[1].is_object &&
+           stack_[1].current_key == Filters::Common::Mcp::McpConstants::META_FIELD;
+  }
+
+  bool isAtParamsMetaTraceparent() const {
+    return stack_.size() == 3 && stack_[0].is_object &&
+           stack_[0].current_key == Filters::Common::Mcp::McpConstants::PARAMS_FIELD &&
+           stack_[1].is_object &&
+           stack_[1].current_key == Filters::Common::Mcp::McpConstants::META_FIELD &&
+           stack_[2].is_object &&
+           stack_[2].current_key == Filters::Common::Mcp::McpConstants::TRACEPARENT_FIELD;
+  }
+
+  bool beginValue(bool is_object, bool is_string) {
+    if (isAtParams()) {
+      if (!is_object) {
+        status_ = absl::InvalidArgumentError("Failed to parse params field to JSON");
+        return false;
+      }
+      found_params_ = true;
+    } else if (isAtParamsMeta()) {
+      if (!is_object) {
+        status_ = absl::InvalidArgumentError("Failed to parse _meta field to JSON");
+        return false;
+      }
+      found_meta_ = true;
+    } else if (isAtParamsMetaTraceparent()) {
+      if (!is_string) {
+        status_ = absl::InvalidArgumentError("Failed to parse traceparent field to string");
+        return false;
+      }
+      found_traceparent_ = true;
+    }
+
+    if (!stack_.empty()) {
+      Scope& scope = stack_.back();
+      if (!scope.is_object) {
+        if (!scope.first_element) {
+          output_.push_back(',');
+        }
+        scope.first_element = false;
+      }
+    }
+    return true;
+  }
+
+  std::vector<Scope> stack_;
+  std::string output_;
+  absl::string_view new_parent_id_;
+  absl::Status status_ = absl::OkStatus();
+  bool found_params_ = false;
+  bool found_meta_ = false;
+  bool found_traceparent_ = false;
+};
 
 // Rewrites the MCP request body's traceparent with the new parent ID. This
 // reparses the entire body and injects `new_parent_id` into the traceparent
@@ -220,34 +390,14 @@ absl::StatusOr<std::string * absl_nonnull> findParamsMetaTraceparent(Protobuf::S
 // TODO: Consider skipping the parse and doing a naive textual replacement. This
 // would only be possible for a fixed-length string like traceparent, but not
 // for tracestate.
-//
-// NOTE: Rewriting by parsing to `Protobuf::Struct` and serializing introduces
-// some edge cases. Large integers, NaN, etc. may not be preserved.
 absl::StatusOr<std::string> rewriteBodyWithNewTraceparent(const Buffer::Instance& body,
                                                           absl::string_view new_parent_id) {
   if (new_parent_id.empty()) {
     return absl::OkStatus();
   }
-  Protobuf::Struct parsed_body;
-  RETURN_IF_NOT_OK(MessageUtil::loadFromJsonNoThrow(body.toString(), parsed_body));
-  absl::StatusOr<std::string * absl_nonnull> traceparent_ptr =
-      findParamsMetaTraceparent(parsed_body);
-  RETURN_IF_NOT_OK_REF(traceparent_ptr.status());
-  absl::StatusOr<SpanContext> parsed_traceparent =
-      SpanContextExtractor::parseTraceparent(**traceparent_ptr, "");
-  RETURN_IF_NOT_OK_REF(parsed_traceparent.status());
-  std::string original_parent_id(parsed_traceparent->spanId());
-
-  // Modify the traceparent's parent ID and serialize it.
-  parsed_traceparent->setSpanId(std::string(new_parent_id));
-  std::string new_traceparent = SpanContextExtractor::serializeTraceparent(*parsed_traceparent);
-
-  // Modify the body's traceparent and serialize it.
-  **traceparent_ptr = new_traceparent;
-  std::string new_body;
-  RETURN_IF_NOT_OK(Protobuf::util::MessageToJsonString(parsed_body, &new_body));
-
-  return new_body;
+  TraceparentRewriter rewriter(new_parent_id);
+  const bool parse_ok = nlohmann::json::sax_parse(body.toString(), &rewriter);
+  return std::move(rewriter).finish(parse_ok);
 }
 
 } // namespace

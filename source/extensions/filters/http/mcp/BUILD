@@ -52,11 +52,11 @@ envoy_cc_library(
         "//source/extensions/filters/common/mcp:filter_state_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/tracers/opentelemetry:span_context_lib",
-        "@abseil-cpp//absl/base:nullability",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
     ],
 )
 
