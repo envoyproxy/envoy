@@ -1,4 +1,4 @@
-``metadata``: ``MetadataKey`` now supports accessing list elements via index. Path segments can
+``MetadataKey`` now supports accessing list elements via index. Path segments can
 now specify either a struct field name (``key``) or a list element index (``index``). This allows
 the ratelimit filter's ``metadata`` descriptor action to access values extracted by
 ``grpc_field_extraction`` (which writes ``ListValue``) without requiring a Lua bridge. For example,

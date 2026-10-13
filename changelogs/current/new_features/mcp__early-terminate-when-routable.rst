@@ -7,4 +7,4 @@ to ``max_request_body_size`` and waiting for the root JSON object to close. This
 from body size so a large trailing payload (for example ``params.arguments``) does not need to be
 buffered just to route the request. Early termination is skipped when ``reject_duplicate_keys``,
 trace context or baggage propagation is configured, or when ``attribute_source`` is not ``BODY``.
-Defaults to false.
+Defaults to ``false``.
