@@ -683,6 +683,21 @@ TEST_F(ReverseConnectionIOHandleTest, NoHostsInClusterCannotConnect) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.empty-cluster.cannot_connect"], 1);
 }
 
+// Test that a connection count of 0 returns before the cluster lookup, so idle ticks are not
+// reported as failed connection attempts.
+TEST_F(ReverseConnectionIOHandleTest, ZeroConnectionCountSkipsClusterLookup) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  RemoteClusterConnectionConfig cluster_config("idle-cluster", 0);
+  maintainClusterConnections("idle-cluster", cluster_config);
+}
+
 // Test maybeUpdateHostsMappingsAndConnections with valid hosts.
 TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsValidHosts) {
   // Set up thread local slot first so stats can be properly tracked.

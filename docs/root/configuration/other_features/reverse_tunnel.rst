@@ -103,6 +103,9 @@ The identifiers serve the following purposes:
   ``Service`` with 2 replicas) with ``connection_count: 4`` establishes 8 connections in total, 4 to
   each endpoint, not 4 shared across the cluster. Size your socket budget accordingly.
 
+  ``connection_count`` must be between ``0`` and ``1024``. A count of ``0`` keeps the listener idle,
+  dialing nothing until a listener update raises the count.
+
 The ``downstream-service`` cluster in the example refers to the service behind the initiator Envoy that will be accessed via reverse tunnels from services behind the responder Envoy.
 
 .. literalinclude:: /_configs/reverse_connection/initiator-envoy.yaml
