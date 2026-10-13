@@ -191,12 +191,13 @@ struct PromiseBase {
     struct InitialAwaiter : public std::suspend_always {
       PromiseBase& promise;
 
+      InitialAwaiter(PromiseBase& promise) : promise(promise) {}
       void await_resume() { on_coroutine_resume(promise); }
     };
 
     caller_ = __builtin_return_address(0);
 
-    return InitialAwaiter{.promise = *this};
+    return InitialAwaiter(*this);
   }
 
   // No exceptions on the data plane: errors travel as absl::Status values. A
