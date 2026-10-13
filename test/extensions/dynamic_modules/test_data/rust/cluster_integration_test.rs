@@ -113,6 +113,20 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "host_churn" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("host_churn_converged_total")
+        .ok();
+      let health_changes_id = envoy_cluster_metrics
+        .define_counter("host_churn_health_changes_total")
+        .ok();
+      Some(Box::new(HostChurnClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        health_changes_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     "worker_timer" => {
       let armed_id = envoy_cluster_metrics
         .define_counter("timer_armed_total")
@@ -1249,6 +1263,146 @@ impl ClusterLb for HealthyHostsRebuildLb {
     // Increment once the bulk read is non-empty and agrees with the per-host count, so the test can
     // wait for every worker to converge.
     if !self.hosts.is_empty() && self.hosts.len() == envoy_lb.get_healthy_host_count(0) {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Host churn.
+// =============================================================================
+//
+// Churns hosts and health; the counter increments once a worker's healthy partition is just the
+// upstream. A second counter records the health-changed hosts Envoy reports.
+
+const HOST_CHURN_EVENT_ID: u64 = 500;
+const HOST_CHURN_DECOY_ADDRESSES: [&str; 2] = ["127.0.0.1:1", "127.0.0.1:2"];
+
+struct HostChurnClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  health_changes_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for HostChurnClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(HostChurnCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      health_changes_id: self.health_changes_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct HostChurnCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  health_changes_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for HostChurnCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.pre_init_complete();
+    let scheduler = envoy_cluster.new_scheduler();
+    scheduler.commit(HOST_CHURN_EVENT_ID);
+  }
+
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(HostChurnLb {
+      healthy_host: None,
+      counter_id: self.counter_id,
+      health_changes_id: self.health_changes_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+
+  fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
+    if event_id != HOST_CHURN_EVENT_ID {
+      return;
+    }
+    let addresses = vec![
+      self.upstream_address.clone(),
+      HOST_CHURN_DECOY_ADDRESSES[0].to_string(),
+      HOST_CHURN_DECOY_ADDRESSES[1].to_string(),
+    ];
+    let Some(hosts) = envoy_cluster.add_hosts(&addresses, &[1u32, 1, 1]) else {
+      return;
+    };
+    envoy_cluster.update_host_health(
+      hosts[0],
+      abi::envoy_dynamic_module_type_host_health::Degraded,
+    );
+    envoy_cluster.update_host_health(
+      hosts[0],
+      abi::envoy_dynamic_module_type_host_health::Healthy,
+    );
+    envoy_cluster.remove_hosts(&[hosts[1]]);
+    envoy_cluster.update_host_health(
+      hosts[2],
+      abi::envoy_dynamic_module_type_host_health::Unhealthy,
+    );
+  }
+}
+
+struct HostChurnLb {
+  healthy_host: Option<usize>,
+  counter_id: Option<EnvoyCounterId>,
+  health_changes_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for HostChurnLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    match self.healthy_host {
+      Some(host) => {
+        HostSelectionResult::Selected(host as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr)
+      },
+      None => HostSelectionResult::NoHost,
+    }
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    let mut healthy = Vec::new();
+    if !envoy_lb.get_healthy_hosts(0, &mut healthy) {
+      return;
+    }
+    let converged = healthy.len() == 1
+      && envoy_lb.get_healthy_host_count(0) == 1
+      && envoy_lb.get_hosts_count(0) == 2
+      && envoy_lb.get_degraded_hosts_count(0) == 0;
+    self.healthy_host = healthy.first().map(|&host| host as usize);
+    if let Some(count) = envoy_lb.get_member_update_health_changed_host_count() {
+      let reported = (0..count)
+        .filter(|&index| {
+          envoy_lb
+            .get_member_update_health_changed_host(index)
+            .is_some()
+        })
+        .count();
+      if let Some(health_changes_id) = self.health_changes_id {
+        let _ = self
+          .metrics
+          .increment_counter(health_changes_id, reported as u64);
+      }
+    }
+    if converged {
       if let Some(counter_id) = self.counter_id {
         let _ = self.metrics.increment_counter(counter_id, 1);
       }

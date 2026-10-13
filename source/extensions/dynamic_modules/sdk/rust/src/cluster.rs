@@ -839,6 +839,32 @@ pub trait EnvoyClusterLoadBalancer: Send {
     index: usize,
     is_added: bool,
   ) -> Option<PackedAddress>;
+
+  /// Returns how many hosts changed health in the update that triggered the current
+  /// [`ClusterLb::on_host_membership_update`] call, so the module can patch its healthy set
+  /// instead of rereading every host. Added and removed hosts are reported by
+  /// [`EnvoyClusterLoadBalancer::get_member_update_host`] instead, and a membership-only update
+  /// reports zero. It is only valid during the `on_host_membership_update` callback.
+  ///
+  /// Returns `None` outside the callback, or when Envoy does not know which hosts changed health:
+  /// the cluster does not keep persistent host partitions, or the update replaced them wholesale.
+  /// The module must then reread the hosts it tracks.
+  fn get_member_update_health_changed_host_count(&self) -> Option<usize>;
+
+  /// Returns a host whose health changed in the update that triggered the current
+  /// [`ClusterLb::on_host_membership_update`] call, with its priority and current health. Valid
+  /// indexes are below [`EnvoyClusterLoadBalancer::get_member_update_health_changed_host_count`].
+  /// It is only valid during the `on_host_membership_update` callback.
+  ///
+  /// Returns `None` when the index is out of bounds or the count is unknown.
+  fn get_member_update_health_changed_host(
+    &self,
+    index: usize,
+  ) -> Option<(
+    abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    u32,
+    abi::envoy_dynamic_module_type_host_health,
+  )>;
 }
 
 /// A per-worker timer handle, created via [`EnvoyClusterLoadBalancer::worker_timer_new`].
@@ -1975,6 +2001,41 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       },
       6 => Some(PackedAddress::V6(result.address_bytes, result.port)),
       _ => None,
+    }
+  }
+
+  fn get_member_update_health_changed_host_count(&self) -> Option<usize> {
+    let mut count = 0usize;
+    let known = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+        self.raw, &mut count,
+      )
+    };
+    known.then_some(count)
+  }
+
+  fn get_member_update_health_changed_host(
+    &self,
+    index: usize,
+  ) -> Option<(
+    abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    u32,
+    abi::envoy_dynamic_module_type_host_health,
+  )> {
+    let mut priority = 0u32;
+    let mut health = abi::envoy_dynamic_module_type_host_health::Unhealthy;
+    let host = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+        self.raw,
+        index,
+        &mut priority,
+        &mut health,
+      )
+    };
+    if host.is_null() {
+      None
+    } else {
+      Some((host, priority, health))
     }
   }
 }
@@ -3394,6 +3455,28 @@ mod tests {
       crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
       2
     );
+  }
+
+  // The stubs in `lib_test.rs` report two health-changed hosts for a null load balancer and an
+  // unknown count for any other.
+  #[test]
+  fn get_member_update_health_changed_hosts_reads_count_and_hosts() {
+    let lb = EnvoyClusterLoadBalancerImpl::new(std::ptr::null_mut());
+    assert_eq!(lb.get_member_update_health_changed_host_count(), Some(2));
+
+    let (host, priority, health) = lb.get_member_update_health_changed_host(0).unwrap();
+    assert_eq!(host as usize, 0xAB);
+    assert_eq!(priority, 1);
+    assert_eq!(health, abi::envoy_dynamic_module_type_host_health::Degraded);
+    let (host, priority, health) = lb.get_member_update_health_changed_host(1).unwrap();
+    assert_eq!(host as usize, 0xCD);
+    assert_eq!(priority, 0);
+    assert_eq!(health, abi::envoy_dynamic_module_type_host_health::Healthy);
+    assert!(lb.get_member_update_health_changed_host(2).is_none());
+
+    let unknown =
+      EnvoyClusterLoadBalancerImpl::new(0x1 as abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr);
+    assert_eq!(unknown.get_member_update_health_changed_host_count(), None);
   }
 
   // The per-request accessor callbacks are satisfied by the link-time stubs in lib_test.rs.

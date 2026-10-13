@@ -481,6 +481,14 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_lb_get_member_update_host_
           false, envoy_dynamic_module_type_cluster_lb_envoy_ptr, size_t, bool,
           envoy_dynamic_module_type_packed_address*)
 
+WEAK_STUB(bool,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count,
+          false, envoy_dynamic_module_type_cluster_lb_envoy_ptr, size_t*)
+WEAK_STUB(envoy_dynamic_module_type_cluster_host_envoy_ptr,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host, nullptr,
+          envoy_dynamic_module_type_cluster_lb_envoy_ptr, size_t, uint32_t*,
+          envoy_dynamic_module_type_host_health*)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_cluster_pre_init_complete,
                envoy_dynamic_module_type_cluster_envoy_ptr)
 

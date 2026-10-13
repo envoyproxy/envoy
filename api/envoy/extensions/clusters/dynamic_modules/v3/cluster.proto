@@ -42,4 +42,12 @@ message ClusterConfig {
   // knowledge of protobuf encoding. Otherwise, the serialized bytes of the type are passed.
   // If not specified, an empty configuration is passed.
   google.protobuf.Any cluster_config = 3;
+
+  // If true, the cluster keeps its host partitions as persistent maps patched by each added,
+  // removed or health-changed host, instead of rebuilding them from every host on each change, and
+  // hands workers a snapshot. The module's load balancer can then read which hosts changed health
+  // through ``envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count``
+  // and ``envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host``.
+  // Locality weights are not supported with this option. Defaults to false.
+  bool use_persistent_host_partitions = 4;
 }

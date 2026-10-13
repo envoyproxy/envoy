@@ -356,7 +356,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->healthyHosts().size();
+  return host_sets[priority]->healthyHostCount();
 }
 
 envoy_dynamic_module_type_cluster_host_envoy_ptr
@@ -435,7 +435,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->hosts().size();
+  return host_sets[priority]->hostCount();
 }
 
 size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
@@ -447,7 +447,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->degradedHosts().size();
+  return host_sets[priority]->degradedHostCount();
 }
 
 size_t envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
@@ -1827,6 +1827,46 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
   }
   result->port = static_cast<uint16_t>(ip->port());
   return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* hosts = getLb(lb_envoy_ptr)->healthChangedHosts();
+  if (hosts == nullptr) {
+    return false;
+  }
+  *result = hosts->size();
+  return true;
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, uint32_t* priority,
+    envoy_dynamic_module_type_host_health* health) {
+  if (lb_envoy_ptr == nullptr || priority == nullptr || health == nullptr) {
+    return nullptr;
+  }
+  const auto* hosts = getLb(lb_envoy_ptr)->healthChangedHosts();
+  if (hosts == nullptr || index >= hosts->size()) {
+    return nullptr;
+  }
+  const auto& host = (*hosts)[index];
+  *priority = host->priority();
+  switch (host->coarseHealth()) {
+  case Envoy::Upstream::Host::Health::Unhealthy:
+    *health = envoy_dynamic_module_type_host_health_Unhealthy;
+    break;
+  case Envoy::Upstream::Host::Health::Degraded:
+    *health = envoy_dynamic_module_type_host_health_Degraded;
+    break;
+  case Envoy::Upstream::Host::Health::Healthy:
+    *health = envoy_dynamic_module_type_host_health_Healthy;
+    break;
+  }
+  return const_cast<Envoy::Upstream::Host*>(host.get());
 }
 
 } // extern "C"
