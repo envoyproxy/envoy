@@ -38,6 +38,9 @@ absl::Status validateIoUringOptions(
   if (options.enable_deferred_taskrun() && options.enable_submission_queue_polling()) {
     return absl::InvalidArgumentError("io_uring deferred task work cannot be combined with SQPOLL");
   }
+  if (options.enable_receive_batching() && !options.enable_multishot_receive()) {
+    return absl::InvalidArgumentError("io_uring receive batching requires multishot receive");
+  }
   return absl::OkStatus();
 }
 #endif
@@ -207,7 +210,7 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, read_buffer_size, 8192),
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000), write_high_watermark,
             write_low_watermark, context.threadLocal(), provided_buffer_count,
-            options.enable_deferred_taskrun());
+            options.enable_deferred_taskrun(), options.enable_receive_batching());
     io_uring_worker_factory_ = io_uring_worker_factory;
 
     return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_worker_factory);

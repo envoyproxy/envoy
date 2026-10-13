@@ -66,6 +66,17 @@ public:
   static void setCompletionBudget(IoUringImpl& instance, unsigned count) {
     instance.cqes_.resize(count, nullptr);
   }
+
+  static void process(IoUringImpl& instance, std::vector<io_uring_cqe>& cqes,
+                      const CompletionCb& callback) {
+    auto original = std::move(instance.cqes_);
+    instance.cqes_.clear();
+    for (auto& cqe : cqes) {
+      instance.cqes_.push_back(&cqe);
+    }
+    instance.processCompletionBatch(cqes.size(), callback);
+    instance.cqes_ = std::move(original);
+  }
 };
 
 namespace {
@@ -126,6 +137,133 @@ public:
 class IoUringImplParamTest
     : public IoUringImplTest,
       public testing::WithParamInterface<std::function<IoUringResult(IoUring&, os_fd_t)>> {};
+
+io_uring_cqe readBatchCqe(Request* request, int32_t result, unsigned flags = IORING_CQE_F_MORE) {
+  io_uring_cqe cqe{};
+  cqe.user_data = reinterpret_cast<uintptr_t>(request);
+  cqe.res = result;
+  cqe.flags = flags;
+  return cqe;
+}
+
+class IoUringReceiveBatchTest : public IoUringImplTest {
+public:
+  IoUringReceiveBatchTest() {
+    if (!should_skip_) {
+      io_uring_ = std::make_unique<IoUringImpl>(8, false, false, 0, 0, false, true);
+    }
+  }
+
+  std::vector<bool> process(std::vector<io_uring_cqe>& cqes) {
+    std::vector<bool> flags;
+    IoUringImplTestPeer::process(*static_cast<IoUringImpl*>(io_uring_.get()), cqes,
+                                 [&flags](Request* request, int32_t, bool injected) {
+                                   EXPECT_FALSE(injected);
+                                   flags.push_back(request != nullptr &&
+                                                   request->moreReadsInBatch());
+                                 });
+    return flags;
+  }
+};
+
+TEST_F(IoUringReceiveBatchTest, InterleavedReadsKeepCompletionOrderAndBatchSameRequest) {
+  int data_a = 0;
+  int data_b = 0;
+  TestRequest request_a(data_a);
+  TestRequest request_b(data_b);
+  std::vector<io_uring_cqe> cqes = {readBatchCqe(&request_a, 5), readBatchCqe(&request_b, 3),
+                                    readBatchCqe(&request_a, 6)};
+  std::vector<Request*> order;
+  std::vector<int32_t> results;
+  std::vector<bool> flags;
+  IoUringImplTestPeer::process(*static_cast<IoUringImpl*>(io_uring_.get()), cqes,
+                               [&](Request* request, int32_t result, bool injected) {
+                                 EXPECT_FALSE(injected);
+                                 order.push_back(request);
+                                 results.push_back(result);
+                                 flags.push_back(request->moreReadsInBatch());
+                               });
+  EXPECT_EQ(std::vector<Request*>({&request_a, &request_b, &request_a}), order);
+  EXPECT_EQ(std::vector<int32_t>({5, 3, 6}), results);
+  EXPECT_EQ(std::vector<bool>({true, false, false}), flags);
+}
+
+TEST_F(IoUringReceiveBatchTest, TerminalPositiveReadsFlushBeforeRequestsAreDeleted) {
+  int data_a = 0;
+  int data_b = 0;
+  auto* request_a = new TestRequest(data_a);
+  auto* request_b = new TestRequest(data_b);
+  std::vector<io_uring_cqe> cqes = {readBatchCqe(request_a, 5), readBatchCqe(request_b, 3, 0),
+                                    readBatchCqe(request_a, 6, 0)};
+  std::vector<bool> flags;
+  IoUringImplTestPeer::process(*static_cast<IoUringImpl*>(io_uring_.get()), cqes,
+                               [&](Request* request, int32_t, bool injected) {
+                                 EXPECT_FALSE(injected);
+                                 flags.push_back(request->moreReadsInBatch());
+                                 // Match worker request ownership: a terminal callback may delete
+                                 // its Request immediately.
+                                 if (!request->moreCompletions()) {
+                                   EXPECT_FALSE(request->moreReadsInBatch());
+                                   delete request;
+                                 }
+                               });
+  EXPECT_EQ(std::vector<bool>({true, false, false}), flags);
+  EXPECT_EQ(-1, data_a);
+  EXPECT_EQ(-1, data_b);
+}
+
+TEST_F(IoUringReceiveBatchTest, ErrorsEofAndOtherOperationsAreCompletionOrderBarriers) {
+  int data_a = 0;
+  TestRequest request_a(data_a);
+  MockIoUringSocket socket;
+  for (Request::RequestType type : {Request::RequestType::Accept, Request::RequestType::Connect,
+                                    Request::RequestType::Write, Request::RequestType::Cancel,
+                                    Request::RequestType::Close, Request::RequestType::Shutdown}) {
+    SCOPED_TRACE(static_cast<uint8_t>(type));
+    Request barrier(type, socket);
+    std::vector<io_uring_cqe> cqes = {readBatchCqe(&request_a, 5), readBatchCqe(&barrier, 1, 0),
+                                      readBatchCqe(&request_a, 6)};
+    EXPECT_EQ(std::vector<bool>({false, false, false}), process(cqes));
+  }
+  Request barrier(Request::RequestType::Read, socket);
+  for (int32_t result : {0, -ECANCELED, -ENOBUFS}) {
+    SCOPED_TRACE(result);
+    std::vector<io_uring_cqe> cqes = {readBatchCqe(&request_a, 5),
+                                      readBatchCqe(&barrier, result, 0),
+                                      readBatchCqe(&request_a, 6)};
+    EXPECT_EQ(std::vector<bool>({false, false, false}), process(cqes));
+  }
+  std::vector<io_uring_cqe> cqes = {readBatchCqe(&request_a, 5), readBatchCqe(nullptr, 0, 0),
+                                    readBatchCqe(&request_a, 6)};
+  EXPECT_EQ(std::vector<bool>({false, false, false}), process(cqes));
+}
+
+TEST_F(IoUringReceiveBatchTest, BatchBoundaryFlushesAndMetadataDoesNotCarryIntoNextBatch) {
+  int data_a = 0;
+  int data_b = 0;
+  TestRequest request_a(data_a);
+  TestRequest request_b(data_b);
+  std::vector<io_uring_cqe> first = {readBatchCqe(&request_a, 5), readBatchCqe(&request_b, 3),
+                                     readBatchCqe(&request_a, 6)};
+  EXPECT_EQ(std::vector<bool>({true, false, false}), process(first));
+  std::vector<io_uring_cqe> second = {readBatchCqe(&request_a, 1)};
+  EXPECT_EQ(std::vector<bool>({false}), process(second));
+  std::vector<io_uring_cqe> empty;
+  EXPECT_TRUE(process(empty).empty());
+}
+
+TEST_F(IoUringReceiveBatchTest, DisabledBatchingKeepsAllReadsImmediate) {
+  IoUringImpl control(8, false, false, 0);
+  int data_a = 0;
+  int data_b = 0;
+  TestRequest request_a(data_a);
+  TestRequest request_b(data_b);
+  std::vector<io_uring_cqe> cqes = {readBatchCqe(&request_a, 5), readBatchCqe(&request_b, 3),
+                                    readBatchCqe(&request_a, 6), readBatchCqe(&request_a, 7)};
+  IoUringImplTestPeer::process(control, cqes, [](Request* request, int32_t, bool) {
+    EXPECT_FALSE(request->moreReadsInBatch());
+  });
+}
 
 class IoUringDeferredCompletionTest : public IoUringImplTest {
 public:

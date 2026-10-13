@@ -261,7 +261,7 @@ public:
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("receive_tuning");
     io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
-        std::make_unique<IoUringImpl>(512, false, true, 64, 128, GetParam()), *dispatcher_);
+        std::make_unique<IoUringImpl>(512, false, true, 64, 128, GetParam(), true), *dispatcher_);
     if (!io_uring_worker_->isMultishotEnabled()) {
       GTEST_SKIP() << "Kernel lacks provided buffer rings";
     }

@@ -1753,6 +1753,42 @@ public:
   unsigned cleanups_{0};
 };
 
+TEST_F(IoUringReceiveBackpressureTest, BatchedReceivesNotifyOnceAndReleaseEveryBuffer) {
+  Request* read = reads_.back();
+  read->setMoreReadsInBatch(true);
+  positive(read, 0, "hello");
+  EXPECT_TRUE(results_.empty());
+  EXPECT_TRUE(buffer_pool_->released_buffers_.empty());
+
+  read->setMoreReadsInBatch(false);
+  positive(read, 1, "world");
+  EXPECT_EQ("helloworld", received_);
+  EXPECT_EQ(std::vector<int32_t>({10}), results_);
+  EXPECT_EQ(std::vector<uint32_t>({0, 1}), buffer_pool_->released_buffers_);
+  EXPECT_EQ(1, reads_.size());
+}
+
+TEST_F(IoUringReceiveBackpressureTest, PauseAfterBatchedCallbackRetainsLaterData) {
+  Request* read = reads_.back();
+  read->setMoreReadsInBatch(true);
+  positive(read, 0, "first");
+  pause_in_read_callback_ = true;
+  read->setMoreReadsInBatch(false);
+  positive(read, 1, "second");
+  EXPECT_EQ("firstsecond", received_);
+  ASSERT_EQ(1, cancellations_.size());
+  positive(read, 2, "late");
+  EXPECT_EQ("late", socket_->getReadBuffer().toString());
+  terminal(read);
+  acknowledge(cancellations_.back().second);
+  pause_in_read_callback_ = false;
+  socket_->enableRead();
+  deliverInjected();
+  EXPECT_EQ("firstsecondlate", received_);
+  EXPECT_EQ(std::vector<int32_t>({11, 4}), results_);
+  EXPECT_EQ(std::vector<uint32_t>({0, 1, 2}), buffer_pool_->released_buffers_);
+}
+
 TEST_F(IoUringReceiveBackpressureTest, DisableCancelsOnceAndRetainsLateDataUntilResume) {
   Request* read = reads_.back();
   socket_->disableRead();

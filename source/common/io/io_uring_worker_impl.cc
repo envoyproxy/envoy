@@ -99,10 +99,11 @@ IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission
                                      uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
                                      uint32_t write_low_watermark_bytes,
                                      Event::Dispatcher& dispatcher, uint32_t provided_buffer_count,
-                                     bool enable_deferred_taskrun)
+                                     bool enable_deferred_taskrun, bool enable_receive_batching)
     : IoUringWorkerImpl(std::make_unique<IoUringImpl>(
                             io_uring_size, use_submission_queue_polling, enable_multishot_receive,
-                            read_buffer_size, provided_buffer_count, enable_deferred_taskrun),
+                            read_buffer_size, provided_buffer_count, enable_deferred_taskrun,
+                            enable_receive_batching),
                         read_buffer_size, write_timeout_ms, write_high_watermark_bytes,
                         write_low_watermark_bytes, dispatcher) {}
 
@@ -801,6 +802,13 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
   if (pause_enabled && !injected && result > 0 && req->moreCompletions() &&
       status_ == ReadDisabled && read_cancel_req_ == nullptr) {
     disableRead();
+  }
+
+  // The next positive completion is already available in this bounded CQ batch. Keep its data
+  // together so the connection and filters run once for the accumulated bytes. The final adjacent
+  // completion always notifies the handler, including when the following completion is an error.
+  if (!injected && result > 0 && req->moreReadsInBatch()) {
+    return;
   }
 
   // If the socket is enabled and there are bytes to read, notify the handler.

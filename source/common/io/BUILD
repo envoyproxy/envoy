@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         "//envoy/common/io:io_uring_interface",
         "//envoy/thread_local:thread_local_interface",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ] + select({
         "//bazel:liburing_enabled": ["//bazel/deps:liburing"],
         "//conditions:default": [],

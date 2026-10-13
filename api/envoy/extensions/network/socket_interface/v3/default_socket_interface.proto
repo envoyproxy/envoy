@@ -40,7 +40,7 @@ message DefaultSocketInterface {
 //   ``io_uring`` support is experimental and its performance characteristics depend heavily on
 //   the kernel version.
 //
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message IoUringOptions {
   // The number of entries in the ``io_uring`` submission queue (SQ). Each in-flight I/O
   // operation requires one SQE. The completion queue (CQ) is sized at ``2x`` this value
@@ -105,4 +105,10 @@ message IoUringOptions {
   // be combined with ``enable_submission_queue_polling``. Unsupported kernels reject
   // ring initialization. If omitted, defaults to false.
   bool enable_deferred_taskrun = 9;
+
+  // Accumulate positive completions for the same persistent receive into one connection
+  // read callback, including interleaved receives. Batches end at the current CQ snapshot
+  // and at error, EOF, or non-read completions; no wait for additional traffic is added.
+  // Requires ``enable_multishot_receive``. If omitted, defaults to false.
+  bool enable_receive_batching = 10;
 }
