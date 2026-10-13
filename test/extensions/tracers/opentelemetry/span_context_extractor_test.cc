@@ -1,9 +1,14 @@
+#include <string>
+
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -189,6 +194,36 @@ TEST(SpanContextExtractorTest, ExtractSpanContextWithMultipleTracestateEntries) 
 
   EXPECT_OK(span_context);
   EXPECT_EQ(span_context->tracestate(), "sample-tracestate,sample-tracestate-2");
+}
+
+TEST(SpanContextExtractorTest, SerializeTraceparent) {
+  static constexpr absl::string_view kOtherParentId = "feedf00dfeedf00d";
+  static constexpr absl::string_view kOtherTraceId = "facefacefacefacefacefacefaceface";
+
+  static_assert(kOtherParentId.size() == parent_id.size());
+  static_assert(kOtherTraceId.size() == trace_id.size());
+
+  for (bool sampled : {false, true}) {
+    SCOPED_TRACE(testing::Message() << "sampled: " << sampled);
+
+    absl::string_view want_flags = sampled ? "01" : "00";
+
+    SpanContext span_context{version, trace_id, parent_id, sampled,
+                             /*tracestate=*/""};
+    std::string serialized_traceparent = SpanContextExtractor::serializeTraceparent(span_context);
+    EXPECT_EQ(serialized_traceparent,
+              fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, want_flags));
+
+    span_context.setSpanId(std::string(kOtherParentId));
+    serialized_traceparent = SpanContextExtractor::serializeTraceparent(span_context);
+    EXPECT_EQ(serialized_traceparent,
+              fmt::format("{}-{}-{}-{}", version, trace_id, kOtherParentId, want_flags));
+
+    span_context.setTraceId(std::string(kOtherTraceId));
+    serialized_traceparent = SpanContextExtractor::serializeTraceparent(span_context);
+    EXPECT_EQ(serialized_traceparent,
+              fmt::format("{}-{}-{}-{}", version, kOtherTraceId, kOtherParentId, want_flags));
+  }
 }
 
 } // namespace
