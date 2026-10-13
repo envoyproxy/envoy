@@ -223,7 +223,7 @@ void ConnectionManager::addOrUpdateGroupMember(absl::string_view group,
 
 void ConnectionManager::onUnregisterClient(RemotingCommandPtr request) {
   auto header = request->typedCustomHeader<UnregisterClientRequestHeader>();
-  if (header == nullptr) {
+  if (header == nullptr || header->clientId().empty()) {
     ENVOY_CONN_LOG(error, "rocketmq_proxy: unregister client request without a valid header",
                    read_callbacks_->connection());
     onError(request, "Malformed unregister client request");
@@ -286,7 +286,7 @@ void ConnectionManager::onSendMessage(RemotingCommandPtr request) {
 void ConnectionManager::onGetConsumerListByGroup(RemotingCommandPtr request) {
   auto requestExtHeader = request->typedCustomHeader<GetConsumerListByGroupRequestHeader>();
 
-  if (requestExtHeader == nullptr) {
+  if (requestExtHeader == nullptr || requestExtHeader->consumerGroup().empty()) {
     ENVOY_CONN_LOG(error, "rocketmq_proxy: get consumer list request without a valid header",
                    read_callbacks_->connection());
     onError(request, "Malformed get consumer list request");

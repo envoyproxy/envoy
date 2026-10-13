@@ -705,11 +705,37 @@ TEST_F(RocketmqConnectionManagerTest, OnDataRequestHandlersRejectNullHeader) {
   // 35 == UnregisterClient, 38 == GetConsumerListByGroup, 50 == PopMessage, 51 == AckMessage.
   for (const int code : {35, 38, 50, 51}) {
     appendJsonHeaderFrame(
-        buffer_, fmt::format(R"({{"code":{},"version":1,"opaque":1,"flag":1,"language":"JAVA"}})",
-                             code));
+        buffer_,
+        fmt::format(R"({{"code":{},"version":1,"opaque":1,"flag":1,"language":"JAVA"}})", code));
     EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
     buffer_.drain(buffer_.length());
   }
+}
+
+TEST_F(RocketmqConnectionManagerTest, OnUnregisterClientRejectsEmptyClientId) {
+  initializeFilter();
+
+  // code 35 == UnregisterClient.
+  appendJsonHeaderFrame(buffer_, R"({"code":35,"version":1,"opaque":1,"flag":0,"language":"JAVA",)"
+                                 R"("extFields":{"clientID":"","producerGroup":"PG_Example_01"}})");
+  EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, store_.counter("test.unregister").value());
+
+  buffer_.drain(buffer_.length());
+}
+
+TEST_F(RocketmqConnectionManagerTest, OnGetConsumerListByGroupRejectsEmptyConsumerGroup) {
+  initializeFilter();
+
+  // code 38 == GetConsumerListByGroup.
+  appendJsonHeaderFrame(buffer_, R"({"code":38,"version":1,"opaque":1,"flag":0,"language":"JAVA",)"
+                                 R"("extFields":{"consumerGroup":""}})");
+  EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, store_.counter("test.get_consumer_list").value());
+
+  buffer_.drain(buffer_.length());
 }
 
 TEST_F(RocketmqConnectionManagerTest, ConsumerGroupMemberEqual) {
