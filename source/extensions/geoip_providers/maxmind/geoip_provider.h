@@ -43,6 +43,7 @@ enum class GeoField {
   CountryGeonameId,
   ContinentGeonameId,
   MetroCode,
+  CountryName,
   Count,
 };
 

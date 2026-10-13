@@ -19,6 +19,7 @@ namespace {
 constexpr const char* MMDB_CITY_LOOKUP_PATH[] = {"city", "names", "en", nullptr};
 constexpr const char* MMDB_REGION_LOOKUP_PATH[] = {"subdivisions", "0", "iso_code", nullptr};
 constexpr const char* MMDB_COUNTRY_LOOKUP_PATH[] = {"country", "iso_code", nullptr};
+constexpr const char* MMDB_COUNTRY_NAME_LOOKUP_PATH[] = {"country", "names", "en", nullptr};
 constexpr const char* MMDB_ASN_LOOKUP_PATH[] = {"autonomous_system_number", nullptr};
 constexpr const char* MMDB_ASN_ORG_LOOKUP_PATH[] = {"autonomous_system_organization", nullptr};
 constexpr const char* MMDB_ISP_LOOKUP_PATH[] = {"isp", nullptr};
@@ -64,6 +65,7 @@ constexpr LookupFieldSpec CITY_LOOKUP_FIELDS[] = {
 };
 constexpr LookupFieldSpec COUNTRY_LOOKUP_FIELDS[] = {
     {GeoField::Country, MMDB_COUNTRY_LOOKUP_PATH},
+    {GeoField::CountryName, MMDB_COUNTRY_NAME_LOOKUP_PATH},
     {GeoField::CountryGeonameId, MMDB_COUNTRY_GEONAME_ID_LOOKUP_PATH},
     {GeoField::ContinentGeonameId, MMDB_CONTINENT_GEONAME_ID_LOOKUP_PATH},
 };
@@ -207,6 +209,7 @@ GeoipProviderConfig::GeoipProviderConfig(
     setFieldKey(GeoField::CountryGeonameId, keys.country_geoname_id());
     setFieldKey(GeoField::ContinentGeonameId, keys.continent_geoname_id());
     setFieldKey(GeoField::MetroCode, keys.metro_code());
+    setFieldKey(GeoField::CountryName, keys.country_name());
   } else if (common_config.has_geo_headers_to_add()) {
     // Fall back to deprecated geo_headers_to_add for backward compatibility.
     const auto& headers = common_config.geo_headers_to_add();
