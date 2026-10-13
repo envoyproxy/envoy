@@ -672,6 +672,46 @@ TEST_F(RocketmqConnectionManagerTest, OnDataInvalidFrameLength) {
   buffer_.drain(buffer_.length());
 }
 
+// Build a single RocketMQ frame carrying a JSON header with the given fields. Used to craft
+// malformed requests whose custom header fails to decode.
+void appendJsonHeaderFrame(Buffer::OwnedImpl& buffer, const std::string& json) {
+  const int32_t header_length = json.size();
+  const int32_t frame_length = 4 + header_length;
+  buffer.writeBEInt<int32_t>(frame_length);
+  buffer.writeBEInt<int32_t>(header_length);
+  buffer.add(json);
+}
+
+// A request frame whose RPC (response) flag is set routes decoding to the response header path,
+// so the request-typed custom header is null. The handler must reject it instead of dereferencing
+// the null header (previously a crash). See regression for the RocketMQ request handlers.
+TEST_F(RocketmqConnectionManagerTest, OnDataRequestWithResponseFlagNullHeader) {
+  initializeFilter();
+
+  // code 10 == SendMessage; flag 1 sets the RPC bit (SHIFT_RPC == 0).
+  appendJsonHeaderFrame(buffer_,
+                        R"({"code":10,"version":1,"opaque":1,"flag":1,"language":"JAVA"})");
+  EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+
+  buffer_.drain(buffer_.length());
+}
+
+TEST_F(RocketmqConnectionManagerTest, OnDataRequestHandlersRejectNullHeader) {
+  initializeFilter();
+
+  // Each of these request codes dispatches to a handler that reads a typed custom header. With the
+  // RPC flag set the header is null; the handler must reject the request without crashing.
+  // 35 == UnregisterClient, 38 == GetConsumerListByGroup, 50 == PopMessage, 51 == AckMessage.
+  for (const int code : {35, 38, 50, 51}) {
+    appendJsonHeaderFrame(
+        buffer_, fmt::format(R"({{"code":{},"version":1,"opaque":1,"flag":1,"language":"JAVA"}})",
+                             code));
+    EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+    buffer_.drain(buffer_.length());
+  }
+}
+
 TEST_F(RocketmqConnectionManagerTest, ConsumerGroupMemberEqual) {
   initializeFilter();
 
