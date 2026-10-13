@@ -220,7 +220,7 @@ buckets:
   EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_invalid").value());
 }
 
-TEST_F(PriorityLoadShedFilterTest, FirstHeaderValueOnly) {
+TEST_F(PriorityLoadShedFilterTest, RepeatedHeaderRejects) {
   EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
       .WillOnce(Return(&low_priority_bucket_));
   initializeFilter(R"EOF(
@@ -231,14 +231,39 @@ buckets:
 )EOF");
 
   EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "invalid priority header",
-                                                 _, std::optional<Grpc::Status::GrpcStatus>(),
-                                                 "priority_load_shed.invalid_header"));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "multiple priority headers", _,
+                             std::optional<Grpc::Status::GrpcStatus>(),
+                             "priority_load_shed.repeated_header"));
   auto headers = defaultHeaders();
-  headers.addCopy("x-message-priority", "bad-first-value");
+  headers.addCopy("x-message-priority", "20");
   headers.addCopy("x-message-priority", "20");
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
-  EXPECT_EQ(1UL, stats_store_.counter("prefix.priority_load_shed.header_invalid").value());
+}
+
+TEST_F(PriorityLoadShedFilterTest, RepeatedHeaderRejectsEvenWithDefault) {
+  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.low"))
+      .WillOnce(Return(&low_priority_bucket_));
+  EXPECT_CALL(overload_manager_, getLoadShedPoint("envoy.load_shed_points.priority.default"))
+      .WillOnce(Return(&default_bucket_));
+  initializeFilter(R"EOF(
+header_name: "x-message-priority"
+buckets:
+- value_range: { start: 16, end: 32 }
+  load_shed_point: "envoy.load_shed_points.priority.low"
+default_load_shed_point: "envoy.load_shed_points.priority.default"
+)EOF");
+
+  EXPECT_CALL(low_priority_bucket_, shouldShedLoad()).Times(0);
+  EXPECT_CALL(default_bucket_, shouldShedLoad()).Times(0);
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "multiple priority headers", _,
+                             std::optional<Grpc::Status::GrpcStatus>(),
+                             "priority_load_shed.repeated_header"));
+  auto headers = defaultHeaders();
+  headers.addCopy("x-message-priority", "5");
+  headers.addCopy("x-message-priority", "20");
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
 }
 
 TEST_F(PriorityLoadShedFilterTest, BucketStartBoundaryIsIncluded) {

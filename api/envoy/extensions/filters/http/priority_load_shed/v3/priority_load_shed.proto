@@ -26,6 +26,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Requests with a missing header, invalid value, or a value that does not match any configured
 // bucket are rejected with a ``400`` status code unless ``default_load_shed_point`` is configured,
 // in which case those requests are evaluated against the default load shed point instead.
+// Requests carrying the header more than once are always rejected with a ``400`` status code.
 message PriorityLoadShed {
   message Bucket {
     // Numeric range of header values in half-open interval semantics [start, end).

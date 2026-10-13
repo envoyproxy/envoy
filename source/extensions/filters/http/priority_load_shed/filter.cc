@@ -115,6 +115,10 @@ Http::FilterHeadersStatus PriorityLoadShedFilter::decodeHeaders(Http::RequestHea
       return rejectBadRequest("missing priority header", "priority_load_shed.missing_header");
     }
     load_shed_point = config_->defaultLoadShedPoint();
+  } else if (header_values.size() > 1) {
+    // More than one value is ambiguous: a client-supplied value would win over one appended by a
+    // trusted classifier. Fail closed instead of guessing, even if a default point is configured.
+    return rejectBadRequest("multiple priority headers", "priority_load_shed.repeated_header");
   } else {
     int32_t header_value = 0;
     if (!absl::SimpleAtoi(header_values[0]->value().getStringView(), &header_value) ||

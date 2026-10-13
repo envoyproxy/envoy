@@ -165,6 +165,24 @@ TEST_P(PriorityLoadShedIntegrationTest, RejectsInvalidHeader) {
   codec_client->close();
 }
 
+TEST_P(PriorityLoadShedIntegrationTest, RejectsRepeatedHeader) {
+  autonomous_upstream_ = true;
+  initializeFilterAndOverloadManager();
+
+  auto codec_client = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "priority.example"}};
+  request_headers.addCopy(Http::LowerCaseString("x-message-priority"), "5");
+  request_headers.addCopy(Http::LowerCaseString("x-message-priority"), "20");
+  auto response = codec_client->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_EQ("multiple priority headers", response->body());
+  codec_client->close();
+}
+
 } // namespace
 } // namespace PriorityLoadShed
 } // namespace HttpFilters

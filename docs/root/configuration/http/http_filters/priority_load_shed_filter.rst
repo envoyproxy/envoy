@@ -28,13 +28,18 @@ Bucket ranges use half-open interval semantics ``[start, end)``:
 
 A request is shed when all of the following are true:
 
-* the configured header is present, its first value parses as a non-negative integer, and the
-  parsed value matches a configured bucket (or ``default_load_shed_point`` is configured and used
-  as a fallback for a missing, invalid, or unmatched value), and
+* the configured header is present exactly once, its value parses as a non-negative integer, and
+  the parsed value matches a configured bucket (or ``default_load_shed_point`` is configured and
+  used as a fallback for a missing, invalid, or unmatched value), and
 * the selected load shed point indicates load should be shed.
 
 If the header is missing, invalid, or the value does not match any bucket and no
 ``default_load_shed_point`` is configured, the request is rejected with ``400 Bad Request``.
+
+If the header is present more than once, the request is always rejected with ``400 Bad Request``,
+even when ``default_load_shed_point`` is configured. Picking one of the values would let a
+client-supplied value override one added by a trusted classifier, so the filter fails closed
+instead.
 
 All referenced load shed points (both in buckets and ``default_load_shed_point``) must be
 configured in the overload manager. If a referenced point does not exist, the configuration
@@ -122,7 +127,7 @@ namespace.
 
   total, Counter, Total number of requests evaluated by the filter
   header_missing, Counter, Requests where the configured header was not present
-  header_invalid, Counter, Requests where the first header value was invalid
+  header_invalid, Counter, Requests where the header value was invalid
   bucket_unmatched, Counter, Requests where parsed value did not match any bucket
   passed, Counter, Requests allowed to continue because selected load shed point did not shed
   shed, Counter, Requests rejected because selected load shed point shed load
