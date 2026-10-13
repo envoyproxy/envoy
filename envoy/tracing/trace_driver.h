@@ -212,6 +212,13 @@ public:
   virtual std::string getSpanId() const PURE;
 
   /**
+   * Retrieve the span's tracestate. This may not have meaning for all
+   * implementors.
+   * @return span's tracestate
+   */
+  virtual std::string getTracestate() const { return ""; }
+
+  /**
    * Reparent this span based on the given trace context.
    */
   virtual void updateParent([[maybe_unused]] const TraceContext& context,
