@@ -1284,8 +1284,6 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
     setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
                                    ? json_rpc[McpConstants::PARAMS_FIELD]
                                    : json::object());
-    // TODO(guoyilin42): We may need to explicitly set `content-length: 0` to prevent curl from
-    // hanging. `modify_headers` fails here as `sendLocalReply` removes it for empty bodies.
     decoder_callbacks_->sendLocalReply(Http::Code::Accepted, "", nullptr,
                                        Grpc::Status::WellKnownGrpcStatus::Ok,
                                        "mcp_json_rest_bridge_filter_initialize_ack");
