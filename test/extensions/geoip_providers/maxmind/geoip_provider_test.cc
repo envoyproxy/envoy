@@ -1094,6 +1094,20 @@ TEST_F(GeoipProviderTest, GeoDbPathDoesNotExist) {
 }
 
 TEST_F(GeoipProviderTest, CityOnlyFieldsWithoutCityDbRejected) {
+  // city field configured without city_db — rejected at config load.
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        city: "x-geo-city"
+        asn: "x-geo-asn"
+    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
+                          "city_db_path is required for the configured geo_field_keys");
+}
+
+TEST_F(GeoipProviderTest, ExtendedCityFieldsWithoutCityDbRejected) {
+  // Extended city-only field (latitude) configured without city_db.
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_field_keys:
@@ -1102,7 +1116,7 @@ TEST_F(GeoipProviderTest, CityOnlyFieldsWithoutCityDbRejected) {
     country_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Country-Test.mmdb"
   )EOF";
   EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
-                          "city_db_path is required when any of the following geo_field_keys");
+                          "city_db_path is required for the configured geo_field_keys");
 }
 
 struct GeoipProviderGeoDbNotSetTestCase {
@@ -1145,15 +1159,8 @@ struct GeoipProviderGeoDbNotSetTestCase geo_db_not_set_test_cases[] = {
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
   )EOF",
         "asn"},
-    {
-        R"EOF(
-    common_provider_config:
-      geo_field_keys:
-        city: "x-geo-city"
-        asn: "x-geo-asn"
-    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
-  )EOF",
-        "city"},
+    // The city-without-city_db case is now rejected at config load time
+    // (see CityOnlyFieldsWithoutCityDbRejected), so it is no longer a death test.
     {
         R"EOF(
     common_provider_config:

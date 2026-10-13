@@ -75,6 +75,25 @@ public:
     DbFileProviders db_file_providers = getDbFileProviders(proto_config, context);
     const auto provider_config =
         std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
+
+    // Reject at config load time when city-dependent fields are configured without a city
+    // database, rather than hitting IS_ENVOY_BUG on every lookup. This covers both the
+    // original fields (city, region) and the extended fields (latitude, metro_code, etc.).
+    if (db_file_providers.city_db_ == nullptr) {
+      static constexpr GeoField CITY_DEPENDENT_FIELDS[] = {
+          GeoField::City,           GeoField::Region,
+          GeoField::CityGeonameId,  GeoField::Latitude,
+          GeoField::Longitude,      GeoField::TimeZone,
+          GeoField::PostalCode,     GeoField::RegionName,
+          GeoField::RegionGeonameId, GeoField::SubregionGeonameId,
+          GeoField::MetroCode,
+      };
+      for (const auto field : CITY_DEPENDENT_FIELDS) {
+        if (provider_config->fieldKey(field).has_value()) {
+          throw EnvoyException("city_db_path is required for the configured geo_field_keys");
+        }
+      }
+    }
     std::shared_ptr<GeoipProvider> driver =
         std::make_shared<GeoipProvider>(singleton, provider_config, std::move(db_file_providers));
     drivers_[key] = driver;
@@ -104,26 +123,6 @@ private:
         getDbFileProvider(GeoDbType::Asn, proto_config.asn_db_path(), context);
     db_file_providers.country_db_ =
         getDbFileProvider(GeoDbType::Country, proto_config.country_db_path(), context);
-
-    // Reject city-only fields configured without a city database at load time,
-    // rather than hitting IS_ENVOY_BUG on every lookup.
-    if (db_file_providers.city_db_ == nullptr) {
-      const auto& common = proto_config.common_provider_config();
-      if (common.has_geo_field_keys()) {
-        const auto& keys = common.geo_field_keys();
-        if (!keys.city_geoname_id().empty() || !keys.latitude().empty() ||
-            !keys.longitude().empty() || !keys.time_zone().empty() ||
-            !keys.postal_code().empty() || !keys.region_name().empty() ||
-            !keys.region_geoname_id().empty() || !keys.subregion_geoname_id().empty() ||
-            !keys.metro_code().empty()) {
-          throw EnvoyException(
-              "city_db_path is required when any of the following geo_field_keys are configured: "
-              "city_geoname_id, latitude, longitude, time_zone, postal_code, region_name, "
-              "region_geoname_id, subregion_geoname_id, metro_code");
-        }
-      }
-    }
-
     return db_file_providers;
   }
 
