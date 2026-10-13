@@ -1,6 +1,6 @@
 module(
     name = "envoy",
-    version = "1.40.0-dev",
+    version = "1.40.0",
 )
 
 ####################################################################################
@@ -27,7 +27,7 @@ bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "emsdk", version = "4.0.23.envoy")
-bazel_dep(name = "envoy_api", version = "1.40.0-dev")
+bazel_dep(name = "envoy_api", version = "1.40.0")
 bazel_dep(name = "envoy_toolshed", version = "0.5.3.envoy")
 bazel_dep(name = "envoy_toolshed_jq", version = "0.5.3.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
