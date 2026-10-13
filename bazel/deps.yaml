@@ -3,7 +3,7 @@ abseil-cpp:
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
   apparent_name: abseil_cpp
-  release_date: "2026-02-11"
+  release_date: "2026-08-18"
   use_category:
   - dataplane_core
   - controlplane
@@ -113,7 +113,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2026-04-14"
+  release_date: "2026-09-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -125,7 +125,7 @@ brotli:
   project_name: "brotli"
   project_desc: "brotli compression library"
   project_url: "https://brotli.org"
-  release_date: "2025-10-27"
+  release_date: "2026-09-30"
   use_category:
   - dataplane_core
   - dataplane_ext
@@ -297,7 +297,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-09-03"
+  release_date: "2026-10-08"
   use_category:
   - build
   - controlplane
@@ -320,7 +320,7 @@ fast_float:
     Fast and exact implementation of the C++ from_chars functions for number types: 4x to 10x faster than strtod,
     part of GCC 12, Chromium, Redis and WebKit/Safari
   project_url: "https://github.com/fastfloat/fast_float"
-  release_date: "2024-11-21"
+  release_date: "2026-03-10"
   use_category:
   - dataplane_ext
   extensions:
@@ -330,7 +330,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -343,7 +343,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -356,7 +356,7 @@ fips_go_linux_amd64:
   project_name: "Go (Linux amd64)"
   project_desc: "Go programming language (Linux amd64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -369,7 +369,7 @@ fips_go_linux_arm64:
   project_name: "Go (Linux arm64)"
   project_desc: "Go programming language (Linux arm64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -662,7 +662,7 @@ libpfm:
   project_name: "libpfm"
   project_desc: "A helper library to develop monitoring tools"
   project_url: "https://sourceforge.net/projects/perfmon2"
-  release_date: "2020-09-02"
+  release_date: "2020-09-03"
   use_category:
   - test_only
 
@@ -860,7 +860,7 @@ proto-converter:
   project_desc: "Library that supports the conversion between protobuf binary and json"
   project_url: "https://github.com/grpc-ecosystem/proto-converter"
   apparent_name: proto-converter
-  release_date: "2024-06-25"
+  release_date: "2026-09-12"
   use_category:
   - dataplane_core
   - controlplane
@@ -1011,7 +1011,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-08-31"
+  release_date: "2026-10-06"
   use_category:
   - controlplane
   - dataplane_core
@@ -1465,7 +1465,7 @@ zstd:
   project_name: "zstd"
   project_desc: "zstd compression library"
   project_url: "https://facebook.github.io/zstd"
-  release_date: "2026-10-06"
+  release_date: "2025-02-19"
   use_category:
   - dataplane_ext
   extensions:
