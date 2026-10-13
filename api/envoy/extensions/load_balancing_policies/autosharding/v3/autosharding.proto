@@ -23,8 +23,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#not-implemented-hide:]
 // [#next-free-field: 6]
 message Autosharding {
-  // Configuration for the gRPC service that the LB policy will communicate with
-  // to receive sharding assignments from.
+  // gRPC service configuration used by the LB policy to fetch sharding
+  // assignments.
+  //
+  // Communicates via the autosharding protocol:
+  // https://github.com/GoogleCloudPlatform/autosharding/blob/main/proto/autosharding/v1/autosharding.proto
   config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
 
   // A unique ID sent to the sharding service to locate assignments.
@@ -39,7 +42,10 @@ message Autosharding {
   // is used to look up the matching key-range assigned by the sharding service.
   string key_header_name = 3 [(validate.rules).string = {min_len: 1}];
 
-  // If true, fallback mechanism is enabled.
+  // When true, enables a fallback mechanism. The LB policy chooses a random
+  // endpoint from the name resolver's list when:
+  //   1. The sharding server fails to return a valid assignment, or
+  //   2. All endpoints matching a key range in the assignment are unhealthy.
   bool enable_fallback = 4;
 
   // How long to wait for the initial assignment from the sharding service. If
