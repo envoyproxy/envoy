@@ -558,6 +558,23 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   sds_resource.name_ = tag_names.XDS_RESOURCE_NAME;
   sds_resource.value_ = "xds_trusted_ca";
   regex_tester.testRegex("sds.xds_trusted_ca.update_attempt", "sds.update_attempt", {sds_resource});
+
+  // Upstream per-zone stats
+  Tag from_zone;
+  from_zone.name_ = tag_names.UPSTREAM_FROM_ZONE;
+  from_zone.value_ = "zone_a";
+  Tag to_zone;
+  to_zone.name_ = tag_names.UPSTREAM_TO_ZONE;
+  to_zone.value_ = "zone_b";
+  regex_tester.testRegex("cluster.test_cluster.zone.zone_a.zone_b.upstream_rq_200",
+                         "cluster.zone.upstream_rq",
+                         {test_cluster, from_zone, to_zone, response_code});
+  regex_tester.testRegex("cluster.test_cluster.alt_prefix.zone.zone_a.zone_b.upstream_rq_time",
+                         "cluster.alt_prefix.zone.upstream_rq_time",
+                         {test_cluster, from_zone, to_zone});
+  regex_tester.testRegex("cluster.test_cluster.zone.zone_a.zone_b.thrift.upstream_resp_success",
+                         "cluster.zone.thrift.upstream_resp_success",
+                         {test_cluster, from_zone, to_zone});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
