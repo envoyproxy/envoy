@@ -1441,9 +1441,12 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEn
     EXPECT_EQ(absl::BytesToHexString(span.parent_span_id()), "00f067aa0ba902b7");
     EXPECT_NE(absl::BytesToHexString(span.span_id()), "");
     EXPECT_NE(absl::BytesToHexString(span.span_id()), "00f067aa0ba902b7");
-    EXPECT_EQ(span.flags() & opentelemetry::proto::trace::v1::SpanFlags::SPAN_FLAGS_TRACE_FLAGS_MASK, 1);
-    EXPECT_TRUE(span.flags() & opentelemetry::proto::trace::v1::SpanFlags::SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK);
-    EXPECT_TRUE(span.flags() & opentelemetry::proto::trace::v1::SpanFlags::SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK);
+    EXPECT_EQ(
+        span.flags() & opentelemetry::proto::trace::v1::SpanFlags::SPAN_FLAGS_TRACE_FLAGS_MASK, 1);
+    EXPECT_TRUE(span.flags() &
+                opentelemetry::proto::trace::v1::SpanFlags::SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK);
+    EXPECT_TRUE(span.flags() &
+                opentelemetry::proto::trace::v1::SpanFlags::SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK);
 
     ASSERT_TRUE(trace_connection->close());
     ASSERT_TRUE(trace_connection->waitForDisconnect());
