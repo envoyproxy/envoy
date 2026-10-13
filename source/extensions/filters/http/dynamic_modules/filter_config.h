@@ -1,0 +1,408 @@
+#pragma once
+
+#include <atomic>
+
+#include "envoy/init/manager.h"
+#include "envoy/secret/secret_provider.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/upstream/cluster_manager.h"
+
+#include "source/common/secret/secret_provider_impl.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace DynamicModules {
+namespace HttpFilters {
+
+// The default custom stat namespace which prepends all user-defined metrics.
+// Note that the prefix is removed from the final output of ``/stats`` endpoints.
+// This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
+constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
+
+using OnHttpConfigDestroyType = decltype(&envoy_dynamic_module_on_http_filter_config_destroy);
+using OnHttpFilterNewType = decltype(&envoy_dynamic_module_on_http_filter_new);
+
+using OnHttpPerRouteConfigDestroyType =
+    decltype(&envoy_dynamic_module_on_http_filter_per_route_config_destroy);
+using OnHttpFilterRequestHeadersType =
+    decltype(&envoy_dynamic_module_on_http_filter_request_headers);
+using OnHttpFilterRequestBodyType = decltype(&envoy_dynamic_module_on_http_filter_request_body);
+using OnHttpFilterRequestTrailersType =
+    decltype(&envoy_dynamic_module_on_http_filter_request_trailers);
+using OnHttpFilterResponseHeadersType =
+    decltype(&envoy_dynamic_module_on_http_filter_response_headers);
+using OnHttpFilterResponseBodyType = decltype(&envoy_dynamic_module_on_http_filter_response_body);
+using OnHttpFilterResponseTrailersType =
+    decltype(&envoy_dynamic_module_on_http_filter_response_trailers);
+using OnHttpFilterStreamCompleteType =
+    decltype(&envoy_dynamic_module_on_http_filter_stream_complete);
+using OnHttpFilterDestroyType = decltype(&envoy_dynamic_module_on_http_filter_destroy);
+using OnHttpFilterHttpCalloutDoneType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_callout_done);
+using OnHttpFilterHttpStreamHeadersType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_headers);
+using OnHttpFilterHttpStreamDataType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_data);
+using OnHttpFilterHttpStreamTrailersType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_trailers);
+using OnHttpFilterHttpStreamCompleteType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_complete);
+using OnHttpFilterHttpStreamResetType =
+    decltype(&envoy_dynamic_module_on_http_filter_http_stream_reset);
+using OnHttpFilterScheduled = decltype(&envoy_dynamic_module_on_http_filter_scheduled);
+using OnHttpFilterDownstreamAboveWriteBufferHighWatermark =
+    decltype(&envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark);
+using OnHttpFilterDownstreamBelowWriteBufferLowWatermark =
+    decltype(&envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark);
+using OnHttpFilterLocalReplyType = decltype(&envoy_dynamic_module_on_http_filter_local_reply);
+using OnHttpFilterConfigScheduled = decltype(&envoy_dynamic_module_on_http_filter_config_scheduled);
+using OnHttpFilterConfigHttpCalloutDoneType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_callout_done);
+using OnHttpFilterConfigHttpStreamHeadersType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_headers);
+using OnHttpFilterConfigHttpStreamDataType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_data);
+using OnHttpFilterConfigHttpStreamTrailersType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_trailers);
+using OnHttpFilterConfigHttpStreamCompleteType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_complete);
+using OnHttpFilterConfigHttpStreamResetType =
+    decltype(&envoy_dynamic_module_on_http_filter_config_http_stream_reset);
+
+/**
+ * A config to create http filters based on a dynamic module. This will be owned by multiple
+ * filter instances. This resolves and holds the symbols used for the HTTP filters.
+ * Each filter instance and the factory callback holds a shared pointer to this config.
+ */
+class DynamicModuleHttpFilterConfig
+    : public std::enable_shared_from_this<DynamicModuleHttpFilterConfig>,
+      public Logger::Loggable<Logger::Id::dynamic_modules> {
+public:
+  /**
+   * Constructor for the config.
+   * @param filter_name the name of the filter.
+   * @param filter_config the configuration for the module.
+   * @param metrics_namespace the namespace prefix for metrics.
+   * @param dynamic_module the dynamic module to use.
+   * @param stats_scope the stats scope for metric creation.
+   * @param context the server factory context.
+   * @param init_manager the init manager to register dynamic secret subscriptions with, if any.
+   * This is only valid for the duration of ``envoy_dynamic_module_on_http_filter_config_new`` and
+   * is cleared afterwards.
+   */
+  DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
+                                const absl::string_view filter_config,
+                                const absl::string_view metrics_namespace,
+                                DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+                                Server::Configuration::ServerFactoryContext& context,
+                                OptRef<Init::Manager> init_manager = std::nullopt);
+
+  ~DynamicModuleHttpFilterConfig();
+
+  // The corresponding in-module configuration.
+  envoy_dynamic_module_type_http_filter_config_module_ptr in_module_config_ = nullptr;
+
+  // The function pointers for the module related to the HTTP filter. All of them are resolved
+  // during the construction of the config and made sure they are not nullptr after that.
+
+  OnHttpConfigDestroyType on_http_filter_config_destroy_ = nullptr;
+  OnHttpFilterNewType on_http_filter_new_ = nullptr;
+  OnHttpFilterRequestHeadersType on_http_filter_request_headers_ = nullptr;
+  OnHttpFilterRequestBodyType on_http_filter_request_body_ = nullptr;
+  OnHttpFilterRequestTrailersType on_http_filter_request_trailers_ = nullptr;
+  OnHttpFilterResponseHeadersType on_http_filter_response_headers_ = nullptr;
+  OnHttpFilterResponseBodyType on_http_filter_response_body_ = nullptr;
+  OnHttpFilterResponseTrailersType on_http_filter_response_trailers_ = nullptr;
+  OnHttpFilterStreamCompleteType on_http_filter_stream_complete_ = nullptr;
+  OnHttpFilterDestroyType on_http_filter_destroy_ = nullptr;
+  OnHttpFilterHttpCalloutDoneType on_http_filter_http_callout_done_ = nullptr;
+  OnHttpFilterHttpStreamHeadersType on_http_filter_http_stream_headers_ = nullptr;
+  OnHttpFilterHttpStreamDataType on_http_filter_http_stream_data_ = nullptr;
+  OnHttpFilterHttpStreamTrailersType on_http_filter_http_stream_trailers_ = nullptr;
+  OnHttpFilterHttpStreamCompleteType on_http_filter_http_stream_complete_ = nullptr;
+  OnHttpFilterHttpStreamResetType on_http_filter_http_stream_reset_ = nullptr;
+  OnHttpFilterScheduled on_http_filter_scheduled_ = nullptr;
+  OnHttpFilterDownstreamAboveWriteBufferHighWatermark
+      on_http_filter_downstream_above_write_buffer_high_watermark_ = nullptr;
+  OnHttpFilterDownstreamBelowWriteBufferLowWatermark
+      on_http_filter_downstream_below_write_buffer_low_watermark_ = nullptr;
+  OnHttpFilterLocalReplyType on_http_filter_local_reply_ = nullptr;
+  OnHttpFilterConfigScheduled on_http_filter_config_scheduled_ = nullptr;
+  OnHttpFilterConfigHttpCalloutDoneType on_http_filter_config_http_callout_done_ = nullptr;
+  OnHttpFilterConfigHttpStreamHeadersType on_http_filter_config_http_stream_headers_ = nullptr;
+  OnHttpFilterConfigHttpStreamDataType on_http_filter_config_http_stream_data_ = nullptr;
+  OnHttpFilterConfigHttpStreamTrailersType on_http_filter_config_http_stream_trailers_ = nullptr;
+  OnHttpFilterConfigHttpStreamCompleteType on_http_filter_config_http_stream_complete_ = nullptr;
+  OnHttpFilterConfigHttpStreamResetType on_http_filter_config_http_stream_reset_ = nullptr;
+
+  Envoy::Upstream::ClusterManager& cluster_manager_;
+  Event::Dispatcher& main_thread_dispatcher_;
+  const Stats::ScopeSharedPtr stats_scope_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
+  // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
+  // and not later during request handling, so that we don't have to wrap the stat storage in a
+  // lock.
+  //
+  // ``stat_creation_frozen_`` is set by the factory (main thread, before any worker observes
+  // this config) and read by the per-request ``define_*`` ABI callbacks (worker thread). The
+  // store/load pair establishes the necessary happens-before via release/acquire ordering;
+  // pre-fix this was a plain ``bool`` whose load was racy with the publishing store under the
+  // C++ memory model, even though steady-state shared_ptr publication usually masked it. An
+  // adversarial module spawning a worker thread inside ``on_http_filter_config_new`` could
+  // observe the stale ``false`` and reproduce the seed StatNamePool race.
+  std::atomic<bool> stat_creation_frozen_{false};
+
+  // Set by the factory once ``envoy_dynamic_module_on_http_filter_config_new`` has returned, after
+  // which ``subscribeGenericSecret`` refuses to create new subscriptions. Uses the same
+  // release/acquire contract as ``stat_creation_frozen_`` above: subscribing allocates a thread
+  // local slot and mutates ``generic_secrets_``, neither of which is safe once a worker can read
+  // the config, so a module that spawns its own thread inside ``config_new`` must observe the
+  // freeze rather than a stale ``false``.
+  std::atomic<bool> secret_subscription_frozen_{false};
+
+  // The init manager to register dynamic secret subscriptions with, so that a listener does not
+  // start serving before its secrets have been delivered. Only valid while the module's
+  // ``config_new`` hook is running: the referenced init manager belongs to the filter chain factory
+  // context, so the factory clears this right after the hook returns.
+  OptRef<Init::Manager> init_manager_;
+
+  bool terminal_filter_ = false;
+
+  // The shared registry holding all module-defined metrics.
+  Extensions::DynamicModules::MetricRegistry& metrics() { return metrics_; }
+  const Extensions::DynamicModules::MetricRegistry& metrics() const { return metrics_; }
+
+  /**
+   * Subscribes to a generic secret so that the module can read its value by the returned ID.
+   *
+   * This is only callable during ``envoy_dynamic_module_on_http_filter_config_new``: creating a
+   * subscription allocates a thread local slot and touches the secret manager, both of which are
+   * main-thread-only, and ``generic_secrets_`` must not be mutated once a worker can read it.
+   *
+   * @param name the name of the secret. For static secrets this is the name in the bootstrap
+   * configuration, and for dynamic secrets the resource name requested from the SDS server.
+   * @param sds_config_source the JSON serialized ``envoy.config.core.v3.ConfigSource`` to fetch the
+   * secret from, or empty to look the name up among the static secrets.
+   * @return a 1-based ID that can be passed to ``getGenericSecretById``, or 0 on failure.
+   */
+  size_t subscribeGenericSecret(absl::string_view name, absl::string_view sds_config_source);
+
+  /**
+   * @param id the ID previously returned by ``subscribeGenericSecret``.
+   * @return the current value of the secret on the calling thread, or nullptr if the ID does not
+   * correspond to a subscribed secret. The value is empty until the first SDS delivery. The
+   * returned reference is invalidated by a secret rotation, which happens between events on the
+   * calling thread, so it must not be retained across events.
+   */
+  const std::string* getGenericSecretById(size_t id) const {
+    if (id == 0 || id > generic_secrets_.size()) {
+      return nullptr;
+    }
+    return &generic_secrets_[id - 1]->secret();
+  }
+
+private:
+  Server::Configuration::ServerFactoryContext& server_context_;
+
+  // The name of the filter passed in the constructor.
+  const std::string filter_name_;
+
+  // The configuration for the module.
+  const std::string filter_config_;
+
+  // The namespace prefix for metrics.
+  const std::string metrics_namespace_;
+
+  // The generic secrets subscribed by the module during ``config_new``, indexed by ID - 1. Appended
+  // to only while ``secret_subscription_frozen_`` is false, and read-only afterwards, which is what
+  // makes the reads from worker threads safe. Each entry keeps its own thread local copy of the
+  // value so that a read is a thread local lookup rather than a lock.
+  std::vector<Secret::ThreadLocalGenericSecretProviderPtr> generic_secrets_;
+
+  // The handle for the module.
+  Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
+
+public:
+  /**
+   * This is called when an event is scheduled via DynamicModuleHttpFilterConfigScheduler::commit.
+   */
+  void onScheduled(uint64_t event_id);
+
+  /**
+   * Sends an HTTP callout to the specified cluster with the given message.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  sendHttpCallout(uint64_t* callout_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
+
+  /**
+   * Starts a streamable HTTP callout to the specified cluster with the given message.
+   */
+  envoy_dynamic_module_type_http_callout_init_result
+  startHttpStream(uint64_t* stream_id_out, absl::string_view cluster_name,
+                  Http::RequestMessagePtr&& message, bool end_stream,
+                  uint64_t timeout_milliseconds);
+
+  /**
+   * Resets an ongoing streamable HTTP callout stream.
+   */
+  void resetHttpStream(uint64_t stream_id);
+
+  /**
+   * Sends data on an ongoing streamable HTTP callout stream.
+   */
+  bool sendStreamData(uint64_t stream_id, Buffer::Instance& data, bool end_stream);
+
+  /**
+   * Sends trailers on an ongoing streamable HTTP callout stream.
+   */
+  bool sendStreamTrailers(uint64_t stream_id, Http::RequestTrailerMapPtr trailers);
+
+private:
+  /**
+   * Callback for one-shot HTTP callouts initiated from an HTTP filter config.
+   */
+  class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
+  public:
+    HttpCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t id)
+        : config_(config), callout_id_(id) {}
+    ~HttpCalloutCallback() override = default;
+
+    void onSuccess(const Http::AsyncClient::Request& request,
+                   Http::ResponseMessagePtr&& response) override;
+    void onFailure(const Http::AsyncClient::Request& request,
+                   Http::AsyncClient::FailureReason reason) override;
+    void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
+                                      const Http::ResponseHeaderMap*) override {};
+    // Used to cancel the callout if the config is destroyed before completion.
+    Http::AsyncClient::Request* request_ = nullptr;
+
+  private:
+    DynamicModuleHttpFilterConfig& config_;
+    const uint64_t callout_id_{};
+  };
+
+  /**
+   * Callback for streaming HTTP callouts initiated from an HTTP filter config.
+   */
+  class HttpStreamCalloutCallback : public Http::AsyncClient::StreamCallbacks,
+                                    public Event::DeferredDeletable {
+  public:
+    HttpStreamCalloutCallback(DynamicModuleHttpFilterConfig& config, uint64_t callout_id)
+        : callout_id_(callout_id), config_(config) {}
+    ~HttpStreamCalloutCallback() override = default;
+
+    void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+    void onData(Buffer::Instance& data, bool end_stream) override;
+    void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+    void onComplete() override;
+    void onReset() override;
+
+    Http::AsyncClient::Stream* stream_ = nullptr;
+    Http::RequestMessagePtr request_message_ = nullptr;
+    Http::RequestTrailerMapPtr request_trailers_ = nullptr;
+    const uint64_t callout_id_{};
+    bool cleaned_up_ = false;
+
+  private:
+    DynamicModuleHttpFilterConfig& config_;
+  };
+
+  /**
+   * This is a helper function to get the `this` pointer as a void pointer which is passed to the
+   * various event hooks.
+   */
+  void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+  uint64_t getNextCalloutId() { return next_callout_id_++; }
+
+  uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
+
+  absl::flat_hash_map<uint64_t, std::unique_ptr<DynamicModuleHttpFilterConfig::HttpCalloutCallback>>
+      http_callouts_;
+  absl::flat_hash_map<uint64_t,
+                      std::unique_ptr<DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback>>
+      http_stream_callouts_;
+};
+
+class DynamicModuleHttpFilterConfigScheduler {
+public:
+  explicit DynamicModuleHttpFilterConfigScheduler(
+      std::weak_ptr<DynamicModuleHttpFilterConfig> config)
+      : config_(std::move(config)) {}
+
+  void commit(uint64_t event_id) {
+    // Lock the config so its dispatcher member stays valid across `post`.
+    auto config_shared = config_.lock();
+    if (!config_shared) {
+      return;
+    }
+    config_shared->main_thread_dispatcher_.post([config = config_, event_id]() {
+      if (std::shared_ptr<DynamicModuleHttpFilterConfig> cs = config.lock()) {
+        cs->onScheduled(event_id);
+      }
+    });
+  }
+
+private:
+  std::weak_ptr<DynamicModuleHttpFilterConfig> config_;
+};
+
+class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
+public:
+  DynamicModuleHttpPerRouteFilterConfig(
+      envoy_dynamic_module_type_http_filter_config_module_ptr config,
+      OnHttpPerRouteConfigDestroyType destroy,
+      Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+      Event::Dispatcher& main_dispatcher)
+      : config_(config), destroy_(destroy), dynamic_module_(std::move(dynamic_module)),
+        main_dispatcher_(main_dispatcher) {}
+  ~DynamicModuleHttpPerRouteFilterConfig() override;
+
+  envoy_dynamic_module_type_http_filter_config_module_ptr config_;
+
+private:
+  OnHttpPerRouteConfigDestroyType destroy_;
+  Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
+  Event::Dispatcher& main_dispatcher_;
+};
+
+using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttpFilterConfig>;
+using DynamicModuleHttpPerRouteFilterConfigConstSharedPtr =
+    std::shared_ptr<const DynamicModuleHttpPerRouteFilterConfig>;
+
+absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
+newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
+                                   const absl::string_view filter_config,
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                                   Event::Dispatcher& main_dispatcher);
+
+/**
+ * Creates a new DynamicModuleHttpFilterConfig for given configuration.
+ * @param filter_name the name of the filter.
+ * @param filter_config the configuration for the module.
+ * @param metrics_namespace the namespace prefix for metrics emitted by this module.
+ * @param terminal_filter whether the filter is terminal.
+ * @param dynamic_module the dynamic module to use.
+ * @param stats_scope the stats scope for metric creation.
+ * @param context the server factory context.
+ * @param init_manager the init manager that dynamic secret subscriptions created by the module are
+ * registered with. When absent, such subscriptions start immediately instead of gating the owner's
+ * initialization.
+ * @return a shared pointer to the new config object or an error if the module could not be loaded.
+ */
+absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
+    const absl::string_view filter_name, const absl::string_view filter_config,
+    const absl::string_view metrics_namespace, const bool terminal_filter,
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+    Server::Configuration::ServerFactoryContext& context,
+    OptRef<Init::Manager> init_manager = std::nullopt);
+
+} // namespace HttpFilters
+} // namespace DynamicModules
+} // namespace Extensions
+} // namespace Envoy

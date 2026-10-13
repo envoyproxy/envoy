@@ -1,0 +1,72 @@
+# This configuration takes incoming data on port 10000,10002 and encapsulates it in a CONNECT
+# request which is sent upstream port 10001. The difference is that if the data was from port
+# 10002, Envoy adds a "foo: bar" header in the CONNECT request.
+# Seeing this "foo: bar" header, another Envoy running with the configuration ``terminate_http1_connect.yaml``
+# will terminate the CONNECT request and establish tcp connection to 127.0.0.1:10003.
+#
+# It can be used to test TCP tunneling as described in
+# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
+# and running `curl -x 127.0.0.1:10000 https://www.google.com`,
+# or running `curl -H 'Host: www.google.com' --resolve www.google.com:10000:127.0.0.1 https://www.google.com:10000`
+
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9903
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: tcp
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: "cluster_0"
+          tunneling_config:
+            hostname: host.com:443
+  - name: listener_1
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 10002
+    filter_chains:
+    - filters:
+      - name: tcp
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: "cluster_0"
+          tunneling_config:
+            # The upstream request content would be ``CONNECT 127.0.0.1:10003 HTTP/1.1``.
+            hostname: 127.0.0.1:10003
+            headers_to_add:
+            - header:
+                key: foo
+                value: bar
+  clusters:
+  - name: cluster_0
+    connect_timeout: 5s
+    # This ensures HTTP/1.1 CONNECT is used for establishing the tunnel.
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http_protocol_options: {}
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10001

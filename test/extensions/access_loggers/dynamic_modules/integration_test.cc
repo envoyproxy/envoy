@@ -1,0 +1,124 @@
+#include "envoy/extensions/access_loggers/dynamic_modules/v3/dynamic_modules.pb.h"
+
+#include "test/integration/http_integration.h"
+
+namespace Envoy {
+
+class DynamicModulesAccessLogIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModulesAccessLogIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  };
+
+  void initializeWithAccessLogger() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::substitute(
+            "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+        1);
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* route_config = hcm.mutable_route_config();
+          ASSERT_EQ(1, route_config->virtual_hosts_size());
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          virtual_host->set_name("test_vhost");
+          auto* virtual_cluster = virtual_host->add_virtual_clusters();
+          virtual_cluster->set_name("test_vcluster");
+          auto* header = virtual_cluster->add_headers();
+          header->set_name(":path");
+          header->mutable_string_match()->set_exact("/test");
+
+          constexpr auto config = R"EOF(
+name: envoy.access_loggers.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.dynamic_modules.v3.DynamicModuleAccessLog
+  dynamic_module_config:
+    name: access_log_integration_test
+  logger_name: test_logger
+  logger_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: test_config
+)EOF";
+          envoy::config::accesslog::v3::AccessLog access_log;
+          TestUtility::loadFromYaml(config, access_log);
+          hcm.add_access_log()->CopyFrom(access_log);
+        });
+
+    initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModulesAccessLogIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModulesAccessLogIntegrationTest, BasicLogging) {
+  initializeWithAccessLogger();
+
+  // The logger config emits a counter directly from the config context (no log event), exercising
+  // config-scoped metric emission.
+  test_server_->waitForCounter("dynamicmodulescustom.config_total", testing::Ge(1));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  // Verify the response was received.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  test_server_->waitForCounter("dynamicmodulescustom.test_downstream_wire_bytes_received",
+                               testing::Gt(0));
+  test_server_->waitForCounter("dynamicmodulescustom.test_downstream_wire_bytes_sent",
+                               testing::Gt(0));
+}
+
+TEST_P(DynamicModulesAccessLogIntegrationTest, DownstreamWireBytesForLocalReply) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->mutable_direct_response()->set_status(400);
+      });
+  initializeWithAccessLogger();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+
+  // The Rust logger verifies that downstream wire bytes are nonzero while upstream bytes are zero.
+  test_server_->waitForCounter("dynamicmodulescustom.test_downstream_wire_bytes_received",
+                               testing::Gt(0));
+  test_server_->waitForCounter("dynamicmodulescustom.test_downstream_wire_bytes_sent",
+                               testing::Gt(0));
+}
+
+TEST_P(DynamicModulesAccessLogIntegrationTest, MultipleRequests) {
+  initializeWithAccessLogger();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Send multiple requests to verify logging works across requests.
+  for (int i = 0; i < 3; i++) {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+
+    auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  }
+}
+
+} // namespace Envoy

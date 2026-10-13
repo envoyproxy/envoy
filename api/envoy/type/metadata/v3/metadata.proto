@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package envoy.type.metadata.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.type.metadata.v3";
+option java_outer_classname = "MetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/metadata/v3;metadatav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Metadata]
+
+// MetadataKey provides a way to retrieve values from
+// :ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` using a ``key`` and a ``path``.
+//
+// For example, consider the following Metadata:
+//
+// .. code-block:: yaml
+//
+//    filter_metadata:
+//      envoy.xxx:
+//        prop:
+//          foo: bar
+//          xyz:
+//            hello: envoy
+//
+// The following MetadataKey would retrieve the string value "bar" from the Metadata:
+//
+// .. code-block:: yaml
+//
+//    key: envoy.xxx
+//    path:
+//    - key: prop
+//    - key: foo
+//
+message MetadataKey {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.metadata.v2.MetadataKey";
+
+  // Specifies a segment in a path for retrieving values from Metadata.
+  // Supports both key-based segments (field names in a Struct) and index-based
+  // segments (element access in a ListValue).
+  message PathSegment {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.type.metadata.v2.MetadataKey.PathSegment";
+
+    oneof segment {
+      option (validate.required) = true;
+
+      // If specified, use this key to retrieve the value in a Struct.
+      string key = 1 [(validate.rules).string = {min_len: 1}];
+
+      // If specified, use this index to retrieve a value from a ListValue.
+      uint32 index = 2;
+    }
+  }
+
+  // The key name of the Metadata from which to retrieve the Struct.
+  // This typically represents a builtin subsystem or custom extension.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The path used to retrieve a specific Value from the Struct.
+  // This can be either a prefix or a full path, depending on the use case.
+  // For example, ``[{key: prop}, {key: xyz}]`` would retrieve a struct or ``[{key: prop}, {key: foo}]``
+  // would retrieve a string in the example above.
+  //
+  // Path segments support both struct field access (via ``key``) and list element access (via ``index``).
+  // For example, to access the first element of a list at ``envoy.filters.http.grpc_field_extraction.tenant_id``,
+  // use ``path: [{key: tenant_id}, {index: 0}]``.
+  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
+}
+
+// Describes different types of metadata sources.
+message MetadataKind {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.type.metadata.v2.MetadataKind";
+
+  // Represents dynamic metadata associated with the request.
+  message Request {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.type.metadata.v2.MetadataKind.Request";
+  }
+
+  // Represents metadata from :ref:`the route<envoy_v3_api_field_config.route.v3.Route.metadata>`.
+  message Route {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.type.metadata.v2.MetadataKind.Route";
+  }
+
+  // Represents metadata from :ref:`the upstream cluster<envoy_v3_api_field_config.cluster.v3.Cluster.metadata>`.
+  message Cluster {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.type.metadata.v2.MetadataKind.Cluster";
+  }
+
+  // Represents metadata from :ref:`the upstream
+  // host<envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>`.
+  message Host {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.type.metadata.v2.MetadataKind.Host";
+  }
+
+  oneof kind {
+    option (validate.required) = true;
+
+    // Request kind of metadata.
+    Request request = 1;
+
+    // Route kind of metadata.
+    Route route = 2;
+
+    // Cluster kind of metadata.
+    Cluster cluster = 3;
+
+    // Host kind of metadata.
+    Host host = 4;
+  }
+}

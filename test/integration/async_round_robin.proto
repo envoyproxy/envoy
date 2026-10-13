@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package test.integration.lb;
+
+message AsyncRoundRobin {
+  // If true, hang during host selection.
+  bool hang = 1;
+}

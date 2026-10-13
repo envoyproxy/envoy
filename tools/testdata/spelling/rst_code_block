@@ -1,0 +1,16 @@
+// Code blocks are ignored.
+
+// .. code-block:: yaml
+//
+//   - speeling: ignored
+//     foo: bar
+//
+//   - speeling: still ignored
+//
+// Code block ends. No bad speelinga allowed here.
+//
+//   .. code-block:: cpp
+//
+//     std::string speeling = "ignored";
+//
+// Code block ends. No bad speelingb allowed here.

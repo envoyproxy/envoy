@@ -1,0 +1,11 @@
+frames {
+  qframe {
+    new_connection_id {
+      control_frame_id: 0,
+      connection_id: "\000\000\000\000",
+      sequence_number: 0,
+      stateless_reset_token: "\000\000\000\000",
+      retire_prior_to: 0,
+    }
+  }
+}

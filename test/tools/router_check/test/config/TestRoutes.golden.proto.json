@@ -1,0 +1,384 @@
+{
+  "tests":  [
+    {
+      "test_name": "Test1",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "instant-server",
+        "virtual_cluster_name": "other",
+        "virtual_host_name": "default",
+        "path_rewrite": "/",
+        "host_rewrite": "api.lyft.com",
+        "path_redirect": ""}
+    },
+    {
+      "test_name": "Test2",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/api/leads/me",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "ats"}
+    },
+    {
+      "test_name": "Test3",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/api/locations?works=true",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "locations"}
+    },
+    {
+      "test_name": "Test4",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/api/locations",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "locations"}
+    },
+    {
+      "test_name": "Test5",
+      "input": {
+        "authority": "lyft.com",
+        "path": "/foo",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "www2"}
+    },
+    {
+      "test_name": "Test6",
+      "input": {
+        "authority": "wwww.lyft.com",
+        "path": "/",
+        "method": "GET"
+      },
+      "validate": {"cluster_name": "root_www2"}
+    },
+    {
+      "test_name": "Test7",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/new_endpoint/foo",
+        "method": "GET"
+      },
+      "validate":
+        {
+    "cluster_name": "www2",
+    "virtual_host_name": "www2"
+        }
+    },
+    {
+      "test_name": "Test8",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/new_endpoint/foo",
+        "method": "GET"
+      },
+      "validate": {"path_rewrite": "/api/new_endpoint/foo"}
+    },
+    {
+      "test_name": "Test9",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/api/locations?works=true",
+        "method": "GET"
+      },
+      "validate": {"path_rewrite": "/rewrote?works=true"}
+    },
+    {
+      "test_name": "Test10",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/foo",
+        "method": "GET"
+      },
+      "validate": {"path_rewrite": "/bar"}
+    },
+    {
+      "test_name": "Test11",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/host/rewrite/me",
+        "method": "GET"
+     },
+      "validate": {"host_rewrite":"new_host"}
+    },
+    {
+      "test_name": "Test12",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/API/locations?works=true",
+        "method": "GET"
+      },
+      "validate": {"path_rewrite": "/rewrote?works=true"}
+    },
+    {
+      "test_name": "Test13",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/fooD",
+        "method": "GET"
+      },
+      "validate": {"path_rewrite": "/cAndy"}
+    },
+    {
+      "test_name": "Test14",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/FOO",
+        "method": "GET"
+      },
+      "validate": {"path_rewrite": "/FOO"}
+    },
+    {
+      "test_name": "Test15",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/ApPles",
+        "method": "GET"
+      },
+      "validate": {"path_rewrite": "/ApPles"}
+    },
+    {
+      "test_name": "Test16",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/oLDhost/rewrite/me",
+        "method": "GET"
+      },
+      "validate": {"host_rewrite": "api.lyft.com"}
+    },
+    {
+      "test_name": "Test17",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/Tart",
+        "method": "GET"
+      },
+      "validate": {"path_rewrite": "/Tart"}
+    },
+    {
+      "test_name": "Test18",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/newhost/rewrite/me",
+        "method": "GET"
+      },
+      "validate": {"host_rewrite": "new_host"}
+    },
+    {
+      "test_name": "Test19",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/rides",
+        "method": "GET"
+      },
+      "validate": {"virtual_cluster_name": "other"}
+    },
+    {
+      "test_name": "Test20",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/rides/blah",
+        "method": "POST"
+       },
+      "validate": {"virtual_cluster_name": "other"}
+    },
+    {
+      "test_name": "Test21",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/rides",
+        "method": "POST"
+      },
+      "validate": {"virtual_cluster_name": "ride_request"}
+    },
+    {
+      "test_name": "Test22",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/rides/123",
+        "method": "PUT"
+      },
+      "validate": {"virtual_cluster_name": "update_ride"}
+    },
+    {
+      "test_name": "Test23",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/users/123/chargeaccounts",
+        "method": "POST"
+      },
+      "validate": {"virtual_cluster_name": "cc_add"}
+    },
+    {
+      "test_name": "Test24",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/users/123/chargeaccounts/hello123",
+        "method": "PUT"
+      },
+      "validate": {"virtual_cluster_name": "cc_add"}
+    },
+    {
+      "test_name": "Test25",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/users/123/chargeaccounts/validate",
+        "method": "PUT"
+      },
+      "validate": {"virtual_cluster_name": "other"}
+    },
+    {
+      "test_name": "Test26",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/foo/bar",
+        "method": "PUT"
+      },
+      "validate": {"virtual_cluster_name": "other"}
+    },
+    {
+      "test_name": "Test27",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/users",
+        "method": "POST"
+      },
+      "validate": {"virtual_cluster_name": "create_user_login"}
+    },
+    {
+      "test_name": "Test28",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/users/123",
+        "method": "PUT"
+      },
+      "validate": {"virtual_cluster_name": "update_user"}
+    },
+    {
+      "test_name": "Test29",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/users/123/location",
+        "method": "POST"
+      },
+      "validate": {"virtual_cluster_name": "ulu"}
+    },
+    {
+      "test_name": "Test30",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/something/else",
+        "method": "GET"
+      },
+      "validate": {"virtual_cluster_name": "other"}
+    },
+    {
+      "test_name": "RequestHeaderMatches 1",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/host/rewrite/me",
+        "method": "GET"
+      },
+      "validate": {
+        "host_rewrite": "new_host",
+        "request_header_matches": [
+          {
+            "name": ":authority",
+            "string_match": {
+              "exact": "new_host"
+            }
+          },
+          {
+            "name": ":path",
+            "string_match": {
+              "exact": "/host/rewrite/me"
+            }
+          },
+          {
+            "name": ":method",
+            "string_match": {
+              "exact": "GET"
+            }
+          },
+          {
+            "name": ":cookie",
+            "invert_match": true
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "RequestHeaderMatches 2",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/customheaders",
+        "method": "GET"
+      },
+      "validate": {
+        "request_header_matches": [
+          {
+            "name": "X-Client-IP",
+            "string_match": {
+              "exact": "127.0.0.1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "ResponseHeaderMatches",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/ping",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_redirect": "http://www.lyft.com/ping",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "response_header_matches": [
+          {
+            "name": "content-type",
+            "string_match": {
+              "exact": "text/plain"
+            }
+          },
+          {
+            "name": "content-length",
+            "range_match":
+            {
+              "start": 0,
+              "end": 100
+            }
+          },
+          {
+            "name": "x-ping-response",
+            "string_match": {
+              "exact": "yes"
+            }
+          },
+          {
+            "name": "x-ping-response",
+            "present_match": true
+          },
+          {
+            "name": "x-pong-response",
+            "present_match": true,
+            "invert_match": true
+          },
+        ]
+      }
+    }
+  ]
+}

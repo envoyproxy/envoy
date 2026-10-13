@@ -1,0 +1,27 @@
+{
+  "tests": [
+    {
+      "test_name": "TEST_NEW_ENDPOINT_ROUTE_1",
+      "input": {
+        "authority": "example.com",
+        "path": "/new_endpoint",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "www2",
+        "path_rewrite": "/api/new_endpoint"
+      }
+    },
+    {
+      "test_name": "TEST_ROOT_ROUTE",
+      "input": {
+        "authority": "example.com",
+        "path": "/root",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "www2"
+      }
+    }
+  ]
+}

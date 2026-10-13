@@ -1,0 +1,17 @@
+initialize_and_validate {
+  custom_settings_parameters {
+    identifier {
+      value: 11008
+    }
+    value {
+      value: 65536
+    }
+  }
+  custom_settings_parameters {
+    identifier {
+      value: 11008
+    }
+    value {
+    }
+  }
+}

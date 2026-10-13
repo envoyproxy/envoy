@@ -1,0 +1,6 @@
+{
+	lua*;
+	envoyGo*;
+	envoy_dynamic_module_callback_*;
+	*_envoy_dynamic_module_on_*;
+};

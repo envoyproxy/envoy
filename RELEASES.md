@@ -1,0 +1,180 @@
+# Release Process
+
+## Active development
+
+Active development is happening on the `main` branch, and a new version is released from it.
+
+## Stable releases
+
+Stable releases of Envoy include:
+
+* Major releases in which a new version a created directly from the `main` branch.
+* Minor releases for versions covered by the extended maintenance window (any version released in the last 12 months).
+  * Security fixes backported from the `main` branch (including those deemed not worthy
+    of creating a CVE).
+  * Stability fixes backported from the `main` branch (anything that can result in a crash,
+    including crashes triggered by a trusted control plane).
+  * Bugfixes, deemed worthwhile by the maintainers of stable releases.
+
+Major releases happen quartely and follow the schedule below. Security fixes typically happen
+quarterly as well, but this depends on the number and severity of security bugs. Other releases
+are ad-hoc and best-effort.
+
+### Security releases
+
+Critical security fixes are owned by the Envoy security team, which provides fixes for the
+`main` branch. Once those fixes are ready, the maintainers
+of stable releases backport them to the remaining supported stable releases.
+
+### Backports
+
+All other security and reliability fixes can be nominated for backporting to stable releases
+by adding the `backport/review` label (this can be done using [repokitteh]'s `/backport` command
+on PRs).
+
+Only security and reliability fixes are backported, so please consider this before proposing a
+backport.
+
+Envoy release maintainers will try to review and include any pending proposed backports prior to
+patch releases. Backports can also be proposed directly, by raising a PR against the relevant
+release branch, eg `release/v1.37`.
+
+When raising a backport, please raise against **all** supported branches, that are affected.
+
+Backport PRs should pick specific commits from the `main` branch, and should be kept as specific
+commits while tracking the upstream release branch, before landing.
+
+For this reason, change should be managed using rebase rather than merge, and if adjustments are
+required they should be squashed into the relevant commit.
+
+Release branches are published as part of the security schedule described below, and immediately
+prior to a `main` release.
+
+### Release management
+
+Major releases are handled by the maintainer on-call and do not involve any backports.
+The details are outlined in the "Cutting a major release" section below.
+Security releases are handled by a Release Manager and a Fix Lead. The Release Manager is
+responsible for approving and merging backports, with responsibilties outlined
+in [BACKPORTS.md](BACKPORTS.md).
+The Fix Lead is a member of the security
+team and is responsible for coordinating the overall release. This includes identifying
+issues to be fixed in the release, communications with the Envoy community, and the
+actual mechanics of the release itself.
+
+| Quarter |       Release Manager                                          |         Fix Lead                                                         |
+|:-------:|:--------------------------------------------------------------:|:-------------------------------------------------------------------------|
+| 2020 Q1 | Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora))   |                                                                          |
+| 2020 Q2 | Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora))   |                                                                          |
+| 2020 Q3 | Yuchen Dai ([lambdai](https://github.com/lambdai))             |                                                                          |
+| 2020 Q4 | Christoph Pakulski ([cpakulski](https://github.com/cpakulski)) |                                                                          |
+| 2021 Q1 | Rei Shimizu ([Shikugawa](https://github.com/Shikugawa))        |                                                                          |
+| 2021 Q2 | Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d))      |                                                                          |
+| 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |                                                                          |
+| 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |                                                                          |
+| 2022 Q1 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    | Ryan Hamilton ([RyanTheOptimist](https://github.com/RyanTheOptimist))    |
+| 2022 Q2 | Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao))    | Matt Klein ([mattklein123](https://github.com/mattklein123))             |
+| 2022 Q4 | Can Cecen ([cancecen](https://github.com/cancecen))            | Tony Allen ([tonya11en](https://github.com/tonya11en))                   |
+| 2023 Q3 | Boteng Yao ([botengyao](https://github.com/botengyao))         | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))              |
+| 2023 Q4 | Paul Merrison ([pmerrison](https://github.com/pmerrison))      | Brian Sonnenberg ([briansonnenberg](https://github.com/briansonnenberg)) |
+| 2024 Q2 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2024 Q3 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2025 Q1 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2025 Q3 | Ryan Northey ([phlax](https://github.com/phlax))               | Yan Avlasov ([yanavlasov](https://github.com/yanavlasov))                |
+| 2025 Q4 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2026 Q1 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2026 Q2 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
+| 2026 Q3 | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))    | Yan Avlasov ([yanavlasov](https://github.com/yanavlasov))                |
+| 2026 Q4 | Jonh Wendell ([jwendell](https://github.com/jwendell))    | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))                |
+
+## Major release schedule
+
+In order to accommodate downstream projects, new Envoy releases are produced on a fixed release
+schedule (the 15th day of each quarter), with an acceptable delay of up to 2 weeks, with a hard
+deadline of 3 weeks.
+
+| Version |  Expected  |   Actual   | Difference | End of Life |
+|:-------:|:----------:|:----------:|:----------:|:-----------:|
+| 1.12.0  | 2019/09/30 | 2019/10/31 |  +31 days  | 2020/10/31  |
+| 1.13.0  | 2019/12/31 | 2020/01/20 |  +20 days  | 2021/01/20  |
+| 1.14.0  | 2020/03/31 | 2020/04/08 |   +8 days  | 2021/04/08  |
+| 1.15.0  | 2020/06/30 | 2020/07/07 |   +7 days  | 2021/07/07  |
+| 1.16.0  | 2020/09/30 | 2020/10/08 |   +8 days  | 2021/10/08  |
+| 1.17.0  | 2020/12/31 | 2021/01/11 |  +11 days  | 2022/01/11  |
+| 1.18.0  | 2021/03/31 | 2021/04/15 |  +15 days  | 2022/04/15  |
+| 1.19.0  | 2021/06/30 | 2021/07/13 |  +13 days  | 2022/07/13  |
+| 1.20.0  | 2021/09/30 | 2021/10/05 |   +5 days  | 2022/10/05  |
+| 1.21.0  | 2022/01/15 | 2022/01/12 |   -3 days  | 2023/01/12  |
+| 1.22.0  | 2022/04/15 | 2022/04/15 |    0 days  | 2023/04/15  |
+| 1.23.0  | 2022/07/15 | 2022/07/15 |    0 days  | 2023/07/15  |
+| 1.24.0  | 2022/10/15 | 2022/10/19 |   +4 days  | 2023/10/19  |
+| 1.25.0  | 2023/01/15 | 2023/01/18 |   +3 days  | 2024/01/18  |
+| 1.26.0  | 2023/04/15 | 2023/04/18 |   +3 days  | 2024/04/18  |
+| 1.27.0  | 2023/07/14 | 2023/07/27 |  +13 days  | 2024/07/27  |
+| 1.28.0  | 2023/10/16 | 2023/10/19 |   +3 days  | 2024/10/19  |
+| 1.29.0  | 2024/01/16 | 2024/01/16 |    0 days  | 2025/01/16  |
+| 1.30.0  | 2024/04/16 | 2024/04/16 |    0 days  | 2025/04/16  |
+| 1.31.0  | 2024/07/16 | 2024/07/19 |   +3 days  | 2025/07/19  |
+| 1.32.0  | 2024/10/15 | 2024/10/15 |    0 days  | 2025/10/15  |
+| 1.33.0  | 2025/01/14 | 2025/01/14 |    0 days  | 2026/01/14  |
+| 1.34.0  | 2025/04/15 | 2025/04/15 |    0 days  | 2026/04/15  |
+| 1.35.0  | 2025/07/15 | 2025/07/23 |    8 days  | 2026/07/23  |
+| 1.36.0  | 2025/10/14 | 2025/10/14 |    0 days  | 2026/10/14  |
+| 1.37.0  | 2026/01/13 | 2026/01/13 |    0 days  | 2027/01/13  |
+| 1.38.0  | 2026/04/14 | 2026/04/23 |   +9 days  | 2027/04/23  |
+| 1.39.0  | 2026/07/14 | 2026/07/14 |    0 days  | 2027/07/14  |
+| 1.40.0  | 2026/10/13 |            |            |             |
+
+### Cutting a major release
+
+* Take a look at open issues tagged with the current release, by
+  [searching](https://github.com/envoyproxy/envoy/issues) for
+  "is:open is:issue milestone:[current milestone]" and either hold off until
+  they are fixed or bump them to the next milestone.
+* Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
+  particularly risky PRs until after the release is tagged. This is because we aim for main to be
+  at release candidate quality at all times.
+* Do a final check of the release note fragments in [changelogs/current](changelogs/current):
+  * Make any needed corrections (grammar, punctuation, formatting, etc.).
+  * Check to see if any security/stable version release notes are duplicated in
+    the major version release notes. These should not be duplicated.
+  * Switch the repo to "release" mode by running `bazel run @envoy_repo//:release`. This tool
+    will create a commit with the necessary changes for a release.
+  * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
+    release, please also make sure there's a stable maintainer signed up for next quarter,
+    and the deadline for the next release is documented in the release schedule.
+  * Get a review and merge.
+* Create a pull request with that commit and **wait for tests to pass**.
+* Once the tests have passed, and the PR has landed, CI will automatically create the tagged release and corresponding release branch.
+* Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
+  necessary changes to continue development.
+* Create a pull request with that commit.
+* Run the deprecate_guards.py script (`bazel run //tools/deprecate_guards:deprecate_guards`)
+* If you haven't done this before, request posting permission from admins for all the groups in the next bullet.
+* Craft a witty/uplifting email and send it to all the email aliases:
+envoy-announce@googlegroups.com
+envoy-users@googlegroups.com
+envoy-dev@googlegroups.com
+envoy-maintainers@googlegroups.com -
+include in this email a link to the latest [release page](https://github.com/envoyproxy/envoy/releases) (ending in `tag/[version]`)
+* Announce in [#envoy-dev](https://envoyproxy.slack.com/archives/C78HA81DH) and [#envoy-users](https://envoyproxy.slack.com/archives/C78M4KW76) slack channels.
+
+## Security release schedule
+
+Security releases are published on a 3-monthly cycle, around the mid point between major releases.
+
+| Quarter |  Expected  |   Actual   | Difference |
+|:-------:|:----------:|:----------:|:----------:|
+| 2024 Q2 | 2024/06/04 | 2024/06/04 |   0 days   |
+| 2024 Q3 | 2024/09/03 | 2024/09/19 |  16 days   |
+| 2024 Q4 | 2024/12/03 | 2024/12/18 |  15 days   |
+| 2025 Q1 | 2025/03/04 | 2025/03/20 |  16 days   |
+| 2025 Q2 | 2025/06/03 |     --     |     --     |
+| 2025 Q3 | 2025/09/02 | 2025/09/03 |   1 day    |
+| 2025 Q4 | 2025/12/02 | 2025/12/03 |   1 day    |
+| 2026 Q1 | 2026/03/03 | 2026/03/10 |   7 days   |
+| 2026 Q2 | 2026/06/02 | 2026/06/24 |   22 days  |
+| 2026 Q3 | 2026/08/18 |            |            |
+| 2026 Q3 | 2026/09/29 |            |            |
+
+NOTE: Zero-day vulnerabilities, and upstream vulnerabilities disclosed to us under embargo, may necessitate an emergency release with little or no warning.

@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.config.listener.v3;
+
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/udp_socket_config.proto";
+import "envoy/config/listener/v3/quic_config.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.config.listener.v3";
+option java_outer_classname = "UdpListenerConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3;listenerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: UDP listener config]
+// Listener :ref:`configuration overview <config_listeners>`
+
+// [#next-free-field: 9]
+message UdpListenerConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.listener.UdpListenerConfig";
+
+  reserved 1, 2, 3, 4, 6;
+
+  reserved "config";
+
+  // UDP socket configuration for the listener. The default for
+  // :ref:`prefer_gro <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>` is false for
+  // listener sockets. If receiving a large amount of datagrams from a small number of sources, it
+  // may be worthwhile to enable this option after performance testing.
+  core.v3.UdpSocketConfig downstream_socket_config = 5;
+
+  // Configuration for QUIC protocol. If empty, QUIC will not be enabled on this listener. Set
+  // to the default object to enable QUIC without modifying any additional options.
+  QuicProtocolOptions quic_options = 7;
+
+  // Configuration for the UDP packet writer. If empty, HTTP/3 will use GSO if available
+  // (:ref:`UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory>`)
+  // or the default kernel sendmsg if not,
+  // (:ref:`UdpDefaultWriterFactory <envoy_v3_api_msg_extensions.udp_packet_writer.v3.UdpDefaultWriterFactory>`)
+  // and raw UDP will use kernel sendmsg.
+  // [#extension-category: envoy.udp_packet_writer]
+  core.v3.TypedExtensionConfig udp_packet_packet_writer_config = 8;
+}
+
+message ActiveRawUdpListenerConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.listener.ActiveRawUdpListenerConfig";
+}

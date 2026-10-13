@@ -1,0 +1,28 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/a2a/v3/a2a.pb.h"
+#include "envoy/extensions/filters/http/a2a/v3/a2a.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace A2a {
+
+class A2aFilterConfigFactory
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::a2a::v3::A2a> {
+public:
+  A2aFilterConfigFactory() : UnifiedFactoryBase("envoy.filters.http.a2a") {}
+
+private:
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::a2a::v3::A2a& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+};
+
+} // namespace A2a
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

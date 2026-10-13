@@ -1,0 +1,5 @@
+config {
+}
+max_size: 65533
+fuzzed {
+}

@@ -1,0 +1,40 @@
+#pragma once
+
+#include <optional>
+#include <string>
+
+#include "envoy/upstream/load_balancer.h"
+
+#include "source/common/upstream/load_balancer_context_base.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Bootstrap {
+namespace ReverseConnection {
+
+/**
+ * Load balancer context for reverse connections.
+ * This context is used to select specific upstream hosts by address.
+ */
+class ReverseConnectionLoadBalancerContext : public Upstream::LoadBalancerContextBase {
+public:
+  /**
+   * Constructor that sets the host to select.
+   * @param host_address the address of the host to select
+   */
+  explicit ReverseConnectionLoadBalancerContext(const std::string& host_address)
+      // Strict so an unavailable requested host returns no host rather than dialing a different one
+      // and charging the resulting tunnel to the requested host's key.
+      : host_to_select_{host_address, /*strict=*/true} {}
+
+  // Upstream::LoadBalancerContext overrides
+  OptRef<const OverrideHost> overrideHostToSelect() const override { return host_to_select_; }
+
+private:
+  OverrideHost host_to_select_;
+};
+
+} // namespace ReverseConnection
+} // namespace Bootstrap
+} // namespace Extensions
+} // namespace Envoy

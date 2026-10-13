@@ -1,0 +1,141 @@
+#include "source/extensions/filters/http/ext_proc/config.h"
+
+#include "source/common/http/http_service_headers.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/filters/http/ext_proc/client_impl.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExternalProcessing {
+
+namespace {
+
+absl::Status verifyProcessingModeConfig(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+  const auto& processing_mode = config.processing_mode();
+  if (config.has_http_service()) {
+    // In case http_service configured, the processing mode can only support sending headers.
+    if (processing_mode.request_body_mode() !=
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE ||
+        processing_mode.response_body_mode() !=
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE ||
+        processing_mode.request_trailer_mode() ==
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND ||
+        processing_mode.response_trailer_mode() ==
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND) {
+      return absl::InvalidArgumentError(
+          "If the ext_proc filter is configured with http_service instead of gRPC service, "
+          "then the processing modes of this filter can not be configured to send body or "
+          "trailer.");
+    }
+  }
+
+  if ((processing_mode.request_body_mode() ==
+       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (processing_mode.request_trailer_mode() !=
+       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND)) {
+    return absl::InvalidArgumentError(
+        "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
+        "then the request_trailer_mode has to be set to SEND");
+  }
+
+  if ((processing_mode.response_body_mode() ==
+       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (processing_mode.response_trailer_mode() !=
+       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND)) {
+    return absl::InvalidArgumentError(
+        "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
+        "then the response_trailer_mode has to be set to SEND");
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status verifyFilterConfig(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+  if (config.has_grpc_service() == config.has_http_service()) {
+    return absl::InvalidArgumentError(
+        "One and only one of grpc_service or http_service must be configured");
+  }
+
+  if (config.disable_clear_route_cache() &&
+      (config.route_cache_action() !=
+       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+    return absl::InvalidArgumentError("disable_clear_route_cache and route_cache_action can not "
+                                      "be set to none-default at the same time.");
+  }
+
+  return verifyProcessingModeConfig(config);
+}
+
+} // namespace
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(
+      proto_config, Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context),
+      server_context);
+}
+
+absl::StatusOr<Http::FilterFactoryCb>
+ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  // Verify configuration before creating FilterConfig
+  RETURN_IF_NOT_OK(verifyFilterConfig(proto_config));
+
+  const uint32_t message_timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
+  const uint32_t max_message_timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
+  Stats::Scope& scope = extra_context.scopeOr(context);
+  absl::Status config_creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms, scope,
+      extra_context.stats_prefix, extra_context.is_upstream,
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context,
+      config_creation_status);
+  RETURN_IF_NOT_OK_REF(config_creation_status);
+  if (proto_config.has_grpc_service()) {
+    return [filter_config = std::move(filter_config),
+            &context](Http::FilterChainFactoryCallbacks& callbacks) {
+      // The google gRPC client will create a fresh scope for its stats from the input scope and use
+      // 'grpc.<google_grpc_stat_prefix>.' as the prefix.
+      // To avoid unexpected additional prefixes like 'http.<connection_manager>' or
+      // 'cluster.<cluster_name>', the server scope here is used.
+      auto client = createExternalProcessorClient(context.clusterManager().grpcAsyncClientManager(),
+                                                  context.scope());
+      callbacks.addStreamFilter(
+          Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
+    };
+  } else {
+    absl::Status creation_status;
+    auto headers_applicator = std::make_shared<Http::HttpServiceHeadersApplicator>(
+        proto_config.http_service().http_service(), context, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    return [proto_config = std::move(proto_config), filter_config = std::move(filter_config),
+            &context, headers_applicator = std::move(headers_applicator)](
+               Http::FilterChainFactoryCallbacks& callbacks) {
+      auto client = std::make_unique<ExtProcHttpClient>(proto_config, context, headers_applicator);
+      callbacks.addStreamFilter(
+          Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
+    };
+  }
+}
+
+LEGACY_REGISTER_FACTORY(ExternalProcessingFilterConfig,
+                        Server::Configuration::NamedHttpFilterConfigFactory, "envoy.ext_proc");
+LEGACY_REGISTER_FACTORY(UpstreamExternalProcessingFilterConfig,
+                        Server::Configuration::UpstreamHttpFilterConfigFactory, "envoy.ext_proc");
+
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

@@ -1,0 +1,14 @@
+watchdogs {
+  main_thread_watchdog {
+    megamiss_timeout {
+      seconds: -27037478448
+    }
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "!"
+    }
+  }
+}

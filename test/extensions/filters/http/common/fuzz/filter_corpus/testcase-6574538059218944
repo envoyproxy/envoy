@@ -1,0 +1,21 @@
+config {
+  name: "envoy.filters.http.mcp"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp"
+  }
+}
+data {
+  headers {
+    headers {
+      key: "content-type"
+      value: "application/json"
+    }
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+  }
+  http_body {
+    data: "{\"theme\": \"Children\"}"
+  }
+}

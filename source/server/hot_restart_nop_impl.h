@@ -1,0 +1,49 @@
+#pragma once
+
+#include <string>
+
+#include "envoy/server/hot_restart.h"
+
+#include "source/common/common/thread.h"
+#include "source/common/stats/allocator.h"
+
+namespace Envoy {
+namespace Server {
+
+/**
+ * No-op implementation of HotRestart.
+ */
+class HotRestartNopImpl : public Server::HotRestart {
+public:
+  // Server::HotRestart
+  void drainParentListeners() override {}
+  // No parent when hot restart is disabled, so there is nothing to wait for.
+  bool parentStopAcceptingRequested() override { return true; }
+  int duplicateParentListenSocket(const std::string&, uint32_t, absl::string_view) override {
+    return -1;
+  }
+  void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr,
+                                     std::shared_ptr<Network::UdpListenerConfig>) override {}
+  OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override {
+    return std::nullopt;
+  }
+  void initialize(Event::Dispatcher&, Server::Instance&) override {}
+  std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override {
+    return std::nullopt;
+  }
+  void sendParentTerminateRequest() override {}
+  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override { return {}; }
+  void shutdown() override {}
+  uint32_t baseId() override { return 0; }
+  std::string version() override { return "disabled"; }
+  Thread::BasicLockable& logLock() override { return log_lock_; }
+  Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
+  bool isInitializing() const override { return false; }
+
+private:
+  Thread::MutexBasicLockable log_lock_;
+  Thread::MutexBasicLockable access_log_lock_;
+};
+
+} // namespace Server
+} // namespace Envoy

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "envoy/config/core/v3/address.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "ResolverProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Resolver]
+
+// Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+message DnsResolverOptions {
+  // Use TCP for all DNS queries instead of the default protocol UDP.
+  bool use_tcp_for_dns_lookups = 1;
+
+  // Do not use the default search domains; only query hostnames as-is or as aliases.
+  bool no_default_search_domain = 2;
+}
+
+// DNS resolution configuration which includes the underlying dns resolver addresses and options.
+message DnsResolutionConfig {
+  // A list of dns resolver addresses. If specified, the DNS client library will perform resolution
+  // via the underlying DNS resolvers. Otherwise, the default system resolvers
+  // (e.g., /etc/resolv.conf) will be used.
+  repeated Address resolvers = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+  DnsResolverOptions dns_resolver_options = 2;
+}

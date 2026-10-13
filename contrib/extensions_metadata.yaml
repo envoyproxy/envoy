@@ -1,0 +1,231 @@
+envoy.filters.http.checksum:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.http.client_cert:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.client_cert.v3alpha.ClientCertConfig
+envoy.filters.http.dynamo:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.filters.http.golang:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.compression.qatzip.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+envoy.compression.qatzstd.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+envoy.filters.http.sxg:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.filters.network.client_ssl_auth:
+  categories:
+  - envoy.filters.network
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+envoy.filters.network.kafka_broker:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+envoy.filters.network.kafka_mesh:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+envoy.filters.network.golang:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.network.rocketmq_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.network.mysql_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.network.postgres_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.filters.listener.postgres_inspector:
+  categories:
+  - envoy.filters.listener
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.filters.network.sip_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.sip.router:
+  categories:
+  - envoy.sip_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.tls.key_providers.cryptomb:
+  categories:
+  - envoy.tls.key_providers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.tls.key_providers.qat:
+  categories:
+  - envoy.tls.key_providers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.tls.key_providers.kae:
+  categories:
+  - envoy.tls.key_providers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.bootstrap.vcl:
+  categories:
+  - envoy.bootstrap
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.matching.input_matchers.hyperscan:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.http.language:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.regex_engines.hyperscan:
+  categories:
+  - envoy.regex_engines
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.stat_sinks.kafka:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.kafka.v3.KafkaStatsSinkConfig
+envoy.stat_sinks.wasm_filter:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.stat_sinks.wasm_filter.v3.WasmFilterStatsSinkConfig
+envoy.tap_sinks.udp_sink:
+  categories:
+  - envoy.filters.http
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.tap_sinks.udp_sink.v3alpha.UdpSink
+envoy.xds_delegates.kv_store:
+  categories:
+  - envoy.xds_delegates
+  security_posture: data_plane_agnostic
+  status: wip
+envoy.generic_proxy.codecs.kafka:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.kafka.v3.KafkaCodecConfig
+envoy.router.cluster_specifier_plugin.golang:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.upstreams.http.tcp.golang:
+  categories:
+  - envoy.upstreams
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.http.peak_ewma:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.peak_ewma.v3alpha.PeakEwmaConfig
+envoy.filters.http.peer_metadata:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - io.istio.http.peer_metadata.Config
+envoy.filters.network.peer_metadata:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.network_filters.peer_metadata.Config
+envoy.filters.network.metadata_exchange:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.tcp.metadataexchange.config.MetadataExchange
+envoy.filters.http.istio_stats:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - stats.PluginConfig
+envoy.filters.http.alpn:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - istio.envoy.config.filter.http.alpn.v2alpha1.FilterConfig
+envoy.load_balancing_policies.peak_ewma:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.peak_ewma.v3alpha.PeakEwma
+envoy.load_balancing_policies.per_worker_subset:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.per_worker_subset.v3alpha.PerWorkerSubset
+envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service:
+  categories:
+  - envoy.bootstrap
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.reverse_tunnel_reporters.v3alpha.reporters.EventReporterConfig
+  - envoy.extensions.reverse_tunnel_reporters.v3alpha.clients.grpc_client.GrpcClientConfig

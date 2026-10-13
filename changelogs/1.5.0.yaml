@@ -1,0 +1,156 @@
+date: December 4, 2017
+
+changes:
+- area: access log
+  change: |
+    added fields for :ref:`UPSTREAM_LOCAL_ADDRESS and DOWNSTREAM_ADDRESS <config_access_log_format>`.
+- area: admin
+  change: |
+    added :ref:`JSON output <operations_admin_interface_stats>` for stats admin endpoint.
+- area: admin
+  change: |
+    added basic :ref:`Prometheus output <operations_admin_interface_stats>` for stats admin endpoint. Histograms are not
+    currently output.
+- area: admin
+  change: |
+    added ``version_info`` to the :ref:`/clusters admin endpoint <operations_admin_interface_clusters>`.
+- area: config
+  change: |
+    the :ref:`v2 API <config_overview_v2>` is now considered production ready.
+- area: config
+  change: |
+    added --v2-config-only CLI flag.
+- area: cors
+  change: |
+    added :ref:`CORS filter <config_http_filters_cors>`.
+- area: health check
+  change: |
+    added :ref:`x-envoy-immediate-health-check-fail <config_http_filters_router_x-envoy-immediate-health-check-fail>` header
+    support.
+- area: health check
+  change: |
+    added :ref:`reuse_connection <envoy_api_field_HealthCheck.reuse_connection>` option.
+- area: http
+  change: |
+    added :ref:`per-listener stats <config_http_conn_man_stats_per_listener>`.
+- area: http
+  change: |
+    end-to-end HTTP flow control is now complete across both connections, streams, and filters.
+- area: load balancer
+  change: |
+    added :ref:`subset load balancer <arch_overview_load_balancer_subsets>`.
+- area: load balancer
+  change: |
+    added ring size and hash :ref:`configuration options <envoy_api_msg_Cluster.RingHashLbConfig>`. This used to be
+    configurable via runtime. The runtime configuration was deleted without deprecation as we are fairly certain no one is
+    using it.
+- area: log
+  change: |
+    added the ability to optionally log to a file instead of stderr via the :option:`--log-path` option.
+- area: listeners
+  change: |
+    added :ref:`drain_type <envoy_api_field_Listener.drain_type>` option.
+- area: lua
+  change: |
+    added experimental :ref:`Lua filter <config_http_filters_lua>`.
+- area: mongo filter
+  change: |
+    added :ref:`fault injection <config_network_filters_mongo_proxy_fault_injection>`.
+- area: mongo filter
+  change: |
+    added :ref:`"drain close" <arch_overview_draining>` support.
+- area: outlier detection
+  change: |
+    added :ref:`HTTP gateway failure type <arch_overview_outlier_detection>`. See `deprecated log
+    <https://github.com/envoyproxy/envoy/blob/v1.5.0/DEPRECATED.md>`_ for outlier detection stats deprecations in this
+    release.
+- area: redis
+  change: |
+    the :ref:`redis proxy filter <config_network_filters_redis_proxy>` is now considered production ready.
+- area: redis
+  change: |
+    added :ref:`"drain close" <arch_overview_draining>` functionality.
+- area: router
+  change: |
+    added :ref:`x-envoy-overloaded <config_http_filters_router_x-envoy-overloaded>` support.
+- area: router
+  change: |
+    added :ref:`regex <envoy_api_field_RouteMatch.regex>` route matching.
+- area: router
+  change: |
+    added :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>` for upstream requests.
+- area: router
+  change: |
+    added :ref:`downstream IP hashing <envoy_api_field_RouteAction.HashPolicy.connection_properties>` for HTTP ketama
+    routing.
+- area: router
+  change: |
+    added :ref:`cookie hashing <envoy_api_msg_RouteAction.HashPolicy.Cookie>`.
+- area: router
+  change: |
+    added :ref:`start_child_span <envoy_api_field_filter.http.Router.start_child_span>` option to create child span for
+    egress calls.
+- area: router
+  change: |
+    added optional :ref:`upstream logs <envoy_api_field_filter.http.Router.upstream_log>`.
+- area: router
+  change: |
+    added complete :ref:`custom append/override/remove support <config_http_conn_man_headers_custom_request_headers>` of
+    request/response headers.
+- area: router
+  change: |
+    added support to :ref:`specify response code during redirect <envoy_api_field_RedirectAction.response_code>`.
+- area: router
+  change: |
+    added :ref:`configuration <envoy_api_field_RouteAction.cluster_not_found_response_code>` to return either a 404 or 503
+    if the upstream cluster does not exist.
+- area: runtime
+  change: |
+    added :ref:`comment capability <config_runtime_comments>`.
+- area: server
+  change: |
+    change default log level (:option:`-l`) to ``info``.
+- area: stats
+  change: |
+    maximum stat/name sizes and maximum number of stats are now variable via the ``--max-obj-name-len`` and ``--max-stats``
+    options.
+- area: tcp proxy
+  change: |
+    added :ref:`access logging <envoy_api_field_filter.network.TcpProxy.access_log>`.
+- area: tcp proxy
+  change: |
+    added :ref:`configurable connect retries <envoy_api_field_filter.network.TcpProxy.max_connect_attempts>`.
+- area: tcp proxy
+  change: |
+    enable use of :ref:`outlier detector <arch_overview_outlier_detection>`.
+- area: tls
+  change: |
+    added :ref:`SNI support <faq_how_to_setup_sni>`.
+- area: tls
+  change: |
+    added support for specifying :ref:`TLS session ticket keys <envoy_api_field_DownstreamTlsContext.session_ticket_keys>`.
+- area: tls
+  change: |
+    allow configuration of the :ref:`min <envoy_api_field_TlsParameters.tls_minimum_protocol_version>` and :ref:`max
+    <envoy_api_field_TlsParameters.tls_minimum_protocol_version>` TLS protocol versions.
+- area: tracing
+  change: |
+    added :ref:`custom trace span decorators <envoy_api_field_Route.decorator>`.
+- area: envoy
+  change: |
+    Many small bug fixes and performance improvements not listed.
+
+deprecated:
+- area: outlier_detection
+  change: |
+    The outlier detection ``ejections_total`` stats counter has been deprecated and not replaced. Monitor the individual
+    ``ejections_detected_*`` counters for the detectors of interest, or ``ejections_enforced_total`` for the total number of
+    ejections that actually occurred.
+- area: outlier_detection
+  change: |
+    The outlier detection ``ejections_consecutive_5xx`` stats counter has been deprecated in favour of
+    ``ejections_detected_consecutive_5xx`` and ``ejections_enforced_consecutive_5xx``.
+- area: outlier_detection
+  change: |
+    The outlier detection ``ejections_success_rate`` stats counter has been deprecated in favour of
+    ``ejections_detected_success_rate`` and ``ejections_enforced_success_rate``.

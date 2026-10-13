@@ -1,0 +1,41 @@
+#pragma once
+
+#include <string>
+
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace Oauth2 {
+
+class OAuth2Config : public Extensions::HttpFilters::Common::UnifiedFactoryBase<
+                         envoy::extensions::filters::http::oauth2::v3::OAuth2,
+                         envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute> {
+public:
+  OAuth2Config() : UnifiedFactoryBase("envoy.filters.http.oauth2") {}
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const envoy::extensions::filters::http::oauth2::v3::OAuth2& config,
+                      const std::string& stats_prefix,
+                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+                      OptRef<Init::Manager> init_manager);
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfigTyped(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2PerRoute&,
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+};
+
+} // namespace Oauth2
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

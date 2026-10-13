@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.open_telemetry.v3;
+
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/config/core/v3/http_service.proto";
+import "envoy/extensions/access_loggers/grpc/v3/als.proto";
+import "envoy/type/tracing/v3/custom_tag.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "opentelemetry/proto/common/v1/common.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.open_telemetry.v3";
+option java_outer_classname = "LogsServiceProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/open_telemetry/v3;open_telemetryv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: OpenTelemetry Access Log]
+
+// Configuration for the built-in ``envoy.access_loggers.open_telemetry``
+// :ref:`AccessLog <envoy_v3_api_msg_config.accesslog.v3.AccessLog>`. This configuration will
+// populate `opentelemetry.proto.collector.v1.logs.ExportLogsServiceRequest.resource_logs <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/collector/logs/v1/logs_service.proto>`_.
+// In addition, the request start time is set in the dedicated field.
+// [#extension: envoy.access_loggers.open_telemetry]
+// [#next-free-field: 16]
+message OpenTelemetryAccessLogConfig {
+  // [#comment:TODO(itamarkam): add 'filter_state_objects_to_log' to logs.]
+  // Deprecated. Use ``grpc_service`` or ``http_service`` instead.
+  grpc.v3.CommonGrpcAccessLogConfig common_config = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // The upstream HTTP cluster that will receive OTLP logs via
+  // `OTLP/HTTP <https://opentelemetry.io/docs/specs/otlp/#otlphttp>`_.
+  // Note: Only one of ``common_config``, ``grpc_service``, or ``http_service`` may be used.
+  //
+  // .. note::
+  //
+  //   The ``request_headers_to_add`` property in the OTLP HTTP exporter service supports
+  //   substitution formatters. The formatters cannot access any HTTP or connection properties, but
+  //   can load content such as environment variables or files or secrets.
+  config.core.v3.HttpService http_service = 8;
+
+  // The upstream gRPC cluster that will receive OTLP logs.
+  // Note: Only one of ``common_config``, ``grpc_service``, or ``http_service`` may be used.
+  // This field is preferred over ``common_config.grpc_service``.
+  config.core.v3.GrpcService grpc_service = 9;
+
+  // If specified, Envoy will not generate built-in resource labels
+  // like ``log_name``, ``zone_name``, ``cluster_name``, ``node_name``.
+  //
+  // Built-in labels have the lowest precedence and can be overridden by matching keys in
+  // :ref:`resource_detectors <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.resource_detectors>`
+  // or :ref:`resource_attributes <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.resource_attributes>`.
+  bool disable_builtin_labels = 5;
+
+  // OpenTelemetry `Resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto#L51>`_
+  // attributes are filled with Envoy node info.
+  // Example: ``resource_attributes { values { key: "region" value { string_value: "cn-north-7" } } }``.
+  //
+  // Attributes configured here take highest precedence (``resource_attributes`` > ``resource_detectors`` > built-in labels)
+  // and will override any matching keys.
+  opentelemetry.proto.common.v1.KeyValueList resource_attributes = 4;
+
+  // An ordered list of resource detectors to detect OpenTelemetry resource information such as
+  // attributes and schema URL.
+  //
+  // Attributes detected here override built-in labels with matching keys, but are overridden by
+  // :ref:`resource_attributes <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.resource_attributes>`
+  // (precedence: ``resource_attributes`` > ``resource_detectors`` > built-in labels).
+  // [#extension-category: envoy.tracers.opentelemetry.resource_detectors]
+  repeated config.core.v3.TypedExtensionConfig resource_detectors = 15;
+
+  // OpenTelemetry `LogResource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/logs/v1/logs.proto>`_
+  // fields, following `Envoy access logging formatting <https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage>`_.
+  //
+  // See 'body' in the LogResource proto for more details.
+  // Example: ``body { string_value: "%PROTOCOL%" }``.
+  opentelemetry.proto.common.v1.AnyValue body = 2;
+
+  // See 'attributes' in the LogResource proto for more details.
+  // Example: ``attributes { values { key: "user_agent" value { string_value: "%REQ(USER-AGENT)%" } } }``.
+  opentelemetry.proto.common.v1.KeyValueList attributes = 3;
+
+  // Optional. Additional prefix to use on OpenTelemetry access logger stats. If empty, the stats will be rooted at
+  // ``access_logs.open_telemetry_access_log.``. If non-empty, stats will be rooted at
+  // ``access_logs.open_telemetry_access_log.<stat_prefix>.``.
+  string stat_prefix = 6;
+
+  // Specifies a collection of Formatter plugins that can be called from the access log configuration.
+  // See the formatters extensions documentation for details.
+  // [#extension-category: envoy.formatter]
+  repeated config.core.v3.TypedExtensionConfig formatters = 7;
+
+  string log_name = 10;
+
+  // The interval for flushing access logs to the transport. Default: 1 second.
+  google.protobuf.Duration buffer_flush_interval = 11;
+
+  // Soft size limit in bytes for the access log buffer. When the buffer exceeds
+  // this limit, logs will be flushed. Default: 16KB.
+  google.protobuf.UInt32Value buffer_size_bytes = 12;
+
+  // Additional filter state objects to log as attributes.
+  repeated string filter_state_objects_to_log = 13;
+
+  // Custom tags to include as log attributes.
+  repeated type.tracing.v3.CustomTag custom_tags = 14;
+}

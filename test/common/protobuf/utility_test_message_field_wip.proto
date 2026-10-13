@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package utility_test.message_field_wip;
+
+import "xds/annotations/v3/status.proto";
+
+message Foo {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+}
+
+message Bar {
+  bool test_field = 1 [(xds.annotations.v3.field_status).work_in_progress = true];
+}
+
+message MultipleFields {
+  string foo = 1;
+  string bar = 2;
+  int32 baz = 3;
+}
+
+message Inner {
+  string name = 1;
+}
+
+message Outer {
+  Inner inner = 1;
+};
+
+message RepeatedField {
+  repeated MultipleFields repeated_multiple_fields = 1;
+};
+
+message MapField {
+  map<string, string> map_field = 1;
+};
+
+// Per https://protobuf.dev/programming-guides/proto3/#backwards the MapField proto is wire
+// compatible with the following proto.
+message StringMapWireCompatible {
+  message MapFieldEntry {
+    string key = 1;
+    string value = 2;
+  };
+
+  repeated MapFieldEntry entries = 1;
+};

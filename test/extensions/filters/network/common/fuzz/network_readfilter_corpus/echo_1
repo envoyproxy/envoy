@@ -1,0 +1,31 @@
+config {
+  name: "envoy.filters.network.echo"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 2097152
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 4194304
+  }
+}
+actions {
+  on_data {
+    data: "y"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 2097152
+  }
+}
+

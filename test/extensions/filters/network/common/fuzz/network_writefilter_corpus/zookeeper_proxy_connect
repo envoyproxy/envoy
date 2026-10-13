@@ -1,0 +1,17 @@
+config {
+  name: "envoy.filters.network.zookeeper_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy"
+    value: "\xa\xb\x74\x65\x73\x74\x5f\x70\x72\x65\x66\x69\x78"
+  }
+}
+actions {
+  on_write {
+    data: "\x0\x0\x0\x14\x0\x0\x0\x0\x0\x0\x0\xa\x0\x0\x0\x0\x0\x0\x0\xc8\x0\x0\x0\x0"
+  }
+}
+actions {
+  on_write {
+  }
+}
+

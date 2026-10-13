@@ -1,0 +1,46 @@
+#pragma once
+
+#include "envoy/config/grpc_mux.h"
+
+namespace Envoy {
+namespace Config {
+
+// A placeholder class returned if no ADS is configured.
+class NullGrpcMuxImpl : public GrpcMux,
+                        GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
+public:
+  void start() override {}
+  ScopedResume pause(const std::string&) override {
+    return std::make_unique<Cleanup>([] {});
+  }
+  ScopedResume pause(const std::vector<std::string>) override {
+    return std::make_unique<Cleanup>([] {});
+  }
+
+  GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
+                           SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
+                           const SubscriptionOptions&) override {
+    ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
+  }
+
+  absl::Status updateMuxSource(
+      Grpc::RawAsyncClientSharedPtr&&, Grpc::RawAsyncClientSharedPtr&&, Stats::Scope&,
+      BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
+      std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> = nullptr) override {
+    return absl::UnimplementedError("");
+  }
+
+  EdsResourcesCacheOptRef edsResourcesCache() override { return std::nullopt; }
+
+  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
+
+  void onWriteable() override {}
+  void onStreamEstablished() override {}
+  void onEstablishmentFailure(bool) override {}
+  void onDiscoveryResponse(ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse>&&,
+                           ControlPlaneStats&) override {}
+};
+
+} // namespace Config
+} // namespace Envoy

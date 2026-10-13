@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package envoy.test.deprecation_test;
+
+import "envoy/annotations/deprecation.proto";
+
+message Base {
+  string not_deprecated = 1;
+  string is_deprecated = 2 [deprecated = true];
+  string is_deprecated_fatal = 3
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  message InnerMessage {
+    string inner_not_deprecated = 1;
+    string inner_deprecated = 2 [deprecated = true];
+    string inner_deprecated_fatal = 3
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  }
+  InnerMessage deprecated_message = 4 [deprecated = true];
+  InnerMessage not_deprecated_message = 5;
+  repeated InnerMessage repeated_message = 6;
+  repeated InnerMessage deprecated_repeated_message = 7 [deprecated = true];
+
+  // For deprecated enum value testing, stick the enum in a container, to avoid
+  // the default instantiation of Base having a deprecated-by-default value.
+  enum DeprecationEnum {
+    DEPRECATED_DEFAULT = 0 [deprecated = true];
+    NOT_DEPRECATED = 1;
+    DEPRECATED_NOT_DEFAULT = 2 [deprecated = true];
+    DEPRECATED_FATAL = 3 [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
+  }
+  message InnerMessageWithDeprecationEnum {
+    DeprecationEnum deprecated_enum = 1;
+  }
+  InnerMessageWithDeprecationEnum enum_container = 8;
+}
+
+// Same structure as base but with protoxform migration style transforms applied
+// manually.
+message UpgradedBase {
+  string not_deprecated = 1;
+  string hidden_envoy_deprecated_is_deprecated = 2 [deprecated = true];
+  string hidden_envoy_deprecated_is_deprecated_fatal = 3 [deprecated = true];
+  message InnerMessage {
+    string inner_not_deprecated = 1;
+    string hidden_envoy_deprecated_inner_deprecated = 2 [deprecated = true];
+    string hidden_envoy_deprecated_inner_deprecated_fatal = 3 [deprecated = true];
+  }
+  InnerMessage hidden_envoy_deprecated_deprecated_message = 4 [deprecated = true];
+  InnerMessage not_deprecated_message = 5;
+  repeated InnerMessage repeated_message = 6;
+  repeated InnerMessage hidden_envoy_deprecated_deprecated_repeated_message = 7 [deprecated = true];
+
+  // For deprecated enum value testing, stick the enum in a container, to avoid
+  // the default instantiation of Base having a deprecated-by-default value.
+  enum DeprecationEnum {
+    hidden_envoy_deprecated_DEPRECATED_DEFAULT = 0 [deprecated = true];
+    NOT_DEPRECATED = 1;
+    hidden_envoy_deprecated_DEPRECATED_NOT_DEFAULT = 2 [deprecated = true];
+  }
+  message InnerMessageWithDeprecationEnum {
+    DeprecationEnum deprecated_enum = 1;
+  }
+  InnerMessageWithDeprecationEnum enum_container = 8;
+}

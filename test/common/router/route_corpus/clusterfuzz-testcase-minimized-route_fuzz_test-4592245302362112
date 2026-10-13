@@ -1,0 +1,123 @@
+config {   virtual_hosts {     name: " "     domains: " "     routes {       match {         prefix: ""         grpc {         }       }       route {         cluster: " "       }       response_headers_to_remove: "    "     }     routes {       match {         path: " "       }       route {         cluster: " "       }       request_headers_to_add {         header {           key: "       0\000\000\000\000\000\000"
+        }
+      }
+      response_headers_to_remove: "J"
+    }
+    routes {
+      match {
+        prefix: ""
+      }
+      route {
+        cluster: "#"
+      }
+    }
+    routes {
+      match {
+        prefix: ""
+      }
+      route {
+        cluster: "W"
+      }
+    }
+    routes {
+      match {
+        prefix: ""
+      }
+      redirect {
+      }
+    }
+    routes {
+      match {
+        path: "?"
+      }
+      route {
+        cluster: "2"
+      }
+    }
+    routes {
+      match {
+        path: "/"
+      }
+      redirect {
+      }
+    }
+    routes {
+      match {
+        path: ""
+      }
+      route {
+        cluster: "$"
+      }
+    }
+    routes {
+      match {
+        path: "?"
+      }
+      route {
+        cluster: "W"
+      }
+    }
+    routes {
+      match {
+        path: ""
+      }
+      route {
+        cluster: "n"
+      }
+    }
+    routes {
+      match {
+        path: ""
+      }
+      route {
+        cluster_header: "J"
+      }
+    }
+    routes {
+      match {
+        path: "W"
+      }
+      route {
+        cluster: "$"
+      }
+      response_headers_to_remove: "\022"
+      response_headers_to_remove: "\022"
+    }
+    routes {
+      match {
+        path: "?"
+      }
+      route {
+        cluster: "\037"
+      }
+    }
+    routes {
+      match {
+        prefix: ""
+      }
+      redirect {
+      }
+    }
+    routes {
+      match {
+        path: "?"
+      }
+      redirect {
+      }
+    }
+    routes {
+      match {
+        prefix: ""
+      }
+      route {
+        cluster: "$"
+      }
+      response_headers_to_remove: ""
+    }
+  }
+  vhds {
+    config_source {
+      path: "2"
+    }
+  }
+}

@@ -1,0 +1,147 @@
+#include "source/extensions/formatter/cel/cel.h"
+
+#include "source/common/config/metadata.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+
+#include "eval/public/value_export_util.h"
+
+#if defined(USE_CEL_PARSER)
+#include "parser/parser.h"
+#endif
+
+namespace Envoy {
+namespace Extensions {
+namespace Formatter {
+
+namespace Expr = Filters::Common::Expr;
+
+CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
+                           Expr::BuilderInstanceSharedConstPtr expr_builder,
+                           const cel::expr::Expr& input_expr, std::optional<size_t>& max_length,
+                           bool typed)
+    : local_info_(local_info), max_length_(max_length), compiled_expr_([&]() {
+        auto compiled_expr = Expr::CompiledExpression::Create(expr_builder, input_expr);
+        if (!compiled_expr.ok()) {
+          throw EnvoyException(
+              absl::StrCat("failed to create an expression: ", compiled_expr.status().message()));
+        }
+        return std::move(compiled_expr.value());
+      }()),
+      typed_(typed) {}
+
+std::optional<std::string> CELFormatter::format(const Envoy::Formatter::Context& context,
+                                                const StreamInfo::StreamInfo& stream_info) const {
+  Protobuf::Arena arena;
+  auto eval_status =
+      compiled_expr_.evaluate(arena, &local_info_, stream_info, context.requestHeaders().ptr(),
+                              context.responseHeaders().ptr(), context.responseTrailers().ptr());
+  if (!eval_status.has_value() || eval_status.value().IsError()) {
+    return std::nullopt;
+  }
+  const auto result = Expr::print(eval_status.value());
+  if (max_length_) {
+    return result.substr(0, max_length_.value());
+  }
+
+  return result;
+}
+
+Protobuf::Value CELFormatter::formatValue(const Envoy::Formatter::Context& context,
+                                          const StreamInfo::StreamInfo& stream_info) const {
+  if (typed_) {
+    Protobuf::Arena arena;
+    auto eval_status =
+        compiled_expr_.evaluate(arena, &local_info_, stream_info, context.requestHeaders().ptr(),
+                                context.responseHeaders().ptr(), context.responseTrailers().ptr());
+    if (!eval_status.has_value() || eval_status.value().IsError()) {
+      return ValueUtil::nullValue();
+    }
+
+    Protobuf::Value proto_value;
+    if (!ExportAsProtoValue(eval_status.value(), &proto_value).ok()) {
+      return ValueUtil::nullValue();
+    }
+
+    if (max_length_ && proto_value.kind_case() == Protobuf::Value::kStringValue) {
+      proto_value.set_string_value(proto_value.string_value().substr(0, max_length_.value()));
+    }
+    return proto_value;
+  } else {
+    auto result = format(context, stream_info);
+    if (!result.has_value()) {
+      return ValueUtil::nullValue();
+    }
+    return ValueUtil::stringValue(result.value());
+  }
+}
+
+bool CELFormatter::formatTo(std::string& sink, const Envoy::Formatter::Context& context,
+                            const StreamInfo::StreamInfo& stream_info) const {
+  const std::optional<std::string> value = format(context, stream_info);
+  if (!value.has_value()) {
+    return false;
+  }
+  sink.append(*value);
+  return true;
+}
+
+void CELFormatter::formatValueTo(Envoy::Formatter::ValueSink& sink,
+                                 const Envoy::Formatter::Context& context,
+                                 const StreamInfo::StreamInfo& stream_info) const {
+  if (!typed_) {
+    // The untyped form is always a string.
+    const std::optional<std::string> value = format(context, stream_info);
+    if (!value.has_value()) {
+      return;
+    }
+    sink.addString(*value);
+    return;
+  }
+  // The typed form produces a genuine proto value, so hand it to the sink as one.
+  const Protobuf::Value value = formatValue(context, stream_info);
+  if (value.kind_case() == Protobuf::Value::kNullValue ||
+      value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    return;
+  }
+  sink.addValue(value);
+}
+
+CELFormatterCommandParser::CELFormatterCommandParser(
+    Expr::BuilderInstanceSharedConstPtr expr_builder)
+    : configured_expr_builder_(std::move(expr_builder)) {
+  ASSERT(configured_expr_builder_ != nullptr);
+}
+
+absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
+CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
+                                 std::optional<size_t> max_length) const {
+#if defined(USE_CEL_PARSER)
+  if (command == "CEL" || command == "TYPED_CEL") {
+    auto parse_status = google::api::expr::parser::Parse(subcommand);
+    if (!parse_status.ok()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Not able to parse expression: ", parse_status.status().ToString()));
+    }
+
+    // Built-in parsers are process-global and may outlive a server context; resolve the default
+    // builder per parse to avoid reusing it across server contexts.
+    Server::Configuration::ServerFactoryContext& context =
+        Server::Configuration::ServerFactoryContextInstance::get();
+    const auto expr_builder =
+        configured_expr_builder_ != nullptr ? configured_expr_builder_ : Expr::getBuilder(context);
+    return std::make_unique<CELFormatter>(context.localInfo(), expr_builder,
+                                          parse_status.value().expr(), max_length,
+                                          command == "TYPED_CEL");
+  }
+
+  return nullptr;
+#else
+  return absl::UnimplementedError("CEL is not available for use in this environment.");
+#endif
+}
+
+} // namespace Formatter
+} // namespace Extensions
+} // namespace Envoy

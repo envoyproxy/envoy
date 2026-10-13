@@ -1,0 +1,41 @@
+syntax = "proto3";
+package envoy.extensions.filters.network.ext_authz;
+
+import "envoy/extensions/filters/network/ext_authz/v3/ext_authz.proto";
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+
+message Result {
+  oneof result_selector {
+    option (validate.required) = true;
+    // Authorization check status
+    google.protobuf.Empty check_status_error = 1;
+    google.protobuf.Empty check_status_denied = 2;
+    google.protobuf.Empty check_status_ok = 3;
+  }
+}
+
+message OnData {
+  bytes data = 1;
+  bool end_stream = 2;
+  // optional: to set the default authorization check result for this and the following onData()
+  Result result = 3;
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+    // Call onNewConnection().
+    google.protobuf.Empty on_new_connection = 1;
+    // Call onData().
+    OnData on_data = 2;
+    // Connection close
+    google.protobuf.Empty remote_close = 3;
+    google.protobuf.Empty local_close = 4;
+  }
+}
+message ExtAuthzTestCase {
+  envoy.extensions.filters.network.ext_authz.v3.ExtAuthz config = 1
+      [(validate.rules).message = {required: true}];
+  repeated Action actions = 2;
+}

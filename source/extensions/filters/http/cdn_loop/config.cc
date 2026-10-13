@@ -1,0 +1,45 @@
+#include "source/extensions/filters/http/cdn_loop/config.h"
+
+#include <memory>
+
+#include "envoy/common/exception.h"
+#include "envoy/extensions/filters/http/cdn_loop/v3/cdn_loop.pb.h"
+#include "envoy/http/filter.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/factory_context.h"
+
+#include "source/common/common/statusor.h"
+#include "source/extensions/filters/http/cdn_loop/filter.h"
+#include "source/extensions/filters/http/cdn_loop/parser.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace CdnLoop {
+
+using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::parseCdnId;
+using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParseContext;
+using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParsedCdnId;
+
+absl::StatusOr<Http::FilterFactoryCb> CdnLoopFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
+    Server::Configuration::ServerFactoryContext& /*context*/,
+    Server::Configuration::ExtraFactoryContext&) {
+  StatusOr<ParsedCdnId> context = parseCdnId(ParseContext(config.cdn_id()));
+  if (!context.ok() || !context->context().atEnd()) {
+    return absl::InvalidArgumentError(
+        fmt::format("Provided cdn_id \"{}\" is not a valid CDN identifier: {}", config.cdn_id(),
+                    context.status().message()));
+  }
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(
+        std::make_shared<CdnLoopFilter>(config.cdn_id(), config.max_allowed_occurrences()));
+  };
+}
+
+REGISTER_FACTORY(CdnLoopFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+
+} // namespace CdnLoop
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

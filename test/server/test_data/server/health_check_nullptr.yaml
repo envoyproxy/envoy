@@ -1,0 +1,22 @@
+﻿staticResources:
+  clusters:
+  - name: foo
+    connectTimeout: 0.000000813s
+    perConnectionBufferLimitBytes: 0
+    lbPolicy: LEAST_REQUEST
+    loadAssignment:
+      clusterName: '*'
+      endpoints:
+      - locality:
+          subZone: "\x1F\x1F"
+        lbEndpoints:
+        - endpoint:
+            address:
+              pipe:
+                path: .
+          healthStatus: HEALTHY
+clusterManager:
+  loadStatsConfig:
+    apiType: GRPC
+    requestTimeout: 0.014024704s
+statsFlushInterval: 0.002097152s

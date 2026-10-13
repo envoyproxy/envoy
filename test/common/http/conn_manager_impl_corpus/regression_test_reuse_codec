@@ -1,0 +1,16 @@
+actions {
+  new_stream {
+    end_stream: true
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+      }
+    }
+  }
+}
+actions {
+}

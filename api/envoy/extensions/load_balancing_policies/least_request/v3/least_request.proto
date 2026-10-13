@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.least_request.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.least_request.v3";
+option java_outer_classname = "LeastRequestProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/least_request/v3;least_requestv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Least Request Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.least_request]
+
+// This configuration allows the built-in LEAST_REQUEST LB policy to be configured via the LB policy
+// extension point. See the :ref:`load balancing architecture overview
+// <arch_overview_load_balancing_types>` for more information.
+// [#next-free-field: 7]
+message LeastRequest {
+  // Available methods for selecting the host set from which to return the host with the
+  // fewest active requests.
+  enum SelectionMethod {
+    // Return host with fewest requests from a set of ``choice_count`` randomly selected hosts.
+    // Best selection method for most scenarios.
+    N_CHOICES = 0;
+
+    // Return host with fewest requests from all hosts.
+    // Useful in some niche use cases involving low request rates and one of:
+    // (example 1) low request limits on workloads, or (example 2) few hosts.
+    //
+    // Example 1: Consider a workload type that can only accept one connection at a time.
+    // If such workloads are deployed across many hosts, only a small percentage of those
+    // workloads have zero connections at any given time, and the rate of new connections is low,
+    // the ``FULL_SCAN`` method is more likely to select a suitable host than ``N_CHOICES``.
+    //
+    // Example 2: Consider a workload type that is only deployed on 2 hosts. With default settings,
+    // the ``N_CHOICES`` method will return the host with more active requests 25% of the time.
+    // If the request rate is sufficiently low, the behavior of always selecting the host with least
+    // requests as of the last metrics refresh may be preferable.
+    FULL_SCAN = 1;
+  }
+
+  // The number of random healthy hosts from which the host with the fewest active requests will
+  // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
+  // Only applies to the ``N_CHOICES`` selection method.
+  google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32 = {gte: 2}];
+
+  // The following formula is used to calculate the dynamic weights when hosts have different load
+  // balancing weights:
+  //
+  // ``weight = load_balancing_weight / (active_requests + 1)^active_request_bias``
+  //
+  // The larger the active request bias is, the more aggressively active requests will lower the
+  // effective weight when all host weights are not equal.
+  //
+  // ``active_request_bias`` must be greater than or equal to 0.0.
+  //
+  // When ``active_request_bias == 0.0`` the Least Request Load Balancer doesn't consider the number
+  // of active requests at the time it picks a host and behaves like the Round Robin Load
+  // Balancer.
+  //
+  // When ``active_request_bias > 0.0`` the Least Request Load Balancer scales the load balancing
+  // weight by the number of active requests at the time it does a pick.
+  //
+  // The value is cached for performance reasons and refreshed whenever one of the Load Balancer's
+  // host sets changes, e.g., whenever there is a host membership update or a host load balancing
+  // weight change.
+  //
+  // .. note::
+  //   This setting only takes effect if all host weights are not equal.
+  config.core.v3.RuntimeDouble active_request_bias = 2;
+
+  // Configuration for slow start mode.
+  // If this configuration is not set, slow start will not be not enabled.
+  common.v3.SlowStartConfig slow_start_config = 3;
+
+  // Configuration for local zone aware load balancing or locality weighted load balancing.
+  common.v3.LocalityLbConfig locality_lb_config = 4;
+
+  // [#not-implemented-hide:]
+  // Unused. Replaced by the `selection_method` enum for better extensibility.
+  google.protobuf.BoolValue enable_full_scan = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Method for selecting the host set from which to return the host with the fewest active requests.
+  //
+  // Defaults to ``N_CHOICES``.
+  SelectionMethod selection_method = 6 [(validate.rules).enum = {defined_only: true}];
+}

@@ -1,0 +1,139 @@
+{
+    "tests": [
+      {
+        "test_name": "Test_1",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/",
+          "method": "GET",
+          "ssl": true,
+          "internal": true
+        },
+        "validate": {
+          "cluster_name": "www3",
+          "virtual_cluster_name": "",
+          "virtual_host_name": "www2",
+          "path_rewrite": "/",
+          "host_rewrite": "www.lyft.com",
+          "path_redirect": ""
+        }
+      },
+      {
+        "test_name": "Test_2",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/",
+          "method": "GET",
+          "ssl": true,
+          "internal": true,
+          "runtime": "runtime.key",
+          "random_value": 70
+        },
+        "validate": {
+          "cluster_name": "www3",
+          "virtual_cluster_name": "",
+          "virtual_host_name": "www2",
+          "path_rewrite": "/",
+          "host_rewrite": "www.lyft.com",
+          "path_redirect": ""
+        }
+      },
+      {
+        "test_name": "Test_3",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/",
+          "method": "GET",
+          "ssl": true,
+          "internal": true,
+          "runtime": "runtime.key",
+          "random_value": 20
+        },
+        "validate": {
+          "cluster_name": "www2",
+          "virtual_cluster_name": "",
+          "virtual_host_name": "www2",
+          "path_rewrite": "/",
+          "host_rewrite": "www.lyft.com",
+          "path_redirect": ""
+        }
+      },
+      {
+        "test_name": "Test_4",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/disabled",
+          "method": "GET",
+          "ssl": true,
+          "internal": true,
+          "runtime": "runtime.key",
+          "random_value": 0
+        },
+        "validate": {
+          "cluster_name": "www4",
+          "virtual_cluster_name": "",
+          "virtual_host_name": "www2",
+          "path_rewrite": "/disabled",
+          "host_rewrite": "www.lyft.com",
+          "path_redirect": ""
+        }
+      },
+      {
+        "test_name": "Test_5",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/disabled",
+          "method": "GET",
+          "ssl": true,
+          "internal": true,
+          "runtime": "runtime.key",
+          "random_value": 2
+        },
+        "validate": {
+          "cluster_name": "www2",
+          "virtual_cluster_name": "",
+          "virtual_host_name": "www2",
+          "path_rewrite": "/disabled",
+          "host_rewrite": "www.lyft.com",
+          "path_redirect": ""
+        }
+      },
+      {
+        "test_name": "Test_6",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/disabled",
+          "method": "GET",
+          "ssl": true,
+          "internal": true,
+          "random_value": 2
+        },
+        "validate": {
+          "cluster_name": "www3",
+          "virtual_cluster_name": "",
+          "virtual_host_name": "www2",
+          "path_rewrite": "/disabled",
+          "host_rewrite": "www.lyft.com",
+          "path_redirect": ""
+        }
+      },
+      {
+        "test_name": "Test_7",
+        "input": {
+          "authority": "www.lyft.com",
+          "path": "/disabled",
+          "method": "GET",
+          "ssl": true,
+          "internal": true
+        },
+        "validate": {
+          "cluster_name": "www3",
+          "virtual_cluster_name": "",
+          "virtual_host_name": "www2",
+          "path_rewrite": "/disabled",
+          "host_rewrite": "www.lyft.com",
+          "path_redirect": ""
+        }
+      }
+    ]
+}

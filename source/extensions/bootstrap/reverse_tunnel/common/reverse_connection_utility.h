@@ -1,0 +1,171 @@
+#pragma once
+
+#include <string>
+#include <utility>
+
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/network/connection.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Bootstrap {
+namespace ReverseConnection {
+
+class ReverseConnectionUtility : public Logger::Loggable<Logger::Id::connection> {
+public:
+  static constexpr absl::string_view PING_MESSAGE = "RPING";
+  static constexpr absl::string_view PROXY_MESSAGE = "PROXY";
+  static constexpr absl::string_view DEFAULT_REVERSE_TUNNEL_REQUEST_PATH =
+      "/reverse_connections/request";
+  static constexpr absl::string_view TENANT_SCOPE_DELIMITER = ":";
+
+  // Upgrade token advertised when the handshake is negotiated as an HTTP/1.1 Upgrade.
+  // Used by both the initiator (request `Upgrade:` header) and responder (`101` response).
+  static constexpr absl::string_view REVERSE_TUNNEL_UPGRADE_PROTOCOL = "reverse-tunnel";
+
+  // Historical default for the host re-check when ``maintain_interval`` is unset.
+  static constexpr uint64_t kDefaultMaintainIntervalMs{10000};
+
+  struct TenantScopedIdentifierView {
+    absl::string_view tenant;
+    absl::string_view identifier;
+    bool hasTenant() const { return !tenant.empty(); }
+  };
+
+  static bool isPingMessage(absl::string_view data);
+
+  // Classification of the front bytes of a read against the RPING keepalive marker.
+  enum class RpingPrefixMatch {
+    // The first PING_MESSAGE.size() bytes are a complete RPING keepalive.
+    Complete,
+    // Fewer than PING_MESSAGE.size() bytes, all matching the RPING prefix so far.
+    PartialPrefix,
+    // Neither a complete RPING nor a viable prefix of one.
+    NotRping,
+  };
+
+  // Classifies `data` against RPING. Only the first PING_MESSAGE.size() bytes are considered;
+  // trailing application bytes are ignored. Empty input is a (trivial) PartialPrefix.
+  static RpingPrefixMatch classifyRpingPrefix(absl::string_view data);
+
+  static Buffer::InstancePtr createPingResponse();
+
+  static bool sendPingResponse(Network::Connection& connection);
+
+  static Api::IoCallUint64Result sendPingResponse(Network::IoHandle& io_handle);
+
+  static bool handlePingMessage(absl::string_view data, Network::Connection& connection);
+
+  static bool extractPingFromHttpData(absl::string_view http_data);
+
+  static TenantScopedIdentifierView splitTenantScopedIdentifier(absl::string_view value);
+
+  static std::string buildTenantScopedIdentifier(absl::string_view tenant,
+                                                 absl::string_view identifier);
+
+  // Build the reverse-tunnel host key "[tenant:]cluster:node" from the scoped node and cluster ids.
+  static std::string buildClusterScopedIdentifier(absl::string_view node_id,
+                                                  absl::string_view cluster_id);
+
+  // Inverse of buildClusterScopedIdentifier: the tenant-scoped {node_id, cluster_id}.
+  static std::pair<std::string, std::string> splitClusterScopedIdentifier(absl::string_view value);
+
+  static void applySslQuietClose(Network::Connection& conn);
+
+  /**
+   * @param interval_ms the base interval in milliseconds.
+   * @param jitter_percent the maximum upward jitter as a percentage of the interval.
+   * @param random the random generator.
+   * @return the jittered interval in milliseconds.
+   */
+  static uint64_t addJitter(uint64_t interval_ms, uint64_t jitter_percent,
+                            Random::RandomGenerator& random);
+
+  static uint64_t diffMs(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end);
+
+private:
+  ReverseConnectionUtility() = delete;
+};
+
+// Header names used by reverse tunnel handshake over HTTP.
+inline const Http::LowerCaseString& reverseTunnelNodeIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-node-id")};
+  return kHeader;
+}
+
+inline const Http::LowerCaseString& reverseTunnelClusterIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-cluster-id")};
+  return kHeader;
+}
+
+inline const Http::LowerCaseString& reverseTunnelTenantIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-tenant-id")};
+  return kHeader;
+}
+
+inline const Http::LowerCaseString& reverseTunnelUpstreamClusterNameHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-upstream-cluster-name")};
+  return kHeader;
+}
+
+// Epoch milliseconds when the tunnel agent initiated the connection.
+// Used for end-to-end propagation latency measurement.
+inline const Http::LowerCaseString& reverseTunnelInitiationTimeHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-initiation-time")};
+  return kHeader;
+}
+
+// Identifies the initiator worker thread that opened the tunnel (the worker dispatcher name, e.g.
+// "worker_2"). Distinguishes tunnels originating from different workers of the same initiator.
+inline const Http::LowerCaseString& reverseTunnelWorkerIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-worker-id")};
+  return kHeader;
+}
+
+// The initiator's per-connection identifier (Envoy's monotonic connection id) for the outbound
+// handshake connection. Combined with the worker id, distinguishes individual tunnels from the
+// same initiator instance.
+inline const Http::LowerCaseString& reverseTunnelConnectionIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-connection-id")};
+  return kHeader;
+}
+
+class ReverseConnectionMessageHandlerFactory {
+public:
+  static std::shared_ptr<class PingMessageHandler> createPingHandler();
+};
+
+class PingMessageHandler : public std::enable_shared_from_this<PingMessageHandler>,
+                           public Logger::Loggable<Logger::Id::connection> {
+public:
+  PingMessageHandler() = default;
+  ~PingMessageHandler() = default;
+
+  bool processPingMessage(absl::string_view data, Network::Connection& connection);
+
+  uint64_t getPingCount() const { return ping_count_; }
+
+private:
+  uint64_t ping_count_{0};
+};
+
+} // namespace ReverseConnection
+} // namespace Bootstrap
+} // namespace Extensions
+} // namespace Envoy

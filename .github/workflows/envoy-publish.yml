@@ -1,0 +1,180 @@
+# This workflow is triggered by azp currently
+# Once arm/x64 build jobs are shifted to github, this can be triggered
+#  by on: workflow_run
+name: Envoy/Publish & verify
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    # Workaround issue with PRs not triggering tertiary workflows
+    - Request
+    # - Envoy/Prechecks
+    types:
+    - completed
+
+concurrency:
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG }}
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI)
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: publish
+      # head-sha: ${{ github.sha }}
+
+  build:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      gcp-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED
+            || secrets.GCP_SERVICE_ACCOUNT_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    if: >-
+      fromJSON(needs.load.outputs.request).run.release
+      || fromJSON(needs.load.outputs.request).run.verify
+      || fromJSON(needs.load.outputs.request).run.docs
+    needs:
+    - load
+    name: Build
+    uses: ./.github/workflows/_publish_build.yml
+    with:
+      docs: ${{ fromJSON(needs.load.outputs.request).run.docs == true }}
+      server: ${{ fromJSON(needs.load.outputs.request).run.release == true || fromJSON(needs.load.outputs.request).run.verify == true }}
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) == true || false }}
+
+  release:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      dockerhub-write-token: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.DOCKERHUB_WRITE_TOKEN
+            || '' }}
+      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      gcp-docs-archive-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.GCP_DOCS_ARCHIVE_KEY
+            || '' }}
+      ENVOY_CI_SYNC_APP_ID: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_SYNC_APP_ID
+            || '' }}
+      ENVOY_CI_SYNC_APP_KEY: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_SYNC_APP_KEY
+            || '' }}
+      ENVOY_CI_PUBLISH_APP_ID: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_PUBLISH_APP_ID
+            || '' }}
+      ENVOY_CI_PUBLISH_APP_KEY: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_PUBLISH_APP_KEY
+            || '' }}
+      gpg-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
+      gpg-key-password: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    if: >-
+      !cancelled()
+      && (fromJSON(needs.load.outputs.request).run.release
+          || fromJSON(needs.load.outputs.request).run.docs)
+      && needs.build.result == 'success'
+    needs:
+    - load
+    - build
+    uses: ./.github/workflows/_publish_release.yml
+    name: Release
+    with:
+      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME }}
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
+  verify:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    if: fromJSON(needs.load.outputs.request).run.verify
+    needs:
+    - load
+    - release
+    uses: ./.github/workflows/_publish_verify.yml
+    name: Verify
+    with:
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: |
+      !cancelled()
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && (fromJSON(needs.load.outputs.request).run.release
+          || fromJSON(needs.load.outputs.request).run.docs
+          || fromJSON(needs.load.outputs.request).run.verify)
+    needs:
+    - load
+    - build
+    - release
+    - verify
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

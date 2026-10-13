@@ -1,0 +1,28 @@
+config {
+  library_id: "test"
+  library_path: "test"
+  plugin_name: "test"
+}
+request_data {
+  headers {
+    headers {
+      key: ":host"
+      value: "example.com"
+    }
+    headers {
+      key: ":method"
+      value: "POST"
+    }
+    headers {
+      key: ":path"
+      value: "/users"
+    }
+    headers {
+      key: ":scheme"
+      value: "https"
+    }
+  }
+  http_body {
+    data: "foobarbaz"
+  }
+}

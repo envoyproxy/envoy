@@ -1,0 +1,756 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/stream_info/filter_state.h"
+
+#include "source/common/common/cleanup.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
+
+#include "test/extensions/dynamic_modules/util.h"
+#include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Clusters {
+namespace DynamicModules {
+
+namespace {
+
+// ObjectFactory used by the cluster filter-state read test: the dynamic-module HTTP filter
+// writes through this factory via envoy_dynamic_module_callback_http_set_filter_state_typed,
+// and the dynamic-module cluster reads it back during host selection via
+// envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed.
+class ClusterTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.cluster_typed_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ClusterTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+// ObjectFactory used by the cluster filter-state write test: the dynamic-module cluster writes
+// through this factory via envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed
+// during host selection, and the access log reads it back on the same request.
+class ClusterWrittenTypedObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.test.cluster_written_typed_object"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ClusterWrittenTypedObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+} // namespace
+
+class DynamicModuleClusterIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void configureUpstreamTlsForLogicalHostname() {
+    upstream_tls_ = true;
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      auto* validation_context =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      tls_context.set_auto_host_sni(true);
+      tls_context.set_auto_sni_san_validation(true);
+
+      cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      std::ignore =
+          cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+    });
+  }
+
+  void initializeWithDecCluster(const std::string& cluster_name,
+                                const std::string& cluster_config = "",
+                                const std::vector<std::string>& logical_hostnames = {}) {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Replace the default cluster_0 with a DEC cluster that uses the Rust module.
+    config_helper_.addConfigModifier([this, cluster_name, cluster_config, logical_hostnames](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+      // Use asString() which correctly formats IPv4 (127.0.0.1:port) and
+      // IPv6 ([::1]:port) for parseInternetAddressAndPortNoThrow.
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      // Configure the cluster as a DEC cluster.
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
+      dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
+      dec_config.set_cluster_name(cluster_name);
+
+      // Pass the upstream address via the cluster config so the Rust module knows
+      // where to add hosts.
+      std::string config_value = cluster_config.empty() ? upstream_address : cluster_config;
+      if (!logical_hostnames.empty()) {
+        RELEASE_ASSERT(logical_hostnames.size() == fake_upstreams_.size(), "");
+        config_value.clear();
+        for (size_t i = 0; i < logical_hostnames.size(); ++i) {
+          config_value +=
+              logical_hostnames[i] + "," + fake_upstreams_[i]->localAddress()->asString() + "\n";
+        }
+      }
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(config_value);
+      std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore = cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that a cluster with synchronous host selection correctly routes requests
+// to the upstream added during on_init.
+TEST_P(DynamicModuleClusterIntegrationTest, SyncHostSelection) {
+  initializeWithDecCluster("sync_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verifies that multiple requests through a synchronous cluster all succeed,
+// exercising the round-robin host selection path.
+TEST_P(DynamicModuleClusterIntegrationTest, SyncHostSelectionMultipleRequests) {
+  initializeWithDecCluster("sync_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+}
+
+// Verifies that a logical hostname supplied separately from the connection address is available
+// to upstream TLS for automatic SNI and SAN validation.
+TEST_P(DynamicModuleClusterIntegrationTest, LogicalHostnameDrivesUpstreamTls) {
+  configureUpstreamTlsForLogicalHostname();
+  initializeWithDecCluster("logical_hostname");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_NE(fake_upstream_connection_, nullptr);
+  ASSERT_NE(fake_upstream_connection_->connection().ssl(), nullptr);
+  EXPECT_EQ("test.lyft.com", fake_upstream_connection_->connection().ssl()->sni());
+}
+
+// Verifies that a cluster with asynchronous host selection correctly routes requests.
+TEST_P(DynamicModuleClusterIntegrationTest, AsyncHostSelection) {
+  initializeWithDecCluster("async_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Exercise asynchronous selection and TLS together using one client context and distinct
+// runtime hosts. Both servers accept the same tickets so server-side key isolation cannot
+// conceal a client that incorrectly offers one hostname's session to another hostname.
+class DynamicModuleAsyncTlsIntegrationTest : public Event::TestUsingSimulatedTime,
+                                             public DynamicModuleClusterIntegrationTest {
+public:
+  void createUpstreams() override {
+    for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      auto* common = tls_context.mutable_common_tls_context();
+      common->mutable_tls_params()->set_tls_maximum_protocol_version(
+          envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+      auto* cert = common->add_tls_certificates();
+      cert->mutable_certificate_chain()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+      cert->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+      tls_context.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, 'a'));
+      auto config = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+          tls_context, factory_context_, {}, false);
+      addFakeUpstream(
+          *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+              std::move(config), context_manager_, server_factory_context_.serverScope()),
+          Http::CodecType::HTTP1, false);
+    }
+  }
+
+  void initializeAsyncTls(const std::vector<std::string>& hostnames) {
+    setUpstreamCount(hostnames.size());
+    configureUpstreamTlsForLogicalHostname();
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* socket =
+          bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      RELEASE_ASSERT(socket->typed_config().UnpackTo(&tls_context), "");
+      // TLS 1.2 delivers the ticket during the handshake, avoiding post-handshake ticket timing.
+      tls_context.mutable_common_tls_context()
+          ->mutable_tls_params()
+          ->set_tls_maximum_protocol_version(
+              envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+      tls_context.mutable_max_session_keys()->set_value(4);
+      std::ignore = socket->mutable_typed_config()->PackFrom(tls_context);
+    });
+    initializeWithDecCluster("async_logical_hostnames", "", hostnames);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  }
+
+  struct SessionExpectation {
+    uint64_t upstream_index;
+    uint64_t sessions_reused;
+  };
+
+  void verifySessionSequence(const std::vector<SessionExpectation>& sequence) {
+    const std::vector<std::string> hostnames{"a.lyft.com", "b.lyft.com"};
+    initializeAsyncTls(hostnames);
+    for (size_t i = 0; i < sequence.size(); ++i) {
+      const auto& [upstream_index, sessions_reused] = sequence[i];
+      SCOPED_TRACE(testing::Message() << "request " << i << ", host " << hostnames[upstream_index]);
+      Http::TestRequestHeaderMapImpl headers(default_request_headers_);
+      headers.setHost("downstream.example");
+      headers.addCopy("x-upstream-index", std::to_string(upstream_index));
+      auto response =
+          sendRequestAndWaitForResponse(headers, 0, default_response_headers_, 0, upstream_index);
+      ASSERT_TRUE(response->complete());
+      ASSERT_EQ("200", response->headers().getStatusValue());
+      ASSERT_NE(fake_upstream_connection_, nullptr);
+      ASSERT_NE(fake_upstream_connection_->connection().ssl(), nullptr);
+      EXPECT_EQ(hostnames[upstream_index], fake_upstream_connection_->connection().ssl()->sni());
+      test_server_->waitForCounter("cluster.cluster_0.ssl.handshake", testing::Eq(i + 1));
+      const auto reused = test_server_->counter("cluster.cluster_0.ssl.session_reused");
+      EXPECT_EQ(sessions_reused, reused == nullptr ? 0 : reused->value());
+
+      // Await Envoy observing the close before the next request; otherwise the pool could reuse
+      // this connection and bypass the handshake that the next assertion is intended to exercise.
+      ASSERT_TRUE(fake_upstream_connection_->close());
+      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+      test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", testing::Eq(i + 1));
+      upstream_request_.reset();
+      fake_upstream_connection_.reset();
+    }
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleAsyncTlsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModuleAsyncTlsIntegrationTest, SessionReuseFollowsLogicalHostname) {
+  // A and B each need an initial handshake before their own sessions can be resumed.
+  verifySessionSequence({{0, 0}, {1, 0}, {0, 1}, {1, 2}});
+}
+
+TEST_P(DynamicModuleAsyncTlsIntegrationTest, SessionReuseFollowsLogicalHostnameReverseOrder) {
+  verifySessionSequence({{1, 0}, {0, 0}, {1, 1}, {0, 2}});
+}
+
+TEST_P(DynamicModuleAsyncTlsIntegrationTest, RejectsMismatchedLogicalHostname) {
+  initializeAsyncTls({"outside-san.example"});
+  Http::TestRequestHeaderMapImpl headers(default_request_headers_);
+  headers.addCopy("x-upstream-index", "0");
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  // Keep the decoder alive while closing any unfinished request after an assertion failure.
+  FakeRawConnectionPtr upstream_connection;
+  Cleanup cleanup([this]() { cleanupUpstreamAndDownstream(); });
+  // Consume the connection to enable reads so TLS can progress even when the handshake fails.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection,
+                                                       TestUtility::DefaultTimeout, *dispatcher_));
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.ssl.fail_verify_san", testing::Eq(1));
+  const auto requests = test_server_->counter("cluster.cluster_0.upstream_rq_total");
+  EXPECT_TRUE(requests == nullptr || requests->value() == 0);
+  ASSERT_TRUE(upstream_connection->waitForDisconnect());
+}
+
+// Verifies that a cluster can use the scheduler to add hosts after initialization.
+TEST_P(DynamicModuleClusterIntegrationTest, SchedulerHostUpdate) {
+  initializeWithDecCluster("scheduler_host_update");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test the main→worker push pipeline end-to-end. The Rust fixture publishes an
+// Arc<Snapshot{multiplier=5}> from main and posts run_on_all_workers(event_id=7); each worker
+// reads the snapshot back and increments a counter by event_id * multiplier. With concurrency=4
+// the final counter must be exactly 4 * 7 * 5 = 140 — which proves the fan-out fired once per
+// worker, the event_id passed through, the typed payload survived FFI, and main was excluded.
+TEST_P(DynamicModuleClusterIntegrationTest, RunOnAllWorkersFiresOnEachWorker) {
+  concurrency_ = 4;
+  initializeWithDecCluster("run_on_all_workers");
+
+  test_server_->waitForCounter("dynamicmodulescustom.worker_events_applied_total",
+                               testing::Eq(140));
+
+  // Cluster should remain functional for normal traffic after the fan-out.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Exercises the worker local priority set path across multiple workers end to end. Each worker
+// load balancer learns the added host through get_member_update_host, confirms its worker local set
+// agrees, and routes a request to the upstream through that host pointer.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerLocalPrioritySetRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("worker_local_rebuild");
+
+  // Each worker increments the counter once its worker local set converges, so wait for all of
+  // them before routing.
+  test_server_->waitForCounter("dynamicmodulescustom.membership_hosts_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Selects the persistent cross-priority host map during init and resolves the host on each worker
+// through find_host_by_address, which reads the map published to that worker.
+TEST_P(DynamicModuleClusterIntegrationTest, PersistentHostMap) {
+  concurrency_ = 2;
+  initializeWithDecCluster("persistent_host_map");
+
+  // Each worker increments the counter once it has resolved the host through the map.
+  test_server_->waitForCounter("dynamicmodulescustom.persistent_host_map_hits_total",
+                               testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the packed member-update address getter end to end. Each worker load balancer reads the
+// added host's address both as a string and as packed integers and confirms they agree before
+// incrementing the counter, so this runs the real packing under both IPv4 and IPv6 params.
+TEST_P(DynamicModuleClusterIntegrationTest, MemberUpdatePackedAddress) {
+  concurrency_ = 2;
+  initializeWithDecCluster("member_update_packed_address");
+
+  // Each worker increments the counter once its packed address matches the formatted address.
+  test_server_->waitForCounter("dynamicmodulescustom.packed_address_verified_total",
+                               testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the bulk healthy-host getter end to end. Each worker load balancer rebuilds its routable
+// set from get_healthy_hosts, confirms it agrees with get_healthy_host_count, and routes a request
+// through a host pointer the bulk getter returned.
+TEST_P(DynamicModuleClusterIntegrationTest, HealthyHostsBulkRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("healthy_hosts_rebuild");
+
+  // Each worker increments the counter once its bulk read agrees with the per-host count.
+  test_server_->waitForCounter("dynamicmodulescustom.healthy_hosts_rebuilt_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verifies that the cluster lifecycle callbacks fire correctly during cluster
+// initialization.
+TEST_P(DynamicModuleClusterIntegrationTest, LifecycleCallbacks) {
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages({{"info", "cluster lifecycle: on_init called"},
+                                  {"info", "cluster lifecycle: on_server_initialized called"}}),
+      initializeWithDecCluster("lifecycle_callbacks"));
+
+  // Send a request to verify the cluster is functional after lifecycle callbacks.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives the per-worker timer ABI end to end. The first request arms a 50ms repeating worker timer
+// from choose_host (which exercises enable/enabled/disable and increments timer_armed_total). The
+// timer then fires repeatedly on the worker dispatcher and re-arms itself, so timer_fired_total
+// keeps climbing without further requests — proving the timer is created on the worker dispatcher,
+// fires on the worker thread, and re-arms. Each fire also records through a resolved counter handle
+// from the worker thread, exercising the resolve-then-record path end to end.
+TEST_P(DynamicModuleClusterIntegrationTest, WorkerTimerArmsFiresAndReArms) {
+  initializeWithDecCluster("worker_timer");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // The first request runs choose_host, which captures the worker dispatcher and arms the timer.
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // The timer is armed exactly once, with enabled()/disable() observed as expected.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_armed_total", testing::Eq(1));
+
+  // The timer fires on the worker dispatcher and re-arms, so the counter keeps climbing.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_total", testing::Ge(3));
+
+  // Each fire also records through a resolved counter handle from the worker thread, so the tagged
+  // child stat climbs alongside timer_fired_total.
+  test_server_->waitForCounter("dynamicmodulescustom.timer_fired_by_outcome.outcome.fired",
+                               testing::Ge(3));
+}
+
+// =============================================================================
+// Filter-state read ABI: an upstream HTTP filter writes filter state on the
+// request path; the dynamic-module cluster reads it back during host selection.
+// =============================================================================
+class DynamicModuleClusterFilterStateIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterFilterStateIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithProducerAndReader() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Prepend the dynamic-module HTTP filter so it writes filter state on every
+    // request before the router runs.
+    constexpr absl::string_view producer_filter_config = R"EOF(
+name: envoy.extensions.filters.http.dynamic_modules
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+  dynamic_module_config:
+    name: cluster_filter_state_test
+  filter_name: filter_state_producer
+  filter_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+    value: ""
+)EOF";
+    config_helper_.prependFilter(std::string(producer_filter_config));
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
+    // reads the filter state we just wrote.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig reader_config;
+      reader_config.mutable_dynamic_module_config()->set_name("cluster_filter_state_test");
+      reader_config.set_cluster_name("filter_state_reader");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = reader_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(reader_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterFilterStateIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that filter state written by an upstream HTTP filter on the request
+// path is observable in the dynamic-module cluster's choose_host callback via
+// both the bytes and the typed filter-state ABI accessors. The cluster returns
+// its only host only when both values match the producer's payload, so a 200
+// response proves the round trip.
+TEST_P(DynamicModuleClusterFilterStateIntegrationTest, ReadsFilterStateProducedByHttpFilter) {
+  initializeWithProducerAndReader();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// =============================================================================
+// Filter-state write ABI: the dynamic-module cluster writes filter state during
+// host selection; the access log reads it back on the same request.
+// =============================================================================
+class DynamicModuleClusterFilterStateWriteIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterFilterStateWriteIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithWriter() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Log both the bytes and the typed filter state the cluster writes during host selection.
+    useAccessLog("%FILTER_STATE(test.cluster_filter_state.written_bytes_key:PLAIN)% "
+                 "%FILTER_STATE(envoy.test.cluster_written_typed_object:PLAIN)%");
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer writes filter
+    // state during host selection.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig writer_config;
+      writer_config.mutable_dynamic_module_config()->set_name("cluster_filter_state_test");
+      writer_config.set_cluster_name("filter_state_writer");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = writer_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(writer_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterFilterStateWriteIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that filter state written by the dynamic-module cluster during host selection (via both
+// the bytes and the typed filter-state ABI setters) is observable at access-log flush on the same
+// request.
+TEST_P(DynamicModuleClusterFilterStateWriteIntegrationTest, WritesFilterStateReadableByAccessLog) {
+  initializeWithWriter();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, testing::HasSubstr("written_bytes_value"));
+  EXPECT_THAT(log, testing::HasSubstr("written_typed_value"));
+}
+
+// =============================================================================
+// Dynamic-metadata set ABI: the dynamic-module cluster annotates the request
+// during host selection; the values are read back from the access log.
+// =============================================================================
+class DynamicModuleClusterDynamicMetadataIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterDynamicMetadataIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithMetadataWriter() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    // Log the dynamic-metadata values the cluster writes during host selection, including the two
+    // strings written by the batch setter.
+    useAccessLog("%DYNAMIC_METADATA(dynamic_modules.test:number_key)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:string_key)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:l1_decision)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:l2_selector)%");
+
+    // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
+    // sets dynamic metadata on the request during host selection.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig writer_config;
+      writer_config.mutable_dynamic_module_config()->set_name("cluster_dynamic_metadata_test");
+      writer_config.set_cluster_name("dynamic_metadata_writer");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = writer_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore =
+          cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(writer_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterDynamicMetadataIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that dynamic metadata set by the dynamic-module cluster during host
+// selection is attached to the request's stream info and observable in the
+// access log via %DYNAMIC_METADATA(namespace:key)%.
+TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDuringHostSelection) {
+  initializeWithMetadataWriter();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_EQ("1234 test_value resolved dicer", log);
+}
+
+// =============================================================================
+// Native LB test: cluster with LEAST_REQUEST policy (native LB, not module LB).
+// =============================================================================
+
+class DynamicModuleClusterNativeLbIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterNativeLbIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithNativeLb() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string upstream_address = fake_upstreams_[0]->localAddress()->asString();
+
+      cluster->set_name("cluster_0");
+      // Use LEAST_REQUEST policy instead of CLUSTER_PROVIDED to test native LB.
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::LEAST_REQUEST);
+      cluster->clear_load_assignment();
+
+      envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
+      dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
+      dec_config.set_cluster_name("native_lb_test");
+
+      Protobuf::StringValue config_proto;
+      config_proto.set_value(upstream_address);
+      std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
+
+      cluster->mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+      std::ignore = cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterNativeLbIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// A native lb_policy makes Envoy build its factory load balancer instead of the module's. The
+// request routes to the upstream, and the module's choose_host must not run: the module provides
+// a load balancer, but native_lb_requests stays 0 because Envoy never calls into it.
+TEST_P(DynamicModuleClusterNativeLbIntegrationTest, NativeLbWithLeastRequestPolicy) {
+  initializeWithNativeLb();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Native LB selected the host; the module's choose_host was never called, so its
+  // native_lb_requests counter is unincremented (absent or 0).
+  auto choose_host = test_server_->counter("dynamicmodulescustom.native_lb_requests");
+  EXPECT_TRUE(choose_host == nullptr || choose_host->value() == 0);
+}
+
+} // namespace DynamicModules
+} // namespace Clusters
+} // namespace Extensions
+} // namespace Envoy

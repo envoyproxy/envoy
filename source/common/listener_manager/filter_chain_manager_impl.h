@@ -1,0 +1,563 @@
+#pragma once
+
+#include <atomic>
+#include <cstdint>
+#include <memory>
+
+#include "envoy/config/grpc_mux.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/typed_metadata.h"
+#include "envoy/event/schedulable_cb.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/network/drain_decision.h"
+#include "envoy/network/filter.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/server/instance.h"
+#include "envoy/server/listener_manager.h"
+#include "envoy/server/options.h"
+#include "envoy/server/transport_socket_config.h"
+#include "envoy/singleton/instance.h"
+#include "envoy/thread_local/thread_local.h"
+
+#include "source/common/common/hash.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/resource_type_helper.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/listener_manager/fcds_api.h"
+#include "source/common/listener_manager/filter_chain_factory_context_callback.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/lc_trie.h"
+#include "source/server/factory_context_impl.h"
+#include "source/server/generic_factory_context.h"
+#include "source/server/transport_socket_config_impl.h"
+
+#include "absl/container/flat_hash_map.h"
+
+namespace Envoy {
+namespace Server {
+
+class FilterChainFactoryBuilder {
+public:
+  virtual ~FilterChainFactoryBuilder() = default;
+  /**
+   * @return Shared filter chain where builder is allowed to determine and reuse duplicated filter
+   * chain or an error status.
+   */
+  virtual absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
+                   FilterChainFactoryContextCreator& context_creator,
+                   bool added_via_api) const PURE;
+};
+
+// PerFilterChainFactoryContextImpl is supposed to be used by network filter chain.
+// Its lifetime must cover the created network filter chain.
+// Its lifetime should be covered by the owned listeners so as to support replacing the active
+// filter chains in the listener.
+class PerFilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
+                                         public Network::DrainDecision {
+public:
+  explicit PerFilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context,
+                                            Init::Manager& init_manager);
+
+  // DrainDecision
+  bool drainClose(Network::DrainDirection) const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
+    IS_ENVOY_BUG("Unexpected function call");
+    return nullptr;
+  }
+
+  // Configuration::FactoryContext
+  Network::DrainDecision& drainDecision() override;
+  Init::Manager& initManager() override;
+  Stats::Scope& scope() override;
+  Stats::Scope& prefixedScope() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Configuration::ServerFactoryContext& serverFactoryContext() override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  bool isQuic() const override;
+  bool shouldBypassOverloadManager() const override;
+
+  void startDraining() override { is_draining_.store(true); }
+
+private:
+  Configuration::FactoryContext& parent_context_;
+  // The scope that has empty prefix.
+  Stats::ScopeSharedPtr scope_;
+  Stats::ScopeSharedPtr prefixed_scope_;
+  Init::Manager& init_manager_;
+  std::atomic<bool> is_draining_{false};
+};
+
+// Forward-declare FCDS-related definitions.
+class FcdsSharedFilterChainManager;
+class FcdsSubscriptionHandle;
+class FcdsClientCallbacks;
+
+using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
+
+struct FilterChainActionFactoryContext {
+  absl::flat_hash_map<std::string, Matcher::ActionConstSharedPtr>
+      actions_by_name_; // de-duplicates action objects.
+  Configuration::ServerFactoryContext& server_;
+  const FilterChainsByName& filter_chains_by_name_;
+  std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager_;
+  FcdsClientCallbacks& fcds_callbacks_;
+  const envoy::config::core::v3::ConfigSource& fcds_config_source_;
+  Init::Manager& init_manager_;
+  // Optional sink: each FCDS subscription handle created while building the matcher is recorded
+  // here so the owning FilterChainManagerImpl can report its (routable) FCDS chains by name. Null
+  // when unused (e.g. no FCDS).
+  std::vector<FcdsSubscriptionHandleSharedPtr>* fcds_handles_sink_ = nullptr;
+};
+
+using FilterChainsByMatcher = absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch,
+                                                  std::string, MessageUtil, MessageUtil>;
+
+class FilterChainTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
+
+using FilterChainMetadataPack = Envoy::Config::MetadataPack<FilterChainTypedMetadataFactory>;
+using FilterChainMetadataPackPtr = Envoy::Config::MetadataPackPtr<FilterChainTypedMetadataFactory>;
+using DefaultFilterChainMetadataPack = ConstSingleton<FilterChainMetadataPack>;
+
+class FilterChainInfoImpl : public Network::FilterChainInfo {
+public:
+  FilterChainInfoImpl(const envoy::config::listener::v3::FilterChain& filter_chain)
+      : name_(filter_chain.name()) {
+    if (filter_chain.has_metadata()) {
+      metadata_ = std::make_unique<FilterChainMetadataPack>(filter_chain.metadata());
+    }
+  }
+
+  // Network::FilterChainInfo
+  absl::string_view name() const override { return name_; }
+
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    return metadata_ != nullptr ? metadata_->proto_metadata_
+                                : DefaultFilterChainMetadataPack::get().proto_metadata_;
+  }
+
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return metadata_ != nullptr ? metadata_->typed_metadata_
+                                : DefaultFilterChainMetadataPack::get().typed_metadata_;
+  }
+
+private:
+  const std::string name_;
+  FilterChainMetadataPackPtr metadata_;
+};
+
+class FilterChainImpl : public Network::DrainableFilterChain {
+public:
+  FilterChainImpl(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
+                  Filter::NetworkFilterFactoriesList&& filters_factory,
+                  std::chrono::milliseconds transport_socket_connect_timeout, bool added_via_api,
+                  const envoy::config::listener::v3::FilterChain& filter_chain)
+      : transport_socket_factory_(std::move(transport_socket_factory)),
+        filters_factory_(std::move(filters_factory)),
+        transport_socket_connect_timeout_(transport_socket_connect_timeout),
+        added_via_api_(added_via_api),
+        filter_chain_info_(std::make_shared<FilterChainInfoImpl>(filter_chain)) {}
+
+  // Network::FilterChain
+  const Network::DownstreamTransportSocketFactory& transportSocketFactory() const override {
+    return *transport_socket_factory_;
+  }
+  std::chrono::milliseconds transportSocketConnectTimeout() const override {
+    return transport_socket_connect_timeout_;
+  }
+  const Filter::NetworkFilterFactoriesList& networkFilterFactories() const override {
+    return filters_factory_;
+  }
+  void startDraining() override { factory_context_->startDraining(); }
+
+  void setFilterChainFactoryContext(
+      Configuration::FilterChainFactoryContextPtr filter_chain_factory_context) {
+    ASSERT(factory_context_ == nullptr);
+    factory_context_ = std::move(filter_chain_factory_context);
+  }
+
+  absl::string_view name() const override { return filter_chain_info_->name(); }
+
+  bool addedViaApi() const override { return added_via_api_; }
+
+  const Network::FilterChainInfoSharedPtr& filterChainInfo() const override {
+    return filter_chain_info_;
+  }
+
+private:
+  Configuration::FilterChainFactoryContextPtr factory_context_;
+  const Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
+  const Filter::NetworkFilterFactoriesList filters_factory_;
+  const std::chrono::milliseconds transport_socket_connect_timeout_;
+  const bool added_via_api_;
+  const Network::FilterChainInfoSharedPtr filter_chain_info_;
+};
+
+/**
+ * Implementation of FilterChainManager. It owns and exchange filter chains.
+ */
+class FilterChainManagerImpl : public Network::FilterChainManager,
+                               public FilterChainFactoryContextCreator,
+                               Logger::Loggable<Logger::Id::config> {
+public:
+  using FcContextMap =
+      absl::flat_hash_map<envoy::config::listener::v3::FilterChain,
+                          Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
+  FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
+                         Configuration::FactoryContext& factory_context,
+                         Init::Manager& init_manager)
+      : addresses_(addresses), parent_context_(factory_context), init_manager_(init_manager) {}
+
+  FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
+                         Configuration::FactoryContext& factory_context,
+                         Init::Manager& init_manager, const FilterChainManagerImpl& parent_manager);
+
+  // FilterChainFactoryContextCreator
+  Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
+
+  // Network::FilterChainManager
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket& socket,
+                                              const StreamInfo::StreamInfo& info) const override;
+  std::vector<absl::string_view> filterChainNames() const override;
+
+  // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
+  // should be called at most once.
+  absl::Status addFilterChains(
+      const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
+      const envoy::config::listener::v3::FilterChain* default_filter_chain,
+      FilterChainFactoryBuilder& filter_chain_factory_builder,
+      FilterChainFactoryContextCreator& context_creator,
+      std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager,
+      const envoy::config::core::v3::ConfigSource& fcds_config_source,
+      FcdsClientCallbacks& fcds_callbacks);
+
+  static bool isWildcardServerName(const std::string& name);
+
+  const std::vector<Network::DrainableFilterChainSharedPtr>& drainingFilterChains() const {
+    return draining_filter_chains_;
+  }
+
+  const std::optional<envoy::config::listener::v3::FilterChain>& defaultFilterChainMessage() const {
+    return default_filter_chain_message_;
+  }
+  const Network::DrainableFilterChainSharedPtr& defaultFilterChain() const {
+    return default_filter_chain_;
+  }
+
+private:
+  absl::Status convertIPsToTries();
+  const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
+                                                          const StreamInfo::StreamInfo& info) const;
+
+  // Build default filter chain from filter chain message. Skip the build but copy from original
+  // filter chain manager if the default filter chain message duplicates the message in origin
+  // filter chain manager. Called by addFilterChains().
+  absl::Status copyOrRebuildDefaultFilterChain(
+      const envoy::config::listener::v3::FilterChain* default_filter_chain,
+      FilterChainFactoryBuilder& filter_chain_factory_builder,
+      FilterChainFactoryContextCreator& context_creator);
+
+  using SourcePortsMap = absl::flat_hash_map<uint16_t, Network::FilterChainSharedPtr>;
+  using SourcePortsMapSharedPtr = std::shared_ptr<SourcePortsMap>;
+  using SourceIPsMap = absl::flat_hash_map<std::string, SourcePortsMapSharedPtr>;
+  using SourceIPsTrie = Network::LcTrie::LcTrie<SourcePortsMapSharedPtr>;
+  using SourceIPsTriePtr = std::unique_ptr<SourceIPsTrie>;
+  using SourceTypesArray = std::array<std::pair<SourceIPsMap, SourceIPsTriePtr>, 3>;
+  using SourceTypesArraySharedPtr = std::shared_ptr<SourceTypesArray>;
+  using DirectSourceIPsMap = absl::flat_hash_map<std::string, SourceTypesArraySharedPtr>;
+  using DirectSourceIPsTrie = Network::LcTrie::LcTrie<SourceTypesArraySharedPtr>;
+  using DirectSourceIPsTriePtr = std::unique_ptr<DirectSourceIPsTrie>;
+
+  // This would nominally be a `std::pair`, but that version crashes the Windows clang_cl compiler
+  // for unknown reasons. This variation, which is equivalent, does not crash the compiler.
+  // The `std::pair` version was confirmed to crash both clang 11 and clang 12.
+  struct DirectSourceIPsPair {
+    DirectSourceIPsMap first;
+    DirectSourceIPsTriePtr second;
+  };
+
+  using ApplicationProtocolsMap = absl::flat_hash_map<std::string, DirectSourceIPsPair>;
+  using TransportProtocolsMap = absl::flat_hash_map<std::string, ApplicationProtocolsMap>;
+  // Both exact server names and wildcard domains are part of the same map, in which wildcard
+  // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
+  // between exact and wildcard entries.
+  using ServerNamesMap = absl::flat_hash_map<std::string, TransportProtocolsMap>;
+  using ServerNamesMapSharedPtr = std::shared_ptr<ServerNamesMap>;
+  using DestinationIPsMap = absl::flat_hash_map<std::string, ServerNamesMapSharedPtr>;
+  using DestinationIPsTrie = Network::LcTrie::LcTrie<ServerNamesMapSharedPtr>;
+  using DestinationIPsTriePtr = std::unique_ptr<DestinationIPsTrie>;
+  using DestinationPortsMap =
+      absl::flat_hash_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>;
+
+  absl::Status
+  verifyNoDuplicateMatchers(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                            FilterChainsByMatcher& filter_chains,
+                            const envoy::config::listener::v3::FilterChain& filter_chain);
+  absl::Status
+  setupFilterChainMatcher(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                          FilterChainsByName& filter_chains_by_name,
+                          const envoy::config::listener::v3::FilterChain& filter_chain,
+                          const Network::DrainableFilterChainSharedPtr& filter_chain_impl);
+  absl::Status
+  maybeConstructMatcher(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                        FilterChainsByName&& filter_chains_by_name,
+                        Configuration::FactoryContext& parent_context,
+                        std::shared_ptr<FcdsSharedFilterChainManager> fcds_manager,
+                        const envoy::config::core::v3::ConfigSource& fcds_config_source,
+                        FcdsClientCallbacks& fcds_callbacks);
+
+  absl::Status addFilterChainForDestinationPorts(
+      DestinationPortsMap& destination_ports_map, uint16_t destination_port,
+      const std::vector<std::string>& destination_ips,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
+      const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const absl::Span<const Protobuf::uint32> source_ports,
+      const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForDestinationIPs(
+      DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
+      const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const absl::Span<const Protobuf::uint32> source_ports,
+      const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForServerNames(
+      ServerNamesMapSharedPtr& server_names_map_ptr,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
+      const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const absl::Span<const Protobuf::uint32> source_ports,
+      const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForApplicationProtocols(
+      ApplicationProtocolsMap& application_protocol_map,
+      const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const absl::Span<const Protobuf::uint32> source_ports,
+      const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForDirectSourceIPs(
+      DirectSourceIPsMap& direct_source_ips_map, const std::vector<std::string>& direct_source_ips,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const absl::Span<const Protobuf::uint32> source_ports,
+      const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForSourceTypes(
+      SourceTypesArraySharedPtr& source_types_array_ptr,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const absl::Span<const Protobuf::uint32> source_ports,
+      const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForSourceIPs(SourceIPsMap& source_ips_map,
+                                          const std::string& source_ip,
+                                          const absl::Span<const Protobuf::uint32> source_ports,
+                                          const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_ports_map_ptr,
+                                            uint32_t source_port,
+                                            const Network::FilterChainSharedPtr& filter_chain);
+
+  const Network::FilterChain*
+  findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,
+                                  const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForServerName(const ServerNamesMap& server_names_map,
+                               const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForTransportProtocol(const TransportProtocolsMap& transport_protocols_map,
+                                      const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForApplicationProtocols(const ApplicationProtocolsMap& application_protocols_map,
+                                         const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForDirectSourceIP(const DirectSourceIPsTrie& direct_source_ips_trie,
+                                   const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForSourceTypes(const SourceTypesArray& source_types,
+                                const Network::ConnectionSocket& socket) const;
+
+  const Network::FilterChain*
+  findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
+                                    const Network::ConnectionSocket& socket) const;
+
+  const FilterChainManagerImpl* getOriginFilterChainManager() { return origin_.value(); }
+  // Duplicate the inherent factory context if any.
+  Network::DrainableFilterChainSharedPtr
+  findExistingFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain_message);
+
+  // Mapping from filter chain message to filter chain. This is used by LDS response handler to
+  // detect the filter chains in the intersection of existing listener and new listener.
+  FcContextMap fc_contexts_;
+
+  std::optional<envoy::config::listener::v3::FilterChain> default_filter_chain_message_;
+  // The optional fallback filter chain if destination_ports_map_ does not find a matched filter
+  // chain.
+  Network::DrainableFilterChainSharedPtr default_filter_chain_;
+
+  // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
+  // and application protocols, using structures defined above.
+  DestinationPortsMap destination_ports_map_;
+
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addresses_;
+  // This is the reference to a factory context which all the generations of listener share.
+  Configuration::FactoryContext& parent_context_;
+
+  // Reference to the previous generation of filter chain manager to share the filter chains.
+  // Caution: only during warm up could the optional have value.
+  std::optional<const FilterChainManagerImpl*> origin_{nullptr};
+
+  // For FilterChainFactoryContextCreator
+  // init manager owned by the corresponding listener. The reference is valid when building the
+  // filter chain.
+  Init::Manager& init_manager_;
+
+  // Matcher selecting the filter chain name.
+  Matcher::MatchTreePtr<Network::MatchingData> matcher_;
+
+  // FCDS subscription handles created for matcher_ (one per matcher-referenced FCDS chain). A chain
+  // is routable via this listener only if its name is here (the matcher references it); used by
+  // filterChainNames() to report active, routable FCDS chains.
+  std::vector<FcdsSubscriptionHandleSharedPtr> fcds_handles_;
+
+  // Index filter chains by name, used by the matcher actions.
+  FilterChainsByName filter_chains_by_name_;
+
+  // Used to hint listener which filter chains it should drain.
+  mutable std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chains_;
+};
+
+namespace FilterChain {
+DECLARE_FACTORY(FilterChainNameActionFactory);
+}
+
+class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
+public:
+  ListenerFilterChainFactoryBuilder(
+      bool is_quic, ProtobufMessage::ValidationVisitor& validator,
+      ListenerComponentFactory& listener_component_factory,
+      Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
+  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
+                   FilterChainFactoryContextCreator& context_creator,
+                   bool added_via_api) const override;
+
+private:
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr> buildFilterChainInternal(
+      const envoy::config::listener::v3::FilterChain& filter_chain,
+      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
+      bool added_via_api) const;
+
+  const bool is_quic_;
+  ProtobufMessage::ValidationVisitor& validator_;
+  ListenerComponentFactory& listener_component_factory_;
+  Configuration::TransportSocketFactoryContext& factory_context_;
+};
+
+class FcdsClientCallbacks {
+public:
+  virtual ~FcdsClientCallbacks() = default;
+  virtual void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) PURE;
+};
+
+class FcdsSubscriptionHandle {
+public:
+  virtual ~FcdsSubscriptionHandle() = default;
+  virtual const Network::FilterChain* filterChain() PURE;
+  virtual FcdsClientCallbacks& callbacks() PURE;
+  // Name of the FCDS filter chain this handle subscribes to.
+  virtual absl::string_view filterChainName() const PURE;
+  // True when the subscribed chain is committed (active) in the shared manager, using the same
+  // active-state test that publishes the worker TLS set.
+  virtual bool isActive() const PURE;
+};
+using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
+
+class FcdsContextCreator : public FilterChainFactoryContextCreator {
+public:
+  FcdsContextCreator(Server::Configuration::ServerFactoryContext& server_context,
+                     const ::envoy::config::listener::v3::FilterChain* const filter_chain);
+
+  // FilterChainFactoryContextCreator
+  Configuration::FilterChainFactoryContextPtr createFilterChainFactoryContext(
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
+
+  void initialize(std::function<void()> completion);
+
+private:
+  std::unique_ptr<FcdsFilterChainFactoryContextImpl> context_;
+  FcdsFilterChainFactoryContextImpl* saved_context_;
+};
+
+class FcdsSharedFilterChainManager
+    : public Singleton::Instance,
+      public std::enable_shared_from_this<FcdsSharedFilterChainManager>,
+      public FilterChainUpdateCallbacks,
+      public Logger::Loggable<Logger::Id::config> {
+public:
+  FcdsSharedFilterChainManager(Server::Configuration::ServerFactoryContext& server_context,
+                               ListenerComponentFactory& listener_component_factory);
+  const Network::FilterChain* findThreadLocalFilterChain(const std::string& name) const;
+
+  // Subscribes a listener callback for a filter chain name FCDS distribution.
+  absl::StatusOr<FcdsSubscriptionHandleSharedPtr>
+  subscribe(const envoy::config::core::v3::ConfigSource& config_source,
+            const std::string& filter_chain_name, FcdsClientCallbacks& callbacks,
+            Init::Manager& init_manager);
+
+  // Unsubscribes a listener from FCDS distribution.
+  void unsubscribe(const std::string& filter_chain_name, FcdsSubscriptionHandle& handle);
+
+  // True if the named subscription's committed (active) filter chain is present, using the same
+  // active-state test that updateTlsState() publishes to workers. Main-thread only.
+  bool isFilterChainActive(const std::string& filter_chain_name) const;
+
+  // FilterChainUpdateCallbacks
+  absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
+  void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
+
+private:
+  friend class FcdsSharedFilterChainManagerPeer;
+
+  struct ThreadLocalState : public ThreadLocal::ThreadLocalObject {
+    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_;
+  };
+  Server::Configuration::ServerFactoryContext& server_context_;
+  ListenerComponentFactory& listener_component_factory_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalState> tls_slot_;
+  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
+  Stats::ScopeSharedPtr scope_;
+  // Shared by all FCDS subscriptions so the resource decoder is built once.
+  const Config::ResourceTypeHelper<FilterChainProto> resource_type_helper_;
+  struct SubscriptionState {
+    std::unique_ptr<FcdsApiImpl> api_;
+    absl::flat_hash_set<FcdsSubscriptionHandle*> handles_;
+    Network::DrainableFilterChainSharedPtr warming_filter_chain_;
+  };
+  absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionState>> subscriptions_;
+
+  void onFilterChainWarmed(Network::DrainableFilterChainSharedPtr filter_chain);
+  void updateTlsState();
+  void scheduleTlsUpdate();
+
+  // Coalesces thread local filter chain updates within a single event loop iteration.
+  Event::SchedulableCallbackPtr tls_update_cb_;
+
+  // Pauses filter chain discovery requests while a thread local publish is pending.
+  Config::ScopedResume xds_pause_;
+};
+
+} // namespace Server
+} // namespace Envoy

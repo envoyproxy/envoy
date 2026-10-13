@@ -1,0 +1,365 @@
+#include "source/extensions/load_balancing_policies/override_host/load_balancer.h"
+
+#include <algorithm>
+#include <memory>
+#include <optional>
+#include <vector>
+
+#include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
+#include "envoy/http/header_map.h"
+#include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/upstream.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
+
+#include "absl/container/inlined_vector.h"
+#include "absl/log/check.h"
+#include "absl/status/status.h"
+#include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
+#include "load_balancer.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace LoadBalancingPolicies {
+namespace OverrideHost {
+
+using ::envoy::extensions::load_balancing_policies::override_host::v3::OverrideHost;
+using ::Envoy::Http::HeaderMap;
+using ::Envoy::Server::Configuration::ServerFactoryContext;
+using ::Envoy::Upstream::HostConstSharedPtr;
+using ::Envoy::Upstream::HostLookupMapConstSharedPtr;
+using ::Envoy::Upstream::HostSharedPtr;
+using ::Envoy::Upstream::LoadBalancerConfig;
+using ::Envoy::Upstream::LoadBalancerContext;
+using ::Envoy::Upstream::LoadBalancerParams;
+using ::Envoy::Upstream::LoadBalancerPtr;
+using ::Envoy::Upstream::TypedLoadBalancerFactory;
+
+OverrideHostLbConfig::OverrideHostLbConfig(std::vector<OverrideSource>&& override_host_sources,
+                                           std::optional<Config::MetadataKey>&& selected_host_key,
+                                           TypedLoadBalancerFactory* fallback_load_balancer_factory,
+                                           LoadBalancerConfigPtr&& fallback_load_balancer_config)
+    : fallback_picker_lb_config_{fallback_load_balancer_factory,
+                                 std::move(fallback_load_balancer_config)},
+      override_host_sources_(std::move(override_host_sources)),
+      selected_host_key_(std::move(selected_host_key)) {}
+
+OverrideHostLbConfig::OverrideSource
+OverrideHostLbConfig::OverrideSource::make(const OverrideHost::OverrideHostSource& config) {
+  return OverrideHostLbConfig::OverrideSource{
+      !config.header().empty()
+          ? std::optional<Http::LowerCaseString>(Http::LowerCaseString(config.header()))
+          : std::nullopt,
+      config.has_metadata() ? std::optional<Config::MetadataKey>(config.metadata()) : std::nullopt};
+}
+
+absl::StatusOr<std::vector<OverrideHostLbConfig::OverrideSource>>
+OverrideHostLbConfig::makeOverrideSources(
+    const Protobuf::RepeatedPtrField<OverrideHost::OverrideHostSource>& override_sources) {
+  std::vector<OverrideSource> result;
+  for (const OverrideHost::OverrideHostSource& source : override_sources) {
+    result.push_back(OverrideSource::make(source));
+    // Either header name or metadata key must be present
+    if (!result.back().header_name.has_value() && !result.back().metadata_key.has_value()) {
+      return absl::InvalidArgumentError("Empty override source");
+    }
+    if (result.back().header_name.has_value() && result.back().metadata_key.has_value()) {
+      return absl::InvalidArgumentError("Only one override source must be set");
+    }
+  }
+  return result;
+}
+
+absl::StatusOr<std::unique_ptr<OverrideHostLbConfig>>
+OverrideHostLbConfig::make(const OverrideHost& config, ServerFactoryContext& context) {
+  // Must be validated before calling this function.
+  absl::StatusOr<std::vector<OverrideSource>> override_host_sources =
+      makeOverrideSources(config.override_host_sources());
+  RETURN_IF_NOT_OK(override_host_sources.status());
+
+  std::optional<Config::MetadataKey> selected_host_key;
+  if (config.has_selected_host_key()) {
+    selected_host_key.emplace(config.selected_host_key());
+  }
+
+  ASSERT(config.has_fallback_policy());
+  absl::InlinedVector<absl::string_view, 4> missing_policies;
+  for (const auto& policy : config.fallback_policy().policies()) {
+    TypedLoadBalancerFactory* factory =
+        Envoy::Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
+            policy.typed_extension_config(), /*is_optional=*/true);
+    if (factory != nullptr) {
+      // Load and validate the configuration.
+      auto proto_message = factory->createEmptyConfigProto();
+      RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
+          policy.typed_extension_config().typed_config(), context.messageValidationVisitor(),
+          *proto_message));
+
+      auto fallback_load_balancer_config = factory->loadConfig(context, *proto_message);
+      RETURN_IF_NOT_OK_REF(fallback_load_balancer_config.status());
+      return std::unique_ptr<OverrideHostLbConfig>(new OverrideHostLbConfig(
+          std::move(override_host_sources).value(), std::move(selected_host_key), factory,
+          std::move(fallback_load_balancer_config.value())));
+    }
+    missing_policies.push_back(policy.typed_extension_config().name());
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("dynamic forwarding LB: didn't find a registered fallback load balancer factory "
+                   "with names from ",
+                   absl::StrJoin(missing_policies, ", ")));
+}
+
+Upstream::ThreadAwareLoadBalancerPtr OverrideHostLbConfig::create(const ClusterInfo& cluster_info,
+                                                                  const PrioritySet& priority_set,
+                                                                  Loader& runtime,
+                                                                  RandomGenerator& random,
+                                                                  TimeSource& time_source) const {
+  return fallback_picker_lb_config_.load_balancer_factory->create(
+      makeOptRefFromPtr<const LoadBalancerConfig>(
+          fallback_picker_lb_config_.load_balancer_config.get()),
+      cluster_info, priority_set, runtime, random, time_source);
+}
+
+absl::Status OverrideHostLoadBalancer::initialize() {
+  ASSERT(fallback_picker_lb_ != nullptr); // Always needs a locality picker LB.
+  return fallback_picker_lb_->initialize();
+}
+
+LoadBalancerFactorySharedPtr OverrideHostLoadBalancer::factory() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (!factory_) {
+    factory_ = std::make_shared<LoadBalancerFactoryImpl>(config_, fallback_picker_lb_->factory());
+  }
+  return factory_;
+}
+
+HostConstSharedPtr
+OverrideHostLoadBalancer::LoadBalancerImpl::peekAnotherHost(LoadBalancerContext* context) {
+  // TODO(yavlasov): Return a host from request metadata if present.
+  return fallback_picker_lb_->peekAnotherHost(context);
+}
+
+HostSelectionResponse
+OverrideHostLoadBalancer::LoadBalancerImpl::chooseHostInternal(LoadBalancerContext* context) {
+  if (!context || !context->requestStreamInfo()) {
+    // If there is no context or no request stream info, we can't use the
+    // metadata, so we just return a host from the fallback picker.
+    return fallback_picker_lb_->chooseHost(context);
+  }
+
+  OverrideHostFilterState* override_host_state = nullptr;
+  std::shared_ptr<OverrideHostFilterState> state_ptr;
+  if (override_host_state =
+          context->requestStreamInfo()->filterState()->getDataMutable<OverrideHostFilterState>(
+              OverrideHostFilterState::kFilterStateKey);
+      override_host_state == nullptr) {
+    state_ptr = std::make_shared<OverrideHostFilterState>(getSelectedHosts(context));
+    override_host_state = state_ptr.get();
+
+    context->requestStreamInfo()->filterState()->setData(OverrideHostFilterState::kFilterStateKey,
+                                                         state_ptr);
+  }
+
+  if (override_host_state->empty()) {
+    ENVOY_LOG(trace, "No overridden hosts were found. Using fallback LB policy.");
+    return fallback_picker_lb_->chooseHost(context);
+  }
+
+  if (HostConstSharedPtr host = getEndpoint(*override_host_state); host != nullptr) {
+    return {host};
+  }
+
+  // If some endpoints were found, but none of them are available in
+  // the cluster endpoint set, or the number of retries in the retry policy
+  // exceeds the number of fallback endpoints, then use to the fallback LB
+  // policy.
+  ENVOY_LOG(trace, "Failed to find any endpoints from metadata in the cluster. "
+                   "Using fallback LB policy.");
+  return fallback_picker_lb_->chooseHost(context);
+}
+
+HostSelectionResponse
+OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
+  auto response = chooseHostInternal(context);
+  addSelectedHostKey(context, response);
+  return response;
+}
+
+void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
+    LoadBalancerContext* context, HostSelectionResponse& response) {
+  if (!config_.selectedHostKey().has_value()) {
+    return;
+  }
+
+  if (context == nullptr || context->requestStreamInfo() == nullptr) {
+    return;
+  }
+
+  if (response.host == nullptr) {
+    return;
+  }
+
+  const std::string selected_endpoint = response.host->address()->asString();
+  const Config::MetadataKey& metadata_key = config_.selectedHostKey().value();
+  if (metadata_key.path_.empty()) {
+    // Should not be possible based on proto validation, catching anyways.
+    ENVOY_LOG(trace, "Path was not provided in selected_host_key.");
+    return;
+  }
+
+  Protobuf::Struct updated_metadata;
+  Protobuf::Struct* updated_metadata_ptr = &updated_metadata;
+
+  for (size_t i = 0; i + 1 < metadata_key.path_.size(); i++) {
+    Protobuf::Value& current_val =
+        (*updated_metadata_ptr->mutable_fields())[metadata_key.path_[i].key_];
+    updated_metadata_ptr = current_val.mutable_struct_value();
+  }
+
+  (*updated_metadata_ptr->mutable_fields())[metadata_key.path_.back().key_].set_string_value(
+      selected_endpoint);
+
+  // Set the value of the metadata key to be the host:port
+  context->requestStreamInfo()->setDynamicMetadata(metadata_key.key_, updated_metadata);
+}
+
+std::optional<absl::string_view>
+OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromMetadata(
+    const ::envoy::config::core::v3::Metadata& metadata, const Config::MetadataKey& metadata_key) {
+  const Protobuf::Value& metadata_value = Config::Metadata::metadataValue(&metadata, metadata_key);
+  // TODO(yanavlasov): make it distinguish between not-present and invalid metadata.
+  if (metadata_value.has_string_value()) {
+    return absl::string_view{metadata_value.string_value()};
+  }
+  return std::nullopt;
+}
+
+std::optional<absl::string_view>
+OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromHeader(
+    const Envoy::Http::RequestHeaderMap* header_map, const Http::LowerCaseString& header_name) {
+  if (!header_map) {
+    return std::nullopt;
+  }
+  HeaderMap::GetResult result = header_map->get(header_name);
+  if (result.empty()) {
+    return std::nullopt;
+  }
+
+  // Use only the first value of the header, if it happens to be have multiple.
+  return result[0]->value().getStringView();
+}
+
+std::vector<std::string>
+OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext* context) {
+  // This is checked by config validation.
+  ASSERT(!config_.overrideHostSources().empty());
+
+  std::vector<std::string> selected_hosts;
+  selected_hosts.reserve(4);
+
+  for (const auto& override_source : config_.overrideHostSources()) {
+    // This is checked by config validation
+    ASSERT(override_source.header_name.has_value() != override_source.metadata_key.has_value());
+
+    std::optional<absl::string_view> hosts;
+    if (override_source.header_name.has_value()) {
+      hosts = getSelectedHostsFromHeader(context->downstreamHeaders(),
+                                         override_source.header_name.value());
+    } else if (override_source.metadata_key.has_value()) {
+      // Lookup selected endpoints in the request metadata if the header based
+      // selection is not enabled.
+      hosts = getSelectedHostsFromMetadata(context->requestStreamInfo()->dynamicMetadata(),
+                                           override_source.metadata_key.value());
+    }
+
+    if (!hosts.has_value()) {
+      continue;
+    }
+
+    for (absl::string_view host : absl::StrSplit(hosts.value(), ',', absl::SkipWhitespace())) {
+      selected_hosts.push_back(std::string(absl::StripAsciiWhitespace(host)));
+    }
+  }
+
+  ENVOY_LOG(trace, "Selected endpoints: {}", absl::StrJoin(selected_hosts, ","));
+  return selected_hosts;
+}
+
+HostConstSharedPtr
+OverrideHostLoadBalancer::LoadBalancerImpl::findHost(absl::string_view endpoint) {
+  HostLookupMapConstSharedPtr hosts = priority_set_.crossPriorityHostMap();
+  if (hosts == nullptr) {
+    return nullptr;
+  }
+
+  if (ENVOY_LOG_CHECK_LEVEL(trace)) {
+    std::vector<absl::string_view> addresses;
+    addresses.reserve(hosts->size());
+    hosts->forEach([&addresses](absl::string_view address, const HostSharedPtr&) {
+      addresses.push_back(address);
+    });
+    ENVOY_LOG(trace, "Looking up {} in {}", endpoint, absl::StrJoin(addresses, ", "));
+  }
+
+  // TODO(yanavlasov): Validate that host health status did not change.
+  return hosts->findHost(endpoint);
+}
+
+HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(
+    OverrideHostFilterState& override_host_state) {
+  absl::string_view override_host = override_host_state.consumeNextHost();
+  while (!override_host.empty()) {
+    if (HostConstSharedPtr host = findHost(override_host); host != nullptr) {
+      ENVOY_LOG(trace, "Selected endpoint: {}", override_host);
+      return host;
+    }
+    override_host = override_host_state.consumeNextHost();
+  }
+
+  // If we reach here, it means that all the selected hosts are not available or have used.
+  ENVOY_LOG(trace, "Number of attempts has exceeded the number of override hosts.");
+
+  return nullptr;
+}
+
+LoadBalancerPtr
+OverrideHostLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
+  return std::make_unique<LoadBalancerImpl>(config_, fallback_picker_lb_factory_, params);
+}
+
+OverrideHostLoadBalancer::LoadBalancerImpl::LoadBalancerImpl(
+    const OverrideHostLbConfig& config, LoadBalancerFactorySharedPtr fallback_picker_lb_factory,
+    LoadBalancerParams params)
+    : config_(config), fallback_picker_lb_factory_(std::move(fallback_picker_lb_factory)),
+      fallback_picker_lb_(fallback_picker_lb_factory_->create(params)),
+      priority_set_(params.priority_set), local_priority_set_(params.local_priority_set) {
+  ASSERT(fallback_picker_lb_ != nullptr); // Factory can not create null LB.
+  // The outer LB opts out of cluster-manager-driven recreate on host changes
+  // (see LoadBalancerFactoryImpl::recreateOnHostChangeDeprecated). If the inner fallback
+  // factory still asks for recreate semantics, honor that locally by rebuilding
+  // the worker-local fallback LB whenever the priority set changes.
+  if (fallback_picker_lb_factory_->recreateOnHostChangeDeprecated()) {
+    member_update_cb_ = priority_set_.addMemberUpdateCb(
+        [this](const Upstream::HostVector&, const Upstream::HostVector&) {
+          fallback_picker_lb_ =
+              fallback_picker_lb_factory_->create({priority_set_, local_priority_set_});
+          ASSERT(fallback_picker_lb_ != nullptr); // Factory can not create null LB.
+        });
+  }
+}
+
+} // namespace OverrideHost
+} // namespace LoadBalancingPolicies
+} // namespace Extensions
+} // namespace Envoy

@@ -1,0 +1,123 @@
+static_resources {
+  clusters {
+    name: "p"
+    connect_timeout {
+      nanos: 786870912
+    }
+    hosts {
+      pipe {
+        path: "`"
+      }
+    }
+    hosts {
+      pipe {
+        path: "`"
+      }
+    }
+    tls_context {
+      common_tls_context {
+        tls_params {
+          ecdh_curves: "P"
+          ecdh_curves: "P"
+        }
+        tls_certificates {
+          private_key {
+            filename: "\001\000\000\t"
+          }
+          password {
+            inline_string: "#\000\000\000\000\000\000\000"
+          }
+          ocsp_staple {
+            filename: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+          }
+        }
+        tls_certificates {
+          private_key {
+            filename: "\001\000\000\t"
+          }
+          password {
+            inline_string: "#\000\000\000\000\000\000\000"
+          }
+          ocsp_staple {
+            filename: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+          }
+        }
+        tls_certificates {
+          private_key {
+            filename: "\001static_resources {\n  clusters {\n    name: \"z:\"\n    type: STRICT_DNS\n    connect_timeout {\n      seconds: -210453399808\n      nanos: 250002048\n    }\n    http2_protocol_options {\n      allow_connect: true\n    }\n    dns_lookup_family: V4_ONLY\n    common_lb_config {\n      ignore_new_hosts_until_first_hc: true\n    }\n    alt_stat_name: \"\\020\"\n    close_connections_on_host_health_failure: true\n    filters {\n      name: \"%\"\n    }\n  }\n  clusters {\n    name: \"service_google\"\n    connect_timeout {\n      nanos\000: 786870912\n    }\n    per_connection_buffer_limit_bytes {\n      value: 4143972352\n    }\n    lb_policy: RING_HASH\n    hosts {\n      pipe {\n        path: \"`\"\n      }\n    }\n    hosts {\n      pipe {\n        path: \"#\"\n      }\n    }\n    hosts {\n      pipe {\n        path: \"`\"\n      }\n    }\n    tls_context {\n      common_tls_conte\000xt {\n        tls_params {\n          ecdh_curves: \"P\"\n        }\n        tls_certificates {\n          private_key {\n            filename: \"\\001\\0\t00\\000\\t\"\n          }\n          password {\n            inline_string: \"#\\000\\000\\000\\000\\000\\000\\000\"\n          }\n          ocsp_staple {\n            filename: \"\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\"\n          }\n        }\n        tls_certificates"
+          }
+          ocsp_staple {
+            filename: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+          }
+        }
+        combined_validation_context {
+          default_validation_context {
+            verify_subject_alt_name: "\001\000\000\000\000\000\000\006"
+            require_ocsp_staple {
+              value: true
+            }
+            require_signed_certificate_timestamp {
+            }
+          }
+          validation_context_sds_secret_config {
+          }
+        }
+      }
+    }
+    close_connections_on_host_health_failure: true
+  }
+  secrets {
+    validation_context {
+      trusted_ca {
+        inline_bytes: "\316"
+      }
+    }
+  }
+}
+cluster_manager {
+  local_cluster_name: ","
+  upstream_bind_config {
+    source_address {
+      address: "\032"
+      port_value: 8192
+      ipv4_compat: true
+    }
+  }
+  load_stats_config {
+    api_type: REST
+    refresh_delay {
+      seconds: 4611686018427387903
+    }
+    set_node_on_first_message_only: true
+  }
+}
+stats_sinks {
+  typed_config {
+    type_url: "\001\000\000\t"
+    value: "\230*Vs{{{{{{{{{{{{{{{{{{{{{{{{{{||{|||{{{{{{{{{{{{{{{{{{{{{{{{{||||||||||||||||||||||||||st|||||||||||||||||||||stt"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"
+  typed_config {
+    type_url: "\001\000\000\t"
+  }
+}
+watchdogs {
+  main_thread_watchdog {
+    miss_timeout {
+      seconds: 2147483707
+    }
+    kill_timeout {
+      seconds: 2046820352
+    }
+  }
+}
+hds_config {
+  api_type: REST
+}
+layered_runtime {
+}
+header_prefix: ":"

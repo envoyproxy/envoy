@@ -1,0 +1,70 @@
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+licenses(["notice"])  # Apache 2
+
+cc_library(
+    name = "file_descriptor_info",
+    hdrs = ["file_descriptor_info.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "text_format_transcoder",
+    srcs = [
+        "text_format_transcoder.cc",
+    ],
+    hdrs = [
+        "create_dynamic_message.h",
+        "text_format_transcoder.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":file_descriptor_info",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@protobuf",
+    ],
+)
+
+cc_library(
+    name = "file_descriptor_generator_lib",
+    srcs = ["file_descriptor_generator.cc"],
+    hdrs = ["file_descriptor_generator.h"],
+    deps = [
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@protobuf",
+        "@protobuf//src/google/protobuf/compiler:code_generator",
+    ],
+)
+
+cc_binary(
+    name = "file_descriptor_generator",
+    srcs = ["file_descriptor_generator_main.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":file_descriptor_generator_lib",
+        "@protobuf",
+        "@protobuf//:protoc_lib",
+        "@protobuf//src/google/protobuf/compiler:code_generator",
+    ],
+)
+
+cc_library(
+    name = "create_dynamic_message",
+    srcs = ["create_dynamic_message.cc"],
+    hdrs = ["create_dynamic_message.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":text_format_transcoder",
+        "@abseil-cpp//absl/memory",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
+        "@protobuf",
+    ],
+)

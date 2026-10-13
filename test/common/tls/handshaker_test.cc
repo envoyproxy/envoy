@@ -1,0 +1,419 @@
+#include <openssl/ssl3.h>
+
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/ssl/handshaker.h"
+#include "envoy/ssl/tls_certificate_config.h"
+
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/context_impl.h"
+#include "source/common/tls/ssl_handshaker.h"
+
+#include "test/common/tls/ssl_certs_test.h"
+#include "test/mocks/network/connection.h"
+#include "test/test_common/logging.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "openssl/evp.h"
+#include "openssl/hmac.h"
+#include "openssl/ssl.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+namespace {
+
+using ::testing::NiceMock;
+using ::testing::Return;
+using ::testing::StrictMock;
+
+// A callback shaped like pem_password_cb.
+// See https://www.openssl.org/docs/man1.1.0/man3/pem_password_cb.html.
+int pemPasswordCallback(char* buf, int buf_size, int, void* u) {
+  if (u == nullptr) {
+    return 0;
+  }
+  std::string passphrase = *reinterpret_cast<std::string*>(u);
+  RELEASE_ASSERT(buf_size >= static_cast<int>(passphrase.size()),
+                 "Passphrase was larger than buffer.");
+  memcpy(buf, passphrase.data(), passphrase.size());
+  return passphrase.size();
+}
+
+class MockHandshakeCallbacks : public Ssl::HandshakeCallbacks {
+public:
+  ~MockHandshakeCallbacks() override = default;
+  MOCK_METHOD(Network::Connection&, connection, (), (const, override));
+  MOCK_METHOD(void, onSuccess, (SSL*), (override));
+  MOCK_METHOD(void, onFailure, (), (override));
+  MOCK_METHOD(Network::TransportSocketCallbacks*, transportSocketCallbacks, (), (override));
+  MOCK_METHOD(void, onAsynchronousCertValidationComplete, (), (override));
+  MOCK_METHOD(void, onAsynchronousCertificateSelectionComplete, (), (override));
+};
+
+class HandshakerTest : public SslCertsTest {
+protected:
+  HandshakerTest()
+      : dispatcher_(api_->allocateDispatcher("test_thread")),
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::Connection),
+        client_ctx_(SSL_CTX_new(TLS_method())), server_ctx_(SSL_CTX_new(TLS_method())) {}
+
+  void SetUp() override {
+    // Set up key and cert, initialize two SSL objects and a pair of BIOs for
+    // handshaking.
+    auto key = makeKey();
+    auto cert = makeCert();
+    auto chain = std::vector<CRYPTO_BUFFER*>{cert.get()};
+
+    server_ssl_ = bssl::UniquePtr<SSL>(SSL_new(server_ctx_.get()));
+    SSL_set_accept_state(server_ssl_.get());
+    ASSERT_NE(key, nullptr);
+
+#ifdef ENVOY_SSL_OPENSSL
+    // In TLS1.3 OpenSSL server will send session ticket after an ssl handshake.
+    // While technically not part of the handshake, it's part of the server state-machine,
+    // and SSL_do_handshake will return errors (SSL_ERROR_WANT_WRITE) on the server-side if
+    // the session tickets (2 by default) have not been read by the client.
+    // To avoid this altogether, we disable session tickets by setting the number of tickets
+    // to generate for a new session to zero.
+    ossl_SSL_set_num_tickets(server_ssl_.get(), 0); // TODO: Could we hide this in SSL_CTX_new() ?
+#endif
+
+    ASSERT_EQ(1, SSL_set_chain_and_key(server_ssl_.get(), chain.data(), chain.size(), key.get(),
+                                       nullptr));
+
+    client_ssl_ = bssl::UniquePtr<SSL>(SSL_new(client_ctx_.get()));
+    SSL_set_connect_state(client_ssl_.get());
+
+    ASSERT_EQ(1, BIO_new_bio_pair(&client_bio_, kBufferLength, &server_bio_, kBufferLength));
+
+    BIO_up_ref(client_bio_);
+    BIO_up_ref(server_bio_);
+    SSL_set0_rbio(client_ssl_.get(), client_bio_);
+    SSL_set0_wbio(client_ssl_.get(), client_bio_);
+    SSL_set0_rbio(server_ssl_.get(), server_bio_);
+    SSL_set0_wbio(server_ssl_.get(), server_bio_);
+  }
+
+  // Read in key.pem and return a new private key.
+  bssl::UniquePtr<EVP_PKEY> makeKey() {
+    std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"));
+    std::string passphrase = "";
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
+
+    bssl::UniquePtr<EVP_PKEY> key(EVP_PKEY_new());
+
+    RSA* rsa = PEM_read_bio_RSAPrivateKey(bio.get(), nullptr, &pemPasswordCallback, &passphrase);
+    RELEASE_ASSERT(rsa != nullptr, "PEM_read_bio_RSAPrivateKey failed.");
+    RELEASE_ASSERT(1 == EVP_PKEY_assign_RSA(key.get(), rsa), "EVP_PKEY_assign_RSA failed.");
+    return key;
+  }
+
+  // Read in cert.pem and return a certificate.
+  bssl::UniquePtr<CRYPTO_BUFFER> makeCert() {
+    std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"));
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(file.data(), file.size()));
+
+    uint8_t* data = nullptr;
+    long len = 0;
+    RELEASE_ASSERT(
+        PEM_bytes_read_bio(&data, &len, nullptr, PEM_STRING_X509, bio.get(), nullptr, nullptr),
+        "PEM_bytes_read_bio failed");
+    bssl::UniquePtr<uint8_t> tmp(data); // Prevents memory leak.
+    return bssl::UniquePtr<CRYPTO_BUFFER>(CRYPTO_BUFFER_new(data, len, nullptr));
+  }
+
+  const size_t kBufferLength{100};
+
+  Event::DispatcherPtr dispatcher_;
+  StreamInfo::StreamInfoImpl stream_info_;
+
+  BIO *client_bio_, *server_bio_;
+  bssl::UniquePtr<SSL_CTX> client_ctx_, server_ctx_;
+  bssl::UniquePtr<SSL> client_ssl_, server_ssl_;
+};
+
+TEST_F(HandshakerTest, NormalOperation) {
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Closed));
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  EXPECT_CALL(handshake_callbacks, onSuccess);
+  ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
+
+  auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
+
+  // Run the handshakes from the client and server until SslHandshakerImpl decides
+  // we're done and returns PostIoAction::Close.
+  while (post_io_action != Network::PostIoAction::Close) {
+    SSL_do_handshake(client_ssl_.get());
+    post_io_action = handshaker.doHandshake();
+  }
+
+  EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+}
+
+// We induce some kind of BIO mismatch and force the SSL_do_handshake to
+// return an error code without error handling, i.e. not SSL_ERROR_WANT_READ
+// or _WRITE or _PRIVATE_KEY_OPERATION.
+TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
+  // We make a new BIO, set it as the `rbio`/`wbio` for the client SSL object,
+  // and break the BIO pair connecting the two SSL objects. Now handshaking will
+  // fail, likely with SSL_ERROR_SSL.
+  BIO* bio = BIO_new(BIO_s_socket());
+  SSL_set_bio(client_ssl_.get(), bio, bio);
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  NiceMock<Network::MockConnection> mock_connection;
+
+  ON_CALL(handshake_callbacks, connection).WillByDefault(ReturnRef(mock_connection));
+  EXPECT_CALL(handshake_callbacks, onFailure);
+
+  SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
+
+  auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
+
+  while (post_io_action != Network::PostIoAction::Close) {
+    SSL_do_handshake(client_ssl_.get());
+    post_io_action = handshaker.doHandshake();
+  }
+
+  // In the error case, SslHandshakerImpl also closes the connection.
+  EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+}
+
+// Example SslHandshakerImpl demonstrating special-case behavior which necessitates
+// extra SSL_ERROR case handling. Here, we induce an SSL_ERROR_WANT_X509_LOOKUP,
+// check for it in the handshaker, faux-trigger the lookup, and then proceed as
+// normal.
+class SslHandshakerImplForTest : public SslHandshakerImpl {
+public:
+  SslHandshakerImplForTest(bssl::UniquePtr<SSL> ssl_ptr,
+                           Ssl::HandshakeCallbacks* handshake_callbacks,
+                           std::function<void()> requested_cert_cb)
+      : SslHandshakerImpl(std::move(ssl_ptr), 0, handshake_callbacks),
+        requested_cert_cb_(requested_cert_cb) {
+    SSL_set_cert_cb(
+        ssl(), [](SSL*, void* arg) -> int { return *static_cast<bool*>(arg) ? 1 : -1; },
+        &cert_cb_ok_);
+  }
+
+  Network::PostIoAction doHandshake() override {
+    RELEASE_ASSERT(state() != Ssl::SocketState::HandshakeComplete &&
+                       state() != Ssl::SocketState::ShutdownSent,
+                   "Handshaker state was either complete or sent.");
+
+    int rc = SSL_do_handshake(ssl());
+    if (rc == 1) {
+      setState(Ssl::SocketState::HandshakeComplete);
+      handshakeCallbacks()->onSuccess(ssl());
+      return Network::PostIoAction::Close;
+    } else {
+      switch (SSL_get_error(ssl(), rc)) {
+      case SSL_ERROR_WANT_READ:
+      case SSL_ERROR_WANT_WRITE:
+        return Network::PostIoAction::KeepOpen;
+      case SSL_ERROR_WANT_X509_LOOKUP:
+        // Special case. Once this lookup is requested, we flip the bit and allow
+        // the handshake to proceed.
+        requested_cert_cb_();
+        return Network::PostIoAction::KeepOpen;
+      default:
+        handshakeCallbacks()->onFailure();
+        return Network::PostIoAction::Close;
+      }
+    }
+  }
+
+  void setCertCbOk() { cert_cb_ok_ = true; }
+
+private:
+  std::function<void()> requested_cert_cb_;
+  bool cert_cb_ok_{false};
+};
+
+TEST_F(HandshakerTest, NormalOperationWithSslHandshakerImplForTest) {
+  ::testing::MockFunction<void()> requested_cert_cb;
+
+  StrictMock<MockHandshakeCallbacks> handshake_callbacks;
+  EXPECT_CALL(handshake_callbacks, onSuccess);
+
+  SslHandshakerImplForTest handshaker(std::move(server_ssl_), &handshake_callbacks,
+                                      requested_cert_cb.AsStdFunction());
+
+  EXPECT_CALL(requested_cert_cb, Call).WillOnce([&]() { handshaker.setCertCbOk(); });
+
+  auto post_io_action = Network::PostIoAction::KeepOpen; // default enum
+
+  while (post_io_action != Network::PostIoAction::Close) {
+    SSL_do_handshake(client_ssl_.get());
+    post_io_action = handshaker.doHandshake();
+  }
+
+  EXPECT_EQ(post_io_action, Network::PostIoAction::Close);
+}
+
+// Test that SslExtendedSocketInfoImpl properly stores and retrieves certificate validation errors.
+TEST_F(HandshakerTest, SslExtendedSocketInfoCertValidationError) {
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Closed));
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
+
+  // Get the extended socket info through the SSL ex_data mechanism
+  auto* extended_info =
+      reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker.ssl(), 0));
+  ASSERT_NE(extended_info, nullptr);
+
+  // Initially, the certificate validation error should be empty.
+  EXPECT_TRUE(extended_info->certificateValidationError().empty());
+
+  // Set the certificate validation error.
+  const std::string error_msg =
+      "verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
+      "certificate has expired";
+  extended_info->setCertificateValidationError(error_msg);
+
+  // Verify the error is properly stored and retrievable.
+  EXPECT_EQ(error_msg, extended_info->certificateValidationError());
+
+  // Test that we can overwrite the error.
+  const std::string new_error_msg = "verify cert failed: SAN matcher";
+  extended_info->setCertificateValidationError(new_error_msg);
+  EXPECT_EQ(new_error_msg, extended_info->certificateValidationError());
+}
+
+// Test that ValidateResultCallbackImpl properly stores error details.
+TEST_F(HandshakerTest, ValidateResultCallbackStoresErrorDetails) {
+  NiceMock<Network::MockConnection> mock_connection;
+  ON_CALL(mock_connection, state).WillByDefault(Return(Network::Connection::State::Open));
+
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  ON_CALL(handshake_callbacks, connection()).WillByDefault(ReturnRef(mock_connection));
+
+  SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);
+
+  // Get the extended socket info
+  auto* extended_info =
+      reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker.ssl(), 0));
+  ASSERT_NE(extended_info, nullptr);
+
+  // Create a validation callback (simulating async validation)
+  auto callback = extended_info->createValidateResultCallback();
+  ASSERT_NE(callback, nullptr);
+
+  // Simulate validation failure with error details
+  const std::string error_details =
+      "verify cert failed: X509_verify_cert: certificate verification error at depth 1: "
+      "unable to get local issuer certificate";
+  callback->onCertValidationResult(false, Ssl::ClientValidationStatus::Failed, error_details,
+                                   SSL_AD_UNKNOWN_CA);
+
+  // Verify the error was stored in extended socket info
+  EXPECT_EQ(error_details, extended_info->certificateValidationError());
+  EXPECT_EQ(Ssl::ClientValidationStatus::Failed, extended_info->certificateValidationStatus());
+  EXPECT_EQ(SSL_AD_UNKNOWN_CA, extended_info->certificateValidationAlert());
+}
+
+using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+
+// Covers the certificate-level tls_params that the handshaker applies to the connection once a
+// certificate is selected.
+class CertSelectionTlsParamsTest : public HandshakerTest {
+protected:
+  Ssl::CertificateSelectionStatus selectCertificate(const Ssl::TlsParams& params,
+                                                    bool provides_ciphers_and_curves = false,
+                                                    bool provides_sigalgs = false) {
+    ON_CALL(handshake_callbacks_, connection()).WillByDefault(ReturnRef(mock_connection_));
+    // Selection completes at most once per connection, so each call needs its own SSL.
+    selection_callback_.reset();
+    handshaker_ = std::make_unique<SslHandshakerImpl>(
+        bssl::UniquePtr<SSL>(SSL_new(server_ctx_.get())), 0, &handshake_callbacks_);
+    selected_ctx_ = std::make_unique<Ssl::TlsContext>();
+    selected_ctx_->ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
+    selected_ctx_->tls_params_ = params;
+    selected_ctx_->provides_ciphers_and_curves_ = provides_ciphers_and_curves;
+    selected_ctx_->provides_sigalgs_ = provides_sigalgs;
+
+    auto* extended_info =
+        reinterpret_cast<Ssl::SslExtendedSocketInfo*>(SSL_get_ex_data(handshaker_->ssl(), 0));
+    selection_callback_ = extended_info->createCertificateSelectionCallback();
+    extended_info->onCertificateSelectionCompleted(
+        makeOptRef<const Ssl::TlsContext>(*selected_ctx_),
+        /*staple=*/false, /*async=*/false);
+    return extended_info->certificateSelectionResult();
+  }
+
+  SSL* ssl() { return handshaker_->ssl(); }
+
+  NiceMock<Network::MockConnection> mock_connection_;
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks_;
+  std::unique_ptr<SslHandshakerImpl> handshaker_;
+  std::unique_ptr<Ssl::TlsContext> selected_ctx_;
+  Ssl::CertificateSelectionCallbackPtr selection_callback_;
+};
+
+TEST_F(CertSelectionTlsParamsTest, ParamsAppliedToConnection) {
+  const Ssl::TlsParams params{
+      .min_protocol_version = TlsProto::TLSv1_2,
+      .max_protocol_version = TlsProto::TLSv1_2,
+      .cipher_suites = "ECDHE-RSA-AES128-GCM-SHA256",
+      .ecdh_curves = "P-256",
+      .signature_algorithms = "rsa_pss_rsae_sha256",
+  };
+  EXPECT_EQ(Ssl::CertificateSelectionStatus::Successful, selectCertificate(params));
+  EXPECT_EQ(TLS1_2_VERSION, SSL_get_min_proto_version(ssl()));
+  EXPECT_EQ(TLS1_2_VERSION, SSL_get_max_proto_version(ssl()));
+}
+
+TEST_F(CertSelectionTlsParamsTest, CompliancePolicyAppliedToConnection) {
+  EXPECT_EQ(Ssl::CertificateSelectionStatus::Successful,
+            selectCertificate({.compliance_policy = TlsProto::FIPS_202205}));
+  EXPECT_EQ(ssl_compliance_policy_fips_202205, SSL_get_compliance_policy(ssl()));
+}
+
+// Fields a custom handshaker owns are left to it, so even unusable values are not an error.
+TEST_F(CertSelectionTlsParamsTest, HandshakerOwnedParamsSkipped) {
+  const Ssl::TlsParams params{
+      .cipher_suites = "not-a-cipher",
+      .ecdh_curves = "not-a-curve",
+      .signature_algorithms = "not-a-sigalg",
+  };
+  EXPECT_EQ(Ssl::CertificateSelectionStatus::Successful,
+            selectCertificate(params, /*provides_ciphers_and_curves=*/true,
+                              /*provides_sigalgs=*/true));
+}
+
+// Params that BoringSSL rejects fail selection instead of leaving the connection with the settings
+// it inherited from the context it was created from.
+TEST_F(CertSelectionTlsParamsTest, UnsupportedParamsFailSelection) {
+  EXPECT_LOG_CONTAINS("warn", "Failed to set per-cert cipher suites",
+                      EXPECT_EQ(Ssl::CertificateSelectionStatus::Failed,
+                                selectCertificate({.cipher_suites = "not-a-cipher"})));
+  EXPECT_LOG_CONTAINS("warn", "Failed to set per-cert ECDH curves",
+                      EXPECT_EQ(Ssl::CertificateSelectionStatus::Failed,
+                                selectCertificate({.ecdh_curves = "not-a-curve"})));
+  EXPECT_LOG_CONTAINS("warn", "Failed to set per-cert signature algorithms",
+                      EXPECT_EQ(Ssl::CertificateSelectionStatus::Failed,
+                                selectCertificate({.signature_algorithms = "not-a-sigalg"})));
+  EXPECT_LOG_CONTAINS(
+      "warn", "Unknown compliance policy: 1234",
+      EXPECT_EQ(
+          Ssl::CertificateSelectionStatus::Failed,
+          selectCertificate({.compliance_policy = static_cast<TlsProto::CompliancePolicy>(1234)})));
+}
+
+} // namespace
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
+} // namespace Envoy

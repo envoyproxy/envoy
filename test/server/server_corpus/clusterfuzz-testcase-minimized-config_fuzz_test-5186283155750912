@@ -1,0 +1,74 @@
+static_resources {
+  clusters {
+    name: "www.google.com"
+    connect_timeout {
+      nanos: 61
+    }
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http2_protocol_options {
+          initial_stream_window_size {
+            value: 917504
+          }
+          initial_connection_window_size {
+            value: 1952382976
+          }
+          allow_connect: true
+          max_outbound_control_frames {
+          value: 1952382976
+        }
+	stream_error_on_invalid_http_messaging: true
+          custom_settings_parameters {
+            identifier {
+	      value: 65536
+	    }
+	    value {
+	      value: 7536640
+	    }
+	  }
+	  custom_settings_parameters {
+	    identifier {
+	      value: 65536
+	    }
+	    value {
+	      value: 7536640
+	    }
+	  }
+        }
+      }
+    }
+    alt_stat_name: ";"
+    load_assignment {
+      cluster_name: "domains"
+      policy {
+        hidden_envoy_deprecated_disable_overprovisioning: true
+      }
+    }
+    lrs_server {
+    }
+  }
+}
+dynamic_resources {
+}
+stats_sinks {
+  hidden_envoy_deprecated_config {
+    fields {
+      key: "fffffffffffffffffffffffffff"
+      value {
+      }
+    }
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "J\004\022\002\010\001J\005\n\003\022\0019J\004\022\002\010\001b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000b\000"
+  }
+}
+admin {
+}
+enable_dispatcher_stats: true
+header_prefix: "*"

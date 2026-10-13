@@ -1,0 +1,180 @@
+#include "source/extensions/filters/http/basic_auth/basic_auth_filter.h"
+
+#include <openssl/sha.h>
+
+#include "envoy/http/header_map.h"
+
+#include "source/common/common/base64.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+
+#include "openssl/mem.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace BasicAuth {
+
+namespace {
+constexpr uint32_t MaximumUriLength = 256;
+constexpr absl::string_view DynamicMetadataUsernameKey = "username";
+
+// Function to compute SHA1 hash
+std::string computeSHA1(absl::string_view password) {
+  unsigned char hash[SHA_DIGEST_LENGTH];
+
+  // Calculate the SHA-1 hash
+  SHA1(reinterpret_cast<const unsigned char*>(password.data()), password.length(), hash);
+
+  // Encode the binary hash in Base64
+  return Base64::encode(reinterpret_cast<const char*>(hash), SHA_DIGEST_LENGTH);
+}
+
+// Escape `"` and `\` for use inside an quoted-string.
+std::string escapeForQuotedString(absl::string_view value) {
+  std::string result;
+  result.reserve(value.size());
+  for (char c : value) {
+    if (c == '\\' || c == '"') {
+      result.push_back('\\');
+    }
+    result.push_back(c);
+  }
+  return result;
+}
+
+} // namespace
+
+FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_header,
+                           const std::string& authentication_header, bool allow_missing,
+                           bool emit_dynamic_metadata, const std::string& realm,
+                           const std::string& stats_prefix, Stats::Scope& scope)
+    : users_(std::move(users)), forward_username_header_(forward_username_header),
+      authentication_header_(Http::LowerCaseString(authentication_header)),
+      allow_missing_(allow_missing), emit_dynamic_metadata_(emit_dynamic_metadata), realm_(realm),
+      stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
+
+BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
+
+Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  const auto* route_specific_settings =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
+  const UserMap* users = &config_->users();
+  if (route_specific_settings != nullptr) {
+    users = &route_specific_settings->users();
+  }
+
+  // Resolve realm: per-route > filter-level > empty (triggers URI fallback in onDenied).
+  absl::string_view effective_realm;
+  if (route_specific_settings != nullptr && !route_specific_settings->realm().empty()) {
+    effective_realm = route_specific_settings->realm();
+  } else if (!config_->realm().empty()) {
+    effective_realm = config_->realm();
+  }
+
+  Http::HeaderMap::GetResult auth_header;
+  if (!config_->authenticationHeader().get().empty()) {
+    auth_header = headers.get(config_->authenticationHeader());
+  } else {
+    auth_header = headers.get(Http::CustomHeaders::get().Authorization);
+  }
+
+  if (auth_header.empty()) {
+    if (config_->allowMissing()) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return onDenied("User authentication failed. Missing username and password.",
+                    "no_credential_for_basic_auth", effective_realm);
+  }
+
+  absl::string_view auth_value = auth_header[0]->value().getStringView();
+
+  if (!absl::StartsWith(auth_value, "Basic ")) {
+    if (config_->allowMissing()) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return onDenied("User authentication failed. Expected 'Basic' authentication scheme.",
+                    "invalid_scheme_for_basic_auth", effective_realm);
+  }
+
+  // Extract and decode the Base64 part of the header.
+  absl::string_view base64_token = auth_value.substr(6);
+  const std::string decoded = Base64::decodeWithoutPadding(base64_token);
+
+  // The decoded string is in the format "username:password".
+  const size_t colon_pos = decoded.find(':');
+  if (colon_pos == std::string::npos) {
+    return onDenied("User authentication failed. Invalid basic credential format.",
+                    "invalid_format_for_basic_auth", effective_realm);
+  }
+
+  absl::string_view decoded_view = decoded;
+  absl::string_view username = decoded_view.substr(0, colon_pos);
+  absl::string_view password = decoded_view.substr(colon_pos + 1);
+
+  if (!validateUser(*users, username, password)) {
+    return onDenied("User authentication failed. Invalid username/password combination.",
+                    "invalid_credential_for_basic_auth", effective_realm);
+  }
+
+  if (!config_->forwardUsernameHeader().empty()) {
+    headers.setCopy(Http::LowerCaseString(config_->forwardUsernameHeader()), username);
+  }
+
+  if (config_->emitDynamicMetadata()) {
+    setDynamicMetadata(username);
+  }
+  config_->stats().allowed_.inc();
+  return Http::FilterHeadersStatus::Continue;
+}
+
+bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view username,
+                                   absl::string_view password) const {
+  auto user = users.find(username);
+  if (user == users.end()) {
+    return false;
+  }
+
+  const std::string computed = computeSHA1(password);
+  const std::string& expected = user->second.hash;
+  if (computed.length() != expected.length()) {
+    return false;
+  }
+  return CRYPTO_memcmp(computed.data(), expected.data(), computed.length()) == 0;
+}
+
+void BasicAuthFilter::setDynamicMetadata(absl::string_view username) {
+  Protobuf::Struct metadata;
+  (*metadata.mutable_fields())[std::string(DynamicMetadataUsernameKey)].set_string_value(
+      std::string(username));
+  decoder_callbacks_->streamInfo().setDynamicMetadata(
+      std::string(decoder_callbacks_->filterConfigName()), metadata);
+}
+
+Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
+                                                    absl::string_view response_code_details,
+                                                    absl::string_view realm) {
+  config_->stats().denied_.inc();
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::Unauthorized, body,
+      [this, realm = std::string(realm)](Http::ResponseHeaderMap& headers) {
+        const std::string realm_value =
+            !realm.empty() ? realm
+                           : Http::Utility::buildOriginalUri(
+                                 // requestHeaders is non-null here: onDenied is only called from
+                                 // decodeHeaders.
+                                 *this->decoder_callbacks_->requestHeaders(), MaximumUriLength);
+        headers.setReferenceKey(
+            Http::Headers::get().WWWAuthenticate,
+            absl::StrCat("Basic realm=\"", escapeForQuotedString(realm_value), "\""));
+      },
+      std::nullopt, response_code_details);
+  return Http::FilterHeadersStatus::StopIteration;
+}
+
+} // namespace BasicAuth
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

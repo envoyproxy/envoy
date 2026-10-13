@@ -1,0 +1,12 @@
+syntax = "proto3";
+package test.protos.breaking;
+
+import "validate/validate.proto";
+
+message ChangePGVOneofMessage {
+    oneof test_oneof {
+      option (validate.required) = false;
+      string name = 4;
+      string sub_message = 9;
+    }
+}

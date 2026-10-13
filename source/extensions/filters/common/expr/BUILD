@@ -1,0 +1,88 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
+
+envoy_cc_library(
+    name = "evaluator_lib",
+    srcs = ["evaluator.cc"],
+    hdrs = ["evaluator.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":context_lib",
+        "//envoy/singleton:manager_interface",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf",
+        "//source/common/runtime:runtime_features_lib",
+        "@cel-cpp//eval/public:activation",
+        "@cel-cpp//eval/public:builtin_func_registrar",
+        "@cel-cpp//eval/public:cel_expr_builder_factory",
+        "@cel-cpp//eval/public:cel_expression",
+        "@cel-cpp//eval/public:cel_value",
+        "@cel-cpp//extensions:regex_functions",
+        "@cel-cpp//extensions:strings",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@xds//xds/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "context_lib",
+    srcs = ["context.cc"],
+    hdrs = ["context.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":cel_state_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/singleton:const_singleton",
+        "//source/common/stream_info:utility_lib",
+        "@cel-cpp//eval/public:cel_value",
+        "@cel-cpp//eval/public:cel_value_producer",
+        "@cel-cpp//eval/public/containers:container_backed_list_impl",
+        "@cel-cpp//eval/public/structs:cel_proto_wrapper",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "flatbuffers_backed_cel_map_lib",
+    srcs = [
+        "flatbuffers_backed_cel_map.cc",
+    ],
+    hdrs = [
+        "flatbuffers_backed_cel_map.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/protobuf",
+        "@cel-cpp//eval/public:cel_value",
+        "@flatbuffers",
+    ],
+)
+
+envoy_cc_library(
+    name = "cel_state_lib",
+    srcs = [
+        "cel_state.cc",
+    ],
+    hdrs = [
+        "cel_state.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":flatbuffers_backed_cel_map_lib",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/protobuf",
+        "//source/common/singleton:const_singleton",
+        "@cel-cpp//eval/public:cel_value",
+        "@cel-cpp//eval/public/structs:cel_proto_wrapper",
+        "@flatbuffers",
+    ],
+)

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+set -e
+
+ENVOY_FORMAT_ACTION="$1"
+if [ -z "$ENVOY_FORMAT_ACTION" ]; then
+  echo "No action specified, defaulting to check"
+  ENVOY_FORMAT_ACTION="check"
+fi
+
+if [[ -n "$BAZEL_BUILD_EXTRA_OPTIONS" ]]; then
+    read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS}"
+else
+    BAZEL_BUILD_EXTRA_OPTIONS=(--config=mobile-clang)
+fi
+
+echo "${BAZEL_BUILD_EXTRA_OPTIONS[*]}"
+
+_bazel () {
+    local cmd="${1}"
+    shift
+    bazel "${cmd}" "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" "${@}"
+}
+
+if [[ $(uname) == "Darwin" ]]; then
+  if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
+    _bazel run @SwiftLint//:swiftlint -- --fix --quiet 2>/dev/null
+    _bazel run @DrString//:drstring format 2>/dev/null
+  else
+    _bazel run @SwiftLint//:swiftlint -- --strict --quiet 2>/dev/null
+    _bazel run @DrString//:drstring check 2>/dev/null
+  fi
+fi
+
+TARGET_PATH="$2"
+
+FORMAT_ARGS=(
+    --config_path ../tools/code_format/config.yaml
+    --add-excluded-prefixes
+    ./envoy/ ./envoy_build_config/extensions_build_config.bzl
+    ./Envoy.xcodeproj/ ./dist/
+    ./examples/swift/swiftpm/Packages/Envoy.xcframework ./tmp
+    --skip_envoy_build_rule_check)
+if [[ -n "$TARGET_PATH" ]]; then
+    FORMAT_ARGS+=("$TARGET_PATH")
+fi
+FORMAT_ARGS+=(
+    --namespace_check_excluded_paths
+    ./envoy ./examples/ ./library/java/ ./library/kotlin
+    ./library/objective-c ./library/python/ ./test/java ./test/java
+    ./test/objective-c ./test/python ./test/swift ./experimental/swift
+    --build_fixer_check_excluded_paths
+    ./envoy ./BUILD ./dist)
+
+export ENVOY_BAZEL_PREFIX="@envoy" && _bazel run @envoy//tools/code_format:check_format -- "${ENVOY_FORMAT_ACTION}" --path "$PWD" "${FORMAT_ARGS[@]}"
+KTFMT="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"/ktfmt.sh
+KOTLIN_DIRS=(
+  "library/kotlin"
+  "test/kotlin"
+  "examples/kotlin"
+)
+if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
+  "${KTFMT}" "${KOTLIN_DIRS[@]}"
+else
+  NEEDS_FORMAT=$("${KTFMT}" --dry-run "${KOTLIN_DIRS[@]}")
+  if [[ -n "${NEEDS_FORMAT}" ]]; then
+    echo "ERROR: Run 'tools/check_format.sh fix' to fix"
+    echo "${NEEDS_FORMAT}"
+    exit 1
+  fi
+fi
+
+PYTHON_DIRS=(
+  "${PWD}/library/python"
+  "${PWD}/test/python"
+  "${PWD}/examples/python"
+)
+if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
+  _bazel run //tools:black -- "${PYTHON_DIRS[@]}"
+else
+  NEEDS_FORMAT=$(_bazel run //tools:black -- --check "${PYTHON_DIRS[@]}" 2>&1 || echo "black failed, exit code=$?")
+  # If black reports that files need to be reformatted, it will exit with code 1, so "black failed, exit code=1" will be added to NEEDS_FORMAT;
+  # otherswise, NEEDS_FORMAT will just contain the black output.
+  if [[ -n "${NEEDS_FORMAT}" ]] && [[ "${NEEDS_FORMAT}" == *"black failed, exit code="* ]]; then
+    echo "ERROR: Run 'tools/check_format.sh fix' to fix"
+    echo "${NEEDS_FORMAT}"
+    exit 1
+  fi
+fi

@@ -1,0 +1,204 @@
+#include "source/extensions/filters/http/thrift_to_metadata/config.h"
+
+#include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ThriftToMetadata {
+
+using StatusHelpers::HasStatus;
+
+TEST(Factory, Basic) {
+  const std::string yaml = R"(
+request_rules:
+- field: PROTOCOL
+  on_present:
+    metadata_namespace: envoy.lb
+    key: protocol
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: protocol
+    value: "unknown"
+- field: TRANSPORT
+  on_present:
+    metadata_namespace: envoy.lb
+    key: transport
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: transport
+    value: "unknown"
+response_rules:
+- field: MESSAGE_TYPE
+  on_present:
+    metadata_namespace: envoy.filters.http.thrift_to_metadata
+    key: response_message_type
+  on_missing:
+    metadata_namespace: envoy.filters.http.thrift_to_metadata
+    key: response_message_type
+    value: "exception"
+- field: REPLY_TYPE
+  on_present:
+    metadata_namespace: envoy.filters.http.thrift_to_metadata
+    key: response_reply_type
+  on_missing:
+    metadata_namespace: envoy.filters.http.thrift_to_metadata
+    key: response_reply_type
+    value: "error"
+- field_selector:
+    child:
+      id: 1
+      name: foo
+    id: 2
+    name: bar
+  on_present:
+    metadata_namespace: envoy.lb
+    key: bar
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: bar
+    value: "unknown"
+  )";
+
+  ThriftToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  auto callback = factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  callback(filter_callback);
+}
+
+TEST(Factory, NoOnPresentOnMissing) {
+  const std::string yaml_request = R"(
+request_rules:
+- field: PROTOCOL
+  )";
+
+  const std::string yaml_response = R"(
+response_rules:
+- field: PROTOCOL
+  )";
+
+  ThriftToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml_request, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "thrift to metadata filter: neither `on_present` nor `on_missing` set"));
+  TestUtility::loadFromYaml(yaml_response, *proto_config);
+  EXPECT_THAT(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "thrift to metadata filter: neither `on_present` nor `on_missing` set"));
+}
+
+TEST(Factory, NoValueIntOnMissing) {
+  const std::string yaml_request = R"(
+request_rules:
+- field: PROTOCOL
+  on_present:
+    metadata_namespace: envoy.lb
+    key: protocol
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: protocol
+  )";
+
+  const std::string yaml_response = R"(
+response_rules:
+- field: MESSAGE_TYPE
+  on_present:
+    metadata_namespace: envoy.filters.http.thrift_to_metadata
+    key: response_message_type
+  on_missing:
+    metadata_namespace: envoy.filters.http.thrift_to_metadata
+    key: response_message_type
+  )";
+
+  ThriftToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml_request, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                "thrift to metadata filter: cannot specify on_missing rule with empty value"));
+  TestUtility::loadFromYaml(yaml_response, *proto_config);
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                "thrift to metadata filter: cannot specify on_missing rule with empty value"));
+}
+
+TEST(Factory, NoRule) {
+  const std::string yaml_empty = R"({})";
+
+  ThriftToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml_empty, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "thrift_to_metadata filter: Per filter configs must at least specify "
+                        "either request or response rules"));
+}
+
+TEST(Factory, DEPRECATED_FEATURE_TEST(NoTwitterProtocol)) {
+  const std::string yaml = R"(
+request_rules:
+- field: PROTOCOL
+  on_present:
+    metadata_namespace: envoy.lb
+    key: protocol
+protocol: TWITTER
+  )";
+
+  ThriftToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THAT(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "thrift_to_metadata filter: Protocol TWITTER is not supported"));
+}
+
+TEST(Factory, BasicWithServerContext) {
+  const std::string yaml = R"(
+request_rules:
+- field: PROTOCOL
+  on_present:
+    metadata_namespace: envoy.lb
+    key: protocol
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: protocol
+    value: "unknown"
+  )";
+
+  ThriftToMetadataConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
+
+  auto callback =
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  callback(filter_callback);
+}
+
+} // namespace ThriftToMetadata
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

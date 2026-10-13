@@ -1,0 +1,334 @@
+#include "source/extensions/filters/http/jwt_authn/jwks_cache.h"
+
+#include <chrono>
+#include <memory>
+#include <optional>
+
+#include "envoy/common/time.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/thread_local/thread_local.h"
+
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/config/datasource.h"
+#include "source/common/http/utility.h"
+#include "source/common/jwt/check_audience.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/retry_policy_impl.h"
+
+#include "absl/container/node_hash_map.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
+#include "absl/time/time.h"
+
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace JwtAuthn {
+namespace {
+
+using JwtVerify::Jwks;
+using JwtVerify::Status;
+
+class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
+public:
+  JwksDataImpl(const JwtProvider& jwt_provider,
+               Server::Configuration::ServerFactoryContext& context,
+               OptRef<Init::Manager> init_manager, CreateJwksFetcherCb fetcher_cb,
+               JwtAuthnFilterStats& stats, absl::Status& creation_status)
+      : jwt_provider_(jwt_provider), time_source_(context.timeSource()),
+        tls_(context.threadLocal()) {
+    std::vector<std::string> audiences;
+    for (const auto& aud : jwt_provider_.audiences()) {
+      audiences.push_back(aud);
+    }
+    audiences_ = std::make_unique<JwtVerify::CheckAudience>(audiences);
+
+    if (jwt_provider_.has_subjects()) {
+      sub_matcher_.emplace(jwt_provider_.subjects(), context);
+    }
+
+    // Resolve each claim_to_headers entry to an explicit path once here rather than per request.
+    // FilterConfigImpl checks that every entry sets exactly one of claim_name and claim_path
+    // before it constructs the JwksCache, so by this point claim_path being empty means
+    // claim_name is set, and vice versa.
+    // The stored segments are views into jwt_provider_, never into a temporary: claim_name() and
+    // key() both return a reference to a string the proto owns, and absl::StrSplit deletes the
+    // overloads taking a std::string&&, so splitting a temporary here would not compile.
+    for (const auto& claim_to_header : jwt_provider_.claim_to_headers()) {
+      ClaimToHeader entry{{}, claim_to_header.header_name()};
+      if (claim_to_header.claim_path().empty()) {
+        entry.claim_path_ = absl::StrSplit(claim_to_header.claim_name(), '.');
+      } else {
+        for (const auto& segment : claim_to_header.claim_path()) {
+          entry.claim_path_.push_back(segment.key());
+        }
+      }
+      claims_to_headers_.push_back(std::move(entry));
+    }
+
+    if (jwt_provider_.require_expiration()) {
+      max_exp_ = absl::InfiniteDuration();
+    }
+
+    if (jwt_provider_.has_max_lifetime()) {
+      // Intentionally overwrite previous max_exp_. max_lifetime takes precedence.
+      max_exp_ = absl::Seconds(jwt_provider_.max_lifetime().seconds()) +
+                 absl::Nanoseconds(jwt_provider_.max_lifetime().nanos());
+    }
+
+    bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
+    const auto& config = jwt_provider_.jwt_cache_config();
+    tls_.set([enable_jwt_cache, config](Envoy::Event::Dispatcher& dispatcher) {
+      return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
+    });
+
+    auto inline_jwks_or = Config::DataSource::read(jwt_provider_.local_jwks(), true, context.api());
+    SET_AND_RETURN_IF_NOT_OK(inline_jwks_or.status(), creation_status);
+    const auto& inline_jwks = inline_jwks_or.value();
+    if (!inline_jwks.empty()) {
+      auto jwks = JwtVerify::Jwks::createFrom(inline_jwks, JwtVerify::Jwks::JWKS);
+      if (jwks->getStatus() != Status::Ok) {
+        ENVOY_LOG(warn, "Invalid inline jwks for issuer: {}, jwks: {}", jwt_provider_.issuer(),
+                  inline_jwks);
+      } else {
+        setJwksToAllThreads(std::move(jwks));
+      }
+    } else {
+      if (!jwt_provider_.has_remote_jwks()) {
+        return;
+      }
+
+      // remote_jwks.retry_policy has an invalid case that could not be validated by the
+      // proto validation annotation. It has to be validated by the code.
+      if (jwt_provider_.remote_jwks().has_retry_policy()) {
+        SET_AND_RETURN_IF_NOT_OK(
+            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()),
+            creation_status);
+        envoy::config::route::v3::RetryPolicy route_retry_policy =
+            Http::Utility::convertCoreToRouteRetryPolicy(jwt_provider_.remote_jwks().retry_policy(),
+                                                         "5xx,gateway-error,connect-failure,reset");
+        // Use the null validation visitor because it was used by the async client in the previous
+        // implementation.
+        auto policy_or_error = Router::RetryPolicyImpl::create(
+            route_retry_policy, ProtobufMessage::getNullValidationVisitor(), context);
+        SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+        retry_policy_ = std::move(policy_or_error.value());
+      }
+
+      if (jwt_provider_.remote_jwks().has_cache_duration()) {
+        // Use `durationToMillisecondsNoThrow` as it has stricter max boundary to the `seconds`
+        // value to avoid overflow.
+        Protobuf::Duration duration_copy(jwt_provider_.remote_jwks().cache_duration());
+        SET_AND_RETURN_IF_NOT_OK(
+            DurationUtil::durationToMillisecondsNoThrow(duration_copy).status(), creation_status);
+
+        // remote_jwks.duration is used as: now + remote_jwks.duration.
+        // need to verify twice of its `seconds` value.
+        duration_copy.set_seconds(2 * duration_copy.seconds());
+        SET_AND_RETURN_IF_NOT_OK(
+            DurationUtil::durationToMillisecondsNoThrow(duration_copy).status(), creation_status);
+      }
+
+      // Validate async_fetch.failed_refetch_duration here so that the JwksAsyncFetcher
+      // constructor does not need to throw on an out-of-range duration.
+      if (jwt_provider_.remote_jwks().async_fetch().has_failed_refetch_duration()) {
+        SET_AND_RETURN_IF_NOT_OK(
+            DurationUtil::durationToMillisecondsNoThrow(
+                jwt_provider_.remote_jwks().async_fetch().failed_refetch_duration())
+                .status(),
+            creation_status);
+      }
+
+      // create async_fetch for remote_jwks, if is no-op if async_fetch is not enabled.
+      async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
+          jwt_provider_.remote_jwks(), retry_policy_, context, init_manager, fetcher_cb,
+          stats.jwks_fetch_success_, stats.jwks_fetch_failed_,
+          [this](Envoy::JwtVerify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
+    }
+  }
+
+  const JwtProvider& getJwtProvider() const override { return jwt_provider_; }
+
+  const std::vector<ClaimToHeader>& claimsToHeaders() const override { return claims_to_headers_; }
+
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() const override { return retry_policy_; }
+
+  bool areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const override {
+    return audiences_->areAudiencesAllowed(jwt_audiences);
+  }
+
+  bool isSubjectAllowed(const absl::string_view jwt_subject) const override {
+    if (!sub_matcher_.has_value()) {
+      return true;
+    }
+
+    return sub_matcher_->match(jwt_subject);
+  }
+
+  bool isLifetimeAllowed(const absl::Time& now, const absl::Time* exp) const override {
+    // This function takes the current time and calculates the remaining lifetime of the JWT.
+    // Then it compares that with the max lifetime in the config. Using issue time or not before
+    // claims would be better, but optional according to the spec.
+
+    // Without a max lifetime, any exp is allowed.
+    if (!max_exp_.has_value()) {
+      return true;
+    }
+
+    // If there's no exp field and we have a max set, then this isn't allowed.
+    if (exp == nullptr) {
+      return false;
+    }
+
+    // Take the remaining credential lifetime and return if it's less
+    // than the max.
+    absl::Duration lifetime = *exp - now;
+    return lifetime < *max_exp_;
+  }
+
+  const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }
+
+  bool isExpired() const override { return time_source_.monotonicTime() >= tls_->expire_; }
+
+  const JwtVerify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) override {
+    // convert unique_ptr to shared_ptr
+    JwksConstSharedPtr shared_jwks = std::move(jwks);
+    tls_->jwks_ = shared_jwks;
+    tls_->expire_ = time_source_.monotonicTime() +
+                    JwksAsyncFetcher::getCacheDuration(jwt_provider_.remote_jwks());
+    return shared_jwks.get();
+  }
+
+  JwtCache& getJwtCache() override { return *tls_->jwt_cache_; }
+
+private:
+  struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalCache(bool enable_jwt_cache,
+                     const envoy::extensions::filters::http::jwt_authn::v3::JwtCacheConfig& config,
+                     TimeSource& time_source)
+        : jwt_cache_(JwtCache::create(enable_jwt_cache, config, time_source)) {}
+
+    // The jwks object.
+    JwksConstSharedPtr jwks_;
+    // The JwtCache object
+    const JwtCachePtr jwt_cache_;
+    // The pubkey expiration time.
+    MonotonicTime expire_;
+  };
+
+  // Set jwks shared_ptr to all threads.
+  void setJwksToAllThreads(JwksConstPtr&& jwks) {
+    JwksConstSharedPtr shared_jwks = std::move(jwks);
+    tls_.runOnAllThreads([shared_jwks](OptRef<ThreadLocalCache> obj) {
+      obj->jwks_ = shared_jwks;
+      obj->expire_ = std::chrono::steady_clock::time_point::max();
+    });
+  }
+
+  // The jwt provider config.
+  const JwtProvider& jwt_provider_;
+  // claim_to_headers with the claim paths resolved.
+  std::vector<ClaimToHeader> claims_to_headers_;
+  // The retry policy for remote jwks fetcher.
+  Router::RetryPolicyConstSharedPtr retry_policy_;
+  // Check audience object
+  JwtVerify::CheckAudiencePtr audiences_;
+  // the time source
+  TimeSource& time_source_;
+  // the thread local slot for cache
+  ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
+  // async fetcher
+  JwksAsyncFetcherPtr async_fetcher_;
+  std::optional<Matchers::StringMatcherImpl> sub_matcher_;
+  std::optional<absl::Duration> max_exp_;
+};
+
+using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
+
+class JwksCacheImpl : public JwksCache {
+public:
+  // Load the config from envoy config.
+  JwksCacheImpl(const JwtAuthentication& config,
+                Server::Configuration::ServerFactoryContext& context,
+                OptRef<Init::Manager> init_manager, CreateJwksFetcherCb fetcher_fn,
+                JwtAuthnFilterStats& stats, absl::Status& creation_status)
+      : stats_(stats) {
+    for (const auto& [name, provider] : config.providers()) {
+      auto jwks_data = std::make_unique<JwksDataImpl>(provider, context, init_manager, fetcher_fn,
+                                                      stats, creation_status);
+      if (!creation_status.ok()) {
+        return;
+      }
+      if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
+        issuer_ptr_map_.emplace(provider.issuer(), jwks_data.get());
+      }
+      jwks_data_map_.emplace(name, std::move(jwks_data));
+    }
+  }
+
+  JwksData* getSingleProvider() override {
+    if (jwks_data_map_.size() == 1) {
+      return jwks_data_map_.begin()->second.get();
+    }
+    return nullptr;
+  }
+
+  JwksData* findByIssuer(const std::string& issuer) override {
+    JwksData* data = findIssuerMap(issuer);
+    if (!data && !issuer.empty()) {
+      // The first empty issuer from JwtProvider can be used.
+      return findIssuerMap(Envoy::EMPTY_STRING);
+    }
+    return data;
+  }
+
+  JwksData* findByProvider(const std::string& provider) override {
+    const auto& it = jwks_data_map_.find(provider);
+    if (it != jwks_data_map_.end()) {
+      return it->second.get();
+    }
+    // Verifier::innerCreate function makes sure that all provider names are defined.
+    PANIC("unexpected");
+  }
+
+  JwtAuthnFilterStats& stats() override { return stats_; }
+
+private:
+  JwksData* findIssuerMap(const std::string& issuer) {
+    const auto& it = issuer_ptr_map_.find(issuer);
+    if (it == issuer_ptr_map_.end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+  // stats
+  JwtAuthnFilterStats& stats_;
+  // The Jwks data map indexed by provider.
+  absl::node_hash_map<std::string, JwksDataImplPtr> jwks_data_map_;
+  // The Jwks data pointer map indexed by issuer.
+  absl::node_hash_map<std::string, JwksData*> issuer_ptr_map_;
+};
+
+} // namespace
+
+absl::StatusOr<JwksCachePtr>
+JwksCache::create(const envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication& config,
+                  Server::Configuration::ServerFactoryContext& context,
+                  OptRef<Init::Manager> init_manager, CreateJwksFetcherCb fetcher_fn,
+                  JwtAuthnFilterStats& stats) {
+  absl::Status creation_status = absl::OkStatus();
+  auto cache = std::make_unique<JwksCacheImpl>(config, context, init_manager, fetcher_fn, stats,
+                                               creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return cache;
+}
+
+} // namespace JwtAuthn
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

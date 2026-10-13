@@ -1,0 +1,86 @@
+config {
+  name: "envoy.filters.network.mysql_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.mysql_proxy.v3.MySQLProxy"
+    value: "\n\006#\336\215\302\246\001"
+  }
+}
+actions {
+  on_write {
+    data: "\031\031\031\031"
+  }
+}
+actions {
+  on_write {
+    data: "\031\031\031\031\031\031\031\031"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "3"
+  }
+}
+actions {
+  on_write {
+    data: "#"
+  }
+}
+actions {
+  on_write {
+    data: "#"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "3"
+  }
+}
+actions {
+  on_write {
+    data: "#"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "#"
+  }
+}
+actions {
+  on_write {
+    data: "#"
+  }
+}
+actions {
+  on_write {
+    data: "\031\031\031\031\031\031\031\031"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "3"
+  }
+}
+actions {
+  on_write {
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "3"
+  }
+}

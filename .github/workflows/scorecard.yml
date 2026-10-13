@@ -1,0 +1,46 @@
+name: Scorecard supply-chain security
+on:
+  branch_protection_rule:
+  schedule:
+  - cron: '33 13 * * 5'
+  push:
+    branches:
+    - "main"
+
+permissions:
+  contents: read
+
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-24.04
+    if: github.repository == 'envoyproxy/envoy'
+    permissions:
+      security-events: write
+      id-token: write
+
+    steps:
+    - name: "Checkout code"
+      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      with:
+        persist-credentials: false
+
+    - name: "Run analysis"
+      uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
+      with:
+        results_file: results.sarif
+        results_format: sarif
+        publish_results: true
+
+    - name: "Upload artifact"
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: SARIF file
+        path: results.sarif
+        retention-days: 5
+
+    - name: "Upload to code-scanning"
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
+      with:
+        sarif_file: results.sarif

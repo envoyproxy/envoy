@@ -1,0 +1,1207 @@
+#include <memory>
+
+#include "envoy/common/exception.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
+#include "envoy/event/timer.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+
+#include "source/common/common/empty_string.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
+
+#include "test/common/stats/stat_test_utility.h"
+#include "test/config/v2_link_hacks.h"
+#include "test/mocks/common.h"
+#include "test/mocks/config/custom_config_validators.h"
+#include "test/mocks/config/eds_resources_cache.h"
+#include "test/mocks/config/mocks.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/grpc/mocks.h"
+#include "test/mocks/local_info/mocks.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/resources.h"
+#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
+#include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using ::Envoy::StatusHelpers::IsOk;
+using testing::_;
+using testing::InSequence;
+using testing::Invoke;
+using testing::NiceMock;
+using ::testing::Not;
+using testing::Return;
+using testing::ReturnRef;
+using testing::SaveArg;
+
+namespace Envoy {
+namespace Config {
+namespace {
+
+enum class LegacyOrUnified { Legacy, Unified };
+
+// We test some mux specific stuff below, other unit test coverage for singleton use of
+// NewGrpcMuxImpl is provided in [grpc_]subscription_impl_test.cc.
+class NewGrpcMuxImplTestBase : public testing::TestWithParam<std::tuple<LegacyOrUnified, bool>> {
+public:
+  NewGrpcMuxImplTestBase(LegacyOrUnified legacy_or_unified)
+      : async_client_(new Grpc::MockAsyncClient()),
+        config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
+        resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+                              envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
+        control_plane_stats_(Utility::generateControlPlaneStats(*stats_.rootScope())),
+        control_plane_connected_state_(
+            stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
+        should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified),
+        using_xds_failover_(std::get<1>(GetParam())) {
+    // Once "envoy.restart_features.xds_failover_support" is deprecated, the
+    // test should no longer be parameterized on the bool value.
+    scoped_runtime_.mergeValues(
+        {{"envoy.restart_features.xds_failover_support", using_xds_failover_ ? "true" : "false"}});
+  }
+
+  void setup() {
+    auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+        SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
+    GrpcMuxContext grpc_mux_context{
+        /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*failover_async_client_=*/nullptr,
+        /*dispatcher_=*/dispatcher_,
+        /*service_method_=*/
+        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+        /*local_info_=*/local_info_,
+        /*rate_limit_settings_=*/rate_limit_settings_,
+        /*scope_=*/*stats_.rootScope(),
+        /*config_validators_=*/std::move(config_validators_),
+        /*xds_resources_delegate_=*/
+        use_resources_delegate_ ? OptRef<XdsResourcesDelegate>(resources_delegate_)
+                                : OptRef<XdsResourcesDelegate>(),
+        /*xds_config_tracker_=*/
+        use_config_tracker_ ? OptRef<XdsConfigTracker>(config_tracker_)
+                            : OptRef<XdsConfigTracker>(),
+        /*backoff_strategy_=*/std::move(backoff_strategy),
+        /*target_xds_authority_=*/"",
+        /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+        /*skip_subsequent_node_=*/skip_subsequent_node_};
+    if (isUnifiedMuxTest()) {
+      grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
+      return;
+    }
+    grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(grpc_mux_context);
+  }
+
+  struct ExpectedMessage {
+    std::string type_url;
+    std::vector<std::string> resource_names_subscribe;
+    std::vector<std::string> resource_names_unsubscribe;
+    std::string nonce = "";
+    Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok;
+    std::string error_message = "";
+    std::map<std::string, std::string> initial_resource_versions;
+    Grpc::MockAsyncStream* async_stream = nullptr;
+    bool with_node = true;
+  };
+
+  void expectSendMessage(const ExpectedMessage& expected_message) {
+    API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) expected_request;
+    if (expected_message.with_node) {
+      expected_request.mutable_node()->CopyFrom(local_info_.node());
+    }
+    for (const auto& resource : expected_message.resource_names_subscribe) {
+      expected_request.add_resource_names_subscribe(resource);
+    }
+    for (const auto& resource : expected_message.resource_names_unsubscribe) {
+      expected_request.add_resource_names_unsubscribe(resource);
+    }
+    for (const auto& v : expected_message.initial_resource_versions) {
+      (*expected_request.mutable_initial_resource_versions())[v.first] = v.second;
+    }
+    expected_request.set_response_nonce(expected_message.nonce);
+    expected_request.set_type_url(expected_message.type_url);
+    if (expected_message.error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
+      ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
+      error_detail->set_code(expected_message.error_code);
+      error_detail->set_message(expected_message.error_message);
+    }
+    EXPECT_CALL(expected_message.async_stream ? *expected_message.async_stream : async_stream_,
+                sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
+  }
+
+  void remoteClose() {
+    if (isUnifiedMuxTest()) {
+      dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get())
+          ->grpcStreamForTest()
+          .onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+      return;
+    }
+    dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get())
+        ->grpcStreamForTest()
+        .onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+  }
+
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& response) {
+    if (isUnifiedMuxTest()) {
+      dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get())
+          ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+      return;
+    }
+    dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get())
+        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  }
+
+  void shutdownMux() {
+    if (isUnifiedMuxTest()) {
+      dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get())->shutdown();
+      return;
+    }
+    dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get())->shutdown();
+  }
+
+  // the code is duplicated here, but all calls other than the check in return statement, return
+  // different types.
+  bool subscriptionExists(const std::string& type_url) const {
+    if (isUnifiedMuxTest()) {
+      auto* mux = dynamic_cast<XdsMux::GrpcMuxDelta*>(grpc_mux_.get());
+      auto& subscriptions = mux->subscriptions();
+      auto sub = subscriptions.find(type_url);
+      return sub != subscriptions.end();
+    }
+    auto* mux = dynamic_cast<NewGrpcMuxImpl*>(grpc_mux_.get());
+    auto& subscriptions = mux->subscriptions();
+    auto sub = subscriptions.find(type_url);
+    return sub != subscriptions.end();
+  }
+
+  bool isUnifiedMuxTest() const { return should_use_unified_; }
+
+  TestScopedRuntime scoped_runtime_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Random::MockRandomGenerator> random_;
+  Grpc::MockAsyncClient* async_client_;
+  NiceMock<Grpc::MockAsyncStream> async_stream_;
+  // Used for tests invoking updateMuxSource().
+  Grpc::MockAsyncClient* replaced_async_client_;
+  Grpc::MockAsyncStream replaced_async_stream_;
+  CustomConfigValidatorsPtr config_validators_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  std::unique_ptr<GrpcMux> grpc_mux_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
+  Stats::TestUtil::TestStore stats_;
+  Envoy::Config::RateLimitSettings rate_limit_settings_;
+  ControlPlaneStats control_plane_stats_;
+  Stats::Gauge& control_plane_connected_state_;
+  bool should_use_unified_;
+  MockEdsResourcesCache* eds_resources_cache_{nullptr};
+  bool skip_subsequent_node_{false};
+  const bool using_xds_failover_;
+  bool use_config_tracker_{false};
+  bool use_resources_delegate_{false};
+  NiceMock<MockXdsConfigTracker> config_tracker_;
+  NiceMock<MockXdsResourcesDelegate> resources_delegate_;
+};
+
+class NewGrpcMuxImplTest : public NewGrpcMuxImplTestBase {
+public:
+  NewGrpcMuxImplTest() : NewGrpcMuxImplTestBase(std::get<0>(GetParam())) {}
+  Event::SimulatedTimeSystem time_system_;
+};
+
+// Validate behavior when skip_subsequent_node parameter is set to true.
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode) {
+  if (!skip_subsequent_node_) {
+    delete async_client_;
+    GTEST_SKIP() << "This test requires skip_subsequent_node to be true.";
+  }
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  // The node has been sent already, so it won't be sent again.
+  expectSendMessage({.type_url = "bar", .with_node = false});
+  grpc_mux_->start();
+  expectSendMessage(
+      {.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}, .with_node = false});
+}
+
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode_SendNodeOnGrpcStreamReset) {
+  if (!skip_subsequent_node_) {
+    delete async_client_;
+    GTEST_SKIP() << "This test requires skip_subsequent_node to be true.";
+  }
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
+      // Happens when adding a type url watch.
+      .WillRepeatedly(Return(ttl_mgr_timer));
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  grpc_mux_->start();
+
+  // Now disconnect.
+  // Grpc stream retry timer will kick in and reconnection will happen.
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
+      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+
+  // On reconnection, node should be sent again with the first message.
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  remoteClose();
+
+  expectSendMessage(
+      {.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}, .with_node = false});
+}
+
+TEST_P(NewGrpcMuxImplTest, SkipSubsequentNodeFeatureFlagDisabled) {
+  if (isUnifiedMuxTest()) {
+    delete async_client_;
+    GTEST_SKIP() << "This test is only relevant for the legacy mux.";
+  }
+  if (!skip_subsequent_node_) {
+    delete async_client_;
+    GTEST_SKIP() << "This test requires skip_subsequent_node to be true.";
+  }
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node", "false"}});
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
+  // Though skip_subsequent_node is true, the feature flag is disabled, so the node will be sent
+  // again.
+  expectSendMessage({.type_url = "bar", .with_node = true});
+  grpc_mux_->start();
+  expectSendMessage(
+      {.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}, .with_node = true});
+}
+
+INSTANTIATE_TEST_SUITE_P(NewGrpcMuxImplTest, NewGrpcMuxImplTest,
+                         testing::Combine(testing::ValuesIn({LegacyOrUnified::Legacy,
+                                                             LegacyOrUnified::Unified}),
+                                          testing::Bool()));
+
+// Validate behavior when dynamic context parameters are updated.
+TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
+  expectSendMessage({.type_url = "bar"});
+  grpc_mux_->start();
+  // Unknown type, shouldn't do anything.
+  EXPECT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz"));
+  // Update to foo type should resend Node.
+  expectSendMessage({.type_url = "foo"});
+  EXPECT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo"));
+  // Update to bar type should resend Node.
+  expectSendMessage({.type_url = "bar"});
+  EXPECT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar"));
+
+  expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}});
+}
+
+// Validate cached nonces are cleared on reconnection.
+// TODO (dmitri-d) remove this test when legacy implementations have been removed
+// common mux functionality is tested in xds_grpc_mux_impl_test.cc
+TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
+      // Happens when adding a type url watch.
+      .WillRepeatedly(Return(ttl_mgr_timer));
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // Send on connection.
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
+  grpc_mux_->start();
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("3000");
+  response->set_nonce("111");
+  auto add_response_resource = [](const std::string& name, const std::string& version,
+                                  envoy::service::discovery::v3::DeltaDiscoveryResponse& response) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+    cla.set_cluster_name(name);
+    auto res = response.add_resources();
+    res->set_name(name);
+    std::ignore = res->mutable_resource()->PackFrom(cla);
+    res->set_version(version);
+  };
+  add_response_resource("x", "2000", *response);
+  add_response_resource("y", "3000", *response);
+  // Pause EDS to allow the ACK to be cached.
+  auto resume_eds = grpc_mux_->pause(type_url);
+  onDiscoveryResponse(std::move(response));
+  // Now disconnect.
+  // Grpc stream retry timer will kick in and reconnection will happen.
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
+      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+
+  // initial_resource_versions should contain client side all resource:version info.
+  if (using_xds_failover_) {
+    // The test suite doesn't invoke the grpc-stream/xds-failover discovery
+    // response path, and so the failover isn't aware that the test suite
+    // passed a valid response back to the mux. However, the xds-failover will now set
+    // the flag that triggers the initial-resource-versions population even if it
+    // was never connected to a source.
+    expectSendMessage({.type_url = type_url,
+                       .resource_names_subscribe = {"x", "y"},
+                       .initial_resource_versions = {{"x", "2000"}, {"y", "3000"}}});
+  } else {
+    expectSendMessage({.type_url = type_url,
+                       .resource_names_subscribe = {"x", "y"},
+                       .initial_resource_versions = {{"x", "2000"}, {"y", "3000"}}});
+  }
+  remoteClose();
+
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"x", "y"}});
+}
+
+// Validate resources are not sent on wildcard watch reconnection.
+// Regression test of https://github.com/envoyproxy/envoy/issues/16063.
+TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
+  Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
+  Event::TimerCb grpc_stream_retry_timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(
+          testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
+      // Happens when adding a type url watch.
+      .WillRepeatedly(Return(ttl_mgr_timer));
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // Send a wildcard request on new connection.
+  expectSendMessage({.type_url = type_url});
+  grpc_mux_->start();
+
+  // An helper function to create a response with a single load_assignment resource
+  // (load_assignment's cluster_name will be updated).
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  auto create_response = [&load_assignment, &type_url](const std::string& name,
+                                                       const std::string& version,
+                                                       const std::string& nonce)
+      -> std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse> {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info(version);
+    response->set_nonce(nonce);
+    auto res = response->add_resources();
+    res->set_name(name);
+    res->set_version(version);
+    load_assignment.set_cluster_name(name);
+    std::ignore = res->mutable_resource()->PackFrom(load_assignment);
+    return response;
+  };
+
+  // Send a response with a single resource that should be received by Envoy,
+  // followed by an ack with the nonce.
+  {
+    auto response = create_response("x", "1000", "111");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1000"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
+        }));
+    // Expect an ack with the nonce.
+    expectSendMessage({.type_url = type_url, .nonce = "111"});
+    onDiscoveryResponse(std::move(response));
+  }
+  // Send another response with a different resource, but where EDS is paused.
+  auto resume_eds = grpc_mux_->pause(type_url);
+  {
+    auto response = create_response("y", "2000", "222");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2000"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
+        }));
+    // No ack reply is expected in this case, as EDS is suspended.
+    onDiscoveryResponse(std::move(response));
+  }
+
+  // Now disconnect.
+  // Grpc stream retry timer will kick in and reconnection will happen.
+  EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
+      .WillOnce(Invoke(grpc_stream_retry_timer_cb));
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  // initial_resource_versions should contain client side all resource:version info, and no
+  // added resources because this is a wildcard request.
+  if (using_xds_failover_) {
+    // The test suite doesn't invoke the grpc-stream/xds-failover discovery
+    // response path, and so the failover isn't aware that the test suite
+    // passed a valid response back to the mux. However, the xds-failover will now set
+    // the flag that triggers the initial-resource-versions population even if it
+    // was never connected to a source.
+    expectSendMessage(
+        {.type_url = type_url, .initial_resource_versions = {{"x", "1000"}, {"y", "2000"}}});
+  } else {
+    expectSendMessage(
+        {.type_url = type_url, .initial_resource_versions = {{"x", "1000"}, {"y", "2000"}}});
+  }
+  remoteClose();
+  // Destruction of wildcard will not issue unsubscribe requests for the resources.
+}
+
+// Test that we simply ignore a message for an unknown type_url, with no ill effects.
+TEST_P(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
+  setup();
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  {
+    auto unexpected_response =
+        std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    unexpected_response->set_type_url(type_url);
+    unexpected_response->set_system_version_info("0");
+    // empty response should call onConfigUpdate on wildcard watch
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0"));
+    onDiscoveryResponse(std::move(unexpected_response));
+  }
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info("1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    std::ignore = response->add_resources()->mutable_resource()->PackFrom(load_assignment);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
+        }));
+    onDiscoveryResponse(std::move(response));
+  }
+}
+
+// DeltaDiscoveryResponse that comes in response to an on-demand request updates the watch with
+// resource's name. The watch is initially created with an alias used in the on-demand request.
+TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
+  setup();
+
+  const std::string& type_url = Config::TestTypeUrl::get().VirtualHost;
+  SubscriptionOptions options;
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, options);
+  // Register a suffix-glob watch so resources named "prefix/<id>" are routed here, without
+  // subscribing to the glob on the wire (mirrors VHDS).
+  watch->accept({"prefix/*"});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+  response->mutable_control_plane()->set_identifier("HAL 9000");
+
+  envoy::config::route::v3::VirtualHost vhost;
+  vhost.set_name("vhost_1");
+  vhost.add_domains("domain1.test");
+  vhost.add_domains("domain2.test");
+
+  std::ignore = response->add_resources()->mutable_resource()->PackFrom(vhost);
+  response->mutable_resources()->at(0).set_name("prefix/vhost_1");
+  response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
+  response->mutable_resources()->at(0).add_aliases("prefix/domain2.test");
+
+  EXPECT_LOG_CONTAINS("debug", "for " + type_url + " from HAL 9000",
+                      onDiscoveryResponse(std::move(response)));
+  EXPECT_TRUE(subscriptionExists(type_url));
+  watch->update({});
+
+  EXPECT_EQ("HAL 9000", stats_.textReadout("control_plane.identifier").value());
+}
+
+// DeltaDiscoveryResponse that comes in response to an on-demand request that couldn't be resolved
+// will contain an empty Resource. The Resource's aliases field will be populated with the alias
+// originally used in the request.
+TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
+  setup();
+
+  const std::string& type_url = Config::TestTypeUrl::get().VirtualHost;
+  SubscriptionOptions options;
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, options);
+  watch->accept({"prefix/*"});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  response->add_resources();
+  response->mutable_resources()->at(0).set_name("not-found");
+  response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
+}
+
+// Validate basic gRPC mux subscriptions to xdstp:// glob collections.
+TEST_P(NewGrpcMuxImplTest, XdsTpGlobCollection) {
+  setup();
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  xds::core::v3::ContextParams context_params;
+  (*context_params.mutable_params())["foo"] = "bar";
+  EXPECT_CALL(local_info_.context_provider_, nodeContext()).WillOnce(ReturnRef(context_params));
+  // We verify that the gRPC mux normalizes the context parameter order below.
+  SubscriptionOptions options;
+  options.add_xdstp_node_context_params_ = true;
+  auto watch = grpc_mux_->addWatch(
+      type_url,
+      {"xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/*?thing=some&some=thing"},
+      callbacks_, resource_decoder_, options);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("ignore");
+  auto* resource = response->add_resources();
+  resource->set_name("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/"
+                     "a?foo=bar&some=thing&thing=some");
+  std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+      .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                          const Protobuf::RepeatedPtrField<std::string>&,
+                                          const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        return absl::OkStatus();
+      }));
+  onDiscoveryResponse(std::move(response));
+}
+
+// Validate basic gRPC mux subscriptions to xdstp:// singletons.
+TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
+  setup();
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  EXPECT_CALL(local_info_.context_provider_, nodeContext()).Times(0);
+  // We verify that the gRPC mux normalizes the context parameter order below. Node context
+  // parameters are skipped.
+  SubscriptionOptions options;
+  auto watch = grpc_mux_->addWatch(type_url,
+                                   {
+                                       "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                                       "bar/baz?thing=some&some=thing",
+                                       "opaque_resource_name",
+                                       "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                                       "bar/blah?thing=some&some=thing",
+                                   },
+                                   callbacks_, resource_decoder_, options);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("ignore");
+  {
+    auto* resource = response->add_resources();
+    resource->set_name(
+        "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/baz?some=thing&thing=some");
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+  }
+  {
+    auto* resource = response->add_resources();
+    resource->set_name("opaque_resource_name");
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+  }
+  {
+    auto* resource = response->add_resources();
+    resource->set_name("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar/"
+                       "blah?some=thing&thing=some");
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+  }
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+      .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                          const Protobuf::RepeatedPtrField<std::string>&,
+                                          const std::string&) {
+        EXPECT_EQ(3, added_resources.size());
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[1].get().resource(), load_assignment));
+        EXPECT_TRUE(TestUtility::protoEqual(added_resources[2].get().resource(), load_assignment));
+        return absl::OkStatus();
+      }));
+  onDiscoveryResponse(std::move(response));
+}
+
+TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
+  setup();
+
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
+  grpc_mux_->start();
+
+  // Additionally add "z" to the watch: it is both subscribed on the wire and routed to this watch.
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"z"}});
+  foo_sub->append({"z"});
+
+  // On watch removal all of its resources -- including the on-demand "z" -- are unsubscribed.
+  expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y", "z"}});
+}
+
+TEST_P(NewGrpcMuxImplTest, Shutdown) {
+  setup();
+  InSequence s;
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
+  grpc_mux_->start();
+
+  shutdownMux();
+  auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
+  // We do not expect any messages to be sent here as the mux has been shutdown
+  // There won't be any unsubscribe messages for the legacy mux either for the same reason
+}
+
+// Validates that the EDS cache getter returns the cache.
+TEST_P(NewGrpcMuxImplTest, EdsResourcesCacheForEds) {
+  eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
+  setup();
+  EXPECT_TRUE(grpc_mux_->edsResourcesCache().has_value());
+}
+
+// Validates that the EDS cache getter returns empty if there is no cache.
+TEST_P(NewGrpcMuxImplTest, EdsResourcesCacheForEdsNoCache) {
+  setup();
+  EXPECT_FALSE(grpc_mux_->edsResourcesCache().has_value());
+}
+
+// Validate that an EDS resource is cached if there's a cache.
+TEST_P(NewGrpcMuxImplTest, CacheEdsResource) {
+  // Create the cache that will also be passed to the GrpcMux object via setup().
+  eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto watch = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
+  grpc_mux_->start();
+
+  // Reply with the resource, it will be added to the cache.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info("1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    auto res = response->add_resources();
+    res->set_name("x");
+    res->set_version("1");
+    load_assignment.set_cluster_name("x");
+    std::ignore = res->mutable_resource()->PackFrom(load_assignment);
+
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
+        }));
+    EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
+    expectSendMessage({.type_url = type_url}); // Ack.
+    onDiscoveryResponse(std::move(response));
+  }
+
+  // Envoy will unsubscribe from all resources.
+  EXPECT_CALL(*eds_resources_cache_, removeResource("x"));
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"x"}});
+}
+
+// Validate that an update to an EDS resource watcher is reflected in the cache,
+// if there's a cache.
+TEST_P(NewGrpcMuxImplTest, UpdateCacheEdsResource) {
+  // Create the cache that will also be passed to the GrpcMux object via setup().
+  eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto watch = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
+  grpc_mux_->start();
+
+  // Reply with the resource, it will be added to the cache.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info("1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    auto res = response->add_resources();
+    res->set_name("x");
+    res->set_version("1");
+    load_assignment.set_cluster_name("x");
+    std::ignore = res->mutable_resource()->PackFrom(load_assignment);
+
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
+        }));
+    EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
+    expectSendMessage({.type_url = type_url}); // Ack.
+    onDiscoveryResponse(std::move(response));
+  }
+
+  // Update the cache to another resource.
+  EXPECT_CALL(*eds_resources_cache_, removeResource("x"));
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_subscribe = {"y"},
+                     .resource_names_unsubscribe = {"x"}});
+  watch->update({"y"});
+
+  // Envoy will unsubscribe from all resources.
+  EXPECT_CALL(*eds_resources_cache_, removeResource("y"));
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"y"}});
+}
+
+// Validate that adding and removing watchers reflects on the cache changes,
+// if there's a cache.
+TEST_P(NewGrpcMuxImplTest, AddRemoveSubscriptions) {
+  // Create the cache that will also be passed to the GrpcMux object via setup().
+  eds_resources_cache_ = new NiceMock<MockEdsResourcesCache>();
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+
+  {
+    auto watch1 = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
+
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+    expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
+    grpc_mux_->start();
+
+    // Reply with the resource, it will be added to the cache.
+    {
+      auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+      response->set_type_url(type_url);
+      response->set_system_version_info("1");
+      envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+      auto res = response->add_resources();
+      res->set_name("x");
+      res->set_version("1");
+      load_assignment.set_cluster_name("x");
+      std::ignore = res->mutable_resource()->PackFrom(load_assignment);
+
+      EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+          .WillOnce(Invoke([&load_assignment](
+                               const std::vector<DecodedResourceRef>& added_resources,
+                               const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+            EXPECT_EQ(1, added_resources.size());
+            EXPECT_TRUE(
+                TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+            return absl::OkStatus();
+          }));
+      EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
+      expectSendMessage({.type_url = type_url}); // Ack.
+      onDiscoveryResponse(std::move(response));
+    }
+
+    // Watcher (watch1) going out of scope, the resource should be removed, as well as
+    // the interest.
+    EXPECT_CALL(*eds_resources_cache_, removeResource("x"));
+    expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"x"}});
+  }
+
+  // Update to a new resource interest.
+  {
+    expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"y"}});
+    auto watch2 = grpc_mux_->addWatch(type_url, {"y"}, callbacks_, resource_decoder_, {});
+
+    // Reply with the resource, it will be added to the cache.
+    {
+      auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+      response->set_type_url(type_url);
+      response->set_system_version_info("2");
+      envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+      auto res = response->add_resources();
+      res->set_name("y");
+      res->set_version("2");
+      load_assignment.set_cluster_name("y");
+      std::ignore = res->mutable_resource()->PackFrom(load_assignment);
+
+      EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2"))
+          .WillOnce(Invoke([&load_assignment](
+                               const std::vector<DecodedResourceRef>& added_resources,
+                               const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+            EXPECT_EQ(1, added_resources.size());
+            EXPECT_TRUE(
+                TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+            return absl::OkStatus();
+          }));
+      EXPECT_CALL(*eds_resources_cache_, setResource("y", ProtoEq(load_assignment)));
+      expectSendMessage({.type_url = type_url}); // Ack.
+      onDiscoveryResponse(std::move(response));
+    }
+
+    // Watcher (watch2) going out of scope, the resource should be removed, as well as
+    // the interest.
+    EXPECT_CALL(*eds_resources_cache_, removeResource("y"));
+    expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"y"}});
+  }
+}
+
+// Updating the mux object while being connected sends the correct requests.
+TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
+  replaced_async_client_ = new Grpc::MockAsyncClient();
+  setup();
+  InSequence s;
+
+  auto foo_sub = grpc_mux_->addWatch("type_url_foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  auto bar_sub = grpc_mux_->addWatch("type_url_bar", {}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "type_url_foo", .resource_names_subscribe = {"x", "y"}});
+  expectSendMessage({.type_url = "type_url_bar"});
+  grpc_mux_->start();
+  EXPECT_EQ(1, control_plane_connected_state_.value());
+
+  // Switch the mux.
+  envoy::config::core::v3::ApiConfigSource empty_ads_config;
+  // Expect a disconnect from the original async_client and stream.
+  EXPECT_CALL(async_stream_, resetStream());
+  // Expect establishing connection to the new client and stream.
+  EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _))
+      .WillOnce(Return(&replaced_async_stream_));
+  // Expect the initial messages to be sent to the new stream.
+  expectSendMessage({.type_url = "type_url_foo",
+                     .resource_names_subscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
+  expectSendMessage({.type_url = "type_url_bar", .async_stream = &replaced_async_stream_});
+  EXPECT_OK(grpc_mux_->updateMuxSource(
+      /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+      /*failover_async_client=*/nullptr,
+      /*scope=*/*stats_.rootScope(),
+      /*backoff_strategy=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      empty_ads_config));
+  // Ending test, removing subscriptions for type_url_foo.
+  expectSendMessage({.type_url = "type_url_foo",
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
+}
+
+// Updating the mux object after receiving a response, sends the correct requests.
+TEST_P(NewGrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
+  replaced_async_client_ = new Grpc::MockAsyncClient();
+  setup();
+  InSequence s;
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
+  grpc_mux_->start();
+
+  // Send back a response for one of the resources.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info("1");
+    response->set_nonce("n1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("x");
+    auto* resource = response->add_resources();
+    resource->set_name("x");
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+    resource->set_version("x1");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
+        }));
+    expectSendMessage({.type_url = type_url, .nonce = "n1"});
+    onDiscoveryResponse(std::move(response));
+  }
+
+  // Switch the mux.
+  envoy::config::core::v3::ApiConfigSource empty_ads_config;
+  // Expect a disconnect from the original async_client and stream.
+  EXPECT_CALL(async_stream_, resetStream());
+  // Expect establishing connection to the new client and stream.
+  EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _))
+      .WillOnce(Return(&replaced_async_stream_));
+  // Expect the initial message to be sent to the new stream.
+  // It will include "x" in its initial_resource_versions.
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_subscribe = {"x", "y"},
+                     .initial_resource_versions = {{"x", "x1"}},
+                     .async_stream = &replaced_async_stream_});
+  EXPECT_OK(grpc_mux_->updateMuxSource(
+      /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+      /*failover_async_client=*/nullptr,
+      /*scope=*/*stats_.rootScope(),
+      /*backoff_strategy=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      empty_ads_config));
+
+  // Send a response to resource "y" on the replaced mux.
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info("2");
+    response->set_nonce("n2");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("y");
+    auto* resource = response->add_resources();
+    resource->set_name("y");
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+    resource->set_version("y1");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2"))
+        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& added_resources,
+                                            const Protobuf::RepeatedPtrField<std::string>&,
+                                            const std::string&) {
+          EXPECT_EQ(1, added_resources.size());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(added_resources[0].get().resource(), load_assignment));
+          return absl::OkStatus();
+        }));
+    expectSendMessage(
+        {.type_url = type_url, .nonce = "n2", .async_stream = &replaced_async_stream_});
+    onDiscoveryResponse(std::move(response));
+  }
+
+  // Ending test, removing subscriptions for the subscription.
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &replaced_async_stream_});
+}
+
+// Updating the mux object with wrong rate limit settings is rejected.
+TEST_P(NewGrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
+  replaced_async_client_ = new Grpc::MockAsyncClient();
+  setup();
+  InSequence s;
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
+  grpc_mux_->start();
+  EXPECT_EQ(1, control_plane_connected_state_.value());
+
+  // Switch the mux.
+  envoy::config::core::v3::ApiConfigSource ads_config_wrong_settings;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
+      ads_config_wrong_settings.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::quiet_NaN());
+  // No disconnect and replacement of the original async_client.
+  EXPECT_CALL(async_stream_, resetStream()).Times(0);
+  EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _)).Times(0);
+  EXPECT_THAT(
+      grpc_mux_->updateMuxSource(
+          /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+          /*failover_async_client=*/nullptr,
+          /*scope=*/*stats_.rootScope(),
+          /*backoff_strategy=*/
+          std::make_unique<JitteredExponentialBackOffStrategy>(
+              SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+              random_),
+          ads_config_wrong_settings),
+      Not(IsOk()));
+  // Ending test, removing subscriptions for type_url_foo.
+  expectSendMessage({.type_url = type_url,
+                     .resource_names_unsubscribe = {"x", "y"},
+                     .async_stream = &async_stream_});
+}
+
+// A temp test to increase coverage. The test will be modified once the
+// implementation will be added.
+TEST_P(NewGrpcMuxImplTest, LrsCoverageIncrease) {
+  setup();
+  EXPECT_EQ(grpc_mux_->loadStatsReporter(), nullptr);
+  EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
+}
+
+TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
+  auto* factory = Config::Utility::getFactoryByName<Config::MuxFactory>(
+      "envoy.config_mux.new_grpc_mux_factory");
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Random::MockRandomGenerator> random;
+  NiceMock<Stats::MockStore> store;
+  Stats::MockScope& scope{store.mockScope()};
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  envoy::config::core::v3::ApiConfigSource ads_config;
+  ads_config.mutable_rate_limit_settings()->mutable_max_tokens()->set_value(100);
+  ads_config.mutable_rate_limit_settings()->mutable_fill_rate()->set_value(
+      std::numeric_limits<double>::quiet_NaN());
+  EXPECT_THROW(factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher,
+                               random, scope, ads_config, local_info, nullptr, nullptr,
+                               std::nullopt, std::nullopt, nullptr),
+               EnvoyException);
+}
+
+TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnConfigAccepted) {
+  use_config_tracker_ = true;
+  setup();
+
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}, .with_node = true});
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_nonce("1");
+  response->set_system_version_info("1");
+
+  // Add added resource
+  auto* resource = response->add_resources();
+  resource->set_name("x");
+  resource->set_version("1");
+  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+  load_assignment.set_cluster_name("x");
+  std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+
+  // Add removed resource
+  response->add_removed_resources("y");
+
+  // Expect callbacks
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1")).WillOnce(Return(absl::OkStatus()));
+  expectSendMessage({.type_url = type_url, .nonce = "1"});
+
+  // Verify onConfigAccepted is called
+  EXPECT_CALL(config_tracker_, onConfigAccepted(type_url, _, _))
+      .WillOnce(Invoke(
+          [](const absl::string_view,
+             absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+             const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+            EXPECT_EQ(1, added_resources.size());
+            EXPECT_EQ("x", added_resources[0]->name());
+            EXPECT_EQ(1, removed_resources.size());
+            EXPECT_EQ("y", removed_resources[0]);
+          }));
+
+  onDiscoveryResponse(std::move(response));
+
+  shutdownMux();
+}
+
+TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnConfigRejected) {
+  use_config_tracker_ = true;
+  setup();
+
+  const std::string& type_url = "foo";
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}, .with_node = true});
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_nonce("1");
+  response->set_system_version_info("1");
+
+  auto* resource = response->add_resources();
+  resource->set_name("x");
+  resource->set_version("1");
+  resource->mutable_resource()->set_type_url("bar"); // Wrong type URL
+
+  std::string response_debug_string = response->DebugString();
+
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
+  expectSendMessage({
+      .type_url = type_url,
+      .nonce = "1",
+      .error_code = Grpc::Status::WellKnownGrpcStatus::Internal,
+      .error_message = fmt::format("type URL bar embedded in an individual Any does not match the "
+                                   "message-wide type URL foo in DeltaDiscoveryResponse {}",
+                                   response_debug_string),
+  });
+
+  // Verify onConfigRejected is called
+  EXPECT_CALL(config_tracker_,
+              onConfigRejected(
+                  testing::An<const envoy::service::discovery::v3::DeltaDiscoveryResponse&>(), _))
+      .WillOnce(Invoke([type_url](const envoy::service::discovery::v3::DeltaDiscoveryResponse& msg,
+                                  const absl::string_view error) {
+        EXPECT_EQ(type_url, msg.type_url());
+        EXPECT_TRUE(absl::StrContains(error, "type URL bar embedded in an individual Any does not "
+                                             "match the message-wide type URL foo"));
+      }));
+
+  onDiscoveryResponse(std::move(response));
+
+  shutdownMux();
+}
+
+} // namespace
+} // namespace Config
+} // namespace Envoy

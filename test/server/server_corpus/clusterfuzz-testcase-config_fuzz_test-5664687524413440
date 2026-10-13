@@ -1,0 +1,214 @@
+node {
+  id: ","
+  cluster: "0"
+  locality {
+    zone: "0"
+    sub_zone: "0"
+  }
+}
+static_resources {
+  listeners {
+    address {
+      pipe {
+        path: "name"
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        source_prefix_ranges {
+          address_prefix: "\177"
+        }
+        transport_protocol: "\177"
+      }
+    }
+    tcp_fast_open_queue_length {
+      value: 99
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "name"
+      }
+    }
+    filter_chains {
+    }
+    tcp_fast_open_queue_length {
+      value: 99
+    }
+  }
+  listeners {
+    name: "listener_0"
+    address {
+      pipe {
+        path: "name"
+      }
+    }
+    filter_chains {
+      tls_context {
+        common_tls_context {
+          tls_params {
+            tls_minimum_protocol_version: TLSv1_2
+            tls_maximum_protocol_version: TLSv1_2
+          }
+          tls_certificate_sds_secret_configs {
+            sds_config {
+              api_config_source {
+                grpc_services {
+                  google_grpc {
+                    target_uri: "name"
+                    stat_prefix: ":"
+                  }
+                }
+              }
+            }
+          }
+        }
+        require_client_certificate {
+        }
+        require_sni {
+        }
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        source_prefix_ranges {
+          address_prefix: "\177"
+        }
+      }
+    }
+    transparent {
+      value: true
+    }
+    listener_filters_timeout {
+      nanos: 1024
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "name"
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        source_prefix_ranges {
+          address_prefix: "\177"
+        }
+      }
+      tls_context {
+        common_tls_context {
+          tls_params {
+            tls_minimum_protocol_version: TLSv1_2
+            tls_maximum_protocol_version: TLSv1_2
+          }
+          tls_certificate_sds_secret_configs {
+            name: "\177"
+            sds_config {
+              api_config_source {
+                grpc_services {
+                  google_grpc {
+                    target_uri: "name"
+                    stat_prefix: ":"
+                  }
+                }
+              }
+            }
+          }
+        }
+        require_client_certificate {
+        }
+        require_sni {
+        }
+      }
+    }
+    tcp_fast_open_queue_length {
+      value: 99
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "name"
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        source_prefix_ranges {
+          address_prefix: "\177"
+        }
+      }
+      tls_context {
+        common_tls_context {
+          tls_params {
+            tls_minimum_protocol_version: TLSv1_2
+            tls_maximum_protocol_version: TLSv1_2
+          }
+          tls_certificate_sds_secret_configs {
+            name: "\177"
+            sds_config {
+              api_config_source {
+                grpc_services {
+                  google_grpc {
+                    target_uri: "name"
+                    stat_prefix: ":"
+                  }
+                }
+              }
+            }
+          }
+        }
+        require_client_certificate {
+        }
+        require_sni {
+        }
+      }
+    }
+    tcp_fast_open_queue_length {
+      value: 99
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "name"
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        source_prefix_ranges {
+          address_prefix: "\177"
+        }
+      }
+    }
+    tcp_fast_open_queue_length {
+      value: 99
+    }
+  }
+  listeners {
+    address {
+      pipe {
+        path: "name"
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        source_prefix_ranges {
+          address_prefix: "\177"
+        }
+      }
+    }
+    tcp_fast_open_queue_length {
+      value: 99
+    }
+  }
+}
+flags_path: " "

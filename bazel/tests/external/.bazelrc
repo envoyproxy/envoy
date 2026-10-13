@@ -1,0 +1,37 @@
+#############################################################################
+# startup
+#############################################################################
+
+startup --host_jvm_args=-Xmx3g
+
+
+#############################################################################
+# global
+#############################################################################
+
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/fc6bed4b571aeb2802c697adc67a6e3205462c57
+
+common --noincompatible_disallow_empty_glob
+
+# hermetic python
+common --@rules_python//python/config_settings:bootstrap_impl=script
+build --incompatible_default_to_explicit_init_py
+
+# prebuilt protoc
+common --incompatible_enable_proto_toolchain_resolution
+common --@protobuf//bazel/toolchains:prefer_prebuilt_protoc
+
+# BCR modules with no registry override — deprecated absl Mutex shims / TSA false positives / fuzz semantics.
+build --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-deprecated-declarations
+build --per_file_copt=external/c-ares.*@-Wno-unused-function
+build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
+build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
+build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
+
+# TODO(phlax): Remove this once a proper fix for the deprecated enum lands
+build --copt=--system-header-prefix=envoy/config/route/v3/route_components.pb.h
+build --per_file_copt=external/envoy_api.*/route_components\.pb\.cc@-Wno-deprecated-declarations
+
+try-import %workspace%/../../../ci.bazelrc
+try-import %workspace%/../../../user.bazelrc

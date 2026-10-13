@@ -1,0 +1,28 @@
+health_check_config {
+  timeout {
+    seconds: 1
+    nanos: 7544832
+  }
+  interval {
+    seconds: 1
+  }
+  interval_jitter {
+    seconds: 1
+  }
+  unhealthy_threshold {
+    value: 2
+  }
+  healthy_threshold {
+    value: 2
+  }
+  http_health_check {
+    path: "/healthcheck"
+    service_name_matcher {
+      prefix: "locations"
+    }
+  }
+}
+actions {
+  respond {
+  }
+}

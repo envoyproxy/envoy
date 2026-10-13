@@ -1,0 +1,107 @@
+#include "envoy/matcher/matcher.h"
+
+#include "source/common/matcher/field_matcher.h"
+#include "source/common/matcher/matcher.h"
+
+#include "test/common/matcher/test_utility.h"
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Matcher {
+
+class FieldMatcherTest : public testing::Test {
+public:
+  std::vector<FieldMatcherPtr<TestData>>
+  createMatchers(std::vector<std::pair<bool, DataAvailability>> values) {
+    std::vector<FieldMatcherPtr<TestData>> matchers;
+
+    matchers.reserve(values.size());
+    for (const auto& v : values) {
+      matchers.emplace_back(
+          SingleFieldMatcher<TestData>::create(std::make_unique<TestInput>(std::nullopt, v.second),
+                                               std::make_unique<BoolMatcher>(v.first))
+              .value());
+    }
+
+    return matchers;
+  }
+
+  std::vector<FieldMatcherPtr<TestData>> createMatchers(std::vector<bool> values) {
+    std::vector<std::pair<bool, DataAvailability>> new_values;
+
+    new_values.reserve(values.size());
+    for (const auto v : values) {
+      new_values.emplace_back(v, DataAvailability::AllDataAvailable);
+    }
+
+    return createMatchers(new_values);
+  }
+};
+
+TEST_F(FieldMatcherTest, SingleFieldMatcher) {
+  EXPECT_EQ(createSingleMatcher("foo", [](auto v) { return v == "foo"; })->match(TestData()),
+            MatchResult::Matched);
+  EXPECT_EQ(createSingleMatcher("foo", [](auto v) { return v != "foo"; })->match(TestData()),
+            MatchResult::NoMatch);
+  EXPECT_EQ(createSingleMatcher(
+                std::nullopt, [](auto v) { return v == "foo"; }, DataAvailability::NotAvailable)
+                ->match(TestData()),
+            MatchResult::InsufficientData);
+  EXPECT_EQ(createSingleMatcher(
+                "fo", [](auto v) { return v == "foo"; }, DataAvailability::MoreDataMightBeAvailable)
+                ->match(TestData()),
+            MatchResult::InsufficientData);
+  EXPECT_EQ(createSingleMatcher(std::nullopt, [](auto v) { return v == "foo"; })->match(TestData()),
+            MatchResult::NoMatch);
+}
+
+TEST_F(FieldMatcherTest, AnyMatcher) {
+  EXPECT_EQ(AnyFieldMatcher<TestData>(createMatchers({true, false})).match(TestData()),
+            MatchResult::Matched);
+  EXPECT_EQ(AnyFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()),
+            MatchResult::Matched);
+  EXPECT_EQ(AnyFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()),
+            MatchResult::NoMatch);
+  EXPECT_EQ(AnyFieldMatcher<TestData>(
+                createMatchers({std::make_pair(false, DataAvailability::MoreDataMightBeAvailable),
+                                std::make_pair(true, DataAvailability::AllDataAvailable)}))
+                .match(TestData()),
+            MatchResult::Matched);
+  EXPECT_EQ(AnyFieldMatcher<TestData>(
+                createMatchers({std::make_pair(false, DataAvailability::MoreDataMightBeAvailable),
+                                std::make_pair(false, DataAvailability::AllDataAvailable)}))
+                .match(TestData()),
+            MatchResult::InsufficientData);
+}
+
+TEST_F(FieldMatcherTest, AllMatcher) {
+  EXPECT_EQ(AllFieldMatcher<TestData>(createMatchers({true, false})).match(TestData()),
+            MatchResult::NoMatch);
+  EXPECT_EQ(AllFieldMatcher<TestData>(createMatchers({true, true})).match(TestData()),
+            MatchResult::Matched);
+  EXPECT_EQ(AllFieldMatcher<TestData>(createMatchers({false, false})).match(TestData()),
+            MatchResult::NoMatch);
+  EXPECT_EQ(AllFieldMatcher<TestData>(
+                createMatchers({std::make_pair(false, DataAvailability::MoreDataMightBeAvailable),
+                                std::make_pair(false, DataAvailability::AllDataAvailable)}))
+                .match(TestData()),
+            MatchResult::InsufficientData);
+}
+
+TEST_F(FieldMatcherTest, NotMatcher) {
+  EXPECT_EQ(NotFieldMatcher<TestData>(
+                std::make_unique<AllFieldMatcher<TestData>>(createMatchers({true, false})))
+                .match(TestData()),
+            MatchResult::Matched);
+
+  EXPECT_EQ(NotFieldMatcher<TestData>(
+                std::make_unique<AllFieldMatcher<TestData>>(createMatchers(
+                    {std::make_pair(false, DataAvailability::MoreDataMightBeAvailable),
+                     std::make_pair(false, DataAvailability::AllDataAvailable)})))
+                .match(TestData()),
+            MatchResult::InsufficientData);
+}
+
+} // namespace Matcher
+} // namespace Envoy

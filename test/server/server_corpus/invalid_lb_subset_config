@@ -1,0 +1,34 @@
+static_resources {
+  clusters {
+    name: "my_clusters"
+    type: STRICT_DNS
+    connect_timeout {
+      seconds: 2304
+    }
+    lb_subset_config {
+      subset_selectors {
+        keys: "key1"
+        keys: "key2"
+        single_host_per_subset: true
+      }
+      list_as_any: true
+    }
+    load_assignment {
+      cluster_name: "cluster_1"
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                protocol: UDP
+                address: "0.0.0.0"
+                ipv4_compat: true
+              }
+            }
+          }
+        }
+        priority: 112
+      }
+    }
+  }
+}

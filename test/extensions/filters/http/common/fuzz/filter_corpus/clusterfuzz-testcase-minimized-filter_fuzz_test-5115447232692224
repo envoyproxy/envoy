@@ -1,0 +1,29 @@
+config {
+  name: "envoy.filters.http.grpc_http1_reverse_bridge"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig"
+    value: "\n\020application/grpc"
+  }
+}
+data {
+  headers {
+    headers {
+      key: "content-type"
+      value: "application/grpc"
+    }
+  }
+  http_body {
+    data: "\000\000\000\000\000\000\000\000"
+  }
+}
+upstream_data {
+  headers {
+    headers {
+      key: "content-type"
+      value: "application/grpc"
+    }
+  }
+  http_body {
+    data: "\000\000\000\000\000\000\000\000"
+  }
+}

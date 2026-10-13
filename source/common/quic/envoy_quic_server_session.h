@@ -1,0 +1,205 @@
+#pragma once
+
+#include <memory>
+#include <ostream>
+
+#include "source/common/http/session_idle_list_interface.h"
+#include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_stat_names.h"
+#include "source/common/quic/send_buffer_monitor.h"
+
+#include "quiche/quic/core/http/quic_server_session_base.h"
+#include "quiche/quic/core/quic_crypto_server_stream.h"
+#include "quiche/quic/core/tls_server_handshaker.h"
+
+namespace Envoy {
+namespace Quic {
+
+#define QUIC_CONNECTION_STATS(COUNTER)                                                             \
+  COUNTER(num_server_migration_detected)                                                           \
+  COUNTER(num_packets_rx_on_preferred_address)
+
+struct QuicConnectionStats {
+  QUIC_CONNECTION_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+using FilterChainToConnectionMap =
+    absl::flat_hash_map<const Network::FilterChain*,
+                        std::list<std::reference_wrapper<Network::Connection>>>;
+using ConnectionMapIter = std::list<std::reference_wrapper<Network::Connection>>::iterator;
+
+// Used to track the matching filter chain and its position in the filter chain to connection map.
+struct ConnectionMapPosition {
+  ConnectionMapPosition(FilterChainToConnectionMap& connection_map,
+                        const Network::FilterChain& filter_chain, ConnectionMapIter iterator)
+      : connection_map_(connection_map), filter_chain_(filter_chain), iterator_(iterator) {}
+
+  // Stores the map from filter chain of connections.
+  FilterChainToConnectionMap& connection_map_;
+  // The matching filter chain of a connection.
+  const Network::FilterChain& filter_chain_;
+  // The position of the connection in the map.
+  ConnectionMapIter iterator_;
+};
+
+// Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
+// TODO(danzh) Lifetime of quic connection and filter manager connection can be
+// simplified by changing the inheritance to a member variable instantiated
+// before quic_connection_.
+class EnvoyQuicServerSession : public quic::QuicServerSessionBase,
+                               public QuicFilterManagerConnectionImpl,
+                               public Envoy::Http::IdleSessionInterface {
+public:
+  EnvoyQuicServerSession(
+      const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
+      std::unique_ptr<EnvoyQuicServerConnection> connection, quic::QuicSession::Visitor* visitor,
+      quic::QuicCryptoServerStreamBase::Helper* helper,
+      const quic::QuicCryptoServerConfig* crypto_config,
+      quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
+      uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+      std::unique_ptr<StreamInfo::StreamInfo>&& stream_info, QuicConnectionStats& connection_stats,
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+      Http::SessionIdleListInterface* session_idle_list);
+
+  ~EnvoyQuicServerSession() override;
+
+  // Network::Connection
+  absl::string_view requestedServerName() const override;
+  void dumpState(std::ostream&, int) const override {
+    // TODO(kbaichoo): Implement dumpState for H3.
+  }
+
+  // Called by QuicHttpServerConnectionImpl before creating data streams.
+  void setHttpConnectionCallbacks(Http::ServerConnectionCallbacks& callbacks) {
+    http_connection_callbacks_ = &callbacks;
+  }
+
+  void setH3GoAwayLoadShedPoints(Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch,
+                                 Server::LoadShedPoint* should_send_go_away_on_dispatch) {
+    ENVOY_LOG_ONCE_IF(trace, should_send_go_away_and_close_on_dispatch == nullptr,
+                      "LoadShedPoint "
+                      "envoy.load_shed_points.http3_server_go_away_and_close_on_dispatch "
+                      "is not found. Is it configured?");
+    ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch == nullptr,
+                      "LoadShedPoint envoy.load_shed_points.http3_server_go_away_on_dispatch "
+                      "is not found. Is it configured?");
+    should_send_go_away_and_close_on_dispatch_ = should_send_go_away_and_close_on_dispatch;
+    should_send_go_away_on_dispatch_ = should_send_go_away_on_dispatch;
+  }
+
+  // quic::QuicSession
+  void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
+                          quic::ConnectionCloseSource source) override;
+  void Initialize() override;
+  void OnCanWrite() override;
+  void OnTlsHandshakeComplete() override;
+  void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+  void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                        const quic::QuicSocketAddress& peer_address,
+                        const quic::QuicReceivedPacket& packet) override;
+  std::vector<absl::string_view>::const_iterator
+  SelectAlpn(const std::vector<absl::string_view>& alpns) const override;
+
+  void setHeadersWithUnderscoreAction(
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action) {
+    headers_with_underscores_action_ = headers_with_underscores_action;
+  }
+
+  void storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
+                                  const Network::FilterChain& filter_chain,
+                                  ConnectionMapIter position);
+
+  // Called by `EnvoyTlsServerHandshaker::VerifyCertChain` when the client certificate chains to the
+  // configured trust anchor, with the chain built during verification (leaf first, issuers
+  // following). Marks the connection's SSL info as validated; the chain serves the
+  // validated-issuer accessors.
+  void setClientCertificateValidated(const std::vector<bssl::UniquePtr<X509>>& validated_chain);
+
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
+    return false;
+  }
+
+  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
+
+  // Overridden to remove the session from the idle list when the last stream is
+  // closed.
+  void OnStreamClosed(quic::QuicStreamId id) override;
+
+  // IdleSessionInterface
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void TerminateIdleSession() override;
+
+  using quic::QuicSession::PerformActionOnActiveStreams;
+
+  // Associates the stream with an HTTP request decoder (creates the HCM stream). For WebTransport
+  // sessions this is deferred from CreateIncomingStream() until real request headers arrive, so a
+  // WebTransport data stream (whose first frame is WEBTRANSPORT_STREAM, not HEADERS) never becomes
+  // an HCM stream. Called by EnvoyQuicServerStream::OnInitialHeadersComplete().
+  void setUpRequestDecoder(EnvoyQuicServerStream& stream);
+
+protected:
+  // quic::QuicServerSessionBase
+  std::unique_ptr<quic::QuicCryptoServerStreamBase>
+  CreateQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
+                               quic::QuicCompressedCertsCache* compressed_certs_cache) override;
+  quic::QuicSSLConfig GetSSLConfig() const override;
+
+  // quic::QuicSession
+  // Overridden to create stream as encoder and associate it with an decoder.
+  quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
+  quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
+
+  quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  quic::WebTransportHttp3VersionSet LocallySupportedWebTransportVersions() const override;
+#endif
+
+  // QuicFilterManagerConnectionImpl
+  bool hasDataToWrite() override;
+  // Used by base class to access quic connection after initialization.
+  const quic::QuicConnection* quicConnection() const override;
+  quic::QuicConnection* quicConnection() override;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void MaybeAddSessionToIdleList();
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void MaybeRemoveSessionFromIdleList();
+
+private:
+  void ActivateStream(std::unique_ptr<quic::QuicStream> stream) override;
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void OnLastActiveStreamClosed();
+
+  std::unique_ptr<EnvoyQuicServerConnection> quic_connection_;
+  // These callbacks are owned by network filters and quic session should out live
+  // them.
+  Http::ServerConnectionCallbacks* http_connection_callbacks_{nullptr};
+
+  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+      headers_with_underscores_action_;
+
+  EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
+  std::optional<ConnectionMapPosition> position_;
+  QuicConnectionStats& connection_stats_;
+  quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
+  std::unique_ptr<quic::QuicConnectionDebugVisitor> debug_visitor_;
+  // Load shed points for H3 GoAway
+  Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_ = nullptr;
+  Server::LoadShedPoint* should_send_go_away_on_dispatch_ = nullptr;
+  Http::SessionIdleListInterface* session_idle_list_;
+  bool h3_go_away_sent_ = false;
+  bool on_connection_closed_called_ = false;
+  bool is_in_idle_list_ = false;
+  // Whether the SSL object will be released after the handshake, in which case the peer
+  // certificate chain is cached at handshake completion.
+  bool reset_ssl_after_handshake_enabled_ = false;
+};
+
+} // namespace Quic
+} // namespace Envoy

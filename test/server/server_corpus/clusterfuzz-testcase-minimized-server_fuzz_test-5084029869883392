@@ -1,0 +1,9 @@
+static_resources {
+  listeners {
+    address {
+      envoy_internal_address {
+        server_listener_name: "ipv6"
+      }
+    }
+  }
+}

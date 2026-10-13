@@ -1,0 +1,15 @@
+date: September 14, 2024
+
+bug_fixes:
+- area: c-ares
+  change: |
+    Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
+- area: dependencies
+  change: |
+    Update curl to mitigate CVE-2024-7264.
+
+new_features:
+- area: access_log
+  change: |
+    added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
+    ``alt_stat_name`` is set.

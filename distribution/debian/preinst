@@ -1,0 +1,47 @@
+#! /bin/sh
+
+# preinst script for envoy
+
+set -e
+
+addenvoyuser() {
+    if ! getent group envoy >/dev/null; then
+        addgroup --system envoy >/dev/null
+    fi
+
+    if ! getent passwd envoy >/dev/null; then
+        adduser \
+          --system \
+          --disabled-login \
+          --ingroup envoy \
+          --no-create-home \
+          --home /nonexistent \
+          --gecos "envoy user" \
+          --shell /bin/false \
+          envoy  >/dev/null
+
+    fi
+}
+
+case "$1" in
+
+    install)
+        addenvoyuser
+        ;;
+
+    upgrade)
+        addenvoyuser
+        ;;
+
+    abort-upgrade)
+        ;;
+
+    *)
+        echo "preinst called with unknown argument \`$1'" >&2
+        exit 0
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

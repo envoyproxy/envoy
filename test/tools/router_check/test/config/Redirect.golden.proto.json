@@ -1,0 +1,134 @@
+{
+  "tests": [
+    {
+      "test_name": "Test_1",
+      "input": {
+        "authority": "www.foo.com",
+        "path": "/foo",
+        "method": "GET",
+        "internal": true,
+        "ssl": true
+      },
+      "validate": {"path_redirect": ""}
+    },
+    {
+      "test_name": "Test_2",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/foo",
+        "method": "GET",
+        "ssl": true,
+        "internal": true
+      },
+      "validate": {"path_redirect": ""}
+    },
+    {
+      "test_name": "Test_3",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/foo",
+        "method": "GET",
+        "ssl": false,
+        "internal": false
+      },
+      "validate": {"path_redirect": "https://www.lyft.com/foo"}
+    },
+    {
+      "test_name": "Test_4",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/foo",
+        "method": "GET",
+        "internal": true
+      },
+      "validate": {"path_redirect": ""}
+    },
+    {
+      "test_name": "Test_5",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/foo",
+        "method": "GET"
+      },
+      "validate": {"path_redirect": "https://api.lyft.com/foo"}
+    },
+    {
+      "test_name": "Test_6",
+      "input": {
+        "authority": "redirect.lyft.com",
+        "path": "/foo",
+        "method": "GET",
+        "ssl": false,
+        "internal": false
+      },
+      "validate": {"path_redirect": "http://new.lyft.com/foo"}
+    },
+    {
+      "test_name": "Test_7",
+      "input": {
+        "authority": "redirect.lyft.com",
+        "path": "/bar",
+        "method": "GET",
+        "ssl": true
+      },
+      "validate": {"path_redirect": "https://redirect.lyft.com/new_bar"}
+    },
+    {
+      "test_name": "Test_8",
+      "input": {
+        "authority": "redirect.lyft.com",
+        "path": "/baz",
+        "method": "GET",
+        "ssl": true,
+        "internal": false
+      },
+      "validate": {"path_redirect": "https://new.lyft.com/new_baz"}
+    },
+    {
+      "test_name": "Test_9",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/pretest",
+        "method": "GET",
+        "ssl": true
+      },
+      "validate": {
+        "host_rewrite": "api.lyft.com",
+        "virtual_host_name": "api",
+        "path_rewrite": "/pre/test",
+        "cluster_name": "www2"
+      }
+    },
+    {
+      "test_name": "Test_10",
+      "input": {
+        "authority": "api.lyft.com",
+        "path": "/secondtest",
+        "method": "GET",
+        "ssl": true
+      },
+      "validate": {
+        "host_rewrite": "api.lyft.com",
+        "virtual_host_name": "api",
+        "path_rewrite": "/second/test",
+        "cluster_name": "www2"
+      }
+    },
+    {
+      "test_name": "Test_11",
+      "input": {
+        "authority": "redirect.lyft.com",
+        "path": "/rewrite",
+        "method": "GET",
+        "ssl": true
+      },
+      "validate": {
+        "host_rewrite": "",
+        "virtual_host_name": "",
+        "path_rewrite": "",
+        "cluster_name": "",
+        "path_redirect": "https://redirect.lyft.com/blah"
+      }
+    }
+  ]
+}

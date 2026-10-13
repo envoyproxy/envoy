@@ -1,0 +1,51 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.h"
+#include "envoy/extensions/filters/http/set_filter_state/v3/set_filter_state.pb.validate.h"
+
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/common/set_filter_state/filter_config.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace SetFilterState {
+
+class SetFilterState : public Http::PassThroughDecoderFilter,
+                       public Logger::Loggable<Logger::Id::filter> {
+public:
+  explicit SetFilterState(const Filters::Common::SetFilterState::ConfigSharedPtr config);
+
+  // StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
+
+private:
+  const Filters::Common::SetFilterState::ConfigSharedPtr config_;
+};
+
+/**
+ * Config registration. @see NamedHttpFilterConfigFactory.
+ */
+class SetFilterStateConfig : public Common::UnifiedFactoryBase<
+                                 envoy::extensions::filters::http::set_filter_state::v3::Config> {
+public:
+  SetFilterStateConfig() : UnifiedFactoryBase("envoy.filters.http.set_filter_state") {}
+
+private:
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
+      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+};
+
+} // namespace SetFilterState
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

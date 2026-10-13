@@ -1,0 +1,74 @@
+name: Precheck/publish
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      dockerhub-token:
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
+  cancel-in-progress: true
+
+
+jobs:
+  publish:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.name || matrix.target }}
+    with:
+      arch: ${{ matrix.arch }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe' }}
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
+      concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
+      rbe: ${{ matrix.rbe }}
+      request: ${{ inputs.request }}
+      runs-on: ${{ matrix.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu  }}
+      timeout-minutes: ${{ matrix.timeout-minutes || 120 }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+        FAILED
+        FAIL:
+      skip: ${{ matrix.skip != false && true || false }}
+      steps-post: ${{ matrix.steps-post }}
+      target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.target-suffix }}
+      trusted: ${{ inputs.trusted }}
+      uploads: ${{ matrix.uploads }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: release.test_only
+          name: Release (x64)
+          target-suffix: x64
+          arch: x64
+          rbe: true
+        - target: release.test_only
+          name: Release (arm64)
+          target-suffix: arm64
+          arch: arm64
+          rbe: true
+          runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
+          timeout-minutes: 180
+        - target: config
+          name: Config
+          rbe: true
+          skip: ${{ ! fromJSON(inputs.request).run.precheck-publish-config }}

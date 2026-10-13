@@ -1,0 +1,69 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "bar"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/foo/bar/baz"
+      }
+      route {
+        cluster: "foo_bar_baz"
+      }
+    }
+    routes {
+      match {
+        prefix: "/foo/bar"
+      }
+      route {
+        cluster: "foo_bar"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "default"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "bat.com"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

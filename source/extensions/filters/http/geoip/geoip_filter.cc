@@ -1,0 +1,137 @@
+#include "source/extensions/filters/http/geoip/geoip_filter.h"
+
+#include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
+
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+
+#include "absl/memory/memory.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace Geoip {
+
+GeoipFilterConfig::GeoipFilterConfig(
+    const envoy::extensions::filters::http::geoip::v3::Geoip& config,
+    const std::string& stat_prefix, Stats::Scope& scope)
+    : scope_(scope), stat_name_set_(scope.symbolTable().makeSet("Geoip")),
+      stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")), use_xff_(config.has_xff_config()),
+      xff_num_trusted_hops_(config.has_xff_config() ? config.xff_config().xff_num_trusted_hops()
+                                                    : 0),
+      ip_address_header_(config.has_custom_header_config()
+                             ? std::make_optional<Http::LowerCaseString>(
+                                   config.custom_header_config().header_name())
+                             : std::nullopt) {
+  stat_name_set_->rememberBuiltin("total");
+  stat_name_set_->rememberBuiltin("skipped");
+}
+
+void GeoipFilterConfig::incCounter(Stats::StatName name) {
+  Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
+  scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
+}
+
+GeoipFilter::GeoipFilter(GeoipFilterConfigSharedPtr config, Geolocation::DriverSharedPtr driver)
+    : config_(config), driver_(std::move(driver)) {}
+
+GeoipFilter::~GeoipFilter() = default;
+
+void GeoipFilter::onDestroy() { destroyed_ = true; }
+
+Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Save request headers for later header manipulation once geolocation lookups are complete.
+  request_headers_ = headers;
+
+  Network::Address::InstanceConstSharedPtr remote_address;
+  const auto& ip_address_header = config_->ipAddressHeader();
+  if (ip_address_header.has_value()) {
+    // Extract IP address from the configured custom header.
+    const auto header_value = headers.get(ip_address_header.value());
+    if (!header_value.empty()) {
+      const std::string ip_string(header_value[0]->value().getStringView());
+      remote_address = Network::Utility::parseInternetAddressNoThrow(ip_string);
+      if (remote_address == nullptr) {
+        ENVOY_LOG(debug, "Geoip filter: failed to parse IP address from header '{}': '{}'",
+                  ip_address_header->get(), ip_string);
+      }
+    } else {
+      ENVOY_LOG(debug, "Geoip filter: configured header '{}' is missing from request",
+                ip_address_header->get());
+    }
+  } else if (config_->useXff() && config_->xffNumTrustedHops() > 0) {
+    remote_address =
+        Envoy::Http::Utility::getLastAddressFromXFF(headers, config_->xffNumTrustedHops()).address_;
+  }
+  // Fallback to the downstream connection source address if no other address source is configured
+  // or if extraction from the configured source failed.
+  if (!remote_address) {
+    remote_address = decoder_callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
+  }
+
+  // A geolocation lookup needs an IP address, and the downstream connection address is not
+  // necessarily one: a connection accepted on an internal listener carries an Envoy internal
+  // address, and a Unix domain socket carries a pipe address. Skip the lookup rather than hand
+  // either to the provider, and let the request through untouched.
+  if (remote_address == nullptr || remote_address->ip() == nullptr) {
+    ENVOY_LOG(debug, "Geoip filter: skipping lookup, no IP address available for the request");
+    config_->incSkipped();
+    config_->incTotal();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  ASSERT(driver_, "No driver is available to perform geolocation lookup");
+
+  // Capturing weak_ptr to GeoipFilter so that filter can be safely accessed in the posted callback.
+  // This is a safe measure to protect against the case when filter gets deleted before the callback
+  // is run.
+  GeoipFilterWeakPtr self = weak_from_this();
+  driver_->lookup(
+      Geolocation::LookupRequest{std::move(remote_address)},
+      [self, &dispatcher = decoder_callbacks_->dispatcher()](Geolocation::LookupResult&& result) {
+        dispatcher.post([self, result]() {
+          if (GeoipFilterSharedPtr filter = self.lock()) {
+            filter->onLookupComplete(std::move(result));
+          }
+        });
+      });
+
+  // Stop the iteration for headers and data (POST request) for the current filter and the filters
+  // following.
+  return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+}
+
+Http::FilterDataStatus GeoipFilter::decodeData(Buffer::Instance&, bool) {
+  return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus GeoipFilter::decodeTrailers(Http::RequestTrailerMap&) {
+  return Http::FilterTrailersStatus::Continue;
+}
+
+void GeoipFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  decoder_callbacks_ = &callbacks;
+}
+
+void GeoipFilter::onLookupComplete(Geolocation::LookupResult&& result) {
+  // The lookup may complete after the stream has been torn down and the filter self hasn't been
+  // destructed because the deferred removal mechanism. Do nothing in this edge case.
+  if (destroyed_) {
+    ENVOY_LOG(debug, "Geoip filter: stream destroyed before lookup completed, dropping result");
+    return;
+  }
+  ASSERT(request_headers_);
+  for (const auto& [geo_header, lookup_value] : result) {
+    if (!lookup_value.empty()) {
+      request_headers_->setCopy(Http::LowerCaseString(geo_header), lookup_value);
+    }
+  }
+  config_->incTotal();
+  ENVOY_LOG(debug, "Geoip filter: finished decoding geolocation headers");
+  decoder_callbacks_->continueDecoding();
+}
+
+} // namespace Geoip
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

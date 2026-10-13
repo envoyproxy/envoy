@@ -1,0 +1,39 @@
+{% import "macros.html" as macros %}
+{% extends "base.html" %}
+
+{% block title %}Envoy coverage report - {{ current }} {% endblock title %}
+
+{%- block content -%}
+{{ macros::summary(parents=parents, stats=stats, precision=precision) }}
+<table class="table is-fullwidth">
+  <thead>
+    <tr>
+      <th>{{ kind }}</th>
+      <th class="has-text-centered" colspan="3">Line Coverage</th>
+      <th class="has-text-centered" colspan="2">Functions</th>
+      {% if branch_enabled %}
+      <th class="has-text-centered" colspan="2">Branches</th>
+      {% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {%- if kind == "Directory" -%}
+    {%- for item, info in items -%}
+    {% if info.abs_prefix and info.abs_prefix != "" %}
+    {{ macros::stats_line(name=item, url=info.abs_prefix~item~"/index.html", stats=info.stats, precision=precision) }}
+    {% else %}
+    {{ macros::stats_line(name=item, url=item~"/index.html", stats=info.stats, precision=precision) }}
+    {% endif %}
+    {%- endfor -%}
+    {%- else -%}
+    {%- for item, info in items -%}
+    {% if info.abs_prefix and info.abs_prefix != "" %}
+    {{ macros::stats_line(name=item, url=info.abs_prefix~"/"~item~".html", stats=info.stats, precision=precision) }}
+    {% else %}
+    {{ macros::stats_line(name=item, url=item~".html", stats=info.stats, precision=precision) }}
+    {% endif %}
+    {%- endfor -%}
+    {%- endif -%}
+  </tbody>
+</table>
+{%- endblock content -%}

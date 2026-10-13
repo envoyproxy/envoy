@@ -1,0 +1,34 @@
+#pragma once
+
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "envoy/upstream/upstream.h"
+
+namespace Envoy {
+namespace Upstream {
+
+/**
+ * Default implementation of UpstreamLocalAddressSelector.
+ *
+ * See :ref:`DefaultLocalAddressSelector
+ * <envoy_v3_api_msg_config.upstream.local_address_selector.v3.DefaultLocalAddressSelector>`
+ * for a description of the behavior of this implementation.
+ */
+class DefaultUpstreamLocalAddressSelector : public UpstreamLocalAddressSelectorBase {
+public:
+  DefaultUpstreamLocalAddressSelector(
+      std::vector<::Envoy::Upstream::UpstreamLocalAddress>&& upstream_local_addresses);
+
+private:
+  // UpstreamLocalAddressSelectorBase
+  UpstreamLocalAddress getUpstreamLocalAddressImpl(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address,
+      OptRef<const Network::TransportSocketOptions> transport_socket_options) const override;
+
+  std::vector<UpstreamLocalAddress> upstream_local_addresses_;
+};
+
+} // namespace Upstream
+} // namespace Envoy

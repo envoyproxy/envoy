@@ -1,0 +1,39 @@
+#include "source/extensions/filters/http/thrift_to_metadata/config.h"
+
+#include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/thrift_to_metadata/filter.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ThriftToMetadata {
+
+ThriftToMetadataConfig::ThriftToMetadataConfig()
+    : UnifiedFactoryBase("envoy.filters.http.thrift_to_metadata") {}
+
+absl::StatusOr<Http::FilterFactoryCb> ThriftToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::thrift_to_metadata::v3::ThriftToMetadata& proto_config,
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  absl::Status creation_status = absl::OkStatus();
+  std::shared_ptr<FilterConfig> config =
+      std::make_shared<FilterConfig>(proto_config, extra_context.scopeOr(context), creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<Filter>(config));
+  };
+}
+
+/**
+ * Static registration for this filter. @see RegisterFactory.
+ */
+REGISTER_FACTORY(ThriftToMetadataConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+
+} // namespace ThriftToMetadata
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

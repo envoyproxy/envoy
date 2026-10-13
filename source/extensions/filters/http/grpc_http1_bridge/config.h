@@ -1,0 +1,31 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace GrpcHttp1Bridge {
+
+/**
+ * Config registration for the grpc HTTP1 bridge filter. @see NamedHttpFilterConfigFactory.
+ */
+class GrpcHttp1BridgeFilterConfig
+    : public Common::UnifiedFactoryBase<
+          envoy::extensions::filters::http::grpc_http1_bridge::v3::Config> {
+public:
+  GrpcHttp1BridgeFilterConfig() : UnifiedFactoryBase("envoy.filters.http.grpc_http1_bridge") {}
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+};
+
+} // namespace GrpcHttp1Bridge
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

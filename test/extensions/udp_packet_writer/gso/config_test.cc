@@ -1,0 +1,41 @@
+#include "envoy/extensions/udp_packet_writer/v3/udp_gso_batch_writer_factory.pb.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+
+#include "source/extensions/udp_packet_writer/gso/config.h"
+
+#include "test/mocks/server/listener_factory_context.h"
+
+#include "gmock/gmock.h"
+
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Quic {
+
+TEST(FactoryTest, Name) {
+  UdpGsoBatchWriterFactoryFactory factory;
+  EXPECT_EQ(factory.name(), "envoy.udp_packet_writer.gso");
+}
+
+TEST(FactoryTest, CreateEmptyConfigProto) {
+  UdpGsoBatchWriterFactoryFactory factory;
+  EXPECT_TRUE(factory.createEmptyConfigProto() != nullptr);
+}
+
+TEST(FactoryTest, CreateUdpPacketWriterFactory) {
+  UdpGsoBatchWriterFactoryFactory factory;
+  envoy::extensions::udp_packet_writer::v3::UdpGsoBatchWriterFactory writer_config;
+  envoy::config::core::v3::TypedExtensionConfig config;
+  std::ignore = config.mutable_typed_config()->PackFrom(writer_config);
+  testing::NiceMock<Server::Configuration::MockListenerFactoryContext> listener_context;
+  EXPECT_TRUE(factory.createUdpPacketWriterFactory(config, listener_context) != nullptr);
+}
+
+} // namespace Quic
+} // namespace Envoy
+
+#endif
+#endif

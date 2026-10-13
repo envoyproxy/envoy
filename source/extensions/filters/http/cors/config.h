@@ -1,0 +1,37 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/cors/v3/cors.pb.h"
+#include "envoy/extensions/filters/http/cors/v3/cors.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace Cors {
+
+/**
+ * Config registration for the cors filter. @see NamedHttpFilterConfigFactory.
+ */
+class CorsFilterFactory
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::cors::v3::Cors,
+                                        envoy::extensions::filters::http::cors::v3::CorsPolicy> {
+public:
+  CorsFilterFactory() : UnifiedFactoryBase("envoy.filters.http.cors") {}
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::cors::v3::Cors& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::cors::v3::CorsPolicy& policy,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
+};
+
+} // namespace Cors
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

@@ -1,0 +1,114 @@
+name: Check/coverage
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      dockerhub-token:
+      gcp-key:
+        required: true
+
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-coverage
+  cancel-in-progress: true
+
+
+jobs:
+  coverage:
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.name ||matrix.target }}
+    with:
+      bazel-extra: '--config=rbe'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+        lower than limit
+        FAILED
+        FAIL:
+      rbe: true
+      request: ${{ inputs.request }}
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
+      steps-post: ${{ matrix.steps-post }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 180
+      uploads: |
+        ${{ matrix.target }}: generated/${{ matrix.target }}/html
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: coverage
+          name: Coverage
+          steps-post: |
+            - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+              with:
+                output-path: generated/coverage/html/gcs-metadata.json
+                input-format: yaml
+                input: |
+                  bucket: ${{
+                    inputs.trusted
+                    && vars.GCS_ARTIFACT_BUCKET_POST
+                    || vars.GCS_ARTIFACT_BUCKET_PRE }}
+                  sha: ${{ fromJSON(inputs.request).request.sha }}
+                  path_upload: coverage
+                  redirect: ${{
+                    vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+                    }}${{ fromJSON(inputs.request).request.pr
+                          || fromJSON(inputs.request).request.target-branch }}
+            - shell: bash
+              run: |
+                ln -sf %{{ github.workspace }}/generated %{{ runner.temp }}/generated
+        - target: fuzz_coverage
+          name: Fuzz coverage
+          steps-post: |
+            - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+              with:
+                output-path: generated/fuzz_coverage/html/gcs-metadata.json
+                input-format: yaml
+                input: |
+                  bucket: ${{
+                    inputs.trusted
+                    && vars.GCS_ARTIFACT_BUCKET_POST
+                    || vars.GCS_ARTIFACT_BUCKET_PRE }}
+                  sha: ${{ fromJSON(inputs.request).request.sha }}
+                  path_upload: fuzz_coverage
+                  redirect: ${{
+                    vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+                    }}${{ fromJSON(inputs.request).request.pr
+                          || fromJSON(inputs.request).request.target-branch }}
+            - shell: bash
+              run: |
+                ln -sf %{{ github.workspace }}/generated %{{ runner.temp }}/generated
+
+  upload:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
+    if: >-
+      !cancelled()
+    needs: coverage
+    uses: ./.github/workflows/_upload_gcs.yml
+    with:
+      artifacts: |
+        ["coverage", "fuzz_coverage"]
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}

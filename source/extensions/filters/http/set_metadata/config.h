@@ -1,0 +1,37 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace SetMetadataFilter {
+
+/**
+ * Config registration for the header-to-metadata filter. @see NamedHttpFilterConfigFactory.
+ */
+class SetMetadataConfig : public Common::UnifiedFactoryBase<
+                              envoy::extensions::filters::http::set_metadata::v3::Config> {
+public:
+  SetMetadataConfig() : UnifiedFactoryBase("envoy.filters.http.set_metadata") {}
+
+private:
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
+};
+
+} // namespace SetMetadataFilter
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

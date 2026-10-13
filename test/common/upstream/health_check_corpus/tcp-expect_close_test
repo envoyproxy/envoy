@@ -1,0 +1,53 @@
+health_check_config {
+    timeout {
+        seconds: 1
+    }
+    interval {
+        seconds: 1
+    }
+    unhealthy_threshold {
+        value: 2
+    }
+    healthy_threshold: {
+        value: 2
+    }
+    reuse_connection {
+        value: false
+    }
+    tcp_health_check {
+        send {
+            text: "01"
+        }
+        receive [{
+            text: "02"
+        }]
+    }
+}
+actions {
+    respond {
+        http_respond {
+            status: "1"
+        }
+        tcp_respond {
+            data: "\x02"
+        }
+    }
+}
+actions {
+    raise_event: REMOTE_CLOSE
+}
+actions {
+    respond {
+        http_respond {
+            status: "1"
+        }
+        tcp_respond {
+            data: "\x02"
+        }
+    }
+}
+actions {
+    trigger_interval_timer {
+        
+    }
+}

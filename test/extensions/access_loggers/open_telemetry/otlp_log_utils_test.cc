@@ -1,0 +1,691 @@
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
+
+#include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/utility.h"
+
+#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+#include "opentelemetry/proto/resource/v1/resource.pb.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace AccessLoggers {
+namespace OpenTelemetry {
+namespace {
+
+using testing::_;
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
+
+// A minimal command parser that resolves the "%FAKE_COMMAND%" token to a fixed value, used to
+// verify that configured formatter command parsers are threaded into custom_tags creation.
+class FakeCommandParser : public Formatter::CommandParser {
+public:
+  class Provider : public Formatter::FormatterProvider {
+  public:
+    std::optional<std::string> format(const Formatter::Context&,
+                                      const StreamInfo::StreamInfo&) const override {
+      return "fake_value";
+    }
+    Protobuf::Value formatValue(const Formatter::Context&,
+                                const StreamInfo::StreamInfo&) const override {
+      return ValueUtil::stringValue("fake_value");
+    }
+    bool formatTo(std::string& sink, const Formatter::Context&,
+                  const StreamInfo::StreamInfo&) const override {
+      sink.append("fake_value");
+      return true;
+    }
+    void formatValueTo(Formatter::ValueSink& sink, const Formatter::Context&,
+                       const StreamInfo::StreamInfo&) const override {
+      sink.addString("fake_value");
+    }
+  };
+
+  absl::StatusOr<Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view, std::optional<size_t>) const override {
+    if (command == "FAKE_COMMAND") {
+      return std::make_unique<Provider>();
+    }
+    return {nullptr};
+  }
+};
+
+const std::string kTestZone = "test_zone";
+const std::string kTestCluster = "test_cluster";
+const std::string kTestNode = "test_node";
+
+TEST(OtlpLogUtilsTest, GetStringKeyValue) {
+  auto kv = getStringKeyValue("test_key", "test_value");
+  EXPECT_EQ("test_key", kv.key());
+  EXPECT_EQ("test_value", kv.value().string_value());
+}
+
+TEST(OtlpLogUtilsTest, PackUnpackBody) {
+  ::opentelemetry::proto::common::v1::AnyValue body;
+  body.set_string_value("test body content");
+
+  auto packed = packBody(body);
+  ASSERT_EQ(1, packed.values().size());
+  EXPECT_EQ(BodyKey, packed.values(0).key());
+
+  auto unpacked = unpackBody(packed);
+  EXPECT_EQ("test body content", unpacked.string_value());
+}
+
+TEST(OtlpLogUtilsTest, GetOtlpUserAgentHeader) {
+  const auto& header = getOtlpUserAgentHeader();
+  EXPECT_TRUE(absl::StartsWith(header, "OTel-OTLP-Exporter-Envoy/"));
+  // Should return the same instance each time.
+  EXPECT_EQ(&header, &getOtlpUserAgentHeader());
+}
+
+TEST(OtlpLogUtilsTest, PopulateTraceContextFullTraceId) {
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+  // 32-char (128-bit) trace ID.
+  const std::string trace_id_hex = "0123456789abcdef0123456789abcdef";
+  const std::string span_id_hex = "0123456789abcdef";
+
+  populateTraceContext(log_entry, trace_id_hex, span_id_hex);
+
+  EXPECT_EQ(16, log_entry.trace_id().size());
+  EXPECT_EQ(8, log_entry.span_id().size());
+  // Verify the hex conversion is correct.
+  EXPECT_EQ(absl::HexStringToBytes(trace_id_hex), log_entry.trace_id());
+  EXPECT_EQ(absl::HexStringToBytes(span_id_hex), log_entry.span_id());
+}
+
+TEST(OtlpLogUtilsTest, PopulateTraceContextShortTraceId) {
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+  // 16-char (64-bit, Zipkin-style) trace ID.
+  const std::string short_trace_id_hex = "0123456789abcdef";
+  const std::string span_id_hex = "fedcba9876543210";
+
+  populateTraceContext(log_entry, short_trace_id_hex, span_id_hex);
+
+  EXPECT_EQ(16, log_entry.trace_id().size());
+  EXPECT_EQ(8, log_entry.span_id().size());
+  // Should be padded with zeros on the left.
+  const std::string expected_trace_id = "0000000000000000" + short_trace_id_hex;
+  EXPECT_EQ(absl::HexStringToBytes(expected_trace_id), log_entry.trace_id());
+}
+
+TEST(OtlpLogUtilsTest, PopulateTraceContextEmptyIds) {
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  populateTraceContext(log_entry, "", "");
+
+  EXPECT_TRUE(log_entry.trace_id().empty());
+  EXPECT_TRUE(log_entry.span_id().empty());
+}
+
+TEST(OtlpLogUtilsTest, PopulateTraceContextInvalidTraceIdLength) {
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+  // Invalid length (not 16 or 32 chars).
+  const std::string invalid_trace_id = "0123456789";
+  const std::string span_id_hex = "0123456789abcdef";
+
+  populateTraceContext(log_entry, invalid_trace_id, span_id_hex);
+
+  // Trace ID should not be set for invalid length.
+  EXPECT_TRUE(log_entry.trace_id().empty());
+  // Span ID should still be set.
+  EXPECT_EQ(8, log_entry.span_id().size());
+}
+
+// Tests for config helper functions with fallback to deprecated common_config.
+
+// Verifies that top-level log_name takes precedence over common_config.log_name.
+TEST(OtlpLogUtilsTest, GetLogNamePrefersTopLevel) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_log_name("top_level_log");
+  config.mutable_common_config()->set_log_name("common_config_log");
+
+  EXPECT_EQ("top_level_log", getLogName(config));
+}
+
+// Verifies fallback to common_config.log_name when top-level is not set.
+TEST(OtlpLogUtilsTest, GetLogNameFallsBackToCommonConfig) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.mutable_common_config()->set_log_name("common_config_log");
+
+  EXPECT_EQ("common_config_log", getLogName(config));
+}
+
+// Verifies that an empty string is returned when neither is set.
+TEST(OtlpLogUtilsTest, GetLogNameReturnsEmptyWhenNotSet) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+
+  EXPECT_TRUE(getLogName(config).empty());
+}
+
+// Verifies that top-level grpc_service takes precedence over common_config.grpc_service.
+TEST(OtlpLogUtilsTest, GetGrpcServicePrefersTopLevel) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("top_level_cluster");
+  config.mutable_common_config()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "common_config_cluster");
+
+  const auto& grpc_service = getGrpcService(config);
+  EXPECT_EQ("top_level_cluster", grpc_service.envoy_grpc().cluster_name());
+}
+
+// Verifies fallback to common_config.grpc_service when top-level is not set.
+TEST(OtlpLogUtilsTest, GetGrpcServiceFallsBackToCommonConfig) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.mutable_common_config()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
+      "common_config_cluster");
+
+  const auto& grpc_service = getGrpcService(config);
+  EXPECT_EQ("common_config_cluster", grpc_service.envoy_grpc().cluster_name());
+}
+
+// Tests for buffer_flush_interval.
+
+// Verifies that buffer_flush_interval is read from config.
+TEST(OtlpLogUtilsTest, GetBufferFlushIntervalFromConfig) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.mutable_buffer_flush_interval()->set_seconds(5);
+
+  EXPECT_EQ(std::chrono::milliseconds(5000), getBufferFlushInterval(config));
+}
+
+// Verifies that the default (1 second) is returned when not set.
+TEST(OtlpLogUtilsTest, GetBufferFlushIntervalReturnsDefaultWhenNotSet) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+
+  EXPECT_EQ(DefaultBufferFlushInterval, getBufferFlushInterval(config));
+}
+
+// Tests for buffer_size_bytes.
+
+// Verifies that buffer_size_bytes is read from config.
+TEST(OtlpLogUtilsTest, GetBufferSizeBytesFromConfig) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.mutable_buffer_size_bytes()->set_value(32768);
+
+  EXPECT_EQ(32768, getBufferSizeBytes(config));
+}
+
+// Verifies that the default (16KB) is returned when not set.
+TEST(OtlpLogUtilsTest, GetBufferSizeBytesReturnsDefaultWhenNotSet) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+
+  EXPECT_EQ(DefaultMaxBufferSizeBytes, getBufferSizeBytes(config));
+}
+
+// Tests for filter_state_objects_to_log.
+
+// Verifies that filter_state_objects_to_log is read from config.
+TEST(OtlpLogUtilsTest, GetFilterStateObjectsToLogFromConfig) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.add_filter_state_objects_to_log("obj1");
+  config.add_filter_state_objects_to_log("obj2");
+
+  auto result = getFilterStateObjectsToLog(config);
+  ASSERT_EQ(2, result.size());
+  EXPECT_EQ("obj1", result[0]);
+  EXPECT_EQ("obj2", result[1]);
+}
+
+// Verifies that an empty vector is returned when not set.
+TEST(OtlpLogUtilsTest, GetFilterStateObjectsToLogReturnsEmptyWhenNotSet) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+
+  auto result = getFilterStateObjectsToLog(config);
+  EXPECT_TRUE(result.empty());
+}
+
+// Tests for custom_tags.
+
+// Verifies that custom_tags is read from config.
+TEST(OtlpLogUtilsTest, GetCustomTagsFromConfig) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  auto* tag1 = config.add_custom_tags();
+  tag1->set_tag("tag1");
+  tag1->mutable_literal()->set_value("value1");
+
+  auto result = getCustomTags(config);
+  ASSERT_EQ(1, result.size());
+  EXPECT_EQ("tag1", result[0]->tag());
+}
+
+// Verifies that an empty vector is returned when not set.
+TEST(OtlpLogUtilsTest, GetCustomTagsReturnsEmptyWhenNotSet) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+
+  auto result = getCustomTags(config);
+  EXPECT_TRUE(result.empty());
+}
+
+// Tests for addFilterStateToAttributes.
+
+// Verifies that filter state from downstream is added to log attributes.
+TEST(OtlpLogUtilsTest, AddFilterStateToAttributesFromDownstream) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  stream_info.filter_state_->setData(
+      "downstream_key", std::make_unique<Router::StringAccessorImpl>("downstream_value"),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  std::vector<std::string> filter_state_objects = {"downstream_key"};
+  addFilterStateToAttributes(stream_info, filter_state_objects, log_entry);
+
+  ASSERT_EQ(1, log_entry.attributes_size());
+  EXPECT_EQ("downstream_key", log_entry.attributes(0).key());
+  // The value is JSON-serialized from the protobuf.
+  EXPECT_FALSE(log_entry.attributes(0).value().string_value().empty());
+}
+
+// Verifies that filter state from upstream is added when not found in downstream.
+TEST(OtlpLogUtilsTest, AddFilterStateToAttributesFromUpstream) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  auto upstream_filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  upstream_filter_state->setData("upstream_key",
+                                 std::make_unique<Router::StringAccessorImpl>("upstream_value"),
+                                 StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.upstreamInfo()->setUpstreamFilterState(upstream_filter_state);
+
+  std::vector<std::string> filter_state_objects = {"upstream_key"};
+  addFilterStateToAttributes(stream_info, filter_state_objects, log_entry);
+
+  ASSERT_EQ(1, log_entry.attributes_size());
+  EXPECT_EQ("upstream_key", log_entry.attributes(0).key());
+  EXPECT_FALSE(log_entry.attributes(0).value().string_value().empty());
+}
+
+// Verifies that downstream takes precedence when the same key exists in both.
+TEST(OtlpLogUtilsTest, AddFilterStateToAttributesDownstreamPrecedence) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  // Add to downstream.
+  stream_info.filter_state_->setData(
+      "same_key", std::make_unique<Router::StringAccessorImpl>("downstream_wins"),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add to upstream.
+  auto upstream_filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  upstream_filter_state->setData("same_key",
+                                 std::make_unique<Router::StringAccessorImpl>("upstream_loses"),
+                                 StreamInfo::FilterState::LifeSpan::FilterChain);
+  stream_info.upstreamInfo()->setUpstreamFilterState(upstream_filter_state);
+
+  std::vector<std::string> filter_state_objects = {"same_key"};
+  addFilterStateToAttributes(stream_info, filter_state_objects, log_entry);
+
+  // Should only have one attribute (from downstream, not both).
+  ASSERT_EQ(1, log_entry.attributes_size());
+  EXPECT_EQ("same_key", log_entry.attributes(0).key());
+  // Value should be non-empty (from downstream filter state).
+  EXPECT_FALSE(log_entry.attributes(0).value().string_value().empty());
+}
+
+// Verifies that missing filter state keys are silently ignored.
+TEST(OtlpLogUtilsTest, AddFilterStateToAttributesMissingKey) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  std::vector<std::string> filter_state_objects = {"nonexistent_key"};
+  addFilterStateToAttributes(stream_info, filter_state_objects, log_entry);
+
+  // No attributes should be added.
+  EXPECT_EQ(0, log_entry.attributes_size());
+}
+
+// Verifies that empty filter state objects list results in no attributes.
+TEST(OtlpLogUtilsTest, AddFilterStateToAttributesEmptyList) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  std::vector<std::string> filter_state_objects;
+  addFilterStateToAttributes(stream_info, filter_state_objects, log_entry);
+
+  EXPECT_EQ(0, log_entry.attributes_size());
+}
+
+// Tests for addCustomTagsToAttributes.
+
+// Verifies that custom tags with literal values are added to attributes.
+TEST(OtlpLogUtilsTest, AddCustomTagsToAttributesWithLiteralTags) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  // Create custom tags.
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  auto* tag = config.add_custom_tags();
+  tag->set_tag("literal_tag");
+  tag->mutable_literal()->set_value("literal_value");
+  auto custom_tags = getCustomTags(config);
+
+  // Create formatter context with request headers.
+  Http::TestRequestHeaderMapImpl request_headers;
+  Formatter::Context context(&request_headers);
+
+  addCustomTagsToAttributes(custom_tags, context, stream_info, log_entry);
+
+  opentelemetry::proto::logs::v1::LogRecord expected;
+  auto* attr = expected.add_attributes();
+  attr->set_key("literal_tag");
+  attr->mutable_value()->set_string_value("literal_value");
+
+  EXPECT_TRUE(TestUtility::protoEqual(log_entry, expected));
+}
+
+// Verifies that configured formatter command parsers are used when creating custom tags, so a
+// custom tag whose value uses a formatter extension command resolves (#45453).
+TEST(OtlpLogUtilsTest, CustomTagsUseConfiguredFormatters) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  auto* tag = config.add_custom_tags();
+  tag->set_tag("fmt_tag");
+  tag->set_value("%FAKE_COMMAND%");
+
+  std::vector<Formatter::CommandParserPtr> commands;
+  commands.push_back(std::make_unique<FakeCommandParser>());
+  auto custom_tags = getCustomTags(config, commands);
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  Formatter::Context context(&request_headers);
+  addCustomTagsToAttributes(custom_tags, context, stream_info, log_entry);
+
+  opentelemetry::proto::logs::v1::LogRecord expected;
+  auto* attr = expected.add_attributes();
+  attr->set_key("fmt_tag");
+  attr->mutable_value()->set_string_value("fake_value");
+
+  EXPECT_TRUE(TestUtility::protoEqual(log_entry, expected));
+}
+
+// Verifies that empty custom tags list is a no-op.
+TEST(OtlpLogUtilsTest, AddCustomTagsToAttributesEmptyTags) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  std::vector<Tracing::CustomTagConstSharedPtr> empty_tags;
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  Formatter::Context context(&request_headers);
+
+  addCustomTagsToAttributes(empty_tags, context, stream_info, log_entry);
+
+  opentelemetry::proto::logs::v1::LogRecord expected;
+  EXPECT_TRUE(TestUtility::protoEqual(log_entry, expected));
+}
+
+// Verifies that custom tags work when request headers are not available.
+TEST(OtlpLogUtilsTest, AddCustomTagsToAttributesWithoutRequestHeaders) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  opentelemetry::proto::logs::v1::LogRecord log_entry;
+
+  // Create custom tags.
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  auto* tag = config.add_custom_tags();
+  tag->set_tag("env_tag");
+  tag->mutable_literal()->set_value("env_value");
+  auto custom_tags = getCustomTags(config);
+
+  // Create context without request headers (simulating TCP connection).
+  Formatter::Context context;
+
+  addCustomTagsToAttributes(custom_tags, context, stream_info, log_entry);
+
+  opentelemetry::proto::logs::v1::LogRecord expected;
+  auto* attr = expected.add_attributes();
+  attr->set_key("env_tag");
+  attr->mutable_value()->set_string_value("env_value");
+
+  EXPECT_TRUE(TestUtility::protoEqual(log_entry, expected));
+}
+
+// Tests for initOtlpMessageRoot.
+
+// Verifies that builtin labels (log_name, zone, cluster, node) are added when not disabled.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithBuiltinLabels) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_log_name("test_log");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.local_info_, zoneName()).WillByDefault(ReturnRef(kTestZone));
+  ON_CALL(context.local_info_, clusterName()).WillByDefault(ReturnRef(kTestCluster));
+  ON_CALL(context.local_info_, nodeName()).WillByDefault(ReturnRef(kTestNode));
+
+  auto* root =
+      initOtlpMessageRoot(message, config, context,
+                          ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
+
+  ASSERT_NE(nullptr, root);
+  ASSERT_EQ(1, message.resource_logs_size());
+
+  opentelemetry::proto::resource::v1::Resource expected_resource;
+  auto* attr = expected_resource.add_attributes();
+  attr->set_key("log_name");
+  attr->mutable_value()->set_string_value("test_log");
+  attr = expected_resource.add_attributes();
+  attr->set_key("zone_name");
+  attr->mutable_value()->set_string_value(kTestZone);
+  attr = expected_resource.add_attributes();
+  attr->set_key("cluster_name");
+  attr->mutable_value()->set_string_value(kTestCluster);
+  attr = expected_resource.add_attributes();
+  attr->set_key("node_name");
+  attr->mutable_value()->set_string_value(kTestNode);
+
+  EXPECT_TRUE(TestUtility::protoEqual(message.resource_logs(0).resource(), expected_resource));
+}
+
+// Verifies that no builtin labels are added when disable_builtin_labels is true.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootDisableBuiltinLabels) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_disable_builtin_labels(true);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto* root =
+      initOtlpMessageRoot(message, config, context,
+                          ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
+
+  ASSERT_NE(nullptr, root);
+  ASSERT_EQ(1, message.resource_logs_size());
+
+  opentelemetry::proto::resource::v1::Resource expected_resource;
+  EXPECT_TRUE(TestUtility::protoEqual(message.resource_logs(0).resource(), expected_resource));
+}
+
+// Verifies that custom resource_attributes are added to the resource.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceAttributes) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_disable_builtin_labels(true);
+  auto* kv = config.mutable_resource_attributes()->add_values();
+  kv->set_key("custom_key");
+  kv->mutable_value()->set_string_value("custom_value");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto* root =
+      initOtlpMessageRoot(message, config, context,
+                          ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
+
+  ASSERT_NE(nullptr, root);
+
+  opentelemetry::proto::resource::v1::Resource expected_resource;
+  auto* attr = expected_resource.add_attributes();
+  attr->set_key("custom_key");
+  attr->mutable_value()->set_string_value("custom_value");
+
+  EXPECT_TRUE(TestUtility::protoEqual(message.resource_logs(0).resource(), expected_resource));
+}
+
+class MockResourceProvider : public Extensions::Tracers::OpenTelemetry::ResourceProvider {
+public:
+  MOCK_METHOD(Extensions::Tracers::OpenTelemetry::Resource, getResource,
+              (const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+                   resource_detectors,
+               Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+               const Extensions::Tracers::OpenTelemetry::ResourceProviderOptions& options),
+              (const));
+};
+
+// Verifies that resource detectors detect and populate resource attributes and schema URL.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceDetectors) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_disable_builtin_labels(true);
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("mock_detector");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  MockResourceProvider mock_resource_provider;
+
+  Extensions::Tracers::OpenTelemetry::Resource detected_resource;
+  detected_resource.schema_url_ = "https://opentelemetry.io/schemas/1.24.0";
+  detected_resource.attributes_["host.name"] = "test-host";
+  detected_resource.attributes_["service.name"] = "test-service";
+
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _))
+      .WillOnce(
+          [&](const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&,
+              Server::Configuration::ServerFactoryContext&, absl::string_view service_name,
+              const Extensions::Tracers::OpenTelemetry::ResourceProviderOptions& options) {
+            EXPECT_TRUE(service_name.empty());
+            EXPECT_FALSE(options.set_service_name_resource_attribute);
+            EXPECT_FALSE(options.set_telemetry_sdk_resource_attributes);
+            return detected_resource;
+          });
+
+  auto* root = initOtlpMessageRoot(message, config, context, mock_resource_provider);
+
+  ASSERT_NE(nullptr, root);
+  ASSERT_EQ(1, message.resource_logs_size());
+  EXPECT_EQ("https://opentelemetry.io/schemas/1.24.0", message.resource_logs(0).schema_url());
+
+  const auto& resource = message.resource_logs(0).resource();
+  EXPECT_EQ(2, resource.attributes_size());
+  absl::flat_hash_map<std::string, std::string> actual_attrs;
+  for (const auto& attr : resource.attributes()) {
+    actual_attrs[attr.key()] = attr.value().string_value();
+  }
+  EXPECT_EQ((absl::flat_hash_map<std::string, std::string>{{"host.name", "test-host"},
+                                                           {"service.name", "test-service"}}),
+            actual_attrs);
+}
+
+// Verifies that both resource detectors and custom resource_attributes are added together.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootWithResourceDetectorsAndResourceAttributes) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_disable_builtin_labels(true);
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("mock_detector");
+  auto* kv = config.mutable_resource_attributes()->add_values();
+  kv->set_key("custom_key");
+  kv->mutable_value()->set_string_value("custom_val");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  MockResourceProvider mock_resource_provider;
+
+  Extensions::Tracers::OpenTelemetry::Resource detected_resource;
+  detected_resource.attributes_["detected_key"] = "detected_val";
+
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _)).WillOnce(Return(detected_resource));
+
+  auto* root = initOtlpMessageRoot(message, config, context, mock_resource_provider);
+
+  ASSERT_NE(nullptr, root);
+  ASSERT_EQ(1, message.resource_logs_size());
+
+  opentelemetry::proto::resource::v1::Resource expected_resource;
+  auto* attr = expected_resource.add_attributes();
+  attr->set_key("detected_key");
+  attr->mutable_value()->set_string_value("detected_val");
+  attr = expected_resource.add_attributes();
+  attr->set_key("custom_key");
+  attr->mutable_value()->set_string_value("custom_val");
+
+  EXPECT_TRUE(TestUtility::protoEqual(message.resource_logs(0).resource(), expected_resource));
+}
+
+// Verifies that conflicting attribute keys are properly overridden without duplicates.
+// Precedence: resource_attributes > resource_detectors > built-in labels.
+TEST(OtlpLogUtilsTest, InitOtlpMessageRootAttributePrecedenceAndDeduplication) {
+  opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_log_name("test_log");
+
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("mock_detector");
+
+  // Overrides built-in log_name.
+  auto* kv1 = config.mutable_resource_attributes()->add_values();
+  kv1->set_key("log_name");
+  kv1->mutable_value()->set_string_value("overridden_log");
+
+  // Overrides detector attribute.
+  auto* kv2 = config.mutable_resource_attributes()->add_values();
+  kv2->set_key("detector_key");
+  kv2->mutable_value()->set_string_value("overridden_detector_val");
+
+  // New custom attribute.
+  auto* kv3 = config.mutable_resource_attributes()->add_values();
+  kv3->set_key("custom_key");
+  kv3->mutable_value()->set_string_value("custom_val");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ON_CALL(context.local_info_, zoneName()).WillByDefault(ReturnRef(kTestZone));
+  ON_CALL(context.local_info_, clusterName()).WillByDefault(ReturnRef(kTestCluster));
+  ON_CALL(context.local_info_, nodeName()).WillByDefault(ReturnRef(kTestNode));
+
+  MockResourceProvider mock_resource_provider;
+  Extensions::Tracers::OpenTelemetry::Resource detected_resource;
+  // Overrides built-in cluster_name.
+  detected_resource.attributes_["cluster_name"] = "detected_cluster";
+  detected_resource.attributes_["detector_key"] = "detected_val";
+
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _)).WillOnce(Return(detected_resource));
+
+  auto* root = initOtlpMessageRoot(message, config, context, mock_resource_provider);
+
+  ASSERT_NE(nullptr, root);
+  ASSERT_EQ(1, message.resource_logs_size());
+
+  const auto& resource = message.resource_logs(0).resource();
+  ASSERT_EQ(6, resource.attributes_size());
+
+  EXPECT_EQ("log_name", resource.attributes(0).key());
+  EXPECT_EQ("overridden_log", resource.attributes(0).value().string_value());
+
+  EXPECT_EQ("zone_name", resource.attributes(1).key());
+  EXPECT_EQ(kTestZone, resource.attributes(1).value().string_value());
+
+  EXPECT_EQ("cluster_name", resource.attributes(2).key());
+  EXPECT_EQ("detected_cluster", resource.attributes(2).value().string_value());
+
+  EXPECT_EQ("node_name", resource.attributes(3).key());
+  EXPECT_EQ(kTestNode, resource.attributes(3).value().string_value());
+
+  EXPECT_EQ("detector_key", resource.attributes(4).key());
+  EXPECT_EQ("overridden_detector_val", resource.attributes(4).value().string_value());
+
+  EXPECT_EQ("custom_key", resource.attributes(5).key());
+  EXPECT_EQ("custom_val", resource.attributes(5).value().string_value());
+}
+
+} // namespace
+} // namespace OpenTelemetry
+} // namespace AccessLoggers
+} // namespace Extensions
+} // namespace Envoy

@@ -1,0 +1,124 @@
+# See bazel/README.md for details on how this system works.
+CONTRIB_EXTENSIONS = {
+    #
+    # Compression
+    #
+
+    "envoy.compression.qatzip.compressor":                      "//contrib/qat/compression/qatzip/compressor/source:config",
+    "envoy.compression.qatzstd.compressor":                      "//contrib/qat/compression/qatzstd/compressor/source:config",
+
+    #
+    # HTTP filters
+    #
+    "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
+    "envoy.filters.http.client_cert":                           "//contrib/client_cert/filters/http/source:config",
+    "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
+    "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
+    "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
+    "envoy.filters.http.peak_ewma":                             "//contrib/peak_ewma/filters/http/source:config",
+    "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
+    "envoy.filters.http.peer_metadata":                         "//contrib/istio/filters/http/peer_metadata/source:config",
+    "envoy.filters.http.istio_stats":                           "//contrib/istio/filters/http/istio_stats/source:istio_stats",
+    "envoy.filters.http.alpn":                                  "//contrib/istio/filters/http/alpn/source:config_lib",
+
+    #
+    # Network filters
+    #
+
+    "envoy.filters.network.client_ssl_auth":                    "//contrib/client_ssl_auth/filters/network/source:config",
+    "envoy.filters.network.kafka_broker":                       "//contrib/kafka/filters/network/source/broker:config_lib",
+    "envoy.filters.network.kafka_mesh":                         "//contrib/kafka/filters/network/source/mesh:config_lib",
+    "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
+    "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
+    "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
+    "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
+    "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
+    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
+
+    #
+    # Listener filters
+    #
+
+    "envoy.filters.listener.postgres_inspector":                "//contrib/postgres_inspector/filters/listener/source:config",
+
+    #
+    # Sip proxy
+    #
+
+    "envoy.filters.network.sip_proxy":                          "//contrib/sip_proxy/filters/network/source:config",
+    "envoy.filters.sip.router":                                 "//contrib/sip_proxy/filters/network/source/router:config",
+
+    #
+    # Stat sinks
+    #
+
+    "envoy.stat_sinks.kafka":                            "//contrib/kafka/stat_sinks/source:config_lib",
+    "envoy.stat_sinks.wasm_filter":                      "//contrib/stat_sinks/wasm_filter/source:config_lib",
+
+    #
+    # Tap sinks
+    #
+
+    "envoy.tap_sinks.udp_sink":                          "//contrib/tap_sinks/udp_sink/source:config",
+
+    #
+    # Private key providers
+    #
+
+    "envoy.tls.key_providers.kae":                              "//contrib/kae/private_key_providers/source:config",
+    "envoy.tls.key_providers.cryptomb":                         "//contrib/cryptomb/private_key_providers/source:config",
+    "envoy.tls.key_providers.qat":                              "//contrib/qat/private_key_providers/source:config",
+
+    #
+    # Socket interface extensions
+    #
+
+    "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
+
+    #
+    # Input matchers
+    #
+
+    "envoy.matching.input_matchers.hyperscan":                  "//contrib/hyperscan/matching/input_matchers/source:config",
+
+    #
+    # Regex engines
+    #
+
+    "envoy.regex_engines.hyperscan":                            "//contrib/hyperscan/regex_engines/source:config",
+
+    #
+    # Extensions for generic proxy
+    #
+    "envoy.generic_proxy.codecs.kafka":                         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
+
+    #
+    # Load balancing policies
+    #
+    "envoy.load_balancing_policies.peak_ewma":      "//contrib/peak_ewma/load_balancing_policies/source:config",
+    "envoy.load_balancing_policies.per_worker_subset": "//contrib/per_worker_subset/load_balancing_policies/source:config",
+
+    #
+    # xDS delegates
+    #
+
+    "envoy.xds_delegates.kv_store":                            "//contrib/config/source:kv_store_xds_delegate",
+
+    #
+    # cluster specifier plugin
+    #
+
+    "envoy.router.cluster_specifier_plugin.golang":             "//contrib/golang/router/cluster_specifier/source:config",
+
+    #
+    # http tcp bridge plugin
+    #
+
+    "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
+
+    #
+    # Reverse tunnel reporters
+    #
+
+    "envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service": "//contrib/reverse_tunnel_reporter/source:config",
+}

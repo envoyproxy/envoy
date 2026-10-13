@@ -1,0 +1,40 @@
+#pragma once
+
+#include "envoy/common/backoff_strategy.h"
+#include "envoy/config/custom_config_validators.h"
+#include "envoy/config/eds_resources_cache.h"
+#include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/grpc/async_client.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/stats/scope.h"
+
+#include "source/common/config/utility.h"
+
+namespace Envoy {
+namespace Config {
+
+// Context (data) needed for creating any GrpcMux object.
+struct GrpcMuxContext {
+  Grpc::RawAsyncClientSharedPtr async_client_;
+  Grpc::RawAsyncClientSharedPtr failover_async_client_;
+  Event::Dispatcher& dispatcher_;
+  const Protobuf::MethodDescriptor& service_method_;
+  const LocalInfo::LocalInfo& local_info_;
+  const RateLimitSettings& rate_limit_settings_;
+  Stats::Scope& scope_;
+  CustomConfigValidatorsPtr config_validators_;
+  XdsResourcesDelegateOptRef xds_resources_delegate_;
+  XdsConfigTrackerOptRef xds_config_tracker_;
+  BackOffStrategyPtr backoff_strategy_;
+  const std::string& target_xds_authority_;
+  EdsResourcesCachePtr eds_resources_cache_;
+  bool skip_subsequent_node_;
+  // A factory method that allows a GrpcMux lazily create a Load-Stats-Reporter
+  // if needed.
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
+};
+
+} // namespace Config
+} // namespace Envoy

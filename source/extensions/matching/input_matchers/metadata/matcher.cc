@@ -1,0 +1,29 @@
+#include "source/extensions/matching/input_matchers/metadata/matcher.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Matching {
+namespace InputMatchers {
+namespace Metadata {
+namespace {
+using ::Envoy::Matcher::MatchResult;
+}
+
+Matcher::Matcher(const Envoy::Matchers::ValueMatcherConstSharedPtr value_matcher, const bool invert)
+    : value_matcher_(value_matcher), invert_(invert) {}
+
+MatchResult Matcher::match(const Envoy::Matcher::DataInputGetResult& input) {
+  if (auto match_data = input.customData<Matching::Http::MetadataInput::MetadataMatchData>();
+      match_data) {
+    if (value_matcher_->match(match_data->value_) ^ invert_) {
+      return MatchResult::Matched;
+    }
+  }
+  return MatchResult::NoMatch;
+}
+
+} // namespace Metadata
+} // namespace InputMatchers
+} // namespace Matching
+} // namespace Extensions
+} // namespace Envoy

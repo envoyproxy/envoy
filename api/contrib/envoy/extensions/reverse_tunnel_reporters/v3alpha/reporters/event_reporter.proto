@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package envoy.extensions.reverse_tunnel_reporters.v3alpha.reporters;
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.reverse_tunnel_reporters.v3alpha.reporters";
+option java_outer_classname = "EventReporterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/reverse_tunnel_reporters/v3alpha/reporters";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+message ReverseConnectionReporterClient {
+  // Name to use to pick out the client should match the one reported by the factory.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Typed config for the client
+  google.protobuf.Any typed_config = 2 [(validate.rules).any = {required: true}];
+}
+
+// Configuration for the connection event reporter.
+message EventReporterConfig {
+  // Stat prefix for this reporter's metrics.
+  // Metrics will be emitted as ``{stat_prefix}.events_pushed``, etc.
+  string stat_prefix = 1;
+
+  // List of clients to report to.
+  repeated ReverseConnectionReporterClient clients = 2 [(validate.rules).repeated = {min_items: 1}];
+}

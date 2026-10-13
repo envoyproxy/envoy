@@ -1,0 +1,55 @@
+#pragma once
+
+#include "envoy/matcher/matcher.h"
+
+#include "source/common/matcher/field_matcher.h"
+
+namespace Envoy {
+namespace Matcher {
+
+/**
+ * A match tree that iterates over a list of matchers to find the first one that matches. If one
+ * does, the ActionMatchResult will be the one specified by the individual matcher.
+ */
+template <class DataType> class ListMatcher : public MatchTree<DataType> {
+public:
+  explicit ListMatcher(std::optional<OnMatch<DataType>> on_no_match) : on_no_match_(on_no_match) {}
+
+  ActionMatchResult match(const DataType& matching_data,
+                          SkippedMatchCb skipped_match_cb = nullptr) override {
+    for (const auto& matcher : matchers_) {
+      MatchResult result = matcher.first->match(matching_data);
+
+      // One of the matchers don't have enough information, bail on evaluating the match.
+      if (result == MatchResult::InsufficientData) {
+        return ActionMatchResult::insufficientData();
+      }
+      if (result == MatchResult::NoMatch) {
+        continue;
+      }
+
+      ActionMatchResult processed_result = MatchTree<DataType>::handleRecursionAndSkips(
+          matcher.second, matching_data, skipped_match_cb);
+      // Continue to next matcher if the result is a no-match or is skipped.
+      if (processed_result.isNoMatch()) {
+        continue;
+      }
+      return processed_result;
+    }
+
+    // Return on-no-match, after keep_matching and/or recursion handling.
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, matching_data,
+                                                        skipped_match_cb);
+  }
+
+  void addMatcher(FieldMatcherPtr<DataType>&& matcher, OnMatch<DataType> action) {
+    matchers_.emplace_back(std::move(matcher), std::move(action));
+  }
+
+private:
+  std::optional<OnMatch<DataType>> on_no_match_;
+  std::vector<std::pair<FieldMatcherPtr<DataType>, OnMatch<DataType>>> matchers_;
+};
+
+} // namespace Matcher
+} // namespace Envoy

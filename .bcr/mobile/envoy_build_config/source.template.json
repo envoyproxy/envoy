@@ -1,0 +1,5 @@
+{
+    "integrity": "",
+    "strip_prefix": "{REPO}-{VERSION}/mobile/envoy_build_config",
+    "url": "https://github.com/{OWNER}/{REPO}/archive/refs/tags/v{TAG}.tar.gz"
+}

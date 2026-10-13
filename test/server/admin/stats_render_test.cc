@@ -1,0 +1,363 @@
+#include <memory>
+
+#include "test/server/admin/stats_render_test_base.h"
+
+namespace Envoy {
+namespace Server {
+
+using StatsRenderTest = StatsRenderTestBase;
+
+TEST_F(StatsRenderTest, TextInt) {
+  StatsTextRender renderer(params_);
+  EXPECT_EQ("name: 42\n", render<uint64_t>(renderer, "name", 42));
+}
+
+TEST_F(StatsRenderTest, TextString) {
+  StatsTextRender renderer(params_);
+  EXPECT_EQ("name: \"abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?\"\n",
+            render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"));
+}
+
+TEST_F(StatsRenderTest, TextHistogramUnset) {
+  StatsTextRender renderer(params_);
+  constexpr absl::string_view expected =
+      "h1: P0(205,205) P25(205,205) P50(303.3333333333333,303.3333333333333) "
+      "P75(306.6666666666667,306.6666666666667) "
+      "P90(306.6666666666667,306.6666666666667) P95(306.6666666666667,306.6666666666667) "
+      "P99(306.6666666666667,306.6666666666667) P99.5(306.6666666666667,306.6666666666667) "
+      "P99.9(306.6666666666667,306.6666666666667) P100(306.6666666666667,306.6666666666667)\n";
+  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+}
+
+TEST_F(StatsRenderTest, TextHistogramCumulative) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Cumulative;
+  StatsTextRender renderer(params_);
+  constexpr absl::string_view expected =
+      "h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(1,1) "
+      "B500(3,3) B1000(3,3) B2500(3,3) B5000(3,3) B10000(3,3) B30000(3,3) B60000(3,3) "
+      "B300000(3,3) B600000(3,3) B1.8e+06(3,3) B3.6e+06(3,3)\n";
+  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+}
+
+TEST_F(StatsRenderTest, TextHistogramDisjoint) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Disjoint;
+  StatsTextRender renderer(params_);
+  constexpr absl::string_view expected =
+      "h1: B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(1,1) B500(2,2) "
+      "B1000(0,0) B2500(0,0) B5000(0,0) B10000(0,0) B30000(0,0) B60000(0,0) B300000(0,0) "
+      "B600000(0,0) B1.8e+06(0,0) B3.6e+06(0,0)\n";
+  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+}
+
+TEST_F(StatsRenderTest, TextHistogramDetailed) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  StatsTextRender renderer(params_);
+  constexpr absl::string_view expected =
+      "h1:\n"
+      "  totals=200,10:1, 300,10:2\n"
+      "  intervals=200,10:1, 300,10:2\n"
+      "  summary=P0(205,205) P25(205,205) P50(303.3333333333333,303.3333333333333) "
+      "P75(306.6666666666667,306.6666666666667) P90(306.6666666666667,306.6666666666667) "
+      "P95(306.6666666666667,306.6666666666667) P99(306.6666666666667,306.6666666666667) "
+      "P99.5(306.6666666666667,306.6666666666667) P99.9(306.6666666666667,306.6666666666667) "
+      "P100(306.6666666666667,306.6666666666667)\n";
+  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+}
+
+TEST_F(StatsRenderTest, TextHistogramSummary) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Summary;
+  StatsTextRender renderer(params_);
+  constexpr absl::string_view expected =
+      "h1: P0(205,205) P25(205,205) P50(303.3333333333333,303.3333333333333) "
+      "P75(306.6666666666667,306.6666666666667) "
+      "P90(306.6666666666667,306.6666666666667) P95(306.6666666666667,306.6666666666667) "
+      "P99(306.6666666666667,306.6666666666667) P99.5(306.6666666666667,306.6666666666667) "
+      "P99.9(306.6666666666667,306.6666666666667) P100(306.6666666666667,306.6666666666667)\n";
+  EXPECT_EQ(expected, render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})));
+}
+
+TEST_F(StatsRenderTest, JsonInt) {
+  StatsJsonRender renderer(response_headers_, response_, params_);
+  const std::string expected = R"EOF({"stats":[ {"value":42, "name":"name"}]})EOF";
+  EXPECT_THAT(render<uint64_t>(renderer, "name", 42), JsonStringEq(expected));
+}
+
+TEST_F(StatsRenderTest, JsonString) {
+  StatsJsonRender renderer(response_headers_, response_, params_);
+  const std::string expected = R"EOF({
+    "stats": [{"value": "abc 123 ~!@#$%^&*()-_=+;:'\",\u003c.\u003e/?",
+               "name": "name"}]})EOF";
+  EXPECT_THAT(render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"),
+              JsonStringEq(expected));
+}
+
+TEST_F(StatsRenderTest, JsonHistogramNoBuckets) {
+  StatsJsonRender renderer(response_headers_, response_, params_);
+  const std::string expected = R"EOF(
+{
+    "stats": [{
+        "histograms": {
+            "supported_quantiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
+            "computed_quantiles": [{
+                "name": "h1",
+                "values": [{
+                    "cumulative": 205,
+                    "interval": 205
+                }, {
+                    "cumulative": 205,
+                    "interval": 205
+                }, {
+                    "cumulative": 303.3333333333333,
+                    "interval": 303.3333333333333
+                }, {
+                    "cumulative": 306.6666666666667,
+                    "interval": 306.6666666666667
+                }, {
+                    "cumulative": 306.6666666666667,
+                    "interval": 306.6666666666667
+                }, {
+                    "cumulative": 306.6666666666667,
+                    "interval": 306.6666666666667
+                }, {
+                    "cumulative": 306.6666666666667,
+                    "interval": 306.6666666666667
+                }, {
+                    "cumulative": 306.6666666666667,
+                    "interval": 306.6666666666667
+                }, {
+                    "cumulative": 306.6666666666667,
+                    "interval": 306.6666666666667
+                }, {
+                    "cumulative": 306.6666666666667,
+                    "interval": 306.6666666666667
+                }]
+            }]
+        }
+    }]
+}
+  )EOF";
+  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
+              JsonStringEq(expected));
+}
+
+TEST_F(StatsRenderTest, JsonHistogramCumulative) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Cumulative;
+  StatsJsonRender renderer(response_headers_, response_, params_);
+  const std::string expected = R"EOF(
+{
+    "stats": [{
+        "histograms": [{
+            "name": "h1",
+            "buckets": [{
+                "upper_bound": 0.5,
+                "interval": 0,
+                "cumulative": 0
+            }, {
+                "upper_bound": 1,
+                "interval": 0,
+                "cumulative": 0
+            }, {
+                "interval": 0,
+                "upper_bound": 5,
+                "cumulative": 0
+            }, {
+                "interval": 0,
+                "upper_bound": 10,
+                "cumulative": 0
+            }, {
+                "interval": 0,
+                "upper_bound": 25,
+                "cumulative": 0
+            }, {
+                "cumulative": 0,
+                "upper_bound": 50,
+                "interval": 0
+            }, {
+                "upper_bound": 100,
+                "interval": 0,
+                "cumulative": 0
+            }, {
+                "upper_bound": 250,
+                "cumulative": 1,
+                "interval": 1
+            }, {
+                "upper_bound": 500,
+                "interval": 3,
+                "cumulative": 3
+            }, {
+                "cumulative": 3,
+                "upper_bound": 1000,
+                "interval": 3
+            }, {
+                "upper_bound": 2500,
+                "cumulative": 3,
+                "interval": 3
+            }, {
+                "cumulative": 3,
+                "interval": 3,
+                "upper_bound": 5000
+            }, {
+                "upper_bound": 10000,
+                "cumulative": 3,
+                "interval": 3
+            }, {
+                "upper_bound": 30000,
+                "interval": 3,
+                "cumulative": 3
+            }, {
+                "cumulative": 3,
+                "upper_bound": 60000,
+                "interval": 3
+            }, {
+                "interval": 3,
+                "upper_bound": 300000,
+                "cumulative": 3
+            }, {
+                "upper_bound": 600000,
+                "interval": 3,
+                "cumulative": 3
+            }, {
+                "interval": 3,
+                "cumulative": 3,
+                "upper_bound": 1800000
+            }, {
+                "upper_bound": 3600000,
+                "interval": 3,
+                "cumulative": 3
+            }]
+        }]
+    }]
+}
+  )EOF";
+  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
+              JsonStringEq(expected));
+}
+
+TEST_F(StatsRenderTest, JsonHistogramDisjoint) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Disjoint;
+  StatsJsonRender renderer(response_headers_, response_, params_);
+  const std::string expected = R"EOF(
+{
+    "stats": [{
+        "histograms": [{
+            "buckets": [{
+                "interval": 0,
+                "cumulative": 0,
+                "upper_bound": 0.5
+            }, {
+                "cumulative": 0,
+                "interval": 0,
+                "upper_bound": 1
+            }, {
+                "cumulative": 0,
+                "interval": 0,
+                "upper_bound": 5
+            }, {
+                "upper_bound": 10,
+                "interval": 0,
+                "cumulative": 0
+            }, {
+                "interval": 0,
+                "upper_bound": 25,
+                "cumulative": 0
+            }, {
+                "cumulative": 0,
+                "upper_bound": 50,
+                "interval": 0
+            }, {
+                "cumulative": 0,
+                "upper_bound": 100,
+                "interval": 0
+            }, {
+                "interval": 1,
+                "cumulative": 1,
+                "upper_bound": 250
+            }, {
+                "cumulative": 2,
+                "upper_bound": 500,
+                "interval": 2
+            }, {
+                "interval": 0,
+                "cumulative": 0,
+                "upper_bound": 1000
+            }, {
+                "interval": 0,
+                "cumulative": 0,
+                "upper_bound": 2500
+            }, {
+                "interval": 0,
+                "upper_bound": 5000,
+                "cumulative": 0
+            }, {
+                "upper_bound": 10000,
+                "interval": 0,
+                "cumulative": 0
+            }, {
+                "cumulative": 0,
+                "interval": 0,
+                "upper_bound": 30000
+            }, {
+                "upper_bound": 60000,
+                "interval": 0,
+                "cumulative": 0
+            }, {
+                "upper_bound": 300000,
+                "interval": 0,
+                "cumulative": 0
+            }, {
+                "cumulative": 0,
+                "upper_bound": 600000,
+                "interval": 0
+            }, {
+                "upper_bound": 1800000,
+                "interval": 0,
+                "cumulative": 0
+            }, {
+                "interval": 0,
+                "cumulative": 0,
+                "upper_bound": 3600000
+            }],
+            "name": "h1"
+        }]
+    }]
+}
+  )EOF";
+  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
+              JsonStringEq(expected));
+}
+
+TEST_F(StatsRenderTest, JsonHistogramDetailed) {
+  params_.histogram_buckets_mode_ = Utility::HistogramBucketsMode::Detailed;
+  StatsJsonRender renderer(response_headers_, response_, params_);
+  const std::string expected = R"EOF(
+{
+    "stats": [{
+        "histograms": {
+            "supported_percentiles": [0, 25, 50, 75, 90, 95, 99, 99.5, 99.9, 100],
+            "details": [{
+                "name": "h1",
+                "percentiles": [
+                    {"cumulative": 205, "interval": 205},
+                    {"cumulative": 205, "interval": 205},
+                    {"cumulative": 303.3333333333333, "interval": 303.3333333333333},
+                    {"cumulative": 306.6666666666667, "interval": 306.6666666666667},
+                    {"cumulative": 306.6666666666667, "interval": 306.6666666666667},
+                    {"cumulative": 306.6666666666667, "interval": 306.6666666666667},
+                    {"cumulative": 306.6666666666667, "interval": 306.6666666666667},
+                    {"cumulative": 306.6666666666667, "interval": 306.6666666666667},
+                    {"cumulative": 306.6666666666667, "interval": 306.6666666666667},
+                    {"cumulative": 306.6666666666667, "interval": 306.6666666666667}
+                ],
+                "totals": [
+                    {"lower_bound": 200, "width": 10, "count": 1},
+                    {"lower_bound": 300, "width": 10, "count": 2}],
+                "intervals":[
+                    {"lower_bound": 200, "width": 10, "count": 1},
+                    {"lower_bound": 300, "width": 10, "count": 2}]}]}}]}
+  )EOF";
+  EXPECT_THAT(render<>(renderer, "h1", populateHistogram("h1", {200, 300, 300})),
+              JsonStringEq(expected));
+}
+
+} // namespace Server
+} // namespace Envoy

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package test.common.http.http2;
+
+import "test/fuzz/common.proto";
+
+import "validate/validate.proto";
+
+// Structured input for hpack_fuzz_test.
+
+message HpackTestCase {
+  test.fuzz.Headers headers = 1 [(validate.rules).message.required = true];
+  bool end_headers = 2;
+}

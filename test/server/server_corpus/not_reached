@@ -1,0 +1,1 @@
+static_resources {   clusters {     name: " "     connect_timeout {       nanos: 4     }     lb_policy: LOAD_BALANCING_POLICY_CONFIG   } } 

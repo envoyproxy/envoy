@@ -1,0 +1,13 @@
+response_headers {
+  headers {
+    key: "endpoint-load-metrics-bin"
+    # This decodes and deserializes to the following proto:
+    # cpu_utilization: 0.4
+    # rps_fractional: 50
+    # named_metrics {
+    #  key: "foo"
+    #  value: 0.5
+    # }
+    value: "CZqZmZmZmdk/MQAAAAAAAElAQg4KA2ZvbxEAAAAAAADgPw=="
+  }
+}

@@ -1,0 +1,102 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/filters/http/ext_proc/matching_utils.h"
+
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExternalProcessing {
+namespace {
+
+using ::Envoy::Http::TestRequestHeaderMapImpl;
+using ::Envoy::Http::TestRequestTrailerMapImpl;
+using ::Envoy::Http::TestResponseHeaderMapImpl;
+using ::Envoy::Http::TestResponseTrailerMapImpl;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
+
+#ifdef USE_CEL_PARSER
+
+class ExpressionManagerTest : public testing::Test {
+protected:
+  ExpressionManagerTest() {
+    auto builder = Filters::Common::Expr::getBuilder(context_);
+    Protobuf::RepeatedPtrField<std::string> request_matchers;
+    Protobuf::RepeatedPtrField<std::string> response_matchers;
+    absl::Status creation_status = absl::OkStatus();
+    expression_manager_ = std::make_unique<ExpressionManager>(
+        builder, context_.local_info_, request_matchers, response_matchers, creation_status);
+    EXPECT_OK(creation_status);
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  std::unique_ptr<ExpressionManager> expression_manager_;
+};
+
+TEST_F(ExpressionManagerTest, SimpleExpression) {
+  EXPECT_FALSE(expression_manager_->hasRequestExpr());
+  EXPECT_FALSE(expression_manager_->hasResponseExpr());
+}
+
+TEST_F(ExpressionManagerTest, InvalidExpression) {
+  Protobuf::RepeatedPtrField<std::string> request_matchers;
+  request_matchers.Add("undefined_func()");
+  auto builder = Filters::Common::Expr::getBuilder(context_);
+  absl::Status creation_status = absl::OkStatus();
+  ExpressionManager test_manager(builder, context_.local_info_, request_matchers, {},
+                                 creation_status);
+  EXPECT_THAT(creation_status, Not(IsOk()));
+}
+
+TEST_F(ExpressionManagerTest, RepeatedMatchers) {
+  Protobuf::RepeatedPtrField<std::string> request_matchers;
+  request_matchers.Add("true");
+  request_matchers.Add("true");
+  auto builder = Filters::Common::Expr::getBuilder(context_);
+  absl::Status creation_status = absl::OkStatus();
+  ExpressionManager test_manager(builder, context_.local_info_, request_matchers, {},
+                                 creation_status);
+  ASSERT_OK(creation_status);
+  EXPECT_TRUE(test_manager.hasRequestExpr());
+}
+
+TEST_F(ExpressionManagerTest, EvaluateAttributesEmpty) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto activation = Filters::Common::Expr::createActivation(&context_.local_info_, stream_info,
+                                                            nullptr, nullptr, nullptr);
+  auto result = ExpressionManager::evaluateAttributes(*activation, {});
+  EXPECT_TRUE(result.fields().empty());
+}
+
+#else
+
+TEST(ExpressionManagerTest, CelUnavailableTest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto builder = Filters::Common::Expr::getBuilder(context);
+  Protobuf::RepeatedPtrField<std::string> request_matchers;
+  request_matchers.Add("true");
+
+  // When CEL is not available, this should log a warning but not throw
+  absl::Status creation_status = absl::OkStatus();
+  ExpressionManager manager(builder, context.local_info_, request_matchers, {}, creation_status);
+  EXPECT_FALSE(manager.hasRequestExpr());
+}
+
+#endif // USE_CEL_PARSER
+
+} // namespace
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

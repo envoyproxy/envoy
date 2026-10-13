@@ -1,0 +1,26 @@
+date: July 9, 2025
+
+bug_fixes:
+- area: conn_pool
+  change: |
+    Fixed an issue that could lead to too many connections when using
+    :ref:`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>` if the
+    established connection is ``http/2`` and Envoy predicted it would have lower concurrent capacity.
+- area: conn_pool
+  change: |
+    Fixed an issue that could lead to insufficient connections for current pending requests. If a connection starts draining while it
+    has negative unused capacity (which happens if an HTTP/2 ``SETTINGS`` frame reduces allowed concurrency to below the current number
+    of requests), that connection's unused capacity will be included in total pool capacity even though it is unusable because it is
+    draining. This can result in not enough connections being established for current pending requests. This is most problematic for
+    long-lived requests (such as streaming gRPC requests or long-poll requests) because a connection could be in the draining state
+    for a long time.
+- area: config_validation
+  change: |
+    Fixed an bug where the config validation server will crash when the configuration contains
+    ``%CEL%`` or ``%METADATA%`` substitution formatter.
+- area: release
+  change: |
+    Container (Ubuntu) updates to resolve glibc vulnerabilities.
+- area: http3
+  change: |
+    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.

@@ -1,0 +1,102 @@
+[package]
+name = "test-programs"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/envoyproxy/envoy"
+
+[dependencies]
+envoy-proxy-dynamic-modules-rust-sdk = { path = "../../../../../source/extensions/dynamic_modules/sdk/rust" }
+
+[dev-dependencies]
+envoy-proxy-dynamic-modules-rust-sdk = { path = "../../../../../source/extensions/dynamic_modules/sdk/rust", features = ["mock"] }
+
+[[example]]
+name = "no_op"
+path = "no_op.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "no_program_init"
+path = "no_program_init.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "program_init_fail"
+path = "program_init_fail.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "abi_version_mismatch"
+path = "abi_version_mismatch.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "http"
+path = "http.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "http_integration_test"
+path = "http_integration_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "network_no_op"
+path = "network_no_op.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "listener_no_op"
+path = "listener_no_op.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "bootstrap_function_registry_test"
+path = "bootstrap_function_registry_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "bootstrap_shared_data_test"
+path = "bootstrap_shared_data_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "bootstrap_timer_test"
+path = "bootstrap_timer_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "bootstrap_signed_callout_test"
+path = "bootstrap_signed_callout_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "bootstrap_admin_handler_test"
+path = "bootstrap_admin_handler_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "bootstrap_http_combined_test"
+path = "bootstrap_http_combined_test.rs"
+crate-type = ["cdylib"]
+test = true
+
+[[example]]
+name = "network_integration_test"
+path = "network_integration_test.rs"
+crate-type = ["cdylib"]
+test = true

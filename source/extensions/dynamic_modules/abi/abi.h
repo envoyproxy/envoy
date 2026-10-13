@@ -1,0 +1,18468 @@
+#pragma once
+
+// NOLINT(namespace-envoy)
+
+// This is a pure C header, so we can't apply clang-tidy to it.
+// NOLINTBEGIN
+
+// This is a pure C header file that defines the ABI of the core of dynamic modules used by Envoy.
+//
+// This must not contain any dependencies besides standard library since it is not only used by
+// Envoy itself but also by dynamic module SDKs written in non-C++ languages.
+//
+// There are three kinds defined in this file:
+//
+//  * Types: type definitions used in the ABI.
+//  * Events Hooks: functions that modules must implement to handle events from Envoy.
+//  * Callbacks: functions that Envoy implements and modules can call to interact with Envoy.
+//
+// Types are prefixed with "envoy_dynamic_module_type_". Event Hooks are prefixed with
+// "envoy_dynamic_module_on_". Callbacks are prefixed with "envoy_dynamic_module_callback_".
+//
+// Some functions are specified/defined under the assumptions that all dynamic modules are trusted
+// and have the same privilege level as the main Envoy program. This is because they run inside the
+// Envoy process, hence they can access all the memory and resources that the main Envoy process
+// can, which makes it impossible to enforce any security boundaries between Envoy and the modules
+// by nature. For example, we assume that modules will not try to pass invalid pointers to Envoy
+// intentionally.
+
+// =============================================================================
+// =========================== ABI Compatibility Policy ========================
+// =============================================================================
+//
+// Modules may be built and shipped independently of the Envoy binary that loads them, so there is
+// no recompilation step that would surface an incompatibility. A mismatch instead shows up as a
+// failed symbol resolution at config load time, or, worse, as undefined behavior at request time.
+// Everything declared in this file is an ABI entity. That covers types
+// (envoy_dynamic_module_type_*), event hooks (envoy_dynamic_module_on_*) and callbacks
+// (envoy_dynamic_module_callback_*), and all of them are governed by the following rules. See also
+// the user-facing summary in docs/root/intro/arch_overview/advanced/dynamic_modules.rst.
+//
+// 1. A released ABI entity is never changed in place.
+//
+//    An entity is "released" once it is present in this file on a cut Envoy release branch, that
+//    is, once it has shipped in any Envoy vX.Y.0.
+//
+//    From then on none of the following may change. The name of a function, type, struct field or
+//    enum value stays fixed. A function keeps its parameter count, order, types and return type. A
+//    struct keeps its layout, so no field may be added, removed, reordered, resized or given a new
+//    meaning. An enum keeps its numbering and the meaning of every existing enumerator. The
+//    documented semantics also stay fixed, including ownership, buffer lifetime, threading and
+//    reentrancy constraints, which values may be null, and the meaning of each return value.
+//
+// 2. An ABI entity that has never been released may be changed freely.
+//
+//    An entity added to main since the last release branch was cut may be modified, renamed or
+//    removed outright, with no suffix, no deprecation period and no release note, because no
+//    released SDK or module can depend on it.
+//
+// 3. Iterate by adding, never by mutating.
+//
+//    When a released entity needs a different signature or different semantics, add a new entity
+//    alongside it and deprecate the old one. There are two naming schemes.
+//
+//    a. Append a _v2 suffix to the existing name, then _v3, and so on. This is the default for a
+//       new entity that is the same operation with a changed signature or semantics, so the name
+//       still describes it accurately. The original unsuffixed name is implicitly _v1 and must
+//       never be renamed to _v1, which would itself be a breaking change. Suffixes are monotonic
+//       and never reused, even if an intermediate version is later removed.
+//
+//    b. Give the replacement an entirely new, descriptive name when the concept itself changed.
+//
+//    Prefer (a) when in doubt, because a numeric suffix needs no naming debate and makes the
+//    lineage obvious.
+//
+//    Adding a brand new callback or type is always additive and needs none of the above. Adding a
+//    new event hook to an existing extension point needs care. A module built against an older SDK
+//    does not export a hook that was added later, so every newly added hook must be resolved
+//    optionally on the Envoy side, treating an unresolved symbol as "the module does not implement
+//    this hook" rather than as a config failure. A new hook resolved as mandatory is a breaking
+//    change. Appending an enumerator is likewise safe only for enums that flow from a module into
+//    Envoy, because an older module never returns the new value. Appending to an enum that Envoy
+//    passes into a module breaks modules built before the value existed.
+//
+// 4. Deprecate for at least four Envoy release cycles before removing.
+//
+//    Four cycles is a floor, not a target. A widely used entity, or one whose replacement is
+//    awkward to migrate to, should stay longer, and never removing a deprecated entity is an
+//    acceptable outcome.
+//
+// Compatibility follows from these four rules together with symbol resolution.
+
+// =============================================================================
+// ======================= End of ABI Compatibility Policy =====================
+// =============================================================================
+
+// ENVOY_DYNAMIC_MODULES_ABI_VERSION is a diagnostic marker. It is deliberately not part of the
+// compatibility policy above, and nothing in Envoy or in a module should depend on it.
+//
+// It records which revision of this file a binary was built against, but Envoy never strictly
+// validates it. A module reports the value it was built against from
+// envoy_dynamic_module_on_program_init, and a value that differs from Envoy's own is logged and
+// otherwise ignored, so the module still loads and runs.
+//
+// Note(internal): We could use the Envoy's version such as "v1.38.0" here, there are several
+// reasons as to why we use a static version string instead:
+// 1. Envoy's version is generated at the build time of Envoy while we need to make it available for
+// SDK downstream users.
+// 2. In the future, after the stable ABI is established, we may want to decouple the ABI version
+// from Envoy's versioning scheme.
+#define ENVOY_DYNAMIC_MODULES_ABI_VERSION "v0.2.0"
+
+#ifdef __cplusplus
+#include <cstddef>
+#include <cstdint>
+
+constexpr const char* envoy_dynamic_modules_abi_version = ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+
+extern "C" {
+#else
+#ifdef _MSC_VER
+// COFF weak definitions do not merge reliably across objects (e.g. when several modules are
+// statically linked into the same binary), so use a COMDAT instead.
+__declspec(selectany) const char* envoy_dynamic_modules_abi_version =
+    ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+#else
+const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
+    ENVOY_DYNAMIC_MODULES_ABI_VERSION;
+#endif
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#endif
+
+// =============================================================================
+// ==================================== Common =================================
+// =============================================================================
+
+// =============================================================================
+// Common Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_abi_version_module_ptr represents a null-terminated string that
+ * contains the ABI version the dynamic module was built against. Envoy logs it and does not
+ * otherwise act on it. It is a diagnostic marker, not a compatibility gate, and a value that
+ * differs from Envoy's own does not prevent the module from loading. See the ABI compatibility
+ * policy at the top of this file.
+ *
+ * OWNERSHIP: Module owns the pointer. Envoy copies the string immediately after on_program_init
+ * returns, so it only needs to remain valid until then. Returning a static string satisfies this.
+ */
+typedef const char* envoy_dynamic_module_type_abi_version_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
+ * represents a contiguous block of memory in bytes.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It depends on the
+ * context where the buffer is used. See for the specific event hook or callback for more details.
+ */
+typedef const char* envoy_dynamic_module_type_buffer_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_buffer_envoy_ptr is a pointer to a buffer in Envoy. A buffer represents
+ * a contiguous block of memory in bytes.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The lifetime depends on the context where the buffer is used.
+ * See for the specific event hook or callback for more details.
+ */
+typedef const char* envoy_dynamic_module_type_buffer_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_envoy_buffer represents a buffer owned by Envoy.
+ * This is to give the direct access to the buffer in Envoy.
+ */
+typedef struct envoy_dynamic_module_type_envoy_buffer {
+  envoy_dynamic_module_type_buffer_envoy_ptr ptr;
+  size_t length;
+} envoy_dynamic_module_type_envoy_buffer;
+
+/**
+ * envoy_dynamic_module_type_module_buffer represents a buffer owned by the module.
+ */
+typedef struct envoy_dynamic_module_type_module_buffer {
+  envoy_dynamic_module_type_buffer_module_ptr ptr;
+  size_t length;
+} envoy_dynamic_module_type_module_buffer;
+
+/**
+ * envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
+ * by the module.
+ */
+typedef struct envoy_dynamic_module_type_module_http_header {
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_module_http_header;
+
+/**
+ * envoy_dynamic_module_type_module_key_value_pair represents a string key-value pair owned by the
+ * module. It is used to set multiple dynamic metadata entries under a single namespace via
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch.
+ */
+typedef struct envoy_dynamic_module_type_module_key_value_pair {
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_module_key_value_pair;
+
+/**
+ * envoy_dynamic_module_type_envoy_http_header represents a key-value pair of an HTTP header owned
+ * by Envoy's HeaderMap.
+ */
+typedef struct envoy_dynamic_module_type_envoy_http_header {
+  envoy_dynamic_module_type_buffer_envoy_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_envoy_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_envoy_http_header;
+
+/**
+ * envoy_dynamic_module_type_timing_info contains timing information from StreamInfo.
+ * All durations are in nanoseconds. A value of -1 indicates the timing is not available.
+ */
+typedef struct envoy_dynamic_module_type_timing_info {
+  int64_t start_time_unix_ns;           // Request start time as Unix timestamp in nanoseconds.
+  int64_t request_complete_duration_ns; // Duration from start to request complete.
+  int64_t first_upstream_tx_byte_sent_ns;
+  int64_t last_upstream_tx_byte_sent_ns;
+  int64_t first_upstream_rx_byte_received_ns;
+  int64_t last_upstream_rx_byte_received_ns;
+  int64_t first_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_tx_byte_sent_ns;
+} envoy_dynamic_module_type_timing_info;
+
+/**
+ * Stream timing for HTTP filters and access loggers. start_time_unix_ns is a Unix timestamp in
+ * nanoseconds; the other numeric fields are nanosecond offsets from the monotonic request start.
+ * Check each numeric value's has_* field for availability. When the flag is false, the numeric
+ * value is -1. Zero and negative offsets are valid.
+ * downstream_connection_begin_ns records accept time, and downstream_handshake_start_ns records
+ * ClientHello. downstream_connection_end_ns is set only if the request is active when the
+ * connection closes. Envoy tracks the final ACK for QUIC.
+ */
+typedef struct envoy_dynamic_module_type_timing_info_v2 {
+  int64_t start_time_unix_ns;
+  int64_t downstream_connection_begin_ns;
+  int64_t downstream_handshake_start_ns;
+  int64_t downstream_handshake_complete_ns;
+  int64_t last_downstream_header_rx_byte_received_ns;
+  int64_t last_downstream_rx_byte_received_ns;
+  int64_t upstream_connect_start_ns;
+  int64_t upstream_connect_complete_ns;
+  int64_t upstream_handshake_complete_ns;
+  int64_t first_upstream_tx_byte_sent_ns;
+  int64_t last_upstream_tx_byte_sent_ns;
+  int64_t first_upstream_rx_byte_received_ns;
+  int64_t first_upstream_rx_body_byte_received_ns;
+  int64_t last_upstream_rx_byte_received_ns;
+  int64_t first_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_tx_byte_sent_ns;
+  int64_t last_downstream_ack_received_ns;
+  int64_t request_complete_duration_ns;
+  int64_t downstream_connection_end_ns;
+  bool has_start_time;
+  bool has_downstream_connection_begin;
+  bool has_downstream_handshake_start;
+  bool has_downstream_handshake_complete;
+  bool has_last_downstream_header_rx_byte_received;
+  bool has_last_downstream_rx_byte_received;
+  bool has_upstream_connect_start;
+  bool has_upstream_connect_complete;
+  bool has_upstream_handshake_complete;
+  bool has_first_upstream_tx_byte_sent;
+  bool has_last_upstream_tx_byte_sent;
+  bool has_first_upstream_rx_byte_received;
+  bool has_first_upstream_rx_body_byte_received;
+  bool has_last_upstream_rx_byte_received;
+  bool has_first_downstream_tx_byte_sent;
+  bool has_last_downstream_tx_byte_sent;
+  bool has_last_downstream_ack_received;
+  bool has_request_complete;
+  bool has_downstream_connection_end;
+} envoy_dynamic_module_type_timing_info_v2;
+
+typedef enum envoy_dynamic_module_type_http_header_type {
+  envoy_dynamic_module_type_http_header_type_RequestHeader,
+  envoy_dynamic_module_type_http_header_type_RequestTrailer,
+  envoy_dynamic_module_type_http_header_type_ResponseHeader,
+  envoy_dynamic_module_type_http_header_type_ResponseTrailer,
+} envoy_dynamic_module_type_http_header_type;
+
+/**
+ * envoy_dynamic_module_type_log_level represents the log level passed to
+ * envoy_dynamic_module_callback_log. This corresponds to the enum defined in
+ * source/common/common/base_logger.h.
+ */
+typedef enum envoy_dynamic_module_type_log_level {
+  envoy_dynamic_module_type_log_level_Trace,
+  envoy_dynamic_module_type_log_level_Debug,
+  envoy_dynamic_module_type_log_level_Info,
+  envoy_dynamic_module_type_log_level_Warn,
+  envoy_dynamic_module_type_log_level_Error,
+  envoy_dynamic_module_type_log_level_Critical,
+  envoy_dynamic_module_type_log_level_Off,
+} envoy_dynamic_module_type_log_level;
+
+/**
+ * envoy_dynamic_module_type_http_callout_init_result represents the result of the HTTP callout
+ * initialization after envoy_dynamic_module_callback_http_filter_http_callout is called.
+ * Success means the callout is successfully initialized and ready to be used.
+ * MissingRequiredHeaders means the callout is missing one of the required headers, :path, :method,
+ * or host header. DuplicateCalloutId means the callout id is already used by another callout.
+ * ClusterNotFound means the cluster is not found in the configuration. CannotCreateRequest means
+ * the request cannot be created. That happens when, for example, there's no healthy upstream host
+ * in the cluster.
+ */
+typedef enum envoy_dynamic_module_type_http_callout_init_result {
+  envoy_dynamic_module_type_http_callout_init_result_Success,
+  envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders,
+  envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound,
+  envoy_dynamic_module_type_http_callout_init_result_DuplicateCalloutId,
+  envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+} envoy_dynamic_module_type_http_callout_init_result;
+
+/**
+ * envoy_dynamic_module_type_http_callout_result represents the result of the HTTP callout.
+ * This corresponds to `AsyncClient::FailureReason::*` in envoy/http/async_client.h plus Success.
+ */
+typedef enum envoy_dynamic_module_type_http_callout_result {
+  envoy_dynamic_module_type_http_callout_result_Success,
+  envoy_dynamic_module_type_http_callout_result_Reset,
+  envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit,
+} envoy_dynamic_module_type_http_callout_result;
+
+/**
+ * envoy_dynamic_module_type_http_stream_reset_reason represents the reason for a stream reset.
+ * This corresponds to `AsyncClient::StreamResetReason::*` in envoy/http/async_client.h.
+ */
+typedef enum envoy_dynamic_module_type_http_stream_reset_reason {
+  envoy_dynamic_module_type_http_stream_reset_reason_ConnectionFailure,
+  envoy_dynamic_module_type_http_stream_reset_reason_ConnectionTermination,
+  envoy_dynamic_module_type_http_stream_reset_reason_LocalReset,
+  envoy_dynamic_module_type_http_stream_reset_reason_LocalRefusedStreamReset,
+  envoy_dynamic_module_type_http_stream_reset_reason_Overflow,
+  envoy_dynamic_module_type_http_stream_reset_reason_RemoteReset,
+  envoy_dynamic_module_type_http_stream_reset_reason_RemoteRefusedStreamReset,
+  envoy_dynamic_module_type_http_stream_reset_reason_ProtocolError,
+} envoy_dynamic_module_type_http_stream_reset_reason;
+
+/**
+ * envoy_dynamic_module_type_metrics_result represents the result of the metrics operation.
+ * Success means the operation was successful.
+ * MetricNotFound means the metric was not found. This is usually an indication that a handle was
+ * improperly initialized or stored. InvalidLabels means the labels are invalid. Frozen means a
+ * metric was attempted to be created when the stats creation is frozen.
+ */
+typedef enum envoy_dynamic_module_type_metrics_result {
+  envoy_dynamic_module_type_metrics_result_Success,
+  envoy_dynamic_module_type_metrics_result_MetricNotFound,
+  envoy_dynamic_module_type_metrics_result_InvalidLabels,
+  envoy_dynamic_module_type_metrics_result_Frozen,
+} envoy_dynamic_module_type_metrics_result;
+
+/**
+ * envoy_dynamic_module_type_metadata_source represents the location of metadata to get when calling
+ * envoy_dynamic_module_callback_http_get_metadata_* functions.
+ */
+typedef enum envoy_dynamic_module_type_metadata_source {
+  // stream's dynamic metadata.
+  envoy_dynamic_module_type_metadata_source_Dynamic,
+  // route metadata
+  envoy_dynamic_module_type_metadata_source_Route,
+  // cluster metadata
+  envoy_dynamic_module_type_metadata_source_Cluster,
+  // host (LbEndpoint in xDS) metadata
+  envoy_dynamic_module_type_metadata_source_Host,
+  // host locality (LocalityLbEndpoints in xDS) metadata
+  envoy_dynamic_module_type_metadata_source_HostLocality,
+} envoy_dynamic_module_type_metadata_source;
+
+/**
+ * envoy_dynamic_module_type_attribute_id represents an attribute described in
+ * https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
+ */
+typedef enum envoy_dynamic_module_type_attribute_id {
+  // request.path
+  envoy_dynamic_module_type_attribute_id_RequestPath,
+  // request.url_path
+  envoy_dynamic_module_type_attribute_id_RequestUrlPath,
+  // request.host
+  envoy_dynamic_module_type_attribute_id_RequestHost,
+  // request.scheme
+  envoy_dynamic_module_type_attribute_id_RequestScheme,
+  // request.method
+  envoy_dynamic_module_type_attribute_id_RequestMethod,
+  // request.headers
+  envoy_dynamic_module_type_attribute_id_RequestHeaders,
+  // request.referer
+  envoy_dynamic_module_type_attribute_id_RequestReferer,
+  // request.useragent
+  envoy_dynamic_module_type_attribute_id_RequestUserAgent,
+  // request.time
+  envoy_dynamic_module_type_attribute_id_RequestTime,
+  // request.id
+  envoy_dynamic_module_type_attribute_id_RequestId,
+  // request.protocol
+  envoy_dynamic_module_type_attribute_id_RequestProtocol,
+  // request.query
+  envoy_dynamic_module_type_attribute_id_RequestQuery,
+  // request.duration
+  envoy_dynamic_module_type_attribute_id_RequestDuration,
+  // request.size
+  envoy_dynamic_module_type_attribute_id_RequestSize,
+  // request.total_size
+  envoy_dynamic_module_type_attribute_id_RequestTotalSize,
+  // response.code
+  envoy_dynamic_module_type_attribute_id_ResponseCode,
+  // response.code_details
+  envoy_dynamic_module_type_attribute_id_ResponseCodeDetails,
+  // response.flags
+  envoy_dynamic_module_type_attribute_id_ResponseFlags,
+  // response.grpc_status
+  envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus,
+  // response.headers
+  envoy_dynamic_module_type_attribute_id_ResponseHeaders,
+  // response.trailers
+  envoy_dynamic_module_type_attribute_id_ResponseTrailers,
+  // response.size
+  envoy_dynamic_module_type_attribute_id_ResponseSize,
+  // response.total_size
+  envoy_dynamic_module_type_attribute_id_ResponseTotalSize,
+  // response.backend_latency
+  envoy_dynamic_module_type_attribute_id_ResponseBackendLatency,
+  // source.address
+  envoy_dynamic_module_type_attribute_id_SourceAddress,
+  // source.port
+  envoy_dynamic_module_type_attribute_id_SourcePort,
+  // destination.address
+  envoy_dynamic_module_type_attribute_id_DestinationAddress,
+  // destination.port
+  envoy_dynamic_module_type_attribute_id_DestinationPort,
+  // connection.id
+  envoy_dynamic_module_type_attribute_id_ConnectionId,
+  // connection.mtls
+  envoy_dynamic_module_type_attribute_id_ConnectionMtls,
+  // connection.requested_server_name
+  envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName,
+  // connection.tls_version
+  envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
+  // connection.subject_local_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate,
+  // connection.subject_peer_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate,
+  // connection.dns_san_local_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate,
+  // connection.dns_san_peer_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate,
+  // connection.uri_san_local_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate,
+  // connection.uri_san_peer_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate,
+  // connection.sha256_peer_certificate_digest
+  envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest,
+  // connection.transport_failure_reason
+  envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason,
+  // connection.termination_details
+  envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails,
+  // upstream.address
+  envoy_dynamic_module_type_attribute_id_UpstreamAddress,
+  // upstream.port
+  envoy_dynamic_module_type_attribute_id_UpstreamPort,
+  // upstream.tls_version
+  envoy_dynamic_module_type_attribute_id_UpstreamTlsVersion,
+  // upstream.subject_local_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamSubjectLocalCertificate,
+  // upstream.subject_peer_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamSubjectPeerCertificate,
+  // upstream.dns_san_local_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamDnsSanLocalCertificate,
+  // upstream.dns_san_peer_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamDnsSanPeerCertificate,
+  // upstream.uri_san_local_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamUriSanLocalCertificate,
+  // upstream.uri_san_peer_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamUriSanPeerCertificate,
+  // upstream.sha256_peer_certificate_digest
+  envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest,
+  // upstream.local_address
+  envoy_dynamic_module_type_attribute_id_UpstreamLocalAddress,
+  // upstream.transport_failure_reason
+  envoy_dynamic_module_type_attribute_id_UpstreamTransportFailureReason,
+  // upstream.request_attempt_count
+  envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount,
+  // upstream.cx_pool_ready_duration
+  envoy_dynamic_module_type_attribute_id_UpstreamCxPoolReadyDuration,
+  // upstream.locality
+  envoy_dynamic_module_type_attribute_id_UpstreamLocality,
+  // xds.node
+  envoy_dynamic_module_type_attribute_id_XdsNode,
+  // xds.cluster_name
+  envoy_dynamic_module_type_attribute_id_XdsClusterName,
+  // xds.cluster_metadata
+  envoy_dynamic_module_type_attribute_id_XdsClusterMetadata,
+  // xds.listener_direction
+  envoy_dynamic_module_type_attribute_id_XdsListenerDirection,
+  // xds.listener_metadata
+  envoy_dynamic_module_type_attribute_id_XdsListenerMetadata,
+  // xds.route_name
+  envoy_dynamic_module_type_attribute_id_XdsRouteName,
+  // xds.route_metadata
+  envoy_dynamic_module_type_attribute_id_XdsRouteMetadata,
+  // xds.virtual_host_name
+  envoy_dynamic_module_type_attribute_id_XdsVirtualHostName,
+  // xds.virtual_host_metadata
+  envoy_dynamic_module_type_attribute_id_XdsVirtualHostMetadata,
+  // xds.upstream_host_metadata
+  envoy_dynamic_module_type_attribute_id_XdsUpstreamHostMetadata,
+  // xds.filter_chain_name
+  envoy_dynamic_module_type_attribute_id_XdsFilterChainName,
+  // health_check
+  envoy_dynamic_module_type_attribute_id_HealthCheck,
+  // upstream.server_name
+  envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName,
+  // xds.virtual_cluster_name
+  envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName,
+  // upstream.protocol
+  envoy_dynamic_module_type_attribute_id_UpstreamProtocol,
+} envoy_dynamic_module_type_attribute_id;
+
+/**
+ * envoy_dynamic_module_type_socket_option_state represents the socket state at which an option
+ * should be applied.
+ */
+typedef enum envoy_dynamic_module_type_socket_option_state {
+  envoy_dynamic_module_type_socket_option_state_Prebind = 0,
+  envoy_dynamic_module_type_socket_option_state_Bound = 1,
+  envoy_dynamic_module_type_socket_option_state_Listening = 2,
+} envoy_dynamic_module_type_socket_option_state;
+
+/**
+ * envoy_dynamic_module_type_socket_option_value_type represents the type of value stored in a
+ * socket option.
+ */
+typedef enum envoy_dynamic_module_type_socket_option_value_type {
+  envoy_dynamic_module_type_socket_option_value_type_Int = 0,
+  envoy_dynamic_module_type_socket_option_value_type_Bytes = 1,
+} envoy_dynamic_module_type_socket_option_value_type;
+
+/**
+ * envoy_dynamic_module_type_socket_option represents a socket option with its level, name, state,
+ * and value. The value can be either an integer or bytes depending on value_type.
+ */
+typedef struct envoy_dynamic_module_type_socket_option {
+  int64_t level;
+  int64_t name;
+  envoy_dynamic_module_type_socket_option_state state;
+  envoy_dynamic_module_type_socket_option_value_type value_type;
+  int64_t int_value;
+  envoy_dynamic_module_type_envoy_buffer byte_value;
+} envoy_dynamic_module_type_socket_option;
+
+/**
+ * envoy_dynamic_module_type_address_type represents the socket address type.
+ */
+typedef enum envoy_dynamic_module_type_address_type {
+  envoy_dynamic_module_type_address_type_Unknown = 0,
+  envoy_dynamic_module_type_address_type_Ip = 1,
+  envoy_dynamic_module_type_address_type_Pipe = 2,
+  envoy_dynamic_module_type_address_type_EnvoyInternal = 3,
+} envoy_dynamic_module_type_address_type;
+
+/**
+ * envoy_dynamic_module_type_socket_direction represents whether the socket option should be
+ * applied to the upstream (outgoing to backend) or downstream (incoming from client) connection.
+ */
+typedef enum envoy_dynamic_module_type_socket_direction {
+  envoy_dynamic_module_type_socket_direction_Upstream = 0,
+  envoy_dynamic_module_type_socket_direction_Downstream = 1,
+} envoy_dynamic_module_type_socket_direction;
+
+// =============================================================================
+// Common Event Hooks
+// =============================================================================
+// Event hooks are functions that are called by Envoy in response to certain events.
+// The module must implement and export these functions in the dynamic module object file.
+//
+// Each event hook is defined as a function prototype. The symbol must be prefixed with
+// "envoy_dynamic_module_on_".
+
+/**
+ * envoy_dynamic_module_on_program_init is called by the main thread exactly when the module is
+ * loaded. The function returns the ABI version of the dynamic module. If null is returned, the
+ * module will be unloaded immediately.
+ *
+ * For Envoy, the return value is recorded and logged for diagnostics only. Envoy does not
+ * validate it against its own ABI version, so returning a version that differs from Envoy's does
+ * not fail the load. Only returning null does.
+ *
+ * For dynamic modules, this is useful when they need to perform some process-wide
+ * initialization or check if the module is compatible with the platform, such as CPU features.
+ * Note that initialization routines of a dynamic module can also be performed without this function
+ * through constructor functions in an object file. However, normal constructors cannot be used
+ * to check compatibility and gracefully fail the initialization because there is no way to
+ * report an error to Envoy.
+ *
+ * @return envoy_dynamic_module_type_abi_version_module_ptr is the ABI version the dynamic module
+ * was built against. Null means the error and the module will be unloaded immediately.
+ */
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void);
+
+// =============================================================================
+// Common Callbacks
+// =============================================================================
+
+// --------------------------------- Logging -----------------------------------
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_log_v2 instead, which additionally reports the
+ * module source location of the log statement.
+ *
+ * envoy_dynamic_module_callback_log is called by the module to log a message as part
+ * of the standard Envoy logging stream under [dynamic_modules] Id.
+ *
+ * @param level is the log level of the message.
+ * @param message is the log message to be logged. The buffer is only read during the call.
+ *
+ */
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       envoy_dynamic_module_type_module_buffer message);
+
+/**
+ * envoy_dynamic_module_callback_log_v2 is called by the module to log a message as part of the
+ * standard Envoy logging stream under [dynamic_modules] Id, reporting the module source location of
+ * the log statement instead of a location inside Envoy.
+ *
+ * @param level is the log level of the message.
+ * @param message is the log message to be logged. The buffer is only read during the call.
+ * @param source_file is the module source file of the log statement, used to report the actual
+ * location instead of a location inside Envoy. The buffer is only read during the call.
+ * @param source_line is the line number of the log statement within source_file.
+ *
+ */
+void envoy_dynamic_module_callback_log_v2(envoy_dynamic_module_type_log_level level,
+                                          envoy_dynamic_module_type_module_buffer message,
+                                          envoy_dynamic_module_type_module_buffer source_file,
+                                          uint32_t source_line);
+
+/**
+ * envoy_dynamic_module_callback_log_enabled is called by the module to check if the log level is
+ * enabled for logging for the dynamic modules Id. This can be used to avoid unnecessary
+ * string formatting and allocation if the log level is not enabled since calling this function
+ * should be negligible in terms of performance.
+ *
+ * @param level is the log level to check.
+ * @return true if the log level is enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level);
+
+/**
+ * envoy_dynamic_module_callback_get_log_level is called by the module to get the current effective
+ * log level for the dynamic modules Id. This allows the module to align its own verbosity with the
+ * level configured on the Envoy side, including changes applied at runtime via the admin API.
+ *
+ * @return the current effective log level as envoy_dynamic_module_type_log_level.
+ */
+envoy_dynamic_module_type_log_level envoy_dynamic_module_callback_get_log_level();
+
+// --------------------------------- Threading -----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_get_concurrency may be called by the dynamic
+ * module in envoy_dynamic_module_on_program_init to get the configured concurrency of the server.
+ * NOTE: This function must be called on the main thread.
+ *
+ * @return number of worker threads (concurrency) that the server is configured to use.
+ */
+uint32_t envoy_dynamic_module_callback_get_concurrency();
+
+// ----------------------------- Server Mode -----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_is_validation_mode may be called by the dynamic
+ * module to check if the server is running in config validation mode (--mode validate).
+ * This allows modules to optimize by only parsing and validating their config without
+ * performing expensive operations such as provider lookups or loading external resources.
+ * NOTE: This function must be called on the main thread.
+ *
+ * @return true if the server is in validation mode, false otherwise.
+ */
+bool envoy_dynamic_module_callback_is_validation_mode();
+
+// ----------------------------- Runtime -----------------------------------
+//
+// The callbacks in this section each read a single value from the Envoy runtime, i.e. the layered
+// key/value configuration described by the `layered_runtime` bootstrap option, including RTDS
+// layers and values set through the admin `/runtime_modify` endpoint. They differ only in the type
+// they read the value as, and all share the following semantics.
+//
+//  * They may be called from any thread.
+//  * key is only read during the call.
+//  * default_value is returned whenever the key does not exist, the stored value cannot be read as
+//    the requested type, or the runtime is not reachable from the calling thread.
+//
+// Envoy stores every numeric runtime value as a double, so the _int and _number callbacks read the
+// same stored value through different conversions. For both of them key must not name one of
+// Envoy's own `envoy.reloadable_features.*` or `envoy.restart_features.*` guards: those are
+// boolean guards and Envoy asserts against reading them as a number in debug builds, so read them
+// with envoy_dynamic_module_callback_get_runtime_bool instead.
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_bool is called by the module to read a runtime value
+ * as a boolean.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not a
+ * boolean, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as a boolean, or default_value.
+ */
+bool envoy_dynamic_module_callback_get_runtime_bool(envoy_dynamic_module_type_module_buffer key,
+                                                    bool default_value);
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_int is called by the module to read a runtime value as
+ * an unsigned integer.
+ *
+ * Because the value is stored as a double, this conversion is lossy at both ends. A value above
+ * 2^53 loses precision and is rounded to the nearest representable value, and a fractional value
+ * is truncated toward zero; in both cases the converted value is returned rather than
+ * default_value. Only a negative value, or one beyond the range of a 64-bit unsigned integer,
+ * stores no integer at all and therefore yields default_value. Use
+ * envoy_dynamic_module_callback_get_runtime_number to read the value without either conversion.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not
+ * an integer, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as an unsigned integer, or default_value.
+ */
+uint64_t envoy_dynamic_module_callback_get_runtime_int(envoy_dynamic_module_type_module_buffer key,
+                                                       uint64_t default_value);
+
+/**
+ * envoy_dynamic_module_callback_get_runtime_number is called by the module to read a runtime value
+ * as a double.
+ *
+ * This is the lossless counterpart to envoy_dynamic_module_callback_get_runtime_int: it returns
+ * the value exactly as Envoy stores it, so it neither rounds nor truncates, and it reads negative
+ * values, which the integer callback answers with default_value.
+ *
+ * @param key is the runtime key to look up.
+ * @param default_value is the value to return if the key does not exist, the stored value is not a
+ * number, or the runtime is not reachable from the calling thread.
+ * @return the runtime value as a double, or default_value.
+ */
+double envoy_dynamic_module_callback_get_runtime_number(envoy_dynamic_module_type_module_buffer key,
+                                                        double default_value);
+
+// ----------------------------- Function Registry -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_register_function registers an opaque function pointer under the
+ * given key in the process-wide function registry. This allows modules loaded in the same process
+ * to expose functions that other modules can resolve by name and call directly, enabling zero-copy
+ * cross-module interactions.
+ *
+ * Registration is typically done once during bootstrap (e.g., in on_server_initialized). The
+ * function pointer must remain valid for the lifetime of the process, so a module that registers
+ * functions must be loaded with do_not_close set to true to avoid being unloaded while the registry
+ * still hands out the pointer.
+ *
+ * Callers are responsible for agreeing on the function signature out-of-band, since the registry
+ * stores opaque void* pointers — analogous to dlsym semantics.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name to register the function under.
+ * @param function_ptr is the function pointer to register. Must not be nullptr.
+ * @return true if registered successfully, false if a function is already registered under key or
+ *         function_ptr is nullptr.
+ */
+bool envoy_dynamic_module_callback_register_function(envoy_dynamic_module_type_module_buffer key,
+                                                     void* function_ptr);
+
+/**
+ * envoy_dynamic_module_callback_get_function retrieves a previously registered function pointer by
+ * key from the process-wide function registry. The returned pointer can be cast to the expected
+ * function signature and called directly.
+ *
+ * Resolution is typically done once during configuration creation (e.g., in
+ * on_http_filter_config_new) and the result cached for per-request use.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name of the function to retrieve.
+ * @param function_ptr_out is a pointer to a variable where the function pointer will be stored.
+ *                         This is only written to if the function returns true.
+ * @return true if a function was found under the given key, false otherwise.
+ */
+bool envoy_dynamic_module_callback_get_function(envoy_dynamic_module_type_module_buffer key,
+                                                void** function_ptr_out);
+
+// ----------------------------- Shared Data Registry -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_register_shared_data registers an opaque data pointer under the
+ * given key in the process-wide shared data registry. This allows modules loaded in the same
+ * process to share arbitrary state — such as runtime handles, configuration snapshots, or shared
+ * caches — without requiring direct access to each other's globals.
+ *
+ * Unlike the function registry, the shared data registry allows overwriting an existing entry.
+ * If the key already exists, the data pointer is updated and the function returns true. This
+ * supports patterns where shared state is refreshed (e.g., after a configuration reload).
+ * Callers are responsible for managing the lifetime of overwritten data pointers.
+ *
+ * Registration is typically done once during bootstrap (e.g., in on_server_initialized or
+ * on_scheduled). The data pointer must remain valid while reachable through the registry. A module
+ * that registers a pointer into its own memory must either be loaded with do_not_close set to true
+ * or overwrite the pointer on each reload before any consumer reads it.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name to register the data under.
+ * @param data_ptr is the data pointer to register. Must not be nullptr.
+ * @return true if registered or updated successfully, false if data_ptr is nullptr.
+ */
+bool envoy_dynamic_module_callback_register_shared_data(envoy_dynamic_module_type_module_buffer key,
+                                                        void* data_ptr);
+
+/**
+ * envoy_dynamic_module_callback_get_shared_data retrieves a previously registered data pointer by
+ * key from the process-wide shared data registry. The returned pointer can be cast to the expected
+ * data type and used directly.
+ *
+ * Resolution is typically done once during configuration creation (e.g., in
+ * on_http_filter_config_new) and the result cached for per-request use.
+ *
+ * This is thread-safe and can be called from any thread.
+ *
+ * @param key is the name of the data to retrieve.
+ * @param data_ptr_out is a pointer to a variable where the data pointer will be stored.
+ *                     This is only written to if the function returns true.
+ * @return true if data was found under the given key, false otherwise.
+ */
+bool envoy_dynamic_module_callback_get_shared_data(envoy_dynamic_module_type_module_buffer key,
+                                                   void** data_ptr_out);
+
+// =============================================================================
+// ============================== HTTP Filter ==================================
+// =============================================================================
+
+// =============================================================================
+// HTTP Filter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_http_filter_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleHttpFilterConfig class in Envoy. This is passed to the module when
+ * creating a new in-module HTTP filter configuration and used to access the HTTP filter-scoped
+ * information such as metadata, metrics, etc.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_http_filter_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_http_filter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_filter_config_module_ptr is a pointer to an in-module HTTP
+ * configuration corresponding to an Envoy HTTP filter configuration. The config is responsible for
+ * creating a new HTTP filter that corresponds to each HTTP stream.
+ *
+ * This has 1:1 correspondence with the DynamicModuleHttpFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_http_filter_config_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_http_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_filter_per_route_config_module_ptr is a pointer to an in-module
+ * HTTP configuration corresponding to an Envoy HTTP per route filter configuration. The config is
+ * responsible for changing HTTP filter's behavior on specific routes.
+ *
+ * This has 1:1 correspondence with the DynamicModuleHttpPerRouteFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_http_filter_per_route_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_http_filter_per_route_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_filter_envoy_ptr is a raw pointer to the DynamicModuleHttpFilter
+ * class in Envoy. This is passed to the module when creating a new HTTP filter for each HTTP stream
+ * and used to access the HTTP filter-scoped information such as headers, body, trailers, etc.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_http_filter_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer, and can be accessed by the module until the filter is
+ * destroyed, i.e. envoy_dynamic_module_on_http_filter_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_http_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_filter_module_ptr is a pointer to an in-module HTTP filter
+ * corresponding to an Envoy HTTP filter. The filter is responsible for processing each HTTP stream.
+ *
+ * This has 1:1 correspondence with the DynamicModuleHttpFilter class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_http_filter_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_filter_scheduler_ptr is a raw pointer to the
+ * DynamicModuleHttpFilterScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the HTTP filter event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_http_filter_scheduler_new and the scheduling and destruction is
+ * done by envoy_dynamic_module_callback_http_filter_scheduler_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_http_filter_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleHttpFilterConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the HTTP filter config event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new and the scheduling and destruction
+ * is done by envoy_dynamic_module_callback_http_filter_config_scheduler_delete. Since its lifecycle
+ * is owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr;
+
+typedef enum envoy_dynamic_module_type_http_body_type {
+  envoy_dynamic_module_type_http_body_type_ReceivedRequestBody,
+  envoy_dynamic_module_type_http_body_type_BufferedRequestBody,
+  envoy_dynamic_module_type_http_body_type_ReceivedResponseBody,
+  envoy_dynamic_module_type_http_body_type_BufferedResponseBody,
+} envoy_dynamic_module_type_http_body_type;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_request_headers_status represents the status of the
+ * filter after processing the HTTP request headers. This corresponds to `FilterHeadersStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_http_filter_request_headers_status {
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration,
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_ContinueAndDontEndStream,
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_StopAllIterationAndBuffer,
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_StopAllIterationAndWatermark,
+} envoy_dynamic_module_type_on_http_filter_request_headers_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_request_body_status represents the status of the filter
+ * after processing the HTTP request body. This corresponds to `FilterDataStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_http_filter_request_body_status {
+  envoy_dynamic_module_type_on_http_filter_request_body_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationAndBuffer,
+  envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationAndWatermark,
+  envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationNoBuffer
+} envoy_dynamic_module_type_on_http_filter_request_body_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_request_trailers_status represents the status of the
+ * filter after processing the HTTP request trailers. This corresponds to `FilterTrailersStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+  envoy_dynamic_module_type_on_http_filter_request_trailers_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_request_trailers_status_StopIteration
+} envoy_dynamic_module_type_on_http_filter_request_trailers_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_response_headers_status represents the status of the
+ * filter after processing the HTTP response headers. This corresponds to `FilterHeadersStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_http_filter_response_headers_status {
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration,
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_ContinueAndDontEndStream,
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_StopAllIterationAndBuffer,
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_StopAllIterationAndWatermark,
+} envoy_dynamic_module_type_on_http_filter_response_headers_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_response_body_status represents the status of the filter
+ * after processing the HTTP response body. This corresponds to `FilterDataStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_http_filter_response_body_status {
+  envoy_dynamic_module_type_on_http_filter_response_body_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationAndBuffer,
+  envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationAndWatermark,
+  envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationNoBuffer
+} envoy_dynamic_module_type_on_http_filter_response_body_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_response_trailers_status represents the status of the
+ * filter after processing the HTTP response trailers. This corresponds to `FilterTrailersStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+  envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_response_trailers_status_StopIteration
+} envoy_dynamic_module_type_on_http_filter_response_trailers_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_local_reply_status represents the action to take after
+ * the onLocalReply hook completes. This corresponds to `LocalErrorStatus` in envoy/http/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_http_filter_local_reply_status {
+  // Continue sending the local reply after onLocalReply has been sent to all filters.
+  envoy_dynamic_module_type_on_http_filter_local_reply_status_Continue,
+  // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
+  // informed rather than sending the local reply.
+  envoy_dynamic_module_type_on_http_filter_local_reply_status_ContinueAndResetStream,
+} envoy_dynamic_module_type_on_http_filter_local_reply_status;
+
+/**
+ * envoy_dynamic_module_type_http_stream_reset_reason represents the reason for resetting the main
+ * HTTP stream. This corresponds to `Http::StreamResetReason` in envoy/http/stream_reset_handler.h.
+ */
+typedef enum envoy_dynamic_module_type_http_filter_stream_reset_reason {
+  // If a local codec level reset was sent on the stream.
+  envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,
+  // If a local codec level refused stream reset was sent on the stream (allowing for retry).
+  envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalRefusedStreamReset,
+} envoy_dynamic_module_type_http_filter_stream_reset_reason;
+
+// =============================================================================
+// HTTP Filter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_new is called by the main thread when the http
+ * filter config is loaded. The function returns a
+ * envoy_dynamic_module_type_http_filter_config_module_ptr for given name and config.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object for the
+ * corresponding config.
+ * @param name is the name of the filter.
+ * @param config is the configuration for the module.
+ * @return envoy_dynamic_module_type_http_filter_config_module_ptr is the pointer to the
+ * in-module HTTP filter configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the filter configuration will be rejected.
+ */
+envoy_dynamic_module_type_http_filter_config_module_ptr
+envoy_dynamic_module_on_http_filter_config_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP filter configuration
+ * is destroyed in Envoy. The module should release any resources associated with the corresponding
+ * in-module HTTP filter configuration.
+ * @param filter_config_ptr is a pointer to the in-module HTTP filter configuration whose
+ * corresponding Envoy HTTP filter configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_http_filter_config_destroy(
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_per_route_config_new is called by the main thread when the
+ * http per-route filter config is loaded. The function returns a
+ * envoy_dynamic_module_type_http_filter_per_route_config_module_ptr for given name and config.
+ *
+ * @param name is the name of the filter.
+ * @param config is the configuration for the module.
+ * @return envoy_dynamic_module_type_http_filter_per_route_config_module_ptr is the pointer to the
+ * in-module HTTP filter configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the filter configuration will be rejected.
+ */
+envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
+envoy_dynamic_module_on_http_filter_per_route_config_new(
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_destroy is called by the main thread when the HTTP
+ * per-route filter configuration is destroyed in Envoy. The module should release any resources
+ * associated with the corresponding in-module HTTP filter configuration. A route configuration may
+ * be released on a worker thread, in which case Envoy defers this hook to the main thread, so the
+ * module may use callbacks that require the main thread from it.
+ * @param filter_config_ptr is a pointer to the in-module HTTP filter configuration whose
+ * corresponding Envoy HTTP filter configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_http_filter_per_route_config_destroy(
+    envoy_dynamic_module_type_http_filter_per_route_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_new is called when the HTTP filter is created for each HTTP
+ * stream.
+ *
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return envoy_dynamic_module_type_http_filter_module_ptr is the pointer to the in-module HTTP
+ * filter. Returning nullptr indicates a failure to initialize the module. When it fails, the stream
+ * will be closed.
+ */
+envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_filter_new(
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_request_headers is called when the HTTP request headers are
+ * received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param end_of_stream is true if the request headers are the last data.
+ * @return envoy_dynamic_module_type_on_http_filter_request_headers_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_request_headers_status
+envoy_dynamic_module_on_http_filter_request_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_request_body is called when a new data frame of the HTTP
+ * request body is received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param end_of_stream is true if the request body is the last data.
+ * @return envoy_dynamic_module_type_on_http_filter_request_body_status is the status of the filter.
+ */
+envoy_dynamic_module_type_on_http_filter_request_body_status
+envoy_dynamic_module_on_http_filter_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_request_trailers is called when the HTTP request trailers are
+ * received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @return envoy_dynamic_module_type_on_http_filter_request_trailers_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_request_trailers_status
+envoy_dynamic_module_on_http_filter_request_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_response_headers is called when the HTTP response headers are
+ * received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param end_of_stream is true if the response headers are the last data.
+ * @return envoy_dynamic_module_type_on_http_filter_response_headers_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_response_headers_status
+envoy_dynamic_module_on_http_filter_response_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_response_body is called when a new data frame of the HTTP
+ * response body is received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param end_of_stream is true if the response body is the last data.
+ * @return envoy_dynamic_module_type_on_http_filter_response_body_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_response_body_status
+envoy_dynamic_module_on_http_filter_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_response_trailers is called when the HTTP response trailers
+ * are received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @return envoy_dynamic_module_type_on_http_filter_response_trailers_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_response_trailers_status
+envoy_dynamic_module_on_http_filter_response_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_stream_complete is called when the HTTP stream is complete.
+ * This is called before envoy_dynamic_module_on_http_filter_destroy and access logs are flushed.
+ *
+ * Unlike envoy_dynamic_module_on_http_filter_destroy, this can run while another event hook of the
+ * same filter is on the stack, because a hook that ends the stream completes it inline.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ */
+void envoy_dynamic_module_on_http_filter_stream_complete(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_destroy is called when the HTTP filter is destroyed for each
+ * HTTP stream.
+ *
+ * Envoy runs this from the worker dispatcher's deferred deletion list, so it is never called while
+ * another event hook of the same filter is on the stack. A hook can end the stream, for example via
+ * envoy_dynamic_module_callback_http_filter_recreate_stream, which tears the filter chain down
+ * before the hook returns. Envoy does not destroy the in-module filter before that hook returns,
+ * and the callbacks the module makes after the teardown are safe.
+ *
+ * By the time this is called the filter is already detached from the HTTP stream, so the callbacks
+ * that need it are no-ops.
+ *
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter.
+ */
+void envoy_dynamic_module_on_http_filter_destroy(
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_callout_done is called when the HTTP callout
+ * response is received initiated by a HTTP filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_http_filter_http_callout_done(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_headers is called when response headers are
+ * received for a streamable HTTP callout stream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param end_stream is true if this is the last data in the stream (no body or trailers will
+ * follow).
+ *
+ * headers are owned by Envoy and are guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size, bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_data is called when a chunk of response body is
+ * received for a streamable HTTP callout stream. This may be called multiple times for a single
+ * stream as body chunks arrive.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param data is the pointer to the array of buffers containing the body chunk.
+ * @param data_count is the number of buffers.
+ * @param end_stream is true if this is the last data in the stream (no trailers will follow).
+ *
+ * data is owned by Envoy and is guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
+    const envoy_dynamic_module_type_envoy_buffer* data, size_t data_count, bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_trailers is called when response trailers are
+ * received for a streamable HTTP callout stream. This is called after headers and any data chunks.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param trailers is the trailers of the response.
+ * @param trailers_size is the size of the trailers.
+ *
+ * trailers are owned by Envoy and are guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* trailers, size_t trailers_size);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_complete is called when a streamable HTTP
+ * callout stream completes successfully. This is called after all headers, data, and trailers have
+ * been received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_id is the handle to the HTTP stream.
+ *
+ * After this callback, the stream is automatically cleaned up and stream_ptr becomes invalid.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_complete(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id);
+
+/**
+ * envoy_dynamic_module_on_http_filter_http_stream_reset is called when a streamable HTTP callout
+ * stream is reset or fails. This may be called instead of the complete callback if the stream
+ * encounters an error.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param reason is the reason for the stream reset.
+ *
+ * After this callback, the stream is automatically cleaned up and stream_ptr becomes invalid.
+ */
+void envoy_dynamic_module_on_http_filter_http_stream_reset(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_http_stream_reset_reason reason);
+
+/**
+ * envoy_dynamic_module_on_http_filter_scheduled is called when the HTTP filter is scheduled
+ * to be executed on the worker thread where the HTTP filter is running with
+ * envoy_dynamic_module_callback_http_filter_scheduler_commit callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_http_filter_scheduler_commit.
+ */
+void envoy_dynamic_module_on_http_filter_scheduled(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_scheduled is called when the HTTP filter
+ * configuration is scheduled to be executed on the main thread with
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit callback.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_http_filter_config_scheduled(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_http_callout_done is called when the HTTP callout
+ * response is received for a callout initiated by an HTTP filter configuration.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_http_filter_config_http_callout_done(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_http_stream_headers is called when response headers
+ * are received for a streamable HTTP callout started from an HTTP filter configuration.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param end_stream is true if this is the last data in the stream (no body or trailers will
+ * follow).
+ *
+ * headers are owned by Envoy and are guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_config_http_stream_headers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size, bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_http_stream_data is called when a chunk of response
+ * body is received for a streamable HTTP callout started from an HTTP filter configuration. This
+ * may be called multiple times for a single stream as body chunks arrive.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param data is the pointer to the array of buffers containing the body chunk.
+ * @param data_count is the number of buffers.
+ * @param end_stream is true if this is the last data in the stream (no trailers will follow).
+ *
+ * data is owned by Envoy and is guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_config_http_stream_data(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    const envoy_dynamic_module_type_envoy_buffer* data, size_t data_count, bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_http_stream_trailers is called when response trailers
+ * are received for a streamable HTTP callout started from an HTTP filter configuration.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param trailers is the trailers of the response.
+ * @param trailers_size is the size of the trailers.
+ *
+ * trailers are owned by Envoy and are guaranteed to be valid until the end of this event hook.
+ */
+void envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_envoy_http_header* trailers, size_t trailers_size);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_http_stream_complete is called when a streamable HTTP
+ * callout stream started from an HTTP filter configuration completes successfully. This is called
+ * after all headers, data, and trailers have been received.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param stream_id is the handle to the HTTP stream.
+ *
+ * After this callback, the stream is automatically cleaned up and stream_id becomes invalid.
+ */
+void envoy_dynamic_module_on_http_filter_config_http_stream_complete(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_http_stream_reset is called when a streamable HTTP
+ * callout stream started from an HTTP filter configuration is reset or fails.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
+ * envoy_dynamic_module_on_http_filter_config_new.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param reason is the reason for the stream reset.
+ *
+ * After this callback, the stream is automatically cleaned up and stream_id becomes invalid.
+ */
+void envoy_dynamic_module_on_http_filter_config_http_stream_reset(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_http_stream_reset_reason reason);
+
+/**
+ * envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark is called when
+ * the buffer for the downstream stream goes over the high watermark for a terminal filter. This may
+ * be called multiple times, in which case envoy_dynamic_module_on_above_write_buffer_low_watermark
+ * will be called an equal number of times until the write buffer is completely drained below the
+ * low watermark.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ */
+void envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark is called when
+ * any buffer for the response stream goes from over its high watermark to under its low watermark
+ * for a terminal filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ */
+void envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_local_reply is called when sendLocalReply is invoked on the
+ * HTTP stream. This allows filters to be notified when a local reply is being generated, which is
+ * useful for logging local errors or modifying local reply behavior.
+ *
+ * The return value controls what happens after all filters have been informed:
+ * - Continue: Send the local reply as normal.
+ * - ContinueAndResetStream: Reset the stream instead of sending the local reply.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param response_code is the HTTP response code for the local reply.
+ * @param details is the response code details string.
+ * @param reset_imminent is true if a reset will occur rather than the local reply.
+ * @return envoy_dynamic_module_type_on_http_filter_local_reply_status indicating the action to take
+ * after the local reply hook completes.
+ */
+envoy_dynamic_module_type_on_http_filter_local_reply_status
+envoy_dynamic_module_on_http_filter_local_reply(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t response_code,
+    envoy_dynamic_module_type_envoy_buffer details, bool reset_imminent);
+
+// =============================================================================
+// HTTP Filter Callbacks
+// =============================================================================
+
+// ----------------------------- Metrics callbacks -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_define_counter is called by the module
+ * during initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_http_filter_increment_counter together with
+ * filter_envoy_ptr created from filter_config_envoy_ptr, or to
+ * envoy_dynamic_module_callback_http_filter_config_increment_counter together with
+ * filter_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_counter(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the counter previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_increment_counter(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_define_gauge is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and labels
+ * during the lifecycle of the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_http_filter_increment_gauge together with
+ * filter_envoy_ptr created from filter_config_envoy_ptr, or to the
+ * envoy_dynamic_module_callback_http_filter_config_{increment,decrement,set}_gauge functions
+ * together with filter_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_increment_gauge is called by the module to increase
+ * the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the gauge previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be increased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_increment_gauge(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_decrement_gauge is called by the module to decrease
+ * the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the gauge previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be decreased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_decrement_gauge(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_set_gauge is called by the module to set the value
+ * of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the gauge previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be set.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_set_gauge(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_define_histogram is called by the module
+ * during initialization to create a template for generating Stats::Histograms with the given name
+ * and labels during the lifecycle of the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_http_filter_record_histogram_value_vec together
+ * with filter_envoy_ptr created from filter_config_envoy_ptr, or to
+ * envoy_dynamic_module_callback_http_filter_config_record_histogram_value together with
+ * filter_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_histogram(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+/**
+ * envoy_dynamic_module_callback_http_filter_record_histogram_value is called by the module to
+ * record a value in a previously defined histogram.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the histogram previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_record_histogram_value(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_increment_counter is called by the module to
+ * increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_increment_counter, this does not require a per-stream
+ * filter and can be called outside of the request lifecycle, e.g. from a scheduled background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the counter.
+ * @param id is the ID of the counter previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_counter(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_increment_gauge, this does not require a per-stream
+ * filter and can be called outside of the request lifecycle, e.g. from a scheduled background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be increased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_decrement_gauge, this does not require a per-stream
+ * filter and can be called outside of the request lifecycle, e.g. from a scheduled background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be decreased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_set_gauge, this does not require a per-stream filter
+ * and can be called outside of the request lifecycle, e.g. from a scheduled background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be set.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_config_set_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_record_histogram_value is called by the module
+ * to record a value in a previously defined histogram from the filter config context. Unlike
+ * envoy_dynamic_module_callback_http_filter_record_histogram_value, this does not require a
+ * per-stream filter and can be called outside of the request lifecycle, e.g. from a scheduled
+ * background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that defined
+ * the histogram.
+ * @param id is the ID of the histogram previously defined using filter_config_envoy_ptr.
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// ----------------------------- Secret callbacks ------------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe is called by the module
+ * during initialization to subscribe to a generic secret so that its value can later be read via
+ * envoy_dynamic_module_callback_http_filter_get_generic_secret or
+ * envoy_dynamic_module_callback_http_filter_config_get_generic_secret.
+ *
+ * The subscription is resolved the same way as any other Envoy extension resolves an
+ * ``SdsSecretConfig``: when sds_config_source is empty the secret is looked up among the statically
+ * configured secrets by name, and otherwise an SDS subscription is created (or shared with an
+ * existing identical one) so that the value is updated whenever the SDS server pushes a new
+ * version.
+ *
+ * This can only be called during envoy_dynamic_module_on_http_filter_config_new. Calling it after
+ * the configuration has been loaded fails, since creating a subscription is only safe on the main
+ * thread before any worker observes the configuration.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig for which the
+ * secret will be subscribed.
+ * @param name is the name of the generic secret. For a static secret this is the name of the
+ * secret in the bootstrap configuration, and for a dynamic secret this is the resource name
+ * requested from the SDS server. This must not be empty.
+ * @param sds_config_source is the JSON serialized ``envoy.config.core.v3.ConfigSource`` describing
+ * where to fetch the secret from. When the length is 0 the secret is looked up among the static
+ * secrets instead.
+ * @return size_t the opaque ID that represents the subscribed secret, which can be passed to
+ * envoy_dynamic_module_callback_http_filter_get_generic_secret together with a filter_envoy_ptr
+ * created from filter_config_envoy_ptr, or to
+ * envoy_dynamic_module_callback_http_filter_config_get_generic_secret together with
+ * filter_config_envoy_ptr. Returning 0 indicates a failure to subscribe, e.g. the name is empty,
+ * the static secret does not exist, or sds_config_source is not a valid ConfigSource.
+ */
+size_t envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer sds_config_source);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_generic_secret is called by the module to read the
+ * current value of a previously subscribed generic secret.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the secret previously subscribed using the config that created
+ * filter_envoy_ptr.
+ * @param result is the buffer where the current value of the secret will be stored. The value is
+ * empty (length 0) when the secret has been subscribed but not yet delivered by the SDS server.
+ * @return true if the operation is successful, false if the id does not correspond to a subscribed
+ * secret.
+ *
+ * The value is read from thread local storage, so this must be called on the worker thread running
+ * the stream, not on a thread created by the module.
+ *
+ * OWNERSHIP: Envoy owns the returned buffer. It is only valid until the module returns from the
+ * current event hook, since a secret rotation replaces the value in between events. The module must
+ * copy the value if it needs to retain it.
+ */
+bool envoy_dynamic_module_callback_http_filter_get_generic_secret(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_get_generic_secret is called by the module to
+ * read the current value of a previously subscribed generic secret from the filter config context.
+ * Unlike envoy_dynamic_module_callback_http_filter_get_generic_secret, this does not require a
+ * per-stream filter and can be called outside of the request lifecycle, e.g. from a scheduled
+ * background task.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig that
+ * subscribed the secret.
+ * @param id is the ID of the secret previously subscribed using filter_config_envoy_ptr.
+ * @param result is the buffer where the current value of the secret will be stored. The value is
+ * empty (length 0) when the secret has been subscribed but not yet delivered by the SDS server.
+ * @return true if the operation is successful, false if the id does not correspond to a subscribed
+ * secret.
+ *
+ * The value is read from thread local storage, so this must be called on an Envoy thread, i.e.
+ * during envoy_dynamic_module_on_http_filter_config_new or from an event hook such as
+ * envoy_dynamic_module_on_http_filter_config_scheduled, not on a thread created by the module.
+ *
+ * OWNERSHIP: Envoy owns the returned buffer. It is only valid until the module returns from the
+ * current event hook, since a secret rotation replaces the value in between events. The module must
+ * copy the value if it needs to retain it.
+ */
+bool envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// ---------------------- HTTP Header/Trailer callbacks ------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_get_header is called by the module to get the
+ * value of the header with the given key. Since a header can have multiple values, the
+ * index is used to get the specific value. This returns the number of values for the given key, so
+ * it can be used to iterate over all values by starting from 0 and incrementing the index until the
+ * return value.
+ *
+ * PRECONDITION: Envoy does not check the validity of the key as well as the result_buffer_ptr
+ * and result_buffer_length_ptr. The module must ensure that these values are valid, e.g.
+ * non-null pointers.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param header_type is the type of the header map to get the header from (request/response
+ * headers/trailers).
+ * @param key is the key of the header.
+ * @param result_buffer is the buffer where the value will be stored. If the key does not exist or
+ * the index is out of range, this will be set to a null buffer (length 0).
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param optional_size is the pointer to the variable where the number of values for the given key
+ * will be stored.
+ * NOTE: This parameter is optional and can be null if the module does not need this information.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that a header value is not guaranteed to be a valid UTF-8 string. The module must be careful
+ * when interpreting the value as a string in the language of the module.
+ *
+ * The buffer pointed by the pointer stored in result_buffer_ptr is owned by Envoy, and they are
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
+ */
+bool envoy_dynamic_module_callback_http_get_header(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
+
+/**
+ * envoy_dynamic_module_callback_http_get_header_values is called by the module to get all values of
+ * the header with the given key in a single call. This is the batched counterpart to
+ * envoy_dynamic_module_callback_http_get_header that avoids one crossing and one lookup per value.
+ *
+ * PRECONDITION: The module must ensure that result_buffer has enough length to store all the
+ * values. Use the count reported by envoy_dynamic_module_callback_http_get_header via its
+ * optional_size output to size the buffer first.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param header_type is the type of the header map to get the header from (request/response
+ * headers/trailers).
+ * @param key is the key of the header.
+ * @param result_buffer is the output array where the values will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that a header value is not guaranteed to be a valid UTF-8 string. The module must be careful
+ * when interpreting the value as a string in the language of the module.
+ *
+ * The buffers pointed by the pointers stored in result_buffer are owned by Envoy, and they are
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
+ */
+bool envoy_dynamic_module_callback_http_get_header_values(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer);
+
+/**
+ * envoy_dynamic_module_callback_http_get_headers_size is called by the module to get the
+ * number of headers. Combined with envoy_dynamic_module_callback_http_get_headers,
+ * this can be used to iterate over all request headers.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param header_type is the type of the header map to get the size from (request/response
+ * headers/trailers).
+ * @return the number of headers. 0 if there are no headers or headers could not be retrieved.
+ */
+size_t envoy_dynamic_module_callback_http_get_headers_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type);
+
+/**
+ * envoy_dynamic_module_callback_http_get_headers is called by the module to get all the
+ * headers. The headers are returned as an array of
+ * envoy_dynamic_module_type_envoy_http_header.
+ *
+ * PRECONDITION: The module must ensure that the result_headers is valid and has enough length to
+ * store all the headers. The module can use
+ * envoy_dynamic_module_callback_http_get_headers_size to get the number of headers before
+ * calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param header_type is the type of the header map to get the headers from (request/response
+ * headers/trailers).
+ * @param result_headers is the pointer to the array of envoy_dynamic_module_type_envoy_http_header
+ * where the headers will be stored. The lifetime of the buffer of key and value of each header is
+ * guaranteed until the end of the current event hook unless the setter callback are called.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_http_add_header is called by the module to add
+ * the value of the header with the given key. If the header does not exist, it will be
+ * created. If the header already exists, all existing values will be removed and the new value will
+ * be set. When the given value is null, the header will be removed if the key exists.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param header_type is the type of the header map to add the header to (request/response
+ * headers/trailers).
+ * @param key is the key of the header.
+ * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that this only adds the header to the underlying Envoy object. Whether or not the header is
+ * actually sent to the upstream depends on the phase of the execution and subsequent
+ * filters. In other words, returning true from this function does not guarantee that the header
+ * will be sent to the upstream.
+ */
+bool envoy_dynamic_module_callback_http_add_header(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_header is called by the module to set
+ * the value of the header with the given key. If the header does not exist, it will be
+ * created. If the header already exists, all existing values will be removed and the new value will
+ * be set. When the given value is null, the header will be removed if the key exists.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param header_type is the type of the header map to set the header to (request/response
+ * headers/trailers).
+ * @param key is the key of the header.
+ * @param value is the pointer to the buffer of the value. It can be null to remove the header.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that this only sets the header to the underlying Envoy object. Whether or not the header is
+ * actually sent to the upstream depends on the phase of the execution and subsequent
+ * filters. In other words, returning true from this function does not guarantee that the header
+ * will be sent to the upstream.
+ */
+bool envoy_dynamic_module_callback_http_set_header(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+// ---------------------- HTTP local response callbacks ------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_send_response is called by the module to send the response
+ * to the downstream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param status_code is the status code of the response.
+ * @param headers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
+ * the headers of the response.
+ * @param headers_vector_size is the size of the headers_vector.
+ * @param body is the body of the response.
+ * @param details is the response code details of the response.
+ * The response code details is an optional short string that provides additional information about
+ * why this response code was sent like "rate_limited". It is typically used for logging purposes.
+ * This is optional and can be null.
+ */
+void envoy_dynamic_module_callback_http_send_response(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    envoy_dynamic_module_type_module_buffer body, envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_http_send_response_headers is called by the module to send the
+ * response headers to the downstream, optionally ending the stream. Necessary pseudo headers
+ * such as :status should be present.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param headers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
+ * the headers of the response.
+ * @param headers_vector_size is the size of the headers_vector.
+ * @param end_stream is a boolean indicating whether to end the stream.
+ */
+void envoy_dynamic_module_callback_http_send_response_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_http_send_response_data is called by the module to send response
+ * data to the downstream, optionally ending the stream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param data is the body data of the response.
+ * @param end_stream is a boolean indicating whether to end the stream.
+ */
+void envoy_dynamic_module_callback_http_send_response_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_http_send_response_trailers is called by the module to send the
+ * response trailers to the downstream, ending the stream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param trailers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
+ * the trailers of the response.
+ * @param trailers_vector_size is the size of the trailers_vector.
+ */
+void envoy_dynamic_module_callback_http_send_response_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_http_header* trailers_vector, size_t trailers_vector_size);
+
+// ------------------- HTTP Request/Response body callbacks --------------------
+
+/**
+ * NOTE: Envoy will handle the request/response as a stream of data. Therefore, the body may not be
+ * available in its entirety before the end of stream flag is set. The Envoy will provides both the
+ * received body (body pieces received in the latest event) and the buffered body (body pieces
+ * buffered so far) to the module. The module should be aware of this distinction when processing
+ * the body.
+ *
+ * NOTE: The received body could only be available during the request/response body
+ * event hooks (the envoy_dynamic_module_on_http_filter_request_body and
+ * envoy_dynamic_module_on_http_filter_response_body).
+ * Outside of these hooks, the received body will be unavailable.
+ *
+ * NOTE: The buffered body, however, is always available. But only the latest data processing filter
+ * in the filter chain could modify the buffered body. That is say for a given filter X, filter X
+ * can safely modify the buffered body if and only if the filters following filter X in the filter
+ * chain have not yet accessed the body.
+ */
+
+/**
+ * envoy_dynamic_module_callback_http_get_body_size is called by the module
+ * to get the total bytes of body.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param body_type is the type of the body to get the size from (request/response,
+ * received/buffered body).
+ * @return the size of the body in bytes. 0 if the body is not available or empty.
+ */
+size_t envoy_dynamic_module_callback_http_get_body_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type);
+
+/**
+ * envoy_dynamic_module_callback_http_get_body_chunks is called by the module to
+ * get the body as a vector of buffers. The body is returned as an array of
+ * envoy_dynamic_module_type_envoy_buffer.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the buffers. The module can use
+ * envoy_dynamic_module_callback_http_get_body_chunks_size to get the number of
+ * buffers before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param body_type is the type of the body to get the buffers from (request/response,
+ * received/buffered body).
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the buffers of the body will be stored. The lifetime of the buffer is guaranteed until the
+ * end of the current event hook unless the setter callback is called.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_body_chunks(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_http_get_body_chunks_size is called by the module
+ * to get the number of buffers in the current request body. Combined with
+ * envoy_dynamic_module_callback_http_get_body_chunks, this can be used to iterate
+ * over all buffers in the body.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param body_type is the type of the body to get the number of buffers from (request/response,
+ * received/buffered body).
+ * @return the number of buffers in the body. 0 if the body is not available or empty.
+ */
+size_t envoy_dynamic_module_callback_http_get_body_chunks_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type);
+
+/**
+ * envoy_dynamic_module_callback_http_append_body is called by the module to append
+ * the given data to the end of the body.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param body_type is the type of the body to append to (request/response,
+ * received/buffered body).
+ * @param data is the body data to be appended.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_append_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_http_drain_body is called by the module to drain
+ * the given number of bytes from the body. If the number of bytes to drain is
+ * greater than the size of the body, the whole body will be drained.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param body_type is the type of the body to drain from (request/response,
+ * received/buffered body).
+ * @param number_of_bytes is the number of bytes to drain.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_drain_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_body_type body_type, size_t number_of_bytes);
+
+/**
+ * envoy_dynamic_module_callback_http_received_buffered_request_body is called by the module to
+ * check if the latest received request body actually is the previously buffered request body.
+ *
+ * For example, the previous filter X have stopped the filter chain and buffered the request body.
+ * Then X resumes the filter chain after receiving the whole request body.
+ * When the next filter Y will receives the buffered request body and this callback will return
+ * true.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return true if the latest received request body is the previously buffered request body, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_http_received_buffered_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_received_buffered_response_body is called by the module to
+ * check if the latest received response body actually is the previously buffered response body.
+ *
+ * For example, the previous filter X have stopped the filter chain and buffered the response body.
+ * Then X resumes the filter chain after receiving the whole response body.
+ * When the next filter Y will receives the buffered response body and this callback will return
+ * true.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return true if the latest received response body is the previously buffered response body, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_http_received_buffered_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------------- Metadata Callbacks -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_number is called by the module to set
+ * the number value of the dynamic metadata with the given namespace and key. If the metadata is
+ * existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the number value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_number is called by the module to get
+ * the number value of the dynamic metadata with the given namespace and key. If the metadata is not
+ * accessible, the namespace does not exist, the key does not exist or the value is not a number,
+ * this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param result is the pointer to the variable where the number value of the dynamic metadata will
+ * be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double* result);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string is called by the module to set
+ * the string value of the dynamic metadata with the given namespace and key. If the metadata is
+ * existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the string value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch is called by the module to
+ * set multiple string-valued dynamic metadata entries under a single namespace in one call. It is
+ * equivalent to calling envoy_dynamic_module_callback_http_set_dynamic_metadata_string once per
+ * entry but resolves the namespace and merges into the metadata struct only once. Existing entries
+ * with the same key are overwritten. Within a single call, a later entry overwrites an earlier
+ * entry with the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_struct is called by the module to set an
+ * entire dynamic metadata namespace from a serialized google.protobuf.Struct. The struct is merged
+ * into the namespace and existing entries with the same key are overwritten. If the buffer does not
+ * parse as a google.protobuf.Struct, this is a no-op.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_typed_metadata is called by the module to set an
+ * entire typed dynamic metadata namespace from a serialized google.protobuf.Any. The Any is merged
+ * into the namespace's typed_filter_metadata entry. If the buffer does not parse as a
+ * google.protobuf.Any, this is a no-op.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
+ * Retrieves the type URL and value of the google.protobuf.Any in the given metadata namespace.
+ * Returns false if the metadata source or namespace is unavailable.
+ *
+ * The result buffers are owned by Envoy and are valid until the end of the current event hook
+ * unless a setter callback modifies the metadata.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the typed metadata.
+ * @param type_url receives the Any type_url.
+ * @param value receives the Any value, containing the serialized message payload.
+ * @return true if typed metadata was found, false otherwise. Empty fields are valid results.
+ */
+bool envoy_dynamic_module_callback_http_get_typed_metadata(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_envoy_buffer* type_url,
+    envoy_dynamic_module_type_envoy_buffer* value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_string is called by the module to get
+ * the string value of the dynamic metadata with the given namespace and key. If the metadata is not
+ * accessible, the namespace does not exist, the key does not exist or the value is not a string,
+ * this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_bool is called by the module to set
+ * the bool value of the dynamic metadata with the given namespace and key. If the metadata is
+ * existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the bool value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_bool is called by the module to get
+ * the bool value of the dynamic metadata with the given namespace and key. If the metadata is not
+ * accessible, the namespace does not exist, the key does not exist or the value is not a bool,
+ * this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param result is the pointer to the variable where the bool value of the dynamic metadata will
+ * be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_keys_count is called by the module to get the
+ * number of keys in the metadata namespace. If the metadata is not accessible or the namespace
+ * does not exist, this returns 0.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @return the number of keys in the metadata namespace.
+ */
+size_t envoy_dynamic_module_callback_http_get_metadata_keys_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_keys is called by the module to get all keys
+ * in the metadata namespace. The keys are returned as an array of
+ * envoy_dynamic_module_type_envoy_buffer.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the keys. The module can use
+ * envoy_dynamic_module_callback_http_get_metadata_keys_count to get the number of
+ * keys before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the key strings will be stored. The lifetime of the buffer is guaranteed until the
+ * end of the current event hook unless the setter callback is called.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_keys(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_namespaces_count is called by the module to get
+ * the number of namespaces in the metadata. If the metadata is not accessible, this returns 0.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @return the number of namespaces in the metadata.
+ */
+size_t envoy_dynamic_module_callback_http_get_metadata_namespaces_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_namespaces is called by the module to get all
+ * namespace names in the metadata. The namespaces are returned as an array of
+ * envoy_dynamic_module_type_envoy_buffer.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the namespaces. The module can use
+ * envoy_dynamic_module_callback_http_get_metadata_namespaces_count to get the number of
+ * namespaces before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the namespace strings will be stored. The lifetime of the buffer is guaranteed until the
+ * end of the current event hook unless the setter callback is called.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_namespaces(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number is called by the module to
+ * append a number value to the dynamic metadata list stored under the given namespace and key. If
+ * the key does not exist, a new list is created. If the key exists but is not a list, this returns
+ * false. If the metadata is not accessible, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param value is the number value to append to the list.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string is called by the module to
+ * append a string value to the dynamic metadata list stored under the given namespace and key. If
+ * the key does not exist, a new list is created. If the key exists but is not a list, this returns
+ * false. If the metadata is not accessible, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param value is the string value to append to the list.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool is called by the module to
+ * append a bool value to the dynamic metadata list stored under the given namespace and key. If the
+ * key does not exist, a new list is created. If the key exists but is not a list, this returns
+ * false. If the metadata is not accessible, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param value is the bool value to append to the list.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_list_size is called by the module to get the
+ * number of elements in the metadata list stored under the given namespace and key. If the metadata
+ * is not accessible, the namespace does not exist, the key does not exist, or the value is not a
+ * list, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param result is the pointer to the variable where the number of elements will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_list_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_list_number is called by the module to get the
+ * number value at the given index in the metadata list stored under the given namespace and key. If
+ * the metadata is not accessible, the namespace does not exist, the key does not exist, the value
+ * is not a list, the index is out of range, or the element at index is not a number, this returns
+ * false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param index is the zero-based index of the element to retrieve.
+ * @param result is the pointer to the variable where the number value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_list_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, double* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_list_string is called by the module to get the
+ * string value at the given index in the metadata list stored under the given namespace and key. If
+ * the metadata is not accessible, the namespace does not exist, the key does not exist, the value
+ * is not a list, the index is out of range, or the element at index is not a string, this returns
+ * false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param index is the zero-based index of the element to retrieve.
+ * @param result is the pointer to the envoy_buffer where the string value will be stored. The
+ * lifetime of the buffer is guaranteed until the end of the current event hook unless the setter
+ * callback is called.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_list_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_list_bool is called by the module to get the
+ * bool value at the given index in the metadata list stored under the given namespace and key. If
+ * the metadata is not accessible, the namespace does not exist, the key does not exist, the value
+ * is not a list, the index is out of range, or the element at index is not a bool, this returns
+ * false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata whose value is expected to be a list.
+ * @param index is the zero-based index of the element to retrieve.
+ * @param result is the pointer to the variable where the bool value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    size_t index, bool* result);
+
+// -------------------------- Filter State Callbacks ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_bytes is called by the module to set the
+ * bytes value of the filter state with the given key. If the filter state is not accessible, this
+ * returns false. If the key does not exist, it will be created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
+ * @return true if the operation is successful, false otherwise. Different from setting metadata,
+ * this could fail if the same key already exists and be marked as read-only.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_bytes is called by the module to get the
+ * bytes value of the filter state with the given key. If the filter state is not accessible, the
+ * key does not exist or the value is not bytes, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the bytes value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_typed is called by the module to set the
+ * typed filter state with the given key. Unlike set_filter_state_bytes which stores a raw
+ * StringAccessor, this uses the registered ObjectFactory for the key to create a properly typed
+ * filter state object via createFromBytes. This is required for interoperability with built-in
+ * Envoy filters that read filter state as typed objects (e.g., tcp_proxy reads
+ * PerConnectionCluster).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if the stream info is not available, no
+ * ObjectFactory is registered for the key, the factory fails to create the object, or the key
+ * already exists and is marked as read-only.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_typed(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_typed is called by the module to get the
+ * serialized bytes value of a typed filter state object with the given key. This retrieves the
+ * object generically and calls serializeAsString to get the bytes representation. This works with
+ * any filter state object type, not just StringAccessor.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the buffer where the serialized value will be stored.
+ * @return true if the operation is successful, false if the stream info is not available, the key
+ * does not exist, or the object does not support serialization.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_filter_state_typed(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_has_filter_state is called by the module to check whether a
+ * filter state entry with the given key exists, regardless of its type. Unlike the getter
+ * callbacks, this does not read or serialize the stored object.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @return true if the key exists in the filter state, false if the stream info is not available or
+ * the key does not exist.
+ */
+bool envoy_dynamic_module_callback_http_has_filter_state(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+// Lifespan of a filter state entry. Mirrors StreamInfo::FilterState::LifeSpan. Entries at Request
+// or Connection lifespan are carried into the new stream on recreate_stream; FilterChain entries
+// are not.
+typedef enum envoy_dynamic_module_type_filter_state_life_span {
+  envoy_dynamic_module_type_filter_state_life_span_FilterChain = 0,
+  envoy_dynamic_module_type_filter_state_life_span_Request = 1,
+  envoy_dynamic_module_type_filter_state_life_span_Connection = 2,
+} envoy_dynamic_module_type_filter_state_life_span;
+
+// Upstream connection sharing options for a filter state entry. Mirrors
+// StreamInfo::StreamSharingMayImpactPooling.
+typedef enum envoy_dynamic_module_type_filter_state_stream_sharing {
+  envoy_dynamic_module_type_filter_state_stream_sharing_None = 0,
+  envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnection = 1,
+  envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnectionOnce = 2,
+} envoy_dynamic_module_type_filter_state_stream_sharing;
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_value is called by the module to set the
+ * bytes value of the filter state with the given key, lifespan, and upstream sharing options. If
+ * the filter state is not accessible, this returns false. If the key does not exist, it will be
+ * created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
+ * @param life_span is the lifespan of the filter state entry.
+ * @param stream_sharing is the upstream connection sharing option of the filter state entry.
+ * @return true if the operation is successful, false otherwise. Different from setting metadata,
+ * this could fail if the same key already exists at a conflicting life_span.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_value(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_filter_state_life_span life_span,
+    envoy_dynamic_module_type_filter_state_stream_sharing stream_sharing);
+
+// OWNERSHIP: module-owned opaque object stored in filter state. Envoy never dereferences it; it
+// calls the supplied destructor exactly once when the entry is destroyed. THREADING: created and
+// accessed on the worker thread owning the stream.
+typedef void* envoy_dynamic_module_type_filter_state_object_module_ptr;
+
+// Destructor for a filter state object. Envoy calls it exactly once, on the worker thread, when the
+// entry is destroyed (stream/connection end per life_span, or overwrite of the same key). It runs
+// on the teardown path outside any module callback guard, so it must not unwind: a panic crossing
+// this boundary is undefined behavior. The Rust SDK enforces this by requiring an
+// ``extern "C"`` destructor, which aborts on unwind.
+typedef void (*envoy_dynamic_module_type_filter_state_object_destructor)(
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object);
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_object is called by the module to store an
+ * opaque, module-owned object in the filter state under the given key. Envoy never interprets the
+ * object; it wraps it in a non-serializable FilterState::Object and calls destructor(module_object)
+ * exactly once when that wrapper is destroyed. Objects stored at Request or Connection lifespan
+ * survive recreate_stream (carried into the new stream's parent filter state); FilterChain-lifespan
+ * objects do not.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param module_object is the opaque object to store. Ownership transfers to Envoy.
+ * @param destructor is called exactly once with module_object when the entry is destroyed, or
+ * before returning false so a failed store never leaks the object. It must not unwind; see the
+ * destructor typedef.
+ * @param life_span is the lifespan of the entry. A Connection-lifespan entry may outlive the
+ * stream, so its object and destructor must remain valid until the connection ends.
+ * @return true if stored. Returns false, after running the destructor, if the stream info or filter
+ * state is not available, or if the key already holds an entry at a different life_span.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object,
+    envoy_dynamic_module_type_filter_state_object_destructor destructor,
+    envoy_dynamic_module_type_filter_state_life_span life_span);
+
+/**
+ * envoy_dynamic_module_callback_http_get_filter_state_object is called by the module to borrow the
+ * opaque object previously stored under the given key. Ownership stays with Envoy; the module must
+ * not free the returned pointer. After a recreate_stream, the rebuilt filter calls this with the
+ * same key to recover the carried-over object.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @return the stored object, or NULL if the stream info is not available, the key does not exist,
+ * or the entry was not stored via set_filter_state_object. Valid until the entry is destroyed or
+ * overwritten.
+ */
+envoy_dynamic_module_type_filter_state_object_module_ptr
+envoy_dynamic_module_callback_http_get_filter_state_object(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+// ---------------------- Other HTTP filter callbacks ----------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_add_custom_flag is called by the module to add a custom flag
+ * to indicate a noteworthy event of this stream. Multiple flags could be added and will be
+ * concatenated with comma. It should not contain any empty or space characters (' ', '\t', '\f',
+ * '\v', '\n', '\r'). to the HTTP stream. The flag can later be used in logging or metrics.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param flag is the custom flag to be added. The flag should not contain any empty or space
+ * characters (' ', '\t', '\f', '\v', '\n', '\r') and should be very short to indicate a noteworthy
+ * event of this stream.
+ */
+void envoy_dynamic_module_callback_http_add_custom_flag(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer flag);
+
+// ---------------------- HTTP filter scheduler callbacks ------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_scheduler_new is called by the module to create a new
+ * HTTP filter scheduler. The scheduler is used to dispatch HTTP filter operations from any thread
+ * including the ones managed by the module.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return envoy_dynamic_module_type_http_filter_scheduler_module_ptr is the pointer to the
+ * created HTTP filter scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_http_filter_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_http_filter_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_http_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_http_filter_scheduler_new(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_scheduler_commit is called by the module to
+ * schedule a generic event to the HTTP filter on the worker thread it is running on.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_http_filter_scheduled
+ * event hook on the worker thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
+ * envoy_dynamic_module_callback_http_filter_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_http_filter_scheduler_commit(
+    envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_scheduler_delete is called by the module to delete
+ * the HTTP filter scheduler created by envoy_dynamic_module_callback_http_filter_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
+ * envoy_dynamic_module_callback_http_filter_scheduler_new.
+ */
+void envoy_dynamic_module_callback_http_filter_scheduler_delete(
+    envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new is called by the module to create
+ * a new HTTP filter configuration scheduler. The scheduler is used to dispatch HTTP filter
+ * configuration operations to the main thread from any thread including the ones managed by the
+ * module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @return envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr is the pointer to the
+ * created HTTP filter configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_http_filter_config_scheduler_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_delete is called by the module to
+ * delete the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_http_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_commit is called by the module to
+ * schedule a generic event to the HTTP filter configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_http_filter_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter configuration scheduler created by
+ * envoy_dynamic_module_callback_http_filter_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+// ------------------- Misc Callbacks for HTTP Filters -------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_clear_route_cache is called by the module to clear the route
+ * cache for the HTTP filter. This is useful when the module wants to make their own routing
+ * decision. This will be a no-op when it's called in the wrong phase.
+ */
+void envoy_dynamic_module_callback_http_clear_route_cache(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_attribute_string is called by the module to get
+ * the string attribute value. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_attribute_int is called by the module to get
+ * an integer attribute value. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_attribute_bool is called by the module to get
+ * a boolean attribute value. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the bool value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+/**
+ * Get a snapshot of the current stream timing information.
+ *
+ * This always populates the module-owned output struct. Each has_* field reports whether its
+ * numeric value is available at the current event hook.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param timing_out is the module-owned output parameter for timing information.
+ */
+void envoy_dynamic_module_callback_http_get_timing_info(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_timing_info_v2* timing_out);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_http_callout is called by the module to initiate
+ * an HTTP callout. The callout is initiated by the HTTP filter and the response is received in
+ * envoy_dynamic_module_on_http_filter_http_callout_done.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same filter.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_http_callout(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_start_http_stream is called by the module to start
+ * a streamable HTTP callout to a specified cluster. Unlike the one-shot HTTP callout, this allows
+ * the module to receive response headers, body chunks, and trailers through separate event hooks,
+ * enabling true streaming behavior.
+ *
+ * The stream will trigger the following event hooks in order:
+ * 1. envoy_dynamic_module_on_http_filter_http_stream_headers - when response headers arrive
+ * 2. envoy_dynamic_module_on_http_filter_http_stream_data - for each body chunk (may be called
+ *    multiple times or not at all)
+ * 3. envoy_dynamic_module_on_http_filter_http_stream_trailers - when trailers arrive (optional)
+ * 4. envoy_dynamic_module_on_http_filter_http_stream_complete - when stream completes successfully
+ *    OR
+ *    envoy_dynamic_module_on_http_filter_http_stream_reset - if stream fails
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param stream_id_out is a pointer to a variable where the stream handle will be stored. The
+ * module can use this handle to reset the stream via
+ * envoy_dynamic_module_callback_http_filter_reset_http_stream.
+ * @param cluster_name is the name of the cluster to which the stream is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param end_stream is true if the request stream should be ended after sending headers and body.
+ * If true and body_size > 0, the body will be sent with end_stream=true.
+ * If true and body_size is 0, headers will be sent with end_stream=true.
+ * If false, the module can send additional data or trailers using send_http_stream_data() or
+ * send_http_stream_trailers().
+ * @param timeout_milliseconds is the timeout for the stream in milliseconds. If 0, no timeout is
+ * set.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the stream
+ * initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_start_http_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* stream_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, bool end_stream, uint64_t timeout_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_reset_http_stream is called by the module to reset
+ * or cancel an ongoing streamable HTTP callout. This causes the stream to be terminated and the
+ * envoy_dynamic_module_on_http_filter_http_stream_reset event hook to be called.
+ *
+ * This can be called at any point after the stream is started and before it completes. After
+ * calling this function, the stream handle becomes invalid.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param stream_id is the handle to the HTTP stream to reset.
+ */
+void envoy_dynamic_module_callback_http_filter_reset_http_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id);
+
+/**
+ * envoy_dynamic_module_callback_http_stream_send_data is called by the module to send request
+ * body data on an active streamable HTTP callout. This can be called multiple times to stream
+ * the request body in chunks.
+ *
+ * This must be called after the stream is started and headers have been sent. It can be called
+ * multiple times until end_stream is set to true.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param data is the body data to send.
+ * @param end_stream is true if this is the last data (no trailers will follow).
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_stream_send_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_http_stream_send_trailers is called by the module to send
+ * request trailers on an active streamable HTTP callout. This implicitly ends the stream.
+ *
+ * This must be called after the stream is started and all request data has been sent.
+ * After calling this, no more data can be sent on the stream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param trailers is the trailers to send.
+ * @param trailers_size is the size of the trailers.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_stream_send_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
+    envoy_dynamic_module_type_module_http_header* trailers, size_t trailers_size);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_http_callout is called by the module to
+ * initiate an HTTP callout from an HTTP filter configuration context. Unlike the per-filter
+ * callout, this callout is tied to the filter configuration lifetime and is not bound to any
+ * specific HTTP request. The response is received in
+ * envoy_dynamic_module_on_http_filter_config_http_callout_done.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can
+ * be arbitrary and is used to differentiate between multiple calls from the same filter config.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_config_http_callout(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t* callout_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_start_http_stream is called by the module to
+ * start a streamable HTTP callout from an HTTP filter configuration context. Unlike the one-shot
+ * HTTP callout, this allows the module to receive response headers, body chunks, and trailers
+ * through separate event hooks, enabling true streaming behavior.
+ *
+ * The stream will trigger the following event hooks in order:
+ * 1. envoy_dynamic_module_on_http_filter_config_http_stream_headers
+ * 2. envoy_dynamic_module_on_http_filter_config_http_stream_data (may be called multiple times)
+ * 3. envoy_dynamic_module_on_http_filter_config_http_stream_trailers (optional)
+ * 4. envoy_dynamic_module_on_http_filter_config_http_stream_complete
+ *    OR
+ *    envoy_dynamic_module_on_http_filter_config_http_stream_reset
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param stream_id_out is a pointer to a variable where the stream handle will be stored. The
+ * module can use this handle to reset the stream via
+ * envoy_dynamic_module_callback_http_filter_config_reset_http_stream.
+ * @param cluster_name is the name of the cluster to which the stream is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param end_stream is true if the request stream should be ended after sending headers and body.
+ * If true and body_size > 0, the body will be sent with end_stream=true.
+ * If true and body_size is 0, headers will be sent with end_stream=true.
+ * If false, the module can send additional data or trailers using
+ * envoy_dynamic_module_callback_http_filter_config_stream_send_data() or
+ * envoy_dynamic_module_callback_http_filter_config_stream_send_trailers().
+ * @param timeout_milliseconds is the timeout for the stream in milliseconds. If 0, no timeout is
+ * set.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the stream
+ * initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t* stream_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, bool end_stream, uint64_t timeout_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_reset_http_stream is called by the module to
+ * reset or cancel an ongoing streamable HTTP callout started from an HTTP filter configuration
+ * context. This causes the stream to be terminated and the
+ * envoy_dynamic_module_on_http_filter_config_http_stream_reset event hook to be called.
+ *
+ * This can be called at any point after the stream is started and before it completes. After
+ * calling this function, the stream handle becomes invalid.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param stream_id is the handle to the HTTP stream to reset.
+ */
+void envoy_dynamic_module_callback_http_filter_config_reset_http_stream(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t stream_id);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_stream_send_data is called by the module to
+ * send request body data on an active streamable HTTP callout started from an HTTP filter
+ * configuration context. This can be called multiple times to stream the request body in chunks.
+ *
+ * This must be called after the stream is started and headers have been sent. It can be called
+ * multiple times until end_stream is set to true.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param data is the body data to send.
+ * @param end_stream is true if this is the last data (no trailers will follow).
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t stream_id, envoy_dynamic_module_type_module_buffer data, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_stream_send_trailers is called by the module to
+ * send request trailers on an active streamable HTTP callout started from an HTTP filter
+ * configuration context. This implicitly ends the stream.
+ *
+ * This must be called after the stream is started and all request data has been sent.
+ * After calling this, no more data can be sent on the stream.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
+ * @param stream_id is the handle to the HTTP stream.
+ * @param trailers is the trailers to send.
+ * @param trailers_size is the size of the trailers.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    uint64_t stream_id, envoy_dynamic_module_type_module_http_header* trailers,
+    size_t trailers_size);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_continue_decoding is called by the module to continue
+ * decoding the HTTP request.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_filter_continue_decoding(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_continue_encoding is called by the module to continue
+ * encoding the HTTP response.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_filter_continue_encoding(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_get_most_specific_route_config may be called by an HTTP filter
+ * to retrieve the most specific per-route filter (based on the route object hierarchy).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the corresponding
+ * HTTP filter.
+ * @return null if no per-route config exist. Otherwise, a pointer to the per-route config is
+ * returned.
+ */
+envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
+envoy_dynamic_module_callback_get_most_specific_route_config(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+// ------------------- Http Filter Callbacks - Misc ---------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_worker_index is called by the module to get the
+ * worker index assigned to the current HTTP filter. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return the worker index assigned to the current HTTP filter.
+ */
+uint32_t envoy_dynamic_module_callback_http_filter_get_worker_index(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------- HTTP filter socket option callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option_int sets an integer socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE).
+ * @param state is the socket state at which this option should be applied. For downstream
+ *        sockets, this is ignored since the socket is already connected.
+ * @param direction specifies whether to apply to upstream or downstream socket.
+ * @param value is the integer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_set_socket_option_bytes sets a bytes socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state at which this option should be applied. For downstream
+ *        sockets, this is ignored since the socket is already connected.
+ * @param direction specifies whether to apply to upstream or downstream socket.
+ * @param value is the byte buffer value for the socket option.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option_int retrieves an integer socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param direction specifies whether to get from upstream or downstream socket.
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_http_get_socket_option_bytes retrieves a bytes socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param direction specifies whether to get from upstream or downstream socket.
+ * @param value_out is the pointer to store the retrieved buffer. The buffer is owned by Envoy and
+ * valid until the filter is destroyed.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_socket_option_bytes(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, int64_t level, int64_t name,
+    envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_socket_direction direction,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+// ------------------- HTTP filter buffer limit callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_get_buffer_limit retrieves the current buffer limit for the
+ * HTTP filter. This is the maximum amount of data that can be buffered for body data before
+ * backpressure is applied. A buffer limit of 0 bytes indicates no limits are applied.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the current buffer limit in bytes.
+ */
+uint64_t envoy_dynamic_module_callback_http_get_buffer_limit(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_set_buffer_limit sets the buffer limit for the HTTP filter.
+ * This controls the maximum amount of data that can be buffered for body data before backpressure
+ * is applied.
+ *
+ * It is recommended (but not required) that filters calling this function should generally only
+ * perform increases to the buffer limit, to avoid potentially conflicting with the buffer
+ * requirements of other filters in the chain.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param limit is the desired buffer limit in bytes.
+ */
+void envoy_dynamic_module_callback_http_set_buffer_limit(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t limit);
+
+// ----------------------------- Tracing callbacks -----------------------------
+
+/**
+ * envoy_dynamic_module_type_span_envoy_ptr is a raw pointer to the active Tracing::Span in Envoy.
+ * This is the span associated with the current HTTP stream.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The span is valid for the lifetime of the HTTP stream.
+ * Modules must not call finish on the active span as Envoy manages its lifecycle.
+ */
+typedef void* envoy_dynamic_module_type_span_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_child_span_module_ptr is a pointer to a child span created by the
+ * module via envoy_dynamic_module_callback_http_span_spawn_child. Child spans are owned by the
+ * module and must be finished by calling envoy_dynamic_module_callback_http_child_span_finish.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime. The span must be finished
+ * by calling envoy_dynamic_module_callback_http_child_span_finish when done.
+ */
+typedef void* envoy_dynamic_module_type_child_span_module_ptr;
+
+/**
+ * envoy_dynamic_module_callback_http_get_active_span retrieves the active tracing span for the
+ * current HTTP stream. This span can be used to add tags, logs, or spawn child spans.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the pointer to the active span. Returns nullptr if tracing is not enabled
+ *         or no span is available for this stream.
+ */
+envoy_dynamic_module_type_span_envoy_ptr envoy_dynamic_module_callback_http_get_active_span(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_tag sets a tag on the given span.
+ * Tags are key-value pairs that provide metadata about the span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param key is the tag key.
+ * @param value is the tag value.
+ */
+void envoy_dynamic_module_callback_http_span_set_tag(envoy_dynamic_module_type_span_envoy_ptr span,
+                                                     envoy_dynamic_module_type_module_buffer key,
+                                                     envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_tag_batch sets multiple tags on the given span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param tags is the array of key-value pairs to set as tags.
+ * @param tags_size is the number of entries in the tags array.
+ */
+void envoy_dynamic_module_callback_http_span_set_tag_batch(
+    envoy_dynamic_module_type_span_envoy_ptr span,
+    const envoy_dynamic_module_type_module_key_value_pair* tags, size_t tags_size);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_operation sets the operation name on the given span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param operation is the operation name to set.
+ */
+void envoy_dynamic_module_callback_http_span_set_operation(
+    envoy_dynamic_module_type_span_envoy_ptr span,
+    envoy_dynamic_module_type_module_buffer operation);
+
+/**
+ * envoy_dynamic_module_callback_http_span_log records an event on the given span.
+ * The event is recorded with the current timestamp from the filter's dispatcher.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param span is the pointer to the span (either active span or child span).
+ * @param event is the event message to log.
+ */
+void envoy_dynamic_module_callback_http_span_log(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_module_buffer event);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_sampled overrides the sampling decision for the span.
+ * If sampled is false, this span and any subsequent child spans will not be reported
+ * to the tracing system.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param sampled is true if the span should be sampled, false otherwise.
+ */
+void envoy_dynamic_module_callback_http_span_set_sampled(
+    envoy_dynamic_module_type_span_envoy_ptr span, bool sampled);
+
+/**
+ * envoy_dynamic_module_callback_http_span_disable_local_decision stops the span from using the
+ * Envoy local tracing decision. Combined with
+ * envoy_dynamic_module_callback_http_span_set_sampled, this keeps a filter's sampling decision when
+ * Envoy refreshes tracing after a route cache change. With the OpenTelemetry tracer the connection
+ * manager does not re-derive the decision after a route cache change. Other tracers may not support
+ * this.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ */
+void envoy_dynamic_module_callback_http_span_disable_local_decision(
+    envoy_dynamic_module_type_span_envoy_ptr span);
+
+/**
+ * envoy_dynamic_module_callback_http_span_get_baggage retrieves a baggage value from the span.
+ * Baggage data may have been set by this span or any parent spans.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param key is the baggage key to retrieve.
+ * @param result is the pointer to store the baggage value. The buffer uses thread-local storage
+ *        and is valid until the next tracing callback on the same thread. The module should copy
+ *        the value if it needs to persist beyond immediate use.
+ * @return true if the baggage key was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_span_get_baggage(
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_span_set_baggage sets a baggage value on the span.
+ * All subsequent child spans will have access to this baggage.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param key is the baggage key.
+ * @param value is the baggage value.
+ */
+void envoy_dynamic_module_callback_http_span_set_baggage(
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_http_span_get_trace_id retrieves the trace ID from the span.
+ * The trace ID may be generated for this span, propagated by parent spans, or not yet created.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param result is the pointer to store the trace ID. The buffer uses thread-local storage
+ *        and is valid until the next tracing callback on the same thread. The module should copy
+ *        the value if it needs to persist beyond immediate use.
+ * @return true if the trace ID was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_span_get_trace_id(
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_span_get_span_id retrieves the span ID from the span.
+ *
+ * @param span is the pointer to the span (either active span or child span).
+ * @param result is the pointer to store the span ID. The buffer uses thread-local storage
+ *        and is valid until the next tracing callback on the same thread. The module should copy
+ *        the value if it needs to persist beyond immediate use.
+ * @return true if the span ID was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_span_get_span_id(
+    envoy_dynamic_module_type_span_envoy_ptr span, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_span_spawn_child creates a child span with the given
+ * operation name. The child span is owned by the module and must be finished by calling
+ * envoy_dynamic_module_callback_http_child_span_finish.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param span is the pointer to the parent span (either active span or another child span).
+ * @param operation_name is the operation name for the child span.
+ * @return the pointer to the child span. Returns nullptr if the span could not be created.
+ */
+envoy_dynamic_module_type_child_span_module_ptr envoy_dynamic_module_callback_http_span_spawn_child(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_span_envoy_ptr span,
+    envoy_dynamic_module_type_module_buffer operation_name);
+
+/**
+ * envoy_dynamic_module_callback_http_child_span_finish finishes and releases a child span.
+ * After calling this function, the span pointer becomes invalid and must not be used.
+ *
+ * @param span is the pointer to the child span to finish.
+ */
+void envoy_dynamic_module_callback_http_child_span_finish(
+    envoy_dynamic_module_type_child_span_module_ptr span);
+
+// ------------------- Cluster/Upstream Information Callbacks -------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_get_cluster_name retrieves the name of the cluster that the
+ * current request is routed to. This is useful for making routing decisions or for logging.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param result is the pointer to store the cluster name. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook or until the route changes.
+ * @return true if the cluster name was retrieved successfully, false otherwise (e.g., no route
+ * selected yet).
+ */
+bool envoy_dynamic_module_callback_http_get_cluster_name(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_cluster_host_count retrieves the host counts for the
+ * cluster that the current request is routed to. This provides visibility into the cluster's
+ * health state and can be used to implement scale-to-zero logic or custom load balancing decisions.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., no cluster
+ * available).
+ */
+bool envoy_dynamic_module_callback_http_get_cluster_host_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t priority,
+    size_t* total_count, size_t* healthy_count, size_t* degraded_count);
+
+/**
+ * envoy_dynamic_module_callback_http_set_upstream_override_host sets the override host to be used
+ * by the upstream load balancer. If the target host exists in the host list of the routed cluster,
+ * this host should be selected first. This is useful for implementing sticky sessions, host
+ * affinity, or custom load balancing logic.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param host is the host address to override (e.g., "10.0.0.1:8080"). Must be a valid IP address.
+ * @param strict if true, the request will fail if the override host is not available. If false,
+ * normal load balancing will be used as a fallback.
+ * @return true if the override host was set successfully, false if the host address is invalid.
+ */
+bool envoy_dynamic_module_callback_http_set_upstream_override_host(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer host, bool strict);
+
+/**
+ * Get the upstream connection ID.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the upstream connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * Get the remote address of the connected upstream socket, including the port.
+ *
+ * This can differ from envoy_dynamic_module_type_attribute_id_UpstreamAddress, which exposes the
+ * selected upstream host address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param result is the pointer to store the address. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the upstream remote address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_upstream_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream socket peer address, including the port, before XFF processing.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param result is the pointer to store the address. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the downstream direct remote address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the number of upstream host addresses attempted for the current request.
+ *
+ * Hosts without an address are excluded from the count.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the number of attempted host addresses, or 0 if upstream information is unavailable.
+ */
+size_t envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * Get the upstream host addresses attempted for the current request in attempt order. The module
+ * should first call get_upstream_hosts_attempted_size and allocate the output array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param hosts_out is a module-owned array where Envoy will store buffers owned by Envoy. The
+ * buffers are valid until the end of the current event hook.
+ * @return true if upstream information is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* hosts_out);
+
+/**
+ * Get the number of upstream connection IDs attempted for the current request.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @return the number of attempted connection IDs, or 0 if upstream information is unavailable.
+ */
+size_t envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * Get the upstream connection IDs attempted for the current request in attempt order. The module
+ * should first call get_upstream_connection_ids_attempted_size and allocate the output array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param connection_ids_out is a module-owned array where Envoy will copy the connection IDs.
+ * @return true if upstream information is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t* connection_ids_out);
+
+// ------------------- Stream Control Callbacks -------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_reset_stream resets the HTTP stream with the specified
+ * reason. This is useful for terminating the stream when an error condition is detected or when
+ * the filter needs to abort processing.
+ *
+ * After calling this function, no further filter callbacks will be invoked for this stream except
+ * for the destroy callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param reason is the reason for resetting the stream.
+ * @param details is an optional details string explaining the reset reason. Can be empty.
+ */
+void envoy_dynamic_module_callback_http_filter_reset_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_stream_reset_reason reason,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_send_go_away_and_close sends a GOAWAY frame to the
+ * downstream and closes the connection. This is useful for implementing graceful connection
+ * shutdown scenarios.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param graceful if true, initiates a graceful drain sequence before closing. If false,
+ * sends GOAWAY and closes immediately.
+ */
+void envoy_dynamic_module_callback_http_filter_send_go_away_and_close(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, bool graceful);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_recreate_stream recreates the HTTP stream, optionally
+ * with new headers. This is useful for implementing internal redirects or request retries.
+ *
+ * After calling this function successfully, the current filter chain will be destroyed and a new
+ * stream will be created. The filter should return StopIteration from the current event hook. The
+ * in-module filter stays valid until the hook returns, and the callbacks the module makes after
+ * the teardown are safe and do not affect the recreated stream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param headers is an optional array of new headers to use for the recreated stream. If null,
+ * the original headers will be reused.
+ * @param headers_size is the size of the headers array.
+ * @return true if the stream recreation was initiated successfully, false otherwise (e.g., if
+ * the request body has not been fully received yet or if the stream cannot be recreated).
+ */
+bool envoy_dynamic_module_callback_http_filter_recreate_stream(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size);
+
+/**
+ * envoy_dynamic_module_callback_http_clear_route_cluster_cache clears only the cluster selection
+ * for the current route without clearing the entire route cache.
+ *
+ * This is a subset of envoy_dynamic_module_callback_http_clear_route_cache. Use this when a filter
+ * modifies headers that affect cluster selection but not the route itself. This is more efficient
+ * than clearing the entire route cache.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+// =============================================================================
+// ============================= Network Filter ================================
+// =============================================================================
+
+// =============================================================================
+// Network Filter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_network_filter_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleNetworkFilterConfig class in Envoy. This is passed to the module when
+ * creating a new in-module network filter configuration and used to access the network
+ * filter-scoped information.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_network_filter_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_config_module_ptr is a pointer to an in-module network
+ * filter configuration corresponding to an Envoy network filter configuration. The config is
+ * responsible for creating a new network filter that corresponds to each TCP connection.
+ *
+ * This has 1:1 correspondence with the DynamicModuleNetworkFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_network_filter_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_network_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_envoy_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilter class in Envoy. This is passed to the module when creating a new
+ * network filter for each TCP connection and used to access the network filter-scoped information
+ * such as connection data, buffers, etc.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_network_filter_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer, and can be accessed by the module until the filter is
+ * destroyed, i.e. envoy_dynamic_module_on_network_filter_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_module_ptr is a pointer to an in-module network filter
+ * corresponding to an Envoy network filter. The filter is responsible for processing each TCP
+ * connection.
+ *
+ * This has 1:1 correspondence with the DynamicModuleNetworkFilter class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_network_filter_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_network_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilterScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the network filter event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new and the scheduling and destruction is
+ * done by envoy_dynamic_module_callback_network_filter_scheduler_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleNetworkFilterConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the network filter config event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new and the scheduling and
+ * destruction is done by envoy_dynamic_module_callback_network_filter_config_scheduler_delete.
+ * Since its lifecycle is owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_network_filter_data_status represents the status of the filter
+ * after processing data. This corresponds to `Network::FilterStatus` in envoy/network/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_network_filter_data_status {
+  // Continue to further filters.
+  envoy_dynamic_module_type_on_network_filter_data_status_Continue,
+  // Stop executing further filters.
+  envoy_dynamic_module_type_on_network_filter_data_status_StopIteration,
+} envoy_dynamic_module_type_on_network_filter_data_status;
+
+/**
+ * envoy_dynamic_module_type_network_connection_close_type represents how to close the connection.
+ * This corresponds to `Network::ConnectionCloseType` in envoy/network/connection.h.
+ */
+typedef enum envoy_dynamic_module_type_network_connection_close_type {
+  // Flush pending write data before raising ConnectionEvent::LocalClose.
+  envoy_dynamic_module_type_network_connection_close_type_FlushWrite,
+  // Do not flush any pending data. Write the pending data to the transport and then immediately
+  // raise ConnectionEvent::LocalClose.
+  envoy_dynamic_module_type_network_connection_close_type_NoFlush,
+  // Flush pending write data and delay raising ConnectionEvent::LocalClose until the delayed_close
+  // timeout has expired.
+  envoy_dynamic_module_type_network_connection_close_type_FlushWriteAndDelay,
+  // Do not write pending data and immediately raise ConnectionEvent::LocalClose.
+  envoy_dynamic_module_type_network_connection_close_type_Abort,
+  // Do not write pending data, immediately send RST, and immediately raise
+  // ConnectionEvent::LocalClose.
+  envoy_dynamic_module_type_network_connection_close_type_AbortReset,
+} envoy_dynamic_module_type_network_connection_close_type;
+
+/**
+ * envoy_dynamic_module_type_network_connection_event represents connection events.
+ * This corresponds to `Network::ConnectionEvent` in envoy/network/connection.h.
+ */
+typedef enum envoy_dynamic_module_type_network_connection_event {
+  // Remote close.
+  envoy_dynamic_module_type_network_connection_event_RemoteClose,
+  // Local close.
+  envoy_dynamic_module_type_network_connection_event_LocalClose,
+  // Connected.
+  envoy_dynamic_module_type_network_connection_event_Connected,
+  // Connected with 0-RTT.
+  envoy_dynamic_module_type_network_connection_event_ConnectedZeroRtt,
+} envoy_dynamic_module_type_network_connection_event;
+
+/**
+ * envoy_dynamic_module_type_network_connection_state represents the current state of a connection.
+ * This corresponds to `Network::Connection::State` in envoy/network/connection.h.
+ */
+typedef enum envoy_dynamic_module_type_network_connection_state {
+  // Connection is open.
+  envoy_dynamic_module_type_network_connection_state_Open,
+  // Connection is closing.
+  envoy_dynamic_module_type_network_connection_state_Closing,
+  // Connection is closed.
+  envoy_dynamic_module_type_network_connection_state_Closed,
+} envoy_dynamic_module_type_network_connection_state;
+
+/**
+ * envoy_dynamic_module_type_network_read_disable_status represents the result of calling
+ * read_disable on a connection.
+ * This corresponds to `Network::Connection::ReadDisableStatus` in envoy/network/connection.h.
+ */
+typedef enum envoy_dynamic_module_type_network_read_disable_status {
+  // No transition occurred.
+  envoy_dynamic_module_type_network_read_disable_status_NoTransition,
+  // Reading is still disabled.
+  envoy_dynamic_module_type_network_read_disable_status_StillReadDisabled,
+  // Transitioned from disabled to enabled.
+  envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadEnabled,
+  // Transitioned from enabled to disabled.
+  envoy_dynamic_module_type_network_read_disable_status_TransitionedToReadDisabled,
+} envoy_dynamic_module_type_network_read_disable_status;
+
+// =============================================================================
+// Network Filter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_network_filter_config_new is called by the main thread when the network
+ * filter config is loaded. The function returns a
+ * envoy_dynamic_module_type_network_filter_config_module_ptr for given name and config.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object for
+ * the corresponding config.
+ * @param name is the name of the filter owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @return envoy_dynamic_module_type_network_filter_config_module_ptr is the pointer to the
+ * in-module network filter configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the filter configuration will be rejected.
+ */
+envoy_dynamic_module_type_network_filter_config_module_ptr
+envoy_dynamic_module_on_network_filter_config_new(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_network_filter_config_destroy is called when the network filter
+ * configuration is destroyed in Envoy. The module should release any resources associated with
+ * the corresponding in-module network filter configuration.
+ *
+ * @param filter_config_ptr is a pointer to the in-module network filter configuration whose
+ * corresponding Envoy network filter configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_network_filter_config_destroy(
+    envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_new is called when a new network filter is created for
+ * each TCP connection.
+ *
+ * @param filter_config_ptr is the pointer to the in-module network filter configuration.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @return envoy_dynamic_module_type_network_filter_module_ptr is the pointer to the in-module
+ * network filter. Returning nullptr indicates a failure to initialize the module. When it fails,
+ * the connection will be closed.
+ */
+envoy_dynamic_module_type_network_filter_module_ptr envoy_dynamic_module_on_network_filter_new(
+    envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_new_connection is called when a new TCP connection is
+ * established. This is called after the filter is created and callbacks are initialized.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @return envoy_dynamic_module_type_on_network_filter_data_status is the status of the filter.
+ * Continue means further filters should be invoked, StopIteration means further filters should
+ * not be invoked until continueReading() is called.
+ */
+envoy_dynamic_module_type_on_network_filter_data_status
+envoy_dynamic_module_on_network_filter_new_connection(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_read is called when data is read from the connection
+ * (downstream -> upstream direction).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param data_length is the total length of the read data buffer.
+ * @param end_stream is true if this is the last data (half-close from downstream).
+ * @return envoy_dynamic_module_type_on_network_filter_data_status is the status of the filter.
+ */
+envoy_dynamic_module_type_on_network_filter_data_status envoy_dynamic_module_on_network_filter_read(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, size_t data_length,
+    bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_network_filter_write is called when data is to be written to the
+ * connection (upstream -> downstream direction).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param data_length is the total length of the write data buffer.
+ * @param end_stream is true if this is the last data.
+ * @return envoy_dynamic_module_type_on_network_filter_data_status is the status of the filter.
+ */
+envoy_dynamic_module_type_on_network_filter_data_status
+envoy_dynamic_module_on_network_filter_write(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, size_t data_length,
+    bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_network_filter_event is called when a connection event occurs.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param event is the connection event type.
+ */
+void envoy_dynamic_module_on_network_filter_event(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr,
+    envoy_dynamic_module_type_network_connection_event event);
+
+/**
+ * envoy_dynamic_module_on_network_filter_destroy is called when the network filter is destroyed
+ * for each TCP connection.
+ *
+ * @param filter_module_ptr is the pointer to the in-module network filter.
+ */
+void envoy_dynamic_module_on_network_filter_destroy(
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_http_callout_done is called when the HTTP callout
+ * response is received initiated by a network filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_network_filter_http_callout_done(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_network_filter_scheduled is called when the event is scheduled via
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_module_ptr is the pointer to the in-module network filter.
+ * @param event_id is the ID of the event. This is the same value as the one passed to
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit.
+ */
+void envoy_dynamic_module_on_network_filter_scheduled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_network_filter_config_scheduled is called when the event is scheduled via
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit callback.
+ *
+ * @param filter_config_ptr is the pointer to the in-module network filter configuration.
+ * @param event_id is the ID of the event. This is the same value as the one passed to
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_network_filter_config_scheduled(
+    envoy_dynamic_module_type_network_filter_config_module_ptr filter_config_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark is called when the
+ * write buffer for the connection goes over its high watermark. This can be used to implement
+ * flow control by disabling reads when the write buffer is full.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ */
+void envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark is called when the
+ * write buffer for the connection goes from over its high watermark to under its low watermark.
+ * This can be used to re-enable reads after flow control was applied.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param filter_module_ptr is the pointer to the in-module network filter created by
+ * envoy_dynamic_module_on_network_filter_new.
+ */
+void envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_filter_module_ptr filter_module_ptr);
+
+// =============================================================================
+// Network Filter Callbacks
+// =============================================================================
+
+// ---------------------- Socket Option Callbacks ----------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_set_socket_option_int sets an integer socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE).
+ * @param state is the socket state at which this option should be applied.
+ * @param value is the integer value for the socket option.
+ */
+void envoy_dynamic_module_callback_network_set_socket_option_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_set_socket_option_bytes sets a bytes socket option with
+ * the given level, name, and state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state at which this option should be applied.
+ * @param value is the byte buffer value for the socket option.
+ */
+void envoy_dynamic_module_callback_network_set_socket_option_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_socket_option_int retrieves an integer socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_socket_option_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_network_get_socket_option_bytes retrieves a bytes socket option
+ * value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param level is the socket option level.
+ * @param name is the socket option name.
+ * @param state is the socket state.
+ * @param value_out is the pointer to store the retrieved buffer. The buffer is owned by Envoy and
+ * valid until the filter is destroyed.
+ * @return true if the option is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_socket_option_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_socket_option_state state,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_network_get_socket_options_size returns the number of socket
+ * options stored on the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the number of socket options.
+ */
+size_t envoy_dynamic_module_callback_network_get_socket_options_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_get_socket_options gets all socket options stored on the
+ * connection. The caller should first call
+ * envoy_dynamic_module_callback_network_get_socket_options_size to get the size, allocate an array
+ * of that size, and pass the pointer to this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param options_out is the pointer to an array of socket options that will be filled. The array
+ * must be pre-allocated by the caller with size equal to the value returned by
+ * envoy_dynamic_module_callback_network_get_socket_options_size.
+ */
+void envoy_dynamic_module_callback_network_get_socket_options(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_socket_option* options_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size is called by the module
+ * to get the number of chunks in the current read data buffer. Combined with
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks, this can be used to iterate
+ * over all chunks in the read buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the number of chunks in the read buffer. 0 if the buffer is not available or empty.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_size is called by the module to
+ * get the total size of the current read data buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the total size of the read buffer. 0 if the buffer is not available or empty.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_read_buffer_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks is called by the module to
+ * get the current read data buffer as chunks. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_read callback for the lifetime of the connection.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the chunks. The module can use
+ * envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size to get the number of
+ * chunks before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the chunks will be stored. The lifetime of the buffer is guaranteed until the end of the
+ * current callback.
+ * @return true if the buffer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size is called by the module
+ * to get the number of chunks in the current write data buffer. Combined with
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks, this can be used to iterate
+ * over all chunks in the write buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the number of chunks in the write buffer. 0 if the buffer is not available or empty.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_size is called by the module to
+ * get the total size of the current write data buffer. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the total size of the write buffer. 0 if the buffer is not available or empty.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_write_buffer_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks is called by the module to
+ * get the current write data buffer as chunks. This is valid after the first
+ * envoy_dynamic_module_on_network_filter_write callback for the lifetime of the connection.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the chunks. The module can use
+ * envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size to get the number of
+ * chunks before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the chunks will be stored. The lifetime of the buffer is guaranteed until the end of the
+ * current callback.
+ * @return true if the buffer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_drain_read_buffer is called by the module to drain
+ * bytes from the beginning of the read buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param length is the number of bytes to drain from the beginning of the buffer.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_drain_read_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_drain_write_buffer is called by the module to drain
+ * bytes from the beginning of the write buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param length is the number of bytes to drain from the beginning of the buffer.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_drain_write_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_prepend_read_buffer is called by the module to
+ * prepend data to the beginning of the read buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the data to prepend owned by the module.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_prepend_read_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_append_read_buffer is called by the module to
+ * append data to the end of the read buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the data to append owned by the module.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_append_read_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_prepend_write_buffer is called by the module to
+ * prepend data to the beginning of the write buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the data to prepend owned by the module.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_prepend_write_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_append_write_buffer is called by the module to
+ * append data to the end of the write buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the data to append owned by the module.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_append_write_buffer(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_write is called by the module to write data
+ * directly to the connection (downstream).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the data to write owned by the module.
+ * @param end_stream is true to half-close the connection after writing.
+ */
+void envoy_dynamic_module_callback_network_filter_write(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_inject_read_data is called by the module to inject
+ * data into the read filter chain (after this filter).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the data to inject owned by the module.
+ * @param end_stream is true if this is the last data.
+ */
+void envoy_dynamic_module_callback_network_filter_inject_read_data(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
+
+/**
+ * envoy_dynamic_module_type_socket_option_value_type represents the type of value stored in a
+ * socket option.
+ * envoy_dynamic_module_callback_network_filter_inject_write_data is called by the module to inject
+ * data into the write filter chain (after this filter).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param data is the data to inject owned by the module.
+ * @param end_stream is true if this is the last data.
+ */
+void envoy_dynamic_module_callback_network_filter_inject_write_data(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_continue_reading is called by the module to
+ * continue reading after returning StopIteration from onNewConnection or onData.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ */
+void envoy_dynamic_module_callback_network_filter_continue_reading(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_close is called by the module to close the
+ * connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param close_type specifies how to close the connection.
+ */
+void envoy_dynamic_module_callback_network_filter_close(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_connection_close_type close_type);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_connection_id is called by the module to get
+ * the unique connection ID.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the unique connection ID.
+ */
+uint64_t envoy_dynamic_module_callback_network_filter_get_connection_id(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_remote_address is called by the module to get
+ * the remote (client) address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address_out is the output pointer to the address string.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_remote_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_local_address is called by the module to get
+ * the local address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address_out is the output pointer to the address string.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_local_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_is_ssl is called by the module to check if the
+ * connection uses SSL/TLS.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the connection uses SSL/TLS, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_is_ssl(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_disable_close is called by the module to disable
+ * or enable connection close handling for this filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param disabled true to disable close handling, false to enable.
+ */
+void envoy_dynamic_module_callback_network_filter_disable_close(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool disabled);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_close_with_details is called by the module to close
+ * the connection with a specific close reason.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param close_type specifies how to close the connection.
+ * @param details is the close reason string owned by the module. Can be empty.
+ */
+void envoy_dynamic_module_callback_network_filter_close_with_details(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_network_connection_close_type close_type,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_requested_server_name is called by the module
+ * to get the requested server name (SNI) from the TLS handshake.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_out is the output buffer where the SNI string owned by Envoy will be stored.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_requested_server_name(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_direct_remote_address is called by the module
+ * to get the direct remote (client) address without considering proxies or XFF.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_direct_remote_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size is called by the module to
+ * get the count of URI Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the count of URI SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans is called by the module to get
+ * the URI Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_uri_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_uri_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size is called by the module to
+ * get the count of DNS Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the count of DNS SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans is called by the module to get
+ * the DNS Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_dns_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_dns_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_ssl_subject is called by the module to get
+ * the subject from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param result_out is the output buffer where the subject owned by Envoy will be stored.
+ * @return true if SSL is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_ssl_subject(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+// ---------------------------- Filter State Callbacks -------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_set_filter_state_bytes is called by the module to set
+ * filter state with a bytes value. The filter state can be read by other filters in the chain and
+ * can influence routing decisions (e.g., tcp_proxy cluster selection).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module.
+ * @param value is the value owned by the module.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_set_filter_state_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_filter_state_bytes is called by the module to get
+ * filter state bytes value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the key exists and is a bytes value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_filter_state_bytes(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_network_set_filter_state_typed is called by the module to set
+ * typed filter state using the registered ObjectFactory for the key. Unlike set_filter_state_bytes
+ * which stores a raw StringAccessor, this creates a properly typed filter state object via
+ * ObjectFactory::createFromBytes. This is required for interoperability with built-in Envoy
+ * filters that read filter state as typed objects (e.g., tcp_proxy reads PerConnectionCluster
+ * via the key "envoy.tcp_proxy.cluster").
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if no ObjectFactory is registered for the
+ * key, the factory fails to create the object, or the key already exists and is marked as
+ * read-only.
+ */
+bool envoy_dynamic_module_callback_network_set_filter_state_typed(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_filter_state_typed is called by the module to get
+ * the serialized bytes value of a typed filter state object with the given key. This retrieves
+ * the object generically and calls serializeAsString to get the bytes representation. This works
+ * with any filter state object type, not just StringAccessor.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param key is the key name owned by the module.
+ * @param value_out is the output buffer where the serialized value owned by Envoy will be stored.
+ * @return true if the key exists and the object supports serialization, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_network_get_filter_state_typed(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+// ---------------------------- Dynamic Metadata Callbacks ---------------------
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_string is called by the module to
+ * set the string value of the dynamic metadata with the given namespace and key. If the metadata
+ * is existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the string value owned by the module.
+ */
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_dynamic_metadata_string is called by the module to
+ * get the string value of the dynamic metadata with the given namespace and key. If the namespace
+ * does not exist, the key does not exist, or the value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and it is
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
+ */
+bool envoy_dynamic_module_callback_network_get_dynamic_metadata_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_number is called by the module to
+ * set the number value of the dynamic metadata with the given namespace and key. If the metadata
+ * is existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the number value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_dynamic_metadata_number is called by the module to
+ * get the number value of the dynamic metadata with the given namespace and key. If the namespace
+ * does not exist, the key does not exist, or the value is not a number, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param result is the output pointer to the number value of the dynamic metadata.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_bool is called by the module to
+ * set the bool value of the dynamic metadata with the given namespace and key. If the metadata
+ * is existing, it will be overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param value is the bool value of the dynamic metadata to be set.
+ */
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, bool value);
+
+/**
+ * envoy_dynamic_module_callback_network_get_dynamic_metadata_bool is called by the module to
+ * get the bool value of the dynamic metadata with the given namespace and key. If the namespace
+ * does not exist, the key does not exist, or the value is not a bool, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param key is the key owned by the module.
+ * @param result is the output pointer to the bool value of the dynamic metadata.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch is called by the module
+ * to set multiple string-valued dynamic metadata entries under a single namespace in one call. It
+ * is equivalent to calling envoy_dynamic_module_callback_network_set_dynamic_metadata_string once
+ * per entry but resolves the namespace and merges into the metadata struct only once. Existing
+ * entries with the same key are overwritten. Within a single call, a later entry overwrites an
+ * earlier entry with the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+// ------------------------------ HTTP Callouts -------------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_http_callout is called by the module to initiate an
+ * HTTP callout. The callout is initiated by the network filter and the response is received in
+ * envoy_dynamic_module_on_network_filter_http_callout_done.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same filter.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout
+ * initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_network_filter_http_callout(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
+
+// -------------------- Network Filter Callbacks - Metrics -----------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_define_counter is called by the module
+ * during initialization to create a new Stats::Counter with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_network_filter_increment_counter together with
+ * filter_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_define_counter(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_increment_counter(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_define_gauge is called by the module during
+ * initialization to create a new Stats::Gauge with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_define_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_gauge is called by the module to set the value
+ * of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_network_filter_set_gauge(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_increment_gauge is called by the module to increase
+ * the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_increment_gauge(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_decrement_gauge is called by the module to decrease
+ * the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_decrement_gauge(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_define_histogram is called by the module
+ * during initialization to create a new Stats::Histogram with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_define_histogram(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_record_histogram_value is called by the module to
+ * record a value in a previously defined histogram.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_record_histogram_value(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_increment_counter is called by the module to
+ * increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_network_filter_increment_counter, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * counter.
+ * @param id is the ID of the counter previously defined using config_envoy_ptr.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_increment_counter(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_network_filter_increment_gauge, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_increment_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_network_filter_decrement_gauge, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_network_filter_set_gauge, this does not require a per-connection
+ * filter and can be called outside of the connection lifecycle, e.g. from a scheduled background
+ * task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_set_gauge(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram from the filter config context.
+ * Unlike envoy_dynamic_module_callback_network_filter_record_histogram_value, this does not require
+ * a per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig that defined the
+ * histogram.
+ * @param id is the ID of the histogram previously defined using config_envoy_ptr.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_network_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+// ---------------------- Upstream Host Access Callbacks -----------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_cluster_host_count retrieves the host counts for
+ * a cluster by name. This provides visibility into the cluster's health state and can be used to
+ * implement scale-to-zero logic or custom load balancing decisions.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * found).
+ */
+bool envoy_dynamic_module_callback_network_filter_get_cluster_host_count(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_upstream_host_address is called by the module
+ * to get the address and port of the currently selected upstream host.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param address_out is the output buffer where the address string owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the upstream host is set and has an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_address(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname is called by the module
+ * to get the hostname of the currently selected upstream host.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param hostname_out is the output buffer where the hostname string owned by Envoy will be stored.
+ * @return true if the upstream host is set and has a hostname, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_hostname(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* hostname_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster is called by the module
+ * to get the cluster name of the currently selected upstream host.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param cluster_name_out is the output buffer where the cluster name string owned by Envoy will
+ * be stored.
+ * @return true if the upstream host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_upstream_host_cluster(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* cluster_name_out);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_has_upstream_host is called by the module to check
+ * if an upstream host has been selected for this connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if an upstream host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_has_upstream_host(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * Get the upstream connection ID.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the upstream connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------- StartTLS Support Callbacks ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport is called by the
+ * module to convert the downstream connection from non-secure to secure mode (StartTLS).
+ *
+ * This signals the downstream connection to enable secure transport mode. This is done when the
+ * downstream connection's transport socket is of startTLS type. At the moment it is the only
+ * transport socket type which can be programmatically converted from non-secure to secure mode.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the downstream transport was successfully converted to secure mode, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_start_downstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport is called by the
+ * module to convert the upstream connection from non-secure to secure mode (StartTLS).
+ *
+ * This signals the filter manager to enable secure transport mode in the upstream connection.
+ * This is done when the upstream connection's transport socket is of startTLS type. At the moment
+ * it is the only transport socket type which can be programmatically converted from non-secure
+ * mode to secure mode.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the upstream transport was successfully converted to secure mode, false
+ * otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_start_upstream_secure_transport(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------- Connection State and Flow Control Callbacks ----------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_connection_state is called by the module to get
+ * the current state of the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the current connection state (Open, Closing, or Closed).
+ */
+envoy_dynamic_module_type_network_connection_state
+envoy_dynamic_module_callback_network_filter_get_connection_state(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_read_disable is called by the module to disable
+ * or enable reading from the connection. This is the primary mechanism for implementing
+ * back-pressure in TCP filters.
+ *
+ * When reads are disabled, no more data will be read from the socket. When re-enabled, if there
+ * is data in the input buffer, it will be re-dispatched through the filter chain.
+ *
+ * Note that this function reference counts calls. For example:
+ *   read_disable(true);  // Disables reading
+ *   read_disable(true);  // Notes the connection is blocked by two sources
+ *   read_disable(false); // Notes the connection is blocked by one source
+ *   read_disable(false); // Marks the connection as unblocked, so resumes reading
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param disable is true to disable reading, false to enable reading.
+ * @return the status indicating the outcome of the operation.
+ */
+envoy_dynamic_module_type_network_read_disable_status
+envoy_dynamic_module_callback_network_filter_read_disable(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool disable);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_read_enabled is called by the module to check if
+ * reading is currently enabled on the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if reading is enabled, false if reading is disabled.
+ */
+bool envoy_dynamic_module_callback_network_filter_read_enabled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_is_half_close_enabled is called by the module to
+ * check if half-close semantics are enabled on this connection.
+ *
+ * When half-close is enabled, reading a remote half-close will not fully close the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if half-close semantics are enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_is_half_close_enabled(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_enable_half_close is called by the module to enable
+ * or disable half-close semantics on the connection.
+ *
+ * When half-close is enabled, reading a remote half-close will not fully close the connection,
+ * allowing the filter to continue writing data.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param enabled is true to enable half-close semantics, false to disable.
+ */
+void envoy_dynamic_module_callback_network_filter_enable_half_close(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, bool enabled);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_buffer_limit is called by the module to get
+ * the current buffer limit set on the connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return the current buffer limit in bytes.
+ */
+uint32_t envoy_dynamic_module_callback_network_filter_get_buffer_limit(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_set_buffer_limits is called by the module to set
+ * a soft limit on the size of buffers for the connection.
+ *
+ * For the read buffer, this limits the bytes read prior to flushing to further stages in the
+ * processing pipeline. For the write buffer, it sets watermarks. When enough data is buffered,
+ * it triggers envoy_dynamic_module_on_network_filter_above_write_buffer_high_watermark callback.
+ * When enough data is drained from the write buffer,
+ * envoy_dynamic_module_on_network_filter_below_write_buffer_low_watermark is called.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param limit is the buffer limit in bytes.
+ */
+void envoy_dynamic_module_callback_network_filter_set_buffer_limits(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint32_t limit);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_above_high_watermark is called by the module to
+ * check if the connection is currently above the high watermark.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @return true if the connection is above the high watermark, false otherwise.
+ */
+bool envoy_dynamic_module_callback_network_filter_above_high_watermark(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+// ---------------------- Network filter scheduler callbacks -------------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_new is called by the module to create a
+ * new network filter scheduler. The scheduler is used to dispatch network filter operations from
+ * any thread including the ones managed by the module.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @return envoy_dynamic_module_type_network_filter_scheduler_module_ptr is the pointer to the
+ * created network filter scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_network_filter_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_network_filter_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_network_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_network_filter_scheduler_new(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_commit is called by the module to
+ * schedule a generic event to the network filter on the worker thread it is running on.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_network_filter_scheduled
+ * event hook on the worker thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_network_filter_scheduler_commit(
+    envoy_dynamic_module_type_network_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_scheduler_delete is called by the module to delete
+ * the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter scheduler created by
+ * envoy_dynamic_module_callback_network_filter_scheduler_new.
+ */
+void envoy_dynamic_module_callback_network_filter_scheduler_delete(
+    envoy_dynamic_module_type_network_filter_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new is called by the module to
+ * create a new network filter configuration scheduler. The scheduler is used to dispatch network
+ * filter configuration operations to the main thread from any thread including the ones managed by
+ * the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleNetworkFilterConfig object.
+ * @return envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr is the pointer to
+ * the created network filter configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_network_filter_config_scheduler_new(
+    envoy_dynamic_module_type_network_filter_config_envoy_ptr filter_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_delete is called by the module to
+ * delete the network filter configuration scheduler created by
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter configuration scheduler created
+ * by envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_network_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_config_scheduler_commit is called by the module to
+ * schedule a generic event to the network filter configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_network_filter_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the network filter configuration scheduler created
+ * by envoy_dynamic_module_callback_network_filter_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_network_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_network_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+// --------------------- Network Filter Callbacks - Misc ---------------
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_worker_index is called by the module to get the
+ * worker index assigned to the current network filter. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @return the worker index assigned to the current network filter.
+ */
+uint32_t envoy_dynamic_module_callback_network_filter_get_worker_index(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_string is called by the module to get
+ * the string attribute value. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_string(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_int is called by the module to get
+ * an integer attribute value. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_int(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_network_filter_get_attribute_bool is called by the module to get
+ * a boolean attribute value. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
+ * corresponding network filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the bool value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_network_filter_get_attribute_bool(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+// =============================================================================
+// ============================= Listener Filter ===============================
+// =============================================================================
+
+// =============================================================================
+// Listener Filter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_listener_filter_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleListenerFilterConfig class in Envoy. This is passed to the module when
+ * creating a new in-module listener filter configuration and used to access the listener
+ * filter-scoped information.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_listener_filter_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_listener_filter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_listener_filter_config_module_ptr is a pointer to an in-module listener
+ * filter configuration corresponding to an Envoy listener filter configuration. The config is
+ * responsible for creating a new listener filter that corresponds to each accepted connection.
+ *
+ * This has 1:1 correspondence with the DynamicModuleListenerFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_listener_filter_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_listener_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_listener_filter_envoy_ptr is a raw pointer to the
+ * DynamicModuleListenerFilter class in Envoy. This is passed to the module when creating a new
+ * listener filter for each accepted connection and used to access the listener filter-scoped
+ * information such as socket data, buffers, etc.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_listener_filter_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer, and can be accessed by the module until the filter is
+ * destroyed, i.e. envoy_dynamic_module_on_listener_filter_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_listener_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_listener_filter_module_ptr is a pointer to an in-module listener filter
+ * corresponding to an Envoy listener filter. The filter is responsible for processing each
+ * accepted connection before a Connection object is created.
+ *
+ * This has 1:1 correspondence with the DynamicModuleListenerFilter class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_listener_filter_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_listener_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_listener_filter_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleListenerFilterScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the listener filter event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_listener_filter_scheduler_new and the scheduling and destruction is
+ * done by envoy_dynamic_module_callback_listener_filter_scheduler_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_listener_filter_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleListenerFilterConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the listener filter config event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_listener_filter_config_scheduler_new and the scheduling and
+ * destruction is done by envoy_dynamic_module_callback_listener_filter_config_scheduler_delete.
+ * Since its lifecycle is owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_listener_filter_status represents the status of the filter
+ * after processing. This corresponds to `Network::FilterStatus` in envoy/network/filter.h.
+ */
+typedef enum envoy_dynamic_module_type_on_listener_filter_status {
+  // Continue to further filters.
+  envoy_dynamic_module_type_on_listener_filter_status_Continue,
+  // Stop executing further filters.
+  envoy_dynamic_module_type_on_listener_filter_status_StopIteration,
+} envoy_dynamic_module_type_on_listener_filter_status;
+
+// =============================================================================
+// Listener Filter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_listener_filter_config_new is called by the main thread when the
+ * listener filter config is loaded. The function returns a
+ * envoy_dynamic_module_type_listener_filter_config_module_ptr for given name and config.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig object
+ * for the corresponding config.
+ * @param name is the name of the filter owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @return envoy_dynamic_module_type_listener_filter_config_module_ptr is the pointer to the
+ * in-module listener filter configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the filter configuration will be rejected.
+ */
+envoy_dynamic_module_type_listener_filter_config_module_ptr
+envoy_dynamic_module_on_listener_filter_config_new(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_config_destroy is called when the listener filter
+ * configuration is destroyed in Envoy. The module should release any resources associated with
+ * the corresponding in-module listener filter configuration.
+ *
+ * @param filter_config_ptr is a pointer to the in-module listener filter configuration whose
+ * corresponding Envoy listener filter configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_listener_filter_config_destroy(
+    envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_new is called when a new listener filter is created for
+ * each accepted connection.
+ *
+ * @param filter_config_ptr is the pointer to the in-module listener filter configuration.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @return envoy_dynamic_module_type_listener_filter_module_ptr is the pointer to the in-module
+ * listener filter. Returning nullptr indicates a failure to initialize the module. When it fails,
+ * the connection will be closed.
+ */
+envoy_dynamic_module_type_listener_filter_module_ptr envoy_dynamic_module_on_listener_filter_new(
+    envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_on_accept is called when a new connection is accepted,
+ * but BEFORE a Connection object is created. This is the first callback for each connection.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_module_ptr is the pointer to the in-module listener filter.
+ * @return envoy_dynamic_module_type_on_listener_filter_status is the status of the filter.
+ * Continue means further filters should be invoked, StopIteration means the filter needs more
+ * data or is waiting for an async operation.
+ */
+envoy_dynamic_module_type_on_listener_filter_status
+envoy_dynamic_module_on_listener_filter_on_accept(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_on_data is called when data is available for inspection.
+ * The data is peek-based, meaning it stays in the buffer for subsequent filters.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_module_ptr is the pointer to the in-module listener filter.
+ * @param data_length is the total length of the available data buffer.
+ * @return envoy_dynamic_module_type_on_listener_filter_status is the status of the filter.
+ */
+envoy_dynamic_module_type_on_listener_filter_status envoy_dynamic_module_on_listener_filter_on_data(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, size_t data_length);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_on_close is called when the socket is closed.
+ * Only the current filter that has stopped filter chain iteration will get this callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_module_ptr is the pointer to the in-module listener filter.
+ */
+void envoy_dynamic_module_on_listener_filter_on_close(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_get_max_read_bytes is called to query the maximum
+ * number of bytes the filter wants to inspect from the connection.
+ *
+ * This is called frequently and should be a fast operation.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_module_ptr is the pointer to the in-module listener filter.
+ * @return the maximum number of bytes to read. 0 means the filter does not need any data.
+ */
+size_t envoy_dynamic_module_on_listener_filter_get_max_read_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_destroy is called when the listener filter is destroyed
+ * for each accepted connection.
+ *
+ * @param filter_module_ptr is the pointer to the in-module listener filter.
+ */
+void envoy_dynamic_module_on_listener_filter_destroy(
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_scheduled is called when the listener filter is scheduled
+ * to be executed on the worker thread where the listener filter is running with
+ * envoy_dynamic_module_callback_listener_filter_scheduler_commit callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param filter_module_ptr is the pointer to the in-module listener filter created by
+ * envoy_dynamic_module_on_listener_filter_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_listener_filter_scheduler_commit.
+ */
+void envoy_dynamic_module_on_listener_filter_scheduled(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_config_scheduled is called when the listener filter
+ * configuration is scheduled to be executed on the main thread with
+ * envoy_dynamic_module_callback_listener_filter_config_scheduler_commit callback.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig object.
+ * @param filter_config_module_ptr is the pointer to the in-module listener filter config created by
+ * envoy_dynamic_module_on_listener_filter_config_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_listener_filter_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_listener_filter_config_scheduled(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_listener_filter_http_callout_done is called when the HTTP callout
+ * response is received initiated by a listener filter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param filter_module_ptr is the pointer to the in-module listener filter created by
+ * envoy_dynamic_module_on_listener_filter_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_listener_filter_http_callout_done(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+// =============================================================================
+// Listener Filter Callbacks
+// =============================================================================
+//
+// Callbacks are functions implemented by Envoy that can be called by the module to interact with
+// Envoy. The name of a callback must be prefixed with "envoy_dynamic_module_callback_".
+
+// ---------------------------- Buffer Operations -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_buffer_chunk is called by the module to
+ * get the current data buffer as a single chunk. This is only valid during the
+ * envoy_dynamic_module_on_listener_filter_on_data callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param chunk_out is the output pointer to the buffer chunk owned by Envoy.
+ * @return true if the buffer is available, false otherwise.
+ *
+ * The returned data is owned by Envoy and valid until the end of the callback.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_buffer_chunk(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* chunk_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_drain_buffer is called by the module to drain
+ * bytes from the beginning of the buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param length is the number of bytes to drain from the beginning of the buffer.
+ * @return true if the drain was successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_drain_buffer(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t length);
+
+// --------------------- Socket Property Setters (Protocol Detection) -----------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol is called by the
+ * module to set the detected transport protocol (e.g., "tls", "raw_buffer").
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param protocol is the protocol string owned by the module.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer protocol);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_requested_server_name is called by the module
+ * to set the requested server name (SNI).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param name is the server name string owned by the module.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_requested_server_name(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols is called by
+ * the module to set the requested application protocols (ALPN).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param protocols is an array of protocol name buffers owned by the module.
+ * @param protocols_count is the number of protocols.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_requested_application_protocols(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer* protocols, size_t protocols_count);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_set_ja3_hash` is called by the module to set the
+ * `JA3` fingerprint hash.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param hash is the hash string owned by the module.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_ja3_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer hash);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_set_ja4_hash` is called by the module to set the
+ * `JA4` fingerprint hash.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param hash is the hash string owned by the module.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_ja4_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer hash);
+
+// --------------------- Socket Property Getters (Protocol Detection & SSL) ----
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_server_name is called by the module
+ * to get the requested server name (SNI) from the connection socket. This returns the value
+ * previously set by a listener filter (e.g., TLS inspector).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the SNI string owned by Envoy will be stored.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_requested_server_name(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol is called by the
+ * module to get the detected transport protocol (e.g., "tls", "raw_buffer") from the connection
+ * socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the protocol string owned by Envoy will be stored.
+ * @return true if the transport protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_detected_transport_protocol(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size is called
+ * by the module to get the count of requested application protocols (ALPN) from the connection
+ * socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of application protocols, or 0 if none are available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols is called by
+ * the module to get the requested application protocols (ALPN) from the connection socket. The
+ * module should first call get_requested_application_protocols_size to get the count and allocate
+ * the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param protocols_out is a pre-allocated array owned by the module where Envoy will populate the
+ *   protocol strings. The module must allocate this array with at least the size returned by
+ *   get_requested_application_protocols_size.
+ * @return true if the protocols were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_requested_application_protocols(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* protocols_out);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_get_ja3_hash` is called by the module to get the
+ * `JA3` fingerprint hash from the connection socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the `JA3` hash string owned by Envoy will be stored.
+ * @return true if the `JA3` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ja3_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * `envoy_dynamic_module_callback_listener_filter_get_ja4_hash` is called by the module to get the
+ * `JA4` fingerprint hash from the connection socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the `JA4` hash string owned by Envoy will be stored.
+ * @return true if the `JA4` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ja4_hash(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_is_ssl is called by the module to check if the
+ * connection has SSL/TLS information available on the socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return true if SSL/TLS connection information is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_is_ssl(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size is called by the module to
+ * get the count of URI Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of URI SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans is called by the module to get
+ * the URI Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_uri_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_uri_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_uri_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size is called by the module to
+ * get the count of DNS Subject Alternative Names from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the count of DNS SANs, or 0 if SSL is not available.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans_size(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans is called by the module to get
+ * the DNS Subject Alternative Names from the peer certificate. The module should first call
+ * get_ssl_dns_sans_size to get the count and allocate the array.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param sans_out is a pre-allocated array owned by the module where Envoy will populate the SANs.
+ *   The module must allocate this array with at least the size returned by get_ssl_dns_sans_size.
+ * @return true if the SANs were populated successfully, false if SSL is not available.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_dns_sans(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_ssl_subject is called by the module to get
+ * the subject from the peer certificate.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param result_out is the output buffer where the subject owned by Envoy will be stored.
+ * @return true if SSL is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_ssl_subject(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_out);
+
+// --------------------------- Address Operations -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_remote_address is called by the module to get
+ * the remote (client) address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_remote_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_direct_remote_address is called by the module
+ * to get the direct remote address which is the peer address before any listener filter
+ * modification.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_direct_remote_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_local_address is called by the module to get
+ * the local address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_local_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_direct_local_address is called by the module to
+ * get the direct local address (the listener address before any restoration).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_direct_local_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+// ---------------------- HTTP filter scheduler callbacks ------------------------
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_original_dst is called by the module to get the
+ * original destination address obtained from the platform (e.g., iptables redirect).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address_out is the output buffer where the address owned by Envoy will be stored.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the original destination address was found and is an IP address, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_original_dst(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_address_type is called by the module to get the
+ * socket address type.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the address type for the current socket.
+ */
+envoy_dynamic_module_type_address_type
+envoy_dynamic_module_callback_listener_filter_get_address_type(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_is_local_address_restored is called by the module
+ * to check whether the local address has been restored to a value different from the listener
+ * address.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return true if the local address has been restored, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_is_local_address_restored(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_remote_address is called by the module to set
+ * the remote address (for proxy protocol parsing).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address is the address string owned by the module.
+ * @param port is the port number.
+ * @param is_ipv6 true if the address is IPv6, false for IPv4.
+ * @return true if successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_remote_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, uint32_t port, bool is_ipv6);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_restore_local_address is called by the module to
+ * restore the local address (for original destination or proxy protocol).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param address is the address string owned by the module.
+ * @param port is the port number.
+ * @param is_ipv6 true if the address is IPv6, false for IPv4.
+ * @return true if successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_restore_local_address(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, uint32_t port, bool is_ipv6);
+
+// ---------------------- Filter Chain Control ---------------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_continue_filter_chain is called by the module to
+ * continue the filter chain after returning StopIteration.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param success is true if the filter execution was successful, false if the connection should
+ * be closed.
+ */
+void envoy_dynamic_module_callback_listener_filter_continue_filter_chain(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, bool success);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_use_original_dst is called by the module to control
+ * whether the listener should use the original destination for filter chain matching.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param use_original_dst indicates whether to enable original destination handling.
+ */
+void envoy_dynamic_module_callback_listener_filter_use_original_dst(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, bool use_original_dst);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_close_socket is called by the module to close
+ * the socket immediately. If details is non-empty, the termination reason is set on the
+ * connection's stream info before closing.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param details is the optional termination reason string owned by the module. Can be empty.
+ */
+void envoy_dynamic_module_callback_listener_filter_close_socket(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_write_to_socket is called by the module to write
+ * data directly to the raw socket. This is useful for protocol negotiation at the listener filter
+ * level, such as writing SSL support responses in Postgres or MySQL handshake packets.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param data is the data to write owned by the module.
+ * @return the number of bytes written, or -1 if the write failed or callbacks are not available.
+ */
+int64_t envoy_dynamic_module_callback_listener_filter_write_to_socket(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+// ---------------------- Socket Option Callbacks ------------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_fd is called by the module to get the
+ * raw socket file descriptor for advanced socket manipulations.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the socket file descriptor, or -1 if the socket is not available.
+ */
+int64_t envoy_dynamic_module_callback_listener_filter_get_socket_fd(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_socket_option_int sets an integer socket option
+ * on the accepted socket (@see man 2 setsockopt).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value is the integer value for the socket option.
+ * @return true if the socket option was set successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes sets a bytes socket option
+ * on the accepted socket (@see man 2 setsockopt).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value is the byte buffer value for the socket option.
+ * @return true if the socket option was set successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_option_int retrieves an integer socket
+ * option value from the accepted socket (@see man 2 getsockopt). This reads the actual value from
+ * the socket, including options set by other filters or the system.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value_out is the pointer to store the retrieved integer value.
+ * @return true if the option was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, int64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes retrieves a bytes socket
+ * option value from the accepted socket (@see man 2 getsockopt). This reads the actual value from
+ * the socket, including options set by other filters or the system.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param level is the socket option level (e.g., SOL_SOCKET, IPPROTO_TCP).
+ * @param name is the socket option name (e.g., SO_KEEPALIVE, TCP_NODELAY).
+ * @param value_out is the pointer to store the retrieved buffer. The module should pre-allocate the
+ * buffer with sufficient size before calling this function.
+ * @param value_size is the size of the pre-allocated buffer.
+ * @param actual_size_out is the pointer to store the actual size of the option value.
+ * @return true if the option was retrieved successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_socket_option_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, int64_t level,
+    int64_t name, char* value_out, size_t value_size, size_t* actual_size_out);
+
+// ------------------------- Filter State Operations ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_filter_state is called by the module to
+ * set a string value in filter state with Connection life span.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param key is the key string owned by the module.
+ * @param value is the value string owned by the module.
+ * @return true if the operation was successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_filter_state(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_filter_state is called by the module to
+ * get a string value from filter state.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param key is the key string owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the value was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_filter_state(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_filter_state_typed is called by the module to
+ * set the typed filter state with the given key and Connection life span. Unlike
+ * envoy_dynamic_module_callback_listener_filter_set_filter_state which stores a raw
+ * ``Router::StringAccessor``, this uses the registered ``ObjectFactory`` for the key to create a
+ * properly typed filter state object via ``createFromBytes``, so a built-in Envoy filter that reads
+ * the key as a typed object can consume it.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param key is the key string owned by the module. This must match a registered ObjectFactory
+ * name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation was successful, false if the filter state is not accessible, no
+ * ObjectFactory is registered for the key, or the factory fails to create the object.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_filter_state_typed is called by the module to
+ * get the serialized value of a typed filter state object with the given key. The object must
+ * support ``serializeAsString()`` on the Envoy side.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param key is the key string owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored. The buffer
+ * is valid until the next call into the module on the same filter.
+ * @return true if the value was found and serialized, false if the key does not exist, the object
+ * does not support serialization, or the filter state is not accessible.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+// ------------------------- Stream Info Operations -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason is called
+ * by the module to set the downstream transport failure reason for logging and debugging.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param reason is the reason string owned by the module.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer reason);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms is called by the
+ * module to obtain the connection start time in milliseconds since Unix epoch.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the start time in milliseconds since Unix epoch.
+ */
+uint64_t envoy_dynamic_module_callback_listener_filter_get_connection_start_time_ms(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string is called by the
+ * module to retrieve a string-typed dynamic metadata value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param key is the key of the metadata field.
+ * @param value_out is the pointer to write the retrieved value. If the metadata is not found or is
+ * not a string type, value_out->ptr will be set to nullptr and value_out->length will be 0.
+ * @return true if the metadata was found and is a string type, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in value_out is owned by Envoy, and it is
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string is called by the
+ * module to set a string-typed dynamic metadata value. If the metadata is existing, it will be
+ * overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param key is the key of the metadata field.
+ * @param value is the string value to set.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number is called by the
+ * module to retrieve a number-typed dynamic metadata value.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param key is the key of the metadata field.
+ * @param result is the output pointer to the number value of the dynamic metadata.
+ * @return true if the metadata was found and is a number type, false otherwise.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number is called by the
+ * module to set a number-typed dynamic metadata value. If the metadata is existing, it will be
+ * overwritten.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param key is the key of the metadata field.
+ * @param value is the number value to set.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer key, double value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch is called by the
+ * module to set multiple string-valued dynamic metadata entries under a single namespace in one
+ * call. It is equivalent to calling
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string once per entry but
+ * resolves the namespace and merges into the metadata struct only once. Existing entries with the
+ * same key are overwritten. Within a single call, a later entry overwrites an earlier entry with
+ * the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ */
+void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_max_read_bytes is called by the
+ * module to determine the maximum number of bytes to read from the socket.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @return the maximum number of bytes to read.
+ */
+size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+// ------------------------ Listener Filter Callbacks - Metrics -------------------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_define_counter is called by the module
+ * during initialization to create a new Stats::Counter with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_listener_filter_increment_counter together with
+ * filter_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_define_counter(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_increment_counter(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_define_gauge is called by the module during
+ * initialization to create a new Stats::Gauge with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_define_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_gauge is called by the module to set the value
+ * of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_listener_filter_set_gauge(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_increment_gauge is called by the module to increase
+ * the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_increment_gauge(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_decrement_gauge is called by the module to decrease
+ * the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_decrement_gauge(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_define_histogram is called by the module
+ * during initialization to create a new Stats::Histogram with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_define_histogram(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_record_histogram_value is called by the module to
+ * record a value in a previously defined histogram.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_record_histogram_value(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_increment_counter is called by the module to
+ * increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_listener_filter_increment_counter, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * counter.
+ * @param id is the ID of the counter previously defined using config_envoy_ptr.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_counter(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_listener_filter_increment_gauge, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_increment_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_listener_filter_decrement_gauge, this does not require a
+ * per-connection filter and can be called outside of the connection lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_listener_filter_set_gauge, this does not require a per-connection
+ * filter and can be called outside of the connection lifecycle, e.g. from a scheduled background
+ * task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_set_gauge(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram from the filter config context.
+ * Unlike envoy_dynamic_module_callback_listener_filter_record_histogram_value, this does not
+ * require a per-connection filter and can be called outside of the connection lifecycle, e.g. from
+ * a scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig that defined the
+ * histogram.
+ * @param id is the ID of the histogram previously defined using config_envoy_ptr.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_listener_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+// ---------------------- Listener Filter Callbacks - HTTP Callout ---------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_http_callout is called by the module to initiate an
+ * HTTP callout. The callout is initiated by the listener filter and the response is received in
+ * envoy_dynamic_module_on_listener_filter_http_callout_done.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same filter.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout
+ * initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_listener_filter_http_callout(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
+
+// ---------------------- Listener filter scheduler callbacks -----------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_scheduler_new is called by the module to create a
+ * new listener filter scheduler. The scheduler is used to dispatch listener filter operations from
+ * any thread including the ones managed by the module.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @return envoy_dynamic_module_type_listener_filter_scheduler_module_ptr is the pointer to the
+ * created listener filter scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_listener_filter_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_listener_filter_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_listener_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_listener_filter_scheduler_new(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_scheduler_commit is called by the module to
+ * schedule a generic event to the listener filter on the worker thread it is running on.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_listener_filter_scheduled
+ * event hook on the worker thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+ * module must join or quiesce any thread that may call this before worker shutdown so a scheduled
+ * event cannot race the worker dispatcher teardown.
+ *
+ * @param scheduler_module_ptr is the pointer to the listener filter scheduler created by
+ * envoy_dynamic_module_callback_listener_filter_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_listener_filter_scheduler_commit(
+    envoy_dynamic_module_type_listener_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_scheduler_delete is called by the module to delete
+ * the listener filter scheduler created by
+ * envoy_dynamic_module_callback_listener_filter_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the listener filter scheduler created by
+ * envoy_dynamic_module_callback_listener_filter_scheduler_new.
+ */
+void envoy_dynamic_module_callback_listener_filter_scheduler_delete(
+    envoy_dynamic_module_type_listener_filter_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_scheduler_new is called by the module to
+ * create a new listener filter configuration scheduler. The scheduler is used to dispatch listener
+ * filter configuration operations to the main thread from any thread including the ones managed by
+ * the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleListenerFilterConfig object.
+ * @return envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr is the pointer to
+ * the created listener filter configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_listener_filter_config_scheduler_delete when it is no longer
+ * needed. See the comment on envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr
+envoy_dynamic_module_callback_listener_filter_config_scheduler_new(
+    envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_scheduler_delete is called by the module to
+ * delete the listener filter configuration scheduler created by
+ * envoy_dynamic_module_callback_listener_filter_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the listener filter configuration scheduler
+ * created by envoy_dynamic_module_callback_listener_filter_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_listener_filter_config_scheduler_delete(
+    envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_config_scheduler_commit is called by the module to
+ * schedule a generic event to the listener filter configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_listener_filter_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the listener filter configuration scheduler
+ * created by envoy_dynamic_module_callback_listener_filter_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(
+    envoy_dynamic_module_type_listener_filter_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+// --------------------- Listener Filter Callbacks - Misc ---------------
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_worker_index is called by the module to get the
+ * worker index assigned to the current listener filter. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @return the worker index assigned to the current listener filter.
+ */
+uint32_t envoy_dynamic_module_callback_listener_filter_get_worker_index(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_string is called by the module to get
+ * the string attribute value. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_string(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_int is called by the module to get
+ * an integer attribute value. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_int(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_get_attribute_bool is called by the module to get
+ * a boolean attribute value. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
+ * corresponding listener filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the bool value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_listener_filter_get_attribute_bool(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+// =============================================================================
+// ========================== UDP Listener Filter ==============================
+// =============================================================================
+
+// =============================================================================
+// UDP Listener Filter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleUdpListenerFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_config_module_ptr is a pointer to an in-module UDP
+ * listener filter configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_udp_listener_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_envoy_ptr is a raw pointer to the
+ * DynamicModuleUdpListenerFilter class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_udp_listener_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_udp_listener_filter_module_ptr is a pointer to an in-module UDP
+ * listener filter.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_udp_listener_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_udp_listener_filter_status represents the status of the UDP
+ * listener filter execution.
+ */
+typedef enum envoy_dynamic_module_type_on_udp_listener_filter_status {
+  envoy_dynamic_module_type_on_udp_listener_filter_status_Continue,
+  envoy_dynamic_module_type_on_udp_listener_filter_status_StopIteration,
+} envoy_dynamic_module_type_on_udp_listener_filter_status;
+
+// =============================================================================
+// UDP Listener Filter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_config_new is called when a new UDP listener filter
+ * configuration is created.
+ */
+envoy_dynamic_module_type_udp_listener_filter_config_module_ptr
+envoy_dynamic_module_on_udp_listener_filter_config_new(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_config_destroy is called when the UDP listener filter
+ * configuration is destroyed.
+ */
+void envoy_dynamic_module_on_udp_listener_filter_config_destroy(
+    envoy_dynamic_module_type_udp_listener_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_new is called when a new UDP listener filter is
+ * created.
+ */
+envoy_dynamic_module_type_udp_listener_filter_module_ptr
+envoy_dynamic_module_on_udp_listener_filter_new(
+    envoy_dynamic_module_type_udp_listener_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_on_data is called when a UDP packet is received.
+ */
+envoy_dynamic_module_type_on_udp_listener_filter_status
+envoy_dynamic_module_on_udp_listener_filter_on_data(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_udp_listener_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_udp_listener_filter_destroy is called when the UDP listener filter is
+ * destroyed.
+ */
+void envoy_dynamic_module_on_udp_listener_filter_destroy(
+    envoy_dynamic_module_type_udp_listener_filter_module_ptr filter_module_ptr);
+
+// =============================================================================
+// UDP Listener Filter Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size is called by the
+ * module to get the number of chunks in the current datagram data. Combined with
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks, this can be used to
+ * iterate over all chunks in the datagram. This is only valid during the
+ * envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object.
+ * @return the number of chunks in the datagram data.
+ */
+size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks is called by the
+ * module to get the current datagram data as chunks. The module must ensure the provided buffer
+ * array has enough capacity to store all chunks, which can be obtained via
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size. This is only
+ * valid during the envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object.
+ * @param chunks_out is the output pointer to the array of buffer chunks owned by Envoy.
+ * @return true if the datagram data is available and chunks_out is populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* chunks_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size is called by the module
+ * to get the total length in bytes of the current datagram data. This is only valid during the
+ * envoy_dynamic_module_on_udp_listener_filter_on_data callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object.
+ * @return the total length in bytes of the datagram data.
+ */
+size_t envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data is called by the module to
+ * set the current datagram data.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_set_datagram_data(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_peer_address is called by the module to
+ * get the peer address.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_peer_address(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_local_address is called by the module to
+ * get the local address.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_get_local_address(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_send_datagram is called by the module to
+ * send a datagram.
+ *
+ * @return true if the datagram was sent, false otherwise.
+ */
+bool envoy_dynamic_module_callback_udp_listener_filter_send_datagram(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data,
+    envoy_dynamic_module_type_module_buffer peer_address, uint32_t peer_port);
+
+// --------------------- UDP Listener Filter Callbacks - Metrics ---------------
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_define_counter is called by the module
+ * during initialization to create a new Stats::Counter with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_udp_listener_filter_increment_counter together
+ * with filter_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_define_counter(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_increment_counter(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge is called by the module
+ * during initialization to create a new Stats::Gauge with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_define_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_set_gauge is called by the module to set the
+ * value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_set_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_increment_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_decrement_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram is called by the
+ * module during initialization to create a new Stats::Histogram with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_define_histogram(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value is called by the module
+ * to record a value in a previously defined histogram.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter is called by the
+ * module to increment a previously defined counter from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_listener_filter_increment_counter, this does not require a
+ * per-datagram filter and can be called outside of the datagram processing lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the counter.
+ * @param id is the ID of the counter previously defined using config_envoy_ptr.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_increment_counter(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge is called by the module
+ * to increase the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_listener_filter_increment_gauge, this does not require a
+ * per-datagram filter and can be called outside of the datagram processing lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_increment_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge is called by the module
+ * to decrease the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_listener_filter_decrement_gauge, this does not require a
+ * per-datagram filter and can be called outside of the datagram processing lifecycle, e.g. from a
+ * scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_decrement_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge is called by the module to set
+ * the value of a previously defined gauge from the filter config context. Unlike
+ * envoy_dynamic_module_callback_udp_listener_filter_set_gauge, this does not require a per-datagram
+ * filter and can be called outside of the datagram processing lifecycle, e.g. from a scheduled
+ * background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the gauge.
+ * @param id is the ID of the gauge previously defined using config_envoy_ptr.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_set_gauge(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram from the filter config context.
+ * Unlike envoy_dynamic_module_callback_udp_listener_filter_record_histogram_value, this does not
+ * require a per-datagram filter and can be called outside of the datagram processing lifecycle,
+ * e.g. from a scheduled background task.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilterConfig that defined
+ * the histogram.
+ * @param id is the ID of the histogram previously defined using config_envoy_ptr.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_udp_listener_filter_config_record_histogram_value(
+    envoy_dynamic_module_type_udp_listener_filter_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+// --------------------- UDP Listener Filter Callbacks - Misc ---------------
+
+/**
+ * envoy_dynamic_module_callback_udp_listener_filter_get_worker_index is called by the module to get
+ * the worker index assigned to the current UDP listener filter. This can be used by the module to
+ * manage worker-specific resources or perform worker-specific logic.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleUdpListenerFilter object of the
+ * corresponding UDP listener filter.
+ * @return the worker index assigned to the current UDP listener filter.
+ */
+uint32_t envoy_dynamic_module_callback_udp_listener_filter_get_worker_index(
+    envoy_dynamic_module_type_udp_listener_filter_envoy_ptr filter_envoy_ptr);
+
+// =============================================================================
+// ============================== Access Logger ================================
+// =============================================================================
+
+// =============================================================================
+// Access Logger Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_access_logger_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleAccessLogConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_access_logger_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_access_logger_config_module_ptr is a pointer to an in-module access
+ * logger configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_access_logger_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_access_logger_envoy_ptr is a raw pointer to the
+ * DynamicModuleAccessLog class in Envoy. This represents a single log event context.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the log event callback.
+ */
+typedef void* envoy_dynamic_module_type_access_logger_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_access_logger_module_ptr is a pointer to an in-module access logger
+ * instance. This can be per-thread or global depending on module implementation.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_access_logger_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_access_log_type represents the type of access log event.
+ * This corresponds to envoy::data::accesslog::v3::AccessLogType.
+ */
+typedef enum envoy_dynamic_module_type_access_log_type {
+  envoy_dynamic_module_type_access_log_type_NotSet = 0,
+  envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected = 1,
+  envoy_dynamic_module_type_access_log_type_TcpPeriodic = 2,
+  envoy_dynamic_module_type_access_log_type_TcpConnectionEnd = 3,
+  envoy_dynamic_module_type_access_log_type_DownstreamStart = 4,
+  envoy_dynamic_module_type_access_log_type_DownstreamPeriodic = 5,
+  envoy_dynamic_module_type_access_log_type_DownstreamEnd = 6,
+  envoy_dynamic_module_type_access_log_type_UpstreamPoolReady = 7,
+  envoy_dynamic_module_type_access_log_type_UpstreamPeriodic = 8,
+  envoy_dynamic_module_type_access_log_type_UpstreamEnd = 9,
+  envoy_dynamic_module_type_access_log_type_DownstreamTunnelSuccessfullyEstablished = 10,
+  envoy_dynamic_module_type_access_log_type_UdpTunnelUpstreamConnected = 11,
+  envoy_dynamic_module_type_access_log_type_UdpPeriodic = 12,
+  envoy_dynamic_module_type_access_log_type_UdpSessionEnd = 13,
+} envoy_dynamic_module_type_access_log_type;
+
+/**
+ * envoy_dynamic_module_type_response_flag represents a response flag from StreamInfo.
+ * Values correspond to CoreResponseFlag enum.
+ */
+typedef enum envoy_dynamic_module_type_response_flag {
+  envoy_dynamic_module_type_response_flag_FailedLocalHealthCheck = 0,
+  envoy_dynamic_module_type_response_flag_NoHealthyUpstream = 1,
+  envoy_dynamic_module_type_response_flag_UpstreamRequestTimeout = 2,
+  envoy_dynamic_module_type_response_flag_LocalReset = 3,
+  envoy_dynamic_module_type_response_flag_UpstreamRemoteReset = 4,
+  envoy_dynamic_module_type_response_flag_UpstreamConnectionFailure = 5,
+  envoy_dynamic_module_type_response_flag_UpstreamConnectionTermination = 6,
+  envoy_dynamic_module_type_response_flag_UpstreamOverflow = 7,
+  envoy_dynamic_module_type_response_flag_NoRouteFound = 8,
+  envoy_dynamic_module_type_response_flag_DelayInjected = 9,
+  envoy_dynamic_module_type_response_flag_FaultInjected = 10,
+  envoy_dynamic_module_type_response_flag_RateLimited = 11,
+  envoy_dynamic_module_type_response_flag_UnauthorizedExternalService = 12,
+  envoy_dynamic_module_type_response_flag_RateLimitServiceError = 13,
+  envoy_dynamic_module_type_response_flag_DownstreamConnectionTermination = 14,
+  envoy_dynamic_module_type_response_flag_UpstreamRetryLimitExceeded = 15,
+  envoy_dynamic_module_type_response_flag_StreamIdleTimeout = 16,
+  envoy_dynamic_module_type_response_flag_InvalidEnvoyRequestHeaders = 17,
+  envoy_dynamic_module_type_response_flag_DownstreamProtocolError = 18,
+  envoy_dynamic_module_type_response_flag_UpstreamMaxStreamDurationReached = 19,
+  envoy_dynamic_module_type_response_flag_ResponseFromCacheFilter = 20,
+  envoy_dynamic_module_type_response_flag_NoFilterConfigFound = 21,
+  envoy_dynamic_module_type_response_flag_DurationTimeout = 22,
+  envoy_dynamic_module_type_response_flag_UpstreamProtocolError = 23,
+  envoy_dynamic_module_type_response_flag_NoClusterFound = 24,
+  envoy_dynamic_module_type_response_flag_OverloadManager = 25,
+  envoy_dynamic_module_type_response_flag_DnsResolutionFailed = 26,
+  envoy_dynamic_module_type_response_flag_DropOverLoad = 27,
+  envoy_dynamic_module_type_response_flag_DownstreamRemoteReset = 28,
+  envoy_dynamic_module_type_response_flag_UnconditionalDropOverload = 29,
+} envoy_dynamic_module_type_response_flag;
+
+/**
+ * envoy_dynamic_module_type_bytes_info contains byte count information.
+ */
+typedef struct envoy_dynamic_module_type_bytes_info {
+  uint64_t bytes_received;      // Total bytes received from downstream.
+  uint64_t bytes_sent;          // Total bytes sent to downstream.
+  uint64_t wire_bytes_received; // Wire bytes received from upstream.
+  uint64_t wire_bytes_sent;     // Wire bytes sent to upstream.
+} envoy_dynamic_module_type_bytes_info;
+
+/**
+ * envoy_dynamic_module_type_downstream_wire_bytes contains cumulative wire byte counts from the
+ * stream's downstream bytes meter.
+ */
+typedef struct envoy_dynamic_module_type_downstream_wire_bytes {
+  uint64_t bytes_received; // Wire bytes received from downstream.
+  uint64_t bytes_sent;     // Wire bytes sent to downstream.
+} envoy_dynamic_module_type_downstream_wire_bytes;
+
+// =============================================================================
+// Access Logger Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_access_logger_config_new is called when a new access logger
+ * configuration is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig object.
+ * @param name is the logger name.
+ * @param config is the configuration for the logger.
+ * @return a pointer to the in-module access logger configuration. Returning nullptr
+ *         indicates a failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_access_logger_config_module_ptr
+envoy_dynamic_module_on_access_logger_config_new(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_access_logger_config_destroy is called when the access logger
+ * configuration is destroyed.
+ *
+ * @param config_module_ptr is a pointer to the in-module access logger configuration.
+ */
+void envoy_dynamic_module_on_access_logger_config_destroy(
+    envoy_dynamic_module_type_access_logger_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_access_logger_new is called to create a new logger instance.
+ * This may be called on any thread (typically per-worker thread for thread-local loggers).
+ *
+ * The module can choose to:
+ * - Return a new instance per call (thread-local pattern, recommended for batching)
+ * - Return the config_module_ptr itself if no per-instance state is needed
+ * - Return a shared instance if the module handles thread safety internally
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration.
+ * @param logger_envoy_ptr is the pointer to the ThreadLocalLogger object. This can be used
+ *        by the module to store a reference for later use in callbacks.
+ * @return a pointer to the in-module logger instance. Returning nullptr will cause
+ *         log events to be silently dropped.
+ */
+envoy_dynamic_module_type_access_logger_module_ptr envoy_dynamic_module_on_access_logger_new(
+    envoy_dynamic_module_type_access_logger_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_access_logger_log is called when a log event occurs.
+ * This is the main logging callback where the module should process the log entry.
+ *
+ * The logger_envoy_ptr is only valid during this callback. The module must not store
+ * this pointer or use it after the callback returns.
+ *
+ * @param logger_envoy_ptr is the pointer to the Envoy log context (valid during this call only).
+ * @param logger_module_ptr is the pointer to the in-module logger instance.
+ * @param log_type is the type of access log event.
+ */
+void envoy_dynamic_module_on_access_logger_log(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr,
+    envoy_dynamic_module_type_access_log_type log_type);
+
+/**
+ * envoy_dynamic_module_on_access_logger_destroy is called when the logger instance
+ * is destroyed.
+ *
+ * @param logger_module_ptr is the pointer to the in-module logger instance.
+ */
+void envoy_dynamic_module_on_access_logger_destroy(
+    envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_access_logger_flush is called before the logger is destroyed
+ * to give the module an opportunity to flush any buffered logs.
+ *
+ * This is called during shutdown when the ThreadLocalLogger is being destroyed.
+ * Modules that buffer log entries should implement this to ensure no logs are lost.
+ *
+ * This is optional. If not implemented by the module, Envoy will skip calling it.
+ *
+ * @param logger_module_ptr is the pointer to the in-module logger instance.
+ */
+void envoy_dynamic_module_on_access_logger_flush(
+    envoy_dynamic_module_type_access_logger_module_ptr logger_module_ptr);
+
+// =============================================================================
+// Access Logger Callbacks
+// =============================================================================
+
+// ---------------------- Access Logger Callbacks - Headers --------------------
+
+/**
+ * Get the number of headers in the specified header map.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @return the number of headers, or 0 if the header map is not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_headers_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type);
+
+/**
+ * Get all headers from the specified header map.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param result_headers is the output array (must be pre-allocated with correct size).
+ * @return true if successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_headers(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * Get a specific header value by key.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param key is the header key to look up.
+ * @param result is the output buffer for the header value.
+ * @param index is the index for multi-value headers (0 for first value).
+ * @param total_count_out is optional output for total number of values with this key.
+ * @return true if the header exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_header_value(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+// ------------------ Access Logger Callbacks - Stream Info Basic --------------
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_int with
+ * envoy_dynamic_module_type_attribute_id_ResponseCode instead.
+ *
+ * Get the HTTP response code.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the HTTP response code, or 0 if not available.
+ */
+uint32_t envoy_dynamic_module_callback_access_logger_get_response_code(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ResponseCodeDetails instead.
+ *
+ * Get the response code details string.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if details are available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_response_code_details(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Check if a specific response flag is set.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param flag is the response flag to check.
+ * @return true if the flag is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_has_response_flag(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_response_flag flag);
+
+/**
+ * Get all response flags as a bitmask.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return bitmask of response flags, or 0 if none are set.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_flags(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_RequestProtocol instead.
+ *
+ * Get the protocol (HTTP/1.0, HTTP/1.1, HTTP/2, HTTP/3).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer for the protocol string.
+ * @return true if protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_protocol(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_timing_info_v2 for the extended
+ * timing snapshot.
+ *
+ * Get timing information from StreamInfo.
+ *
+ * This always populates the output struct. Individual fields are set to -1 if unavailable.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param timing_out is the output parameter for timing info.
+ */
+void envoy_dynamic_module_callback_access_logger_get_timing_info(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_timing_info* timing_out);
+
+/**
+ * Get the extended timing snapshot from StreamInfo.
+ *
+ * This always populates the output struct. Each has_* field reports whether its numeric value is
+ * available.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param timing_out is the output parameter for timing info.
+ */
+void envoy_dynamic_module_callback_access_logger_get_timing_info_v2(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_timing_info_v2* timing_out);
+
+/**
+ * Get byte count information from StreamInfo.
+ *
+ * This always populates the output struct. Individual fields are set to 0 if unavailable.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param bytes_out is the output parameter for byte counts.
+ */
+void envoy_dynamic_module_callback_access_logger_get_bytes_info(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_bytes_info* bytes_out);
+
+/**
+ * Get cumulative downstream wire byte counts from StreamInfo's downstream bytes meter.
+ *
+ * These correspond to DOWNSTREAM_WIRE_BYTES_RECEIVED and DOWNSTREAM_WIRE_BYTES_SENT in access logs.
+ * For HTTP streams, they include protocol overhead accounted for by the codec, not just body bytes.
+ * They can be nonzero for locally generated responses with no upstream connection.
+ * This always populates the output struct. Both fields are set to 0 if the meter is unavailable.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param bytes_out is the output parameter for downstream wire byte counts.
+ */
+void envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_downstream_wire_bytes* bytes_out);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_bool with
+ * envoy_dynamic_module_type_attribute_id_HealthCheck instead.
+ *
+ * Check if this is a health check request.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if this is a health check, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_is_health_check(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_XdsRouteName instead.
+ *
+ * Get the route name.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if route name is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_route_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName instead.
+ *
+ * Get the virtual cluster name.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if virtual cluster name is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_int with
+ * envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount instead.
+ *
+ * Get the upstream request attempt count.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the attempt count, or 0 if not available.
+ */
+uint32_t envoy_dynamic_module_callback_access_logger_get_attempt_count(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails instead.
+ *
+ * Get the connection termination details.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if termination details are available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_connection_termination_details(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// -----------------Access Logger Callbacks - Address Information---------------
+
+/**
+ * Get the downstream remote address (client).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_remote_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the downstream local address (Envoy listener).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the downstream direct remote address (physical peer address before XFF processing).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_direct_remote_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the downstream direct local address (physical listener address).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_direct_local_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the upstream remote address (backend).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_remote_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * Get the upstream local address (Envoy outbound).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param address_out is the output buffer for the IP address string.
+ * @param port_out is the output parameter for the port.
+ * @return true if address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_address(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+// ------------------- Access Logger Callbacks - Upstream Info -----------------
+
+/**
+ * Get the upstream cluster name.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if cluster name is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_cluster(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream host address (selected endpoint).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if host address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_host(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamTransportFailureReason instead.
+ *
+ * Get the upstream transport failure reason.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if failure reason is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_transport_failure_reason(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream connection ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the upstream connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_upstream_connection_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the upstream TLS cipher suite. The buffer uses thread-local storage and is valid until the
+ * next call to this function or `get_downstream_tls_cipher` on the same thread.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if cipher suite is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_cipher(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream TLS session ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if session ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_session_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamTlsVersion instead.
+ *
+ * Get the upstream TLS version (e.g., "TLSv1.2", "TLSv1.3").
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if TLS version is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_tls_version(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamSubjectPeerCertificate instead.
+ *
+ * Get the upstream peer certificate subject.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream peer certificate issuer.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if issuer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_issuer(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamSubjectLocalCertificate instead.
+ *
+ * Get the upstream local certificate subject (Envoy's own certificate for the upstream connection).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest instead.
+ *
+ * Get the upstream peer certificate SHA256 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_digest(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream peer certificate validity start time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notBefore field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_start(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the upstream peer certificate validity end time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notAfter field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_cert_v_end(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the count of URI Subject Alternative Names from the upstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the upstream peer certificate. The module should
+ * first call get_upstream_peer_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of URI Subject Alternative Names from the upstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the upstream local certificate. The module should
+ * first call get_upstream_local_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the upstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the upstream peer certificate. The module should
+ * first call get_upstream_peer_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_peer_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the upstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the upstream local certificate. The module should
+ * first call get_upstream_local_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_local_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+// ------------------ Access Logger Callbacks - Connection/TLS Info ------------
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_int with
+ * envoy_dynamic_module_type_attribute_id_ConnectionId instead.
+ *
+ * Get the connection ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the connection ID, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_connection_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_bool with
+ * envoy_dynamic_module_type_attribute_id_ConnectionMtls instead.
+ *
+ * Check if mTLS was used.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if mTLS was used, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_is_mtls(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName instead.
+ *
+ * Get the requested server name (SNI).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if SNI is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_requested_server_name(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion instead.
+ *
+ * Get the downstream TLS version.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if TLS version is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate instead.
+ *
+ * Get the downstream peer certificate subject.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest instead.
+ *
+ * Get the downstream peer certificate SHA256 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream TLS cipher suite. The buffer uses thread-local storage and is valid until the
+ * next call to this function or `get_upstream_tls_cipher` on the same thread.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if cipher suite is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_cipher(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream TLS session ID.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if session ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_tls_session_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream peer certificate issuer.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if issuer is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_issuer(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream peer certificate serial number.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if serial number is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_serial(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream peer certificate SHA1 fingerprint.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if fingerprint is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_fingerprint_1(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate instead.
+ *
+ * Get the downstream local certificate subject (Envoy's own certificate).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if subject is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_subject(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Check if the downstream peer certificate was presented.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if a peer certificate was presented, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_presented(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Check if the downstream peer certificate was validated.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if the peer certificate was validated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_validated(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the downstream peer certificate validity start time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notBefore field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_start(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the downstream peer certificate validity end time.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return epoch seconds of the certificate's notAfter field, or 0 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_v_end(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the count of URI Subject Alternative Names from the downstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the downstream peer certificate. The module should
+ * first call get_downstream_peer_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of URI Subject Alternative Names from the downstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of URI SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the URI Subject Alternative Names from the downstream local certificate. The module should
+ * first call get_downstream_local_uri_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_uri_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the downstream peer certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the downstream peer certificate. The module should
+ * first call get_downstream_peer_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_peer_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+/**
+ * Get the count of DNS Subject Alternative Names from the downstream local certificate.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the count of DNS SANs, or 0 if not available.
+ */
+size_t envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san_size(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the DNS Subject Alternative Names from the downstream local certificate. The module should
+ * first call get_downstream_local_dns_san_size to get the count and allocate the array.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param sans_out is a pre-allocated array where Envoy will populate the SANs.
+ * @return true if the SANs were populated successfully, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_local_dns_san(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* sans_out);
+
+// ---------------- Access Logger Callbacks - Metadata and Dynamic State -------
+
+/**
+ * Get a value from dynamic metadata by filter name and key path.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the string value. Only string-typed metadata is returned.
+ * @return true if a string value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get a number value from dynamic metadata by filter name and key path.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the number value. Only number-typed metadata is returned.
+ * @return true if a number value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * Get a bool value from dynamic metadata by filter name and key path.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the bool value. Only bool-typed metadata is returned.
+ * @return true if a bool value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
+ * Get a value from filter state by key.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param key is the filter state key.
+ * @param result is the output buffer (serialized representation).
+ * @return true if value exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_filter_state(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_RequestId instead.
+ *
+ * Get the request ID (x-request-id header value or generated).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if request ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_request_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the local reply body (if this was a local response).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if local reply body exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_local_reply_body(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// ------------------- Access Logger Callbacks - Tracing -----------------------
+
+/**
+ * Get the trace ID from the active span.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if trace ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_trace_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the span ID from the active span.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer.
+ * @return true if span ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_span_id(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Check if the request was sampled for tracing.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return true if sampled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_is_trace_sampled(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Additional Stream Info
+// -----------------------------------------------------------------------------
+
+/**
+ * Get the `JA3` fingerprint hash from the downstream connection.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the `JA3` hash string owned by Envoy will be stored.
+ * @return true if the `JA3` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_ja3_hash(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the `JA4` fingerprint hash from the downstream connection.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the `JA4` hash string owned by Envoy will be stored.
+ * @return true if the `JA4` hash is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_ja4_hash(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * @deprecated Use envoy_dynamic_module_callback_access_logger_get_attribute_string with
+ * envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason instead.
+ *
+ * Get the downstream transport failure reason.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the failure reason string will be stored.
+ * @return true if the failure reason is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_downstream_transport_failure_reason(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the byte size of request headers (uncompressed).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the byte size of request headers, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_request_headers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the byte size of response headers (uncompressed).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the byte size of response headers, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_headers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the byte size of response trailers (uncompressed).
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the byte size of response trailers, or 0 if not available.
+ */
+uint64_t envoy_dynamic_module_callback_access_logger_get_response_trailers_bytes(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+/**
+ * Get the upstream protocol (e.g., "HTTP/1.1", "HTTP/2").
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param result is the output buffer where the protocol string will be stored.
+ * @return true if the upstream protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_upstream_protocol(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the upstream connection pool ready duration in nanoseconds.
+ * This is the time from when the upstream request was created to when the connection pool
+ * became ready.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @return the duration in nanoseconds, or -1 if not available.
+ */
+int64_t envoy_dynamic_module_callback_access_logger_get_upstream_pool_ready_duration_ns(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Generic Attribute Accessors
+// -----------------------------------------------------------------------------
+// These callbacks provide a generic attribute-based interface for accessing
+// stream info data, following the same pattern as the HTTP filter attribute
+// accessors. They use the same envoy_dynamic_module_type_attribute_id enum.
+
+/**
+ * envoy_dynamic_module_callback_access_logger_get_attribute_string is called by the module to get
+ * a string attribute value from the access log context. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the buffer where the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_attribute_string(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_get_attribute_int is called by the module to get
+ * an integer attribute value from the access log context. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_attribute_int(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_get_attribute_bool is called by the module to get
+ * a boolean attribute value from the access log context. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param logger_envoy_ptr is the pointer to the log context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+    envoy_dynamic_module_type_access_logger_envoy_ptr logger_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+// -----------------------------------------------------------------------------
+// Access Logger Callbacks - Metrics
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_callback_access_logger_config_define_counter is called by the module during
+ * initialization to create a new Stats::Counter with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_access_logger_increment_counter together with
+ * config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_config_define_counter(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig.
+ * @param id is the ID of the counter previously defined using this config.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_increment_counter(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_config_define_gauge is called by the module during
+ * initialization to create a new Stats::Gauge with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_config_define_gauge(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_set_gauge is called by the module to set the value
+ * of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig.
+ * @param id is the ID of the gauge previously defined using this config.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_access_logger_set_gauge(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_increment_gauge is called by the module to increase
+ * the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig.
+ * @param id is the ID of the gauge previously defined using this config.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_increment_gauge(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_decrement_gauge is called by the module to decrease
+ * the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig.
+ * @param id is the ID of the gauge previously defined using this config.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_decrement_gauge(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_config_define_histogram is called by the module
+ * during initialization to create a new Stats::Histogram with the given name.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_config_define_histogram(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_access_logger_record_histogram_value is called by the module to
+ * record a value in a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleAccessLogConfig.
+ * @param id is the ID of the histogram previously defined using this config.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_access_logger_record_histogram_value(
+    envoy_dynamic_module_type_access_logger_config_envoy_ptr config_envoy_ptr, size_t id,
+    uint64_t value);
+
+// --------------------- Access Logger Callbacks - Misc ---------------
+
+/**
+ * envoy_dynamic_module_callback_access_logger_get_worker_index is called by the module to get the
+ * worker index assigned to the current access logger. This can be used by the module to manage
+ * worker-specific resources or perform worker-specific logic.
+ * @param access_logger_envoy_ptr is the pointer to the DynamicModuleAccessLogger object of the
+ * corresponding access logger.
+ * @return the worker index assigned to the current access logger. For the main thread the index
+ * will be equal to envoy_dynamic_module_callback_get_concurrency result.
+ */
+uint32_t envoy_dynamic_module_callback_access_logger_get_worker_index(
+    envoy_dynamic_module_type_access_logger_envoy_ptr access_logger_envoy_ptr);
+
+// =============================================================================
+// ================================ Formatter ==================================
+// =============================================================================
+
+// =============================================================================
+// Formatter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_formatter_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleFormatterConfig class in Envoy. This is passed to the module when creating a new
+ * in-module command parser configuration and may be used to access the formatter
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_formatter_config_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_formatter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_formatter_config_module_ptr is a pointer to an in-module command parser
+ * configuration created by envoy_dynamic_module_on_formatter_config_new. A single configuration may
+ * be shared by the command parser and all formatter providers it produces.
+ *
+ * This has 1:1 correspondence with the DynamicModuleFormatterConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_formatter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_formatter_provider_module_ptr is a pointer to an in-module formatter
+ * provider created by envoy_dynamic_module_on_formatter_parse. A provider produces the value for a
+ * single parsed command token.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_formatter_provider_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_formatter_context_envoy_ptr is a raw pointer to the Envoy formatting
+ * context for a single format operation. It provides access to the request and response state
+ * through the formatter callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the
+ * envoy_dynamic_module_on_formatter_format callback.
+ */
+typedef void* envoy_dynamic_module_type_formatter_context_envoy_ptr;
+
+// =============================================================================
+// Formatter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_formatter_config_new is called on the main thread when a command parser
+ * referencing this module is configured. The module should parse the configuration and return a
+ * pointer to the in-module command parser configuration.
+ *
+ * @param formatter_config_envoy_ptr is the pointer to the DynamicModuleFormatterConfig object for
+ * the corresponding config.
+ * @param name is the formatter name used to select an implementation within the module.
+ * @param config is the configuration bytes for the formatter.
+ * @return a pointer to the in-module command parser configuration. Returning nullptr indicates a
+ * failure to initialize, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_formatter_config_module_ptr envoy_dynamic_module_on_formatter_config_new(
+    envoy_dynamic_module_type_formatter_config_envoy_ptr formatter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_formatter_config_destroy is called when the command parser configuration
+ * is destroyed.
+ *
+ * @param config_module_ptr is the pointer to the in-module command parser configuration.
+ */
+void envoy_dynamic_module_on_formatter_config_destroy(
+    envoy_dynamic_module_type_formatter_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_formatter_parse is called on the main thread for each command token in an
+ * access log or header format string. The module should return a provider when it recognizes the
+ * command, or nullptr to let other parsers handle it.
+ *
+ * @param config_module_ptr is the pointer to the in-module command parser configuration.
+ * @param command is the command token, the text before the first parenthesis or colon.
+ * @param command_arg is the command argument, or an empty buffer when no argument is provided.
+ * @param has_max_length is true when a truncation length is configured. When false, max_length is
+ * unspecified and must be ignored.
+ * @param max_length is the truncation length applied to the produced value.
+ * @return a pointer to the in-module formatter provider, or nullptr if the command is not handled
+ * by this module.
+ */
+envoy_dynamic_module_type_formatter_provider_module_ptr envoy_dynamic_module_on_formatter_parse(
+    envoy_dynamic_module_type_formatter_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer command,
+    envoy_dynamic_module_type_envoy_buffer command_arg, bool has_max_length, size_t max_length);
+
+/**
+ * envoy_dynamic_module_on_formatter_provider_destroy is called when a formatter provider is
+ * destroyed.
+ *
+ * @param provider_module_ptr is the pointer to the in-module formatter provider.
+ */
+void envoy_dynamic_module_on_formatter_provider_destroy(
+    envoy_dynamic_module_type_formatter_provider_module_ptr provider_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_formatter_format is called to produce the value for a parsed command
+ * token. This may be called concurrently on multiple worker threads, so the module must treat the
+ * provider as read-only and avoid shared mutable state.
+ *
+ * @param provider_module_ptr is the pointer to the in-module formatter provider.
+ * @param formatter_context_envoy_ptr is the pointer to the Envoy formatting context, valid only
+ * during this call.
+ * @param result is filled by the module with the produced value as an
+ * envoy_dynamic_module_type_module_buffer. The buffer must remain valid until the next call into
+ * the module on the same thread. An empty buffer is a valid value when the function returns true.
+ * @return true when a value is produced, false when the value is absent. When false, Envoy
+ * substitutes the default empty value for the token.
+ */
+bool envoy_dynamic_module_on_formatter_format(
+    envoy_dynamic_module_type_formatter_provider_module_ptr provider_module_ptr,
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer* result);
+
+// =============================================================================
+// Formatter Callbacks
+// =============================================================================
+
+// -------------------------- Formatter Callbacks - Headers --------------------
+
+/**
+ * Get the number of headers in the specified header map.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @return the number of headers, or 0 if the header map is not available.
+ */
+size_t envoy_dynamic_module_callback_formatter_get_headers_size(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type);
+
+/**
+ * Get all headers from the specified header map.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param result_headers is the output array (must be pre-allocated with correct size).
+ * @return true if successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_headers(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * Get a specific header value by key.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param key is the header key to look up.
+ * @param result is the output buffer for the header value.
+ * @param index is the index for multi-value headers (0 for first value).
+ * @param total_count_out is optional output for total number of values with this key.
+ * @return true if the header exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_header_value(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+// ------------------- Formatter Callbacks - Generic Attributes ----------------
+// These callbacks share the envoy_dynamic_module_type_attribute_id enum and the access logger
+// attribute semantics, exposing the full stream info surface to formatter modules.
+
+/**
+ * envoy_dynamic_module_callback_formatter_get_attribute_string is called by the module to get a
+ * string attribute value from the formatting context. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the buffer where the string value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_attribute_string(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_formatter_get_attribute_int is called by the module to get an
+ * integer attribute value from the formatting context. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_attribute_int(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_formatter_get_attribute_bool is called by the module to get a
+ * boolean attribute value from the formatting context. If the attribute is not accessible or the
+ * value is not a boolean, this returns false.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_attribute_bool(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+// --------------- Formatter Callbacks - Metadata and Dynamic State ------------
+
+/**
+ * Get a value from dynamic metadata by filter name and key path.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace (can be nested with dots).
+ * @param result receives the string value. Only string-typed metadata is returned.
+ * @return true if a string value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_dynamic_metadata(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the local reply body (if this was a local response).
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @param result is the output buffer.
+ * @return true if local reply body exists, false otherwise.
+ */
+bool envoy_dynamic_module_callback_formatter_get_local_reply_body(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the access log type of the formatting context. This is NotSet when the formatter is not used
+ * for access logging.
+ *
+ * @param formatter_context_envoy_ptr is the pointer to the formatting context.
+ * @return the access log type of the formatting context.
+ */
+envoy_dynamic_module_type_access_log_type
+envoy_dynamic_module_callback_formatter_get_access_log_type(
+    envoy_dynamic_module_type_formatter_context_envoy_ptr formatter_context_envoy_ptr);
+
+// =============================================================================
+// =========================== Bootstrap Extension =============================
+// =============================================================================
+
+// =============================================================================
+// Bootstrap Extension Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtensionConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_config_module_ptr is a pointer to an in-module
+ * bootstrap extension configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_bootstrap_extension_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_envoy_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtension class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_module_ptr is a pointer to an in-module bootstrap
+ * extension.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_bootstrap_extension_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr is a raw pointer to
+ * the DynamicModuleBootstrapExtensionConfigScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the bootstrap extension config event is done. The creation of this pointer is
+ * done by envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new and the scheduling
+ * and destruction is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr is a raw pointer to the
+ * DynamicModuleBootstrapExtensionTimer class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when the timer is no longer needed. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new and the destruction is done by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr;
+
+/**
+ * File watcher event constants. These correspond to Envoy's Filesystem::Watcher::Events.
+ * These are bitmask values that can be OR'd together.
+ */
+typedef enum envoy_dynamic_module_type_file_watcher_event {
+  envoy_dynamic_module_type_file_watcher_event_MovedTo = 0x1,
+  envoy_dynamic_module_type_file_watcher_event_Modified = 0x2,
+} envoy_dynamic_module_type_file_watcher_event;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_active_resource_kind selects which kind of active resource
+ * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names enumerates. New kinds
+ * may be appended as new values without changing the enumeration function's signature.
+ */
+typedef enum {
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain = 0,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster = 1,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch = 2,
+  envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret = 3,
+} envoy_dynamic_module_type_bootstrap_active_resource_kind;
+
+/**
+ * The callback type invoked once per active resource name during enumeration.
+ *
+ * @param name is the name of the resource. The buffer is owned by Envoy and is valid only for the
+ * duration of this call.
+ * @param user_data is the user data passed to the enumeration function.
+ */
+typedef void (*envoy_dynamic_module_type_bootstrap_active_resource_name_fn)(
+    envoy_dynamic_module_type_envoy_buffer name, void* user_data);
+
+// =============================================================================
+// Bootstrap Extension Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_config_new is called by the main thread when the
+ * bootstrap extension config is loaded. The function returns a
+ * envoy_dynamic_module_type_bootstrap_extension_config_module_ptr for the given name and config.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object for the corresponding config.
+ * @param name is the name of the extension.
+ * @param config is the configuration for the extension.
+ * @return envoy_dynamic_module_type_bootstrap_extension_config_module_ptr is the pointer to the
+ * in-module bootstrap extension configuration. Returning nullptr indicates a failure to initialize
+ * the module. When it fails, the extension configuration will be rejected.
+ */
+envoy_dynamic_module_type_bootstrap_extension_config_module_ptr
+envoy_dynamic_module_on_bootstrap_extension_config_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_config_destroy is called when the bootstrap extension
+ * configuration is destroyed in Envoy. The module should release any resources associated with the
+ * corresponding in-module bootstrap extension configuration.
+ *
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration
+ * whose corresponding Envoy bootstrap extension configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_config_destroy(
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_new is called when a new bootstrap extension is
+ * created.
+ *
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration.
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object of the
+ * corresponding bootstrap extension.
+ * @return envoy_dynamic_module_type_bootstrap_extension_module_ptr is the pointer to the in-module
+ * bootstrap extension. Returning nullptr indicates a failure to initialize the module. When it
+ * fails, the extension will be rejected.
+ */
+envoy_dynamic_module_type_bootstrap_extension_module_ptr
+envoy_dynamic_module_on_bootstrap_extension_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized is called when the server is
+ * initialized. This is called on the main thread after the ServerFactoryContext is fully
+ * initialized.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_server_initialized(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized is called when a worker
+ * thread is initialized. This is called once per worker thread.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_drain_started is called when Envoy begins draining.
+ *
+ * This is called on the main thread before workers are stopped. The module can still make HTTP
+ * callouts and use timers during drain. This is the appropriate place to close persistent
+ * connections, stop background tasks, or de-register from service discovery.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_drain_started(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_type_event_cb is a function pointer type used for completion callbacks.
+ *
+ * When Envoy passes a completion callback to a module, the module MUST invoke it exactly once
+ * when it has finished its asynchronous work. Envoy will wait for the callback before proceeding.
+ *
+ * @param context is the opaque context pointer that was passed alongside this callback. The module
+ * must pass it back unchanged when invoking the callback.
+ */
+typedef void (*envoy_dynamic_module_type_event_cb)(void* context);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_shutdown is called when Envoy is about to exit.
+ *
+ * This is called on the main thread during the ShutdownExit lifecycle stage. The module MUST
+ * invoke the completion callback exactly once with the provided context when it has finished
+ * cleanup. Envoy will wait for the callback before terminating. This is the appropriate place to
+ * flush batched data, close connections, or signal external systems that this Envoy instance is
+ * going away.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ * @param completion_callback is the callback that must be invoked when shutdown cleanup is done.
+ * @param completion_context is the opaque context pointer to pass to the completion callback.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_shutdown(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr,
+    envoy_dynamic_module_type_event_cb completion_callback, void* completion_context);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_destroy is called when the bootstrap extension is
+ * destroyed.
+ *
+ * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_destroy(
+    envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_config_scheduled is called when the bootstrap
+ * extension configuration is scheduled to be executed on the main thread with
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit callback.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_ptr is the pointer to the in-module bootstrap extension configuration
+ * created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_timer_fired is called when a timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new fires on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param timer_ptr is the pointer to the timer that fired. The module can re-enable this timer
+ * by calling envoy_dynamic_module_callback_bootstrap_extension_timer_enable again.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_timer_fired(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_file_changed is called when a file watched by
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch changes on the main
+ * thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param path is the path that was registered via
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch that triggered the
+ * change. This is owned by the callback closure and valid only for the duration of this call.
+ * @param events is the bitmask of events that occurred (MovedTo = 0x1, Modified = 0x2).
+ */
+void envoy_dynamic_module_on_bootstrap_extension_file_changed(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer path, uint32_t events);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update is called when a cluster is
+ * added to or updated in the ClusterManager.
+ *
+ * This is only called if the module has opted in to receiving cluster lifecycle events via
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle. The callback is
+ * registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param cluster_name is the name of the cluster that was added or updated.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_removal is called when a cluster is
+ * removed from the ClusterManager.
+ *
+ * This is only called if the module has opted in to receiving cluster lifecycle events via
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle. The callback is
+ * registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param cluster_name is the name of the cluster that was removed.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update is called when a listener is
+ * added to or updated in the ListenerManager.
+ *
+ * This is only called if the module has opted in to receiving listener lifecycle events via
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle. The callback is
+ * registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param listener_name is the name of the listener that was added or updated.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer listener_name);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_listener_removal is called when a listener is
+ * removed from the ListenerManager.
+ *
+ * This is only called if the module has opted in to receiving listener lifecycle events via
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle. The callback is
+ * registered on the main thread and invoked on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param listener_name is the name of the listener that was removed.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer listener_name);
+
+// =============================================================================
+// Bootstrap Extension Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new is called by the module
+ * to create a new bootstrap extension configuration scheduler. The scheduler is used to dispatch
+ * bootstrap extension configuration operations to the main thread from any thread including the
+ * ones managed by the module.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr is the pointer
+ * to the created bootstrap extension configuration scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete when it is no longer
+ * needed. See the comment on
+ * envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete is called by the
+ * module to delete the bootstrap extension configuration scheduler created by
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the bootstrap extension configuration scheduler
+ * created by envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_delete(
+    envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit is called by the
+ * module to schedule a generic event to the bootstrap extension configuration on the main thread.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_bootstrap_extension_config_scheduled
+ * event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the bootstrap extension configuration scheduler
+ * created by envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same configuration. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
+    envoy_dynamic_module_type_bootstrap_extension_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+// -----------------------------------------------------------------------------
+// Bootstrap Extension - HTTP Client
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_http_callout_done is called when the HTTP callout
+ * response is received initiated by a bootstrap extension.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param callout_id is the ID of the callout. This is used to differentiate between multiple
+ * calls.
+ * @param result is the result of the callout.
+ * @param headers is the headers of the response.
+ * @param headers_size is the size of the headers.
+ * @param body_chunks is the body of the response.
+ * @param body_chunks_size is the size of the body.
+ *
+ * headers and body_chunks are owned by Envoy, and they are guaranteed to be valid until the end of
+ * this event hook. They may be null if the callout fails or the response is empty.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t callout_id, envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_http_callout is called by the module to
+ * initiate an HTTP callout. The callout is initiated by the bootstrap extension and the response
+ * is received in envoy_dynamic_module_on_bootstrap_extension_http_callout_done.
+ *
+ * This must be called on the main thread. To call from other threads, use the scheduler mechanism
+ * to post an event to the main thread first.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored. This can be
+ * arbitrary and is used to differentiate between multiple calls from the same extension.
+ * @param cluster_name is the name of the cluster to which the callout is sent.
+ * @param headers is the headers of the request. It must contain :method, :path and host headers.
+ * @param headers_size is the size of the headers.
+ * @param body is the body of the request.
+ * @param timeout_milliseconds is the timeout for the callout in milliseconds.
+ * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_bootstrap_extension_http_callout(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    uint64_t* callout_id_out, envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
+
+// -----------------------------------------------------------------------------
+// Bootstrap Extension - Init Manager Integration
+// -----------------------------------------------------------------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete is called by the
+ * module to signal that the bootstrap extension has completed its initialization. Envoy
+ * automatically registers an init target for every bootstrap extension, blocking traffic until
+ * the module signals readiness by calling this function.
+ *
+ * The module must call this exactly once during or after
+ * envoy_dynamic_module_on_bootstrap_extension_config_new to unblock Envoy. If the module does not
+ * require asynchronous initialization, it should call this immediately during config creation.
+ *
+ * This must be called on the main thread. To call from other threads, use the scheduler mechanism
+ * to post an event to the main thread first.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - Stats Access --------------------
+
+/**
+ * envoy_dynamic_module_type_stats_iteration_action represents the action to take after each
+ * stat is visited during iteration.
+ */
+typedef enum {
+  // Continue iterating.
+  envoy_dynamic_module_type_stats_iteration_action_Continue = 0,
+  // Stop iterating.
+  envoy_dynamic_module_type_stats_iteration_action_Stop = 1,
+} envoy_dynamic_module_type_stats_iteration_action;
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_counter_value is called by the module to
+ * get the current value of a counter by name.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the counter to find.
+ * @param value_ptr is where the value will be stored if the counter is found.
+ * @return true if the counter was found and value_ptr was populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_counter_value(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* value_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value is called by the module to
+ * get the current value of a gauge by name.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the gauge to find.
+ * @param value_ptr is where the value will be stored if the gauge is found.
+ * @return true if the gauge was found and value_ptr was populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_gauge_value(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* value_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary is called by the module
+ * to get the summary statistics of a histogram by name. This returns the cumulative statistics
+ * since the server started.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param name is the name of the histogram to find.
+ * @param sample_count_ptr is where the sample count will be stored if the histogram is found.
+ * @param sample_sum_ptr is where the sample sum will be stored if the histogram is found.
+ * @return true if the histogram was found and the output pointers were populated, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_get_histogram_summary(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, uint64_t* sample_count_ptr,
+    double* sample_sum_ptr);
+
+/**
+ * The callback type for iterating counters.
+ *
+ * @param name is the name of the counter.
+ * @param value is the current value of the counter.
+ * @param user_data is the user data passed to the iterate function.
+ * @return the action to take after visiting this counter.
+ */
+typedef envoy_dynamic_module_type_stats_iteration_action (
+    *envoy_dynamic_module_type_counter_iterator_fn)(envoy_dynamic_module_type_envoy_buffer name,
+                                                    uint64_t value, void* user_data);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_iterate_counters is called by the module to
+ * iterate over all counters in the stats store.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param iterator_fn is the callback function to call for each counter.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_counter_iterator_fn iterator_fn, void* user_data);
+
+/**
+ * The callback type for iterating gauges.
+ *
+ * @param name is the name of the gauge.
+ * @param value is the current value of the gauge.
+ * @param user_data is the user data passed to the iterate function.
+ * @return the action to take after visiting this gauge.
+ */
+typedef envoy_dynamic_module_type_stats_iteration_action (
+    *envoy_dynamic_module_type_gauge_iterator_fn)(envoy_dynamic_module_type_envoy_buffer name,
+                                                  uint64_t value, void* user_data);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges is called by the module to
+ * iterate over all gauges in the stats store.
+ *
+ * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
+ * @param iterator_fn is the callback function to call for each gauge.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+    envoy_dynamic_module_type_bootstrap_extension_envoy_ptr extension_envoy_ptr,
+    envoy_dynamic_module_type_gauge_iterator_fn iterator_fn, void* user_data);
+
+// -------------------- Bootstrap Extension Callbacks - Metrics Define/Update --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_define_counter is called by the module
+ * during initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter
+ * together with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter is called by the
+ * module to increment a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge is called by the module
+ * during initialization to create a template for generating Stats::Gauges with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge together
+ * with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge is called by the module to
+ * set the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be set.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_set_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge is called by the module
+ * to increase the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be increased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_increment_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge is called by the module
+ * to decrease the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be decreased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_decrement_gauge(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram is called by the
+ * module during initialization to create a template for generating Stats::Histograms with the given
+ * name and labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_define_histogram(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig object.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// -------------------- Bootstrap Extension Callbacks - Timer --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new is called by the module to create a
+ * new timer on the main thread dispatcher. The timer is not enabled upon creation; the module must
+ * call envoy_dynamic_module_callback_bootstrap_extension_timer_enable to arm it.
+ *
+ * When the timer fires, envoy_dynamic_module_on_bootstrap_extension_timer_fired is called on the
+ * main thread.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr is the pointer to the
+ * created timer.
+ *
+ * NOTE: it is the caller's responsibility to delete the timer using
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr
+envoy_dynamic_module_callback_bootstrap_extension_timer_new(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enable is called by the module to enable
+ * the timer with a given delay. If the timer is already enabled, it will be reset to the new delay.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ * @param delay_milliseconds is the delay in milliseconds before the timer fires.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_enable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr,
+    uint64_t delay_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_disable is called by the module to
+ * disable the timer without destroying it. The timer can be re-enabled later using
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enable.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_disable(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_enabled is called by the module to check
+ * whether the timer is currently armed.
+ *
+ * This must be called on the main thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ * @return true if the timer is currently enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_timer_enabled(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_delete is called by the module to delete
+ * a timer created by envoy_dynamic_module_callback_bootstrap_extension_timer_new. The timer is
+ * automatically disabled before deletion.
+ *
+ * This must be called on the main thread. The underlying Envoy timer `deregisters` from the
+ * main thread dispatcher's timer list in its destructor, so invoking this callback from any
+ * other thread is undefined behavior. If the module cannot guarantee main-thread deletion (for
+ * example, when the handle is owned by an async task that may complete on a worker thread), it
+ * must route deletion through the scheduler ABI so that the actual call lands on the main
+ * thread.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_bootstrap_extension_timer_new.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_timer_delete(
+    envoy_dynamic_module_type_bootstrap_extension_timer_module_ptr timer_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - File Watcher --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch is called by the module
+ * to watch a file or directory. Each call creates a new watcher for the given path. The watcher
+ * lifetime is managed by Envoy and tied to the config — all watchers are automatically destroyed
+ * when the config is destroyed.
+ *
+ * When the watched path changes, envoy_dynamic_module_on_bootstrap_extension_file_changed is called
+ * on the main thread with the path and events.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path is the path to the file or directory to watch.
+ * @param events is the bitmask of events to watch for (MovedTo = 0x1, Modified = 0x2).
+ * @return true if the watch was successfully added, false otherwise (e.g. file does not exist).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_file_watcher_add_watch(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path, uint32_t events);
+
+// -------------------- Bootstrap Extension Callbacks - Admin Handler --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request is called when an admin endpoint
+ * registered via envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is
+ * requested.
+ *
+ * The module should use envoy_dynamic_module_callback_bootstrap_extension_admin_set_response
+ * from within this hook to set the response body. Envoy copies the buffer immediately, so the
+ * module does not need to keep the buffer alive after the callback returns.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param method is the HTTP method of the request (e.g. "GET", "POST").
+ * @param path is the full path and query string of the request.
+ * @param body is the request body. May be empty.
+ * @return the HTTP status code to send back to the client. This corresponds to the numeric
+ * value of the HTTP status code (e.g. 200, 404, 500).
+ */
+uint32_t envoy_dynamic_module_on_bootstrap_extension_admin_request(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer method, envoy_dynamic_module_type_envoy_buffer path,
+    envoy_dynamic_module_type_envoy_buffer body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_admin_set_response is called by the module
+ * during envoy_dynamic_module_on_bootstrap_extension_admin_request to set the response body.
+ * Envoy copies the provided buffer immediately, so the module does not need to keep the buffer
+ * alive after this call returns.
+ *
+ * This must only be called from within the on_bootstrap_extension_admin_request event hook.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param response_body is the response body owned by the module.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer response_body);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler is called by the
+ * module to register a custom admin HTTP endpoint. When the endpoint is requested, the
+ * envoy_dynamic_module_on_bootstrap_extension_admin_request event hook will be invoked.
+ *
+ * This must be called on the main thread (e.g. during on_server_initialized or from a
+ * scheduled event on the main thread).
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix to handle (e.g. "/admin/my_module/status").
+ * @param help_text is the help text for the handler displayed in the admin console.
+ * @param removable if true, allows the handler to be removed later via
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler.
+ * @param mutates_server_state if true, indicates the handler mutates server state (e.g. POST
+ * endpoints).
+ * @return true if the handler was successfully registered, false otherwise (e.g. if admin is
+ * not available or the prefix is already taken).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix,
+    envoy_dynamic_module_type_module_buffer help_text, bool removable, bool mutates_server_state);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler is called by the
+ * module to remove a previously registered admin HTTP endpoint.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param path_prefix is the URL prefix of the handler to remove.
+ * @return true if the handler was successfully removed, false otherwise (e.g. if the handler
+ * was not found or is not removable).
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path_prefix);
+
+// -------------------- Bootstrap Extension Callbacks - Cluster Lifecycle --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle is called by the
+ * module to opt in to receiving cluster lifecycle events
+ * (envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update and
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_removal).
+ *
+ * This must be called on the main thread, typically during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, since the ClusterManager is
+ * not available until that point.
+ *
+ * This should be called at most once. Subsequent calls are no-ops and return false.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the cluster lifecycle callbacks were successfully registered, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - Listener Lifecycle --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle is called by the
+ * module to opt in to receiving listener lifecycle events
+ * (envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update and
+ * envoy_dynamic_module_on_bootstrap_extension_listener_removal).
+ *
+ * This must be called on the main thread, typically during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, since the ListenerManager is
+ * not available until that point.
+ *
+ * This should be called at most once. Subsequent calls are no-ops and return false.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the listener lifecycle callbacks were successfully registered, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
+
+// -------------------- Bootstrap Extension Callbacks - Active Resource Names --------------------
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names is called by the
+ * module to enumerate the names of the currently active resources of a single kind, invoking
+ * name_fn once per name. Each name is reported at most once. To read several kinds, call once per
+ * kind. A no-op before the server is initialized. Must be called on the main thread.
+ *
+ * The kinds report:
+ * - FilterChain: the named filter chains of the active listeners: inline chains, the default
+ *   filter chain, and FCDS chains. An FCDS chain is reported only while an active listener's
+ *   matcher references it and its chain is committed, so a reported name is routable.
+ * - Cluster: the names of the active clusters.
+ * - TransportSocketMatch: the transport socket match names present in every active cluster that
+ *   has transport socket matches. Clusters with no matches do not constrain the result, and a name
+ *   missing from any cluster that has matches is not reported.
+ * - Secret: the names of the dynamic (SDS) secrets that have been delivered: TLS certificates,
+ *   certificate validation contexts, session ticket keys and generic secrets.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param kind selects which kind of active resource to enumerate.
+ * @param name_fn is the callback function to call for each resource name.
+ * @param user_data is the user data to pass to the callback function.
+ */
+void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+    envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
+
+// =============================================================================
+// Common Host Types (shared by cluster and standalone load balancer extensions)
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_host_health represents the health status of an upstream host.
+ */
+typedef enum {
+  // Host is unhealthy and should not be used for traffic.
+  envoy_dynamic_module_type_host_health_Unhealthy = 0,
+  // Host is healthy but degraded. It can receive traffic but healthy hosts are preferred.
+  envoy_dynamic_module_type_host_health_Degraded = 1,
+  // Host is healthy and can receive traffic.
+  envoy_dynamic_module_type_host_health_Healthy = 2,
+} envoy_dynamic_module_type_host_health;
+
+/**
+ * envoy_dynamic_module_type_host_stat identifies a per-host stat.
+ * These correspond to the counters and gauges in Envoy's HostStats struct.
+ */
+typedef enum {
+  // Counter: total connection connect failures.
+  envoy_dynamic_module_type_host_stat_CxConnectFail = 0,
+  // Counter: total connections opened.
+  envoy_dynamic_module_type_host_stat_CxTotal = 1,
+  // Counter: total request errors (used for EDS load reporting).
+  envoy_dynamic_module_type_host_stat_RqError = 2,
+  // Counter: total successful requests (used for EDS load reporting).
+  envoy_dynamic_module_type_host_stat_RqSuccess = 3,
+  // Counter: total request timeouts.
+  envoy_dynamic_module_type_host_stat_RqTimeout = 4,
+  // Counter: total requests sent.
+  envoy_dynamic_module_type_host_stat_RqTotal = 5,
+  // Gauge: current active connections.
+  envoy_dynamic_module_type_host_stat_CxActive = 6,
+  // Gauge: current active requests.
+  envoy_dynamic_module_type_host_stat_RqActive = 7,
+} envoy_dynamic_module_type_host_stat;
+
+// =============================================================================
+// ============================ Cluster Extension ==============================
+// =============================================================================
+
+// =============================================================================
+// Cluster Dynamic Module Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_cluster_config_envoy_ptr is a raw pointer to the cluster configuration
+ * object in Envoy. This is passed to the module when creating a new in-module cluster
+ * configuration.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_config_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_cluster_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr is an opaque handle to one child
+ * counter of a cluster counter vec, already resolved for a specific label-value tuple.
+ *
+ * Incrementing a counter vec by id resolves its label values on every call, which allocates and
+ * rebuilds the tagged stat name each time. A module on a per-request path resolves the tuple once
+ * with envoy_dynamic_module_callback_cluster_config_resolve_counter_vec and then increments by
+ * handle, which allocates nothing.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr is an opaque handle to one child gauge
+ * of a cluster gauge vec, already resolved for a specific label-value tuple. See
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr for why this exists.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr is an opaque handle to one child
+ * histogram of a cluster histogram vec, already resolved for a specific label-value tuple. See
+ * envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr for why this exists.
+ *
+ * OWNERSHIP: Envoy owns the pointer. It stays valid until
+ * envoy_dynamic_module_on_cluster_config_destroy is called for the owning configuration.
+ */
+typedef void* envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_config_module_ptr is a pointer to an in-module cluster
+ * configuration corresponding to an Envoy cluster configuration. The config is responsible for
+ * creating new cluster instances.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_config_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_config_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_envoy_ptr is a raw pointer to the DynamicModuleCluster class
+ * in Envoy. This is passed to the module when creating a new cluster and used to access cluster
+ * operations such as adding/removing hosts.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid until
+ * envoy_dynamic_module_on_cluster_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_cluster_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_module_ptr is a pointer to an in-module cluster instance
+ * corresponding to an Envoy cluster.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_envoy_ptr is a raw pointer to the load balancer instance
+ * in Envoy. This provides thread-local access to the cluster's host set for load balancing
+ * decisions. One load balancer instance is created per worker thread.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_lb_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid until
+ * envoy_dynamic_module_on_cluster_lb_destroy is called.
+ */
+typedef void* envoy_dynamic_module_type_cluster_lb_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_module_ptr is a pointer to an in-module load balancer
+ * instance. The load balancer is responsible for selecting hosts for requests.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_lb_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_cluster_lb_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_lb_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_host_envoy_ptr is a pointer to a Host in Envoy's cluster. This
+ * represents an upstream endpoint that can receive traffic.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer remains valid as long as the host is part of the
+ * cluster's host set.
+ */
+typedef void* envoy_dynamic_module_type_cluster_host_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_context_envoy_ptr is a pointer to the LoadBalancerContext in
+ * Envoy. This provides per-request information for load balancing decisions such as hash keys and
+ * downstream headers.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the
+ * envoy_dynamic_module_on_cluster_lb_choose_host call, unless async host selection is used. When
+ * async host selection is used, the context remains valid until the async completion callback is
+ * called or the selection is canceled.
+ */
+typedef void* envoy_dynamic_module_type_cluster_lb_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_scheduler_envoy_ptr is a raw pointer to the
+ * DynamicModuleClusterScheduler class in Envoy. This is used to schedule events to the main thread
+ * from background threads.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling cluster events is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_cluster_scheduler_new and the scheduling and destruction is done by
+ * envoy_dynamic_module_callback_cluster_scheduler_commit and
+ * envoy_dynamic_module_callback_cluster_scheduler_delete. Since its lifecycle is owned/managed by
+ * the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_cluster_scheduler_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr is a pointer to an in-module async
+ * host selection handle. This is returned by the module during
+ * envoy_dynamic_module_on_cluster_lb_choose_host when the module needs to perform asynchronous
+ * work (e.g., DNS resolution) before selecting a host.
+ *
+ * OWNERSHIP: The module owns the pointer. The module must keep it valid until either
+ * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called or
+ * envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called. After either event, the
+ * module may release the handle.
+ */
+typedef void* envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr is a module-owned opaque pointer
+ * stored in the cluster's worker thread-local slot. Envoy treats the value as opaque and never
+ * dereferences it.
+ *
+ * OWNERSHIP: The module owns the allocation. Envoy retains a shared_ptr to a thin wrapper around
+ * the pointer and invokes the module's destroy hook on whichever thread drops the last reference.
+ */
+typedef void* envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_worker_timer_module_ptr is a raw pointer to the
+ * DynamicModuleClusterWorkerTimer class in Envoy. The timer runs on the worker thread that created
+ * it (the dispatcher captured during envoy_dynamic_module_on_cluster_lb_choose_host), so the timer,
+ * its callback, and its deletion are all confined to a single worker thread.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module when the timer is
+ * no longer needed. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new and the destruction is done by
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete. Since its lifecycle is owned/managed
+ * by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_cluster_worker_timer_module_ptr;
+
+// =============================================================================
+// Cluster Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cluster_config_new is called by the main thread when a cluster
+ * configuration referencing this module is loaded. The module should parse the configuration and
+ * return a pointer to the in-module configuration object.
+ *
+ * @param config_envoy_ptr is the pointer to the Envoy cluster configuration object.
+ * @param name is the cluster name identifying the implementation within the module.
+ * @param config is the configuration bytes for the module.
+ * @return envoy_dynamic_module_type_cluster_config_module_ptr is the pointer to the in-module
+ * cluster configuration. Returning nullptr indicates a failure, and the cluster configuration
+ * will be rejected.
+ */
+envoy_dynamic_module_type_cluster_config_module_ptr envoy_dynamic_module_on_cluster_config_new(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_cluster_config_destroy is called when the cluster configuration is
+ * destroyed. The module should release any resources associated with the configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module cluster configuration.
+ */
+void envoy_dynamic_module_on_cluster_config_destroy(
+    envoy_dynamic_module_type_cluster_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_new is called when a new cluster instance is created.
+ *
+ * @param config_module_ptr is the pointer to the in-module cluster configuration.
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object, which can be used with
+ * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_hosts.
+ * @return envoy_dynamic_module_type_cluster_module_ptr is the pointer to the in-module cluster.
+ * Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_cluster_module_ptr envoy_dynamic_module_on_cluster_new(
+    envoy_dynamic_module_type_cluster_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_init is called when cluster initialization begins. The module
+ * should perform initial host discovery and call
+ * envoy_dynamic_module_callback_cluster_pre_init_complete when the initial set of hosts is ready.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ */
+void envoy_dynamic_module_on_cluster_init(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_destroy is called when the cluster is destroyed. The module
+ * should release any resources associated with the cluster.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ */
+void envoy_dynamic_module_on_cluster_destroy(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_new is called when a new load balancer instance is created
+ * for a worker thread. Each worker thread gets its own load balancer instance.
+ *
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object, which provides
+ * thread-local access to the cluster's host set via callbacks such as
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count.
+ * @return envoy_dynamic_module_type_cluster_lb_module_ptr is the pointer to the in-module load
+ * balancer. Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_cluster_lb_module_ptr envoy_dynamic_module_on_cluster_lb_new(
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_destroy is called when the load balancer is destroyed.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer.
+ */
+void envoy_dynamic_module_on_cluster_lb_destroy(
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_choose_host is called to select a host for a request.
+ *
+ * The module can respond in one of three ways:
+ * 1. Synchronous success: Set ``*host_out`` to a valid host pointer and ``*async_handle_out`` to
+ *    nullptr.
+ * 2. Synchronous failure: Set ``*host_out`` to nullptr and ``*async_handle_out`` to nullptr.
+ * 3. Async pending: Set ``*host_out`` to nullptr and ``*async_handle_out`` to a valid in-module
+ *    async handle. In this case, the module must later call
+ *    envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete to deliver the result,
+ *    unless envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called first.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer.
+ * @param context_envoy_ptr is the per-request load balancer context. Can be nullptr.
+ * @param host_out is the output pointer for the selected host. Set to nullptr if no host is
+ * immediately available.
+ * @param async_handle_out is the output pointer for the async handle. Set to nullptr for
+ * synchronous results.
+ */
+void envoy_dynamic_module_on_cluster_lb_choose_host(
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* host_out,
+    envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr* async_handle_out);
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_cancel_host_selection is called when the stream is destroyed
+ * before async host selection completes (e.g., stream timeout). After this call, the module must
+ * not call envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete for this handle.
+ *
+ * This is optional. Only modules that use asynchronous host selection need to implement this.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer.
+ * @param async_handle_module_ptr is the in-module async handle that was previously returned from
+ * envoy_dynamic_module_on_cluster_lb_choose_host.
+ */
+void envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr async_handle_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_scheduled is called on the main thread when an event previously
+ * scheduled via envoy_dynamic_module_callback_cluster_scheduler_commit is dispatched. The module
+ * can use the event_id to distinguish between different scheduled events.
+ *
+ * This is optional. Only modules that use the scheduler need to implement this.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object. This can be used with
+ * cluster callbacks such as envoy_dynamic_module_callback_cluster_add_hosts.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param event_id is the ID of the event that was scheduled with
+ * envoy_dynamic_module_callback_cluster_scheduler_commit.
+ */
+void envoy_dynamic_module_on_cluster_scheduled(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_event is called on every worker thread once per
+ * main-thread fan-out posted by the module. This is optional; modules that don't fan out events
+ * to workers need not implement it.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param event_id is the module-defined identifier supplied at the main-thread fan-out call site.
+ */
+void envoy_dynamic_module_on_cluster_worker_event(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_slot_data_destroy is invoked when a previously published
+ * worker-slot pointer is no longer referenced — that is, when the slot has been overwritten or
+ * the cluster has been torn down. The module is expected to release any allocation backing the
+ * pointer.
+ *
+ * This is optional but required for modules that publish payloads, otherwise the prior payload
+ * leaks. The hook fires on whichever thread drops the last reference, so the module must make
+ * the destructor thread-safe with respect to any shared state it touches.
+ *
+ * @param data_module_ptr is the opaque module pointer that was previously published. May be NULL
+ * if the module published NULL.
+ */
+void envoy_dynamic_module_on_cluster_worker_slot_data_destroy(
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_server_initialized is called when the server initialization is
+ * complete. This is called on the main thread during the PostInit lifecycle stage, after all
+ * clusters have finished initialization and before workers are started.
+ *
+ * This is the appropriate place to start background discovery tasks or establish connections that
+ * depend on the server being fully operational.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ */
+void envoy_dynamic_module_on_cluster_server_initialized(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_drain_started is called when Envoy begins draining.
+ *
+ * This is called on the main thread before workers are stopped. The module can still use cluster
+ * operations during drain. This is the appropriate place to stop accepting new hosts, close
+ * persistent connections, or de-register from service discovery.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ */
+void envoy_dynamic_module_on_cluster_drain_started(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_shutdown is called when Envoy is about to exit.
+ *
+ * This is called on the main thread during the ShutdownExit lifecycle stage. The module MUST
+ * invoke the completion callback exactly once with the provided context when it has finished
+ * cleanup. Envoy will wait for the callback before terminating. This is the appropriate place to
+ * flush batched data, close gRPC connections, or signal external systems.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param completion_callback is the callback that must be invoked when shutdown cleanup is done.
+ * @param completion_context is the opaque context pointer to pass to the completion callback.
+ */
+void envoy_dynamic_module_on_cluster_shutdown(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr,
+    envoy_dynamic_module_type_event_cb completion_callback, void* completion_context);
+
+/**
+ * envoy_dynamic_module_on_cluster_http_callout_done is called on the main thread when an HTTP
+ * callout initiated by envoy_dynamic_module_callback_cluster_http_callout receives a response or
+ * fails.
+ *
+ * This is optional. Only modules that use HTTP callouts need to implement this. If not
+ * implemented, envoy_dynamic_module_callback_cluster_http_callout will return
+ * envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param cluster_module_ptr is the pointer to the in-module cluster.
+ * @param callout_id is the ID of the callout that was returned by
+ * envoy_dynamic_module_callback_cluster_http_callout.
+ * @param result is the result of the HTTP callout.
+ * @param headers is the response headers. Can be nullptr if the callout failed.
+ * @param headers_size is the number of response headers.
+ * @param body_chunks is the response body chunks. Can be nullptr if the callout failed or
+ * there is no body.
+ * @param body_chunks_size is the number of response body chunks.
+ */
+void envoy_dynamic_module_on_cluster_http_callout_done(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr, uint64_t callout_id,
+    envoy_dynamic_module_type_http_callout_result result,
+    envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size);
+
+/**
+ * envoy_dynamic_module_on_cluster_worker_timer_fired is called when a timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new fires. It runs on the worker thread that
+ * created the timer, so it can safely touch that worker's per-load-balancer state without
+ * synchronization.
+ *
+ * This is optional. Only modules that create worker timers need to implement it.
+ *
+ * The timer is one-shot per Envoy semantics; the module re-arms it by calling
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable again for periodic behavior.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy-side load balancer, usable with the cluster LB
+ * callbacks (e.g. host queries) for the duration of this call.
+ * @param lb_module_ptr is the pointer to the in-module load balancer that owns the timer.
+ * @param timer_ptr is the pointer to the timer that fired.
+ */
+void envoy_dynamic_module_on_cluster_worker_timer_fired(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
+
+// =============================================================================
+// Cluster Dynamic Module Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cluster_add_hosts adds multiple hosts to the cluster at the
+ * specified priority level with locality and metadata information in a single batch operation.
+ *
+ * This triggers only one priority set update regardless of how many hosts are added.
+ *
+ * For simple use cases that do not require locality or priority, the SDK provides convenience
+ * wrappers that pass empty locality, no metadata, and priority 0.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @param priority is the priority level to add hosts to. Use 0 for the default priority.
+ * @param addresses is the array of host addresses in ``ip:port`` format (e.g.,
+ * ``127.0.0.1:8080``). Each address is owned by the module.
+ * @param weights is the array of load balancing weights for each host (1-128).
+ * @param regions is the array of locality region strings for each host. Each entry is owned by the
+ * module. An entry with length 0 indicates no region.
+ * @param zones is the array of locality zone strings for each host. Each entry is owned by the
+ * module. An entry with length 0 indicates no zone.
+ * @param sub_zones is the array of locality sub-zone strings for each host. Each entry is owned by
+ * the module. An entry with length 0 indicates no sub-zone.
+ * @param metadata_pairs is an optional flat array of (filter_name, key, value) triples for
+ * endpoint metadata. Each triple consists of three consecutive
+ * ``envoy_dynamic_module_type_module_buffer`` entries. All metadata values are stored as string
+ * values. Can be nullptr if no metadata is needed.
+ * @param metadata_pairs_per_host is the number of (filter_name, key, value) triples per host. Must
+ * be the same for all hosts. The total number of entries in ``metadata_pairs`` must be
+ * ``count * metadata_pairs_per_host * 3``. Can be 0 if no metadata is needed.
+ * @param count is the number of hosts to add. Must match the length of all per-host arrays.
+ * @param result_host_ptrs is the output array of host pointers. On success, each entry is set to
+ * the corresponding created host pointer. On failure, the array contents are undefined. The array
+ * must be pre-allocated by the caller with at least ``count`` entries.
+ * @return true if all hosts were added successfully, false if any host failed (e.g., invalid
+ * address or weight). On failure, no hosts are added.
+ */
+bool envoy_dynamic_module_callback_cluster_add_hosts(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
+
+/**
+ * envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames is equivalent to
+ * envoy_dynamic_module_callback_cluster_add_hosts, but additionally assigns each host a logical
+ * hostname.
+ *
+ * A non-empty logical hostname is available to upstream features such as automatic SNI and SAN
+ * validation. An empty hostname entry uses the same synthesized hostname behavior as
+ * envoy_dynamic_module_callback_cluster_add_hosts.
+ *
+ * @param hostnames is the optional array of logical hostnames corresponding to ``addresses``. Each
+ * entry is owned by the module. An entry with length 0 uses the same synthesized hostname behavior
+ * as envoy_dynamic_module_callback_cluster_add_hosts. The entire array can be nullptr to use that
+ * behavior for all hosts.
+ *
+ * See envoy_dynamic_module_callback_cluster_add_hosts for all other parameters and return
+ * semantics.
+ */
+bool envoy_dynamic_module_callback_cluster_add_hosts_with_hostnames(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint32_t priority,
+    const envoy_dynamic_module_type_module_buffer* addresses,
+    const envoy_dynamic_module_type_module_buffer* hostnames, const uint32_t* weights,
+    const envoy_dynamic_module_type_module_buffer* regions,
+    const envoy_dynamic_module_type_module_buffer* zones,
+    const envoy_dynamic_module_type_module_buffer* sub_zones,
+    const envoy_dynamic_module_type_module_buffer* metadata_pairs, size_t metadata_pairs_per_host,
+    size_t count, envoy_dynamic_module_type_cluster_host_envoy_ptr* result_host_ptrs);
+
+/**
+ * envoy_dynamic_module_callback_cluster_remove_hosts removes multiple hosts from the cluster in a
+ * single batch operation. This triggers only one priority set update regardless of how many hosts
+ * are removed.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @param host_envoy_ptrs is the array of host pointers to remove, as returned by
+ * envoy_dynamic_module_callback_cluster_add_hosts.
+ * @param count is the number of hosts to remove.
+ * @return the number of hosts that were successfully removed. Hosts not found in the cluster are
+ * skipped.
+ */
+size_t envoy_dynamic_module_callback_cluster_remove_hosts(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    const envoy_dynamic_module_type_cluster_host_envoy_ptr* host_envoy_ptrs, size_t count);
+
+/**
+ * envoy_dynamic_module_callback_cluster_update_host_health updates the health status of a host in
+ * the cluster. This allows the module to mark hosts as unhealthy, degraded, or healthy based on
+ * external health information (e.g., from a custom service discovery system).
+ *
+ * This uses EDS health flags internally and triggers a priority set update so that the load
+ * balancer sees the change.
+ *
+ * This is optional. Only modules that manage host health externally need to use this.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @param host_envoy_ptr is the pointer to the host to update, as returned by
+ * envoy_dynamic_module_callback_cluster_add_hosts.
+ * @param health_status is the new health status for the host.
+ * @return true if the host was found and updated, false if the host pointer is not in the cluster.
+ */
+bool envoy_dynamic_module_callback_cluster_update_host_health(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_health health_status);
+
+/**
+ * envoy_dynamic_module_callback_cluster_find_host_by_address looks up a host by its address string
+ * across all priorities in the cluster and returns the host pointer. This uses the cross-priority
+ * host map internally, so the lookup is O(1) with the default flat host map, or O(log N) if the
+ * cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
+ *
+ * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
+ *
+ * This is optional. Only modules that need to resolve addresses to host pointers need to use this.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @param address is the address string to look up, owned by the module.
+ * @return the host pointer if found, or nullptr if the address is not in the cluster.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_find_host_by_address(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address);
+
+/**
+ * envoy_dynamic_module_callback_cluster_pre_init_complete signals that the cluster's initial host
+ * discovery is complete. The module must call this during or after
+ * envoy_dynamic_module_on_cluster_init to allow Envoy to start routing traffic to this cluster.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ */
+void envoy_dynamic_module_callback_cluster_pre_init_complete(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map backs the cross-priority host map
+ * of the cluster with a persistent map instead of the default flat map. The flat map is copied in
+ * full on every host update, so clusters with many hosts and frequent updates can use this to make
+ * each update cost O(log N) instead. In exchange a lookup by address costs O(log N) rather than
+ * O(1).
+ *
+ * This is optional and must be called on the main thread during
+ * envoy_dynamic_module_on_cluster_init before any host is added. A call made after a host has
+ * been added or off the main thread has no effect and is reported as a bug.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ */
+void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count returns the number of healthy
+ * hosts at the given priority level in the cluster's host set.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level (typically 0 for default priority).
+ * @return the number of healthy hosts at the given priority level.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host returns a healthy host pointer by
+ * index at the given priority level.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host in the healthy host list.
+ * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the host,
+ * or nullptr if the index is out of bounds.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_healthy_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts writes every healthy host pointer at
+ * the given priority level into a module-owned array, in the same order
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host reports. It reads the whole partition
+ * in one ABI crossing instead of one crossing per host.
+ *
+ * Nothing is written unless every healthy host fits, so a caller whose buffer is too small sizes
+ * the retry from hosts_size_out rather than acting on a partial partition.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
+ * @param priority is the priority level.
+ * @param hosts_out is the array to fill, owned by the module. May be null only when hosts_capacity
+ * is zero.
+ * @param hosts_capacity is the number of elements hosts_out can hold.
+ * @param hosts_size_out is set to the number of healthy hosts at this priority level, whether or
+ * not they fit. Set to zero when the priority level does not exist. Must not be null.
+ * @return true when every healthy host was written, false when the priority level does not exist or
+ * hosts_capacity is smaller than hosts_size_out.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr* hosts_out, size_t hosts_capacity,
+    size_t* hosts_size_out);
+
+// =============================================================================
+// Cluster LB Host Information Callbacks
+// =============================================================================
+//
+// These callbacks provide the cluster load balancer with access to host
+// information from the cluster's priority set. They mirror the standalone load
+// balancer's host information callbacks (envoy_dynamic_module_callback_lb_*)
+// but operate on the cluster_lb_envoy_ptr instead.
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_cluster_name returns the name of the cluster.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param result is the output for the cluster name. The buffer is owned by Envoy.
+ */
+void envoy_dynamic_module_callback_cluster_lb_get_cluster_name(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_hosts_count returns the number of all hosts
+ * at a given priority level, regardless of health status.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level to query.
+ * @return the number of all hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count returns the number of degraded
+ * hosts at a given priority level.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level to query.
+ * @return the number of degraded hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_priority_set_size returns the number of priority
+ * levels in the cluster.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @return the number of priority levels.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address returns the address of a host
+ * by index within the healthy hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within healthy hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_healthy_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight returns the load balancing
+ * weight of a host by index within the healthy hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within healthy hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_health returns the health status of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the health status of the host.
+ */
+envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_cluster_lb_get_host_health(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address looks up a host by its
+ * address string across all priorities and returns the health status. This uses the cross-priority
+ * host map internally, so the lookup is O(1) with the default flat host map, or O(log N) if the
+ * cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
+ *
+ * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param address is the address string to look up, owned by the module.
+ * @param result is the output for the health status of the host.
+ * @return true if the host was found, false if the address is not in the host map.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, envoy_dynamic_module_type_host_health* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_find_host_by_address looks up a host by its address
+ * string across all priorities in the cluster's priority set and returns the host pointer. This
+ * uses the cross-priority host map internally, so the lookup is O(1) with the default flat host
+ * map, or O(log N) if the cluster selected the persistent host map via
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
+ *
+ * Unlike envoy_dynamic_module_callback_cluster_find_host_by_address which operates on the
+ * cluster_envoy_ptr (main thread), this operates on the lb_envoy_ptr and is safe to call from
+ * worker threads during load balancing decisions.
+ *
+ * The address string must match the format ``ip:port`` (e.g., ``10.0.0.1:8080``).
+ *
+ * This is optional. Only modules that need to resolve addresses to host pointers during load
+ * balancing need to use this.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param address is the address string to look up, owned by the module.
+ * @return the host pointer if found, or nullptr if the address is not in the cluster.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_find_host_by_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host returns a host pointer by index within all
+ * hosts at the given priority level, regardless of health status.
+ *
+ * Unlike envoy_dynamic_module_callback_cluster_lb_get_healthy_host which only returns healthy
+ * hosts, this returns any host at the given index in the full host list. This is useful for
+ * modules that need to iterate over all hosts or access hosts that may not be healthy.
+ *
+ * This is optional. Only modules that need access to all hosts regardless of health status need
+ * to use this.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return envoy_dynamic_module_type_cluster_host_envoy_ptr is the pointer to the host,
+ * or nullptr if the index is out of bounds.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_callback_cluster_lb_get_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_address returns the address of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_weight returns the load balancing weight
+ * of a host by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_host_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_stat returns the value of a per-host stat
+ * identified by the stat enum. This provides access to host-level counters and gauges such as
+ * total connections, request errors, active requests, and active connections.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param stat is the host stat to query.
+ * @return the stat value, or 0 if the host was not found or the stat is invalid.
+ */
+uint64_t envoy_dynamic_module_callback_cluster_lb_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_host_stat stat);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_locality returns the locality information
+ * (region, zone, sub_zone) for a host by index within all hosts at a given priority.
+ * This enables zone-aware and locality-aware load balancing algorithms.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param region is the output for the region string. Can be null if not needed.
+ * @param zone is the output for the zone string. Can be null if not needed.
+ * @param sub_zone is the output for the sub-zone string. Can be null if not needed.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_locality(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* region, envoy_dynamic_module_type_envoy_buffer* zone,
+    envoy_dynamic_module_type_envoy_buffer* sub_zone);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_set_host_data stores a module-defined opaque value on a
+ * host identified by priority and index within all hosts. This data is stored per load balancer
+ * instance (i.e., per worker thread) and can be used to attach per-host state for load balancing
+ * decisions such as moving averages or request tracking.
+ *
+ * The data is only valid for the lifetime of the load balancer instance. It is not shared across
+ * worker threads. Callers are responsible for managing the memory pointed to by the stored value
+ * if it represents a pointer.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param data is the opaque value to store. Use 0 to clear the data.
+ * @return true if the data was stored successfully, false if the host was not found.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_set_host_data(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t data);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_data retrieves a module-defined opaque value
+ * previously stored on a host via envoy_dynamic_module_callback_cluster_lb_set_host_data.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param data is the output for the stored opaque value. Set to 0 if no data was stored.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_data(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t* data);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string is called by the module to get
+ * the string value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a string, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the string value. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the key was found and the value is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number is called by the module to get
+ * the number value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a number, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the number value.
+ * @return true if the key was found and the value is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool is called by the module to get
+ * the bool value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a bool, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the bool value.
+ * @return true if the key was found and the value is a bool, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_locality_count returns the number of locality
+ * buckets for the healthy hosts at a given priority. Each bucket groups hosts that share the same
+ * locality.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @return the number of locality buckets at the given priority.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_locality_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_locality_host_count returns the number of healthy
+ * hosts in a specific locality bucket at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @return the number of hosts in the locality bucket, or 0 if the index is out of bounds.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_get_locality_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_locality_host_address returns the address of a host
+ * within a specific locality bucket at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @param host_index is the index of the host within the locality bucket.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_locality_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index, size_t host_index, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_locality_weight returns the weight of a locality
+ * bucket at a given priority. Locality weights are used for locality-aware load balancing.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @return the weight of the locality, or 0 if the index is out of bounds or weights are not set.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_get_locality_weight(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority,
+    size_t locality_index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_new creates a new scheduler for the given
+ * cluster. The scheduler allows the module to dispatch events to the main thread from any thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
+ * @return envoy_dynamic_module_type_cluster_scheduler_module_ptr is the pointer to the scheduler.
+ * The module is responsible for deleting the scheduler via
+ * envoy_dynamic_module_callback_cluster_scheduler_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_cluster_scheduler_module_ptr
+envoy_dynamic_module_callback_cluster_scheduler_new(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_delete deletes a scheduler previously created by
+ * envoy_dynamic_module_callback_cluster_scheduler_new. After this call, the scheduler pointer is
+ * no longer valid.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler to delete.
+ */
+void envoy_dynamic_module_callback_cluster_scheduler_delete(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_scheduler_commit schedules an event to be dispatched on
+ * the main thread. When the event is dispatched, envoy_dynamic_module_on_cluster_scheduled will be
+ * called with the same event_id.
+ *
+ * This function is thread-safe and can be called from any thread.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler.
+ * @param event_id is a module-defined identifier to distinguish different scheduled events.
+ */
+void envoy_dynamic_module_callback_cluster_scheduler_commit(
+    envoy_dynamic_module_type_cluster_scheduler_module_ptr scheduler_module_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_cluster_run_on_all_workers posts the module's worker-event hook
+ * to every worker thread registered with the server's thread-local engine. The main thread is
+ * excluded. Must be called from the main thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param event_id is a module-defined identifier delivered to each worker invocation.
+ */
+void envoy_dynamic_module_callback_cluster_run_on_all_workers(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_slot_set publishes an opaque module pointer to
+ * the cluster's worker thread-local slot. All registered threads observe the same pointer
+ * (single-pointer semantics — not a per-worker factory). Any previously published pointer is
+ * released through the module's destroy hook. Must be called from the main thread.
+ *
+ * Threads that are not yet registered with the TLS engine at the time of the call will not
+ * observe this update.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param data_module_ptr is the opaque module pointer to publish. May be NULL to clear the slot.
+ */
+void envoy_dynamic_module_callback_cluster_worker_slot_set(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr data_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_slot_get returns the pointer most recently
+ * delivered to the calling thread's slot, or NULL if the slot has not been populated on this
+ * thread. Callable from any thread that has a TLS registration (workers and main). The returned
+ * pointer is valid until the next slot update on this thread.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @return the opaque module pointer most recently published to this thread, or NULL.
+ */
+envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr
+envoy_dynamic_module_callback_cluster_worker_slot_get(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_get_name returns the cluster's CDS name
+ * (ClusterInfo::name()). Callable from any cluster-side callback holding a cluster_envoy_ptr
+ * (on_init, on_scheduled, on_worker_event).
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param result is the output for the cluster name. The buffer is owned by Envoy and valid for
+ * the duration of the call.
+ */
+void envoy_dynamic_module_callback_cluster_get_name(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// -------------------- Cluster Dynamic Module Callbacks - Worker Timer --------------------
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_new creates a new timer on the calling
+ * worker thread's dispatcher. The timer is not enabled upon creation; the module must call
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable to arm it.
+ *
+ * This must be called on a worker thread from within an
+ * envoy_dynamic_module_on_cluster_lb_choose_host call, so that the worker dispatcher has been
+ * captured for this load balancer. When the timer fires,
+ * envoy_dynamic_module_on_cluster_worker_timer_fired is called on the same worker thread.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy-side load balancer. The module receives this as
+ * the second parameter to envoy_dynamic_module_on_cluster_lb_new.
+ * @return the pointer to the created timer, or NULL if no worker dispatcher has been captured yet
+ * (no choose_host has run on this worker).
+ *
+ * NOTE: it is the caller's responsibility to delete the timer using
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete when it is no longer needed, on the
+ * same worker thread.
+ */
+envoy_dynamic_module_type_cluster_worker_timer_module_ptr
+envoy_dynamic_module_callback_cluster_worker_timer_new(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable enables the timer with a given delay.
+ * If the timer is already enabled, it is reset to the new delay.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ * @param delay_milliseconds is the delay in milliseconds before the timer fires.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_enable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr,
+    uint64_t delay_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_disable disables the timer without destroying
+ * it. The timer can be re-enabled later using
+ * envoy_dynamic_module_callback_cluster_worker_timer_enable.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_disable(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_enabled checks whether the timer is currently
+ * armed.
+ *
+ * This must be called on the worker thread that created the timer.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ * @return true if the timer is currently enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_worker_timer_enabled(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_worker_timer_delete deletes a timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new. The timer is automatically disabled
+ * before deletion.
+ *
+ * This must be called on the worker thread that created the timer. The underlying Envoy timer
+ * `deregisters` from that worker dispatcher's timer list in its destructor, so invoking this
+ * callback from any other thread is undefined behavior. Same-thread ordering with
+ * envoy_dynamic_module_on_cluster_worker_timer_fired guarantees the timer cannot fire after delete.
+ *
+ * @param timer_ptr is the pointer to the timer created by
+ * envoy_dynamic_module_callback_cluster_worker_timer_new.
+ */
+void envoy_dynamic_module_callback_cluster_worker_timer_delete(
+    envoy_dynamic_module_type_cluster_worker_timer_module_ptr timer_ptr);
+
+// =============================================================================
+// Cluster Dynamic Module Callbacks - Metrics
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_define_counter is called by the module during
+ * initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_cluster_config_increment_counter together with
+ * cluster_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_define_counter(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_increment_counter(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// ------------------ Cluster resolved metric handles ------------------------
+//
+// The id-plus-label-values callbacks above resolve the label tuple on every call, which allocates
+// per label value and rebuilds the tagged stat name. A module writing metrics on a per-request path
+// resolves each tuple once through the callbacks below and then records by handle, which allocates
+// nothing and builds no name. The handles stay valid until the owning configuration is destroyed,
+// so a module resolves them once per configuration and keeps them.
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec resolves one label-value tuple
+ * of a previously defined counter vec to a handle.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the counter vec previously defined using the config.
+ * @param label_values is the label values to resolve, one per label name given when the counter
+ * vec was defined.
+ * @param label_values_length is the number of label values. **IT MUST MATCH THE LABEL NAMES GIVEN
+ * WHEN THE COUNTER WAS DEFINED.**
+ * @param counter_ptr receives the handle. Must not be null. Left untouched on failure.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_counter_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr* counter_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec resolves one label-value tuple of
+ * a previously defined gauge vec to a handle. See
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec for the parameter and return
+ * contract.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr* gauge_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec resolves one label-value tuple
+ * of a previously defined histogram vec to a handle. See
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec for the parameter and return
+ * contract.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr* histogram_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_counter_add adds to a resolved counter. Safe from
+ * any thread. A null handle is ignored.
+ *
+ * @param counter_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_counter_vec.
+ * @param value is the amount to add.
+ */
+void envoy_dynamic_module_callback_cluster_metric_counter_add(
+    envoy_dynamic_module_type_cluster_metric_counter_envoy_ptr counter_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_set sets a resolved gauge. Safe from any
+ * thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to set.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_set(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_add adds to a resolved gauge. Safe from any
+ * thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to add.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_add(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_gauge_sub subtracts from a resolved gauge. Safe from
+ * any thread. A null handle is ignored.
+ *
+ * @param gauge_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_gauge_vec.
+ * @param value is the amount to subtract.
+ */
+void envoy_dynamic_module_callback_cluster_metric_gauge_sub(
+    envoy_dynamic_module_type_cluster_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_metric_histogram_record records a value on a resolved
+ * histogram. Safe to call from any Envoy worker or main thread. A null handle is ignored.
+ *
+ * @param histogram_envoy_ptr is a handle from
+ * envoy_dynamic_module_callback_cluster_config_resolve_histogram_vec.
+ * @param value is the value to record.
+ */
+void envoy_dynamic_module_callback_cluster_metric_histogram_record(
+    envoy_dynamic_module_type_cluster_metric_histogram_envoy_ptr histogram_envoy_ptr,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_define_gauge is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_cluster_config_define_gauge(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_set_gauge is called by the module to set the value
+ * of a previously defined gauge.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_cluster_config_set_gauge(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_increment_gauge is called by the module to
+ * increment a previously defined gauge.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increment the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_increment_gauge(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_decrement_gauge is called by the module to
+ * decrement a previously defined gauge.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrement the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_decrement_gauge(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_define_histogram is called by the module during
+ * initialization to create a template for generating Stats::Histograms with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_define_histogram(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_config_record_histogram_value is called by the module to
+ * record a value for a previously defined histogram.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_config_record_histogram_value(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// =============================================================================
+// Cluster LB Context Callbacks
+// =============================================================================
+//
+// These callbacks allow the cluster load balancer to access per-request context
+// information during envoy_dynamic_module_on_cluster_lb_choose_host. They
+// provide the same capabilities as the standalone load balancer context
+// callbacks (envoy_dynamic_module_callback_lb_context_*), but operate on the
+// cluster_lb_context_envoy_ptr instead.
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key computes a hash key from the
+ * request context for consistent hashing.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param hash_out is the output hash value. Only valid when the function returns true.
+ * @return true if a hash key was computed, false if no hash key is available or the context is
+ * nullptr.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_compute_hash_key(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr, uint64_t* hash_out);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size returns the number
+ * of downstream request headers available in the context.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @return the number of headers, or 0 if the context is nullptr or no headers are available.
+ */
+size_t envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers retrieves all downstream
+ * request headers into a pre-allocated array.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param result_headers is the output array of header key-value pairs. Must be pre-allocated with
+ * at least the number of headers returned by
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers_size.
+ * @return true if the headers were retrieved, false if the context is nullptr or no headers are
+ * available.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header retrieves a single
+ * downstream request header value by key and index.
+ *
+ * Since a header key can have multiple values, the ``index`` parameter selects a specific value.
+ * The ``optional_size`` parameter can be used to retrieve the total number of values for the key.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the header key to look up. Owned by the module.
+ * @param result_buffer is the output buffer for the header value. Owned by Envoy and valid only
+ * during the current callback.
+ * @param index is the index of the header value (for multi-valued headers).
+ * @param optional_size is an optional output for the total number of values for this key. Can be
+ * nullptr if not needed.
+ * @return true if the header value was found at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_header(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count returns the
+ * maximum number of times host selection should be retried if the chosen host is rejected by
+ * envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @return the retry count, or 0 if the context is nullptr.
+ */
+uint32_t envoy_dynamic_module_callback_cluster_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host checks whether the
+ * load balancer should reject the given host and retry selection. This is used during retries to
+ * avoid selecting hosts that were already attempted.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer, used to access the host set.
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param priority is the priority level of the host.
+ * @param index is the index of the host within the healthy host list at the given priority.
+ * @return true if another host should be selected, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
+    size_t index);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_override_host returns the override host
+ * address and strict mode flag from the context. Override host allows upstream filters to direct
+ * the load balancer to prefer a specific host by address.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param address is the output buffer for the override host address. Owned by Envoy and valid only
+ * during the current callback.
+ * @param strict is the output flag. When true, the load balancer should return no host if the
+ * override host is not valid.
+ * @return true if an override host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_override_host(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address, bool* strict);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni returns the
+ * requested server name (SNI) from the downstream connection associated with the request.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param result_buffer is the output buffer for the SNI string. Owned by Envoy and valid only
+ * during the current callback.
+ * @return true if the SNI is available and non-empty, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_downstream_connection_sni(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes is called by the module
+ * to get the bytes value of the request's filter state with the given key. This lets a
+ * dynamic-module cluster consume filter state set by an upstream HTTP filter (or any other
+ * producer that stores a ``Router::StringAccessor``) when picking a host. If the filter state is
+ * not accessible, the key does not exist, or the value is not a ``Router::StringAccessor``, this
+ * returns false.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the pointer variable where the pointer to the buffer
+ * of the bytes value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * is guaranteed to be valid for the duration of the current host-selection callback.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed is called by the module
+ * to get the serialized bytes value of a typed filter state object with the given key. It
+ * retrieves the object generically and calls serializeAsString to get the bytes representation,
+ * so it works with any filter state object type (e.g. one set by an upstream HTTP filter through
+ * a registered ``ObjectFactory``), not just ``Router::StringAccessor``.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param result is the pointer to the buffer where the serialized value will be stored.
+ * @return true if the operation is successful, false if the stream info is not available, the key
+ * does not exist, or the object does not support serialization.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and is
+ * guaranteed to be valid until the end of the current host-selection callback.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes is called by the module
+ * to set the bytes value of the request's filter state with the given key. This lets a
+ * dynamic-module cluster publish a value that a later filter, the access log, or another producer
+ * reads back on the same request (stored as a ``Router::StringAccessor``). If the filter state is
+ * not accessible, this returns false. If the key does not exist, it will be created. The value is
+ * stored with FilterChain life span so it is available at access-log flush on the same request.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
+ * @return true if the operation is successful, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_bytes(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed is called by the module
+ * to set the typed filter state with the given key. Unlike set_filter_state_bytes which stores a
+ * raw ``Router::StringAccessor``, this uses the registered ``ObjectFactory`` for the key to create
+ * a properly typed filter state object via ``createFromBytes``, so a built-in Envoy filter that
+ * reads the key as a typed object can consume it. The value is stored with FilterChain life span.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param key is the key of the filter state. This must match a registered ObjectFactory name.
+ * @param value is the serialized bytes value used to construct the typed object.
+ * @return true if the operation is successful, false if the request has no stream info, no
+ * ObjectFactory is registered for the key, or the factory fails to create the object.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_filter_state_typed(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_get_host_stat returns the value of a per-host
+ * stat identified by the stat enum for the given host pointer. The module must ensure
+ * host_envoy_ptr still belongs to the cluster's host set.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param host_envoy_ptr is the host whose stat to read.
+ * @param stat is the host stat to query.
+ * @return the stat value, or 0 if the context or host is nullptr.
+ */
+uint64_t envoy_dynamic_module_callback_cluster_lb_context_get_host_stat(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host_envoy_ptr,
+    envoy_dynamic_module_type_host_stat stat);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number sets the number
+ * value of the request's dynamic metadata under the given namespace and key, overwriting any
+ * existing value. This lets a dynamic-module cluster annotate the current request so the value is
+ * observable in the access log via %DYNAMIC_METADATA(namespace:key)%.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the number value to set.
+ * @return true if the value was set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string sets the string
+ * value of the request's dynamic metadata under the given namespace and key, overwriting any
+ * existing value. This lets a dynamic-module cluster annotate the current request so the value is
+ * observable in the access log via %DYNAMIC_METADATA(namespace:key)%.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param key is the key of the dynamic metadata.
+ * @param value is the string value to set.
+ * @return true if the value was set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch sets multiple
+ * string-valued dynamic metadata entries on the request under a single namespace in one call. It is
+ * equivalent to calling
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string once per entry but
+ * resolves the namespace and merges into the metadata struct only once. Existing entries with the
+ * same key are overwritten. Within a single call, a later entry overwrites an earlier entry with
+ * the same key. An empty array is a no-op and does not create the namespace.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param entries is the pointer to an array of key-value pairs whose values are set as strings. It
+ * may be null only when entries_size is zero.
+ * @param entries_size is the number of entries in the array.
+ * @return true if the values were set, false if the request has no stream info.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
+ * to deliver the result of an asynchronous host selection. This must be called exactly once for
+ * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
+ * envoy_dynamic_module_on_cluster_lb_cancel_host_selection was called first.
+ *
+ * After calling this, the module must not use the ``lb_envoy_ptr`` for this async operation again.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy-side load balancer. The module receives this as
+ * the second parameter to envoy_dynamic_module_on_cluster_lb_new.
+ * @param context_envoy_ptr is the per-request load balancer context that was passed to the
+ * original envoy_dynamic_module_on_cluster_lb_choose_host call.
+ * @param host is the selected host, or nullptr if host selection failed.
+ * @param details is a description of the resolution outcome (e.g., error reason). Can be empty.
+ */
+void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_cluster_host_envoy_ptr host,
+    envoy_dynamic_module_type_module_buffer details);
+
+/**
+ * envoy_dynamic_module_callback_cluster_http_callout sends an HTTP request to the specified cluster
+ * and asynchronously delivers the response via envoy_dynamic_module_on_cluster_http_callout_done.
+ *
+ * This must be called on the main thread. The request requires ``:method``, ``:path``, and
+ * ``host`` headers to be present.
+ *
+ * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
+ * @param callout_id_out is a pointer to a variable where the callout ID will be stored on success.
+ * @param cluster_name is the name of the target cluster to which the HTTP request is sent.
+ * @param headers is the array of request headers. Must include ``:method``, ``:path``, and
+ * ``host``.
+ * @param headers_size is the number of request headers.
+ * @param body is the request body. Can be empty (length 0) for requests without a body.
+ * @param timeout_milliseconds is the timeout for the request in milliseconds.
+ * @return the result of the callout initialization.
+ */
+envoy_dynamic_module_type_http_callout_init_result
+envoy_dynamic_module_callback_cluster_http_callout(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uint64_t* callout_id_out,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
+    envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds);
+
+// =============================================================================
+// Cluster LB Host Membership Update
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cluster_lb_on_host_membership_update is called on each worker thread
+ * when the set of hosts in the cluster changes. This is triggered by
+ * envoy_dynamic_module_callback_cluster_add_hosts,
+ * envoy_dynamic_module_callback_cluster_remove_hosts, or any other mechanism that modifies
+ * the cluster's host set.
+ *
+ * During this callback, the module can call
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host to get the host pointers, or
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address to get the addresses of
+ * the added or removed hosts by index.
+ *
+ * After this callback returns, the module can use the standard host query callbacks to inspect the
+ * new host state.
+ *
+ * This is optional. Only modules whose per-worker load balancers need to rebuild internal data
+ * structures (e.g., hash rings, address-to-index maps) when the host set changes need to implement
+ * this.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param lb_module_ptr is the pointer to the in-module load balancer instance.
+ * @param num_hosts_added is the number of hosts added.
+ * @param num_hosts_removed is the number of hosts removed.
+ */
+void envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_cluster_lb_module_ptr lb_module_ptr, size_t num_hosts_added,
+    size_t num_hosts_removed);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address returns the address of
+ * an added or removed host during the on_cluster_lb_on_host_membership_update event hook. This
+ * callback is only valid during envoy_dynamic_module_on_cluster_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host address, false to get a removed host address.
+ * @param result is the output buffer for the host address string. The buffer points to Envoy-owned
+ * memory that is valid only for the duration of the on_cluster_lb_on_host_membership_update
+ * callback.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host returns the host pointer of an
+ * added or removed host during the on_cluster_lb_on_host_membership_update event hook. This
+ * returns the host directly from the added or removed list without an address lookup, so it is
+ * only valid during envoy_dynamic_module_on_cluster_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host, false to get a removed host.
+ * @return the host pointer if found, or nullptr if the index is out of bounds or the callback is
+ * not active.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added);
+
+/**
+ * envoy_dynamic_module_type_packed_address holds a host's IP address and port as packed integers,
+ * read directly from the host's parsed sockaddr without any string formatting. This is the output
+ * of envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address.
+ *
+ * @param address_bytes is the IP address in network byte order. An IPv4 address occupies the first
+ * four bytes; an IPv6 address occupies all sixteen. Bytes beyond the address are zeroed.
+ * @param port is the port in host byte order.
+ * @param family is 4 for an IPv4 address and 6 for an IPv6 address.
+ */
+typedef struct envoy_dynamic_module_type_packed_address {
+  uint8_t address_bytes[16];
+  uint16_t port;
+  uint8_t family;
+} envoy_dynamic_module_type_packed_address;
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address returns the
+ * address of an added or removed host during the on_cluster_lb_on_host_membership_update event hook
+ * as packed integers, read directly from the host's sockaddr with no string formatting or
+ * allocation. This is the packed-integer sibling of
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_host_address, intended for modules
+ * that key their own host maps by an integer rather than a string. It is only valid during
+ * envoy_dynamic_module_on_cluster_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host address, false to get a removed host address.
+ * @param result is the output buffer that receives the packed address. Its contents are unspecified
+ * when the callback returns false; callers must gate on the return value.
+ * @return true if the host was found and has an IP address, false on a null pointer, an
+ * out-of-bounds index, the callback not being active, or a non-IP (pipe) address.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_packed_address* result);
+
+// =============================================================================
+// =============================== Load Balancer ===============================
+// =============================================================================
+//
+// This extension enables custom load balancing algorithms via dynamic modules.
+// The module implements the host selection logic while Envoy handles cluster
+// management, health checking, and connection pooling.
+//
+// The module only needs to implement the chooseHost event hook which receives
+// host information and context to make a selection decision.
+
+// =============================================================================
+// Load Balancer Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_lb_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleLbConfig class in Envoy. This is passed to the module when
+ * creating a new in-module load balancer configuration.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_lb_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_lb_config_module_ptr is a pointer to an in-module
+ * load balancer configuration. This is created by the module when the
+ * configuration is loaded.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_lb_config_destroy is called.
+ */
+typedef const void* envoy_dynamic_module_type_lb_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_lb_envoy_ptr is a raw pointer to the
+ * DynamicModuleLoadBalancer class in Envoy. This is passed to the module for callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the event hook calls.
+ */
+typedef void* envoy_dynamic_module_type_lb_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_lb_module_ptr is a pointer to an in-module
+ * load balancer instance. This is created per worker thread.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_lb_destroy is called.
+ */
+typedef const void* envoy_dynamic_module_type_lb_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_lb_context_envoy_ptr is a raw pointer to the
+ * LoadBalancerContext in Envoy. This is passed to the module during chooseHost.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is valid only during the chooseHost call.
+ */
+typedef void* envoy_dynamic_module_type_lb_context_envoy_ptr;
+
+// =============================================================================
+// Load Balancer Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_lb_config_new is called by the main thread when
+ * a new load balancer configuration is loaded.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the Envoy load balancer config object.
+ * @param name is the name identifying the load balancer implementation in the module.
+ * @param config is the configuration bytes for the module.
+ * @return envoy_dynamic_module_type_lb_config_module_ptr is the pointer to
+ * the in-module configuration. Returning nullptr indicates a failure and the configuration will
+ * be rejected.
+ */
+envoy_dynamic_module_type_lb_config_module_ptr envoy_dynamic_module_on_lb_config_new(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_lb_config_destroy is called when the load balancer
+ * configuration is destroyed. The module should release any resources associated with it.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration.
+ */
+void envoy_dynamic_module_on_lb_config_destroy(
+    envoy_dynamic_module_type_lb_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_lb_new is called when a new load balancer instance is
+ * created for a worker thread.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration.
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object for callbacks.
+ * @return envoy_dynamic_module_type_lb_module_ptr is the pointer to the in-module
+ * load balancer instance. Returning nullptr indicates a failure.
+ */
+envoy_dynamic_module_type_lb_module_ptr
+envoy_dynamic_module_on_lb_new(envoy_dynamic_module_type_lb_config_module_ptr config_module_ptr,
+                               envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_lb_choose_host is called when a host needs to be selected
+ * for an upstream request. The module should select a host by writing the priority level
+ * and host index (within the healthy hosts at that priority) into the output parameters.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param lb_module_ptr is the pointer to the in-module load balancer instance.
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext (may be null).
+ * @param result_priority is the output parameter for the priority level of the selected host.
+ * @param result_index is the output parameter for the index of the selected host within the
+ * healthy hosts at the given priority.
+ * @return true if a host was selected (result_priority and result_index are populated),
+ * false if no host should be selected (which will result in no upstream connection).
+ */
+bool envoy_dynamic_module_on_lb_choose_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t* result_priority,
+    uint32_t* result_index);
+
+/**
+ * envoy_dynamic_module_on_lb_on_host_membership_update is called when the set of hosts in the
+ * cluster changes. This is triggered by EDS updates, health check transitions, or any other
+ * mechanism that adds or removes hosts from the priority set.
+ *
+ * During this callback, the module can call
+ * envoy_dynamic_module_callback_lb_get_member_update_host_address to get the addresses of the
+ * added or removed hosts by index.
+ *
+ * After this callback returns, the module can use the standard host query callbacks
+ * (get_hosts_count, get_healthy_hosts_count, etc.) to inspect the new host state.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param lb_module_ptr is the pointer to the in-module load balancer instance.
+ * @param num_hosts_added is the number of hosts added.
+ * @param num_hosts_removed is the number of hosts removed.
+ */
+void envoy_dynamic_module_on_lb_on_host_membership_update(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_module_ptr lb_module_ptr, size_t num_hosts_added,
+    size_t num_hosts_removed);
+
+/**
+ * envoy_dynamic_module_on_lb_destroy is called when the load balancer instance is
+ * destroyed. The module should release any resources associated with it.
+ *
+ * @param lb_module_ptr is the pointer to the in-module load balancer instance.
+ */
+void envoy_dynamic_module_on_lb_destroy(envoy_dynamic_module_type_lb_module_ptr lb_module_ptr);
+
+// =============================================================================
+// Load Balancer Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_lb_get_cluster_name returns the name of the cluster.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param result is the output for the cluster name.
+ */
+void envoy_dynamic_module_callback_lb_get_cluster_name(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_hosts_count returns the number of all hosts
+ * in the cluster (across all priorities and health states).
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level to query.
+ * @return the number of all hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_lb_get_hosts_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_healthy_hosts_count returns the number of healthy hosts
+ * in the cluster at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level to query.
+ * @return the number of healthy hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_lb_get_healthy_hosts_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_degraded_hosts_count returns the number of degraded hosts
+ * in the cluster at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level to query.
+ * @return the number of degraded hosts at the given priority.
+ */
+size_t envoy_dynamic_module_callback_lb_get_degraded_hosts_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_priority_set_size returns the number of priority levels
+ * in the cluster.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @return the number of priority levels.
+ */
+size_t envoy_dynamic_module_callback_lb_get_priority_set_size(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_healthy_host_address returns the address of a host
+ * by index within the healthy hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within healthy hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_healthy_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_healthy_host_weight returns the load balancing weight
+ * of a host by index within the healthy hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within healthy hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_lb_get_healthy_host_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_health returns the health status of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the health status of the host.
+ */
+envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_lb_get_host_health(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_health_by_address looks up a host by its address
+ * string across all priorities and returns the health status. This uses the cross-priority host
+ * map internally instead of requiring the caller to iterate through all hosts by index. The lookup
+ * is O(1) with the default flat host map, or O(log N) if the cluster selected the persistent host
+ * map via envoy_dynamic_module_callback_cluster_use_persistent_host_map.
+ *
+ * The address string must match the format returned by host->address()->asStringView(), which is
+ * typically "ip:port" (e.g., "10.0.0.1:8080").
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param address is the address string to look up.
+ * @param result is the output for the health status of the host.
+ * @return true if the host was found, false if the address is not in the host map.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_health_by_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer address, envoy_dynamic_module_type_host_health* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_address returns the address of a host
+ * by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_weight returns the load balancing weight
+ * of a host by index within all hosts at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return the weight of the host (1-128), or 0 if the host was not found.
+ */
+uint32_t envoy_dynamic_module_callback_lb_get_host_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_locality returns the locality information
+ * (region, zone, sub_zone) for a host by index within all hosts at a given priority.
+ * This enables zone-aware and locality-aware load balancing algorithms.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param region is the output for the region string. Can be null if not needed.
+ * @param zone is the output for the zone string. Can be null if not needed.
+ * @param sub_zone is the output for the sub-zone string. Can be null if not needed.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_locality(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* region, envoy_dynamic_module_type_envoy_buffer* zone,
+    envoy_dynamic_module_type_envoy_buffer* sub_zone);
+
+/**
+ * envoy_dynamic_module_callback_lb_set_host_data stores a module-defined opaque value on a host
+ * identified by priority and index within all hosts. This data is stored per load balancer instance
+ * (i.e., per worker thread) and can be used to attach per-host state for load balancing decisions
+ * such as moving averages or request tracking.
+ *
+ * The data is only valid for the lifetime of the load balancer instance. It is not shared across
+ * worker threads. Callers are responsible for managing the memory pointed to by the stored value
+ * if it represents a pointer.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param data is the opaque value to store. Use 0 to clear the data.
+ * @return true if the data was stored successfully, false if the host was not found.
+ */
+bool envoy_dynamic_module_callback_lb_set_host_data(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t data);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_data retrieves a module-defined opaque value
+ * previously stored on a host via envoy_dynamic_module_callback_lb_set_host_data.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param data is the output for the stored opaque value. Set to 0 if no data was stored.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_data(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    uintptr_t* data);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_metadata_string is called by the module to get
+ * the string value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a string, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., "envoy.lb").
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the string value. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the key was found and the value is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_metadata_string(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_metadata_number is called by the module to get
+ * the number value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a number, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., "envoy.lb").
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the number value.
+ * @return true if the key was found and the value is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_metadata_number(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_metadata_bool is called by the module to get
+ * the bool value of a host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a bool, this returns false.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param filter_name is the filter namespace to look up (e.g., "envoy.lb").
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the bool value.
+ * @return true if the key was found and the value is a bool, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_host_metadata_bool(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t index,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_locality_count returns the number of locality buckets
+ * for the healthy hosts at a given priority. Each bucket groups hosts that share the same locality.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @return the number of locality buckets at the given priority.
+ */
+size_t envoy_dynamic_module_callback_lb_get_locality_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_locality_host_count returns the number of healthy hosts
+ * in a specific locality bucket at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @return the number of hosts in the locality bucket, or 0 if the index is out of bounds.
+ */
+size_t envoy_dynamic_module_callback_lb_get_locality_host_count(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_locality_host_address returns the address of a host
+ * within a specific locality bucket at a given priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @param host_index is the index of the host within the locality bucket.
+ * @param result is the output for the host address as a string.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_locality_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index,
+    size_t host_index, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_locality_weight returns the weight of a locality bucket
+ * at a given priority. Locality weights are used for locality-aware load balancing.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param locality_index is the index of the locality bucket.
+ * @return the weight of the locality, or 0 if the index is out of bounds or weights are not set.
+ */
+uint32_t envoy_dynamic_module_callback_lb_get_locality_weight(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, uint32_t priority, size_t locality_index);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_compute_hash_key computes a hash key from
+ * the load balancer context.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param hash_out is the output for the computed hash.
+ * @return true if a hash was computed, false if the context is null or no hash is available.
+ */
+bool envoy_dynamic_module_callback_lb_context_compute_hash_key(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint64_t* hash_out);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers_size returns
+ * the number of downstream request headers. Combined with
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers, this can be used to iterate
+ * over all downstream request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @return the number of headers, or 0 if context is null or headers are not available.
+ */
+size_t envoy_dynamic_module_callback_lb_context_get_downstream_headers_size(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers is called by the module to get
+ * all the downstream request headers. The headers are returned as an array of
+ * envoy_dynamic_module_type_envoy_http_header.
+ *
+ * PRECONDITION: The module must ensure that the result_headers is valid and has enough length to
+ * store all the headers. The module can use
+ * envoy_dynamic_module_callback_lb_context_get_downstream_headers_size to get the number of
+ * headers before calling this function.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param result_headers is the pointer to the array of envoy_dynamic_module_type_envoy_http_header
+ * where the headers will be stored. The lifetime of the buffer of key and value of each header is
+ * guaranteed until the end of the current choose_host callback.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_get_downstream_headers(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_downstream_header is called by the module to get
+ * the value of the downstream request header with the given key. Since a header can have multiple
+ * values, the index is used to get the specific value. This returns the number of values for the
+ * given key via optional_size, so it can be used to iterate over all values by starting from 0 and
+ * incrementing the index until the return value.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param key is the key of the header.
+ * @param result_buffer is the buffer where the value will be stored. If the key does not exist or
+ * the index is out of range, this will be set to a null buffer (length 0).
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param optional_size is the pointer to the variable where the number of values for the given key
+ * will be stored.
+ * NOTE: This parameter is optional and can be null if the module does not need this information.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_get_downstream_header(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t index, size_t* optional_size);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count returns the number
+ * of times host selection should be retried if the chosen host is rejected by
+ * shouldSelectAnotherHost. Built-in load balancers use this value as the upper bound of a
+ * retry loop during host selection.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @return the maximum number of host selection retries, or 0 if the context is null.
+ */
+uint32_t envoy_dynamic_module_callback_lb_context_get_host_selection_retry_count(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_should_select_another_host checks whether the
+ * load balancer should reject the given host and retry selection. This is used during retries
+ * to avoid selecting hosts that were already attempted. The host is identified by priority
+ * and index within all hosts at that priority.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @return true if the host should be rejected and selection retried, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_should_select_another_host(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr, uint32_t priority,
+    size_t index);
+
+/**
+ * envoy_dynamic_module_callback_lb_context_get_override_host returns the override host address
+ * and strict mode flag from the load balancer context. Override host allows upstream filters to
+ * direct the load balancer to prefer a specific host by address. Note that override host
+ * resolution is normally handled by the ClusterManager before the load balancer is invoked, so
+ * this callback provides read-only access to the override host preference.
+ *
+ * @param context_envoy_ptr is the pointer to the LoadBalancerContext.
+ * @param address is the output buffer for the override host address string. The buffer points to
+ * Envoy-owned memory valid for the duration of the context.
+ * @param strict is the output for the strict mode flag. When true, the load balancer should
+ * return nullptr if the override host is not valid. When false, the load balancer should fall
+ * back to normal selection.
+ * @return true if an override host is set, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_context_get_override_host(
+    envoy_dynamic_module_type_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address, bool* strict);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_member_update_host_address returns the address of an added
+ * or removed host during the on_host_membership_update event hook. This callback is only valid
+ * during envoy_dynamic_module_on_lb_on_host_membership_update.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param index is the index of the host in the added or removed list.
+ * @param is_added is true to get an added host address, false to get a removed host address.
+ * @param result is the output buffer for the host address string. The buffer points to Envoy-owned
+ * memory that is valid only for the duration of the on_host_membership_update callback.
+ * @return true if the host was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_lb_get_member_update_host_address(
+    envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_lb_get_host_stat returns the value of a per-host stat
+ * identified by the stat enum. This provides access to host-level counters and gauges such as
+ * total connections, request errors, active requests, and active connections.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy load balancer object.
+ * @param priority is the priority level.
+ * @param index is the index of the host within all hosts.
+ * @param stat is the host stat to query.
+ * @return the stat value, or 0 if the host was not found or the stat is invalid.
+ */
+uint64_t
+envoy_dynamic_module_callback_lb_get_host_stat(envoy_dynamic_module_type_lb_envoy_ptr lb_envoy_ptr,
+                                               uint32_t priority, size_t index,
+                                               envoy_dynamic_module_type_host_stat stat);
+
+// =============================================================================
+// Load Balancer Callbacks - Metrics
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_lb_config_define_counter is called by the module during
+ * initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig in which the counter
+ * will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_lb_config_increment_counter together with
+ * lb_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_lb_config_define_counter(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_config_increment_counter is called by the module to increment
+ * a previously defined counter.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_lb_config_increment_counter(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_lb_config_define_gauge is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and labels
+ * during the lifecycle of the module.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig in which the gauge
+ * will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_lb_config_set_gauge together with
+ * lb_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_lb_config_define_gauge(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_config_set_gauge is called by the module to set the value of a
+ * previously defined gauge.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be set.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_lb_config_set_gauge(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_lb_config_increment_gauge is called by the module to increase the
+ * value of a previously defined gauge.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be increased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_lb_config_increment_gauge(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_lb_config_decrement_gauge is called by the module to decrease the
+ * value of a previously defined gauge.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be decreased.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_lb_config_decrement_gauge(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_lb_config_define_histogram is called by the module during
+ * initialization to create a template for generating Stats::Histograms with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig in which the histogram
+ * will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * This can be passed to envoy_dynamic_module_callback_lb_config_record_histogram_value together
+ * with lb_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_lb_config_define_histogram(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_lb_config_record_histogram_value is called by the module to record
+ * a value in a previously defined histogram.
+ *
+ * @param lb_config_envoy_ptr is the pointer to the DynamicModuleLbConfig.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_lb_config_record_histogram_value(
+    envoy_dynamic_module_type_lb_config_envoy_ptr lb_config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// =============================================================================
+// Matcher Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_matcher_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleInputMatcher class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_matcher_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_config_module_ptr is a pointer to an in-module matcher
+ * configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_matcher_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_input_envoy_ptr is a raw pointer to the matcher input in Envoy.
+ * This represents the matching data available during a single match evaluation.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the match event hook.
+ */
+typedef void* envoy_dynamic_module_type_matcher_input_envoy_ptr;
+
+// =============================================================================
+// Matcher Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_matcher_config_new is called when a new matcher configuration
+ * is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleInputMatcher object.
+ * @param name is the matcher config name.
+ * @param config is the configuration for the matcher.
+ * @return a pointer to the in-module matcher configuration. Returning nullptr
+ *         indicates a failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_matcher_config_module_ptr envoy_dynamic_module_on_matcher_config_new(
+    envoy_dynamic_module_type_matcher_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_matcher_config_destroy is called when the matcher configuration
+ * is destroyed.
+ *
+ * @param config_module_ptr is a pointer to the in-module matcher configuration.
+ */
+void envoy_dynamic_module_on_matcher_config_destroy(
+    envoy_dynamic_module_type_matcher_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_matcher_match is called when a match evaluation occurs.
+ * This is called on worker threads.
+ *
+ * The matcher_input_envoy_ptr is only valid during this callback. The module must not store
+ * this pointer or use it after the callback returns. The module can use the matcher
+ * callbacks (e.g. envoy_dynamic_module_callback_matcher_get_header_value) to access the
+ * matching data during this callback.
+ *
+ * @param config_module_ptr is the pointer to the in-module matcher configuration.
+ * @param matcher_input_envoy_ptr is the pointer to the Envoy matcher input (valid during this
+ *        call only).
+ * @return true if the input matches, false otherwise.
+ */
+bool envoy_dynamic_module_on_matcher_match(
+    envoy_dynamic_module_type_matcher_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr);
+
+// =============================================================================
+// Matcher Callbacks
+// =============================================================================
+
+/**
+ * Get the number of headers in the specified header map.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @return the number of headers, or 0 if the header map is not available.
+ */
+size_t envoy_dynamic_module_callback_matcher_get_headers_size(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type);
+
+/**
+ * Get all headers from the specified header map.
+ *
+ * PRECONDITION: The module must ensure that result_headers is valid and has enough length to
+ * store all the headers. Use envoy_dynamic_module_callback_matcher_get_headers_size to get
+ * the number of headers before calling this function.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access.
+ * @param result_headers is the pointer to the array where headers will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_get_headers(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * Get a specific header value by key.
+ *
+ * Since a header can have multiple values, the index is used to get the specific value.
+ * This returns the total number of values for the given key via total_count_out, so it can
+ * be used to iterate over all values by starting from 0 and incrementing the index.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ * @param header_type is the type of header map to access.
+ * @param key is the key of the header to look up.
+ * @param result is the buffer where the header value will be stored.
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param total_count_out is the pointer to the variable where the total number of values for
+ *        the given key will be stored. This parameter is optional and can be null.
+ * @return true if the header value is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_get_header_value(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * Report that the module could not complete a match evaluation, for example because the match hook
+ * panicked. The matcher then applies its configured on_error policy for this evaluation instead of
+ * treating the failure as a no match. The SDK panic barrier invokes this when a match hook panics,
+ * so a hook that returns normally does not trigger it.
+ *
+ * @param matcher_input_envoy_ptr is the pointer to the matcher input.
+ */
+void envoy_dynamic_module_callback_matcher_set_error(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr);
+
+// =============================================================================
+// Matcher Data Input Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleDataInput class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_config_module_ptr is a pointer to an in-module
+ * matcher data input configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_matcher_data_input_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_matcher_data_input_envoy_ptr is a raw pointer to the matcher data input
+ * in Envoy. This represents the matching data available during a single get evaluation.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the get event hook.
+ */
+typedef void* envoy_dynamic_module_type_matcher_data_input_envoy_ptr;
+
+// =============================================================================
+// Matcher Data Input Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_config_new is called when a new matcher data input
+ * configuration is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleDataInput object.
+ * @param name is the data input config name.
+ * @param config is the configuration for the data input.
+ * @return a pointer to the in-module data input configuration. Returning nullptr indicates a
+ *         failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_matcher_data_input_config_module_ptr
+envoy_dynamic_module_on_matcher_data_input_config_new(
+    envoy_dynamic_module_type_matcher_data_input_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_config_destroy is called when the matcher data input
+ * configuration is destroyed.
+ *
+ * @param config_module_ptr is a pointer to the in-module data input configuration.
+ */
+void envoy_dynamic_module_on_matcher_data_input_config_destroy(
+    envoy_dynamic_module_type_matcher_data_input_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_matcher_data_input_get is called to extract a value used for matching.
+ * This is called on worker threads.
+ *
+ * The data_input_envoy_ptr is only valid during this callback. The module must not store this
+ * pointer or use it after the callback returns. The module reads matching data with the matcher
+ * data input callbacks (e.g. envoy_dynamic_module_callback_matcher_data_input_get_header_value) and
+ * provides the extracted value with envoy_dynamic_module_callback_matcher_data_input_set_result.
+ * When the module does not set a result, Envoy treats the input as having no value.
+ *
+ * @param config_module_ptr is the pointer to the in-module data input configuration.
+ * @param data_input_envoy_ptr is the pointer to the Envoy matcher data input (valid during this
+ *        call only).
+ */
+void envoy_dynamic_module_on_matcher_data_input_get(
+    envoy_dynamic_module_type_matcher_data_input_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr);
+
+// =============================================================================
+// Matcher Data Input Callbacks
+// =============================================================================
+
+/**
+ * Get a specific header value by key during a matcher data input get evaluation.
+ *
+ * Since a header can have multiple values, the index is used to get the specific value. This
+ * returns the total number of values for the given key via total_count_out, so it can be used to
+ * iterate over all values by starting from 0 and incrementing the index.
+ *
+ * @param data_input_envoy_ptr is the pointer to the matcher data input.
+ * @param header_type is the type of header map to access. Supported types are RequestHeader,
+ *        ResponseHeader, and ResponseTrailer.
+ * @param key is the key of the header to look up.
+ * @param result is the buffer where the header value will be stored.
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param total_count_out is the pointer to the variable where the total number of values for the
+ *        given key will be stored. This parameter is optional and can be null.
+ * @return true if the header value is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_matcher_data_input_get_header_value(
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr,
+    envoy_dynamic_module_type_http_header_type header_type,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * Set the value extracted by the module for this get evaluation. Envoy copies the buffer, so the
+ * module may release it after this call returns. Calling this more than once overwrites the
+ * previous value. When this is not called, the input is treated as having no value.
+ *
+ * @param data_input_envoy_ptr is the pointer to the matcher data input.
+ * @param result is the value extracted by the module, owned by the module and copied by Envoy.
+ */
+void envoy_dynamic_module_callback_matcher_data_input_set_result(
+    envoy_dynamic_module_type_matcher_data_input_envoy_ptr data_input_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer result);
+
+// =============================================================================
+// ============================ Cert Validator ==================================
+// =============================================================================
+//
+// This extension enables custom TLS certificate validation via dynamic modules.
+// It integrates with Envoy's custom_validator_config in CertificateValidationContext,
+// registered under the envoy.tls.cert_validator category.
+//
+// The module receives DER-encoded certificates during validation and returns
+// a result indicating success or failure with optional TLS alert and error details.
+
+// =============================================================================
+// Cert Validator Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_cert_validator_config_envoy_ptr is an opaque Envoy pointer for cert
+ * validator hooks. During config creation it identifies the cert validator configuration. During
+ * cert chain verification it identifies the active verification call and must be passed back to the
+ * cert validator callbacks. It is valid only for the duration of the hook that provides it.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_cert_validator_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_config_module_ptr is a pointer to the in-module cert
+ * validator configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cert_validator_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_validation_status represents the status of the
+ * certificate chain validation. This corresponds to ValidationResults::ValidationStatus in
+ * cert_validator.h.
+ *
+ * Note: Pending (asynchronous) validation is not supported.
+ */
+typedef enum envoy_dynamic_module_type_cert_validator_validation_status {
+  envoy_dynamic_module_type_cert_validator_validation_status_Successful = 0,
+  envoy_dynamic_module_type_cert_validator_validation_status_Failed = 1,
+} envoy_dynamic_module_type_cert_validator_validation_status;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_client_validation_status represents the detailed client
+ * validation status. This corresponds to Ssl::ClientValidationStatus in
+ * ssl_socket_extended_info.h.
+ */
+typedef enum envoy_dynamic_module_type_cert_validator_client_validation_status {
+  envoy_dynamic_module_type_cert_validator_client_validation_status_NotValidated = 0,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_NoClientCertificate = 1,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_Validated = 2,
+  envoy_dynamic_module_type_cert_validator_client_validation_status_Failed = 3,
+} envoy_dynamic_module_type_cert_validator_client_validation_status;
+
+/**
+ * envoy_dynamic_module_type_cert_validator_validation_result is the result of a certificate chain
+ * verification. Returned by the envoy_dynamic_module_on_cert_validator_do_verify_cert_chain event
+ * hook.
+ *
+ * Error details, if any, should be set via the
+ * envoy_dynamic_module_callback_cert_validator_set_error_details callback before returning.
+ */
+typedef struct envoy_dynamic_module_type_cert_validator_validation_result {
+  // The overall validation status (Successful or Failed).
+  envoy_dynamic_module_type_cert_validator_validation_status status;
+  // The detailed client validation status.
+  envoy_dynamic_module_type_cert_validator_client_validation_status detailed_status;
+  // The TLS alert code to send on failure (e.g. SSL_AD_BAD_CERTIFICATE).
+  uint8_t tls_alert;
+  // Whether the tls_alert field is set.
+  bool has_tls_alert;
+} envoy_dynamic_module_type_cert_validator_validation_result;
+
+// =============================================================================
+// Cert Validator Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cert_validator_config_new is called by the main thread when the cert
+ * validator config is loaded. The function returns a
+ * envoy_dynamic_module_type_cert_validator_config_module_ptr for given name and config.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleCertValidatorConfig object for the
+ * corresponding config.
+ * @param name is the name of the validator owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @return envoy_dynamic_module_type_cert_validator_config_module_ptr is the pointer to the
+ * in-module cert validator configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the cert validator configuration will be rejected.
+ */
+envoy_dynamic_module_type_cert_validator_config_module_ptr
+envoy_dynamic_module_on_cert_validator_config_new(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_config_destroy is called when the cert validator
+ * configuration is destroyed in Envoy. The module should release any resources associated with
+ * the corresponding in-module cert validator configuration.
+ *
+ * @param config_module_ptr is a pointer to the in-module cert validator configuration whose
+ * corresponding Envoy cert validator configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_cert_validator_config_destroy(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_do_verify_cert_chain is called to verify a certificate
+ * chain during a TLS handshake. The certificates are provided as DER-encoded buffers. The first
+ * certificate (index 0) is the leaf certificate.
+ *
+ * The certs array and its buffer contents are owned by Envoy and are valid only for the duration
+ * of this event hook call.
+ *
+ * @param config_envoy_ptr identifies this verification call and must be passed back to the cert
+ *        validator callbacks.
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param certs is an array of DER-encoded certificate buffers.
+ * @param certs_count is the number of certificates in the array.
+ * @param host_name is the SNI host name for validation.
+ * @param is_server is true if the validation is on the server side (validating client certs).
+ * @return envoy_dynamic_module_type_cert_validator_validation_result is the validation result.
+ */
+envoy_dynamic_module_type_cert_validator_validation_result
+envoy_dynamic_module_on_cert_validator_do_verify_cert_chain(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer* certs, size_t certs_count,
+    envoy_dynamic_module_type_envoy_buffer host_name, bool is_server);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode is called during SSL context
+ * initialization to get the SSL verify mode flags that should be applied to SSL contexts.
+ *
+ * The return value should be a combination of SSL_VERIFY_* flags (e.g. SSL_VERIFY_PEER,
+ * SSL_VERIFY_FAIL_IF_NO_PEER_CERT). Returning 0 means SSL_VERIFY_NONE.
+ *
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param handshaker_provides_certificates is true if the handshaker provides certificates itself.
+ * @return int the SSL verify mode flags.
+ */
+int envoy_dynamic_module_on_cert_validator_get_ssl_verify_mode(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    bool handshaker_provides_certificates);
+
+/**
+ * envoy_dynamic_module_on_cert_validator_update_digest is called to contribute to the session
+ * context hash. The module should provide bytes that uniquely identify its validation configuration
+ * so that configuration changes invalidate existing TLS sessions. Envoy reads the buffer
+ * immediately after this event hook returns, so it must remain valid until then.
+ *
+ * @param config_module_ptr is the pointer to the in-module cert validator configuration.
+ * @param out_data is a pointer to a buffer that the module should fill with the digest data.
+ * The module should set the ptr and length fields.
+ */
+void envoy_dynamic_module_on_cert_validator_update_digest(
+    envoy_dynamic_module_type_cert_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_module_buffer* out_data);
+
+// =============================================================================
+// Cert Validator Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_set_error_details is called by the module during
+ * envoy_dynamic_module_on_cert_validator_do_verify_cert_chain to set error details for a failed
+ * validation. Envoy copies the provided buffer immediately, so the module does not need to keep
+ * the buffer alive after this call returns.
+ *
+ * This must only be called from within the do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
+ * @param error_details is the error details string owned by the module.
+ */
+void envoy_dynamic_module_callback_cert_validator_set_error_details(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer error_details);
+
+// ------------------------- Filter State Operations ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_set_filter_state is called by the module to
+ * set a string value in filter state with Connection life span. This must only be called from
+ * within the do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
+ * @param key is the key string owned by the module.
+ * @param value is the value string owned by the module.
+ * @return true if the operation was successful, false otherwise (e.g. no connection context
+ * available or the key already exists and is read-only).
+ */
+bool envoy_dynamic_module_callback_cert_validator_set_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cert_validator_get_filter_state is called by the module to
+ * get a string value from filter state. This must only be called from within the
+ * do_verify_cert_chain event hook.
+ *
+ * @param config_envoy_ptr is the verification call pointer provided to do_verify_cert_chain.
+ * @param key is the key string owned by the module.
+ * @param value_out is the output buffer where the value owned by Envoy will be stored.
+ * @return true if the value was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cert_validator_get_filter_state(
+    envoy_dynamic_module_type_cert_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+// =============================================================================
+// ============================ TLS Handshaker =================================
+// =============================================================================
+//
+// This extension enables custom TLS handshakers via dynamic modules. It integrates with Envoy's
+// custom_handshaker in CommonTlsContext, registered under the envoy.tls_handshakers category, and
+// is used for both client and server TLS contexts.
+//
+// The module declares its capabilities and may configure the SSL_CTX during context creation. For
+// each connection the module can optionally drive the handshake on the SSL object and report the
+// outcome, or return RunDefault to let Envoy run the standard handshake step. A module that only
+// configures the SSL_CTX reuses the default handshake.
+
+// =============================================================================
+// TLS Handshaker Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr is a pointer to the
+ * DynamicModuleHandshakerConfig object in Envoy passed to the module during config creation.
+ *
+ * OWNERSHIP: Envoy owns this object. The pointer remains stable until
+ * envoy_dynamic_module_on_tls_handshaker_config_destroy returns for the corresponding in-module
+ * config.
+ */
+typedef void* envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_config_module_ptr is a pointer to the in-module
+ * handshaker configuration created and owned by the module. It is shared across all connections
+ * using the handshaker.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_tls_handshaker_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_module_ptr is a pointer to a per-connection in-module
+ * handshaker created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_tls_handshaker_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_ssl_ctx_ptr is an opaque pointer to the BoringSSL
+ * SSL_CTX passed to envoy_dynamic_module_on_tls_handshaker_configure_ssl_context. A module that
+ * uses it must link the same BoringSSL ABI as Envoy. It is valid only for the duration of that
+ * hook.
+ *
+ * OWNERSHIP: Envoy owns this pointer.
+ */
+typedef void* envoy_dynamic_module_type_tls_handshaker_ssl_ctx_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_ssl_ptr is an opaque pointer to the per-connection
+ * BoringSSL SSL object passed to envoy_dynamic_module_on_tls_handshaker_new. A module that uses it
+ * must link the same BoringSSL ABI as Envoy. It remains valid for the lifetime of the connection
+ * handshaker.
+ *
+ * OWNERSHIP: Envoy owns this pointer.
+ */
+typedef void* envoy_dynamic_module_type_tls_handshaker_ssl_ptr;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_result is returned by
+ * envoy_dynamic_module_on_tls_handshaker_handshake to report the outcome of a handshake step. Envoy
+ * applies the matching Ssl::SocketState transition and the success or failure notification, so the
+ * module does not call back into Envoy to do so.
+ */
+typedef enum envoy_dynamic_module_type_tls_handshaker_result {
+  // The module did not drive the handshake, so Envoy runs the standard handshake step.
+  envoy_dynamic_module_type_tls_handshaker_result_RunDefault = 0,
+  // The handshake completed. Envoy marks it complete and notifies success.
+  envoy_dynamic_module_type_tls_handshaker_result_Complete = 1,
+  // The handshake failed. Envoy notifies failure and closes the connection.
+  envoy_dynamic_module_type_tls_handshaker_result_Failed = 2,
+  // The handshake needs more data from the connection.
+  envoy_dynamic_module_type_tls_handshaker_result_WaitForData = 3,
+  // The handshake is blocked on an Envoy-managed asynchronous operation, such as an asynchronous
+  // private key provider or certificate validation. Envoy re-invokes the handshake hook when the
+  // operation completes.
+  envoy_dynamic_module_type_tls_handshaker_result_Pending = 4,
+} envoy_dynamic_module_type_tls_handshaker_result;
+
+/**
+ * envoy_dynamic_module_type_tls_handshaker_capabilities declares which TLS behaviors the handshaker
+ * implements itself. This corresponds to Ssl::HandshakerCapabilities. Envoy initializes the struct
+ * with the default capabilities before calling envoy_dynamic_module_on_tls_handshaker_config_new,
+ * and the module overrides the fields it cares about.
+ */
+typedef struct envoy_dynamic_module_type_tls_handshaker_capabilities {
+  // Whether the handshaker provides certificates itself.
+  bool provides_certificates;
+  // Whether the handshaker verifies peer certificates itself.
+  bool verifies_peer_certificates;
+  // Whether the handshaker handles session resumption itself.
+  bool handles_session_resumption;
+  // Whether the handshaker provides its own ciphers and curves.
+  bool provides_ciphers_and_curves;
+  // Whether the handshaker handles ALPN selection.
+  bool handles_alpn_selection;
+  // Whether the handshaker is FIPS compliant. Defaults to true.
+  bool is_fips_compliant;
+  // Whether the handshaker provides its own signature algorithms.
+  bool provides_sigalgs;
+} envoy_dynamic_module_type_tls_handshaker_capabilities;
+
+// =============================================================================
+// TLS Handshaker Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_config_new is called by the main thread when the
+ * handshaker config is loaded. The module returns a config pointer and fills the capabilities
+ * struct.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleHandshakerConfig object for the
+ * corresponding config.
+ * @param name is the name of the handshaker owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @param capabilities is pre-filled with the default capabilities and may be overridden by the
+ * module. Envoy reads it immediately after this hook returns.
+ * @return envoy_dynamic_module_type_tls_handshaker_config_module_ptr is the pointer to the
+ * in-module handshaker configuration. Returning nullptr indicates a failure to initialize the
+ * module, and the configuration is rejected.
+ */
+envoy_dynamic_module_type_tls_handshaker_config_module_ptr
+envoy_dynamic_module_on_tls_handshaker_config_new(
+    envoy_dynamic_module_type_tls_handshaker_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config,
+    envoy_dynamic_module_type_tls_handshaker_capabilities* capabilities);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_config_destroy is called when the handshaker configuration
+ * is destroyed in Envoy. The module should release any resources associated with the in-module
+ * configuration. This may run on a worker thread when a draining connection outlives the
+ * configuration, so it must not assume the main thread.
+ *
+ * @param config_module_ptr is the pointer to the in-module handshaker configuration being
+ * destroyed.
+ */
+void envoy_dynamic_module_on_tls_handshaker_config_destroy(
+    envoy_dynamic_module_type_tls_handshaker_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_configure_ssl_context is an optional hook called once per
+ * SSL_CTX during context creation on the main thread. The module may configure the context, for
+ * example to install a PSK callback. If the module does not export this hook, Envoy leaves the
+ * context unchanged.
+ *
+ * @param config_module_ptr is the pointer to the in-module handshaker configuration.
+ * @param ssl_ctx is the opaque BoringSSL SSL_CTX to configure. It is valid only for this call.
+ * @return true if the configuration succeeded. Returning false is logged and the context is used as
+ * is.
+ */
+bool envoy_dynamic_module_on_tls_handshaker_configure_ssl_context(
+    envoy_dynamic_module_type_tls_handshaker_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_tls_handshaker_ssl_ctx_ptr ssl_ctx);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_new is an optional hook called when a new connection
+ * handshaker is created on that connection's worker thread. If the module does not export this
+ * hook, no per-connection module handshaker is created and the module pointer passed to the
+ * handshake hook is nullptr. If the module exports this hook it must also export
+ * envoy_dynamic_module_on_tls_handshaker_destroy.
+ *
+ * @param config_module_ptr is the pointer to the in-module handshaker configuration.
+ * @param ssl is the opaque BoringSSL SSL object for the connection. It remains valid until
+ * envoy_dynamic_module_on_tls_handshaker_destroy is called.
+ * @return envoy_dynamic_module_type_tls_handshaker_module_ptr is the pointer to the per-connection
+ * in-module handshaker. Returning nullptr indicates a failure, and the connection is closed.
+ */
+envoy_dynamic_module_type_tls_handshaker_module_ptr envoy_dynamic_module_on_tls_handshaker_new(
+    envoy_dynamic_module_type_tls_handshaker_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_tls_handshaker_ssl_ptr ssl);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_destroy is an optional hook called on the connection's
+ * worker thread when a connection handshaker is destroyed. The module should release any resources
+ * associated with the per-connection in-module handshaker.
+ *
+ * @param handshaker_module_ptr is the pointer to the per-connection in-module handshaker being
+ * destroyed.
+ */
+void envoy_dynamic_module_on_tls_handshaker_destroy(
+    envoy_dynamic_module_type_tls_handshaker_module_ptr handshaker_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tls_handshaker_handshake is an optional hook called to advance the TLS
+ * handshake on the connection's worker thread. A module that drives the handshake itself operates
+ * on the SSL object from envoy_dynamic_module_on_tls_handshaker_new and returns the resulting
+ * state. A module that does not drive the handshake returns RunDefault so Envoy runs the standard
+ * step. If the module does not export this hook, Envoy runs the standard handshake directly.
+ *
+ * @param handshaker_module_ptr is the per-connection in-module handshaker, or nullptr if the module
+ * does not export envoy_dynamic_module_on_tls_handshaker_new.
+ * @return envoy_dynamic_module_type_tls_handshaker_result is the outcome of the handshake step.
+ */
+envoy_dynamic_module_type_tls_handshaker_result envoy_dynamic_module_on_tls_handshaker_handshake(
+    envoy_dynamic_module_type_tls_handshaker_module_ptr handshaker_module_ptr);
+
+// =============================================================================
+// =========================== Config Validator ================================
+// =============================================================================
+//
+// This extension enables xDS config validation via dynamic modules. During a State-of-the-World or
+// delta xDS update, the module receives the xDS resource type URL and the decoded resources, each
+// carrying its name, version, aliases, TTL, and serialized protobuf payload. The module can also
+// read current server state, such as the dynamic cluster count, through the validation context.
+// Returning false from a validation hook rejects the xDS update, and Envoy sends a normal xDS NACK.
+
+// =============================================================================
+// Config Validator Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_config_validator_config_envoy_ptr is a pointer to the
+ * DynamicModuleConfigValidatorConfig object in Envoy passed to the module during config creation.
+ *
+ * OWNERSHIP: Envoy owns this object. The pointer remains stable until
+ * envoy_dynamic_module_on_config_validator_config_destroy returns for the corresponding in-module
+ * config.
+ */
+typedef void* envoy_dynamic_module_type_config_validator_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_config_validator_config_module_ptr is a pointer to the in-module config
+ * validator configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_config_validator_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_config_validator_context_envoy_ptr is a pointer to the per-call
+ * validation context in Envoy. It is passed to a validation event hook and to the callbacks the
+ * module invokes from within that hook, giving access to the rejection message and current server
+ * state.
+ *
+ * OWNERSHIP: Envoy owns this object. The pointer is valid only for the duration of the validation
+ * event hook call. Modules must not retain it.
+ */
+typedef void* envoy_dynamic_module_type_config_validator_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_config_validator_resource is a decoded xDS resource passed to a config
+ * validator.
+ *
+ * All buffers and arrays referenced by this struct are owned by Envoy and are valid only for the
+ * duration of the validation event hook call. Modules must copy any data they need to retain after
+ * returning. When has_resource is false, serialized_resource is {NULL, 0} while the other fields
+ * remain valid. A payload-less entry can represent a State-of-the-World heartbeat resource or a
+ * delta unresolved alias.
+ */
+typedef struct envoy_dynamic_module_type_config_validator_resource {
+  // Resource name from Config::DecodedResource::name().
+  envoy_dynamic_module_type_envoy_buffer name;
+  // Resource version from Config::DecodedResource::version().
+  envoy_dynamic_module_type_envoy_buffer version;
+  // Resource aliases from Config::DecodedResource::aliases(). aliases is NULL when aliases_count is
+  // zero.
+  const envoy_dynamic_module_type_envoy_buffer* aliases;
+  // The number of aliases in the aliases array.
+  size_t aliases_count;
+  // Whether the resource carries a TTL, from Config::DecodedResource::ttl().
+  bool has_ttl;
+  // The resource TTL in milliseconds. Only meaningful when has_ttl is true.
+  uint64_t ttl_milliseconds;
+  // Whether the xDS resource envelope contains a resource payload.
+  bool has_resource;
+  // Serialized protobuf bytes for Config::DecodedResource::resource().
+  envoy_dynamic_module_type_envoy_buffer serialized_resource;
+} envoy_dynamic_module_type_config_validator_resource;
+
+// =============================================================================
+// Config Validator Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_config_validator_config_new is called by the main thread when the config
+ * validator configuration is loaded.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleConfigValidatorConfig object.
+ * @param name is the extension name owned by Envoy and valid only for the duration of this call.
+ * @param config is the extension configuration bytes owned by Envoy and valid only for the duration
+ * of this call.
+ * @return a pointer to the in-module config validator configuration. Returning nullptr indicates a
+ * failure to initialize the module, and the Envoy configuration is rejected.
+ */
+envoy_dynamic_module_type_config_validator_config_module_ptr
+envoy_dynamic_module_on_config_validator_config_new(
+    envoy_dynamic_module_type_config_validator_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_config_validator_config_destroy is called when the config validator
+ * configuration is destroyed in Envoy. The module should release any resources associated with the
+ * in-module config validator configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module config validator configuration.
+ */
+void envoy_dynamic_module_on_config_validator_config_destroy(
+    envoy_dynamic_module_type_config_validator_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_config_validator_validate is called for State-of-the-World xDS updates
+ * before Envoy accepts the update.
+ *
+ * The resources array and all buffers it references are owned by Envoy and are valid only for the
+ * duration of this call. Modules must copy any data they need to retain. The resources pointer may
+ * be NULL when resources_count is zero.
+ *
+ * @param context_envoy_ptr is the pointer to the per-call validation context.
+ * @param config_module_ptr is the pointer to the in-module config validator configuration.
+ * @param type_url is the xDS resource type URL for the update.
+ * @param resources is an array of decoded resources, each carrying its name, version, aliases, TTL,
+ * and serialized protobuf payload.
+ * @param resources_count is the number of resources in the array.
+ * @return true if the update is accepted, false if the update is rejected. A rejection reason may
+ * be set with envoy_dynamic_module_callback_config_validator_set_rejection_message before
+ * returning. If no reason is set, or it is empty, Envoy uses a generic rejection message.
+ */
+bool envoy_dynamic_module_on_config_validator_validate(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_config_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer type_url,
+    const envoy_dynamic_module_type_config_validator_resource* resources, size_t resources_count);
+
+/**
+ * envoy_dynamic_module_on_config_validator_validate_delta is called for delta xDS updates before
+ * Envoy accepts the update.
+ *
+ * The added_resources array, removed_resources array, and all buffers they reference are owned by
+ * Envoy and are valid only for the duration of this call. Modules must copy any data they need to
+ * retain. Either array pointer may be NULL when its count is zero. Envoy can also invoke this delta
+ * hook when a resource TTL expires, including for a State-of-the-World subscription.
+ *
+ * @param context_envoy_ptr is the pointer to the per-call validation context.
+ * @param config_module_ptr is the pointer to the in-module config validator configuration.
+ * @param type_url is the xDS resource type URL for the update.
+ * @param added_resources is an array of added or modified resources, each carrying its name,
+ * version, aliases, TTL, and serialized protobuf payload.
+ * @param added_resources_count is the number of added or modified resources in the array.
+ * @param removed_resources is an array of removed resource names.
+ * @param removed_resources_count is the number of removed resource names in the array.
+ * @return true if the update is accepted, false if the update is rejected. A rejection reason may
+ * be set with envoy_dynamic_module_callback_config_validator_set_rejection_message before
+ * returning. If no reason is set, or it is empty, Envoy uses a generic rejection message.
+ */
+bool envoy_dynamic_module_on_config_validator_validate_delta(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_config_validator_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer type_url,
+    const envoy_dynamic_module_type_config_validator_resource* added_resources,
+    size_t added_resources_count, const envoy_dynamic_module_type_envoy_buffer* removed_resources,
+    size_t removed_resources_count);
+
+// =============================================================================
+// Config Validator Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_config_validator_set_rejection_message is called by the module
+ * during a validation event hook to set the rejection message for a failed validation. Envoy copies
+ * the buffer immediately, so the module does not need to keep it alive after this call returns.
+ *
+ * This must only be called from within a config validator validation event hook, which runs on
+ * Envoy's main thread, so this callback must also be called on the main thread.
+ *
+ * @param context_envoy_ptr is the pointer to the per-call validation context.
+ * @param rejection_message is the rejection details string owned by the module. An empty message is
+ * treated the same as not setting a rejection message.
+ */
+void envoy_dynamic_module_callback_config_validator_set_rejection_message(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer rejection_message);
+
+/**
+ * envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count returns the number of
+ * clusters currently added via the xDS API (dynamic clusters, as opposed to statically configured
+ * ones). This matches the count Envoy's built-in config validation uses for CDS, so a module can
+ * reject a CDS update that would drop the dynamic cluster count below a threshold.
+ *
+ * This must only be called from within a config validator validation event hook, which runs on
+ * Envoy's main thread, so this callback must also be called on the main thread.
+ *
+ * @param context_envoy_ptr is the pointer to the per-call validation context.
+ * @return the number of clusters currently added via the xDS API, or 0 if the context is invalid.
+ */
+uint64_t envoy_dynamic_module_callback_config_validator_get_dynamic_cluster_count(
+    envoy_dynamic_module_type_config_validator_context_envoy_ptr context_envoy_ptr);
+
+// =============================================================================
+// ========================= Upstream HTTP TCP Bridge ===========================
+// =============================================================================
+//
+// This extension enables custom HTTP-to-TCP protocol bridging via dynamic modules.
+// It implements the Router::GenericConnPoolFactory interface, allowing modules to
+// transform HTTP requests into raw TCP data for upstream connections and convert
+// TCP responses back into HTTP responses.
+//
+// The module receives HTTP request headers/body/trailers during the encode path
+// and raw TCP response data during the decode path. The module uses callbacks to
+// read request headers, manipulate request buffers (data sent upstream), and build
+// HTTP responses (headers, body, trailers) from TCP data.
+
+// =============================================================================
+// Upstream HTTP TCP Bridge Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_config_envoy_ptr is a pointer to the
+ * BridgeConfig object in Envoy. This is passed to the module during config creation for
+ * future extensibility.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_upstream_http_tcp_bridge_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr is a pointer to the
+ * in-module bridge configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr is a pointer to the
+ * HttpTcpBridge object in Envoy. This is passed to the module for each per-request bridge
+ * instance and is used as the context for all callback invocations.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr is a pointer to the
+ * in-module per-request bridge instance created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr;
+
+// =============================================================================
+// Upstream HTTP TCP Bridge Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new is called by the main thread when
+ * the bridge configuration is loaded. The function returns a
+ * envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr for given name and config.
+ *
+ * @param config_envoy_ptr is the pointer to the BridgeConfig object for the corresponding config.
+ * @param name is the name of the bridge owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @return envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr is the pointer to
+ * the in-module bridge configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the bridge configuration will be rejected.
+ */
+envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr
+envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy is called when the bridge
+ * configuration is destroyed in Envoy. The module should release any resources associated with
+ * the corresponding in-module bridge configuration.
+ *
+ * @param config_module_ptr is a pointer to the in-module bridge configuration whose corresponding
+ * Envoy bridge configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_new is called when a new per-request bridge
+ * instance is created. This happens for each HTTP request that is routed to a cluster configured
+ * with this upstream bridge.
+ *
+ * @param config_module_ptr is the pointer to the in-module bridge configuration.
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object in Envoy.
+ * @return envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr is the pointer to the
+ * in-module per-request bridge instance. Returning nullptr indicates a failure to create the
+ * bridge.
+ */
+envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr
+envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers is called when the HTTP request
+ * headers are being encoded for the upstream. The module can read request headers via header
+ * callbacks and use send_upstream_data or send_response to act on the request.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param bridge_module_ptr is the pointer to the in-module per-request bridge instance.
+ * @param end_of_stream is true if this is the final frame (header-only request).
+ */
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
+    bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data is called when the HTTP request
+ * body data is being encoded for the upstream. The module can read the current request body data
+ * via get_request_buffer and use send_upstream_data to forward data to the TCP upstream.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param bridge_module_ptr is the pointer to the in-module per-request bridge instance.
+ * @param end_of_stream is true if this is the final data frame.
+ */
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
+    bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers is called when the HTTP request
+ * trailers are being encoded for the upstream. The module can use send_upstream_data to forward
+ * any remaining data to the TCP upstream.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param bridge_module_ptr is the pointer to the in-module per-request bridge instance.
+ */
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data is called when raw TCP data
+ * is received from the upstream connection. The module should read the TCP data via
+ * get_response_buffer, process it, and send the HTTP response using send_response_headers,
+ * send_response_data, and send_response_trailers callbacks.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param bridge_module_ptr is the pointer to the in-module per-request bridge instance.
+ * @param end_of_stream is true if the upstream connection has closed (no more data).
+ */
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr,
+    bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy is called when the per-request bridge
+ * instance is being destroyed. The module should release any resources associated with the
+ * bridge instance.
+ *
+ * @param bridge_module_ptr is a pointer to the in-module per-request bridge instance.
+ */
+void envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr bridge_module_ptr);
+
+// =============================================================================
+// Upstream HTTP TCP Bridge Callbacks
+// =============================================================================
+
+// ----------------------- Request Header Operations ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header is called by the
+ * module to get a request header value by key. Since a header can have multiple values, the
+ * index is used to get the specific value.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param key is the key of the header to look up.
+ * @param result is the buffer where the header value will be stored.
+ * @param index is the index of the header value in the list of values for the given key.
+ * @param total_count_out is the pointer to the variable where the total number of values for
+ *        the given key will be stored. This parameter is optional and can be null.
+ * @return true if the header value is found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_header(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size is called by
+ * the module to get the number of request headers.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @return the number of request headers. 0 if there are no headers or headers could not be
+ * retrieved.
+ */
+size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers is called by the
+ * module to get all request headers.
+ *
+ * PRECONDITION: The module must ensure that result_headers is valid and has enough length to
+ * store all the headers. Use get_request_headers_size to get the number of headers first.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param result_headers is the pointer to the array where headers will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+// ----------------------- Request Buffer Operations ---------------------------
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer is called by the
+ * module to get the current request body data as a series of buffer slices. During encode_data,
+ * this contains the current body chunk. During encode_headers, the buffer is initially empty.
+ *
+ * PRECONDITION: The module must ensure that result_buffer has enough length to store all the
+ * slices. Use
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size to get
+ * the number of slices first.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param result_buffer is the output array for buffer slices owned by Envoy.
+ * @param result_buffer_length is the output for the number of slices.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t* result_buffer_length);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size is called
+ * by the module to get the number of buffer slices in the current request body data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @return the number of buffer slices. 0 if the buffer is empty or could not be retrieved.
+ */
+size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_buffer_chunks_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
+
+// ----------------------- Response Buffer Operations --------------------------
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer is called by the
+ * module to get the raw TCP data received from the upstream connection as a series of buffer
+ * slices. This is available during on_upstream_data.
+ *
+ * PRECONDITION: The module must ensure that result_buffer has enough length to store all the
+ * slices. Use
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size to get
+ * the number of slices first.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param result_buffer is the output array for buffer slices owned by Envoy.
+ * @param result_buffer_length is the output for the number of slices.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer, size_t* result_buffer_length);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size is called
+ * by the module to get the number of buffer slices in the raw TCP response data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @return the number of buffer slices. 0 if the buffer is empty or could not be retrieved.
+ */
+size_t envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_response_buffer_chunks_size(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr);
+
+// ----------------------- Send Upstream Data ----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data is called by the
+ * module to send transformed data to the TCP upstream connection.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param data is the data to send, owned by the module. Envoy copies the data.
+ * @param end_stream is true to half-close the upstream connection after writing.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_upstream_data(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
+
+// ----------------------- Send Response Operations ----------------------------
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response is called by the module
+ * to send a complete local response to the downstream client, ending the stream. This is useful
+ * for error responses or short-circuit replies that do not require upstream communication.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param status_code is the HTTP status code of the response.
+ * @param headers_vector is the array of response headers owned by the module. Can be null.
+ * @param headers_vector_size is the number of headers in the array.
+ * @param body is the response body, owned by the module.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    uint32_t status_code, envoy_dynamic_module_type_module_http_header* headers_vector,
+    size_t headers_vector_size, envoy_dynamic_module_type_module_buffer body);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_headers is called by the
+ * module to send response headers to the downstream client, optionally ending the stream.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param status_code is the HTTP status code of the response.
+ * @param headers_vector is the array of response headers owned by the module. Can be null.
+ * @param headers_vector_size is the number of headers in the array.
+ * @param end_stream is true to end the stream after sending headers.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_headers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    uint32_t status_code, envoy_dynamic_module_type_module_http_header* headers_vector,
+    size_t headers_vector_size, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_data is called by the
+ * module to send response body data to the downstream client, optionally ending the stream.
+ * This can be called multiple times to stream data.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param data is the response body data, owned by the module. Envoy copies the data.
+ * @param end_stream is true to end the stream after sending data.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_data(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer data, bool end_stream);
+
+/**
+ * envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers is called by the
+ * module to send response trailers to the downstream client, ending the stream.
+ *
+ * @param bridge_envoy_ptr is the pointer to the HttpTcpBridge object.
+ * @param trailers_vector is the array of response trailers owned by the module.
+ * @param trailers_vector_size is the number of trailers in the array.
+ */
+void envoy_dynamic_module_callback_upstream_http_tcp_bridge_send_response_trailers(
+    envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr bridge_envoy_ptr,
+    envoy_dynamic_module_type_module_http_header* trailers_vector, size_t trailers_vector_size);
+
+// =============================================================================
+// ================================== Tracer ===================================
+// =============================================================================
+//
+// This extension enables custom distributed tracing via dynamic modules.
+// It implements the Tracing::Driver and Tracing::Span interfaces, allowing
+// modules to create spans, propagate trace context, set tags, log events,
+// and report traces to arbitrary backends.
+//
+// The module receives trace context (headers) from incoming requests during
+// span creation and can inject trace context into outgoing requests for
+// propagation. The module controls all span lifecycle operations.
+
+// =============================================================================
+// Tracer Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_tracer_config_envoy_ptr is a pointer to the
+ * DynamicModuleTracerConfig object in Envoy. This is passed to the module during config creation.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_tracer_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_tracer_config_module_ptr is a pointer to the
+ * in-module tracer configuration created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_tracer_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_tracer_span_envoy_ptr is a pointer to the
+ * DynamicModuleSpan object in Envoy. This is used as context for trace context
+ * access callbacks during startSpan and injectContext.
+ *
+ * OWNERSHIP: Envoy owns this object.
+ */
+typedef void* envoy_dynamic_module_type_tracer_span_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_tracer_span_module_ptr is a pointer to the
+ * in-module span instance created and owned by the module.
+ *
+ * OWNERSHIP: Module owns this pointer.
+ */
+typedef const void* envoy_dynamic_module_type_tracer_span_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_trace_reason corresponds to Envoy's Tracing::Reason enum.
+ */
+typedef enum envoy_dynamic_module_type_trace_reason {
+  envoy_dynamic_module_type_trace_reason_NotTraceable,
+  envoy_dynamic_module_type_trace_reason_HealthCheck,
+  envoy_dynamic_module_type_trace_reason_Sampling,
+  envoy_dynamic_module_type_trace_reason_ServiceForced,
+  envoy_dynamic_module_type_trace_reason_ClientForced,
+} envoy_dynamic_module_type_trace_reason;
+
+// =============================================================================
+// Tracer Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_tracer_config_new is called by the main thread when the tracer
+ * configuration is loaded. The function returns a module-side config pointer for the given name
+ * and config.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param name is the tracer name owned by Envoy.
+ * @param config is the configuration for the module owned by Envoy.
+ * @return envoy_dynamic_module_type_tracer_config_module_ptr is the pointer to the in-module
+ * tracer configuration. Returning nullptr indicates a failure to initialize the module.
+ * When it fails, the tracer configuration will be rejected.
+ */
+envoy_dynamic_module_type_tracer_config_module_ptr envoy_dynamic_module_on_tracer_config_new(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_tracer_config_destroy is called when the tracer configuration is
+ * destroyed in Envoy. The module should release any resources associated with the corresponding
+ * in-module tracer configuration.
+ *
+ * @param config_module_ptr is a pointer to the in-module tracer configuration whose corresponding
+ * Envoy tracer configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_tracer_config_destroy(
+    envoy_dynamic_module_type_tracer_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tracer_start_span is called when a new span needs to be started
+ * for an incoming request. During this call, the module can use trace context callbacks
+ * (get/set/remove) on span_envoy_ptr to read incoming propagation headers.
+ *
+ * @param config_module_ptr is the pointer to the in-module tracer configuration.
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object in Envoy. This is used
+ * as context for trace context callbacks.
+ * @param operation_name is the operation name for this span.
+ * @param traced is true if this request should be traced based on Envoy's sampling decision.
+ * @param reason is the reason for the tracing decision.
+ * @return envoy_dynamic_module_type_tracer_span_module_ptr is the pointer to the in-module
+ * span instance. Returning nullptr results in a NullSpan being used.
+ */
+envoy_dynamic_module_type_tracer_span_module_ptr envoy_dynamic_module_on_tracer_start_span(
+    envoy_dynamic_module_type_tracer_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer operation_name, bool traced,
+    envoy_dynamic_module_type_trace_reason reason);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_set_operation is called to update the span's operation name.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param operation is the new operation name.
+ */
+void envoy_dynamic_module_on_tracer_span_set_operation(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer operation);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_set_tag is called to set a tag on the span.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param key is the tag key.
+ * @param value is the tag value.
+ */
+void envoy_dynamic_module_on_tracer_span_set_tag(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_reserve_tags is called to reserve capacity for tags that will
+ * be set via envoy_dynamic_module_on_tracer_span_set_tag.
+ *
+ * This is optional. If not implemented by the module, Envoy will skip calling it.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param tags_size is the number of tags that will be set.
+ */
+void envoy_dynamic_module_on_tracer_span_reserve_tags(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, size_t tags_size);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_log is called to record a log event on the span.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param timestamp_ns is the event timestamp in nanoseconds since epoch.
+ * @param event is the event description.
+ */
+void envoy_dynamic_module_on_tracer_span_log(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, int64_t timestamp_ns,
+    envoy_dynamic_module_type_envoy_buffer event);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_finish is called to finish the span and report it.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ */
+void envoy_dynamic_module_on_tracer_span_finish(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_inject_context is called when Envoy needs to propagate
+ * trace context to an upstream request. During this call, the module can use trace context
+ * callbacks (get/set/remove) on span_envoy_ptr to write propagation headers.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object with the outgoing
+ * trace context set. The module should use set/remove callbacks on this pointer.
+ */
+void envoy_dynamic_module_on_tracer_span_inject_context(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_spawn_child is called to create a child span from the
+ * current span.
+ *
+ * @param span_module_ptr is the pointer to the parent in-module span instance.
+ * @param name is the operation name for the child span.
+ * @param start_time_ns is the start time in nanoseconds since epoch.
+ * @return envoy_dynamic_module_type_tracer_span_module_ptr is the pointer to the child in-module
+ * span instance. Returning nullptr results in a NullSpan being used for the child.
+ */
+envoy_dynamic_module_type_tracer_span_module_ptr envoy_dynamic_module_on_tracer_span_spawn_child(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, int64_t start_time_ns);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_set_sampled is called to override the sampling decision.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param sampled is true if the span should be sampled/reported.
+ */
+void envoy_dynamic_module_on_tracer_span_set_sampled(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr, bool sampled);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_use_local_decision is called to query whether the span
+ * uses Envoy's local sampling decision or its own.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @return true if Envoy's sampling decision is used, false if the module has its own.
+ */
+bool envoy_dynamic_module_on_tracer_span_use_local_decision(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_get_baggage is called to retrieve a baggage value by key.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param key is the baggage key.
+ * @param value_out is the output buffer where the baggage value will be stored.
+ * @return true if the baggage key was found, false otherwise.
+ */
+bool envoy_dynamic_module_on_tracer_span_get_baggage(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_module_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_set_baggage is called to set a baggage key/value pair.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param key is the baggage key.
+ * @param value is the baggage value.
+ */
+void envoy_dynamic_module_on_tracer_span_set_baggage(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_envoy_buffer value);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_get_trace_id is called to retrieve the trace ID.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param value_out is the output buffer where the trace ID will be stored. The module must
+ * ensure the underlying memory remains valid until the span is destroyed.
+ * @return true if a trace ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_on_tracer_span_get_trace_id(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_module_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_get_span_id is called to retrieve the span ID.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ * @param value_out is the output buffer where the span ID will be stored. The module must
+ * ensure the underlying memory remains valid until the span is destroyed.
+ * @return true if a span ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_on_tracer_span_get_span_id(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr,
+    envoy_dynamic_module_type_module_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_on_tracer_span_destroy is called when the span is being destroyed.
+ * The module should release any resources associated with the span.
+ *
+ * @param span_module_ptr is the pointer to the in-module span instance.
+ */
+void envoy_dynamic_module_on_tracer_span_destroy(
+    envoy_dynamic_module_type_tracer_span_module_ptr span_module_ptr);
+
+// =============================================================================
+// Tracer Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_value is called by the module to get
+ * a trace context header value by key. This operates on the currently active trace context
+ * (incoming during startSpan, outgoing during injectContext).
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param key is the header key to look up.
+ * @param value_out is the buffer where the header value will be stored.
+ * @return true if the header was found, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_set_trace_context_value is called by the module to set
+ * a trace context header. This is typically used during injectContext to write propagation headers.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param key is the header key to set.
+ * @param value is the header value to set.
+ */
+void envoy_dynamic_module_callback_tracer_set_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_tracer_remove_trace_context_value is called by the module to
+ * remove a trace context header.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param key is the header key to remove.
+ */
+void envoy_dynamic_module_callback_tracer_remove_trace_context_value(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_protocol is called by the module to
+ * get the protocol of the traceable stream (e.g., "HTTP/1.1", "HTTP/2").
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param value_out is the buffer where the protocol string will be stored.
+ * @return true if the protocol is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_protocol(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_host is called by the module to get
+ * the host of the traceable stream.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param value_out is the buffer where the host string will be stored.
+ * @return true if the host is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_host(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_path is called by the module to get
+ * the path of the traceable stream.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param value_out is the buffer where the path string will be stored.
+ * @return true if the path is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_path(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_get_trace_context_method is called by the module to get
+ * the method of the traceable stream.
+ *
+ * @param span_envoy_ptr is the pointer to the DynamicModuleSpan object.
+ * @param value_out is the buffer where the method string will be stored.
+ * @return true if the method is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_tracer_get_trace_context_method(
+    envoy_dynamic_module_type_tracer_span_envoy_ptr span_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* value_out);
+
+/**
+ * envoy_dynamic_module_callback_tracer_define_counter is called by the module during
+ * initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_tracer_increment_counter together with
+ * config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_define_counter(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_tracer_define_gauge is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_define_gauge(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_tracer_define_histogram is called by the module during
+ * initialization to create a template for generating Stats::Histograms with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_define_histogram(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_tracer_increment_counter is called by the module to increment
+ * a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_increment_counter(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_tracer_record_histogram_value is called by the module to
+ * record a value for a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_tracer_record_histogram_value(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_tracer_set_gauge is called by the module to set the value of
+ * a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTracerConfig object.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_tracer_set_gauge(
+    envoy_dynamic_module_type_tracer_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// =============================================================================
+// ================================ DNS Resolver ===============================
+// =============================================================================
+
+// =============================================================================
+// DNS Resolver Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_dns_resolver_config_envoy_ptr is a raw pointer to the DNS resolver
+ * configuration object in Envoy. This is passed to the module when creating a new in-module DNS
+ * resolver configuration.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_dns_resolver_config_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_dns_resolver_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_dns_resolver_config_module_ptr is a pointer to an in-module DNS
+ * resolver configuration object. This is created by the module via
+ * envoy_dynamic_module_on_dns_resolver_config_new and passed back to the module in subsequent
+ * calls.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_dns_resolver_config_envoy_ptr in
+ * Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of this pointer. Envoy will call
+ * envoy_dynamic_module_on_dns_resolver_config_destroy when the configuration is no longer needed.
+ */
+typedef const void* envoy_dynamic_module_type_dns_resolver_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_dns_resolver_module_ptr is a pointer to an in-module DNS resolver
+ * instance. This is created by the module via envoy_dynamic_module_on_dns_resolver_new.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of this pointer. Envoy will call
+ * envoy_dynamic_module_on_dns_resolver_destroy when the resolver is no longer needed.
+ */
+typedef const void* envoy_dynamic_module_type_dns_resolver_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_dns_resolver_envoy_ptr is a pointer to the Envoy-side DNS resolver
+ * instance. This is passed to the module so it can call back into Envoy (e.g., to deliver
+ * resolution results via envoy_dynamic_module_callback_dns_resolve_complete).
+ *
+ * OWNERSHIP: Envoy owns this pointer. The module must not free it.
+ */
+typedef const void* envoy_dynamic_module_type_dns_resolver_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_dns_query_module_ptr is a pointer to an in-module active DNS query
+ * object. This is created by the module when envoy_dynamic_module_on_dns_resolve is called.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of this pointer. Envoy will call
+ * envoy_dynamic_module_on_dns_resolve_cancel to cancel the query, after which the module should
+ * clean it up.
+ */
+typedef const void* envoy_dynamic_module_type_dns_query_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_dns_lookup_family specifies which address families to look up.
+ * This corresponds to Network::DnsLookupFamily in Envoy.
+ */
+typedef enum envoy_dynamic_module_type_dns_lookup_family {
+  envoy_dynamic_module_type_dns_lookup_family_V4Only,
+  envoy_dynamic_module_type_dns_lookup_family_V6Only,
+  envoy_dynamic_module_type_dns_lookup_family_Auto,
+  envoy_dynamic_module_type_dns_lookup_family_V4Preferred,
+  envoy_dynamic_module_type_dns_lookup_family_All,
+} envoy_dynamic_module_type_dns_lookup_family;
+
+/**
+ * envoy_dynamic_module_type_dns_resolution_status represents the final status of a DNS resolution.
+ * This corresponds to Network::DnsResolver::ResolutionStatus in Envoy.
+ */
+typedef enum envoy_dynamic_module_type_dns_resolution_status {
+  envoy_dynamic_module_type_dns_resolution_status_Completed,
+  envoy_dynamic_module_type_dns_resolution_status_Failure,
+} envoy_dynamic_module_type_dns_resolution_status;
+
+/**
+ * envoy_dynamic_module_type_dns_address represents a single resolved DNS address with its TTL.
+ * The address_ptr/address_length must contain an "ip:port" string (e.g., "1.2.3.4:0"). The port
+ * must always be 0 because DNS resolution only produces IP addresses; the actual port comes from
+ * the cluster/endpoint configuration. The ttl_seconds is the time-to-live in seconds for this
+ * record.
+ */
+typedef struct envoy_dynamic_module_type_dns_address {
+  envoy_dynamic_module_type_buffer_module_ptr address_ptr;
+  size_t address_length;
+  uint32_t ttl_seconds;
+} envoy_dynamic_module_type_dns_address;
+
+// =============================================================================
+// DNS Resolver Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_dns_resolver_config_new is called by the main thread when a DNS resolver
+ * configuration referencing this module is loaded. The module should parse the configuration and
+ * return a pointer to the in-module configuration object.
+ *
+ * @param config_envoy_ptr is the pointer to the Envoy DNS resolver configuration object.
+ * @param name is the resolver name identifying the implementation within the module.
+ * @param config is the configuration bytes for the module.
+ * @return envoy_dynamic_module_type_dns_resolver_config_module_ptr is the pointer to the in-module
+ * DNS resolver configuration. Returning nullptr indicates a failure, and the configuration will be
+ * rejected.
+ */
+envoy_dynamic_module_type_dns_resolver_config_module_ptr
+envoy_dynamic_module_on_dns_resolver_config_new(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_dns_resolver_config_destroy is called when the DNS resolver configuration
+ * is destroyed. The module should release any resources associated with the configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module DNS resolver configuration.
+ */
+void envoy_dynamic_module_on_dns_resolver_config_destroy(
+    envoy_dynamic_module_type_dns_resolver_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_dns_resolver_new is called to create a new DNS resolver instance from
+ * the given configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module DNS resolver configuration.
+ * @param resolver_envoy_ptr is the Envoy-side resolver pointer, used by the module when calling
+ * envoy_dynamic_module_callback_dns_resolve_complete.
+ * @return envoy_dynamic_module_type_dns_resolver_module_ptr is the pointer to the in-module DNS
+ * resolver instance. Returning nullptr indicates a failure to create the resolver.
+ */
+envoy_dynamic_module_type_dns_resolver_module_ptr envoy_dynamic_module_on_dns_resolver_new(
+    envoy_dynamic_module_type_dns_resolver_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_dns_resolver_envoy_ptr resolver_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_dns_resolver_destroy is called when the DNS resolver instance is
+ * destroyed. The module should release the in-module resolver and shut down any background threads.
+ *
+ * @param resolver_module_ptr is the pointer to the in-module DNS resolver instance.
+ */
+void envoy_dynamic_module_on_dns_resolver_destroy(
+    envoy_dynamic_module_type_dns_resolver_module_ptr resolver_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_dns_resolve is called to initiate an asynchronous DNS resolution.
+ * The module should start the resolution and return a query handle. When the resolution completes,
+ * the module must call envoy_dynamic_module_callback_dns_resolve_complete (from any thread).
+ *
+ * @param resolver_module_ptr is the pointer to the in-module DNS resolver instance.
+ * @param dns_name is the DNS name to resolve.
+ * @param lookup_family is the address family to look up.
+ * @param query_id is a unique identifier for this query, assigned by Envoy. The module must pass
+ * this back in envoy_dynamic_module_callback_dns_resolve_complete.
+ * @return envoy_dynamic_module_type_dns_query_module_ptr is the pointer to the in-module active
+ * query. Returning nullptr indicates that the resolution could not be started.
+ */
+envoy_dynamic_module_type_dns_query_module_ptr envoy_dynamic_module_on_dns_resolve(
+    envoy_dynamic_module_type_dns_resolver_module_ptr resolver_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer dns_name,
+    envoy_dynamic_module_type_dns_lookup_family lookup_family, uint64_t query_id);
+
+/**
+ * envoy_dynamic_module_on_dns_resolve_cancel is called to cancel an in-flight DNS query. After
+ * this call, the module must not call envoy_dynamic_module_callback_dns_resolve_complete for the
+ * cancelled query. The module should clean up any resources associated with the query.
+ *
+ * @param resolver_module_ptr is the pointer to the in-module DNS resolver instance.
+ * @param query_module_ptr is the pointer to the in-module active query returned by
+ * envoy_dynamic_module_on_dns_resolve.
+ */
+void envoy_dynamic_module_on_dns_resolve_cancel(
+    envoy_dynamic_module_type_dns_resolver_module_ptr resolver_module_ptr,
+    envoy_dynamic_module_type_dns_query_module_ptr query_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_dns_resolver_reset_networking is called to reset the resolver's
+ * networking state, typically in response to a network change (e.g., WiFi to cellular).
+ * The module may recreate connections, re-read system configuration, etc.
+ *
+ * @param resolver_module_ptr is the pointer to the in-module DNS resolver instance.
+ */
+void envoy_dynamic_module_on_dns_resolver_reset_networking(
+    envoy_dynamic_module_type_dns_resolver_module_ptr resolver_module_ptr);
+
+// =============================================================================
+// DNS Resolver Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_dns_resolve_complete is called by the module to deliver DNS
+ * resolution results back to Envoy.
+ *
+ * THREAD SAFETY: This function is safe to call from any thread. The C++ shell will post the
+ * results to the correct Envoy dispatcher thread.
+ *
+ * BUFFER LIFETIME: All buffer data (details, address strings) is copied synchronously before this
+ * function returns. The caller only needs to keep the data valid for the duration of the call.
+ *
+ * @param resolver_envoy_ptr is the Envoy-side resolver pointer passed during resolver creation.
+ * @param query_id is the query identifier that was passed to envoy_dynamic_module_on_dns_resolve.
+ * @param status is the resolution status (Completed or Failure).
+ * @param details is a human-readable string describing the resolution result.
+ * @param addresses is an array of resolved addresses with TTLs.
+ * @param num_addresses is the number of elements in the addresses array.
+ */
+void envoy_dynamic_module_callback_dns_resolve_complete(
+    envoy_dynamic_module_type_dns_resolver_envoy_ptr resolver_envoy_ptr, uint64_t query_id,
+    envoy_dynamic_module_type_dns_resolution_status status,
+    envoy_dynamic_module_type_module_buffer details,
+    const envoy_dynamic_module_type_dns_address* addresses, size_t num_addresses);
+
+// =============================================================================
+// DNS Resolver Callbacks - Metrics
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_dns_resolver_config_define_counter is called by the module during
+ * initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DNS resolver configuration in which the counter
+ * will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_dns_resolver_config_increment_counter together
+ * with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_define_counter(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_dns_resolver_config_increment_counter is called by the module to
+ * increment a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DNS resolver configuration.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_increment_counter(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_dns_resolver_config_define_gauge is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DNS resolver configuration in which the gauge
+ * will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_define_gauge(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_dns_resolver_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DNS resolver configuration.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_set_gauge(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_dns_resolver_config_increment_gauge is called by the module to
+ * increment a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DNS resolver configuration.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increment the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_increment_gauge(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_dns_resolver_config_decrement_gauge is called by the module to
+ * decrement a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DNS resolver configuration.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrement the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_decrement_gauge(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_dns_resolver_config_define_histogram is called by the module during
+ * initialization to create a template for generating Stats::Histograms with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DNS resolver configuration in which the histogram
+ * will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_define_histogram(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value is called by the module
+ * to record a value for a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DNS resolver configuration.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_dns_resolver_config_record_histogram_value(
+    envoy_dynamic_module_type_dns_resolver_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// =============================================================================
+// =========================== Transport Socket ================================
+// =============================================================================
+
+// =============================================================================
+// Transport Socket Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr is a raw pointer to the
+ * transport socket factory configuration object in Envoy. This is passed to the module when
+ * creating a new in-module transport socket factory configuration.
+ *
+ * This has 1:1 correspondence with
+ * envoy_dynamic_module_type_transport_socket_factory_config_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_factory_config_module_ptr is a pointer to an in-module
+ * transport socket factory configuration object. This is created by the module via
+ * envoy_dynamic_module_on_transport_socket_factory_config_new and passed back to the module in
+ * subsequent calls.
+ *
+ * This has 1:1 correspondence with
+ * envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of this pointer. Envoy will call
+ * envoy_dynamic_module_on_transport_socket_factory_config_destroy when the configuration is no
+ * longer needed.
+ */
+typedef const void* envoy_dynamic_module_type_transport_socket_factory_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_envoy_ptr is a raw pointer to the transport socket
+ * object in Envoy. This is passed to the module when a new transport socket is created for a
+ * connection and is used to call back into Envoy (e.g., buffer and I/O handle operations).
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_transport_socket_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The module must not free it. It remains valid until
+ * envoy_dynamic_module_on_transport_socket_destroy is called for the corresponding in-module
+ * transport socket.
+ */
+typedef void* envoy_dynamic_module_type_transport_socket_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_module_ptr is a pointer to an in-module transport
+ * socket instance. This is created by the module via envoy_dynamic_module_on_transport_socket_new.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of this pointer. Envoy will call
+ * envoy_dynamic_module_on_transport_socket_destroy when the transport socket is no longer needed.
+ */
+typedef const void* envoy_dynamic_module_type_transport_socket_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_post_io_action specifies what should happen on the
+ * connection after an I/O operation. This corresponds to Network::PostIoAction in Envoy, with Reset
+ * mapping to Close and the ConnectionReset error code of Network::IoResult.
+ */
+typedef enum envoy_dynamic_module_type_transport_socket_post_io_action {
+  envoy_dynamic_module_type_transport_socket_post_io_action_KeepOpen,
+  envoy_dynamic_module_type_transport_socket_post_io_action_Close,
+  // Closes the connection as reset by the peer.
+  envoy_dynamic_module_type_transport_socket_post_io_action_Reset,
+} envoy_dynamic_module_type_transport_socket_post_io_action;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_io_result is the result of a transport socket read or
+ * write operation. This corresponds to Network::IoResult in Envoy.
+ */
+typedef struct envoy_dynamic_module_type_transport_socket_io_result {
+  // Whether the connection should stay open or be closed after this operation.
+  envoy_dynamic_module_type_transport_socket_post_io_action action;
+  // Number of bytes consumed from the read buffer or written from the write buffer.
+  uint64_t bytes_processed;
+  // Set by a read to signal the peer closed the read side. Meaningful only for do_read; it is
+  // ignored for do_write.
+  bool end_stream_read;
+} envoy_dynamic_module_type_transport_socket_io_result;
+
+/**
+ * envoy_dynamic_module_type_transport_socket_io_status is the outcome of a raw socket read or write
+ * performed via the transport socket I/O callbacks.
+ */
+typedef enum envoy_dynamic_module_type_transport_socket_io_status {
+  // The operation transferred bytes. For a read, a transfer of zero bytes means the peer closed the
+  // read side.
+  envoy_dynamic_module_type_transport_socket_io_status_Success,
+  // The socket would block. No bytes were transferred and the caller should stop and retry later.
+  envoy_dynamic_module_type_transport_socket_io_status_Again,
+  // The operation failed. The caller should close the connection.
+  envoy_dynamic_module_type_transport_socket_io_status_Error,
+} envoy_dynamic_module_type_transport_socket_io_status;
+
+// =============================================================================
+// Transport Socket Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_transport_socket_factory_config_new is called by the main thread when a
+ * transport socket factory configuration referencing this module is loaded. The module should parse
+ * the configuration and return a pointer to the in-module factory configuration object.
+ *
+ * @param factory_config_envoy_ptr is the pointer to the Envoy transport socket factory
+ * configuration object.
+ * @param socket_name is the name identifying the transport socket implementation within the module.
+ * The buffer is only valid for the duration of this call, so the module must copy what it needs.
+ * @param socket_config is the configuration bytes for the module. The buffer is only valid for the
+ * duration of this call, so the module must copy what it needs.
+ * @param is_upstream is true if this factory is for upstream connections, false for downstream.
+ * @return envoy_dynamic_module_type_transport_socket_factory_config_module_ptr is the pointer to
+ * the in-module factory configuration. Returning nullptr indicates a failure, and the configuration
+ * will be rejected.
+ */
+envoy_dynamic_module_type_transport_socket_factory_config_module_ptr
+envoy_dynamic_module_on_transport_socket_factory_config_new(
+    envoy_dynamic_module_type_transport_socket_factory_config_envoy_ptr factory_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer socket_name,
+    envoy_dynamic_module_type_envoy_buffer socket_config, bool is_upstream);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_factory_config_destroy is called when the transport
+ * socket factory configuration is destroyed. The module should release any resources associated
+ * with the configuration.
+ *
+ * @param factory_config_ptr is the pointer to the in-module transport socket factory
+ * configuration.
+ */
+void envoy_dynamic_module_on_transport_socket_factory_config_destroy(
+    envoy_dynamic_module_type_transport_socket_factory_config_module_ptr factory_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_new is called when a new transport socket is created
+ * for a connection.
+ *
+ * @param factory_config_ptr is the pointer to the in-module transport socket factory
+ * configuration.
+ * @param transport_socket_envoy_ptr is the Envoy-side transport socket pointer, used by the module
+ * when calling transport socket callbacks.
+ * @return envoy_dynamic_module_type_transport_socket_module_ptr is the pointer to the in-module
+ * transport socket. Returning nullptr indicates a failure to create the transport socket, and the
+ * connection will be closed.
+ */
+envoy_dynamic_module_type_transport_socket_module_ptr envoy_dynamic_module_on_transport_socket_new(
+    envoy_dynamic_module_type_transport_socket_factory_config_module_ptr factory_config_ptr,
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_destroy is called when the transport socket is
+ * destroyed. The module should release the in-module transport socket and any associated
+ * resources.
+ *
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ */
+void envoy_dynamic_module_on_transport_socket_destroy(
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_set_callbacks is called once to supply the transport
+ * socket with its Envoy callbacks before any I/O operations occur.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ */
+void envoy_dynamic_module_on_transport_socket_set_callbacks(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_on_connected is called when the underlying transport is
+ * established.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ */
+void envoy_dynamic_module_on_transport_socket_on_connected(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_do_read is called when data is to be read from the
+ * connection and decrypted or transformed into the read buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @return envoy_dynamic_module_type_transport_socket_io_result is the result of the read operation.
+ */
+envoy_dynamic_module_type_transport_socket_io_result
+envoy_dynamic_module_on_transport_socket_do_read(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_do_write is called when data is to be written to the
+ * connection from the write buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @param end_stream is true if this is the end of the stream (half-close after a full write).
+ * @return envoy_dynamic_module_type_transport_socket_io_result is the result of the write
+ * operation.
+ */
+envoy_dynamic_module_type_transport_socket_io_result
+envoy_dynamic_module_on_transport_socket_do_write(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr,
+    bool end_stream);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_close is called when the transport socket is being
+ * closed.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @param event is the connection event that caused the close.
+ * @param abort_reset is true if the connection is being torn down with a TCP reset. The module
+ * should skip any graceful shutdown so the peer reliably observes the reset.
+ */
+void envoy_dynamic_module_on_transport_socket_close(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr,
+    envoy_dynamic_module_type_network_connection_event event, bool abort_reset);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_get_protocol is called to obtain the negotiated
+ * application-level protocol (e.g., ALPN), if any.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @param result is filled by the module with the protocol string as an
+ * envoy_dynamic_module_type_module_buffer. An empty buffer means no protocol was negotiated.
+ */
+void envoy_dynamic_module_on_transport_socket_get_protocol(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr,
+    envoy_dynamic_module_type_module_buffer* result);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_get_failure_reason is called to obtain a description
+ * of the last failure on the transport socket, if any.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @param result is filled by the module with the failure reason as an
+ * envoy_dynamic_module_type_module_buffer. An empty buffer means there is no failure reason.
+ */
+void envoy_dynamic_module_on_transport_socket_get_failure_reason(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr,
+    envoy_dynamic_module_type_module_buffer* result);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_can_flush_close is called to determine whether the
+ * socket may be flushed and closed.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @return true if the socket can be flushed and closed, false otherwise.
+ */
+bool envoy_dynamic_module_on_transport_socket_can_flush_close(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_transport_socket_start_secure_transport is called to instruct the
+ * transport socket to begin using secure transport. This supports the STARTTLS pattern, where a
+ * connection is upgraded to secure transport after some plaintext negotiation. Not all transport
+ * sockets support this operation.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param transport_socket_module_ptr is the pointer to the in-module transport socket.
+ * @return true if the transport socket started secure transport, false otherwise.
+ */
+bool envoy_dynamic_module_on_transport_socket_start_secure_transport(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_module_ptr transport_socket_module_ptr);
+
+// =============================================================================
+// Transport Socket Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_read reads raw bytes from the underlying socket
+ * into the supplied buffer. This is typically called from within do_read.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param buffer is the buffer to read into.
+ * @param length is the maximum number of bytes to read.
+ * @param bytes_read is set to the number of bytes actually read. Must not be null. When length is
+ * non-zero, a value of zero with a Success status means the peer closed the read side.
+ * @return the status of the read operation.
+ */
+envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_read(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr, char* buffer,
+    size_t length, size_t* bytes_read);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_write writes raw bytes to the underlying socket
+ * from the supplied buffer. This is typically called from within do_write.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param buffer is the buffer to write from.
+ * @param length is the number of bytes to write.
+ * @param bytes_written is set to the number of bytes actually written. Must not be null.
+ * @return the status of the write operation.
+ */
+envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_write(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    const char* buffer, size_t length, size_t* bytes_written);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer reads raw bytes from the
+ * underlying socket into the connection read buffer without an intermediate copy. This is only
+ * valid within do_read.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param max_length is the maximum number of bytes to read.
+ * @param bytes_read is set to the number of bytes actually read. Must not be null. When max_length
+ * is non-zero, a value of zero with a Success status means the peer closed the read side.
+ * @return the status of the read operation. When the peer reset the connection, the status is Error
+ * and a Close returned afterwards closes the connection as reset by the peer.
+ */
+envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    size_t max_length, size_t* bytes_read);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer writes bytes from the
+ * connection write buffer to the underlying socket and drains the bytes written. This is only valid
+ * within do_write.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param bytes_written is set to the number of bytes actually written. Must not be null. It is zero
+ * with a Success status when the write buffer is empty.
+ * @return the status of the write operation. When the peer reset the connection, the status is
+ * Error and a Close returned afterwards closes the connection as reset by the peer.
+ */
+envoy_dynamic_module_type_transport_socket_io_status
+envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    size_t* bytes_written);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_io_shutdown_write shuts down the write side of the
+ * underlying socket so the peer observes end of stream. This is typically called from within
+ * do_write once all data has been written and end_stream was requested.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ */
+void envoy_dynamic_module_callback_transport_socket_io_shutdown_write(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_get_fd returns the native OS file descriptor of
+ * the underlying socket. A module that performs raw socket operations such as installing kernel TLS
+ * with setsockopt uses this descriptor. It is only meaningful for transports backed by an OS
+ * socket. The descriptor is owned by Envoy and is only valid while the connection is open, so the
+ * module must not close it or use it after the connection closes.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return the native file descriptor, or -1 if it is unavailable.
+ */
+int envoy_dynamic_module_callback_transport_socket_get_fd(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_read_buffer_add appends data to the connection
+ * read buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param data is a pointer to the data to add.
+ * @param length is the length of the data in bytes.
+ */
+void envoy_dynamic_module_callback_transport_socket_read_buffer_add(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    const char* data, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_write_buffer_drain drains bytes from the beginning
+ * of the connection write buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param length is the number of bytes to drain.
+ */
+void envoy_dynamic_module_callback_transport_socket_write_buffer_drain(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices copies or queries write
+ * buffer slices. If slices is NULL, the function runs in query mode: slices_count is set to the
+ * total number of slices available. Otherwise, up to slices_count slices are written into slices,
+ * and slices_count is set to the number of slices returned.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param slices is the output array of envoy_dynamic_module_type_envoy_buffer, or NULL for query
+ * mode.
+ * @param slices_count is the maximum number of slices to return on input, and the actual count on
+ * output. Must not be null.
+ */
+void envoy_dynamic_module_callback_transport_socket_write_buffer_get_slices(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* slices, size_t* slices_count);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_write_buffer_length returns the number of bytes
+ * currently queued in the connection write buffer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return the length of the write buffer in bytes, or zero when there is no active write buffer.
+ */
+size_t envoy_dynamic_module_callback_transport_socket_write_buffer_length(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_raise_event raises a connection event on the
+ * connection (e.g., Connected after TLS handshake). Raising a close event can synchronously
+ * re-enter the module through on_close, so the caller must not rely on any state after this
+ * returns.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param event is the connection event to raise.
+ */
+void envoy_dynamic_module_callback_transport_socket_raise_event(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_network_connection_event event);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer returns whether the read
+ * buffer should be drained to enforce read limits and yielding.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @return true if the read buffer should be drained, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_should_drain_read_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_set_is_readable marks the transport socket as
+ * readable so that a read will be scheduled on a future event loop iteration. It is a no-op while
+ * the connection is connecting or once it is closed.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ */
+void envoy_dynamic_module_callback_transport_socket_set_is_readable(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_set_is_writable schedules another write on a
+ * future event loop iteration. A module calls this when it defers buffered bytes for its own
+ * reasons rather than because the socket reported it would block. After a write reports it would
+ * block, Envoy re-arms the writable notification on its own, so this call is not needed then. It
+ * is a no-op while the connection is connecting or once it is closed.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ */
+void envoy_dynamic_module_callback_transport_socket_set_is_writable(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_flush_write_buffer requests that the connection
+ * flush its write buffer. This is typically called after the module has queued additional bytes
+ * that must reach the peer, for example handshake records produced outside of do_write.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ */
+void envoy_dynamic_module_callback_transport_socket_flush_write_buffer(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_get_remote_address gets the remote (peer) address
+ * of the connection.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param address_out is the output pointer to the address string.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_get_remote_address(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_get_local_address gets the local address of the
+ * connection.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param address_out is the output pointer to the address string.
+ * @param port_out is the output pointer to the port number.
+ * @return true if the address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_get_local_address(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* address_out, uint32_t* port_out);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_get_connection_id gets the unique ID of the
+ * connection.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param connection_id_out is the output pointer to the connection ID.
+ * @return true if the connection ID is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_get_connection_id(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t* connection_id_out);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id gets the ID of the
+ * upstream connection recorded in the stream info of the connection. The TCP proxy records it on
+ * the downstream connection once the upstream connection is ready. When the TCP proxy tunnels over
+ * HTTP, that connection also carries HTTP framing and other streams. When it races several upstream
+ * addresses, the ID belongs to the connection that wraps the attempts.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param connection_id_out is the output pointer to the upstream connection ID.
+ * @return true if an upstream connection ID is recorded, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t* connection_id_out);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_add_wire_bytes adds bytes that the module moved
+ * through the underlying socket outside the read and write buffers, for example with splice(2), to
+ * the stream info of the connection. On a TCP proxy downstream connection they also count as
+ * downstream wire bytes and, in the other direction, as upstream wire bytes, like the bytes the TCP
+ * proxy relays. A module also reports these bytes in bytes_processed, which feeds the connection
+ * stats and, for writes, resets the TCP proxy idle timer.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param bytes_received is the number of bytes received from the socket.
+ * @param bytes_sent is the number of bytes sent to the socket.
+ */
+void envoy_dynamic_module_callback_transport_socket_add_wire_bytes(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    uint64_t bytes_received, uint64_t bytes_sent);
+
+// =============================================================================
+// ============================== Stats Sink ===================================
+// =============================================================================
+
+// =============================================================================
+// Stats Sink Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_stat_sink_config_envoy_ptr is a raw pointer to
+ * the DynamicModuleStatsSinkConfig class in Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_stat_sink_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_stat_sink_config_module_ptr is a pointer to an in-module stats sink
+ * configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer.
+ */
+typedef const void* envoy_dynamic_module_type_stat_sink_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr is an opaque handle to the metric
+ * snapshot for a single flush. It is passed to the snapshot read-back callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. Valid only during the flush event hook.
+ */
+typedef void* envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleStatsSinkConfigScheduler class in Envoy.
+ *
+ * The scheduler dispatches events from any thread to the stats sink configuration on the main
+ * thread, which lets a module aggregate metrics off the main thread and publish the results back
+ * safely. It is created by envoy_dynamic_module_callback_stat_sink_config_scheduler_new, used via
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit, and destroyed by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Since its lifecycle is owned by the module, this has the _module_ptr
+ * suffix.
+ */
+typedef void* envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr;
+
+// =============================================================================
+// Stats Sink Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_stat_sink_config_new is called when a new stats sink configuration
+ * is created. The module must return a pointer to its own configuration object. If the module
+ * returns nullptr, the stats sink will fail to be created.
+ *
+ * This is called on the main thread during server initialization.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param sink_name is the name identifying the sink implementation within the module.
+ * @param sink_config is the configuration bytes for the sink. This is valid only during this call.
+ * @return a pointer to the in-module configuration object, or nullptr on failure.
+ */
+envoy_dynamic_module_type_stat_sink_config_module_ptr envoy_dynamic_module_on_stat_sink_config_new(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer sink_name,
+    envoy_dynamic_module_type_envoy_buffer sink_config);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_config_destroy is called when the stats sink configuration
+ * is being destroyed. The module must release all resources associated with the configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ */
+void envoy_dynamic_module_on_stat_sink_config_destroy(
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_flush is called periodically to flush metrics to the sink.
+ * The module can iterate over counters, gauges, and text readouts via the snapshot callbacks.
+ *
+ * This is called on the main thread during the periodic stats flush. Implementations must not
+ * block.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ * @param snapshot_envoy_ptr is the opaque snapshot handle. Valid only during this call.
+ */
+void envoy_dynamic_module_on_stat_sink_flush(
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_on_histogram_complete is called synchronously on the worker
+ * thread that records a histogram observation. Implementations must be thread-safe and must not
+ * block.
+ *
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ * @param histogram_name is the name of the histogram. Valid only during this call.
+ * @param value is the recorded value.
+ */
+void envoy_dynamic_module_on_stat_sink_on_histogram_complete(
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer histogram_name, uint64_t value);
+
+/**
+ * envoy_dynamic_module_on_stat_sink_config_scheduled is called when an event committed via
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit is dispatched.
+ *
+ * This is called on the main thread. It is the place to publish gauges aggregated off the main
+ * thread back into Envoy via envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ *
+ * This hook is optional. Modules that do not schedule events do not need to implement it.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param config_module_ptr is the pointer to the in-module configuration object.
+ * @param event_id is the value passed to
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit.
+ */
+void envoy_dynamic_module_on_stat_sink_config_scheduled(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_stat_sink_config_module_ptr config_module_ptr, uint64_t event_id);
+
+// =============================================================================
+// Stats Sink Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count returns the number of
+ * counters in the metric snapshot.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @return the number of counters.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter writes the name and returns the
+ * values of a counter at the given index. The name is written directly into a module-provided
+ * buffer, allowing the module to decode it straight into its own storage (for example a socket
+ * write buffer) without Envoy allocating an intermediate string.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param name_buffer is the module-owned buffer that receives the counter name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param value_out is the output for the current accumulated counter value.
+ * @param delta_out is the output for the counter delta since the last flush.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* value_out,
+    uint64_t* delta_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count returns the number of
+ * gauges in the metric snapshot.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @return the number of gauges.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge writes the name and returns the
+ * value of a gauge at the given index. The name is written directly into a module-provided
+ * buffer, as described for the counter callback above.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the gauge (0-based).
+ * @param name_buffer is the module-owned buffer that receives the gauge name. No null terminator
+ *        is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param value_out is the output for the current gauge value.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* value_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count returns the number
+ * of text readouts in the metric snapshot.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @return the number of text readouts.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout writes the name and value
+ * of a text readout at the given index into module-provided buffers.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the text readout (0-based).
+ * @param name_buffer is the module-owned buffer that receives the text readout name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param value_buffer is the module-owned buffer that receives the text readout value. No null
+ *        terminator is written. May be null only if value_buffer_capacity is 0.
+ * @param value_buffer_capacity is the capacity of value_buffer in bytes.
+ * @param value_size is set to the full length of the value, with the same truncation contract as
+ *        name_size. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, char* value_buffer,
+    size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count returns the number of
+ * histograms in the metric snapshot.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @return the number of histograms.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram writes the name and returns the
+ * cumulative sample count and sum of a histogram at the given index. The name is written directly
+ * into a module-provided buffer, as described for the counter callback above. The per-bucket
+ * counts are read separately via the bucket callbacks below.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the histogram (0-based).
+ * @param name_buffer is the module-owned buffer that receives the histogram name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name. If it exceeds name_buffer_capacity the
+ *        name was truncated and the module should retry with a buffer of at least name_size bytes.
+ *        Must not be null.
+ * @param sample_count_out is the output for the cumulative sample count.
+ * @param sample_sum_out is the output for the cumulative sample sum.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size, uint64_t* sample_count_out,
+    double* sample_sum_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count returns the number
+ * of buckets for the histogram at the given index. The bucket layout is the one Envoy resolved
+ * for that histogram, so it already reflects any per-stat bucket configuration.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param histogram_index is the index of the histogram (0-based).
+ * @return the number of buckets, or 0 if histogram_index is out of range.
+ */
+size_t envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr,
+    size_t histogram_index);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket returns the upper bound
+ * and cumulative count of one bucket. The count is the number of samples less than or equal to
+ * the upper bound, matching the cumulative form Prometheus expects for a bucket boundary.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param histogram_index is the index of the histogram (0-based).
+ * @param bucket_index is the index of the bucket within the histogram (0-based).
+ * @param upper_bound_out is the output for the bucket upper bound (the Prometheus `le` value).
+ * @param cumulative_count_out is the output for the count of samples at or below the upper bound.
+ * @return true if both indices are valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr,
+    size_t histogram_index, size_t bucket_index, double* upper_bound_out,
+    uint64_t* cumulative_count_out);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name is the
+ * histogram counterpart of the counter tag-extracted-name callback below, with the same buffer
+ * and truncation contract. The index is into the snapshot's histogram collection.
+ *
+ * These histogram tag callbacks are only valid during envoy_dynamic_module_on_stat_sink_flush.
+ * A module aggregating observations from envoy_dynamic_module_on_stat_sink_on_histogram_complete
+ * can use the raw name returned by envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
+ * to associate those observations with an owned copy of this name and its tags. No tag extraction
+ * or histogram statistics computation is performed by these callbacks.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count is the histogram
+ * counterpart of the counter tag-count callback below. Returns false for an out-of-range
+ * histogram index without writing tag_count. A histogram with no tags returns true and zero.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag is the histogram counterpart
+ * of the counter tag callback below, with the same buffer and truncation contract. Returns false
+ * without writing outputs if either the histogram index or tag index is out of range.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name writes the
+ * tag-extracted name of a counter at the given index. The tag-extracted name is the stat name with
+ * the tag values removed (for example "cluster.foo.bar" with a "cluster_name" tag extracted becomes
+ * "cluster.bar"), so a module can reconstruct the same name and labels that Envoy's built-in stat
+ * formatters produce. Pair this with the tag callbacks below.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param name_buffer is the module-owned buffer that receives the tag-extracted name. No null
+ *        terminator is written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the name, with the same truncation contract as the
+ *        name callbacks above. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, no outputs are written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count returns the number of
+ * tags on the counter at the given index.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param tag_count is set to the number of tags on the counter. Must not be null.
+ * @return true if the index is valid, false otherwise. When false, tag_count is not written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag writes the name and value of a
+ * single tag on the counter at the given index into module-provided buffers.
+ *
+ * @param snapshot_envoy_ptr is the opaque snapshot handle.
+ * @param index is the index of the counter (0-based).
+ * @param tag_index is the index of the tag (0-based, less than the count reported by
+ *        envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count).
+ * @param name_buffer is the module-owned buffer that receives the tag name. No null terminator is
+ *        written. May be null only if name_buffer_capacity is 0.
+ * @param name_buffer_capacity is the capacity of name_buffer in bytes.
+ * @param name_size is set to the full length of the tag name, with the same truncation contract as
+ *        the name callbacks above. Must not be null.
+ * @param value_buffer is the module-owned buffer that receives the tag value. No null terminator is
+ *        written. May be null only if value_buffer_capacity is 0.
+ * @param value_buffer_capacity is the capacity of value_buffer in bytes.
+ * @param value_size is set to the full length of the tag value, with the same truncation contract.
+ *        Must not be null.
+ * @return true if both index and tag_index are valid, false otherwise. When false, no outputs are
+ *         written.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name is the gauge
+ * counterpart of the counter tag-extracted-name callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count is the gauge counterpart of
+ * the counter tag-count callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag is the gauge counterpart of the
+ * counter tag callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name is the text
+ * readout counterpart of the counter tag-extracted-name callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count is the text readout
+ * counterpart of the counter tag-count callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag is the text readout
+ * counterpart of the counter tag callback above.
+ */
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_define_gauge creates a gauge with the given name
+ * that the module can update later via envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ *
+ * This must only be called during envoy_dynamic_module_on_stat_sink_config_new. Calls made after
+ * the configuration is created return envoy_dynamic_module_type_metrics_result_Frozen.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param name is the name of the gauge to define. Valid only during this call.
+ * @param gauge_id_ptr is where the opaque id identifying the gauge is stored. The id can be passed
+ * to envoy_dynamic_module_callback_stat_sink_config_set_gauge.
+ * @return envoy_dynamic_module_type_metrics_result_Success on success, or
+ * envoy_dynamic_module_type_metrics_result_Frozen if called after the configuration is created.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_stat_sink_config_define_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_set_gauge sets the value of a gauge previously
+ * defined via envoy_dynamic_module_callback_stat_sink_config_define_gauge.
+ *
+ * This must be called on the main thread, typically from the
+ * envoy_dynamic_module_on_stat_sink_config_scheduled event hook.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @param gauge_id is the id returned by
+ * envoy_dynamic_module_callback_stat_sink_config_define_gauge.
+ * @param value is the value to set the gauge to.
+ * @return envoy_dynamic_module_type_metrics_result_Success on success, or
+ * envoy_dynamic_module_type_metrics_result_MetricNotFound if the id does not identify a gauge.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_stat_sink_config_set_gauge(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr, size_t gauge_id,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new creates a new stats sink
+ * configuration scheduler. The scheduler dispatches events to the stats sink configuration on the
+ * main thread from any thread, including the ones managed by the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleStatsSinkConfig object in Envoy.
+ * @return a pointer to the created scheduler.
+ *
+ * NOTE: it is the caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr
+envoy_dynamic_module_callback_stat_sink_config_scheduler_new(
+    envoy_dynamic_module_type_stat_sink_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_commit schedules an event to the stats
+ * sink configuration on the main thread. This eventually invokes the
+ * envoy_dynamic_module_on_stat_sink_config_scheduled event hook on the main thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same configuration.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ * @param event_id is the id of the event. It can be any module-defined value and is passed back to
+ * the envoy_dynamic_module_on_stat_sink_config_scheduled event hook.
+ */
+void envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_delete deletes the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ * envoy_dynamic_module_callback_stat_sink_config_scheduler_new.
+ */
+void envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(
+    envoy_dynamic_module_type_stat_sink_config_scheduler_module_ptr scheduler_module_ptr);
+
+// =============================================================================
+// ============================== Health Checker ===============================
+// =============================================================================
+
+// =============================================================================
+// Health Checker Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_health_checker_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleHealthCheckerConfig class in Envoy. A single config is shared by all per-host
+ * sessions of one configured custom health checker.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_health_checker_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_health_checker_config_module_ptr is a pointer to an in-module health
+ * checker configuration.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_health_checker_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_health_checker_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_health_checker_session_envoy_ptr is a raw pointer to the
+ * DynamicModuleActiveHealthCheckSession class in Envoy. There is one session per checked host.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ *
+ * THREADING: This pointer is only valid on the main thread during a health checker event hook
+ * (e.g. envoy_dynamic_module_on_health_checker_session_on_interval). The module must NOT store it
+ * for use from another thread or after the hook returns. To deliver a result from another thread,
+ * create a scheduler with envoy_dynamic_module_callback_health_checker_scheduler_new and use it
+ * instead. The host info callbacks (address/metadata/health) accept this pointer and must only be
+ * called on the main thread during an event hook.
+ */
+typedef void* envoy_dynamic_module_type_health_checker_session_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_health_checker_session_module_ptr is a pointer to an in-module health
+ * check session corresponding to a single checked host.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can
+ * be released when envoy_dynamic_module_on_health_checker_session_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_health_checker_session_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_health_checker_scheduler_module_ptr is a raw pointer to the
+ * DynamicModuleHealthCheckerScheduler class in Envoy. It is a thread-safe handle used to report a
+ * health check result back to the main thread from any thread (including ones managed by the
+ * module).
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. It must be explicitly destroyed by the module with
+ * envoy_dynamic_module_callback_health_checker_scheduler_delete when no longer needed. Reporting a
+ * result through a scheduler whose session has already been destroyed is safe and is a no-op.
+ * Since its lifecycle is owned/managed by the module, this has the _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_health_checker_scheduler_module_ptr;
+
+// =============================================================================
+// Health Checker Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_health_checker_config_new is called when a new custom health checker
+ * configuration is created. This is called on the main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleHealthCheckerConfig object.
+ * @param name is the health checker name from the configuration.
+ * @param config is the configuration bytes for the health checker.
+ * @return a pointer to the in-module health checker configuration. Returning nullptr indicates a
+ *         failure to initialize the module, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_health_checker_config_module_ptr
+envoy_dynamic_module_on_health_checker_config_new(
+    envoy_dynamic_module_type_health_checker_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_health_checker_config_destroy is called when the custom health checker
+ * configuration is destroyed. This is called on the main thread.
+ *
+ * @param config_module_ptr is a pointer to the in-module health checker configuration.
+ */
+void envoy_dynamic_module_on_health_checker_config_destroy(
+    envoy_dynamic_module_type_health_checker_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_health_checker_session_new is called to create a new per-host health
+ * check session. This is called on the main thread, once for each host that is health checked.
+ *
+ * @param config_module_ptr is the pointer to the in-module health checker configuration.
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ *        It is only valid on the main thread during this call and may be used to read host info.
+ * @return a pointer to the in-module session instance. Returning nullptr will cause the host to
+ *         be left in its current health state and no checks will be performed for it.
+ */
+envoy_dynamic_module_type_health_checker_session_module_ptr
+envoy_dynamic_module_on_health_checker_session_new(
+    envoy_dynamic_module_type_health_checker_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_health_checker_session_on_interval is called on the main thread each time
+ * the health check interval timer fires for the host. The module should start a health check here
+ * (it may perform the actual work on its own thread) and eventually report the result through a
+ * scheduler created with envoy_dynamic_module_callback_health_checker_scheduler_new.
+ *
+ * The session_envoy_ptr is only valid on the main thread during this call. The module should read
+ * any required host info (address/metadata/health) here before going asynchronous.
+ *
+ * @param session_module_ptr is the pointer to the in-module session instance.
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ */
+void envoy_dynamic_module_on_health_checker_session_on_interval(
+    envoy_dynamic_module_type_health_checker_session_module_ptr session_module_ptr,
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_health_checker_session_on_timeout is called on the main thread when the
+ * health check timeout fires before a result was reported. Envoy automatically records a timeout
+ * failure for the host; this hook gives the module a chance to cancel any in-flight work.
+ *
+ * This is optional. If not implemented by the module, Envoy will skip calling it.
+ *
+ * @param session_module_ptr is the pointer to the in-module session instance.
+ */
+void envoy_dynamic_module_on_health_checker_session_on_timeout(
+    envoy_dynamic_module_type_health_checker_session_module_ptr session_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_health_checker_session_destroy is called on the main thread when the
+ * per-host session is destroyed (e.g. the host was removed or the cluster is being torn down).
+ *
+ * @param session_module_ptr is the pointer to the in-module session instance.
+ */
+void envoy_dynamic_module_on_health_checker_session_destroy(
+    envoy_dynamic_module_type_health_checker_session_module_ptr session_module_ptr);
+
+// =============================================================================
+// Health Checker Callbacks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_health_checker_scheduler_new is called by the module to create a
+ * new health checker scheduler for a session. The scheduler is a thread-safe handle used to report
+ * a health check result back to the session on the main thread from any thread.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ *        This must be called on the main thread.
+ * @return envoy_dynamic_module_type_health_checker_scheduler_module_ptr is the pointer to the
+ *         created scheduler.
+ *
+ * NOTE: it is the caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_health_checker_scheduler_delete when it is no longer needed.
+ */
+envoy_dynamic_module_type_health_checker_scheduler_module_ptr
+envoy_dynamic_module_callback_health_checker_scheduler_new(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_scheduler_report is called by the module to report a
+ * health check result for the session associated with the scheduler. This may be called from any
+ * thread. The result is applied on the main thread: Healthy and Degraded are treated as a
+ * successful check (Degraded marks the host degraded), and Unhealthy is treated as an active health
+ * check failure.
+ *
+ * If the underlying session has already been destroyed, this call is a safe no-op.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler created by
+ *        envoy_dynamic_module_callback_health_checker_scheduler_new.
+ * @param health is the reported health status of the host.
+ */
+void envoy_dynamic_module_callback_health_checker_scheduler_report(
+    envoy_dynamic_module_type_health_checker_scheduler_module_ptr scheduler_module_ptr,
+    envoy_dynamic_module_type_host_health health);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_scheduler_delete is called by the module to delete a
+ * scheduler created by envoy_dynamic_module_callback_health_checker_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the scheduler to delete.
+ */
+void envoy_dynamic_module_callback_health_checker_scheduler_delete(
+    envoy_dynamic_module_type_health_checker_scheduler_module_ptr scheduler_module_ptr);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_address returns the resolved address
+ * (ip:port) of the host being checked by the session.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param result is the output for the host address as a string. The buffer is owned by Envoy and
+ *        is valid until the end of the current event hook.
+ * @return true if the address was available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_health_checker_get_host_address(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_metadata_string is called by the module to
+ * get the string value of the host's endpoint metadata by looking up the given filter name and
+ * key. If the key does not exist or the value is not a string, this returns false.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the string value. The buffer is owned by Envoy and is valid
+ *        until the end of the current event hook.
+ * @return true if the key was found and the value is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_health_checker_get_host_metadata_string(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_metadata_number is called by the module to
+ * get the number value of the host's endpoint metadata by looking up the given filter name and
+ * key. If the key does not exist or the value is not a number, this returns false.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the number value.
+ * @return true if the key was found and the value is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_health_checker_get_host_metadata_number(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, double* result);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_metadata_bool is called by the module to
+ * get the bool value of the host's endpoint metadata by looking up the given filter name and key.
+ * If the key does not exist or the value is not a bool, this returns false.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param filter_name is the filter namespace to look up (e.g., ``envoy.lb``).
+ * @param key is the key within the filter namespace.
+ * @param result is the output for the bool value.
+ * @return true if the key was found and the value is a bool, false otherwise.
+ */
+bool envoy_dynamic_module_callback_health_checker_get_host_metadata_bool(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer key, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_get_host_health returns the current health status of
+ * the host being checked by the session, as currently known to Envoy.
+ *
+ * This must be called on the main thread during a health checker event hook.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @return the current health status of the host.
+ */
+envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_health_checker_get_host_health(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+// =============================================================================
+// ============================ Cluster Specifier ==============================
+// =============================================================================
+
+// =============================================================================
+// Cluster Specifier Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleClusterSpecifierConfig class in Envoy. This is passed to the module when creating a
+ * new in-module cluster specifier configuration and may be used to access the cluster specifier
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_cluster_specifier_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_specifier_config_module_ptr is a pointer to an in-module
+ * cluster specifier configuration created by envoy_dynamic_module_on_cluster_specifier_config_new.
+ * A single configuration is shared by every request routed through the cluster specifier.
+ *
+ * This has 1:1 correspondence with the DynamicModuleClusterSpecifierConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_cluster_specifier_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_cluster_specifier_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr is a raw pointer to the Envoy
+ * context of a single cluster selection. It provides read access to the request headers and the
+ * stream info, and it is the target of the setter callbacks that record the selection.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ *
+ * THREADING: This pointer is only valid on the worker thread handling the request, for the duration
+ * of a single envoy_dynamic_module_on_cluster_specifier_select call, and it refers to storage that
+ * Envoy reuses once the call returns. Selection runs concurrently on multiple worker threads, so
+ * the module must not store this pointer, share it across threads, or use it after the hook
+ * returns. Every envoy_dynamic_module_callback_cluster_specifier_* callback must be called with
+ * this pointer from inside that hook.
+ */
+typedef void* envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_resource_priority represents the priority of the upstream resources
+ * used for a request. This has 1:1 correspondence with Envoy::Upstream::ResourcePriority.
+ */
+typedef enum envoy_dynamic_module_type_resource_priority {
+  // The request uses the default priority resources of the cluster.
+  envoy_dynamic_module_type_resource_priority_Default = 0,
+  // The request uses the high priority resources of the cluster.
+  envoy_dynamic_module_type_resource_priority_High = 1,
+} envoy_dynamic_module_type_resource_priority;
+
+// =============================================================================
+// Cluster Specifier Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_cluster_specifier_config_new is called on the main thread when a cluster
+ * specifier referencing this module is configured. The module should parse the configuration and
+ * return a pointer to the in-module cluster specifier configuration.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig object for the
+ * corresponding config.
+ * @param name is the cluster specifier name used to select an implementation within the module. The
+ * buffer is owned by Envoy and is valid only during this call.
+ * @param config is the configuration bytes for the cluster specifier. The buffer is owned by Envoy
+ * and is valid only during this call.
+ * @return a pointer to the in-module cluster specifier configuration. Returning nullptr indicates a
+ * failure to initialize, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_cluster_specifier_config_module_ptr
+envoy_dynamic_module_on_cluster_specifier_config_new(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_cluster_specifier_config_destroy is called when the cluster specifier
+ * configuration is destroyed.
+ *
+ * This may be called on any thread. The configuration is kept alive by the requests referencing it,
+ * so the last reference may be released on a worker thread after the route configuration is
+ * replaced. The module must not assume the main thread here.
+ *
+ * @param config_module_ptr is the pointer to the in-module cluster specifier configuration.
+ */
+void envoy_dynamic_module_on_cluster_specifier_config_destroy(
+    envoy_dynamic_module_type_cluster_specifier_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_cluster_specifier_select is called while the route is being resolved for
+ * a request, and again whenever a filter refreshes the route cluster or a retry whose policy
+ * refreshes the cluster re-selects it. The module records its decision with the setter callbacks
+ * below.
+ *
+ * This may be called concurrently on multiple worker threads with the same in-module configuration,
+ * so the module must treat the configuration as read-only and avoid shared mutable state. Because
+ * the hook is also called on refresh, the module must be able to reach a decision from the request
+ * headers and the stream info alone.
+ *
+ * Not every property can be changed by a later call. Envoy reads the cluster name and the priority
+ * on every upstream attempt, so a refresh changes those. It reads the idle timeout and the request
+ * body buffer limit while resolving the route, and the timeout, the retry policy and the mirroring
+ * policies before the first upstream attempt, so a call that runs after those points leaves them
+ * unchanged. The metadata match criteria are read on every upstream attempt, but only while nothing
+ * has set envoy.lb dynamic metadata on the request or the downstream connection. Envoy merges that
+ * metadata over the criteria of the route and caches the result, so once it has done so a later
+ * call cannot change them.
+ *
+ * @param config_module_ptr is the pointer to the in-module cluster specifier configuration.
+ * @param context_envoy_ptr is the pointer to the Envoy cluster selection context, valid only during
+ * this call.
+ * @return true when the module made a decision, false when it has none. Returning true replaces the
+ * whole recorded decision with what was set during this call, so a property that a previous call
+ * set but this call leaves unset reverts to the matched route. Returning false discards everything
+ * set during this call and leaves the previous decision, if any, in effect.
+ */
+bool envoy_dynamic_module_on_cluster_specifier_select(
+    envoy_dynamic_module_type_cluster_specifier_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr);
+
+// =============================================================================
+// Cluster Specifier Callbacks
+// =============================================================================
+
+// ------------------- Cluster Specifier Callbacks - Request State -------------
+// The attribute callbacks share the envoy_dynamic_module_type_attribute_id enum with the access
+// logger. Cluster selection runs before the upstream request, so the response and upstream
+// attributes are not populated yet and the getters return false for them.
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size returns the number of
+ * request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_request_headers is called by the module to
+ * get all request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param result_headers is the output array. The module must pre-allocate at least
+ * envoy_dynamic_module_callback_cluster_specifier_get_request_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_request_headers(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_request_header_value is called by the module
+ * to get a request header value by key.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param key is the header key to look up.
+ * @param result is the output buffer for the header value. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook.
+ * @param index is the index for multi-value headers, 0 for the first value.
+ * @param total_count_out receives the total number of values for the key when non-null.
+ * @return true if the header exists at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_request_header_value(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_attribute_string is called by the module to
+ * get a string attribute value from the stream info. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the buffer where the string value will be stored. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_attribute_string(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_attribute_int is called by the module to get
+ * an integer attribute value from the stream info. If the attribute is not accessible or the value
+ * is not an integer, this returns false.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_attribute_int(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_attribute_bool is called by the module to get
+ * a boolean attribute value from the stream info. If the attribute is not accessible or the value
+ * is not a boolean, this returns false.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_attribute_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata is called by the module to
+ * get a value from dynamic metadata by filter name and key path.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result receives the string value. Only string-typed metadata is returned. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if a string value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number is called by the
+ * module to get a number value from dynamic metadata by filter name and key path.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result receives the number value. It is left untouched when this returns false.
+ * @return true if a number value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool is called by the module
+ * to get a boolean value from dynamic metadata by filter name and key path.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result receives the boolean value. It is left untouched when this returns false.
+ * @return true if a boolean value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_route_name is called by the module to get the
+ * name of the matched route.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param result receives the route name. The buffer is owned by Envoy and is valid until the end of
+ * the current event hook. It is left untouched when this returns false.
+ * @return true if the route has a name, false when the name is empty.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_route_name(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_random_value returns the random value that
+ * Envoy generated for cluster selection. It is stable for the lifetime of the request, including
+ * across refreshes, so a module can use it to split traffic by percentage without re-deriving a
+ * hash.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @return the random value for the request.
+ */
+uint64_t envoy_dynamic_module_callback_cluster_specifier_get_random_value(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count retrieves the host counts
+ * for a cluster by name. This lets a module check whether a cluster is routable from the current
+ * worker before naming it with set_cluster_name.
+ *
+ * The lookup uses getThreadLocalCluster(), so false is returned when the cluster is not routable
+ * from this worker at the moment, which can happen even when the cluster is configured but not yet
+ * warmed or propagated. Healthy and degraded host counts are eventually consistent.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * routable from this worker).
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_get_cluster_host_count(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
+
+// ------------------- Cluster Specifier Callbacks - Selection -----------------
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_cluster_name sets the upstream cluster for
+ * the request. When the cluster does not exist, the request is failed with the cluster-not-found
+ * response code of the matched route. Use get_cluster_host_count to check `routability` first.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param cluster_name is the name of the cluster to route to. Envoy copies the buffer. An empty
+ * name is treated as no cluster selection, which leaves the cluster of the matched route in effect.
+ * A route that uses a cluster specifier has no cluster of its own, so a module that returns true
+ * without setting a name fails the request with the cluster-not-found response code.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_cluster_name(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_timeout sets the route timeout for the
+ * request, replacing the timeout of the matched route. Zero disables the timeout.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param timeout_ms is the timeout in milliseconds. Values above the ceiling that the timer
+ * implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_timeout(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_idle_timeout sets the stream idle timeout for
+ * the request, replacing the idle timeout of the matched route. Zero disables the idle timeout
+ * rather than deferring to the connection manager timeout. There is no way to select deference to
+ * the connection manager idle timeout, so leave this unset to keep the idle timeout of the matched
+ * route.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param idle_timeout_ms is the idle timeout in milliseconds. Values above the ceiling that the
+ * timer implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_idle_timeout(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t idle_timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_request_body_buffer_limit sets the request
+ * body buffer limit for the request, replacing the limit of the matched route.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param limit_bytes is the buffer limit in bytes. Zero disables body buffering rather than
+ * removing the limit, and the maximum value of uint64_t means that no limit is configured. Envoy
+ * only raises the buffer limit of the stream, so a value below the limit already in effect does not
+ * shrink it, but it does cap the body buffered for retries.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_request_body_buffer_limit(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t limit_bytes);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_priority sets the upstream resource priority
+ * for the request, replacing the priority of the matched route.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param priority is the resource priority to use. Any value other than
+ * envoy_dynamic_module_type_resource_priority_High is treated as
+ * envoy_dynamic_module_type_resource_priority_Default.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_priority(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_resource_priority priority);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code sets the
+ * status code Envoy replies with when the selected cluster does not exist, replacing the one of the
+ * matched route. A module that derives cluster names from the request can use this to distinguish a
+ * name that resolves to nothing from an upstream that is unavailable.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param status_code is the HTTP status code to reply with. Only codes in the range [200, 600) are
+ * accepted, because the code is used to terminate the request.
+ * @return true if the status code was accepted, false when it is out of range, in which case the
+ * call changes nothing.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_set_cluster_not_found_response_code(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    uint32_t status_code);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_action_override selects one of the
+ * route action overrides declared in the cluster specifier configuration. The selected override
+ * replaces the retry policy, the subset load balancing metadata match criteria and the request
+ * mirroring policies of the matched route, for the properties that it sets.
+ *
+ * These properties are built and validated once when the cluster specifier is configured because
+ * they are constructed from other extensions, so they cannot be passed as plain values on the
+ * request path.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param name is the key of the override in the route_action_overrides map.
+ * @return true if the override exists, false otherwise. A call that returns false changes nothing,
+ * so the properties of the matched route stay in effect unless an earlier call already selected an
+ * override.
+ */
+bool envoy_dynamic_module_callback_cluster_specifier_set_route_action_override(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name);
+
+// ------------------- Cluster Specifier Callbacks - Route Metadata ------------
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number sets the number value
+ * of the route metadata under the given namespace and key. The entry is layered onto the metadata
+ * of the matched route, so consumers that read route metadata, such as the rate limit ROUTE_ENTRY
+ * action or the METADATA(ROUTE) formatter, observe it. An existing entry with the same namespace
+ * and key is overwritten, while the other entries of the matched route stay in effect.
+ *
+ * The metadata takes effect only when the select call reports a decision. A select that reports
+ * none changes nothing, and a decision that sets no metadata drops what an earlier decision set.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the number value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string sets the string value
+ * of the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number but stores a string.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the string value to set. Envoy copies the buffer.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_string(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool sets the bool value of
+ * the route metadata under the given namespace and key. It behaves like
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_number but stores a bool.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param key is the key of the route metadata.
+ * @param value is the bool value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_bool(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct merges a serialized
+ * google.protobuf.Struct into the route metadata under the given namespace. Existing entries with
+ * the same key are overwritten, while the others stay in effect. If the buffer does not parse as a
+ * google.protobuf.Struct, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_metadata_struct(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata sets the typed route
+ * metadata under the given namespace from a serialized google.protobuf.Any, replacing an existing
+ * entry, so a typed metadata factory registered for the namespace can parse it out of
+ * typedMetadata(). If the buffer does not parse as a google.protobuf.Any, this is a no-op.
+ *
+ * @param context_envoy_ptr is the pointer to the cluster selection context.
+ * @param ns is the namespace of the route metadata.
+ * @param serialized_any is the serialized google.protobuf.Any value to set.
+ */
+void envoy_dynamic_module_callback_cluster_specifier_set_route_typed_metadata(
+    envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+// =============================================================================
+// Cluster Specifier Callbacks - Metrics
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_define_counter is called by the module
+ * during initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_cluster_specifier_config_increment_counter
+ * together with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_counter(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_increment_counter is called by the module
+ * to increment a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the counter previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING COUNTER DEFINITION.**
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_increment_counter(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_define_gauge is called by the module
+ * during initialization to create a template for generating Stats::Gauges with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_cluster_specifier_config_set_gauge together with
+ * config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_set_gauge is called by the module to set
+ * the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be set.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_set_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be incremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_increment_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the gauge previously defined using the config.
+ * @param label_values is the values of the labels to be decremented.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING GAUGE DEFINITION.**
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_decrement_gauge(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_define_histogram is called by the module
+ * during initialization to create a template for generating Stats::Histograms with the given name
+ * and labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label names could be null if the label_names_length is 0.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value
+ * together with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_define_histogram(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value is called by the
+ * module to record a value in a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleClusterSpecifierConfig.
+ * @param id is the ID of the histogram previously defined using the config.
+ * @param label_values is the values of the labels to be recorded.
+ * NOTE: label_values could be null if the label_values_length is 0.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels. **THE LENGTH MUST MATCH THE
+ * LABEL NAMES DEFINED DURING HISTOGRAM DEFINITION.**
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_cluster_specifier_config_record_histogram_value(
+    envoy_dynamic_module_type_cluster_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// =============================================================================
+// ============================= Route Specifier ===============================
+// =============================================================================
+
+// =============================================================================
+// Route Specifier Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_route_specifier_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleRouteSpecifierConfig class in Envoy. This is passed to the module when creating a
+ * new in-module route specifier configuration and stays valid until
+ * envoy_dynamic_module_on_route_specifier_config_destroy returns for that configuration.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_route_specifier_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_route_specifier_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_config_module_ptr is a pointer to an in-module route
+ * specifier configuration created by envoy_dynamic_module_on_route_specifier_config_new. A single
+ * configuration is shared by every request the route specifier resolves a route for.
+ *
+ * This has 1:1 correspondence with the DynamicModuleRouteSpecifierConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_route_specifier_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_route_specifier_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_context_envoy_ptr is a raw pointer to the Envoy context
+ * of a single route decision. It provides read access to the request, to the stream info and to the
+ * route that route matching resolved, and it is the target of the setter callbacks that record the
+ * decision.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ *
+ * THREADING: This pointer is only valid on the worker thread handling the request, for the duration
+ * of a single envoy_dynamic_module_on_route_specifier_on_route call, and it refers to storage that
+ * Envoy reuses once the call returns. Route resolution runs concurrently on multiple worker
+ * threads, so the module must not store this pointer, share it across threads, or use it after the
+ * hook returns. Every envoy_dynamic_module_callback_route_specifier_* callback that takes it must
+ * be called with this pointer from inside that hook.
+ */
+typedef void* envoy_dynamic_module_type_route_specifier_context_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_decision is the decision a route specifier records for
+ * a request with envoy_dynamic_module_callback_route_specifier_set_decision. It selects how Envoy
+ * builds the route.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_decision {
+  // The default behavior, in effect when the module records no decision: Envoy generates a new
+  // route based on what the envoy_dynamic_module_callback_route_specifier_set_* callbacks
+  // recorded. The base is the route template recorded with set_route_template, evaluated against
+  // the request like a configured route, or the route the specifier was given when no template
+  // was recorded, and the recorded overrides are applied on top of it. With nothing recorded the
+  // route the specifier was given is used unchanged, a null route included.
+  envoy_dynamic_module_type_route_specifier_decision_Unspecified = 0,
+  // Use the route the specifier was given, unchanged. The recorded template and overrides are
+  // ignored.
+  envoy_dynamic_module_type_route_specifier_decision_PassThrough = 1,
+  // Use no route, so the request is handled as if nothing had matched.
+  envoy_dynamic_module_type_route_specifier_decision_NoRoute = 2,
+  // The module could not reach a decision, and Envoy applies the configured failure policy.
+  envoy_dynamic_module_type_route_specifier_decision_Error = 3,
+  // Use the previous route of the stream unchanged, without building a new route. Valid only when a
+  // previous route exists, otherwise Envoy applies the failure policy. Recorded overrides are
+  // ignored.
+  envoy_dynamic_module_type_route_specifier_decision_ReusePrevious = 4,
+  // Not a decision. Pins the type to a stable 32 bit size and widens its value range, so that a
+  // decision a newer ABI defines can be held and inspected by an Envoy that does not know it
+  // without undefined behavior.
+  envoy_dynamic_module_type_route_specifier_decision_Sentinel = 0x7FFFFFFF,
+} envoy_dynamic_module_type_route_specifier_decision;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_on_route_status is what
+ * envoy_dynamic_module_on_route_specifier_on_route returns: whether the route specifiers
+ * configured after this one run for the request, and whether route matching accepts the route the
+ * decision produced. A value Envoy does not know is handled by the configured failure policy.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_on_route_status {
+  // The chain continues: the route the decision produced is handed to the next specifier.
+  envoy_dynamic_module_type_route_specifier_on_route_status_Continue = 0,
+  // The chain stops and the route the decision produced is the final route.
+  envoy_dynamic_module_type_route_specifier_on_route_status_StopIteration = 1,
+  // The chain stops, the route is turned down, and route matching carries on with the next route
+  // of the list being evaluated. The recorded decision, template and overrides are ignored, since
+  // no route is built for a request this specifier skipped.
+  envoy_dynamic_module_type_route_specifier_on_route_status_StopIterationAndSkipRoute = 2,
+} envoy_dynamic_module_type_route_specifier_on_route_status;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_route_kind is the kind of a route. A route is exactly
+ * one of these. Whether a direct response is a redirect is a per request property reported by
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_redirect_location.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_route_kind {
+  // There is no route.
+  envoy_dynamic_module_type_route_specifier_route_kind_None = 0,
+  // The route forwards the request to a cluster.
+  envoy_dynamic_module_type_route_specifier_route_kind_RouteEntry = 1,
+  // The route answers the request directly, either with a redirect or with a direct response.
+  envoy_dynamic_module_type_route_specifier_route_kind_DirectResponse = 2,
+} envoy_dynamic_module_type_route_specifier_route_kind;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_header_append_action selects how a header a module adds
+ * combines with a header of the same name that is already present. This has 1:1 correspondence with
+ * envoy::config::core::v3::HeaderValueOption::HeaderAppendAction.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_header_append_action {
+  envoy_dynamic_module_type_route_specifier_header_append_action_AppendIfExistsOrAdd = 0,
+  envoy_dynamic_module_type_route_specifier_header_append_action_AddIfAbsent = 1,
+  envoy_dynamic_module_type_route_specifier_header_append_action_OverwriteIfExistsOrAdd = 2,
+  envoy_dynamic_module_type_route_specifier_header_append_action_OverwriteIfExists = 3,
+} envoy_dynamic_module_type_route_specifier_header_append_action;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_input_route holds the properties of the route the
+ * module is resolving that are free to read, so that a module can take all of them in one call
+ * instead of one call each. After a template is selected with
+ * envoy_dynamic_module_callback_route_specifier_set_route_template it holds the properties of that
+ * template.
+ *
+ * A property the kind of the route does not carry is zero. The route entry properties are zero for
+ * a route that answers the request directly, and response_code is zero for a route entry. A boolean
+ * flag reports whether a route action property is configured, and the full value is read through
+ * the route templates and route overrides rather than on the request path. The buffers point
+ * at storage Envoy owns which is valid for the duration of the event hook.
+ */
+typedef struct envoy_dynamic_module_type_route_specifier_input_route {
+  envoy_dynamic_module_type_route_specifier_route_kind kind;
+  envoy_dynamic_module_type_envoy_buffer name;
+  envoy_dynamic_module_type_envoy_buffer virtual_host_name;
+  // Whether the route carries metadata, read per namespace and key with get_input_route_metadata.
+  bool has_metadata;
+  // Route entry properties.
+  envoy_dynamic_module_type_envoy_buffer cluster_name;
+  uint64_t timeout_ms;
+  // idle_timeout_ms is valid only when has_idle_timeout is true.
+  bool has_idle_timeout;
+  uint64_t idle_timeout_ms;
+  // max_stream_duration_ms is valid only when has_max_stream_duration is true.
+  bool has_max_stream_duration;
+  uint64_t max_stream_duration_ms;
+  envoy_dynamic_module_type_resource_priority priority;
+  uint64_t request_body_buffer_limit;
+  uint32_t cluster_not_found_response_code;
+  bool has_metadata_match;
+  bool has_hash_policy;
+  bool has_rate_limits;
+  size_t request_mirror_policies_count;
+  // Direct response property.
+  uint32_t response_code;
+} envoy_dynamic_module_type_route_specifier_input_route;
+
+// =============================================================================
+// Route Specifier Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_route_specifier_config_new is called on the main thread when a route
+ * specifier referencing this module is configured. The module should parse the configuration and
+ * return a pointer to the in-module route specifier configuration. The
+ * envoy_dynamic_module_callback_route_specifier_config_define_* callbacks that define metrics may
+ * only be called from inside this hook. The callbacks that read the declared templates and route
+ * overrides may be called from here or from the request path.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig object for the
+ * corresponding config.
+ * @param name is the specifier name used to select an implementation within the module. The buffer
+ * is owned by Envoy and is valid only during this call.
+ * @param config is the configuration bytes for the route specifier. The buffer is owned by Envoy
+ * and is valid only during this call.
+ * @return a pointer to the in-module route specifier configuration. Returning nullptr indicates a
+ * failure to initialize, and the route configuration will be rejected.
+ */
+envoy_dynamic_module_type_route_specifier_config_module_ptr
+envoy_dynamic_module_on_route_specifier_config_new(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_route_specifier_config_destroy is called when the route specifier
+ * configuration is destroyed.
+ *
+ * This may be called on any thread. The configuration is kept alive by the routes referencing it,
+ * so the last reference may be released on a worker thread after the route configuration is
+ * replaced. The module must not assume the main thread here.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ */
+void envoy_dynamic_module_on_route_specifier_config_destroy(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_route_specifier_on_route is called while the route is being resolved for
+ * a request, and again whenever the route is recomputed, for example after a filter clears the
+ * route cache. The module reads the request and the route that route matching resolved with the
+ * getter callbacks, records a template, overrides and the decision that tells Envoy how to build
+ * the route with the setter callbacks, and returns the status that tells Envoy whether the route
+ * specifiers configured after this one run and whether route matching accepts the produced route.
+ *
+ * This may be called concurrently on multiple worker threads with the same in-module configuration,
+ * so the module must treat the configuration as read-only and avoid shared mutable state. The call
+ * is synchronous and cannot be time boxed, so the module must not block or perform I/O.
+ *
+ * The recorded template and overrides take effect only when the decision is left Unspecified,
+ * the default, under which Envoy generates a new route based on what the
+ * envoy_dynamic_module_callback_route_specifier_set_* callbacks recorded.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ * @param context_envoy_ptr is the pointer to the Envoy route decision context, valid only during
+ * this call.
+ * @return the status for the request.
+ */
+envoy_dynamic_module_type_route_specifier_on_route_status
+envoy_dynamic_module_on_route_specifier_on_route(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_route_specifier_route_destroy is called when a route this specifier
+ * produced with envoy_dynamic_module_callback_route_specifier_set_route_user_data is destroyed. It
+ * is optional, resolved by Envoy with a nullable lookup, and absence is a no op.
+ *
+ * It may run on any thread, concurrently with other hooks, and possibly after the stream that
+ * installed the route is gone, because another owner may retain the route. It must not block,
+ * allocate heavily or call back into Envoy. It is called at most once per built route and always
+ * before envoy_dynamic_module_on_route_specifier_config_destroy for the owning configuration.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ * @param user_data is the value recorded on the route with set_route_user_data.
+ */
+void envoy_dynamic_module_on_route_specifier_route_destroy(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
+    uint64_t user_data);
+
+// =============================================================================
+// Route Specifier Callbacks
+// =============================================================================
+
+// ------------------- Route Specifier Callbacks - Configuration ---------------
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_get_template_count returns the number of
+ * route templates the route specifier configuration declares. This may be called from the config
+ * hook or from the request path, since the declarations are immutable after configuration load.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @return the number of route templates.
+ */
+size_t envoy_dynamic_module_callback_route_specifier_config_get_template_count(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_get_template_id is called by the module to
+ * get the identifier of a route template by index, in configuration order. This may be called from
+ * the config hook or from the request path.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param index is the index of the template.
+ * @param result is the output buffer for the identifier. The buffer is owned by Envoy and is valid
+ * for the lifetime of the configuration.
+ * @return true if the index is in range, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_get_template_id(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t index,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_get_template_kind is called by the module to
+ * get the kind of a route template. A template that resolves its cluster per request, such as one
+ * using weighted clusters, is a route entry. This may be called from the config hook or from the
+ * request path.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param template_id is the identifier of the template. The buffer is owned by the module.
+ * @return the kind of the template, or None when the identifier is not declared.
+ */
+envoy_dynamic_module_type_route_specifier_route_kind
+envoy_dynamic_module_callback_route_specifier_config_get_template_kind(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_has_route_override is called by the
+ * module to check whether a route override is declared. This may be called from the config
+ * hook or from the request path.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param override_id is the identifier of the entry in route_overrides. The buffer is owned by
+ * the module.
+ * @return true if the override_id is declared, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_has_route_override(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer override_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_register_route_template registers a route
+ * template from a serialized envoy.config.route.v3.Route, so that a module can declare the routes
+ * it produces from its own configuration rather than only from the ones the route specifier
+ * declares. Envoy builds and validates the route on the main thread while the configuration is
+ * created, and the module selects it later with
+ * envoy_dynamic_module_callback_route_specifier_set_route_template. This may only be called from
+ * inside envoy_dynamic_module_on_route_specifier_config_new, because a route can only be built
+ * while the configuration is created.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param template_id is the identifier the module selects the template with. The buffer is owned by
+ * the module. It must be non-empty and must not already be used by a declared or registered
+ * template.
+ * @param serialized_route is the serialized Route. The buffer is owned by the module. Its
+ * route_specifiers must be empty, since a built route is not run through the specifier chains.
+ * @return true if the route was built and registered, false when called outside the config hook,
+ * when the route specifier is configured on a route configuration that has no virtual host to build
+ * routes in, when the identifier is empty or already used, when the bytes do not parse as a Route,
+ * or when the route is invalid.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_register_route_template(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id,
+    envoy_dynamic_module_type_module_buffer serialized_route);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id returns the
+ * specifier_instance_id of this configuration, empty when it is unset. This may be called from the
+ * config hook or from the request path, since it is immutable after configuration load.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @param result is the output buffer for the identifier. The buffer is owned by Envoy and is valid
+ * for the lifetime of the configuration.
+ */
+void envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// ------------------- Route Specifier Callbacks - Metrics ---------------------
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_define_counter is called by the module
+ * during initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param label_names is the labels of the counter to be defined.
+ * NOTE: label_names must be non-null unless label_names_length is 0, otherwise the result is
+ * InvalidLabels. The array and the buffers it holds are owned by the module.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_route_specifier_config_increment_counter together
+ * with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_define_counter(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_increment_counter is called by the module to
+ * increment the value of a previously defined counter.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * counter was defined.
+ * @param id is the opaque ID of the counter.
+ * @param label_values is the label values of the counter.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_increment_counter(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_define_gauge is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and labels
+ * during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param label_names is the labels of the gauge to be defined.
+ * NOTE: label_names must be non-null unless label_names_length is 0, otherwise the result is
+ * InvalidLabels. The array and the buffers it holds are owned by the module.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_route_specifier_config_set_gauge together with
+ * config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_define_gauge(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_set_gauge is called by the module to set the
+ * value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * gauge was defined.
+ * @param id is the opaque ID of the gauge.
+ * @param label_values is the label values of the gauge.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_set_gauge(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_increment_gauge is called by the module to
+ * increase the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * gauge was defined.
+ * @param id is the opaque ID of the gauge.
+ * @param label_values is the label values of the gauge.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_increment_gauge(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_decrement_gauge is called by the module to
+ * decrease the value of a previously defined gauge.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * gauge was defined.
+ * @param id is the opaque ID of the gauge.
+ * @param label_values is the label values of the gauge.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_decrement_gauge(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_define_histogram is called by the module
+ * during initialization to create a template for generating Stats::Histograms with the given name
+ * and labels during the lifecycle of the module.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param label_names is the labels of the histogram to be defined.
+ * NOTE: label_names must be non-null unless label_names_length is 0, otherwise the result is
+ * InvalidLabels. The array and the buffers it holds are owned by the module.
+ * @param label_names_length is the length of the label_names.
+ * NOTE: label_names_length could be 0 if there are no labels.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_route_specifier_config_record_histogram_value
+ * together with config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_define_histogram(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer name,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_record_histogram_value is called by the
+ * module to record a value for a previously defined histogram.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleRouteSpecifierConfig in which the
+ * histogram was defined.
+ * @param id is the opaque ID of the histogram.
+ * @param label_values is the label values of the histogram.
+ * NOTE: label_values must be non-null unless label_values_length is 0, and its length must match
+ * the labels of the definition, otherwise the result is InvalidLabels. The array and the buffers it
+ * holds are owned by the module.
+ * @param label_values_length is the length of the label_values.
+ * NOTE: label_values_length could be 0 if there are no labels.
+ * @param value is the value to record.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_route_specifier_config_record_histogram_value(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
+
+// ------------------- Route Specifier Callbacks - Request State ---------------
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers_size returns the number of
+ * request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_route_specifier_get_request_headers_size(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers is called by the module to get
+ * all request headers.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result_headers is the output array. The module must pre-allocate at least
+ * envoy_dynamic_module_callback_route_specifier_get_request_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_request_headers(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_request_header_value is called by the module to
+ * get a request header value by key.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key to look up. The buffer is owned by the module.
+ * @param result is the output buffer for the header value. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook.
+ * @param index is the index for multi-value headers, 0 for the first value.
+ * @param total_count_out receives the total number of values for the key when non-null.
+ * @return true if the header exists at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_request_header_value(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_attribute_string is called by the module to get
+ * the string value of an attribute of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param attribute_id is the ID of the attribute to get.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the attribute is available and is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_attribute_string(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_attribute_int is called by the module to get
+ * the integer value of an attribute of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param attribute_id is the ID of the attribute to get.
+ * @param result is the output pointer for the value.
+ * @return true if the attribute is available and is an integer, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_attribute_int(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_attribute_bool is called by the module to get
+ * the boolean value of an attribute of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param attribute_id is the ID of the attribute to get.
+ * @param result is the output pointer for the value.
+ * @return true if the attribute is available and is a boolean, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_attribute_bool(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata is called by the module to get
+ * the string value of a dynamic metadata entry of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param filter_name is the namespace of the metadata. The buffer is owned by the module.
+ * @param path is the dotted key path within the namespace. The buffer is owned by the module.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the entry exists and is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata_number is called by the module
+ * to get the number value of a dynamic metadata entry of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param filter_name is the namespace of the metadata. The buffer is owned by the module.
+ * @param path is the dotted key path within the namespace. The buffer is owned by the module.
+ * @param result is the output pointer for the value.
+ * @return true if the entry exists and is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata_bool is called by the module
+ * to get the boolean value of a dynamic metadata entry of the stream.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param filter_name is the namespace of the metadata. The buffer is owned by the module.
+ * @param path is the dotted key path within the namespace. The buffer is owned by the module.
+ * @param result is the output pointer for the value.
+ * @return true if the entry exists and is a boolean, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_filter_state_bytes is called by the module to
+ * get a filter state value by key. Only objects stored as Router::StringAccessor, which is what the
+ * HTTP filter callback envoy_dynamic_module_callback_http_set_filter_state_bytes creates, are
+ * readable. Together with the dynamic metadata getters this is how a decision an earlier filter
+ * made asynchronously reaches the module when the route is recomputed.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the filter state key. The buffer is owned by the module.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the key exists and holds such an object, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_filter_state_bytes(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_random_value returns the stable random value
+ * Envoy generated for the request. It is the same when the route of a request is recomputed,
+ * so a weighted choice a module makes with it holds for the request.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @return the random value for the request.
+ */
+uint64_t envoy_dynamic_module_callback_route_specifier_get_random_value(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_cluster_host_count retrieves the host counts
+ * for a cluster by name. This lets a module check whether a cluster is routable from the current
+ * worker before naming it with set_cluster_name.
+ *
+ * The lookup uses getThreadLocalCluster(), so false is returned when the cluster is not routable
+ * from this worker at the moment, which can happen even when the cluster is configured but not yet
+ * warmed or propagated. Healthy and degraded host counts are eventually consistent.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param cluster_name is the name of the cluster to query owned by the module.
+ * @param priority is the priority level to query (0 for default priority).
+ * @param total_count is the pointer to store the total number of hosts. Can be null if not needed.
+ * @param healthy_count is the pointer to store the number of healthy hosts. Can be null if not
+ * needed.
+ * @param degraded_count is the pointer to store the number of degraded hosts. Can be null if not
+ * needed.
+ * @return true if the counts were retrieved successfully, false otherwise (e.g., cluster not
+ * routable from this worker).
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_cluster_host_count(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name, uint32_t priority, size_t* total_count,
+    size_t* healthy_count, size_t* degraded_count);
+
+// ------------------- Route Specifier Callbacks - Input Route -----------------
+// These read the route the module is resolving, which is the route that route matching and any
+// earlier specifier resolved, or the template selected with set_route_template once one is
+// selected.
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route is called by the module to get the
+ * properties of the route it is resolving that are free to read, in one call. After a template is
+ * selected the properties are those of the template.
+ *
+ * Prefer this over the individual getters when the module reads more than one of them, for example
+ * to compare the route of the module with the one it replaces. The properties that are not free to
+ * read, such as the redirect location and the route metadata, have no bulk form.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is where the properties are stored. It is only written when this returns true.
+ * @return true if a route was resolved for the request, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_input_route* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_kind returns the kind of the route
+ * that route matching, and any route specifier that ran before this one, resolved for the request.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @return the kind of the route, or None when no route was resolved.
+ */
+envoy_dynamic_module_type_route_specifier_route_kind
+envoy_dynamic_module_callback_route_specifier_get_input_route_kind(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_name is called by the module to get
+ * the name of the resolved route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the name. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if a route was resolved, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_virtual_host_name is called by the
+ * module to get the name of the virtual host the resolved route belongs to.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the name. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if a route was resolved, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_virtual_host_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_cluster_name is called by the
+ * module to get the upstream cluster of the resolved route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the cluster name. The buffer is owned by Envoy and is
+ * valid until the end of the current event hook.
+ * @return true if the resolved route forwards the request to a cluster, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_cluster_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_timeout is called by the module to
+ * get the route timeout of the resolved route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param timeout_ms is the output pointer for the timeout in milliseconds, where zero means the
+ * timeout is disabled.
+ * @return true if the resolved route forwards the request to a cluster, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_timeout(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t* timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_response_code is called by the
+ * module to get the status code the resolved route answers the request with.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param status_code is the output pointer for the status code.
+ * @return true if the resolved route answers the request directly, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_response_code(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint32_t* status_code);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_redirect_location is called by the
+ * module to get the location the resolved route redirects the request to. A non-empty result
+ * identifies a redirect, and a direct response that is not a redirect yields an empty result.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the location. The buffer is owned by Envoy and stays valid
+ * until the end of the current event hook, including after the current route changes. The location
+ * is built once per route, so repeated reads for the same route return the same buffer.
+ * @return true if the resolved route answers the request directly, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_redirect_location(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_metadata is called by the module to
+ * get the string value of a route metadata entry of the resolved route. A route the module replaces
+ * can carry the identifier of the template that replaces it, so that a module can check its own
+ * decision against the route table it is being validated against.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the entry exists and is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_number is called by the
+ * module to get the number value of a route metadata entry of the resolved route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param result is the output pointer for the value.
+ * @return true if the entry exists and is a number, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_number(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_previous_route reads the previous route of the
+ * stream, the route the connection manager last installed before this resolution. It is null on the
+ * first resolution, after an internal redirect that recreated the stream, and when a filter
+ * installed a null route. It can be a static route, a route of another specifier, a filter supplied
+ * route or a route this specifier produced. Same struct and semantics as get_input_route. Valid
+ * only during on_route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is where the properties are stored. It is only written when this returns true.
+ * @return true if there is a previous route, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_previous_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_input_route* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_previous_route_metadata reads the string value
+ * of a metadata entry of the previous route. Same signature and lifetime rules as
+ * get_input_route_metadata.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param result is the output buffer for the value. The buffer is owned by Envoy and is valid until
+ * the end of the current event hook.
+ * @return true if the entry exists and is a string, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_previous_route_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_get_selected_template_id is called by the module to
+ * get the identifier recorded by envoy_dynamic_module_callback_route_specifier_set_route_template.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param result is the output buffer for the identifier. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if a template was selected for the request, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_get_selected_template_id(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+// ------------------- Route Specifier Callbacks - Decision --------------------
+
+// The setter callbacks record the decision of the module. They validate their arguments and record
+// nothing when an argument is rejected. Envoy copies every module buffer.
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_template selects the route template
+ * Envoy generates the final route from, in place of the route the specifier was given, when the
+ * decision is left Unspecified. Envoy evaluates the match
+ * of the template against the request when this is called, like it does for a configured route,
+ * and applies the failure policy when the match does not hold. After a successful selection the
+ * input route getters reflect the template. A call that names an identifier that is not declared
+ * returns false and, when no template ends up selected and the decision is left Unspecified, is
+ * handled by the failure policy rather than silently falling back to the route the specifier was
+ * given. A module that wants to probe for a template without committing checks
+ * envoy_dynamic_module_callback_route_specifier_config_get_template_kind instead.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param template_id is the identifier of the template. The buffer is owned by the module.
+ * @return true if the identifier is declared, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_template(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_unset_route_template reverts a set_route_template
+ * call with the same identifier, so the route the specifier was given becomes the base of the
+ * final route again and the input route getters reflect it again. The recorded overrides stay in
+ * effect.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param template_id is the identifier of the template. The buffer is owned by the module.
+ * @return true if the identifier named the selected template, false otherwise, in which case
+ * nothing changes.
+ */
+bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer template_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_user_data records a u64 on the route this
+ * decision produces. It forces the produced route to be wrapped even when no other override was
+ * recorded, so that envoy_dynamic_module_on_route_specifier_route_destroy fires for it with this
+ * value. It is effective when the decision is left Unspecified.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param user_data is the value passed to on_route_specifier_route_destroy when the route is
+ * destroyed.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t user_data);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite records a prefix rewrite of the
+ * request path sent upstream. matched must be a case insensitive prefix of the current path without
+ * its query string, which is replaced by replacement while the query string is preserved. Envoy
+ * computes the rewritten path once, so it takes precedence over the rewrites of the route the same
+ * way set_path does.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param matched is the prefix of the path to replace. The buffer is owned by the module.
+ * @param replacement is the replacement for the matched prefix. The buffer is owned by the module.
+ * @return true when matched is a case insensitive prefix of the path and the rewritten path is
+ * within the configured maximum, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer matched,
+    envoy_dynamic_module_type_module_buffer replacement);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_override selects a route override
+ * declared in the route specifier configuration by override_id. It replaces the retry policy,
+ * metadata match criteria, request mirroring policies, hash policy, hedge policy, rate limits and
+ * CORS policy of the route with the ones the override builds, for the properties that it sets.
+ * The path rewrite and the metadata the override carries are applied when the decision resolves,
+ * and the values the module records itself win whatever the call order: the override's regex
+ * rewrite applies only when the module recorded no path, and its metadata sits under the metadata
+ * the module recorded.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param override_id is the identifier of the entry in route_overrides. The buffer is owned by
+ * the module.
+ * @return true if the override_id is declared, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_override(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer override_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_unset_route_override reverts a
+ * set_route_override call with the same identifier, so nothing of the override applies to the
+ * final route. The values the module recorded itself stay in effect.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param override_id is the identifier of the entry in route_overrides. The buffer is owned by
+ * the module.
+ * @return true if the identifier named the selected override, false otherwise, in which case
+ * nothing changes.
+ */
+bool envoy_dynamic_module_callback_route_specifier_unset_route_override(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer override_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_decision records the decision that tells
+ * Envoy how to build the route. Unspecified is the default when the module records none, under
+ * which Envoy generates a new route based on what the
+ * envoy_dynamic_module_callback_route_specifier_set_* callbacks recorded. A later call replaces
+ * the decision of an earlier one.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param decision is the decision to record.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_decision(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_decision decision);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_cluster_name records the upstream cluster the
+ * request should use. When the cluster does not exist, the request is failed with the
+ * cluster-not-found response code of the route. Use get_cluster_host_count to check whether the
+ * cluster can be reached from the current worker first.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param cluster_name is the name of the cluster. The buffer is owned by the module.
+ * @return true if the name is not empty and is a valid header value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_cluster_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_name records the name of the route the
+ * decision produces, replacing the name of the route the decision was given. The name is what the
+ * %ROUTE_NAME% access log command operator reports, so a module built route carries an identity of
+ * its own in access logs and other route name consumers. The name is not validated beyond being
+ * non-empty.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param route_name is the name to record. The buffer is owned by the module.
+ * @return true if the name is not empty, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer route_name);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_timeout records the route timeout for the
+ * request, replacing the timeout of the route. Zero disables the timeout.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param timeout_ms is the timeout in milliseconds. Values above the ceiling that the timer
+ * implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_timeout(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_idle_timeout records the stream idle timeout
+ * for the request, replacing the idle timeout of the route. Zero disables the idle timeout rather
+ * than deferring to the connection manager timeout. There is no way to select deference to the
+ * connection manager idle timeout, so leave this unset to keep the idle timeout of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param idle_timeout_ms is the idle timeout in milliseconds. Values above the ceiling that the
+ * timer implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_idle_timeout(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t idle_timeout_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_max_stream_duration records the maximum stream
+ * duration for the request, replacing the one of the route. Zero disables it.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param max_stream_duration_ms is the maximum stream duration in milliseconds. Values above the
+ * ceiling that the timer implementation supports, which is 2147483647 seconds, are clamped to it.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_max_stream_duration(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t max_stream_duration_ms);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_request_body_buffer_limit records the request
+ * body buffer limit for the request, replacing the limit of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param limit_bytes is the buffer limit in bytes. Zero disables body buffering rather than
+ * removing the limit, and the maximum value of uint64_t means that no limit is configured. Envoy
+ * only raises the buffer limit of the stream, so a value below the limit already in effect does not
+ * shrink it, but it does cap the body buffered for retries.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_request_body_buffer_limit(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint64_t limit_bytes);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_priority records the upstream resource priority
+ * for the request, replacing the priority of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param priority is the resource priority to use. Any value other than
+ * envoy_dynamic_module_type_resource_priority_High is treated as
+ * envoy_dynamic_module_type_resource_priority_Default.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_priority(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_resource_priority priority);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_response_code records the
+ * status code Envoy replies with when the selected cluster does not exist, replacing the one of the
+ * route. A module that derives cluster names from the request can use this to distinguish a name
+ * that resolves to nothing from an upstream that is unavailable.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param status_code is the HTTP status code to reply with. Only codes in the range [200, 600) are
+ * accepted, because the code is used to terminate the request.
+ * @return true if the status code was accepted, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_response_code(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    uint32_t status_code);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_string records the string value
+ * of a route metadata entry. The entry is layered onto the metadata of the route, so consumers that
+ * read route metadata, such as the rate limit ROUTE_ENTRY action or the METADATA(ROUTE) formatter,
+ * observe it. An existing entry with the same namespace and key is overwritten, while the other
+ * entries stay in effect.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param value is the value to set. The buffer is owned by the module.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_number behaves like
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_string but records a number.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param value is the value to set.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_route_metadata_number(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    double value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool behaves like
+ * envoy_dynamic_module_callback_route_specifier_set_route_metadata_string but records a boolean.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param key is the key of the route metadata. The buffer is owned by the module.
+ * @param value is the value to set.
+ */
+void envoy_dynamic_module_callback_route_specifier_set_route_metadata_bool(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
+    bool value);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata records the typed route
+ * metadata of a namespace from a serialized google.protobuf.Any, replacing an existing entry, so
+ * that a typed metadata factory registered for the namespace can parse it out of typedMetadata().
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param ns is the namespace of the route metadata. The buffer is owned by the module.
+ * @param serialized_any is the serialized google.protobuf.Any value. The buffer is owned by the
+ * module.
+ * @return true if the buffer parses as a google.protobuf.Any, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_route_typed_metadata(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_filter_disabled records whether an HTTP filter
+ * is disabled for the request, replacing what the route configures for it.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param filter_name is the name of the filter configuration. The buffer is owned by the module.
+ * @param disabled is whether the filter is disabled.
+ * @return true if the name is not empty, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_filter_disabled(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name, bool disabled);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_path records the path, including any query
+ * string, of the request sent upstream. It is applied after the rewrites of the route, so it takes
+ * precedence over them.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param path is the path to send upstream. The buffer is owned by the module.
+ * @return true if the path starts with '/' and is a valid header value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_path(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer path);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_host records the authority of the request sent
+ * upstream. It is applied after the host rewrite of the route, so it takes precedence over it, and
+ * it records the original authority the same way a host rewrite of a route does.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param host is the authority to send upstream. The buffer is owned by the module.
+ * @return true if the authority is valid, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_host(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer host);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_add_request_header records a header added to the
+ * request sent upstream, after the header mutations of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key. The buffer is owned by the module.
+ * @param value is the header value. The buffer is owned by the module.
+ * @param action selects how the header combines with one of the same name that is already present.
+ * @return true if the action is known, the key is a valid header name that is not a pseudo header,
+ * set_path and set_host being the way to replace those, and the value is a valid header value,
+ * false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_add_request_header(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_route_specifier_header_append_action action);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_remove_request_header records a header removed from
+ * the request sent upstream, after the header mutations of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key. The buffer is owned by the module.
+ * @return true if the key is a valid header name that is not a pseudo header, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_remove_request_header(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_add_response_header records a header added to the
+ * response, after the header mutations of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key. The buffer is owned by the module.
+ * @param value is the header value. The buffer is owned by the module.
+ * @param action selects how the header combines with one of the same name that is already present.
+ * @return true if the action is known, the key is a valid header name that is not a pseudo header
+ * and the value is a valid header value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_add_response_header(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_route_specifier_header_append_action action);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_remove_response_header records a header removed
+ * from the response, after the header mutations of the route.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the header key. The buffer is owned by the module.
+ * @return true if the key is a valid header name that is not a pseudo header, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_remove_response_header(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+// =============================================================================
+// ========================= Early Header Mutation =============================
+// =============================================================================
+
+// =============================================================================
+// Early Header Mutation Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleEarlyHeaderMutation class in Envoy. This is passed to the module when creating a new
+ * in-module early header mutation configuration and may be used to access the early header mutation
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with
+ * envoy_dynamic_module_type_early_header_mutation_config_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_config_module_ptr is a pointer to an in-module
+ * early header mutation configuration created by
+ * envoy_dynamic_module_on_early_header_mutation_config_new. Exactly one configuration is created
+ * per configured extension entry, and it is shared by every request handled by every worker thread.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_early_header_mutation_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_early_header_mutation_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr is a raw pointer to the Envoy
+ * context of a single early header mutation. It provides read and write access to the request
+ * headers and read access to the stream info through the early header mutation callbacks.
+ *
+ * OWNERSHIP: Envoy owns the pointer. The pointer is only valid during the
+ * envoy_dynamic_module_on_early_header_mutation_mutate callback on the worker thread handling the
+ * request, and it refers to storage that Envoy reuses once the callback returns. The module must
+ * not store this pointer, share it across threads, or use it after the callback returns.
+ */
+typedef void* envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr;
+
+// =============================================================================
+// Early Header Mutation Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_config_new is called on the main thread when an
+ * early header mutation extension referencing this module is configured. The module should parse
+ * the configuration and return a pointer to the in-module early header mutation configuration.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleEarlyHeaderMutation object for the
+ * corresponding config.
+ * @param name is the early header mutation name used to select an implementation within the module.
+ * @param config is the configuration bytes for the early header mutation.
+ * @return envoy_dynamic_module_type_early_header_mutation_config_module_ptr is the pointer to the
+ * in-module early header mutation configuration. Returning nullptr indicates a failure to
+ * initialize, and the configuration will be rejected.
+ */
+envoy_dynamic_module_type_early_header_mutation_config_module_ptr
+envoy_dynamic_module_on_early_header_mutation_config_new(
+    envoy_dynamic_module_type_early_header_mutation_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_config_destroy is called when the early header
+ * mutation configuration is destroyed, which happens when the listener owning the connection
+ * manager configuration that references it is drained and removed.
+ *
+ * @param config_module_ptr is the pointer to the in-module early header mutation configuration.
+ */
+void envoy_dynamic_module_on_early_header_mutation_config_destroy(
+    envoy_dynamic_module_type_early_header_mutation_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_early_header_mutation_mutate is called once per request to rewrite the
+ * request headers, before routing, tracing, request ID generation, x-forwarded-for handling and any
+ * HTTP filter runs.
+ *
+ * This may be called concurrently on multiple worker threads with the same in-module configuration,
+ * so the module must treat the configuration as read-only and avoid shared mutable state.
+ *
+ * Only the request headers exist at this point. The stream info is read-only: the connection-level
+ * attributes and any dynamic metadata or filter state published by listener or network filters are
+ * available, while the route, the response and every upstream attribute are not yet populated and
+ * their getters return false.
+ *
+ * @param config_module_ptr is the pointer to the in-module early header mutation configuration.
+ * @param envoy_ptr is the pointer to the Envoy early header mutation context, valid only during
+ * this call.
+ * @return true to continue to the next early header mutation extension in the configured chain,
+ * false to stop the chain. This is not a success or failure signal: the mutations the module has
+ * already made are kept either way, and returning false only suppresses the extensions configured
+ * after this one. When this is the last or only extension in the chain, the return value has no
+ * effect.
+ */
+bool envoy_dynamic_module_on_early_header_mutation_mutate(
+    envoy_dynamic_module_type_early_header_mutation_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr);
+
+// =============================================================================
+// Early Header Mutation Callbacks
+// =============================================================================
+
+// ------------------ Early Header Mutation Callbacks - Headers ----------------
+// Only the request headers exist at this point in the request lifecycle, so these callbacks take no
+// header type and always operate on the request header map.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers_size is called by the module to
+ * get the number of request headers.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @return the number of request headers.
+ */
+size_t envoy_dynamic_module_callback_early_header_mutation_get_headers_size(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers is called by the module to get
+ * all request headers.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param result_headers is the array to store the headers. The module must ensure that the array
+ * has enough space to store all headers, i.e. at least
+ * envoy_dynamic_module_callback_early_header_mutation_get_headers_size entries. Envoy does not
+ * bounds check the array, so passing a shorter one is undefined behavior. The buffers in the
+ * entries are owned by Envoy and are invalidated by any of the header setter callbacks below.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_headers(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_envoy_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_header_value is called by the module to
+ * get the value of a request header with the given key.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header.
+ * @param result is the pointer to the buffer where the header value will be stored. It is set to a
+ * null buffer of length zero when the key does not exist or the index is out of range. The buffer
+ * is owned by Envoy and is invalidated by any of the header setter callbacks below.
+ * @param index is the index of the header value in the case of multiple values for the same key,
+ * zero for the first value.
+ * @param total_count_out, when non-null, receives the total number of values for the key.
+ * @return true if the header exists at the given index, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_header_value(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result,
+    size_t index, size_t* total_count_out);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_set_header is called by the module to set the
+ * value of the request header with the given key. If the header does not exist, it will be created.
+ * If the header already exists, all existing values will be removed and the new value will be set.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header. An empty key is rejected.
+ * @param value is the value of the header. An empty value sets the header to an empty string; use
+ * envoy_dynamic_module_callback_early_header_mutation_remove_header to remove a header.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that this only sets the header on the underlying Envoy object. The connection manager and
+ * the subsequent filters may still rewrite or drop it, so returning true does not guarantee that
+ * the header reaches the upstream. In particular, the connection manager sanitizes the
+ * ``connection``,
+ * ``upgrade``, ``te`` and ``x-forwarded-for`` headers right after this hook runs.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_set_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_add_header is called by the module to add a
+ * value to the request header with the given key, preserving any existing values. If the header
+ * does not exist, it will be created.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header. An empty key is rejected.
+ * @param value is the value to add.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_add_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_remove_header is called by the module to
+ * remove all values of the request header with the given key.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the key of the header to remove. An empty key is rejected.
+ * @return true if the operation is successful, false otherwise. Removing a key that does not exist
+ * is successful.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_remove_header(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key);
+
+// ----------- Early Header Mutation Callbacks - Generic Attributes ------------
+// The attribute callbacks share the envoy_dynamic_module_type_attribute_id enum with the access
+// logger. Early header mutation runs before routing and before the upstream request, so the route,
+// response and upstream attributes are not populated yet and the getters return false for them.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_string is called by the module
+ * to get a string attribute value from the stream info. If the attribute is not found, not
+ * supported or is not a string, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the buffer where the string value will be stored. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_string(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_int is called by the module to
+ * get an integer attribute value from the stream info. If the attribute is not found, not supported
+ * or is not an integer, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_int(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool is called by the module to
+ * get a boolean attribute value from the stream info. If the attribute is not found, not supported
+ * or is not a boolean, this returns false.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_attribute_bool(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+// -------- Early Header Mutation Callbacks - Metadata and Dynamic State -------
+// The stream info is read-only at this point in the request lifecycle, so only getters are exposed.
+// A module that needs to publish state for later extensions should do so from an HTTP filter.
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata is called by the module
+ * to get a string value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the buffer where the string value will be stored. Only string
+ * values are returned. The buffer is owned by Envoy and is valid until the end of the current event
+ * hook.
+ * @return true if a string value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number is called by the
+ * module to get a number value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the variable where the number value will be stored.
+ * @return true if a number value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, double* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool is called by the
+ * module to get a boolean value from dynamic metadata by filter name and key path.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param filter_name is the filter namespace in dynamic metadata.
+ * @param path is the key path within the filter namespace, which may be nested with dots.
+ * @param result is the pointer to the variable where the boolean value will be stored.
+ * @return true if a boolean value exists at the path, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_dynamic_metadata_bool(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_name,
+    envoy_dynamic_module_type_module_buffer path, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes is called by the
+ * module to get a bytes value from the filter state. Only objects stored as
+ * Envoy::Router::StringAccessor, which is what the dynamic module filter state setters create, are
+ * readable through this callback.
+ *
+ * @param envoy_ptr is the pointer to the early header mutation context.
+ * @param key is the filter state key to look up.
+ * @param result is the pointer to the buffer where the bytes value will be stored. The buffer is
+ * owned by Envoy and is valid until the end of the current event hook.
+ * @return true if the key exists and holds a readable value, false otherwise.
+ */
+bool envoy_dynamic_module_callback_early_header_mutation_get_filter_state_bytes(
+    envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_envoy_buffer* result);
+
+// =============================================================================
+// ========================= HTTP Header Formatter =============================
+// =============================================================================
+
+// =============================================================================
+// HTTP Header Formatter Types
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_type_header_formatter_config_envoy_ptr is a raw pointer to the
+ * DynamicModuleHeaderFormatterConfig class in Envoy. This is passed to the module when creating a
+ * new in-module header formatter configuration and may be used to access the header formatter
+ * configuration-scoped information in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_header_formatter_config_module_ptr in
+ * the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_header_formatter_config_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_header_formatter_config_module_ptr is a pointer to an in-module header
+ * formatter configuration created by envoy_dynamic_module_on_header_formatter_config_new. Exactly
+ * one configuration is created per configured stateful_formatter entry, on the main thread, and it
+ * is shared by every per-message formatter instance it produces on every worker thread. It is
+ * therefore used concurrently and must be treated as read-only after creation.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It can be
+ * released when envoy_dynamic_module_on_header_formatter_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_header_formatter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_header_formatter_envoy_ptr is a raw pointer to the
+ * DynamicModuleHeaderFormatter class in Envoy. This is passed to the module when creating a new
+ * in-module formatter instance for a single HTTP/1 message.
+ *
+ * This is passed to every per-message hook: envoy_dynamic_module_on_header_formatter_new,
+ * envoy_dynamic_module_on_header_formatter_process_key and
+ * envoy_dynamic_module_on_header_formatter_format. Header formatting happens in the codec, below
+ * the filter chain, so no callback takes this pointer today - the logging callbacks a module uses
+ * here are the module-wide ones. It is passed so that per-message information may be exposed
+ * through it in the future.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_header_formatter_module_ptr in the
+ * module.
+ *
+ * OWNERSHIP: Envoy owns the pointer, and it can be accessed by the module until the formatter
+ * instance is destroyed, i.e. envoy_dynamic_module_on_header_formatter_destroy is called for the
+ * corresponding module pointer.
+ */
+typedef void* envoy_dynamic_module_type_header_formatter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_header_formatter_module_ptr is a pointer to an in-module header
+ * formatter instance created by envoy_dynamic_module_on_header_formatter_new. One instance is
+ * created per HTTP/1 message being decoded, and every hook taking it is called by the single worker
+ * thread that owns that message. Unlike the configuration it may therefore hold mutable state
+ * without synchronization, which is what makes the formatter "stateful": keys observed while
+ * decoding a request can be replayed when encoding the response on the same connection.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It can be
+ * released when envoy_dynamic_module_on_header_formatter_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_header_formatter_module_ptr;
+
+// =============================================================================
+// HTTP Header Formatter Event Hooks
+// =============================================================================
+
+/**
+ * envoy_dynamic_module_on_header_formatter_config_new is called on the main thread when an HTTP/1
+ * ``stateful_formatter`` referencing a dynamic module is configured, i.e. once per configured
+ * entry.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleHeaderFormatterConfig object for the
+ * module to interact with Envoy.
+ * @param name is the header formatter name used to select an implementation within the module. The
+ * buffer is owned by Envoy and is only valid for the duration of this call, so a module that needs
+ * the name later must copy it.
+ * @param config is the configuration bytes for the header formatter, owned by Envoy and valid for
+ * the duration of this call only.
+ * @return envoy_dynamic_module_type_header_formatter_config_module_ptr is the pointer to the
+ * in-module header formatter configuration. Returning nullptr causes Envoy to reject the
+ * configuration.
+ */
+envoy_dynamic_module_type_header_formatter_config_module_ptr
+envoy_dynamic_module_on_header_formatter_config_new(
+    envoy_dynamic_module_type_header_formatter_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_config_destroy is called when the header formatter
+ * configuration is destroyed in Envoy, which happens once the listener or cluster owning the
+ * protocol options that reference it has been drained and removed and every connection still using
+ * it has closed. Every formatter instance created from the configuration has already been
+ * destroyed at that point.
+ *
+ * This is always called on the main thread. A formatter can outlive the configuration that
+ * produced it - it is owned by a header map, which a straggler connection may hold past the
+ * removal of the listener - so the last reference to the configuration is frequently released by a
+ * worker thread. Envoy defers the destruction to the main thread dispatcher in that case, so a
+ * module may tear down main-thread-affine state here.
+ *
+ * @param config_module_ptr is a pointer to the in-module header formatter configuration.
+ */
+void envoy_dynamic_module_on_header_formatter_config_destroy(
+    envoy_dynamic_module_type_header_formatter_config_module_ptr config_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_new is called to create a formatter instance for a
+ * single HTTP/1 message. Envoy creates one instance each time it begins decoding a message, on the
+ * worker thread owning the connection, so this is called concurrently against the one shared
+ * configuration and must be thread-safe.
+ *
+ * @param config_module_ptr is the pointer to the in-module header formatter configuration.
+ * @param formatter_envoy_ptr is the pointer to the DynamicModuleHeaderFormatter object of the
+ * corresponding formatter instance.
+ * @return envoy_dynamic_module_type_header_formatter_module_ptr is the pointer to the in-module
+ * formatter instance. Returning nullptr makes Envoy fall back to its default header casing for
+ * that message rather than failing the request.
+ */
+envoy_dynamic_module_type_header_formatter_module_ptr envoy_dynamic_module_on_header_formatter_new(
+    envoy_dynamic_module_type_header_formatter_config_module_ptr config_module_ptr,
+    envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_destroy is called when the formatter instance for a
+ * message is destroyed, on the same worker thread that created it.
+ *
+ * @param formatter_module_ptr is the pointer to the in-module formatter instance.
+ */
+void envoy_dynamic_module_on_header_formatter_destroy(
+    envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_process_key is called for each header key the HTTP/1
+ * codec receives on the wire, with the original casing as sent by the peer. It gives the module the
+ * chance to remember the original spelling so that
+ * envoy_dynamic_module_on_header_formatter_format can restore it on the way out.
+ *
+ * Note that this is called for received headers only. Headers that Envoy itself adds never reach
+ * this hook, and format is still called for them.
+ *
+ * @param formatter_envoy_ptr is the pointer to the DynamicModuleHeaderFormatter object of the
+ * corresponding formatter instance.
+ * @param formatter_module_ptr is the pointer to the in-module formatter instance.
+ * @param key is the header key as received. The buffer is owned by Envoy and is only valid for the
+ * duration of this call, so a module that needs the key later must copy it.
+ */
+void envoy_dynamic_module_on_header_formatter_process_key(
+    envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr,
+    envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key);
+
+/**
+ * envoy_dynamic_module_on_header_formatter_format is called for each header key Envoy is about to
+ * serialize, to decide the casing written on the wire.
+ *
+ * @param formatter_envoy_ptr is the pointer to the DynamicModuleHeaderFormatter object of the
+ * corresponding formatter instance.
+ * @param formatter_module_ptr is the pointer to the in-module formatter instance.
+ * @param key is the lower-cased header key Envoy holds internally. The buffer is owned by Envoy and
+ * is only valid for the duration of this call.
+ * @param result is where the module writes the formatted key. The buffer is owned by the module.
+ * Envoy copies it only after this hook has returned, so it must outlive the call; keeping it valid
+ * until the next call into the module on the same thread satisfies that.
+ * @return true when result was populated, false to make Envoy serialize the key unchanged. A module
+ * that only wants to rewrite some keys should return false for the rest rather than echoing them
+ * back.
+ */
+bool envoy_dynamic_module_on_header_formatter_format(
+    envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr,
+    envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr,
+    envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_module_buffer* result);
+
+#ifdef __cplusplus
+}
+#endif
+
+// NOLINTEND

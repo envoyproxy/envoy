@@ -1,0 +1,203 @@
+node {
+}
+static_resources {
+  clusters {
+    name: ";"
+    connect_timeout {
+      seconds: 8
+      nanos: 132
+    }
+    per_connection_buffer_limit_bytes {
+      value: 1728053248
+    }
+    health_checks {
+      timeout {
+        seconds: 8
+        nanos: 25
+      }
+      interval {
+        seconds: 2559
+        nanos: 67154560
+      }
+      unhealthy_threshold {
+        value: 1728053248
+      }
+      healthy_threshold {
+        value: 1728053248
+      }
+      alt_port {
+        value: 4
+      }
+      http_health_check {
+        path: ":"
+        receive {
+          text: "@B\017\000\000\000\000\000"
+        }
+        request_headers_to_add {
+          header {
+            key: "\361\211\211\211\t\341\211\211\tt"
+            value: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\337\205\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+          }
+        }
+        request_headers_to_remove: ";"
+      }
+      unhealthy_interval {
+        seconds: 8
+        nanos: 132
+      }
+      unhealthy_edge_interval {
+        seconds: 2299
+        nanos: 16384
+      }
+      always_log_health_check_failures: true
+    }
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http2_protocol_options {
+          max_inbound_priority_frames_per_stream {
+            value: 1701737468
+          }
+        common_http_protocol_options {
+          max_headers_count {
+            value: 842473504
+          }
+        }
+      }
+    }
+    load_assignment {
+      cluster_name: "domains"
+      endpoints {
+        locality {
+          zone: "6"
+        }
+        load_balancing_weight {
+          value: 842473504
+        }
+        priority: 122
+      }
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                address: "0.0.0.0"
+                port_value: 0
+              }
+            }
+          }
+          health_status: TIMEOUT
+        }
+        priority: 122
+        proximity {
+          value: 28732523
+        }
+      }
+      endpoints {
+        locality {
+          sub_zone: "|"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "$node {\n}\ns"
+              }
+            }
+          }
+          health_status: UNHEALTHY
+        }
+        load_balancing_weight {
+          value: 122
+        }
+        priority: 122
+      }
+      endpoints {
+        locality {
+          sub_zone: "|"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                address: "0.0.0.0"
+                port_value: 0
+              }
+            }
+          }
+          health_status: DEGRADED
+        }
+        priority: 122
+      }
+      endpoints {
+        lb_endpoints {
+          health_status: HEALTHY
+          endpoint_name: "\021\000\000\000\000\000\000\000"
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              envoy_internal_address {
+                server_listener_name: "\001\000\000\001"
+              }
+            }
+          }
+          health_status: TIMEOUT
+        }
+        priority: 106
+      }
+      policy {
+        drop_overloads {
+          category: "U"
+        }
+      }
+    }
+    dns_failure_refresh_rate {
+      base_interval {
+        seconds: 8
+        nanos: 132
+      }
+    }
+    track_cluster_stats {
+    }
+  }
+}
+stats_sinks {
+  name: "type.googleapis.com/envoy.api.v2.route.Route"
+  typed_config {
+    type_url: "IIIIIIIIIIIIIIII"
+  }
+}
+stats_sinks {
+  name: "="
+  typed_config {
+    value: "\000\037"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "["
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "z"
+}
+stats_sinks {
+  name: "z"
+}
+stats_sinks {
+  name: "z"
+}
+stats_sinks {
+  name: "z"
+}
+stats_sinks {
+  name: "z"
+}
+stats_sinks {
+  name: "z"
+}

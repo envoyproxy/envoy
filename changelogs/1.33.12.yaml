@@ -1,0 +1,7 @@
+date: October 16, 2025
+
+bug_fixes:
+- area: lua
+  change: |
+    Fix a bug where Lua filters may result in Envoy crashes when setting response body to a
+    larger payload (greater than the body buffer limit).

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+import "google/protobuf/duration.proto";
+
+// Configuration for BlockFilter that blocks the worker thread for a specific
+// time (using real thread sleep)..
+message BlockFilterConfig {
+  // Duration to block the thread in decodeHeaders.
+  // If the value is 0, the thread will not wait.
+  google.protobuf.Duration block_duration = 1;
+}

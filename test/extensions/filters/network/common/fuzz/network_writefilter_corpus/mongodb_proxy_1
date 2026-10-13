@@ -1,0 +1,107 @@
+config {
+  name: "envoy.filters.network.mongo_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy"
+    value: "\n\001\\\032\007\"\003\010\200t*\000 \001"
+  }
+}
+actions {
+  on_write {
+    data: "]\000"
+  }
+}
+actions {
+  on_write {
+    data: "\004\000"
+    end_stream: true
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 14848
+  }
+}
+actions {
+  on_write {
+    data: "\004\000"
+    end_stream: true
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 14848
+  }
+}
+actions {
+  on_write {
+    data: "\004\000\001\000\000\000\000\000\000\001"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "<"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "\004\000"
+  }
+}
+actions {
+  on_write {
+    data: "\004\000"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 14848
+  }
+}
+actions {
+  on_write {
+    data: "type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "\004\000"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "\004\000"
+  }
+}
+actions {
+  on_write {
+    data: "pH\037\000 `\000\000"
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "\004\000"
+    end_stream: true
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 14848
+  }
+}
+actions {
+  on_write {
+    data: "="
+    end_stream: true
+  }
+}
+actions {
+  on_write {
+    data: "\004\000"
+    end_stream: true
+  }
+}

@@ -1,0 +1,213 @@
+name: Upload to GCS
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      gcp-key:
+    inputs:
+      artifacts:
+        description: JSON array of artifacts to upload to GCS
+        type: string
+        required: true
+      layout:
+        description: >-
+          Upload layout (sha or version). For `version` the artifact is synced to
+          `<bucket>/<prefix>/<version>`.
+        type: string
+        default: sha
+      dry-run:
+        description: Validate and dry-run the upload without writing to GCS. Dev versions are permitted in dry-run mode.
+        type: boolean
+        default: false
+      prefix:
+        description: >-
+          Object prefix within the bucket for `layout: version`, eg `envoy/docs` gives
+          `gs://<bucket>/envoy/docs/<version>`.
+        type: string
+        default: envoy/docs
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    env:
+      HAS_GCP_KEY: ${{ secrets.gcp-key != '' }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact: ${{ fromJSON(inputs.artifacts) }}
+    steps:
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      with:
+        name: ${{ matrix.artifact }}
+        path: ${{ matrix.artifact }}
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      id: metadata
+      with:
+        input: ${{ matrix.artifact }}/gcs-metadata.json
+        input-format: json-path
+    - run: |
+        rm -rf "${ARTIFACT}/gcs-metadata.json"
+      env:
+        ARTIFACT: ${{ matrix.artifact }}
+    # Nothing in the downloaded artifact is trusted (see POLICY.md). Destination components
+    # are cross-checked against workflow-resolved values before any credential is loaded.
+    - name: Validate upload metadata
+      env:
+        BUCKET: ${{ fromJSON(steps.metadata.outputs.value).bucket }}
+        BUCKET_EXPECTED: >-
+          ${{ inputs.layout == 'version'
+              && vars.GCS_DOCS_ARCHIVE_BUCKET
+              || inputs.layout == 'sha'
+                  && (inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST
+                      || vars.GCS_ARTIFACT_BUCKET_PRE) }}
+        ARCHIVE_BUCKET: ${{ inputs.layout == 'version' && fromJSON(steps.metadata.outputs.value).archive-bucket || '' }}
+        SHA: ${{ fromJSON(steps.metadata.outputs.value).sha }}
+        SHA_EXPECTED: ${{ fromJSON(inputs.request).request.sha }}
+        REDIRECT: ${{ fromJSON(steps.metadata.outputs.value).redirect }}
+        REDIRECT_EXPECTED: >-
+          ${{ vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+          }}${{ fromJSON(inputs.request).request.pr
+                || fromJSON(inputs.request).request.target-branch }}
+        LAYOUT: ${{ inputs.layout }}
+        VERSION: ${{ fromJSON(steps.metadata.outputs.value).version }}
+        VERSION_EXPECTED: >-
+          ${{ format(
+              'v{0}.{1}.{2}',
+              fromJSON(inputs.request).request.version.major,
+              fromJSON(inputs.request).request.version.minor,
+              fromJSON(inputs.request).request.version.patch
+          ) }}
+        VERSION_DEV: ${{ fromJSON(inputs.request).request.version.dev }}
+        PREFIX: ${{ inputs.prefix }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        HAS_GCP_KEY: ${{ secrets.gcp-key != '' }}
+      run: |
+        VERSION_REGEX='^v[0-9]+\.[0-9]+\.[0-9]+$'
+        PATH_REGEX='^[a-zA-Z0-9][a-zA-Z0-9_.-]*(/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*$'
+        if [[ "$LAYOUT" != "sha" && "$LAYOUT" != "version" ]]; then
+            echo "::error::Unsupported upload layout (${LAYOUT})"
+            exit 1
+        fi
+        if [[ -z "$BUCKET_EXPECTED" ]]; then
+            echo "::error::Expected bucket is empty"
+            exit 1
+        fi
+        if ! [[ "$SHA_EXPECTED" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "::error::Expected SHA (${SHA_EXPECTED}) is not a valid commit sha"
+            exit 1
+        fi
+        if [[ "$SHA" != "$SHA_EXPECTED" ]]; then
+            echo "::error::SHA (${SHA}) does not match expected sha (${SHA_EXPECTED})"
+            exit 1
+        fi
+        if [[ "$LAYOUT" == "version" ]]; then
+            if [[ -z "$ARCHIVE_BUCKET" || "$ARCHIVE_BUCKET" != "$BUCKET_EXPECTED" ]]; then
+                echo "::error::Archive bucket (${ARCHIVE_BUCKET}) does not match expected bucket (${BUCKET_EXPECTED})"
+                exit 1
+            fi
+            if [[ "$VERSION_DEV" == "true" && "$DRY_RUN" != "true" ]]; then
+                echo "::error::Versioned docs cannot be uploaded for a dev request"
+                exit 1
+            fi
+            if ! [[ "$VERSION_EXPECTED" =~ $VERSION_REGEX ]] || ! [[ "$VERSION" =~ $VERSION_REGEX ]]; then
+                echo "::error::Version (${VERSION}) is not a valid release version"
+                exit 1
+            fi
+            if [[ "$VERSION" != "$VERSION_EXPECTED" ]]; then
+                echo "::error::Version (${VERSION}) does not match expected release version (${VERSION_EXPECTED})"
+                exit 1
+            fi
+            if ! [[ "$PREFIX" =~ $PATH_REGEX ]]; then
+                echo "::error::Upload prefix (${PREFIX}) is not a valid object prefix"
+                exit 1
+            fi
+        else
+            if [[ -z "$BUCKET" || "$BUCKET" != "$BUCKET_EXPECTED" ]]; then
+                echo "::error::Bucket (${BUCKET}) does not match expected bucket (${BUCKET_EXPECTED})"
+                exit 1
+            fi
+            if [[ -z "$REDIRECT_EXPECTED" ]] || ! [[ "$REDIRECT_EXPECTED" =~ $PATH_REGEX ]]; then
+                echo "::error::Expected redirect (${REDIRECT_EXPECTED}) is not a valid redirect path"
+                exit 1
+            fi
+            if [[ "$REDIRECT" != "$REDIRECT_EXPECTED" ]]; then
+                echo "::error::Redirect (${REDIRECT}) does not match expected redirect (${REDIRECT_EXPECTED})"
+                exit 1
+            fi
+        fi
+        if [[ "$DRY_RUN" != "true" && "$HAS_GCP_KEY" != "true" ]]; then
+            echo "::error::No GCP key provided for non-dry-run upload"
+            exit 1
+        fi
+    - name: Set up GCP credentials for dry run
+      if: ${{ inputs.dry-run && env.HAS_GCP_KEY == 'true' }}
+      uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        key: ${{ secrets.gcp-key }}
+    - name: Dry-run versioned artifact sync
+      if: ${{ inputs.dry-run && inputs.layout == 'version' && env.HAS_GCP_KEY == 'true' }}
+      env:
+        ARTIFACT: ${{ matrix.artifact }}
+        BUCKET: ${{ vars.GCS_DOCS_ARCHIVE_BUCKET }}
+        VERSION: ${{ fromJSON(steps.metadata.outputs.value).version }}
+        PREFIX: ${{ inputs.prefix }}
+      run: |
+        gcloud storage rsync --dry-run --delete-unmatched-destination-objects -r \
+          "$ARTIFACT" "gs://${BUCKET}/${PREFIX}/${VERSION}"
+    - name: Report dry-run destination
+      if: ${{ inputs.dry-run && (env.HAS_GCP_KEY != 'true' || inputs.layout == 'sha') }}
+      env:
+        ARTIFACT: ${{ matrix.artifact }}
+        LAYOUT: ${{ inputs.layout }}
+        BUCKET: >-
+          ${{ inputs.layout == 'version' && vars.GCS_DOCS_ARCHIVE_BUCKET
+              || inputs.layout == 'sha'
+                  && (inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST
+                      || vars.GCS_ARTIFACT_BUCKET_PRE) }}
+        VERSION: ${{ fromJSON(steps.metadata.outputs.value).version }}
+        PREFIX: ${{ inputs.prefix }}
+        SHA: ${{ fromJSON(inputs.request).request.sha }}
+        REDIRECT: ${{ fromJSON(steps.metadata.outputs.value).redirect }}
+      run: |
+        if [[ "$LAYOUT" == "version" ]]; then
+            echo "::notice::Dry run: would write to gs://${BUCKET}/${PREFIX}/${VERSION}"
+        else
+            echo "::notice::Dry run: would write ${ARTIFACT} to gs://${BUCKET}/${SHA}/${ARTIFACT} (redirect: ${REDIRECT})"
+        fi
+    - uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      if: ${{ !inputs.dry-run }}
+      with:
+        key: ${{ secrets.gcp-key }}
+    - if: ${{ !inputs.dry-run && inputs.layout == 'sha' }}
+      uses: envoyproxy/toolshed/actions/gcs/artefact/sync@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
+        path: ${{ matrix.artifact }}
+        path-upload: ${{ matrix.artifact }}
+        sha: ${{ fromJSON(inputs.request).request.sha }}
+        redirect: >-
+          ${{ vars.GCS_ARTIFACT_PREFIX && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+          }}${{ fromJSON(inputs.request).request.pr
+                || fromJSON(inputs.request).request.target-branch }}
+    - if: ${{ !inputs.dry-run && inputs.layout == 'version' }}
+      name: Sync versioned artifact
+      env:
+        ARTIFACT: ${{ matrix.artifact }}
+        BUCKET: ${{ vars.GCS_DOCS_ARCHIVE_BUCKET }}
+        VERSION: ${{ fromJSON(steps.metadata.outputs.value).version }}
+        PREFIX: ${{ inputs.prefix }}
+      run: |
+        gcloud storage rsync --delete-unmatched-destination-objects -r \
+          "$ARTIFACT" "gs://${BUCKET}/${PREFIX}/${VERSION}"

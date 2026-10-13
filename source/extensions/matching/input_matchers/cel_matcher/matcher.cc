@@ -1,0 +1,46 @@
+#include "source/extensions/matching/input_matchers/cel_matcher/matcher.h"
+
+#include "envoy/matcher/matcher.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Matching {
+namespace InputMatchers {
+namespace CelMatcher {
+
+using ::Envoy::Extensions::Matching::Http::CelInput::CelMatchData;
+CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
+                                 Filters::Common::Expr::BuilderInstanceSharedConstPtr builder)
+    : compiled_expr_([&]() {
+        auto compiled_expr =
+            Filters::Common::Expr::CompiledExpression::Create(builder, cel_matcher->expr_match());
+        if (!compiled_expr.ok()) {
+          throw EnvoyException(
+              absl::StrCat("failed to create an expression: ", compiled_expr.status().message()));
+        }
+        return std::move(compiled_expr.value());
+      }()) {}
+
+Matcher::MatchResult CelInputMatcher::match(const DataInputGetResult& input) {
+  Protobuf::Arena arena;
+  if (auto cel_data = input.customData<CelMatchData>(); cel_data) {
+    auto eval_result = compiled_expr_.evaluate(*cel_data->activation_, &arena);
+    if (eval_result.ok() && eval_result.value().IsBool()) {
+      if (eval_result.value().BoolOrDie()) {
+        return Matcher::MatchResult::Matched;
+      }
+    }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_cel_response_path_matching") &&
+        cel_data->needs_response() && !cel_data->has_response_data()) {
+      return Matcher::MatchResult::InsufficientData;
+    }
+  }
+  return Matcher::MatchResult::NoMatch;
+}
+
+} // namespace CelMatcher
+} // namespace InputMatchers
+} // namespace Matching
+} // namespace Extensions
+} // namespace Envoy

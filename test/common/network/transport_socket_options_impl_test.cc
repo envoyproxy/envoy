@@ -1,0 +1,336 @@
+#include "envoy/common/hashable.h"
+
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/downstream_network_namespace.h"
+#include "source/common/network/filter_state_proxy_info.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_subject_alt_names.h"
+#include "source/common/stream_info/filter_state_impl.h"
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Network {
+namespace {
+
+class TransportSocketOptionsImplTest : public testing::Test {
+public:
+  TransportSocketOptionsImplTest()
+      : filter_state_(StreamInfo::FilterState::LifeSpan::FilterChain) {}
+  void setFilterStateObject(const std::string& key, const std::string& value) {
+    auto* factory =
+        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
+    ASSERT_NE(nullptr, factory);
+    EXPECT_EQ(key, factory->name());
+    auto object = factory->createFromBytes(value);
+    ASSERT_NE(nullptr, object);
+    filter_state_.setData(key, std::move(object), StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
+protected:
+  StreamInfo::FilterStateImpl filter_state_;
+};
+
+TEST_F(TransportSocketOptionsImplTest, Nullptr) {
+  EXPECT_EQ(nullptr, TransportSocketOptionsUtility::fromFilterState(filter_state_));
+  filter_state_.setData("random_key_has_no_effect",
+                        std::make_unique<UpstreamServerName>("www.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(nullptr, TransportSocketOptionsUtility::fromFilterState(filter_state_));
+}
+
+TEST_F(TransportSocketOptionsImplTest, SharedFilterState) {
+  filter_state_.setData("random_key_has_effect",
+                        std::make_unique<UpstreamServerName>("www.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
+  EXPECT_EQ(1, objects.size());
+  EXPECT_EQ("random_key_has_effect", objects.at(0).name_);
+}
+
+TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
+  filter_state_.setData(UpstreamServerName::key(),
+                        std::make_unique<UpstreamServerName>("www.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData(ProxyProtocolFilterState::key(),
+                        std::make_unique<ProxyProtocolFilterState>(Network::ProxyProtocolData{
+                            Network::Address::InstanceConstSharedPtr(
+                                new Network::Address::Ipv4Instance("202.168.0.13", 52000)),
+                            Network::Address::InstanceConstSharedPtr(
+                                new Network::Address::Ipv4Instance("174.2.2.222", 80))}),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
+            transport_socket_options->serverNameOverride());
+  EXPECT_EQ("202.168.0.13:52000",
+            transport_socket_options->proxyProtocolOptions()->src_addr_->asStringView());
+  EXPECT_TRUE(transport_socket_options->applicationProtocolListOverride().empty());
+}
+
+TEST_F(TransportSocketOptionsImplTest, ApplicationProtocols) {
+  std::vector<std::string> http_alpns{Http::Utility::AlpnNames::get().Http2,
+                                      Http::Utility::AlpnNames::get().Http11};
+  filter_state_.setData(ApplicationProtocols::key(),
+                        std::make_unique<ApplicationProtocols>(http_alpns),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  EXPECT_EQ(std::nullopt, transport_socket_options->serverNameOverride());
+  EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
+}
+
+TEST_F(TransportSocketOptionsImplTest, Both) {
+  std::vector<std::string> http_alpns{Http::Utility::AlpnNames::get().Http2,
+                                      Http::Utility::AlpnNames::get().Http11};
+  filter_state_.setData(UpstreamServerName::key(),
+                        std::make_unique<UpstreamServerName>("www.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_.setData(ApplicationProtocols::key(),
+                        std::make_unique<ApplicationProtocols>(http_alpns),
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
+            transport_socket_options->serverNameOverride());
+  EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
+}
+
+class TestTransportSocketFactory : public CommonUpstreamTransportSocketFactory {
+public:
+  TransportSocketPtr
+  createTransportSocket(TransportSocketOptionsConstSharedPtr,
+                        std::shared_ptr<const Upstream::HostDescription>) const override {
+    return nullptr;
+  }
+  absl::string_view defaultServerNameIndication() const override { return ""; }
+  bool implementsSecureTransport() const override { return false; }
+};
+
+class NonHashableObj : public StreamInfo::FilterState::Object {};
+class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
+  std::optional<uint64_t> hash() const override { return 12345; };
+};
+
+TEST_F(TransportSocketOptionsImplTest, FilterStateHashable) {
+  filter_state_.setData("hashable", std::make_shared<HashableObj>(),
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  TestTransportSocketFactory factory;
+  std::vector<uint8_t> keys;
+  factory.hashKey(keys, transport_socket_options);
+  EXPECT_GT(keys.size(), 0);
+}
+
+TEST_F(TransportSocketOptionsImplTest, FilterStateNonHashable) {
+  filter_state_.setData("non-hashable", std::make_shared<NonHashableObj>(),
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  TestTransportSocketFactory factory;
+  std::vector<uint8_t> keys;
+  factory.hashKey(keys, transport_socket_options);
+  EXPECT_EQ(keys.size(), 0);
+}
+
+TEST_F(TransportSocketOptionsImplTest, DynamicObjects) {
+  setFilterStateObject(UpstreamServerName::key(), "www.example.com");
+  setFilterStateObject(ApplicationProtocols::key(), "h2,http/1.1");
+  setFilterStateObject(UpstreamSubjectAltNames::key(), "www.example.com,example.com");
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  EXPECT_EQ(std::make_optional<std::string>("www.example.com"),
+            transport_socket_options->serverNameOverride());
+  std::vector<std::string> http_alpns{"h2", "http/1.1"};
+  EXPECT_EQ(http_alpns, transport_socket_options->applicationProtocolListOverride());
+  std::vector<std::string> sans{"www.example.com", "example.com"};
+  EXPECT_EQ(sans, transport_socket_options->verifySubjectAltNameListOverride());
+}
+
+TEST_F(TransportSocketOptionsImplTest, DownstreamNetworkNamespace) {
+  const std::string network_namespace_filepath = "/var/run/netns/production";
+
+  // Create the object directly.
+  auto network_namespace_obj =
+      std::make_unique<DownstreamNetworkNamespace>(network_namespace_filepath);
+  EXPECT_EQ(network_namespace_filepath, network_namespace_obj->value());
+  EXPECT_EQ(std::make_optional<std::string>(network_namespace_filepath),
+            network_namespace_obj->serializeAsString());
+
+  // Test key.
+  EXPECT_EQ("envoy.network.network_namespace", DownstreamNetworkNamespace::key());
+}
+
+TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceSharedWithUpstream) {
+  const std::string network_namespace_filepath = "/var/run/netns/staging";
+
+  // Set network namespace as shared with upstream connection.
+  filter_state_.setData(DownstreamNetworkNamespace::key(),
+                        std::make_unique<DownstreamNetworkNamespace>(network_namespace_filepath),
+                        StreamInfo::FilterState::LifeSpan::Connection,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+
+  auto objects = transport_socket_options->downstreamSharedFilterStateObjects();
+  EXPECT_EQ(1, objects.size());
+  EXPECT_EQ(DownstreamNetworkNamespace::key(), objects.at(0).name_);
+
+  // Verify we can retrieve the network namespace from the filter state object.
+  const auto* network_namespace_state =
+      dynamic_cast<const DownstreamNetworkNamespace*>(objects.at(0).data_.get());
+  ASSERT_NE(nullptr, network_namespace_state);
+  EXPECT_EQ(network_namespace_filepath, network_namespace_state->value());
+}
+
+TEST_F(TransportSocketOptionsImplTest, NetworkNamespaceDynamicObject) {
+  setFilterStateObject(DownstreamNetworkNamespace::key(), "/var/run/netns/development");
+
+  // When network namespace is set alone without shared flag, it won't create transport socket
+  // options.
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  EXPECT_EQ(nullptr, transport_socket_options);
+}
+
+TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoFromWellKnownKey) {
+  setFilterStateObject(Http11ProxyInfoFilterState::key(), "www.example.com:443,127.0.0.1:15002");
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+  ASSERT_TRUE(transport_socket_options->http11ProxyInfo().has_value());
+  EXPECT_EQ("www.example.com:443", transport_socket_options->http11ProxyInfo()->hostname);
+  EXPECT_EQ("127.0.0.1:15002",
+            transport_socket_options->http11ProxyInfo()->proxy_address->asStringView());
+}
+
+TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoIpv6ProxyAddressBracketed) {
+  setFilterStateObject(Http11ProxyInfoFilterState::key(), "www.example.com:443,[::1]:15002");
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+  ASSERT_TRUE(transport_socket_options->http11ProxyInfo().has_value());
+  EXPECT_EQ("www.example.com:443", transport_socket_options->http11ProxyInfo()->hostname);
+  EXPECT_EQ(Address::IpVersion::v6,
+            transport_socket_options->http11ProxyInfo()->proxy_address->ip()->version());
+  EXPECT_EQ("::1",
+            transport_socket_options->http11ProxyInfo()->proxy_address->ip()->addressAsString());
+  EXPECT_EQ(15002, transport_socket_options->http11ProxyInfo()->proxy_address->ip()->port());
+}
+
+TEST_F(TransportSocketOptionsImplTest, Http11ProxyInfoInvalidEncodingsAreRejected) {
+  // Add another valid option so that TransportSocketOptions are still created even if proxy-info is
+  // rejected.
+  setFilterStateObject(UpstreamServerName::key(), "www.example.com");
+
+  auto* factory = Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(
+      Http11ProxyInfoFilterState::key());
+  ASSERT_NE(nullptr, factory);
+
+  auto expectRejected = [&](absl::string_view bytes) {
+    SCOPED_TRACE(std::string(bytes));
+    EXPECT_EQ(nullptr, factory->createFromBytes(bytes));
+  };
+
+  // - Invalid format (no comma, empty parts)
+  expectRejected("example.com:443");
+  expectRejected(",127.0.0.1:15002");
+  expectRejected("example.com:443,");
+
+  // - Invalid proxy address
+  expectRejected("example.com:443,not-an-ip");
+
+  // - IPv6 proxy address format: requires bracket notation
+  expectRejected("example.com:443,::1:15002");
+
+  auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, transport_socket_options);
+  EXPECT_FALSE(transport_socket_options->http11ProxyInfo().has_value());
+}
+
+TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingAllFieldsDelegation) {
+  // Populate full inner options: SANs, ProxyProtocol, FilterState, ALPN, Http11Proxy
+  setFilterStateObject(UpstreamServerName::key(), "inner.example.com");
+  setFilterStateObject(ApplicationProtocols::key(), "h2,http/1.1");
+  setFilterStateObject(UpstreamSubjectAltNames::key(), "inner.example.com,inner-alt.example.com");
+  setFilterStateObject(Http11ProxyInfoFilterState::key(), "inner.example.com:443,127.0.0.1:15002");
+  filter_state_.setData("shared_key", std::make_unique<UpstreamServerName>("inner.example.com"),
+                        StreamInfo::FilterState::LifeSpan::FilterChain,
+                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+  auto inner_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
+  ASSERT_NE(nullptr, inner_options);
+  auto decorated_options = std::make_shared<ServerNameDecoratingTransportSocketOptions>(
+      "override.example.com", inner_options);
+  EXPECT_EQ(std::make_optional<std::string>("override.example.com"),
+            decorated_options->serverNameOverride());
+  std::vector<std::string> expected_alpns{"h2", "http/1.1"};
+  EXPECT_EQ(expected_alpns, decorated_options->applicationProtocolListOverride());
+  std::vector<std::string> expected_sans{"inner.example.com", "inner-alt.example.com"};
+  EXPECT_EQ(expected_sans, decorated_options->verifySubjectAltNameListOverride());
+  ASSERT_TRUE(decorated_options->http11ProxyInfo().has_value());
+  EXPECT_EQ("inner.example.com:443", decorated_options->http11ProxyInfo()->hostname);
+  EXPECT_EQ(1, decorated_options->downstreamSharedFilterStateObjects().size());
+}
+
+TEST_F(TransportSocketOptionsImplTest, ServerNameAndAlpnDecoratingChaining) {
+  // Test chaining: ServerNameDecorator wrapping AlpnDecorator
+  auto base_options = std::make_shared<TransportSocketOptionsImpl>("base.example.com");
+  std::vector<std::string> custom_alpns{"custom-alpn"};
+  auto alpn_decorated = std::make_shared<AlpnDecoratingTransportSocketOptions>(
+      std::vector<std::string>(custom_alpns), base_options);
+  auto full_decorated = std::make_shared<ServerNameDecoratingTransportSocketOptions>(
+      "overridden.example.com", alpn_decorated);
+  EXPECT_EQ(std::make_optional<std::string>("overridden.example.com"),
+            full_decorated->serverNameOverride());
+  EXPECT_EQ(custom_alpns, full_decorated->applicationProtocolFallback());
+}
+
+TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingNullInnerOptions) {
+  auto null_decorated = std::make_shared<ServerNameDecoratingTransportSocketOptions>(
+      "standalone.example.com", nullptr);
+  EXPECT_EQ(std::make_optional<std::string>("standalone.example.com"),
+            null_decorated->serverNameOverride());
+  EXPECT_TRUE(null_decorated->verifySubjectAltNameListOverride().empty());
+  EXPECT_TRUE(null_decorated->applicationProtocolListOverride().empty());
+  EXPECT_TRUE(null_decorated->applicationProtocolFallback().empty());
+  EXPECT_FALSE(null_decorated->proxyProtocolOptions().has_value());
+  EXPECT_FALSE(null_decorated->http11ProxyInfo().has_value());
+  EXPECT_TRUE(null_decorated->downstreamSharedFilterStateObjects().empty());
+}
+
+TEST_F(TransportSocketOptionsImplTest,
+       ServerNameDecoratingTransportSocketOptionsOverrideAndPassThrough) {
+  std::vector<std::string> http_alpns{"h2", "http/1.1"};
+  auto inner_options = std::make_shared<TransportSocketOptionsImpl>(
+      "original.server.com", std::vector<std::string>{"san1.com"},
+      std::vector<std::string>(http_alpns));
+  ServerNameDecoratingTransportSocketOptions decorated("override.service.target", inner_options);
+  EXPECT_EQ(std::make_optional<std::string>("override.service.target"),
+            decorated.serverNameOverride());
+  EXPECT_EQ(std::vector<std::string>{"san1.com"}, decorated.verifySubjectAltNameListOverride());
+  EXPECT_EQ(http_alpns, decorated.applicationProtocolListOverride());
+}
+TEST_F(TransportSocketOptionsImplTest,
+       ServerNameDecoratingTransportSocketOptionsEmptyStringIsNullopt) {
+  auto inner_options = std::make_shared<TransportSocketOptionsImpl>("original.server.com");
+  ServerNameDecoratingTransportSocketOptions decorated("", inner_options);
+  EXPECT_EQ(std::nullopt, decorated.serverNameOverride());
+}
+TEST_F(TransportSocketOptionsImplTest, ServerNameDecoratingTransportSocketOptionsNullInnerOptions) {
+  ServerNameDecoratingTransportSocketOptions decorated("override.service.target", nullptr);
+  EXPECT_EQ(std::make_optional<std::string>("override.service.target"),
+            decorated.serverNameOverride());
+  EXPECT_TRUE(decorated.verifySubjectAltNameListOverride().empty());
+  EXPECT_TRUE(decorated.applicationProtocolListOverride().empty());
+  EXPECT_TRUE(decorated.applicationProtocolFallback().empty());
+  EXPECT_EQ(std::nullopt, decorated.proxyProtocolOptions());
+  EXPECT_FALSE(decorated.http11ProxyInfo().has_value());
+  EXPECT_TRUE(decorated.downstreamSharedFilterStateObjects().empty());
+}
+
+} // namespace
+} // namespace Network
+} // namespace Envoy

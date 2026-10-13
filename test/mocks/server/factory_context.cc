@@ -1,0 +1,47 @@
+#include "factory_context.h"
+
+#include <string>
+
+#include "source/common/singleton/manager_impl.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Server {
+namespace Configuration {
+
+using ::testing::Return;
+using ::testing::ReturnRef;
+
+MockFactoryContext::MockFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+
+  ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
+  ON_CALL(*this, prefixedScope()).WillByDefault(ReturnRef(*listener_store_.rootScope()));
+  ON_CALL(*this, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
+  ON_CALL(*this, direction()).WillByDefault([this]() { return listener_info_.direction(); });
+  ON_CALL(*this, isQuic()).WillByDefault([this]() { return listener_info_.isQuic(); });
+  ON_CALL(*this, shouldBypassOverloadManager()).WillByDefault([this]() {
+    return listener_info_.shouldBypassOverloadManager();
+  });
+  ON_CALL(listener_info_, direction())
+      .WillByDefault(Return(envoy::config::core::v3::TrafficDirection::UNSPECIFIED));
+}
+
+MockFactoryContext::~MockFactoryContext() = default;
+
+MockUpstreamFactoryContext::MockUpstreamFactoryContext() {
+  ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+  ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+}
+
+} // namespace Configuration
+} // namespace Server
+} // namespace Envoy

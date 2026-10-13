@@ -1,0 +1,116 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
+    "envoy_extension_cc_test",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_extension_cc_test(
+    name = "eds_test",
+    srcs = ["eds_test.cc"],
+    extension_names = ["envoy.clusters.eds"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/config:utility_lib",
+        "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
+        "//source/server:transport_socket_config_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/integration/load_balancers:custom_lb_policy",
+        "//test/mocks/config:eds_resources_cache_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_benchmark_binary(
+    name = "eds_speed_test",
+    srcs = ["eds_speed_test.cc"],
+    extension_names = ["envoy.clusters.eds"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//envoy/config:xds_resources_delegate_interface",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:utility_lib",
+        "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/config_subscription/grpc:grpc_subscription_lib",
+        "//source/extensions/config_subscription/grpc/xds_mux:grpc_mux_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/config:custom_config_validators_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:options_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_benchmark_test(
+    name = "eds_speed_test_benchmark_test",
+    benchmark_binary = "eds_speed_test",
+    extension_names = ["envoy.clusters.eds"],
+)
+
+envoy_extension_cc_test(
+    name = "leds_test",
+    srcs = ["leds_test.cc"],
+    extension_names = ["envoy.clusters.eds"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/config:utility_lib",
+        "//source/extensions/clusters/eds:leds_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)

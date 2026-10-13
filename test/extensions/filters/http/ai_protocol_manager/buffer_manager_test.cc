@@ -1,0 +1,1214 @@
+#include <deque>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+
+#include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
+#include "test/mocks/event/mocks.h"
+#include "test/test_common/status_utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using testing::Invoke;
+using testing::NiceMock;
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace AiProtocolManager {
+namespace {
+
+// An ExternalBuffer that completes both write and read asynchronously, via
+// dispatcher.post() -- modelling a network/disk-backed store. Used to exercise
+// the BufferManager's asynchronous (non-re-entrant) replay path, where each read
+// completion runs on its own event-loop iteration.
+class PostingExternalBuffer : public ExternalBuffer {
+public:
+  explicit PostingExternalBuffer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  ~PostingExternalBuffer() override { *alive_ = false; }
+
+  void write(Buffer::InstancePtr data, bool end_stream, WriteCallback cb) override {
+    // Enforce the single-writer contract: the manager must never issue a write
+    // while another is outstanding.
+    EXPECT_FALSE(write_active_);
+    write_active_ = true;
+    ++write_calls_;
+    write_sizes_.push_back(data->length());
+    write_end_streams_.push_back(end_stream);
+    dispatcher_.post([this, alive = alive_, data = std::move(data), cb = std::move(cb)]() mutable {
+      if (!*alive) {
+        return;
+      }
+      data_.move(*data);
+      write_active_ = false;
+      cb(ExternalBufferStatus::Ok);
+    });
+  }
+  void read(uint64_t offset, uint64_t length, ReadCallback cb) override {
+    auto out = std::make_unique<Buffer::OwnedImpl>();
+    if (length > 0) {
+      auto slice = std::make_unique<uint8_t[]>(length);
+      data_.copyOut(offset, length, slice.get());
+      out->add(slice.get(), length);
+    }
+    dispatcher_.post([alive = alive_, out = std::move(out), cb = std::move(cb)]() mutable {
+      if (!*alive) {
+        return;
+      }
+      cb(ExternalBufferStatus::Ok, std::move(out));
+    });
+  }
+  uint64_t length() const override { return data_.length(); }
+
+  // Number of write() calls and the byte length each carried, so tests can assert
+  // that the manager serializes and coalesces queued writes.
+  int write_calls_{0};
+  std::vector<uint64_t> write_sizes_;
+  std::vector<bool> write_end_streams_;
+
+private:
+  Event::Dispatcher& dispatcher_;
+  Buffer::OwnedImpl data_;
+  // True while a write's posted completion has not yet run; used to verify the
+  // single-writer contract.
+  bool write_active_{false};
+  std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
+};
+
+class PostingExternalBufferFactory : public ExternalBufferFactory {
+public:
+  using ExternalBufferFactory::createBuffer;
+  ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
+    auto buffer = std::make_unique<PostingExternalBuffer>(dispatcher);
+    last_ = buffer.get();
+    ++create_calls_;
+    return buffer;
+  }
+
+  // The most recently created buffer (owned by the BufferManager under test).
+  PostingExternalBuffer* last_{nullptr};
+  // Counted so a test can assert that a payload within the in-memory limit creates no store.
+  int create_calls_{0};
+};
+
+// An ExternalBuffer that reports an I/O error from its write or read completion,
+// to exercise the BufferManager's unrecoverable-error path. The write completion
+// is posted (so the test drives it via the event loop); the read completes
+// synchronously, like the in-memory store.
+class FailingExternalBuffer : public ExternalBuffer {
+public:
+  enum class FailMode { Write, Read };
+  FailingExternalBuffer(Event::Dispatcher& dispatcher, FailMode mode)
+      : dispatcher_(dispatcher), mode_(mode) {}
+  ~FailingExternalBuffer() override { *alive_ = false; }
+
+  void write(Buffer::InstancePtr data, bool /*end_stream*/, WriteCallback cb) override {
+    dispatcher_.post([this, alive = alive_, data = std::move(data), cb = std::move(cb)]() mutable {
+      if (!*alive) {
+        return;
+      }
+      if (mode_ == FailMode::Write) {
+        cb(ExternalBufferStatus::Error);
+        return;
+      }
+      // A read-failure run still needs the bytes to become durable so replay can
+      // begin and reach the failing read.
+      data_.move(*data);
+      cb(ExternalBufferStatus::Ok);
+    });
+  }
+  void read(uint64_t offset, uint64_t length, ReadCallback cb) override {
+    if (mode_ == FailMode::Read) {
+      // On error `data` is nullptr (see external_buffer.h).
+      cb(ExternalBufferStatus::Error, nullptr);
+      return;
+    }
+    auto out = std::make_unique<Buffer::OwnedImpl>();
+    if (length > 0) {
+      auto slice = std::make_unique<uint8_t[]>(length);
+      data_.copyOut(offset, length, slice.get());
+      out->add(slice.get(), length);
+    }
+    cb(ExternalBufferStatus::Ok, std::move(out));
+  }
+  uint64_t length() const override { return data_.length(); }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  FailMode mode_;
+  Buffer::OwnedImpl data_;
+  std::shared_ptr<bool> alive_{std::make_shared<bool>(true)};
+};
+
+class FailingExternalBufferFactory : public ExternalBufferFactory {
+public:
+  using ExternalBufferFactory::createBuffer;
+  explicit FailingExternalBufferFactory(FailingExternalBuffer::FailMode mode) : mode_(mode) {}
+  ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
+    return std::make_unique<FailingExternalBuffer>(dispatcher, mode_);
+  }
+  FailingExternalBuffer::FailMode mode_;
+};
+
+class BufferManagerTest : public testing::Test {
+public:
+  BufferManagerTest() {
+    // The in-memory buffer delivers write completions via dispatcher.post().
+    // Capture those callbacks so the test can run the event loop deterministically.
+    ON_CALL(dispatcher_, post(testing::_)).WillByDefault(Invoke([this](Event::PostCb cb) {
+      posted_.push_back(std::move(cb));
+    }));
+    // The manager creates its replay callback on first replay, so the mock is manufactured on
+    // demand: arming a one-shot expectation up front would leave it unmet in every test that
+    // never replays.
+    ON_CALL(dispatcher_, createSchedulableCallback_(testing::_))
+        .WillByDefault(Invoke([this](std::function<void()> cb) -> Event::SchedulableCallback* {
+          replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_, cb);
+          return replay_cb_;
+        }));
+    resetManager(factory_);
+  }
+
+  // Builds a BufferManager backed by `factory`, wiring a fresh FakeBridge. bridge_ points at the
+  // new one; replay_cb_ is filled in if and when the manager creates its replay callback.
+  BufferManagerPtr makeManager(ExternalBufferFactory& factory) {
+    bridges_.push_back(std::make_unique<FakeBridge>(dispatcher_, bridge_buffer_limit_));
+    bridge_ = bridges_.back().get();
+    replay_cb_ = nullptr;
+    return std::make_shared<BufferManager>(manager_config_, factory, *bridge_);
+  }
+
+  // Swaps in a manager backed by `factory`, detaching the outgoing one first so it
+  // honors the onDestroy()-before-destruction contract when it is replaced.
+  void resetManager(ExternalBufferFactory& factory) {
+    if (manager_ != nullptr) {
+      manager_->onDestroy();
+    }
+    manager_ = makeManager(factory);
+  }
+
+  // Replays the whole offloaded payload, recording completion in replay_done_.
+  // (End-of-stream handling lives in the filter, not the manager, so the unit
+  // tests just observe that the requested range was injected and done fired.)
+  void replayAll() {
+    manager_->replay(0, manager_->length(), [this](absl::Status status) {
+      if (status.ok()) {
+        replay_done_ = true;
+      }
+    });
+  }
+
+  // Run all posted callbacks, including ones enqueued while draining.
+  void drain() {
+    while (!posted_.empty()) {
+      Event::PostCb cb = std::move(posted_.front());
+      posted_.pop_front();
+      cb();
+    }
+  }
+
+  // Runs exactly one posted callback (FIFO), leaving the rest queued -- lets a test
+  // pause with a write or read still in flight.
+  void runOnePosted() {
+    ASSERT_FALSE(posted_.empty());
+    Event::PostCb cb = std::move(posted_.front());
+    posted_.pop_front();
+    cb();
+  }
+
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  std::deque<Event::PostCb> posted_;
+  // Offload from the first byte unless a test opts into the in-memory tier (before resetManager()).
+  BufferManager::Config manager_config_{};
+  // The bridge samples this at construction, so a test must set it before resetManager().
+  uint32_t bridge_buffer_limit_{1024 * 1024};
+  InMemoryExternalBufferFactory factory_;
+  // Declared before manager_ so it outlives the manager that references it.
+  PostingExternalBufferFactory posting_factory_;
+  FailingExternalBufferFactory write_failing_factory_{FailingExternalBuffer::FailMode::Write};
+  FailingExternalBufferFactory read_failing_factory_{FailingExternalBuffer::FailMode::Read};
+  // Bridges outlive the managers that reference them, so they are kept here rather than owned by
+  // the manager.
+  std::vector<std::unique_ptr<FakeBridge>> bridges_;
+  FakeBridge* bridge_{nullptr};
+  // Owned by manager_, created on its first replay; fire invokeCallback() to simulate the next
+  // event-loop
+  // iteration resuming replay after a per-iteration budget yield, starting a
+  // replay that was deferred because the offload was already durable, or resuming
+  // replay after chain back-pressure clears (deferred out of the watermark
+  // callback).
+  NiceMock<Event::MockSchedulableCallback>* replay_cb_{nullptr};
+  bool replay_done_{false};
+  BufferManagerPtr manager_;
+};
+
+// The body is offloaded chunk-by-chunk and replayed verbatim once the caller
+// triggers replay; completion is reported through the done callback.
+TEST_F(BufferManagerTest, OffloadsAndReplaysBody) {
+  Buffer::OwnedImpl chunk1("{\"messages\":");
+  manager_->onData(chunk1);
+  Buffer::OwnedImpl chunk2("[\"hi\"]}");
+  manager_->onData(chunk2);
+  manager_->endStream();
+  replayAll();
+
+  // Nothing has been replayed yet: writes and replay are all asynchronous.
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
+
+  drain();
+
+  EXPECT_GE(bridge_->inject_calls_, 1);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "{\"messages\":[\"hi\"]}");
+}
+
+// A body that arrives in a single frame is still round-tripped.
+TEST_F(BufferManagerTest, SingleFrameBody) {
+  Buffer::OwnedImpl body("{}");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+  drain();
+
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "{}");
+}
+
+// An empty body has nothing to inject: a zero-length replay still reports done so
+// the caller can terminate the stream. With nothing offloaded the data is already
+// durable, so replay is deferred to a fresh event-loop iteration.
+TEST_F(BufferManagerTest, EmptyBody) {
+  Buffer::OwnedImpl empty;
+  manager_->onData(empty);
+  manager_->endStream();
+  replayAll();
+
+  EXPECT_FALSE(replay_done_);
+  EXPECT_TRUE(replay_cb_->enabled());
+
+  replay_cb_->invokeCallback();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+}
+
+// A payload larger than the replay chunk size is streamed back in multiple
+// bounded frames and reassembles to the original bytes.
+TEST_F(BufferManagerTest, LargePayloadReplayedInChunks) {
+  const std::string big(200 * 1024, 'x'); // > ReadChunkSize (64KiB)
+  Buffer::OwnedImpl body(big);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+  drain();
+
+  EXPECT_GT(bridge_->inject_calls_, 1);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.length(), big.size());
+  EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// A payload larger than the per-iteration replay budget (ReplayChunksPerIteration
+// chunks of ReadChunkSize) is not replayed all at once: replay injects one budget
+// of chunks, yields to the event loop, and resumes via the scheduled continuation.
+// This keeps a large replay from monopolizing the worker thread.
+TEST_F(BufferManagerTest, ReplayYieldsAcrossIterationsForLargePayload) {
+  // 10 chunks total; the budget is 8, so replay should stop after 8 and resume
+  // for the remaining 2 on the next iteration.
+  const uint64_t chunk = 64 * 1024;
+  const std::string big(10 * chunk, 'x');
+  Buffer::OwnedImpl body(big);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // First iteration: exactly the budget of chunks is injected, then replay yields
+  // (the continuation is scheduled, not posted) without finishing.
+  drain();
+  EXPECT_EQ(bridge_->inject_calls_, 8);
+  EXPECT_EQ(bridge_->injected_.length(), 8 * chunk);
+  EXPECT_FALSE(replay_done_);
+  EXPECT_TRUE(replay_cb_->enabled());
+
+  // The scheduled continuation (next event-loop iteration) resumes replay to
+  // completion with the original bytes intact.
+  replay_cb_->invokeCallback();
+  drain();
+  EXPECT_EQ(bridge_->inject_calls_, 10);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// A store that completes reads asynchronously (posts; like a network/disk
+// backend) is not re-entrant, so the manager drives exactly one chunk per
+// completion and never schedules an artificial yield -- the store paces itself.
+// Even a payload larger than ReplayChunksPerIteration replays without a yield.
+TEST_F(BufferManagerTest, AsyncStoreReplaysOneChunkPerCallWithoutYield) {
+  resetManager(posting_factory_);
+
+  const std::string big(10 * 64 * 1024, 'x'); // 10 chunks > ReplayChunksPerIteration (8).
+  Buffer::OwnedImpl body(big);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+  drain();
+
+  // No yield was needed, so the manager never even created its replay callback.
+  EXPECT_EQ(replay_cb_, nullptr);
+  EXPECT_EQ(bridge_->inject_calls_, 10);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// Replay is caller-triggered: the body can be fully offloaded and durable before
+// the caller decides to replay. replay() then starts playback on a fresh
+// event-loop iteration, decoupling offload from playback.
+TEST_F(BufferManagerTest, ReplayDeferredUntilCallerRequests) {
+  Buffer::OwnedImpl body("{\"messages\":[\"hi\"]}");
+  manager_->onData(body);
+  manager_->endStream();
+
+  // The write completes, but with no replay() request nothing is injected.
+  drain();
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+
+  // The caller decides to proceed. Replay is deferred to a fresh iteration (the
+  // caller may be inside a data callback), so nothing is injected synchronously.
+  replayAll();
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_TRUE(replay_cb_->enabled());
+
+  replay_cb_->invokeCallback();
+  EXPECT_GE(bridge_->inject_calls_, 1);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "{\"messages\":[\"hi\"]}");
+}
+
+// The caller can stream the payload back as independent sub-ranges, chaining the
+// next from each range's done callback. The ranges reassemble to the full payload.
+TEST_F(BufferManagerTest, ReplaysSubRangesInSequence) {
+  Buffer::OwnedImpl body("HELLOWORLD");
+  manager_->onData(body);
+  manager_->endStream();
+  drain(); // Make the payload durable; replay not yet requested.
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+
+  bool second_done = false;
+  // Replay the first half, then chain the second half from its done callback.
+  manager_->replay(0, 5, [&](absl::Status status) {
+    ASSERT_OK(status);
+    EXPECT_EQ(bridge_->injected_.toString(), "HELLO");
+    manager_->replay(5, 5, [&second_done](absl::Status status2) {
+      ASSERT_OK(status2);
+      second_done = true;
+    });
+  });
+
+  // First range was deferred (offload already durable).
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  EXPECT_FALSE(second_done);
+
+  // The chained second range is itself deferred; fire it to completion.
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  EXPECT_TRUE(second_done);
+  EXPECT_EQ(bridge_->injected_.toString(), "HELLOWORLD");
+}
+
+// Destroying the manager mid-flight cancels pending callbacks; no replay occurs.
+TEST_F(BufferManagerTest, DestroyBeforeReplay) {
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+  manager_->onDestroy();
+  drain();
+
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
+}
+
+// A synchronous store completes its final replay read on-stack, so finishReplay()
+// invokes the caller's done() from inside buffer_->read(). That callback may end
+// the stream and detach the manager on-stack (onDestroy()) -- exactly what the real
+// filter does when the terminal end-of-stream injection triggers teardown. Per the
+// onDestroy()-before-destruction contract the manager is only detached here, not
+// freed, so the read loop must unwind cleanly (guarding on destroyed_) rather than
+// touch the released buffer/bridge. The actual free happens later (TearDown).
+TEST_F(BufferManagerTest, TerminalReplayDoneDetachesManagerSynchronously) {
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+
+  std::string injected;
+  bool done_ran = false;
+  // The write is still in flight (posted) when replay() is requested, so replay
+  // starts from the write completion during drain() and runs synchronously through
+  // the in-memory store into this done callback.
+  manager_->replay(0, manager_->length(), [&](absl::Status status) {
+    ASSERT_OK(status);
+    done_ran = true;
+    injected = bridge_->injected_.toString();
+    // Mirror the filter's teardown: detach on-stack, mid-read.
+    manager_->onDestroy();
+  });
+
+  drain();
+  EXPECT_TRUE(done_ran);
+  EXPECT_EQ(injected, "payload");
+}
+
+// Managers share one bridge and take its replay handler slot only for the duration of a range, so
+// a second manager on the same bridge can replay after the first is done. Holding the slot would
+// trip setReplayHandler()'s ASSERT here.
+TEST_F(BufferManagerTest, ManagersTakeTheBridgeReplaySlotInTurn) {
+  Buffer::OwnedImpl body("first");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+  drain();
+  ASSERT_TRUE(replay_done_);
+
+  BufferManager second(manager_config_, factory_, *bridge_);
+  Buffer::OwnedImpl more("second");
+  second.onData(more);
+  second.endStream();
+  bool second_done = false;
+  second.replay(0, second.length(),
+                [&second_done](absl::Status status) { second_done = status.ok(); });
+  drain();
+  EXPECT_TRUE(second_done);
+  EXPECT_EQ(bridge_->injected_.toString(), "firstsecond");
+}
+
+// With no body offloaded the manager reports empty(), so the caller knows there is
+// nothing to replay (a trailer-only request lets its trailers flow without calling
+// endStream()/replay()).
+TEST_F(BufferManagerTest, EmptyWhenNoDataOffloaded) {
+  EXPECT_TRUE(manager_->empty());
+  Buffer::OwnedImpl body("x");
+  manager_->onData(body);
+  EXPECT_FALSE(manager_->empty());
+}
+
+// length() reports the total offloaded so far, including not-yet-durable bytes.
+TEST_F(BufferManagerTest, LengthCountsNotYetDurableBytes) {
+  Buffer::OwnedImpl chunk1("abc");
+  manager_->onData(chunk1);
+  Buffer::OwnedImpl chunk2("defg");
+  manager_->onData(chunk2);
+  manager_->endStream();
+  // The writes are still in flight (posted), but length() already reflects them.
+  EXPECT_EQ(manager_->length(), 7);
+  drain();
+  EXPECT_EQ(manager_->length(), 7);
+}
+
+// Not-yet-durable bytes crossing the buffer limit pause the data source via the
+// bridge; once the write completes and they drain, the source resumes.
+TEST_F(BufferManagerTest, IngestBackpressureDrivesSourceFlowControl) {
+  // Small limit so a single frame crosses the high watermark (high=100, low=50).
+  bridge_buffer_limit_ = 100;
+  resetManager(factory_);
+
+  // The frame exceeds the high watermark. The in-memory write completion is
+  // posted, so its bytes stay not-yet-durable until the event loop runs: the
+  // source is paused immediately.
+  Buffer::OwnedImpl body(std::string(150, 'x'));
+  manager_->onData(body);
+  EXPECT_EQ(bridge_->pause_source_calls_, 1);
+  EXPECT_EQ(bridge_->resume_source_calls_, 0);
+
+  // Draining makes the write durable; not-yet-durable bytes fall to zero (<= low)
+  // and the source resumes.
+  drain();
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+}
+
+// Sub-threshold frames are batched: each is held in the queue rather than written
+// individually, and they coalesce into a single write flushed at endStream().
+TEST_F(BufferManagerTest, BatchesSmallFramesUntilEndStream) {
+  resetManager(posting_factory_);
+
+  Buffer::OwnedImpl f1("aaa");
+  Buffer::OwnedImpl f2("bbb");
+  manager_->onData(f1);
+  manager_->onData(f2);
+
+  // The buffer is created lazily on the first onData(); neither small frame has
+  // triggered a write -- they wait in the queue.
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 0);
+
+  Buffer::OwnedImpl f3("cc");
+  manager_->onData(f3);
+  manager_->endStream();
+
+  // endStream() flushes the batched backlog as a single write.
+  EXPECT_EQ(buffer->write_calls_, 1);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(8)); // "aaa"+"bbb"+"cc".
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(true));
+
+  replayAll();
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "aaabbbcc");
+}
+
+// A frame at the flush threshold is written immediately; frames that arrive while
+// that write is in flight queue and coalesce into a single follow-up write. The
+// manager issues exactly one write at a time (asserted in the fake) and replays
+// the reassembled payload verbatim.
+TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
+  resetManager(posting_factory_);
+
+  // Each frame is exactly the flush threshold (WriteFlushThreshold == 64KiB), so
+  // the first flushes at once.
+  const uint64_t threshold = 64 * 1024;
+  const std::string chunk(threshold, 'x');
+  Buffer::OwnedImpl f1(chunk);
+  Buffer::OwnedImpl f2(chunk);
+  Buffer::OwnedImpl f3(chunk);
+  manager_->onData(f1);
+  manager_->onData(f2);
+  manager_->onData(f3);
+  manager_->endStream();
+
+  // Only the first frame has been written; f2 and f3 wait behind the in-flight write.
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  replayAll();
+  drain();
+
+  // The queued backlog coalesced into one follow-up write -- two writes total,
+  // never overlapping (asserted in the fake) -- and the payload round-trips.
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(threshold, 2 * threshold));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk + chunk + chunk);
+}
+
+// When the chain we replay into is backed up before replay starts, no data is
+// injected until the back-pressure is released.
+TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
+  const std::string big(200 * 1024, 'x'); // > ReadChunkSize, multiple chunks.
+  Buffer::OwnedImpl body(big);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // The chain signals back-pressure before replay begins.
+  ASSERT_TRUE(bridge_->subscribed_);
+  bridge_->raiseReplayWatermark();
+
+  // Draining completes the write and starts replay, but replay is paused: no
+  // chunk is read or injected while the high watermark is held.
+  drain();
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
+
+  // Releasing back-pressure schedules the resume off the watermark callback stack
+  // (deferred so we never read/inject reentrantly from within it); firing the
+  // continuation runs replay to completion.
+  bridge_->lowerReplayWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.length(), big.size());
+  EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// Back-pressure arising mid-replay (the chain fills as we inject) halts the
+// synchronous read loop, and replay resumes when it clears.
+TEST_F(BufferManagerTest, ReplayResumesMidStream) {
+  const std::string big(200 * 1024, 'x'); // 4 chunks of 64KiB + remainder.
+  // The chain raises its replay high watermark right after the first injected
+  // chunk; the loop must then stop until it is released.
+  bridge_->raise_replay_watermark_at_inject_ = 1;
+  Buffer::OwnedImpl body(big);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // The write completes, replay injects one chunk, then pauses on the watermark
+  // raised during that inject.
+  drain();
+  EXPECT_EQ(bridge_->inject_calls_, 1);
+  EXPECT_FALSE(replay_done_);
+  EXPECT_LT(bridge_->injected_.length(), big.size());
+
+  // Release back-pressure; the resume is scheduled off the watermark callback
+  // stack (deferred to avoid reentrant read/inject) and the continuation runs
+  // replay to completion.
+  ASSERT_TRUE(bridge_->subscribed_);
+  bridge_->lowerReplayWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// High watermark callbacks can nest (stream + connection); replay resumes only
+// after a matching number of low-watermark callbacks.
+TEST_F(BufferManagerTest, NestedWatermarksRequireBalancedRelease) {
+  const std::string big(200 * 1024, 'x');
+  Buffer::OwnedImpl body(big);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  ASSERT_TRUE(bridge_->subscribed_);
+  bridge_->raiseReplayWatermark();
+  bridge_->raiseReplayWatermark();
+  drain();
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+
+  // One release is not enough to resume.
+  bridge_->lowerReplayWatermark();
+  drain();
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
+
+  // Balanced release schedules the resume off the watermark callback stack; the
+  // continuation runs replay to completion.
+  bridge_->lowerReplayWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// A write that fails fails the stream: the manager surfaces the unrecoverable
+// error through the bridge and injects nothing. A pending replay never starts.
+TEST_F(BufferManagerTest, WriteErrorFailsStream) {
+  resetManager(write_failing_factory_);
+
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // The failing completion is posted; nothing has happened yet.
+  EXPECT_EQ(bridge_->error_calls_, 0);
+
+  drain();
+
+  EXPECT_EQ(bridge_->error_calls_, 1);
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
+}
+
+// A read that fails during replay fails the stream: the manager reports the error
+// through the bridge and does not finish the replay or inject the failed chunk.
+TEST_F(BufferManagerTest, ReadErrorFailsStream) {
+  resetManager(read_failing_factory_);
+
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // Draining makes the write durable and starts replay, whose first read fails.
+  drain();
+
+  EXPECT_EQ(bridge_->error_calls_, 1);
+  EXPECT_EQ(bridge_->inject_calls_, 0);
+  EXPECT_FALSE(replay_done_);
+}
+
+// An external-buffer error delivered after onDestroy() is inert: the completion
+// handlers bail out and never touch the (detached) bridge.
+TEST_F(BufferManagerTest, ErrorAfterDestroyIsInert) {
+  resetManager(write_failing_factory_);
+
+  Buffer::OwnedImpl body("payload");
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+  manager_->onDestroy();
+
+  // The posted write completion (whether it carried Ok or Error) is dropped once
+  // the buffer is reset in onDestroy(); no error reaches the bridge.
+  drain();
+  EXPECT_EQ(bridge_->error_calls_, 0);
+}
+
+// With an asynchronous store, a replay resumed by a watermark drain while a read is
+// still in flight must not issue an overlapping read -- it waits for the in-flight
+// read to complete.
+TEST_F(BufferManagerTest, ResumeSkipsReadWhileOneInFlight) {
+  resetManager(posting_factory_);
+
+  const std::string big(200 * 1024, 'x'); // Multiple chunks.
+  Buffer::OwnedImpl body(big);
+  manager_->onData(body);
+  manager_->endStream();
+  replayAll();
+
+  // Run just the write completion: replay starts and posts its first read (now in
+  // flight, not yet completed).
+  runOnePosted();
+
+  // A watermark cycle schedules a resume while the read is still in flight.
+  ASSERT_TRUE(bridge_->subscribed_);
+  bridge_->raiseReplayWatermark();
+  bridge_->lowerReplayWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  // The continuation finds a read in flight and returns without issuing another.
+  replay_cb_->invokeCallback();
+
+  // Draining the in-flight read (and its successors) still completes the replay
+  // with the payload intact -- no read was dropped or duplicated.
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), big);
+}
+
+// Inject injects small buffer data into the filter chain verbatim and triggers done
+// callback.
+TEST_F(BufferManagerTest, InjectsCallerDataVerbatim) {
+  Buffer::OwnedImpl body("{\"messages\":[\"hello\"]}");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  Buffer::OwnedImpl inject_data("{\"modified\":true}");
+  bool inject_done = false;
+  manager_->inject(inject_data, [&inject_done](absl::Status status) {
+    ASSERT_OK(status);
+    inject_done = true;
+  });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_TRUE(inject_done);
+  EXPECT_EQ(bridge_->injected_.toString(), "{\"modified\":true}");
+}
+
+// Inject pauses when high watermark is hit and resumes when low watermark drains.
+TEST_F(BufferManagerTest, InjectRespectsWatermarkBackpressure) {
+  Buffer::OwnedImpl body("initial");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  // Set bridge to raise high watermark on the first injected chunk.
+  bridge_->raise_replay_watermark_at_inject_ = 1;
+
+  const std::string big_payload(200 * 1024, 'z'); // Multiple 64KB chunks
+  Buffer::OwnedImpl inject_data(big_payload);
+  bool inject_done = false;
+  manager_->inject(inject_data, [&inject_done](absl::Status status) {
+    ASSERT_OK(status);
+    inject_done = true;
+  });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // The first chunk injected and triggered high watermark, pausing replay.
+  EXPECT_FALSE(inject_done);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+
+  // Now clear the watermark: low watermark schedules continuation to resume draining.
+  ASSERT_TRUE(bridge_->subscribed_);
+  bridge_->lowerReplayWatermark();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_TRUE(inject_done);
+  EXPECT_EQ(bridge_->injected_.toString(), big_payload);
+}
+
+// Inject larger than the bridge's inject budget stops mid-drain, yields to the event
+// loop, and finishes on the continuation that refills the budget.
+TEST_F(BufferManagerTest, InjectYieldsWhenTheBudgetIsSpent) {
+  Buffer::OwnedImpl body("initial");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  const std::string big_payload(10 * 64 * 1024, 'z'); // 10 chunks, over the 8-chunk budget.
+  Buffer::OwnedImpl inject_data(big_payload);
+  bool inject_done = false;
+  manager_->inject(inject_data, [&inject_done](absl::Status status) {
+    ASSERT_OK(status);
+    inject_done = true;
+  });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // The budget stops the drain a chunk short of the payload; the rest waits for the next pass.
+  EXPECT_FALSE(inject_done);
+  EXPECT_EQ(bridge_->injected_.length(), 8 * 64 * 1024);
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  EXPECT_TRUE(inject_done);
+  EXPECT_EQ(bridge_->injected_.toString(), big_payload);
+}
+
+// A payload that stays within the in-memory limit never creates a store: it is replayed straight
+// out of the ingest queue, with no write and no read.
+TEST_F(BufferManagerTest, PayloadUnderTheInMemoryLimitSkipsStorage) {
+  manager_config_.max_in_memory_bytes = 1024;
+  resetManager(posting_factory_);
+
+  Buffer::OwnedImpl chunk1("{\"messages\":");
+  manager_->onData(chunk1);
+  Buffer::OwnedImpl chunk2("[\"hello\"]}");
+  manager_->onData(chunk2);
+  manager_->endStream();
+  EXPECT_EQ(posting_factory_.create_calls_, 0);
+  EXPECT_EQ(manager_->length(), 22);
+  EXPECT_FALSE(manager_->empty());
+
+  replayAll();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "{\"messages\":[\"hello\"]}");
+  EXPECT_EQ(posting_factory_.create_calls_, 0);
+  // Nothing was ever awaiting a write, so the source was never paused for ingest back-pressure.
+  EXPECT_EQ(bridge_->pause_source_calls_, 0);
+}
+
+// Crossing the in-memory limit creates the store and offloads everything held up to that point,
+// so the replay comes back from storage.
+TEST_F(BufferManagerTest, CrossingTheInMemoryLimitOffloadsEverything) {
+  manager_config_.max_in_memory_bytes = 8;
+  resetManager(posting_factory_);
+
+  Buffer::OwnedImpl chunk1("12345678"); // Exactly at the limit, so still in memory.
+  manager_->onData(chunk1);
+  EXPECT_EQ(posting_factory_.create_calls_, 0);
+
+  Buffer::OwnedImpl chunk2("9");
+  manager_->onData(chunk2);
+  ASSERT_EQ(posting_factory_.create_calls_, 1);
+
+  manager_->endStream();
+  drain();
+  ASSERT_NE(posting_factory_.last_, nullptr);
+  // One write carrying the whole payload, including the part that had been held in memory.
+  ASSERT_EQ(posting_factory_.last_->write_calls_, 1);
+  EXPECT_EQ(posting_factory_.last_->write_sizes_[0], 9);
+
+  replayAll();
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "123456789");
+}
+
+// cancelReplay cancels in-flight external buffer replay so late read completions are dropped.
+TEST_F(BufferManagerTest, CancelReplayCancelsPendingExternalBufferReplay) {
+  resetManager(posting_factory_);
+
+  Buffer::OwnedImpl body("message data for offload");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  replayAll();
+
+  // A deferred replay was scheduled; fire replay_cb_ to issue read().
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // The read callback was posted to dispatcher, so read is currently in flight.
+  EXPECT_FALSE(posted_.empty());
+
+  // Now cancel replay before the posted read callback completes.
+  manager_->cancelReplay();
+
+  // Run the remaining posted read callback.
+  drain();
+
+  EXPECT_FALSE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
+// cancelReplay cancels in-flight inject so scheduled callbacks do not inject.
+TEST_F(BufferManagerTest, CancelReplayCancelsAPendingInject) {
+  Buffer::OwnedImpl inject_data("{\"modified\":true}");
+  bool inject_done = false;
+  manager_->inject(inject_data, [&inject_done](absl::Status) { inject_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  manager_->cancelReplay();
+  EXPECT_FALSE(replay_cb_->enabled());
+
+  drain();
+  EXPECT_FALSE(inject_done);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
+// onDestroy cancels in-flight inject so scheduled callbacks do not inject or trigger
+// done.
+TEST_F(BufferManagerTest, DestroyCancelsAPendingInject) {
+  Buffer::OwnedImpl inject_data("{\"modified\":true}");
+  bool inject_done = false;
+  manager_->inject(inject_data, [&inject_done](absl::Status) { inject_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  manager_->onDestroy();
+  EXPECT_FALSE(replay_cb_->enabled());
+
+  drain();
+  EXPECT_FALSE(inject_done);
+  EXPECT_EQ(bridge_->injected_.length(), 0);
+}
+
+// cancelReplay permanently disables starting any new replay.
+TEST_F(BufferManagerTest, CancelReplayPermanentlyPreventsFurtherReplay) {
+  Buffer::OwnedImpl body("some payload");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  manager_->cancelReplay();
+
+  // Attempting to replay after cancelReplay triggers an assert in debug builds.
+  EXPECT_DEBUG_DEATH(manager_->replay(0, 5, [](absl::Status) {}), ".*");
+
+  Buffer::OwnedImpl in_mem("test");
+  EXPECT_DEBUG_DEATH(manager_->inject(in_mem, [](absl::Status) {}), ".*");
+}
+
+// If inject is cancelled synchronously during injectData, draining stops immediately.
+TEST_F(BufferManagerTest, SynchronousCancelReplayStopsAnInjectImmediately) {
+  Buffer::OwnedImpl body("initial");
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  const std::string big_payload(200 * 1024, 'z'); // Multiple 64KB chunks
+  Buffer::OwnedImpl inject_data(big_payload);
+  bool inject_done = false;
+
+  bridge_->on_inject_ = [this]() { manager_->cancelReplay(); };
+
+  manager_->inject(inject_data, [&inject_done](absl::Status) { inject_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // Draining stopped after the first chunk was injected; no further chunks or done callback ran.
+  EXPECT_EQ(bridge_->inject_calls_, 1);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+  EXPECT_FALSE(inject_done);
+}
+
+// If external buffer replay is cancelled synchronously during injectData, replay stops immediately.
+TEST_F(BufferManagerTest, SynchronousCancelReplayStopsExternalBufferReplayImmediately) {
+  const std::string big_payload(200 * 1024, 'z');
+  Buffer::OwnedImpl body(big_payload);
+  manager_->onData(body);
+  manager_->endStream();
+  drain();
+
+  bool replay_done = false;
+  bridge_->on_inject_ = [this]() { manager_->cancelReplay(); };
+
+  manager_->replay(0, big_payload.size(), [&replay_done](absl::Status) { replay_done = true; });
+
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  // Replay stopped after the first chunk was injected.
+  EXPECT_EQ(bridge_->inject_calls_, 1);
+  EXPECT_EQ(bridge_->injected_.length(), 64 * 1024);
+  EXPECT_FALSE(replay_done);
+}
+
+// Destroying a spilled BufferManager while writes are in-flight or pending releases its unacked
+// byte count back to the bridge so ingest backpressure does not permanently deadlock the stream.
+TEST_F(BufferManagerTest, DestroyReleasesUnackedBytesAndUnpausesSource) {
+  bridge_buffer_limit_ = 1024;
+  PostingExternalBufferFactory posting_factory;
+  resetManager(posting_factory);
+
+  // Feed 2048 bytes (> 1024 high watermark). Write is posted but not yet completed.
+  Buffer::OwnedImpl body(std::string(2048, 'a'));
+  manager_->onData(body);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_EQ(bridge_->pause_source_calls_, 1);
+  EXPECT_EQ(bridge_->resume_source_calls_, 0);
+
+  // Destroy the manager before the write completes (e.g. an SSE frame store discarded).
+  manager_->onDestroy();
+
+  // Unacked bytes must be released and the source resumed immediately.
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+}
+
+// If the FilterChainBridge is destroyed while a BufferManager (e.g. owned by an SseEvent) is still
+// alive, the bridge detaches all registered managers so subsequent BufferManager destruction does
+// not access the destroyed bridge.
+TEST_F(BufferManagerTest, BridgeDestructionDetachesRegisteredManagers) {
+  auto local_bridge = std::make_unique<FakeBridge>(dispatcher_, 1024);
+  auto local_manager =
+      std::make_shared<BufferManager>(BufferManager::Config{}, factory_, *local_bridge);
+
+  Buffer::OwnedImpl body("payload");
+  local_manager->onData(body);
+  local_manager->endStream();
+
+  // Destroy the bridge first (simulating filter teardown while coroutine still holds SseEvent).
+  local_bridge.reset();
+
+  // Destroying local_manager afterwards must be a safe no-op (already detached by bridge dtor).
+  local_manager.reset();
+}
+
+// Dropping the last external shared_ptr<BufferManager> synchronously inside injectData() (e.g.
+// stream reset destroying SseEvent on stack) must not cause stack UAF when onReadComplete /
+// maybeReadNextChunk unwinds.
+TEST_F(BufferManagerTest, SynchronousDeallocationDuringInjectDataDoesNotUAF) {
+  manager_config_.max_in_memory_bytes = 1024 * 1024;
+  BufferManagerPtr local_manager = makeManager(factory_);
+
+  Buffer::OwnedImpl body("hello world");
+  local_manager->onData(body);
+  local_manager->endStream();
+
+  bridge_->on_inject_ = [&local_manager]() {
+    local_manager->onDestroy();
+    local_manager.reset();
+  };
+
+  local_manager->replay(0, 11, [](absl::Status) {});
+  ASSERT_NE(replay_cb_, nullptr);
+  ASSERT_TRUE(replay_cb_->enabled());
+  replay_cb_->invokeCallback();
+
+  EXPECT_EQ(local_manager, nullptr);
+  EXPECT_EQ(bridge_->injected_.toString(), "hello world");
+}
+
+// When replay has yielded for the per-iteration inject budget, a watermark resume must not
+// overwrite the scheduled next-iteration callback with a current-iteration callback.
+TEST_F(BufferManagerTest, OnReplayResumedWhileBudgetYieldedDoesNotScheduleCurrentIteration) {
+  manager_config_.max_in_memory_bytes = 1024 * 1024;
+  resetManager(factory_);
+
+  // 10 chunks of 64KB > 8 chunks per iteration budget.
+  const std::string big_payload(10 * 64 * 1024, 'x');
+  Buffer::OwnedImpl body(big_payload);
+  manager_->onData(body);
+  manager_->endStream();
+
+  manager_->replay(0, big_payload.size(), [](absl::Status) {});
+  ASSERT_TRUE(replay_cb_->enabled());
+
+  // Capture calls to scheduleCallbackCurrentIteration vs NextIteration during watermark lower.
+  int current_iter_calls = 0;
+  ON_CALL(*replay_cb_, scheduleCallbackCurrentIteration()).WillByDefault(Invoke([&]() {
+    ++current_iter_calls;
+  }));
+
+  // First continuation consumes the 8-chunk budget and yields via scheduleCallbackNextIteration().
+  replay_cb_->invokeCallback();
+  EXPECT_EQ(bridge_->inject_calls_, 8);
+
+  // Simulate a watermark cycle while budget_yielded_ is true.
+  current_iter_calls = 0;
+  bridge_->raiseReplayWatermark();
+  bridge_->lowerReplayWatermark();
+  EXPECT_EQ(current_iter_calls, 0);
+}
+
+// Write failure completion that triggers onUnrecoverableError() and drops the last external
+// shared_ptr<BufferManager> while onWriteComplete() is on the call stack must not cause UAF.
+TEST_F(BufferManagerTest, SynchronousDeallocationDuringWriteFailureDoesNotUAF) {
+  manager_config_.max_in_memory_bytes = 0;
+  FailingExternalBufferFactory failing_factory(FailingExternalBuffer::FailMode::Write);
+  BufferManagerPtr local_manager = makeManager(failing_factory);
+
+  bridge_->on_error_ = [&]() {
+    bridge_->detachFromFilterChain();
+    local_manager.reset();
+  };
+
+  Buffer::OwnedImpl body(std::string(128 * 1024, 'x'));
+  local_manager->onData(body);
+  drain();
+
+  EXPECT_EQ(local_manager, nullptr);
+  EXPECT_EQ(bridge_->error_calls_, 1);
+}
+
+// If onDestroy() releases unacked bytes, which lowers ingest backpressure and calls resumeSource(),
+// and resumeSource() synchronously triggers bridge_.detachFromFilterChain(), unregistering from
+// registered_managers_ before releaseUnacked() prevents an infinite loop in
+// detachFromFilterChain().
+TEST_F(BufferManagerTest, SynchronousDetachDuringResumeSourceInOnDestroyDoesNotInfiniteLoop) {
+  bridge_buffer_limit_ = 1024;
+  PostingExternalBufferFactory posting_factory;
+  resetManager(posting_factory);
+
+  Buffer::OwnedImpl body(std::string(2048, 'a'));
+  manager_->onData(body);
+  ASSERT_TRUE(bridge_->ingestPaused());
+
+  bridge_->on_resume_source_ = [this]() { bridge_->detachFromFilterChain(); };
+
+  manager_->onDestroy();
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+}
+
+// When a BufferManager holds a sub-WriteFlushThreshold pending backlog (> low_watermark_) while
+// ingestPaused() is false, and a second charger (such as ScopedUnacked or another BufferManager)
+// subsequently pushes unacked_ over high_watermark_, the bridge notifies registered BufferManagers
+// to flush their pending backlog so unacked_ can fall back below low_watermark_.
+TEST_F(BufferManagerTest, SubThresholdPendingFlushedWhenExternalChargerPausesIngest) {
+  // high_watermark = 40 KiB, low_watermark = 20 KiB, WriteFlushThreshold = 64 KiB.
+  bridge_buffer_limit_ = 40 * 1024;
+  PostingExternalBufferFactory posting_factory;
+  resetManager(posting_factory);
+
+  // 30 KiB (> low_watermark, < high_watermark, < WriteFlushThreshold): queued in pending_ without
+  // issuing a write because ingestPaused() is still false.
+  Buffer::OwnedImpl chunk(std::string(30 * 1024, 'a'));
+  manager_->onData(chunk);
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_EQ(posting_factory.last_->write_calls_, 0);
+
+  // An external charger (e.g. pending_items_ ScopedUnacked) pushes unacked_ to 50 KiB > 40 KiB.
+  // Transitioning to source_paused_ = true flushes manager_'s 30 KiB pending_ backlog.
+  {
+    FilterChainBridge::ScopedUnacked unacked(*bridge_, 20 * 1024);
+    EXPECT_TRUE(bridge_->ingestPaused());
+    EXPECT_EQ(posting_factory.last_->write_calls_, 1);
+    drain();
+  }
+
+  // Once both the external ScopedUnacked and the flushed write complete, unacked_ drops to 0 <= 20
+  // KiB and the source resumes instead of deadlocking at 30 KiB > 20 KiB.
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+}
+
+} // namespace
+} // namespace AiProtocolManager
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

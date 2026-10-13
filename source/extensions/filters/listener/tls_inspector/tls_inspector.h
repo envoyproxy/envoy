@@ -1,0 +1,139 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
+#include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener_filter_buffer.h"
+#include "envoy/stats/scope.h"
+
+#include "source/common/common/logger.h"
+
+#include "absl/strings/string_view.h"
+#include "openssl/ssl.h"
+#include "openssl/ssl3.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace ListenerFilters {
+namespace TlsInspector {
+
+/**
+ * All stats for the TLS inspector. @see stats_macros.h
+ */
+#define ALL_TLS_INSPECTOR_STATS(COUNTER, HISTOGRAM)                                                \
+  COUNTER(client_hello_too_large)                                                                  \
+  COUNTER(tls_found)                                                                               \
+  COUNTER(tls_not_found)                                                                           \
+  COUNTER(alpn_found)                                                                              \
+  COUNTER(alpn_not_found)                                                                          \
+  COUNTER(sni_found)                                                                               \
+  COUNTER(sni_not_found)                                                                           \
+  HISTOGRAM(bytes_processed, Bytes)
+
+/**
+ * Definition of all stats for the TLS inspector. @see stats_macros.h
+ */
+struct TlsInspectorStats {
+  ALL_TLS_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
+enum class ParseState {
+  // Parse result is out. It could be tls or not.
+  Done,
+  // Parser expects more data.
+  Continue,
+  // Parser reports unrecoverable error.
+  Error
+};
+
+/**
+ * Global configuration for TLS inspector.
+ */
+class Config {
+public:
+  Config(Stats::Scope& scope,
+         const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config);
+
+  const TlsInspectorStats& stats() const { return stats_; }
+  bssl::UniquePtr<SSL> newSsl();
+  bool enableJA3Fingerprinting() const { return enable_ja3_fingerprinting_; }
+  bool enableJA4Fingerprinting() const { return enable_ja4_fingerprinting_; }
+  uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
+  uint32_t initialReadBufferSize() const { return initial_read_buffer_size_; }
+  bool closeConnectionOnTlsHelloParsingErrors() const {
+    return close_connection_on_client_hello_parsing_errors_;
+  }
+
+  // This is the maximum size of a ClientHello that boring ssl will accept.
+  // Here is the check in boring ssl:
+  // https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20250818.0/ssl/handshake.cc#137
+  static constexpr size_t TLS_MAX_CLIENT_HELLO = SSL3_RT_MAX_PLAIN_LENGTH;
+  static const unsigned TLS_MIN_SUPPORTED_VERSION;
+  static const unsigned TLS_MAX_SUPPORTED_VERSION;
+
+private:
+  TlsInspectorStats stats_;
+  bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+  const bool enable_ja3_fingerprinting_;
+  const bool enable_ja4_fingerprinting_;
+  const bool close_connection_on_client_hello_parsing_errors_;
+  const uint32_t max_client_hello_size_;
+  const uint32_t initial_read_buffer_size_;
+};
+
+using ConfigSharedPtr = std::shared_ptr<Config>;
+
+/**
+ * TLS inspector listener filter.
+ */
+class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
+public:
+  Filter(const ConfigSharedPtr& config);
+
+  // Network::ListenerFilter
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
+  Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
+  size_t maxReadBytes() const override { return requested_read_bytes_; }
+  void setClientTlsVersion(uint16_t version) { client_tls_version_ = version; }
+
+  static const std::string& dynamicMetadataKey();
+  static const std::string& failureReasonKey();
+  static const std::string& failureReasonClientHelloTooLarge();
+  static const std::string& failureReasonClientHelloNotDetected();
+  static const std::string& failureReasonClientHelloInvalidTlsVersion();
+
+private:
+  ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);
+  ParseState onRead();
+  void onALPN(const unsigned char* data, unsigned int len);
+  void onServername(absl::string_view name);
+  void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
+  void createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
+  uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
+  ParseState getParserState(int handshake_status);
+  void setDynamicMetadata(absl::string_view failure_reason);
+  void setDownstreamTransportFailureReason();
+
+  ConfigSharedPtr config_;
+  Network::ListenerFilterCallbacks* cb_{};
+
+  bssl::UniquePtr<SSL> ssl_;
+  uint64_t read_{0};
+  bool alpn_found_{false};
+  bool clienthello_success_{false};
+  // We dynamically adjust the number of bytes requested by the filter up to the
+  // maxConfigReadBytes.
+  uint32_t requested_read_bytes_;
+  uint16_t client_tls_version_{0};
+
+  // Allows callbacks on the SSL_CTX to set fields in this class.
+  friend class Config;
+};
+
+} // namespace TlsInspector
+} // namespace ListenerFilters
+} // namespace Extensions
+} // namespace Envoy

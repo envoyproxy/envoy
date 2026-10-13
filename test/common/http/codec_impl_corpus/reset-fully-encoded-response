@@ -1,0 +1,69 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "*"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 2
+    request {
+      trailers {
+      }
+    }
+    dispatching_action {
+      data: 2
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 2
+    response {
+      headers {
+      }
+      end_stream: true
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      reset_stream: 2
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "GET"
+        value: "/"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+    }
+  }
+}

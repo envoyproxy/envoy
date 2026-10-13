@@ -1,0 +1,1799 @@
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/filters/network/ext_proc/ext_proc.h"
+
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/struct_matchers.h"
+#include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::IsSupersetOf;
+using testing::Key;
+using testing::Pair;
+using testing::UnorderedElementsAre;
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace ExtProc {
+
+namespace {
+
+using testing::_;
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnNull;
+using testing::ReturnRef;
+
+class MockExternalProcessorStream : public ExternalProcessorStream {
+public:
+  // Use NiceMock to avoid "uninteresting mock function call" warnings for methods we don't care
+  // about
+  MockExternalProcessorStream() {
+    // Set default actions for methods that will be called but we don't necessarily want to verify
+    ON_CALL(*this, send(_, _)).WillByDefault(Return());
+    ON_CALL(*this, close()).WillByDefault(Return(true));
+  }
+
+  MOCK_METHOD(void, send,
+              (envoy::service::network_ext_proc::v3::ProcessingRequest && request,
+               bool end_stream));
+  MOCK_METHOD(bool, close, ());
+  MOCK_METHOD(bool, halfCloseAndDeleteOnRemoteClose, ());
+  MOCK_METHOD(void, notifyFilterDestroy, ());
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+};
+
+class MockExternalProcessorClient : public ExternalProcessorClient {
+public:
+  MOCK_METHOD(ExternalProcessorStreamPtr, start,
+              (ExternalProcessorCallbacks & callbacks,
+               const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+               Http::AsyncClient::StreamOptions& options,
+               Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks));
+  MOCK_METHOD(
+      void, sendRequest,
+      (envoy::service::network_ext_proc::v3::ProcessingRequest && request, bool end_stream,
+       const uint64_t stream_id,
+       CommonExtProc::RequestCallbacks<envoy::service::network_ext_proc::v3::ProcessingResponse>*
+           callbacks,
+       CommonExtProc::StreamBase* stream));
+  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const));
+};
+
+class NetworkExtProcFilterTest : public testing::Test {
+public:
+  NetworkExtProcFilterTest() {
+    ON_CALL(read_callbacks_, connection()).WillByDefault(ReturnRef(connection_));
+    ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+
+    // Set up basic config with failure_mode_allow = false
+    auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
+    auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+    client_ = client.get();
+    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+    filter_->initializeReadFilterCallbacks(read_callbacks_);
+    filter_->initializeWriteFilterCallbacks(write_callbacks_);
+  }
+
+  // Create a config with specified failure_mode_allow setting
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor
+  createConfig(bool failure_mode_allow) {
+    envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+    config.set_stat_prefix("test_ext_proc");
+    config.set_failure_mode_allow(failure_mode_allow);
+    config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+    return config;
+  }
+
+  // Set up a new filter with the specified failure_mode_allow setting
+  void recreateFilterWithConfig(bool failure_mode_allow) {
+    auto filter_config = std::make_shared<Config>(createConfig(failure_mode_allow), scope_);
+    auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+    client_ = client.get();
+    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+    filter_->initializeReadFilterCallbacks(read_callbacks_);
+    filter_->initializeWriteFilterCallbacks(write_callbacks_);
+  }
+
+  // Create a config with metadata options
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor
+  createConfigWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
+                                  const std::vector<std::string>& typed_namespaces) {
+    envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+    config.set_failure_mode_allow(false);
+    config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+
+    auto* metadata_options = config.mutable_metadata_options();
+    auto* forwarding_namespaces = metadata_options->mutable_forwarding_namespaces();
+
+    for (const auto& ns : untyped_namespaces) {
+      forwarding_namespaces->add_untyped(ns);
+    }
+
+    for (const auto& ns : typed_namespaces) {
+      forwarding_namespaces->add_typed(ns);
+    }
+
+    return config;
+  }
+
+  // Set up a new filter with metadata options
+  void recreateFilterWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
+                                         const std::vector<std::string>& typed_namespaces) {
+    auto filter_config = std::make_shared<Config>(
+        createConfigWithMetadataOptions(untyped_namespaces, typed_namespaces), scope_);
+    auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+    client_ = client.get();
+    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+    filter_->initializeReadFilterCallbacks(read_callbacks_);
+    filter_->initializeWriteFilterCallbacks(write_callbacks_);
+  }
+
+  // Add dynamic metadata to the stream info
+  void addDynamicMetadata(const std::string& namespace_key, const std::string& key,
+                          const std::string& value) {
+    auto& metadata = *stream_info_.metadata_.mutable_filter_metadata();
+    Protobuf::Struct struct_obj;
+    auto& fields = *struct_obj.mutable_fields();
+    fields[key].set_string_value(value);
+    metadata[namespace_key] = struct_obj;
+  }
+
+  // Add typed dynamic metadata to the stream info
+  void addTypedDynamicMetadata(const std::string& namespace_key, const Protobuf::Any& typed_value) {
+    stream_info_.metadata_.mutable_typed_filter_metadata()->insert({namespace_key, typed_value});
+  }
+
+  uint64_t getCounterValue(const std::string& name) {
+    const auto counter = TestUtility::findCounter(store_, name);
+    return counter != nullptr ? counter->value() : 0;
+  }
+
+protected:
+  NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& scope_{*store_.rootScope()};
+  NiceMock<Network::MockReadFilterCallbacks> read_callbacks_;
+  NiceMock<Network::MockWriteFilterCallbacks> write_callbacks_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<MockExternalProcessorClient>* client_;
+  std::unique_ptr<NetworkExtProcFilter> filter_;
+};
+
+// Test receiving a message when processing is already complete
+TEST_F(NetworkExtProcFilterTest, ReceiveMessageAfterProcessingComplete) {
+  // First, mark processing as complete
+  filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Create a message to send - the filter should ignore it
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+  auto* read_data = response->mutable_read_data();
+  read_data->set_data("data");
+  read_data->set_end_of_stream(false);
+
+  // We expect the filter to ignore this message since processing is complete
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
+
+  filter_->onReceiveMessage(std::move(response));
+
+  // Check counter for spurious messages
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.spurious_msgs_received"));
+}
+
+// Test receiving a message with no data (neither read_data nor write_data)
+TEST_F(NetworkExtProcFilterTest, ReceiveEmptyMessage) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Verify read_data_sent counter incremented
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_sent"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+
+  // Create a message with neither read_data nor write_data
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+
+  // Ensure no data is injected into either filter chain
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _)).Times(0);
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
+
+  filter_->onReceiveMessage(std::move(response));
+
+  // Verify we count empty responses
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.empty_response_received"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+}
+
+// Test openStream method when processing is already complete
+TEST_F(NetworkExtProcFilterTest, OpenStreamAfterProcessingComplete) {
+  // First, mark processing as complete
+  filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Verify the failure counter was incremented
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_error"));
+
+  // Should not attempt to create a new stream
+  EXPECT_CALL(*client_, start(_, _, _, _)).Times(0);
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  // No new streams should be started
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
+}
+
+// Test the onLogStreamInfo method
+TEST_F(NetworkExtProcFilterTest, LogStreamInfo) {
+  // Simply call the method to ensure coverage
+  filter_->logStreamInfo();
+}
+
+// Test the onComplete method
+TEST_F(NetworkExtProcFilterTest, OnComplete) {
+  // Simply call the method to ensure coverage
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  filter_->onComplete(response);
+}
+
+// Test the onError method
+TEST_F(NetworkExtProcFilterTest, OnError) {
+  // Simply call the method to ensure coverage
+  filter_->onError();
+}
+
+// Test failure mode allow behavior when stream creation fails
+TEST_F(NetworkExtProcFilterTest, StreamCreationFailureWithFailureModeAllow) {
+  // Recreate filter with failure_mode_allow = true
+  recreateFilterWithConfig(true);
+
+  // When client->start is called, it returns nullptr to simulate stream creation failure
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(ReturnNull());
+
+  // With failure_mode_allow=true, filter should continue processing
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  // Buffer should be untouched since we're continuing
+  EXPECT_EQ(data.length(), 4);
+  // Check failure counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_open_failures"));
+}
+
+// Test failure mode disallow behavior when stream creation fails
+TEST_F(NetworkExtProcFilterTest, StreamCreationFailureWithFailureModeDisallow) {
+  // With failure_mode_allow=false (default in setup)
+
+  // Expect connection to be closed when stream creation fails
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(ReturnNull());
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_stream_error"));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  // Verify stream open failure counter and connection closed counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_open_failures"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
+}
+
+// Test gRPC error handling with failure mode allow
+TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeAllow) {
+  // Recreate filter with failure_mode_allow = true
+  recreateFilterWithConfig(true);
+
+  // Create a mock stream and set expectations
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // Expect the send method to be called when processing data
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  // Expect close to be called during cleanup after error
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  // Set up the client to return our mock stream
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Stream should be started
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
+
+  // Now simulate a gRPC error
+  // With failure_mode_allow=true, connection should NOT be closed
+  EXPECT_CALL(connection_, close(_, _)).Times(0);
+
+  filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Verify error counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_error"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.failure_mode_allowed"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+
+  // Next data should pass through without issues
+  Buffer::OwnedImpl more_data("more");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
+}
+
+// Test gRPC error handling with failure mode disallow
+TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeDisallow) {
+  // With failure_mode_allow=false (default in setup)
+  // Create a mock stream and set expectations
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // Expect the send method to be called when processing data
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  // Expect close to be called during cleanup after error
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // With failure_mode_allow=false, connection should be closed on gRPC error
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite, "ext_proc_grpc_error"));
+
+  // Trigger onGrpcError callback
+  filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Verify error counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_error"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
+
+  // Failure mode allowed should not be incremented
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.failure_mode_allowed"));
+}
+
+// Test normal processing flow for read data
+TEST_F(NetworkExtProcFilterTest, NormalProcessingReadData) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // Expect the send method to be called when processing data
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Initial call should stop iteration until we get a response
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Check read data sent counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_sent"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+
+  // Simulate response from external processor
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  auto* read_data = response.mutable_read_data();
+  read_data->set_data("modified");
+  read_data->set_end_of_stream(false);
+
+  // Expect data to be injected to the filter chain
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+
+  // Check data counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+}
+
+// Test normal processing flow for write data
+TEST_F(NetworkExtProcFilterTest, NormalProcessingWriteData) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // Expect the send method to be called when processing data
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Initial call should stop iteration until we get a response
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  // Check write data sent counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_sent"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+
+  // Simulate response from external processor
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  auto* write_data = response.mutable_write_data();
+  write_data->set_data("modified");
+  write_data->set_end_of_stream(false);
+
+  // Expect data to be injected to the filter chain
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+
+  // Check data counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_received"));
+}
+
+// Test onGrpcClose handling
+TEST_F(NetworkExtProcFilterTest, GrpcCloseHandling) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Trigger onGrpcClose and verify behavior
+  filter_->onGrpcClose();
+
+  // Verify counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_close"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+
+  // Subsequent data should pass through directly
+  Buffer::OwnedImpl more_data("more");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
+}
+
+// Test edge case with null stream in sendRequest
+TEST_F(NetworkExtProcFilterTest, SendRequestWithNullStream) {
+  // Set filter's stream to nullptr
+  auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(ReturnNull());
+  EXPECT_CALL(connection_, close(_, _)).WillOnce(Return());
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  testing::Mock::VerifyAndClearExpectations(&connection_);
+}
+
+// Test onWrite error path
+TEST_F(NetworkExtProcFilterTest, OnWriteErrorPath) {
+  // Recreate filter with failure_mode_allow = true to test different error path
+  recreateFilterWithConfig(true);
+
+  // Expect client->start to return nullptr to trigger error condition
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(ReturnNull());
+
+  // With failure_mode_allow=true, should continue
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data, false));
+}
+
+// Test updateCloseCallbackStatus edge cases
+TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusEdgeCases) {
+  // Test multiple enable/disable for read callbacks
+  Buffer::OwnedImpl data("test");
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Send multiple responses to trigger disable/enable cycles
+  // This will test the counter logic in updateCloseCallbackStatus
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  auto* read_data = response.mutable_read_data();
+  read_data->set_data("modified");
+  read_data->set_end_of_stream(false);
+
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+
+  // Test write callbacks with multiple enable/disable
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  response = envoy::service::network_ext_proc::v3::ProcessingResponse();
+  auto* write_data = response.mutable_write_data();
+  write_data->set_data("modified_write");
+  write_data->set_end_of_stream(false);
+
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+}
+
+// Test downstream connection close event
+TEST_F(NetworkExtProcFilterTest, DownstreamConnectionCloseEvent) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Set up expectation for stream closure
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  // Simulate downstream connection close
+  Network::ConnectionEvent close_event = Network::ConnectionEvent::RemoteClose;
+  filter_->onDownstreamEvent(close_event);
+
+  // Verify stream close counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+}
+
+// Test processing mode configurations
+TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
+  // Test with SKIP for read processing
+  auto config = createConfig(false);
+  config.mutable_processing_mode()->set_process_read(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // With process_read set to SKIP, data should pass through directly
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  // No stream should be created and no messages should be sent
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+
+  // Testing SKIP for write processing
+  config = createConfig(false);
+  config.mutable_processing_mode()->set_process_write(
+      envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::SKIP);
+
+  filter_config = std::make_shared<Config>(config, scope_);
+  client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // With process_write set to SKIP, data should pass through directly
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onWrite(data, false));
+
+  // No stream should be created and no messages should be sent
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.stream_msgs_sent"));
+}
+
+// Test metadata forwarding when no namespaces are configured
+TEST_F(NetworkExtProcFilterTest, NoMetadataForwardingConfigured) {
+  // Create a filter with no metadata options
+  recreateFilterWithMetadataOptions({}, {});
+
+  // Add some metadata to the stream info
+  addDynamicMetadata("test-namespace", "key1", "value1");
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(
+          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                             bool /*end_stream*/) {
+            // Verify the request doesn't have metadata
+            EXPECT_FALSE(request.has_metadata());
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test untyped metadata forwarding
+TEST_F(NetworkExtProcFilterTest, UntypedMetadataForwarding) {
+  // Create a filter with untyped metadata forwarding
+  recreateFilterWithMetadataOptions({"test-namespace"}, {});
+
+  // Add metadata to the stream info
+  addDynamicMetadata("test-namespace", "key1", "value1");
+  addDynamicMetadata("other-namespace", "key2", "value2"); // Should not be forwarded
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(
+          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                             bool /*end_stream*/) {
+            // Verify the request has metadata
+            EXPECT_TRUE(request.has_metadata());
+
+            // Verify it has the expected test-namespace and key-value pair.
+            EXPECT_THAT(request.metadata().filter_metadata(),
+                        UnorderedElementsAre(
+                            Pair("test-namespace",
+                                 HasStructFields(Contains(IsStructString("key1", "value1"))))));
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test typed metadata forwarding
+TEST_F(NetworkExtProcFilterTest, TypedMetadataForwarding) {
+  // Create a filter with typed metadata forwarding
+  recreateFilterWithMetadataOptions({}, {"typed-namespace"});
+
+  // Create a typed metadata value
+  Protobuf::Any typed_value;
+  typed_value.set_type_url("type.googleapis.com/envoy.test.TestMessage");
+  typed_value.set_value("test-value");
+
+  // Add typed metadata to the stream info
+  addTypedDynamicMetadata("typed-namespace", typed_value);
+
+  // Create another typed value that shouldn't be forwarded
+  Protobuf::Any other_typed_value;
+  other_typed_value.set_type_url("type.googleapis.com/envoy.test.OtherMessage");
+  other_typed_value.set_value("other-value");
+  addTypedDynamicMetadata("other-namespace", other_typed_value);
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(testing::Invoke(
+          [&typed_value](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                         bool /*end_stream*/) {
+            // Verify the request has metadata
+            EXPECT_TRUE(request.has_metadata());
+
+            // Verify it has the typed-namespace but not other-namespace
+            const auto& typed_metadata = request.metadata().typed_filter_metadata();
+            EXPECT_THAT(typed_metadata, UnorderedElementsAre(Key("typed-namespace")));
+
+            // Verify the typed value matches what we set
+            const auto& actual_typed_value = typed_metadata.at("typed-namespace");
+            EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
+            EXPECT_EQ(actual_typed_value.value(), typed_value.value());
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test both untyped and typed metadata forwarding together
+TEST_F(NetworkExtProcFilterTest, BothTypedAndUntypedMetadataForwarding) {
+  // Create a filter that forwards both typed and untyped metadata
+  recreateFilterWithMetadataOptions({"untyped-ns"}, {"typed-ns"});
+
+  // Add untyped metadata
+  addDynamicMetadata("untyped-ns", "key1", "value1");
+
+  // Add typed metadata
+  Protobuf::Any typed_value;
+  typed_value.set_type_url("type.googleapis.com/envoy.test.TestMessage");
+  typed_value.set_value("test-value");
+  addTypedDynamicMetadata("typed-ns", typed_value);
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(testing::Invoke(
+          [&typed_value](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                         bool /*end_stream*/) {
+            // Verify the request has metadata
+            EXPECT_TRUE(request.has_metadata());
+
+            // Verify untyped metadata
+            EXPECT_THAT(request.metadata().filter_metadata(),
+                        Contains(Pair("untyped-ns", HasStructFields(Contains(
+                                                        IsStructString("key1", "value1"))))));
+
+            // Verify typed metadata
+            const auto& typed_metadata = request.metadata().typed_filter_metadata();
+            EXPECT_THAT(typed_metadata, Contains(Key("typed-ns")));
+            const auto& actual_typed_value = typed_metadata.at("typed-ns");
+            EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
+            EXPECT_EQ(actual_typed_value.value(), typed_value.value());
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test metadata forwarding with empty metadata
+TEST_F(NetworkExtProcFilterTest, MetadataForwardingWithEmptyMetadata) {
+  // Create a filter with metadata options but don't add any metadata
+  recreateFilterWithMetadataOptions({"untyped-ns"}, {"typed-ns"});
+
+  // Create a mock stream to verify request content
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  // This will capture the request that's sent to the external processor
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(
+          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                             bool /*end_stream*/) {
+            // Verify the request doesn't have metadata since no matching metadata exists
+            EXPECT_FALSE(request.has_metadata());
+          }));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+// Test timeout configuration
+TEST_F(NetworkExtProcFilterTest, TimeoutConfiguration) {
+  // Test default timeout value
+  auto config = createConfig(false);
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  EXPECT_EQ(filter_config->messageTimeout().count(), 200);
+
+  // Test custom timeout value
+  config.mutable_message_timeout()->set_seconds(2);
+  filter_config = std::make_shared<Config>(config, scope_);
+  EXPECT_EQ(filter_config->messageTimeout().count(), 2000);
+
+  // Test zero timeout (means no timeout)
+  config.mutable_message_timeout()->set_seconds(0);
+  config.mutable_message_timeout()->set_nanos(0);
+  filter_config = std::make_shared<Config>(config, scope_);
+  EXPECT_EQ(filter_config->messageTimeout().count(), 0);
+}
+
+// Test message timeout with failure_mode_allow=true
+TEST_F(NetworkExtProcFilterTest, MessageTimeoutWithFailureModeAllow) {
+  // Create filter with failure_mode_allow=true and custom timeout
+  auto config = createConfig(true);
+  config.mutable_message_timeout()->set_nanos(100000000); // 100ms
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // Create a mock stream
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  // Send data which starts the timer
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Simulate timeout - with failure_mode_allow=true, connection should NOT close
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+  EXPECT_CALL(connection_, close(_, _)).Times(0); // Should NOT close connection
+
+  filter_->handleMessageTimeout(true); // Read timeout
+
+  // Verify timeout counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.failure_mode_allowed"));
+
+  // Subsequent data should pass through
+  Buffer::OwnedImpl more_data("more");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
+}
+
+// Test timeout during write operation
+TEST_F(NetworkExtProcFilterTest, WriteMessageTimeout) {
+  auto config = createConfig(false);
+  config.mutable_message_timeout()->set_nanos(100000000); // 100ms
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // Create a mock stream
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Send write data which starts the timer
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  // Simulate timeout
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"))
+      .WillOnce([]() {});
+
+  filter_->handleMessageTimeout(false);
+
+  // Verify counters
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_sent"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
+}
+
+// Test timeout with both read and write pending
+TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
+  auto config = createConfig(false);
+  config.mutable_message_timeout()->set_nanos(100000000); // 100ms
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // Create a mock stream
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false)).Times(2); // Both read and write
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Send both read and write data
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  Buffer::OwnedImpl read_data("read_test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(read_data, false));
+
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+  Buffer::OwnedImpl write_data("write_test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(write_data, false));
+
+  // Simulate timeout - should clean up both directions exactly once
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"))
+      .WillOnce([]() {});
+
+  filter_->handleMessageTimeout(true); // Timeout on read, but should clean up both
+
+  // Verify both operations were cleaned up
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
+}
+
+// Test that timer stops when response is received
+TEST_F(NetworkExtProcFilterTest, TimerStopsOnResponse) {
+  auto config = createConfig(false);
+  config.mutable_message_timeout()->set_nanos(100000000); // 100ms
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Send data which starts the timer
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Receive response before timeout - timer should be stopped
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  auto* read_data = response.mutable_read_data();
+  read_data->set_data("modified");
+  read_data->set_end_of_stream(false);
+
+  EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, false));
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+
+  // No timeout should occur
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_injected"));
+}
+
+// Test that write timer stops when write response is received
+TEST_F(NetworkExtProcFilterTest, WriteTimerStopsOnWriteResponse) {
+  auto config = createConfig(false);
+  config.mutable_message_timeout()->set_nanos(100000000); // 100ms
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+
+  auto* read_timer = new NiceMock<Event::MockTimer>();
+  auto* write_timer = new NiceMock<Event::MockTimer>();
+
+  EXPECT_CALL(connection_.dispatcher_, createTimer_(_))
+      .WillOnce(Return(read_timer))
+      .WillOnce(Return(write_timer));
+
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Expect write timer to be enabled when sending write data
+  EXPECT_CALL(*write_timer, enableTimer(_, _));
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  auto* write_data = response.mutable_write_data();
+  write_data->set_data("modified");
+  write_data->set_end_of_stream(false);
+
+  EXPECT_CALL(*write_timer, disableTimer());
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false));
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.write_data_injected"));
+}
+
+// Test timeout cleanup on stream errors
+TEST_F(NetworkExtProcFilterTest, TimeoutCleanupOnGrpcError) {
+  auto config = createConfig(false);
+  config.mutable_message_timeout()->set_nanos(100000000); // 100ms
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  // Create a mock stream
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Send data which starts the timer
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Simulate gRPC error - should stop timer and clean up
+  EXPECT_CALL(read_callbacks_, disableClose(false)); // Expect re-enable before close
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite, "ext_proc_grpc_error"))
+      .WillOnce([]() {});
+
+  filter_->onGrpcError(Grpc::Status::Internal, "test error");
+
+  // Verify cleanup but no timeout counter
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_grpc_error"));
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
+}
+
+// Test zero timeout (disabled)
+TEST_F(NetworkExtProcFilterTest, ZeroTimeoutDisabled) {
+  auto config = createConfig(false);
+  config.mutable_message_timeout()->set_nanos(0);
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  EXPECT_EQ(filter_->getMessageTimeout().count(), 0);
+
+  // With zero timeout, timer should not be started
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  EXPECT_CALL(*stream, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // No timeout should occur with zero timeout
+  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+}
+
+// Test NetworkExtProcLoggingInfo basic operations.
+TEST(NetworkExtProcLoggingInfoTest, BasicOperations) {
+  NetworkExtProcLoggingInfo logging_info;
+
+  // Test recording gRPC calls for read direction
+  logging_info.recordGrpcCall(std::chrono::microseconds(100), Grpc::Status::WellKnownGrpcStatus::Ok,
+                              true);
+  logging_info.recordGrpcCall(std::chrono::microseconds(200),
+                              Grpc::Status::WellKnownGrpcStatus::Unavailable, true);
+
+  const auto& read_stats = logging_info.readStats();
+  EXPECT_EQ(read_stats.grpc_calls_, 2);
+  EXPECT_EQ(read_stats.grpc_errors_, 1);
+  EXPECT_EQ(read_stats.total_latency_.count(), 300);
+  EXPECT_EQ(read_stats.max_latency_.count(), 200);
+  EXPECT_EQ(read_stats.min_latency_.count(), 100);
+  EXPECT_EQ(logging_info.lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::Unavailable);
+
+  // Test recording gRPC calls for write direction
+  logging_info.recordGrpcCall(std::chrono::microseconds(50), Grpc::Status::WellKnownGrpcStatus::Ok,
+                              false);
+
+  const auto& write_stats = logging_info.writeStats();
+  EXPECT_EQ(write_stats.grpc_calls_, 1);
+  EXPECT_EQ(write_stats.grpc_errors_, 0);
+  EXPECT_EQ(write_stats.total_latency_.count(), 50);
+  EXPECT_EQ(write_stats.max_latency_.count(), 50);
+  EXPECT_EQ(write_stats.min_latency_.count(), 50);
+}
+
+// Test NetworkExtProcLoggingInfo bytes processing count.
+TEST(NetworkExtProcLoggingInfoTest, BytesProcessing) {
+  NetworkExtProcLoggingInfo logging_info;
+
+  // Add bytes for read direction
+  logging_info.addBytesProcessed(100, true);
+  logging_info.addBytesProcessed(200, true);
+  logging_info.addBytesProcessed(50, true);
+
+  // Add bytes for write direction
+  logging_info.addBytesProcessed(150, false);
+  logging_info.addBytesProcessed(250, false);
+
+  EXPECT_EQ(logging_info.readStats().bytes_processed_, 350);
+  EXPECT_EQ(logging_info.readStats().message_count_, 3);
+  EXPECT_EQ(logging_info.writeStats().bytes_processed_, 400);
+  EXPECT_EQ(logging_info.writeStats().message_count_, 2);
+  EXPECT_EQ(logging_info.totalBytesProcessed(), 750);
+}
+
+// Test logging info for connection info.
+TEST(NetworkExtProcLoggingInfoTest, ConnectionInfoSetup) {
+  NetworkExtProcLoggingInfo logging_info;
+
+  NiceMock<Network::MockConnection> connection;
+  Network::ConnectionInfoSetterImpl connection_info(nullptr, nullptr);
+
+  auto local_address = Network::Utility::parseInternetAddressNoThrow("192.168.1.1", 9090);
+  auto remote_address = Network::Utility::parseInternetAddressNoThrow("10.0.0.5", 54321);
+  connection_info.setLocalAddress(local_address);
+  connection_info.setRemoteAddress(remote_address);
+
+  EXPECT_CALL(connection, connectionInfoProvider()).WillRepeatedly(ReturnRef(connection_info));
+  logging_info.setConnectionInfo(&connection);
+
+  EXPECT_EQ(logging_info.peerAddress(), "10.0.0.5:54321");
+  EXPECT_EQ(logging_info.localAddress(), "192.168.1.1:9090");
+}
+
+// Test gRPC call latency recording
+TEST_F(NetworkExtProcFilterTest, LoggingInfoLatencyTracking) {
+  recreateFilterWithConfig(false);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false)).Times(3);
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  // Start processing
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+  response->mutable_read_data()->set_data("modified");
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+  filter_->onReceiveMessage(std::move(response));
+
+  Buffer::OwnedImpl data_second("test_second");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_second, false));
+  auto response_second = Grpc::ResponsePtr<ProcessingResponse>();
+  response_second->mutable_read_data()->set_data("modified");
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  filter_->onReceiveMessage(std::move(response_second));
+
+  Buffer::OwnedImpl write_data("write");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(write_data, false));
+  auto write_response = Grpc::ResponsePtr<ProcessingResponse>();
+  write_response->mutable_write_data()->set_data("write");
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(50));
+  filter_->onReceiveMessage(std::move(write_response));
+
+  auto& filter_state = read_callbacks_.connection().streamInfo().filterState();
+  auto logging_info =
+      filter_state->getDataReadOnly<NetworkExtProcLoggingInfo>("envoy.filters.network.ext_proc");
+
+  EXPECT_EQ(logging_info->readStats().grpc_calls_, 2);
+  EXPECT_EQ(logging_info->readStats().total_latency_.count(), 300000);
+  EXPECT_EQ(logging_info->readStats().max_latency_.count(), 200000);
+  EXPECT_EQ(logging_info->readStats().min_latency_.count(), 100000);
+  EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  EXPECT_EQ(logging_info->writeStats().grpc_calls_, 1);
+  EXPECT_EQ(logging_info->writeStats().total_latency_.count(), 50000);
+}
+
+// Test gRPC call onGrpcError recording
+TEST_F(NetworkExtProcFilterTest, LoggingInfoOnError) {
+  recreateFilterWithConfig(true);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+  filter_->onGrpcError(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted, "test error");
+
+  auto& filter_state = read_callbacks_.connection().streamInfo().filterState();
+  auto logging_info =
+      filter_state->getDataReadOnly<NetworkExtProcLoggingInfo>("envoy.filters.network.ext_proc");
+
+  EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
+}
+
+// Test onNewConnection
+TEST_F(NetworkExtProcFilterTest, OnNewConnection) {
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+}
+
+// Test handleConnectionStatus CLOSE
+TEST_F(NetworkExtProcFilterTest, HandleConnectionStatusClose) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(testing::Return(ByMove(std::move(stream))));
+
+  Buffer::OwnedImpl data("test");
+  filter_->onData(data, false);
+
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+  response->set_connection_status(envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE);
+
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_close_requested"));
+  filter_->onReceiveMessage(std::move(response));
+}
+
+// Test handleConnectionStatus CLOSE_RST
+TEST_F(NetworkExtProcFilterTest, HandleConnectionStatusCloseRst) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(testing::Return(ByMove(std::move(stream))));
+
+  Buffer::OwnedImpl data("test");
+  filter_->onData(data, false);
+
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+  response->set_connection_status(
+      envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE_RST);
+
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::AbortReset, "ext_proc_reset_requested"));
+  filter_->onReceiveMessage(std::move(response));
+}
+
+// Test handleConnectionStatus default (unknown status)
+TEST_F(NetworkExtProcFilterTest, HandleConnectionStatusUnknown) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(testing::Return(ByMove(std::move(stream))));
+
+  Buffer::OwnedImpl data("test");
+  filter_->onData(data, false);
+
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+  response->set_connection_status(
+      static_cast<envoy::service::network_ext_proc::v3::ProcessingResponse_ConnectionStatus>(999));
+
+  EXPECT_CALL(connection_, close(_, _)).Times(0);
+  filter_->onReceiveMessage(std::move(response));
+}
+
+// Test recordCallCompletion when call_start_time is nullopt
+TEST_F(NetworkExtProcFilterTest, RecordCallCompletionNullStartTime) {
+  // Directly calling onReceiveMessage without a pending call should trigger recordCallCompletion
+  // with nullopt start time
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+  response->mutable_read_data()->set_data("test");
+
+  filter_->onReceiveMessage(std::move(response));
+}
+
+// Test message timeout triggered via Timer
+TEST_F(NetworkExtProcFilterTest, MessageTimeoutViaTimer) {
+  // Capture the read timer callback from the initially created filter
+  // We need to trigger a timeout on the filter already held in filter_
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Return(ByMove(std::move(stream))));
+
+  Buffer::OwnedImpl data("test");
+  filter_->onData(data, false);
+
+  // Trigger timeout directly via the filter
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
+  filter_->handleMessageTimeout(true);
+
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
+}
+
+// Test sendRequest when stream is null
+TEST_F(NetworkExtProcFilterTest, SendRequestStreamNull) {
+  // We need to access sendRequest which is private, but we can trigger it via onData
+  // and making openStream return Error.
+  EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(ReturnNull());
+  EXPECT_CALL(connection_, close(_, _));
+
+  Buffer::OwnedImpl data("test");
+  filter_->onData(data, false);
+}
+
+// Test gRPC call onGrpcError recording for write direction
+TEST_F(NetworkExtProcFilterTest, LoggingInfoOnErrorWrite) {
+  recreateFilterWithConfig(true);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onWrite(data, false));
+  connection_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+  filter_->onGrpcError(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted, "test error");
+
+  auto& filter_state = read_callbacks_.connection().streamInfo().filterState();
+  auto logging_info =
+      filter_state->getDataReadOnly<NetworkExtProcLoggingInfo>("envoy.filters.network.ext_proc");
+
+  EXPECT_EQ(logging_info->lastCallStatus(), Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
+  EXPECT_EQ(logging_info->writeStats().grpc_calls_, 1);
+  EXPECT_EQ(logging_info->writeStats().grpc_errors_, 1);
+}
+
+// Test NetworkExtProcLoggingInfo::setConnectionInfo with null remote and local addresses
+TEST(NetworkExtProcLoggingInfoCoverageTest, ConnectionInfoSetupNullAddresses) {
+  NetworkExtProcLoggingInfo logging_info;
+
+  NiceMock<Network::MockConnection> connection;
+  Network::ConnectionInfoSetterImpl connection_info(nullptr, nullptr);
+
+  EXPECT_CALL(connection, connectionInfoProvider()).WillRepeatedly(ReturnRef(connection_info));
+  logging_info.setConnectionInfo(&connection);
+
+  EXPECT_TRUE(logging_info.peerAddress().empty());
+  EXPECT_TRUE(logging_info.localAddress().empty());
+}
+
+// Test updateCloseCallbackStatus for write direction
+TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusWrite) {
+  EXPECT_CALL(write_callbacks_, disableClose(true));
+  filter_->updateCloseCallbackStatus(true, false); // Enable, write direction
+
+  EXPECT_CALL(write_callbacks_, disableClose(false));
+  filter_->updateCloseCallbackStatus(false, false); // Disable, write direction
+}
+
+// Test close_stream_to_ext_proc_server functionality
+TEST_F(NetworkExtProcFilterTest, CloseSidestream) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Initial call, should intercept and send request
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Simulate response with close_stream_to_ext_proc_server = true
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  response.set_close_stream_to_ext_proc_server(true);
+
+  // Expect the stream to be gracefully closed
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+
+  // Verify stream closed counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+
+  // Subsequent data should pass through directly (SKIP mode equivalent behavior)
+  Buffer::OwnedImpl more_data("more");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(more_data, false));
+}
+
+// Test that close callbacks are correctly balanced when close_stream_to_ext_proc_server is received
+TEST_F(NetworkExtProcFilterTest, CloseSidestreamBalancedCallbacks) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false));
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // Initial call should disable close callbacks
+  EXPECT_CALL(read_callbacks_, disableClose(true));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Simulate response with close_stream_to_ext_proc_server = true
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  response.set_close_stream_to_ext_proc_server(true);
+
+  // When processing the close_stream_to_ext_proc_server response, the close callbacks should be
+  // re-enabled
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+
+  // Verify stream closed counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+}
+
+// Test that close callbacks are correctly balanced when close_stream_to_ext_proc_server is received
+// with multiple outstanding requests
+TEST_F(NetworkExtProcFilterTest, CloseSidestreamMultipleOutstandingBalancedCallbacks) {
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+
+  EXPECT_CALL(*stream_ptr, send(_, false)).Times(3);
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            return std::move(stream);
+          }));
+
+  // 3 initial calls should disable close callbacks each time
+  EXPECT_CALL(read_callbacks_, disableClose(true)).Times(3);
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  // Simulate response with close_stream_to_ext_proc_server = true
+  envoy::service::network_ext_proc::v3::ProcessingResponse response;
+  response.set_close_stream_to_ext_proc_server(true);
+
+  // When processing the close_stream_to_ext_proc_server response, the close callbacks should be
+  // re-enabled regardless of outstanding count
+  EXPECT_CALL(read_callbacks_, disableClose(false));
+  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
+
+  filter_->onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>(response));
+
+  // Verify stream closed counter
+  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
+}
+
+TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataAllowed) {
+  std::vector<std::string> receiving_namespaces = {"test-namespace"};
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  for (const auto& ns : receiving_namespaces) {
+    config.mutable_metadata_options()->mutable_receiving_namespaces()->add_untyped(ns);
+  }
+
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+  auto* dynamic_metadata = response->mutable_dynamic_metadata();
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["key1"].set_string_value("value1");
+  *(*dynamic_metadata->mutable_fields())["test-namespace"].mutable_struct_value() = struct_obj;
+
+  EXPECT_CALL(stream_info_, setDynamicMetadata("test-namespace", _));
+
+  filter_->onReceiveMessage(std::move(response));
+}
+
+TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataNotAllowed) {
+  std::vector<std::string> receiving_namespaces = {"test-namespace"};
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  for (const auto& ns : receiving_namespaces) {
+    config.mutable_metadata_options()->mutable_receiving_namespaces()->add_untyped(ns);
+  }
+
+  auto filter_config = std::make_shared<Config>(config, scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto response = Grpc::ResponsePtr<ProcessingResponse>();
+  auto* dynamic_metadata = response->mutable_dynamic_metadata();
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["key1"].set_string_value("value1");
+  *(*dynamic_metadata->mutable_fields())["other-namespace"].mutable_struct_value() = struct_obj;
+
+  EXPECT_CALL(stream_info_, setDynamicMetadata("other-namespace", _)).Times(0);
+
+  filter_->onReceiveMessage(std::move(response));
+}
+
+TEST_F(NetworkExtProcFilterTest, SendRequestWithConnectionAttributes) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  config.add_connection_attributes("connection.mtls");
+  config.add_connection_attributes("connection.id");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  auto builder = Filters::Common::Expr::getBuilder(server_context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<Config>(config, scope_, builder,
+                                                &server_context.local_info_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  stream_info_.downstream_connection_info_provider_->setConnectionID(12345);
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_TRUE(req.has_read_data());
+    EXPECT_EQ("hello", req.read_data().data());
+    EXPECT_EQ(1, req.attributes().size());
+    auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
+    EXPECT_THAT(proto_struct.fields(),
+                UnorderedElementsAre(IsStructBool("connection.mtls", false),
+                                     IsStructNumber("connection.id", 12345)));
+  });
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+TEST_F(NetworkExtProcFilterTest, SendRequestWithFilterStateStringAccessor) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  config.add_connection_attributes("filter_state['authority']");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  auto builder = Filters::Common::Expr::getBuilder(server_context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<Config>(config, scope_, builder,
+                                                &server_context.local_info_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  stream_info_.filter_state_->setData(
+      "authority", std::make_shared<Router::StringAccessorImpl>("example.com:443"),
+      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data("payload");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_TRUE(req.has_read_data());
+    EXPECT_EQ(1, req.attributes().size());
+    auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
+    EXPECT_THAT(proto_struct.fields(),
+                Contains(IsStructString("filter_state['authority']", "example.com:443")));
+  });
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+}
+
+TEST_F(NetworkExtProcFilterTest, ConnectionAttributesSentOnlyOnce) {
+  envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
+  config.set_failure_mode_allow(false);
+  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
+  config.add_connection_attributes("filter_state['authority']");
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  auto builder = Filters::Common::Expr::getBuilder(server_context);
+  absl::Status creation_status = absl::OkStatus();
+  auto filter_config = std::make_shared<Config>(config, scope_, builder,
+                                                &server_context.local_info_, creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  stream_info_.filter_state_->setData("authority",
+                                      std::make_shared<Router::StringAccessorImpl>("foo.bar.com"),
+                                      StreamInfo::FilterState::LifeSpan::Connection);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  Buffer::OwnedImpl data1("chunk1");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_EQ(1, req.attributes().size());
+    auto proto_struct = req.attributes().at("envoy.filters.network.ext_proc");
+    EXPECT_THAT(proto_struct.fields(),
+                Contains(IsStructString("filter_state['authority']", "foo.bar.com")));
+  });
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data1, false));
+
+  // Receive response for first chunk to resume iteration
+  auto response = std::make_unique<envoy::service::network_ext_proc::v3::ProcessingResponse>();
+  response->mutable_read_data()->set_data("chunk1");
+  response->set_data_processing_status(
+      envoy::service::network_ext_proc::v3::ProcessingResponse::UNMODIFIED);
+  filter_->onReceiveMessage(std::move(response));
+
+  // Send second chunk
+  Buffer::OwnedImpl data2("chunk2");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    // Attributes should NOT be present on subsequent requests
+    EXPECT_EQ(0, req.attributes().size());
+  });
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
+}
+
+} // namespace
+} // namespace ExtProc
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

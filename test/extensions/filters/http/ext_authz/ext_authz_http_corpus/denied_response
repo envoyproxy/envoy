@@ -1,0 +1,31 @@
+base {
+  config {
+    grpc_service {
+      envoy_grpc {
+        cluster_name: "ext_authz_server"
+      }
+    }
+    stat_prefix: "with_stat_prefix"
+  }
+  request_data {
+    headers {
+      headers {
+        key: ":host"
+        value: "example.com"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/users"
+      }
+      headers {
+        key: ":scheme"
+        value: "https"
+      }
+    }
+  }
+}
+result: DENIED

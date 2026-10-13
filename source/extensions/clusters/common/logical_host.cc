@@ -1,0 +1,146 @@
+#include "source/extensions/clusters/common/logical_host.h"
+
+namespace Envoy {
+namespace Upstream {
+
+absl::StatusOr<std::unique_ptr<LogicalHost>> LogicalHost::create(
+    const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
+    const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+    const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<LogicalHost>(
+      new LogicalHost(cluster, hostname, address, address_list, locality_lb_endpoint, lb_endpoint,
+                      override_transport_socket_options, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
+LogicalHost::LogicalHost(
+    const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
+    const Network::Address::InstanceConstSharedPtr& address, const AddressVector& address_list,
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+    const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
+    absl::Status& creation_status)
+    : HostImplBase(lb_endpoint.load_balancing_weight().value(),
+                   lb_endpoint.endpoint().health_check_config(), lb_endpoint.health_status()),
+      HostDescriptionImplBase(
+          cluster, hostname, address,
+          // TODO(zyfjeff): Created through metadata shared pool
+          std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
+          std::make_shared<const envoy::config::core::v3::Metadata>(
+              locality_lb_endpoint.metadata()),
+          // TODO(adisuissa): Create through localities shared pool.
+          std::make_shared<const envoy::config::core::v3::Locality>(
+              locality_lb_endpoint.locality()),
+          lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
+          creation_status),
+      override_transport_socket_options_(override_transport_socket_options), address_(address),
+      address_list_or_null_(makeAddressListOrNull(address, address_list)),
+      sorted_address_list_or_null_(makeSortedAddressListOrNull(*cluster, address_list)) {
+  health_check_address_ =
+      resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
+}
+
+Network::Address::InstanceConstSharedPtr LogicalHost::healthCheckAddress() const {
+  absl::MutexLock lock(address_lock_);
+  return health_check_address_;
+}
+
+void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
+                                  const AddressVector& address_list,
+                                  const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
+  const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
+  // TODO(jmarantz): change setNewAddresses interface to specify the address_list as a shared_ptr.
+  auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
+  SharedConstAddressVector shared_address_list;
+  if (!address_list.empty()) {
+    shared_address_list = std::make_shared<AddressVector>(address_list);
+    ASSERT(*address_list.front() == *address);
+  }
+  SharedConstAddressVector sorted_address_list =
+      makeSortedAddressListOrNull(cluster(), address_list);
+  {
+    absl::MutexLock lock(address_lock_);
+    address_ = address;
+    address_list_or_null_ = std::move(shared_address_list);
+    sorted_address_list_or_null_ = std::move(sorted_address_list);
+    health_check_address_ = std::move(health_check_address);
+  }
+}
+
+HostDescription::SharedConstAddressVector LogicalHost::addressListOrNull() const {
+  absl::MutexLock lock(address_lock_);
+  return address_list_or_null_;
+}
+
+HostDescription::SharedConstAddressVector LogicalHost::sortedAddressListOrNull() const {
+  absl::MutexLock lock(address_lock_);
+  return sorted_address_list_or_null_;
+}
+
+Network::Address::InstanceConstSharedPtr LogicalHost::address() const {
+  absl::MutexLock lock(address_lock_);
+  return address_;
+}
+
+Network::Address::InstanceConstSharedPtr LogicalHost::orcaReportingAddress() const {
+  absl::MutexLock lock(address_lock_);
+  return address_;
+}
+
+Upstream::Host::CreateConnectionData LogicalHost::createConnection(
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
+  Network::Address::InstanceConstSharedPtr address;
+  SharedConstAddressVector sorted_address_list_or_null;
+  {
+    absl::MutexLock lock(address_lock_);
+    address = address_;
+    sorted_address_list_or_null = sorted_address_list_or_null_;
+  }
+
+  // Use override_transport_socket_options if set, otherwise use the passed options.
+  const auto& effective_options = override_transport_socket_options_ != nullptr
+                                      ? override_transport_socket_options_
+                                      : transport_socket_options;
+
+  // Per-connection resolution for filter state-based transport socket matching.
+  const bool needs_per_connection_resolution =
+      cluster().transportSocketMatcher().usesFilterState() && effective_options &&
+      !effective_options->downstreamSharedFilterStateObjects().empty();
+
+  Network::UpstreamTransportSocketFactory& factory =
+      needs_per_connection_resolution
+          ? resolveTransportSocketFactory(address, metadata().get(), effective_options)
+          : transportSocketFactory();
+
+  return HostImplBase::createConnection(
+      dispatcher, cluster(), address, sorted_address_list_or_null, factory, options,
+      effective_options, std::make_shared<RealHostDescription>(address, shared_from_this()));
+}
+
+Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+    Network::UpstreamTransportSocketFactory& factory,
+    Network::Address::InstanceConstSharedPtr orca_address) const {
+  Network::Address::InstanceConstSharedPtr host_address;
+  SharedConstAddressVector sorted_address_list_or_null;
+  {
+    absl::MutexLock lock(address_lock_);
+    host_address = address_;
+    sorted_address_list_or_null = sorted_address_list_or_null_;
+  }
+  // The caller's options pass through unchanged; as with health checks,
+  // override_transport_socket_options_ is not consulted here.
+  return createOrcaConnection(
+      dispatcher, transport_socket_options, factory, orca_address, host_address,
+      sorted_address_list_or_null,
+      std::make_shared<RealHostDescription>(orca_address, shared_from_this()));
+}
+
+} // namespace Upstream
+} // namespace Envoy

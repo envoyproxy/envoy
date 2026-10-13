@@ -1,0 +1,78 @@
+name: Command
+
+# NB: **ALL** commands should be permissionless and only use an app token or relevant secrets
+#   specific to their requirements!
+permissions:
+  contents: read
+
+on:
+  issue_comment:
+    types:
+    - created
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG }}
+
+
+jobs:
+  # For speed and _security_ only a single command (first matching) will be parsed/run from a comment
+  command:
+    name: Parse and run command
+    runs-on: ubuntu-24.04
+    if: >-
+      ${{
+         github.event.issue.pull_request
+         && (vars.ENVOY_CI
+             || github.repository == 'envoyproxy/envoy')
+         && github.actor != 'repokitteh-read-only[bot]'
+         && github.actor != 'dependabot[bot]'
+      }}
+    steps:
+    - uses: envoyproxy/toolshed/actions/github/command@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      name: Parse command from comment
+      id: command
+      with:
+        text: ${{ github.event.comment.body }}
+        matching: >-
+          ^/(retest)([[:space:]]|$)
+
+    # /retest
+    # The command parser may retain a carriage return in the command for CRLF comments.
+    - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      if: ${{ startsWith(steps.command.outputs.command, 'retest') }}
+      id: appauth-retest
+      name: Appauth (retest)
+      with:
+        key: ${{ secrets.ENVOY_CI_APP_KEY }}
+        app_id: ${{ secrets.ENVOY_CI_APP_ID }}
+    - uses: envoyproxy/toolshed/actions/retest@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      if: ${{ startsWith(steps.command.outputs.command, 'retest') }}
+      name: Retest
+      with:
+        token: ${{ steps.appauth-retest.outputs.token }}
+        azp_org: cncf
+        azp_token: ${{ secrets.AZP_TOKEN }}
+        comment-id: ${{ github.event.comment.id }}
+        pr-url: ${{ github.event.issue.pull_request.url }}
+        args: ${{ steps.command.outputs.args }}
+        app-owner: ci-envoy
+
+  # ACK /gemini commands with a rocket emoji reaction.
+  # The actual review/summary is handled natively by the Gemini Code Assist GitHub App.
+  gemini:
+    name: ACK Gemini command
+    runs-on: ubuntu-24.04
+    if: >-
+      ${{
+         github.event.issue.pull_request
+         && startsWith(github.event.comment.body, '/gemini')
+         && github.actor != 'gemini-code-assist[bot]'
+      }}
+    permissions:
+      pull-requests: write
+    steps:
+    - name: React with rocket emoji
+      uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9  # v5.0.0
+      with:
+        comment-id: ${{ github.event.comment.id }}
+        reactions: rocket

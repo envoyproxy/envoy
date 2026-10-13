@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.clusters.dynamic_modules.v3";
+option java_outer_classname = "ClusterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Modules Cluster]
+
+// Configuration for the dynamic modules cluster.
+//
+// This cluster type delegates host discovery and load balancing to a dynamic module. The module
+// manages hosts via callbacks such as ``envoy_dynamic_module_callback_cluster_add_host`` and
+// ``envoy_dynamic_module_callback_cluster_remove_host``. The cluster must use
+// ``lb_policy: CLUSTER_PROVIDED`` since the module provides its own load balancer.
+//
+// [#extension: envoy.clusters.dynamic_modules]
+message ClusterConfig {
+  // The dynamic module configuration for the cluster.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name to identify the cluster implementation within the module.
+  // This is passed to the module's ``envoy_dynamic_module_on_cluster_config_new`` function.
+  string cluster_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The configuration for the module's cluster implementation.
+  // This is passed to the module's ``envoy_dynamic_module_on_cluster_config_new`` function.
+  // The configuration can be any protobuf message. However, it is recommended to use
+  // ``google.protobuf.Struct``, ``google.protobuf.StringValue``, or ``google.protobuf.BytesValue``.
+  // These types are passed directly as bytes to the module, so the module does not need to have
+  // knowledge of protobuf encoding. Otherwise, the serialized bytes of the type are passed.
+  // If not specified, an empty configuration is passed.
+  google.protobuf.Any cluster_config = 3;
+}

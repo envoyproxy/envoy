@@ -1,0 +1,70 @@
+#include "source/extensions/filters/http/geoip/config.h"
+
+#include "envoy/registry/registry.h"
+
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/geoip/geoip_filter.h"
+#include "source/server/generic_factory_context.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace Geoip {
+
+namespace {
+absl::Status validateConfig(const envoy::extensions::filters::http::geoip::v3::Geoip& config) {
+  // xff_config and custom_header_config are mutually exclusive.
+  if (config.has_xff_config() && config.has_custom_header_config()) {
+    return absl::InvalidArgumentError(
+        "Only one of xff_config or custom_header_config can be set in the geoip filter "
+        "configuration");
+  }
+  return absl::OkStatus();
+}
+} // namespace
+
+absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactory(
+    const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
+    const std::string& stat_prefix, Server::Configuration::GenericFactoryContext& context) {
+  // Validate configuration before creating the filter.
+  auto status = validateConfig(proto_config);
+  if (!status.ok()) {
+    return status;
+  }
+
+  GeoipFilterConfigSharedPtr filter_config(
+      std::make_shared<GeoipFilterConfig>(proto_config, stat_prefix, context.scope()));
+
+  const auto& provider_config = proto_config.provider();
+  auto& geo_provider_factory =
+      Envoy::Config::Utility::getAndCheckFactory<Geolocation::GeoipProviderFactory>(
+          provider_config);
+  ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
+      provider_config, context.messageValidationVisitor(), geo_provider_factory);
+  auto driver = geo_provider_factory.createGeoipProviderDriver(*message, stat_prefix,
+                                                               context.serverFactoryContext());
+  return [filter_config, driver](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<GeoipFilter>(filter_config, driver));
+  };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+  return createFilterFactory(proto_config, extra_context.stats_prefix, generic_context);
+}
+
+/**
+ * Static registration for geoip filter. @see RegisterFactory.
+ */
+REGISTER_FACTORY(GeoipFilterFactory,
+                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.geoip"};
+
+} // namespace Geoip
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

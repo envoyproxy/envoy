@@ -1,0 +1,12 @@
+{
+  "envoy.retry_host_predicates.previous_hosts": {
+    "title": "Previous Hosts",
+    "path": "retry/previous_hosts",
+    "ref": "arch_overview_http_retry_plugins"
+  },
+  "envoy.retry_host_predicates.omit_canary_hosts": {
+    "title": "Omit Canary Hosts",
+    "path": "retry/omit_canary_hosts",
+    "ref": "arch_overview_http_retry_plugins"
+  }
+}

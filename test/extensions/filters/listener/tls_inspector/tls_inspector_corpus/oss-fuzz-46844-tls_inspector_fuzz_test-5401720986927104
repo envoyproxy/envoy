@@ -1,0 +1,7 @@
+config {
+}
+fuzzed {
+  sock {
+    local_address: "un:ix/L"
+  }
+}

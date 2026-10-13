@@ -1,0 +1,62 @@
+#include "source/extensions/access_loggers/filters/cel/config.h"
+
+#include "envoy/extensions/access_loggers/filters/cel/v3/cel.pb.h"
+
+#include "source/extensions/access_loggers/filters/cel/cel.h"
+
+#if defined(USE_CEL_PARSER)
+#include "parser/parser.h"
+#endif
+
+namespace Envoy {
+namespace Extensions {
+namespace AccessLoggers {
+namespace Filters {
+namespace CEL {
+
+absl::StatusOr<Envoy::AccessLog::FilterPtr> CELAccessLogExtensionFilterFactory::createFilter(
+    const envoy::config::accesslog::v3::ExtensionFilter& config,
+    Server::Configuration::GenericFactoryContext& context) {
+
+  auto factory_config =
+      Config::Utility::translateToFactoryConfig(config, context.messageValidationVisitor(), *this);
+
+#if defined(USE_CEL_PARSER)
+  envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter cel_config =
+      *dynamic_cast<const envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter*>(
+          factory_config.get());
+
+  auto parse_status = google::api::expr::parser::Parse(cel_config.expression());
+  if (!parse_status.ok()) {
+    throw EnvoyException("Not able to parse filter expression: " +
+                         parse_status.status().ToString());
+  }
+
+  // Use the CEL configuration from the filter if available.
+  auto config_ref = cel_config.has_cel_config()
+                        ? Envoy::makeOptRef(cel_config.cel_config())
+                        : Envoy::OptRef<const envoy::config::core::v3::CelExpressionConfig>{};
+  auto builder =
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext(), config_ref);
+
+  return std::make_unique<CELAccessLogExtensionFilter>(context.serverFactoryContext().localInfo(),
+                                                       builder, parse_status.value().expr());
+#else
+  throw EnvoyException("CEL is not available for use in this environment.");
+#endif
+}
+
+ProtobufTypes::MessagePtr CELAccessLogExtensionFilterFactory::createEmptyConfigProto() {
+  return std::make_unique<envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter>();
+}
+
+/**
+ * Static registration for the CELAccessLogExtensionFilter. @see RegisterFactory.
+ */
+REGISTER_FACTORY(CELAccessLogExtensionFilterFactory, Envoy::AccessLog::ExtensionFilterFactory);
+
+} // namespace CEL
+} // namespace Filters
+} // namespace AccessLoggers
+} // namespace Extensions
+} // namespace Envoy

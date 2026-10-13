@@ -1,0 +1,59 @@
+#include <assert.h>
+
+#include "source/extensions/dynamic_modules/abi/abi.h"
+
+
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init() {
+  return envoy_dynamic_modules_abi_version;
+}
+
+envoy_dynamic_module_type_http_filter_config_module_ptr
+envoy_dynamic_module_on_http_filter_config_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
+  return 0;
+}
+
+void envoy_dynamic_module_on_http_filter_config_destroy(
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr) {}
+
+envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_filter_new(
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  return 0;
+}
+
+envoy_dynamic_module_type_on_http_filter_request_headers_status
+envoy_dynamic_module_on_http_filter_request_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream) {
+  return envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
+}
+
+envoy_dynamic_module_type_on_http_filter_request_body_status
+envoy_dynamic_module_on_http_filter_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream) {
+  return envoy_dynamic_module_type_on_http_filter_request_body_status_Continue;
+}
+
+envoy_dynamic_module_type_on_http_filter_request_trailers_status
+envoy_dynamic_module_on_http_filter_request_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr) {
+  return envoy_dynamic_module_type_on_http_filter_request_trailers_status_Continue;
+}
+
+envoy_dynamic_module_type_on_http_filter_response_headers_status
+envoy_dynamic_module_on_http_filter_response_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream) {
+  return envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue;
+}
+
+envoy_dynamic_module_type_on_http_filter_response_body_status
+envoy_dynamic_module_on_http_filter_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream) {
+  return envoy_dynamic_module_type_on_http_filter_response_body_status_Continue;
+}

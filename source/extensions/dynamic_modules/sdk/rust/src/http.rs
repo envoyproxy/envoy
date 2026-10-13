@@ -1,0 +1,5509 @@
+use crate::abi::envoy_dynamic_module_type_metrics_result;
+use crate::buffer::{EnvoyBuffer, EnvoyMutBuffer};
+use crate::utility::HeaderPairSlice;
+use crate::{
+  abi, bytes_to_module_buffer, ffi_export, str_to_module_buffer, strs_to_module_buffers,
+  ClusterHostCount, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId,
+  EnvoyGenericSecretId, EnvoyHistogramId, EnvoyHistogramVecId, NewHttpFilterConfigFunction,
+  NewHttpFilterPerRouteConfigFunction, TimingInfo, NEW_HTTP_FILTER_CONFIG_FUNCTION,
+  NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+};
+#[cfg(any(test, feature = "mock"))]
+use mockall::*;
+use std::any::Any;
+use std::ffi::c_void;
+use std::num::NonZero;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::rc::Rc;
+
+/// The trait that represents the configuration for an Envoy Http filter configuration.
+/// This has one to one mapping with the [`EnvoyHttpFilterConfig`] object.
+///
+/// The object is created when the corresponding Envoy Http filter config is created, and it is
+/// dropped when the corresponding Envoy Http filter config is destroyed. Therefore, the
+/// implementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
+///
+/// Implementations must also be `Sync` since they are accessed from worker threads.
+pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
+  /// This is called from a worker thread when a HTTP filter chain is created for a new stream.
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    panic!("not implemented");
+  }
+
+  /// This is called when the new event is scheduled via the
+  /// [`EnvoyHttpFilterConfigScheduler::commit`] for this [`HttpFilterConfig`].
+  ///
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyHttpFilterConfigScheduler::commit`] to distinguish multiple scheduled events.
+  fn on_scheduled(&self, _event_id: u64) {}
+
+  /// This is called when an HTTP callout initiated via
+  /// [`EnvoyHttpFilterConfig::send_http_callout`] completes.
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `callout_id` is the opaque handle returned from
+  ///   [`EnvoyHttpFilterConfig::send_http_callout`].
+  /// * `result` indicates the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers.
+  /// * `response_body` is the response body chunks.
+  fn on_http_callout_done(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
+  }
+
+  /// This is called when response headers are received from an HTTP stream started via
+  /// [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_headers` is a list of key-value pairs of the response headers.
+  /// * `end_stream` indicates whether this is the final frame of the response.
+  fn on_http_stream_headers(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
+    _end_stream: bool,
+  ) {
+  }
+
+  /// This is called when response data is received from an HTTP stream started via
+  /// [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_data` is the response body data chunks.
+  /// * `end_stream` indicates whether this is the final frame of the response.
+  fn on_http_stream_data(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _response_data: &[EnvoyBuffer],
+    _end_stream: bool,
+  ) {
+  }
+
+  /// This is called when response trailers are received from an HTTP stream started via
+  /// [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_trailers` is a list of key-value pairs of the response trailers.
+  fn on_http_stream_trailers(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _response_trailers: &[(EnvoyBuffer, EnvoyBuffer)],
+  ) {
+  }
+
+  /// This is called when an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`]
+  /// completes successfully.
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
+  fn on_http_stream_complete(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+  ) {
+  }
+
+  /// This is called when an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`]
+  /// is reset (failed or cancelled).
+  ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
+  /// * `reset_reason` indicates why the stream was reset.
+  fn on_http_stream_reset(
+    &self,
+    _envoy_config: &mut EnvoyHttpFilterConfigImpl,
+    _stream_handle: u64,
+    _reset_reason: abi::envoy_dynamic_module_type_http_stream_reset_reason,
+  ) {
+  }
+}
+
+/// The trait that corresponds to an Envoy Http filter for each stream
+/// created via the [`HttpFilterConfig::new_http_filter`] method.
+///
+/// All the event hooks are called on the same thread as the one that the [`HttpFilter`] is created
+/// via the [`HttpFilterConfig::new_http_filter`] method. In other words, the [`HttpFilter`] object
+/// is thread-local.
+///
+/// The hooks take `&self`, not `&mut self`, because Envoy may synchronously re-enter this filter
+/// while a hook is still on the stack; two aliasing `&mut self` would be undefined behavior,
+/// whereas shared `&self` borrows coexist soundly. A filter that needs mutable state keeps it
+/// behind interior mutability (`Cell`/`RefCell`).
+///
+/// The response hooks (`on_response_headers`, `on_response_body`, `on_response_trailers`) and
+/// `on_stream_complete` can run for a stream whose request hooks never ran, for example an
+/// Envoy-generated local reply for a request that failed before reaching this filter. Such a
+/// stream has no per-stream state built during decode, so these hooks must not assume it exists.
+/// Keep per-stream state in an `Option` set from a request hook and treat `None` as the
+/// never-decoded case.
+///
+/// An implementation's `Drop` must not panic. A hook can end the stream, which makes Envoy release
+/// its reference to the filter while the hook is still running, so the filter is dropped as that
+/// hook returns; the SDK catches a panic from there, but a `Drop` that panics while another panic
+/// is already unwinding aborts the process.
+pub trait HttpFilter<EHF: EnvoyHttpFilter> {
+  /// This is called when the request headers are received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_headers_status`] to
+  /// indicate the status of the request headers processing.
+  fn on_request_headers(
+    &self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  /// This is called when the request body is received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_body_status`] to
+  /// indicate the status of the request body processing.
+  fn on_request_body(
+    &self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  /// This is called when the request trailers are received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status`] to
+  /// indicate the status of the request trailers processing.
+  fn on_request_trailers(
+    &self,
+    _envoy_filter: &mut EHF,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+    abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
+  }
+
+  /// This is called when the response headers are received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_headers_status`] to
+  /// indicate the status of the response headers processing.
+  fn on_response_headers(
+    &self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  /// This is called when the response body is received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_body_status`] to
+  /// indicate the status of the response body processing.
+  fn on_response_body(
+    &self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+  }
+
+  /// This is called when the response trailers are received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status`] to
+  /// indicate the status of the response trailers processing.
+  fn on_response_trailers(
+    &self,
+    _envoy_filter: &mut EHF,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+    abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
+  }
+
+  /// This is called when the stream is complete.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  ///
+  /// This is called before this [`HttpFilter`] object is dropped and access logs are flushed.
+  fn on_stream_complete(&self, _envoy_filter: &mut EHF) {}
+
+  /// This is called when the HTTP callout is done.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `callout_id` is the ID of the callout that was done.
+  /// * `result` indicates the result of the callout.
+  /// * `response_headers` is a list of key-value pairs of the response headers. This is optional.
+  /// * `response_body` is the response body. This is optional.
+  fn on_http_callout_done(
+    &self,
+    _envoy_filter: &mut EHF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    _response_body: Option<&[EnvoyBuffer]>,
+  ) {
+  }
+
+  /// This is called when response headers are received from an HTTP stream callout.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_headers` is a list of key-value pairs of the response headers.
+  /// * `end_stream` indicates whether this is the final frame of the response.
+  fn on_http_stream_headers(
+    &self,
+    _envoy_filter: &mut EHF,
+    _stream_handle: u64,
+    _response_headers: &[(EnvoyBuffer, EnvoyBuffer)],
+    _end_stream: bool,
+  ) {
+  }
+
+  /// This is called when response data is received from an HTTP stream callout.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_data` is the response body data chunks.
+  /// * `end_stream` indicates whether this is the final frame of the response.
+  fn on_http_stream_data(
+    &self,
+    _envoy_filter: &mut EHF,
+    _stream_handle: u64,
+    _response_data: &[EnvoyBuffer],
+    _end_stream: bool,
+  ) {
+  }
+
+  /// This is called when response trailers are received from an HTTP stream callout.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream.
+  /// * `response_trailers` is a list of key-value pairs of the response trailers.
+  fn on_http_stream_trailers(
+    &self,
+    _envoy_filter: &mut EHF,
+    _stream_handle: u64,
+    _response_trailers: &[(EnvoyBuffer, EnvoyBuffer)],
+  ) {
+  }
+
+  /// This is called when an HTTP stream callout completes successfully.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
+  fn on_http_stream_complete(&self, _envoy_filter: &mut EHF, _stream_handle: u64) {}
+
+  /// This is called when an HTTP stream callout is reset (failed or cancelled).
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
+  /// * `reset_reason` indicates why the stream was reset.
+  fn on_http_stream_reset(
+    &self,
+    _envoy_filter: &mut EHF,
+    _stream_handle: u64,
+    _reset_reason: abi::envoy_dynamic_module_type_http_stream_reset_reason,
+  ) {
+  }
+
+  /// This is called when the new event is scheduled via the [`EnvoyHttpFilterScheduler::commit`]
+  /// for this [`HttpFilter`].
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyHttpFilterScheduler::commit`] to distinguish multiple scheduled events.
+  ///
+  /// See [`EnvoyHttpFilter::new_scheduler`] for more details on how to use this.
+  fn on_scheduled(&self, _envoy_filter: &mut EHF, _event_id: u64) {}
+
+  /// This is called when the downstream buffer size goes above the high watermark for a
+  /// terminal filter.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  fn on_downstream_above_write_buffer_high_watermark(&self, _envoy_filter: &mut EHF) {}
+
+  /// This is called when the downstream buffer size goes below the low watermark for a
+  /// terminal filter.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  fn on_downstream_below_write_buffer_low_watermark(&self, _envoy_filter: &mut EHF) {}
+
+  /// This is called when a local reply (error response) is being sent to the downstream.
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `response_code` is the HTTP status code of the local reply.
+  /// * `body` is the body content of the local reply.
+  /// * `details` is the response code details string.
+  ///
+  /// Returns the action to take after the local reply hook completes:
+  /// - Continue: Send the local reply as normal.
+  /// - ContinueAndResetStream: Reset the stream instead of sending the local reply.
+  fn on_local_reply(
+    &self,
+    _envoy_filter: &mut EHF,
+    _response_code: u32,
+    _details: EnvoyBuffer,
+    _reset_imminent: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_local_reply_status {
+    abi::envoy_dynamic_module_type_on_http_filter_local_reply_status::Continue
+  }
+}
+
+/// An opaque object that represents the underlying Envoy Http filter config. This has one to one
+/// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
+pub trait EnvoyHttpFilterConfig {
+  /// Define a new counter scoped to this filter config with the given name.
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result>;
+
+  // Define a new counter vec scoped to this filter config with the given name.
+  fn define_counter_vec(
+    &mut self,
+    name: &str,
+    label_names: &[&str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge scoped to this filter config with the given name.
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge vec scoped to this filter config with the given name.
+  fn define_gauge_vec(
+    &mut self,
+    name: &str,
+    label_names: &[&str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram scoped to this filter config with the given name.
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram vec scoped to this filter config with the given name.
+  fn define_histogram_vec(
+    &mut self,
+    name: &str,
+    label_names: &[&str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Subscribe to a generic secret so that its value can later be read via
+  /// [`EnvoyHttpFilterConfig::get_generic_secret`] or [`EnvoyHttpFilter::get_generic_secret`].
+  ///
+  /// `name` is the name of the secret: for a static secret the name in the bootstrap
+  /// configuration, and for a dynamic secret the resource name requested from the SDS server.
+  ///
+  /// `sds_config_source` is the JSON serialized `envoy.config.core.v3.ConfigSource` describing where
+  /// to fetch the secret from, so that the value is updated whenever the SDS server pushes a new
+  /// version. Pass `None` to look the name up among the statically configured secrets instead.
+  ///
+  /// This can only be called while the filter config is being created, i.e. from
+  /// [`HttpFilterConfig`]'s constructor. Returns `None` if the secret cannot be subscribed to, for
+  /// example when the static secret does not exist or `sds_config_source` is not a valid
+  /// `ConfigSource`.
+  fn subscribe_generic_secret(
+    &mut self,
+    name: &str,
+    sds_config_source: Option<&str>,
+  ) -> Option<EnvoyGenericSecretId>;
+
+  /// Get the current value of a previously subscribed generic secret from the config context.
+  ///
+  /// Unlike [`EnvoyHttpFilter::get_generic_secret`], this does not require a per-stream filter and
+  /// can be called outside of the request lifecycle, for example from a scheduled background task.
+  ///
+  /// Returns `None` if the id does not correspond to a subscribed secret. The value is empty when
+  /// the secret has been subscribed to but not yet delivered by the SDS server.
+  fn get_generic_secret(&self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'_>>;
+
+  /// Increment the counter with the given id from the config context.
+  ///
+  /// Unlike [`EnvoyHttpFilter::increment_counter`], this does not require a per-stream filter and
+  /// can be called outside of the request lifecycle, for example from a scheduled background task.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter vec with the given id from the config context.
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id from the config context.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge vec with the given id from the config context.
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id from the config context.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge vec with the given id from the config context.
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id from the config context.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge vec with the given id from the config context.
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id from the config context.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram vec with the given id from the config context.
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Create a new implementation of the [`EnvoyHttpFilterConfigScheduler`] trait.
+  ///
+  /// This can be used to schedule an event to the main thread where the filter config is running.
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler>;
+
+  /// Perform an HTTP callout from the config context. The result will be delivered to
+  /// [`HttpFilterConfig::on_http_callout_done`].
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: &'a [(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
+
+  /// Start an HTTP stream from the config context. Events will be delivered to
+  /// [`HttpFilterConfig::on_http_stream_headers`], etc.
+  fn start_http_stream<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: &'a [(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    end_stream: bool,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64);
+
+  /// Send data on an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from
+  ///   [`EnvoyHttpFilterConfig::start_http_stream`].
+  unsafe fn send_http_stream_data(
+    &mut self,
+    stream_handle: u64,
+    data: &[u8],
+    end_stream: bool,
+  ) -> bool;
+
+  /// Send trailers on an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from
+  ///   [`EnvoyHttpFilterConfig::start_http_stream`].
+  unsafe fn send_http_stream_trailers<'a>(
+    &mut self,
+    stream_handle: u64,
+    trailers: &'a [(&'a str, &'a [u8])],
+  ) -> bool;
+
+  /// Reset an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from
+  ///   [`EnvoyHttpFilterConfig::start_http_stream`].
+  unsafe fn reset_http_stream(&mut self, stream_handle: u64);
+}
+
+pub struct EnvoyHttpFilterConfigImpl {
+  pub(crate) raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+}
+
+impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_counter(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterId(id))
+  }
+
+  fn define_counter_vec(
+    &mut self,
+    name: &str,
+    label_names: &[&str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result> {
+    let mut label_names = strs_to_module_buffers(label_names);
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_counter(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+        label_names.as_mut_ptr(),
+        label_names.len(),
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterVecId(id))
+  }
+
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_gauge(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeId(id))
+  }
+
+  fn define_gauge_vec(
+    &mut self,
+    name: &str,
+    label_names: &[&str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result> {
+    let mut label_names = strs_to_module_buffers(label_names);
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_gauge(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+        label_names.as_mut_ptr(),
+        label_names.len(),
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeVecId(id))
+  }
+
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result> {
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_histogram(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+        std::ptr::null_mut(),
+        0,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramId(id))
+  }
+
+  fn define_histogram_vec(
+    &mut self,
+    name: &str,
+    label_names: &[&str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result> {
+    let mut label_names = strs_to_module_buffers(label_names);
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_histogram(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+        label_names.as_mut_ptr(),
+        label_names.len(),
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramVecId(id))
+  }
+
+  fn subscribe_generic_secret(
+    &mut self,
+    name: &str,
+    sds_config_source: Option<&str>,
+  ) -> Option<EnvoyGenericSecretId> {
+    let id = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe(
+        self.raw_ptr,
+        str_to_module_buffer(name),
+        // An empty buffer tells Envoy to resolve the name as a static secret.
+        sds_config_source.map_or_else(|| bytes_to_module_buffer(&[]), str_to_module_buffer),
+      )
+    };
+    // 0 is reserved to signal that the subscription could not be created.
+    if id == 0 {
+      None
+    } else {
+      Some(EnvoyGenericSecretId(id))
+    }
+  }
+
+  fn get_generic_secret(&self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'_>> {
+    let EnvoyGenericSecretId(id) = id;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_get_generic_secret(
+        self.raw_ptr,
+        id,
+        &mut result as *mut _,
+      )
+    };
+    if !success {
+      return None;
+    }
+    // Safety: Envoy owns the buffer and keeps it alive until the module returns from the current
+    // event hook, which outlives the borrow of `self`.
+    Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_counter(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_counter(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_increment_gauge(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_decrement_gauge(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_set_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_set_gauge(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_record_histogram_value(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterConfigScheduler> {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_http_filter_config_scheduler_new(self.raw_ptr);
+      Box::new(EnvoyHttpFilterConfigSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      })
+    }
+  }
+
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: &'a [(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let mut callout_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_http_callout(
+        self.raw_ptr,
+        &mut callout_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        headers_ptr as *const _ as *mut _,
+        headers_len,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        timeout_milliseconds,
+      )
+    };
+
+    (result, callout_id)
+  }
+
+  fn start_http_stream<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: &'a [(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    end_stream: bool,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let mut stream_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_start_http_stream(
+        self.raw_ptr,
+        &mut stream_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        headers_ptr as *const _ as *mut _,
+        headers_len,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        end_stream,
+        timeout_milliseconds,
+      )
+    };
+
+    (result, stream_id)
+  }
+
+  unsafe fn send_http_stream_data(
+    &mut self,
+    stream_handle: u64,
+    data: &[u8],
+    end_stream: bool,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_stream_send_data(
+        self.raw_ptr,
+        stream_handle,
+        bytes_to_module_buffer(data),
+        end_stream,
+      )
+    }
+  }
+
+  unsafe fn send_http_stream_trailers<'a>(
+    &mut self,
+    stream_handle: u64,
+    trailers: &'a [(&'a str, &'a [u8])],
+  ) -> bool {
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
+        self.raw_ptr,
+        stream_handle,
+        trailers_ptr as *const _ as *mut _,
+        trailers_len,
+      )
+    }
+  }
+
+  unsafe fn reset_http_stream(&mut self, stream_handle: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_reset_http_stream(
+        self.raw_ptr,
+        stream_handle,
+      );
+    }
+  }
+}
+/// An opaque object that represents the underlying Envoy Http filter. This has one to one
+/// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
+///
+/// The Envoy filter object is inherently not thread-safe, and it is always recommended to
+/// access it from the same thread as the one that [`HttpFilter`] event hooks are called.
+#[cfg_attr(any(test, feature = "mock"), automock)]
+#[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
+pub trait EnvoyHttpFilter {
+  /// Get the value of the request header with the given key.
+  /// If the header is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use
+  /// [`EnvoyHttpFilter::get_request_header_values`] variant.
+  fn get_request_header_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the values of the request header with the given key.
+  ///
+  /// If the header is not found, this returns an empty vector.
+  fn get_request_header_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get all request headers.
+  ///
+  /// Returns a list of key-value pairs of the request headers.
+  /// If there are no headers or headers are not available, this returns an empty list.
+  fn get_request_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
+
+  /// Set the request header with the given key and value.
+  ///
+  /// This will overwrite the existing value if the header is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and
+  /// set the new value.
+  ///
+  /// Returns true if the header is set successfully.
+  fn set_request_header(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Add a new request header with the given key and value.
+  ///
+  /// This will add a new header even if the header with the same key already exists.
+  ///
+  /// Returns true if the header is added successfully.
+  fn add_request_header(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Remove the request header with the given key.
+  ///
+  /// Returns true if the header is removed successfully.
+  fn remove_request_header(&mut self, key: &str) -> bool;
+
+  /// Get the value of the request trailer with the given key.
+  /// If the trailer is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use
+  /// [`EnvoyHttpFilter::get_request_trailer_values`] variant.
+  fn get_request_trailer_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the values of the request trailer with the given key.
+  ///
+  /// If the trailer is not found, this returns an empty vector.
+  fn get_request_trailer_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get all request trailers.
+  ///
+  /// Returns a list of key-value pairs of the request trailers.
+  /// If there are no trailers or trailers are not available, this returns an empty list.
+  fn get_request_trailers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
+
+  /// Set the request trailer with the given key and value.
+  ///
+  /// This will overwrite the existing value if the trailer is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and
+  /// set the new value.
+  ///
+  /// Returns true if the trailer is set successfully.
+  fn set_request_trailer(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Add a new request trailer with the given key and value.
+  ///
+  /// This will add a new trailer even if the trailer with the same key already exists.
+  ///
+  /// Returns true if the trailer is added successfully.
+  fn add_request_trailer(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Remove the request trailer with the given key.
+  ///
+  /// Returns true if the trailer is removed successfully.
+  fn remove_request_trailer(&mut self, key: &str) -> bool;
+
+  /// Get the value of the response header with the given key.
+  /// If the header is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use
+  /// [`EnvoyHttpFilter::get_response_header_values`] variant.
+  fn get_response_header_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the values of the response header with the given key.
+  ///
+  /// If the header is not found, this returns an empty vector.
+  fn get_response_header_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get all response headers.
+  ///
+  /// Returns a list of key-value pairs of the response headers.
+  /// If there are no headers or headers are not available, this returns an empty list.
+  fn get_response_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
+
+  /// Set the response header with the given key and value.
+  ///
+  /// This will overwrite the existing value if the header is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and
+  /// set the new value.
+  ///
+  /// Returns true if the header is set successfully.
+  fn set_response_header(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Add a new response header with the given key and value.
+  ///
+  /// This will add a new header even if the header with the same key already exists.
+  ///
+  /// Returns true if the header is added successfully.
+  fn add_response_header(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Remove the response header with the given key.
+  ///
+  /// Returns true if the header is removed successfully.
+  fn remove_response_header(&mut self, key: &str) -> bool;
+
+  /// Get the value of the response trailer with the given key.
+  /// If the trailer is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use
+  /// [`EnvoyHttpFilter::get_response_trailer_values`] variant.
+  fn get_response_trailer_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the values of the response trailer with the given key.
+  ///
+  /// If the trailer is not found, this returns an empty vector.
+  fn get_response_trailer_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
+  /// Get all response trailers.
+  ///
+  /// Returns a list of key-value pairs of the response trailers.
+  /// If there are no trailers or trailers are not available, this returns an empty list.
+  fn get_response_trailers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
+
+  /// Set the response trailer with the given key and value.
+  ///
+  /// This will overwrite the existing value if the trailer is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and
+  /// set the new value.
+  ///
+  /// Returns true if the operation is successful.
+  fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Add a new response trailer with the given key and value.
+  ///
+  /// This will add a new trailer even if the trailer with the same key already exists.
+  ///
+  /// Returns true if the trailer is added successfully.
+  fn add_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Remove the response trailer with the given key.
+  ///
+  /// Returns true if the trailer is removed successfully.
+  fn remove_response_trailer(&mut self, key: &str) -> bool;
+
+  /// Send a response to the downstream with the given status code, headers, and body.
+  ///
+  /// The headers are passed as a list of key-value pairs.
+  fn send_response<'a>(
+    &mut self,
+    status_code: u32,
+    headers: &'a [(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    details: Option<&'a str>,
+  );
+
+  /// Send response headers to the downstream, optionally indicating end of stream.
+  /// Necessary pseudo headers such as :status should be present.
+  ///
+  /// The headers are passed as a list of key-value pairs.
+  fn send_response_headers<'a>(&mut self, headers: &'a [(&'a str, &'a [u8])], end_stream: bool);
+
+  /// Send response body data to the downstream, optionally indicating end of stream.
+  fn send_response_data<'a>(&mut self, body: &'a [u8], end_stream: bool);
+
+  /// Send response trailers to the downstream. This implicitly ends the stream.
+  ///
+  /// The trailers are passed as a list of key-value pairs.
+  fn send_response_trailers<'a>(&mut self, trailers: &'a [(&'a str, &'a [u8])]);
+
+  /// add a custom flag to indicate a noteworthy event of this stream. Mutliple flags could be added
+  /// and will be concatenated with comma. It should not contain any empty or space characters (' ',
+  /// '\t', '\f', '\v', '\n', '\r'). to the HTTP stream. The flag can later be used in logging or
+  /// metrics. Ideally, it should be a very short string that represents a single event, like the
+  /// the Envoy response flag.
+  fn add_custom_flag(&mut self, flag: &str);
+
+  /// Get the number-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
+  fn get_metadata_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<f64>;
+
+  /// Set the number-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64);
+
+  /// Get the string-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
+  fn get_metadata_string<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Set the string-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  ///
+  /// Returns true if the operation is successful.
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str);
+
+  /// Set the dynamic metadata value with the given namespace and key to raw bytes.
+  ///
+  /// The bytes are stored as the metadata value as is, so non-UTF-8 values are preserved. Read
+  /// them back with [`Self::get_metadata_string`].
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]);
+
+  /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
+  ///
+  /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
+  /// namespace and merges into the metadata struct only once. Existing entries with the same key
+  /// are overwritten. Within `entries`, a later entry overwrites an earlier one with the same key.
+  /// An empty `entries` is a no-op and does not create the namespace.
+  fn set_dynamic_metadata_string_batch<'a>(
+    &mut self,
+    namespace: &'a str,
+    entries: &'a [(&'a str, &'a str)],
+  );
+
+  /// Set an entire dynamic metadata namespace from a serialized `google.protobuf.Struct`.
+  /// The struct is merged into the namespace and existing entries with the same key are
+  /// overwritten. A buffer that does not parse as a `google.protobuf.Struct` is a no-op.
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]);
+
+  /// Set an entire typed dynamic metadata namespace from a serialized `google.protobuf.Any`.
+  /// The Any is merged into the namespace's `typed_filter_metadata` entry. A buffer that does not
+  /// parse as a `google.protobuf.Any` is a no-op.
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]);
+
+  /// Get the type URL and serialized message payload of typed metadata from the selected source.
+  /// The returned buffers are valid until the end of the current event hook unless a setter
+  /// modifies the metadata. Empty fields are valid results.
+  /// Returns `None` when the namespace or metadata source is unavailable.
+  fn get_typed_metadata<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
+
+  /// Get the bool-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
+  fn get_metadata_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<bool>;
+
+  /// Set the bool-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  fn set_dynamic_metadata_bool(&mut self, namespace: &str, key: &str, value: bool);
+
+  /// Get all keys in the given metadata namespace.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns a vector of `EnvoyBuffer` representing the key names,
+  /// or `None` if the namespace is not found.
+  fn get_metadata_keys<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<Vec<EnvoyBuffer<'a>>>;
+
+  /// Get all namespace names in the metadata.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns a vector of `EnvoyBuffer` representing the namespace names,
+  /// or `None` if no namespaces exist.
+  fn get_metadata_namespaces<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+  ) -> Option<Vec<EnvoyBuffer<'a>>>;
+
+  /// Append a number value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Append a string value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Append a bool value to the dynamic metadata list stored under the given namespace and key.
+  /// If the key does not exist, a new list is created. If the key exists but is not a list,
+  /// or if the metadata is not accessible, this returns false.
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool;
+
+  /// Get the number of elements in the metadata list stored under the given namespace and key.
+  /// Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// or the value is not a list.
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize>;
+
+  /// Get the number value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a number.
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64>;
+
+  /// Get the string value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a string.
+  ///
+  /// The returned buffer's lifetime is tied to the current event hook.
+  fn get_metadata_list_string<'a>(
+    &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the bool value at the given index in the metadata list stored under the given namespace
+  /// and key. Use the `source` parameter to specify which metadata to use.
+  /// Returns `None` if the metadata is not accessible, the namespace or key does not exist,
+  /// the value is not a list, the index is out of range, or the element is not a bool.
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool>;
+
+  /// Get the bytes-typed filter state value with the given key.
+  /// If the filter state is not found or is the wrong type, this returns `None`.
+  fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Set the bytes-typed filter state value with the given key.
+  /// If the filter state is not found, this will create a new filter state.
+  ///
+  /// Returns true if the operation is successful.
+  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Set the bytes-typed filter state value with the given key, lifespan, and upstream sharing
+  /// options. If the filter state is not found, this will create a new filter state.
+  ///
+  /// Returns true if the operation is successful.
+  fn set_filter_state_value(
+    &mut self,
+    key: &[u8],
+    value: &[u8],
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+    stream_sharing: abi::envoy_dynamic_module_type_filter_state_stream_sharing,
+  ) -> bool;
+
+  /// Set a typed filter state value with the given key. The value is deserialized by a
+  /// registered `StreamInfo::FilterState::ObjectFactory` on the Envoy side. This is useful for
+  /// setting filter state objects that other Envoy filters expect to read as specific C++ types
+  /// (e.g., `PerConnectionCluster` used by TCP Proxy).
+  ///
+  /// Returns true if the operation is successful. This can fail if no ObjectFactory is registered
+  /// for the key, if deserialization fails, or if the key already exists and is read-only.
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Get the serialized value of a typed filter state object with the given key. The object must
+  /// support `serializeAsString()` on the Envoy side.
+  ///
+  /// Returns None if the key does not exist, the object does not support serialization, or the
+  /// filter state is not accessible.
+  fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Check whether a filter state entry with the given key exists, regardless of its type. Unlike
+  /// the getter methods, this does not read or serialize the stored object.
+  fn has_filter_state(&self, key: &[u8]) -> bool;
+
+  /// Store an opaque, module-owned object in the filter state under `key`. Envoy never interprets
+  /// the object; it calls `destructor` exactly once when the entry is destroyed. Objects stored at
+  /// `Request` or `Connection` lifespan survive `recreate_stream`; `FilterChain` objects do not.
+  ///
+  /// Typical use: `Box::into_raw(Box::new(state)) as *mut c_void`, with a destructor that calls
+  /// `drop(Box::from_raw(ptr as *mut State))`. The module must only recover the object via
+  /// [`EnvoyHttpFilter::get_filter_state_object`] and never free it itself.
+  ///
+  /// Ownership transfers to Envoy on every path: the destructor runs exactly once, either when the
+  /// entry is destroyed or before this returns `false`, so a failed store never leaks the object.
+  ///
+  /// Returns true if stored. Returns false, after running the destructor, if the filter state is
+  /// not accessible or the key already holds an entry at a different `life_span`.
+  ///
+  /// # Safety
+  ///
+  /// `object` must be a valid pointer that `destructor` can free, and `destructor` must free it
+  /// without unwinding: it runs on the teardown path, and a panic crossing the FFI boundary is
+  /// undefined behavior. Use an `extern "C"` destructor, which aborts rather than unwinds.
+  unsafe fn set_filter_state_object(
+    &mut self,
+    key: &[u8],
+    object: *mut c_void,
+    destructor: extern "C" fn(*mut c_void),
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  ) -> bool;
+
+  /// Borrow the opaque object previously stored under `key`, or `None` if absent. Ownership stays
+  /// with Envoy; the module must not free the returned pointer.
+  ///
+  /// The pointer is valid only on the worker thread owning the stream, and only until the entry is
+  /// destroyed or overwritten. It is shared: the rebuilt filter after a `recreate_stream`, or
+  /// another filter on the same stream, can hold it too, so the module must synchronize any
+  /// interior mutability through it.
+  fn get_filter_state_object(&self, key: &[u8]) -> Option<*mut c_void>;
+
+  /// Get the received request body (the request body pieces received in the latest event).
+  /// This should only be used in the [`HttpFilter::on_request_body`] callback.
+  ///
+  /// The body is represented as a list of [`EnvoyBuffer`].
+  /// Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be modified in place.
+  /// However, the vector itself is a "copied view". For example, adding or removing
+  /// [`EnvoyBuffer`] from the vector has no effect on the underlying Envoy buffer. To write beyond
+  /// the end of the buffer, use [`EnvoyHttpFilter::append_received_request_body`]. To remove data
+  /// from the buffer, use [`EnvoyHttpFilter::drain_received_request_body`].
+  ///
+  /// To write completely new data, use [`EnvoyHttpFilter::drain_received_request_body`] for the
+  /// size of the buffer, and then use [`EnvoyHttpFilter::append_received_request_body`] to write
+  /// the new data.
+  ///
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  ///
+  /// // This is the test setup.
+  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// // Mutable static storage is used for the test to simulate the response body operation.
+  /// static mut BUFFER: [u8; 10] = *b"helloworld";
+  /// envoy_filter
+  ///   .expect_get_received_request_body()
+  ///   .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
+  /// envoy_filter
+  ///   .expect_drain_received_request_body()
+  ///   .return_const(true);
+  ///
+  ///
+  /// // Calculate the size of the new received request body in bytes.
+  /// let buffers = envoy_filter.get_received_request_body().unwrap();
+  /// let mut size = 0;
+  /// for buffer in &buffers {
+  ///   size += buffer.as_slice().len();
+  /// }
+  /// assert_eq!(size, 10);
+  ///
+  /// // drain the new received request body.
+  /// assert!(envoy_filter.drain_received_request_body(10));
+  ///
+  /// // Now start writing new data from the beginning of the request body.
+  /// ```
+  ///
+  /// This returns None if the request body is not available.
+  fn get_received_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
+
+  /// Similar to [`EnvoyHttpFilter::get_received_request_body`], but returns the buffered request
+  /// body (the request body pieces buffered so far in the filter chain).
+  fn get_buffered_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
+
+  /// Get the size of the received request body in bytes.
+  /// This should only be used in the [`HttpFilter::on_request_body`] callback.
+  ///
+  /// Returns None if the request body is not available.
+  fn get_received_request_body_size(&mut self) -> usize;
+
+  /// Similar to [`EnvoyHttpFilter::get_received_request_body_size`], but returns the size of the
+  /// buffered request body in bytes.
+  fn get_buffered_request_body_size(&mut self) -> usize;
+
+  /// Drain the given number of bytes from the front of the received request body.
+  /// This should only be used in the [`HttpFilter::on_request_body`] callback.
+  ///
+  /// Returns false if the request body is not available.
+  ///
+  /// Note that after changing the request body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn drain_received_request_body(&mut self, number_of_bytes: usize) -> bool;
+
+  /// Similar to [`EnvoyHttpFilter::drain_received_request_body`], but drains from the buffered
+  /// request body.
+  ///
+  /// This method should only be used by the final data-processing filter in the chain.
+  /// In other words, a filter may safely modify the buffered body only if no later filters
+  /// in the chain have accessed it yet.
+  ///
+  /// Returns false if the request body is not available.
+  /// Note that after changing the request body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn drain_buffered_request_body(&mut self, number_of_bytes: usize) -> bool;
+
+  /// Append the given data to the end of the received request body.
+  /// This should only be used in the [`HttpFilter::on_request_body`] callback.
+  ///
+  /// Returns false if the request body is not available.
+  ///
+  /// Note that after changing the request body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn append_received_request_body(&mut self, data: &[u8]) -> bool;
+
+  /// Similar to [`EnvoyHttpFilter::append_received_request_body`], but appends to the buffered
+  /// request body.
+  ///
+  /// This method should only be used by the final data-processing filter in the chain.
+  /// In other words, a filter may safely modify the buffered body only if no later filters
+  /// in the chain have accessed it yet.
+  ///
+  /// Returns false if the request body is not available.
+  /// Note that after changing the request body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn append_buffered_request_body(&mut self, data: &[u8]) -> bool;
+
+  /// Get the received response body (the response body pieces received in the latest event).
+  /// This should only be used in the [`HttpFilter::on_response_body`] callback.
+  ///
+  /// The body is represented as a list of
+  /// [`EnvoyBuffer`]. Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be
+  /// modified in place. However, the buffer itself is immutable. For example, adding or removing
+  /// [`EnvoyBuffer`] from the vector has no effect on the underlying Envoy buffer. To write the
+  /// contents by changing its length, use [`EnvoyHttpFilter::drain_received_response_body`] or
+  /// [`EnvoyHttpFilter::append_received_response_body`].
+  ///
+  /// To write completely new data, use [`EnvoyHttpFilter::drain_received_response_body`] for the
+  /// size of the buffer, and then use [`EnvoyHttpFilter::append_received_response_body`] to write
+  /// the new data.
+  ///
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  ///
+  /// // This is the test setup.
+  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// // Mutable static storage is used for the test to simulate the response body operation.
+  /// static mut BUFFER: [u8; 10] = *b"helloworld";
+  /// envoy_filter
+  ///   .expect_get_received_response_body()
+  ///   .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
+  /// envoy_filter
+  ///   .expect_drain_received_response_body()
+  ///   .return_const(true);
+  ///
+  ///
+  /// // Calculate the size of the received response body in bytes.
+  /// let buffers = envoy_filter.get_received_response_body().unwrap();
+  /// let mut size = 0;
+  /// for buffer in &buffers {
+  ///   size += buffer.as_slice().len();
+  /// }
+  /// assert_eq!(size, 10);
+  ///
+  /// // drain the received response body.
+  /// assert!(envoy_filter.drain_received_response_body(10));
+  ///
+  /// // Now start writing new data from the beginning of the request body.
+  /// ```
+  ///
+  /// Returns None if the response body is not available.
+  fn get_received_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
+
+  /// Similar to [`EnvoyHttpFilter::get_received_response_body`], but returns the buffered response
+  /// body (the response body pieces buffered so far in the filter chain).
+  fn get_buffered_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
+
+  /// Get the size of the received response body in bytes.
+  /// This should only be used in the [`HttpFilter::on_response_body`] callback.
+  ///
+  /// Returns zero if the response body is not available or empty.
+  fn get_received_response_body_size(&mut self) -> usize;
+
+  /// Similar to [`EnvoyHttpFilter::get_received_response_body_size`], but returns the size of the
+  /// buffered response body in bytes.
+  ///
+  /// Returns zero if the response body is not available or empty.
+  fn get_buffered_response_body_size(&mut self) -> usize;
+
+  /// Drain the given number of bytes from the front of the received response body.
+  /// This should only be used in the [`HttpFilter::on_response_body`] callback.
+  ///
+  /// Returns false if the response body is not available.
+  ///
+  /// Note that after changing the response body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn drain_received_response_body(&mut self, number_of_bytes: usize) -> bool;
+
+  /// Similar to [`EnvoyHttpFilter::drain_received_response_body`], but drains from the buffered
+  /// response body.
+  ///
+  /// This method should only be used by the final data-processing filter in the chain.
+  /// In other words, a filter may safely modify the buffered body only if no later filters
+  /// in the chain have accessed it yet.
+  ///
+  /// Returns false if the response body is not available.
+  /// Note that after changing the response body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn drain_buffered_response_body(&mut self, number_of_bytes: usize) -> bool;
+
+  /// Append the given data to the end of the received response body.
+  /// This should only be used in the [`HttpFilter::on_response_body`] callback.
+  ///
+  /// Returns false if the response body is not available.
+  ///
+  /// Note that after changing the response body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn append_received_response_body(&mut self, data: &[u8]) -> bool;
+
+  /// Similar to [`EnvoyHttpFilter::append_received_response_body`], but appends to the buffered
+  /// response body.
+  ///
+  /// This method should only be used by the final data-processing filter in the chain.
+  /// In other words, a filter may safely modify the buffered body only if no later filters
+  /// in the chain have accessed it yet.
+  ///
+  /// Returns false if the response body is not available.
+  /// Note that after changing the response body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn append_buffered_response_body(&mut self, data: &[u8]) -> bool;
+
+  /// Returns true if the latest received request body is the previously buffered request body.
+  ///
+  /// This is true when a previous filter in the chain stopped and buffered the request body,
+  /// then resumed, and this filter is now receiving that buffered body.
+  ///
+  /// NOTE: This is only meaningful inside [`HttpFilter::on_request_body`].
+  fn received_buffered_request_body(&mut self) -> bool;
+
+  /// Returns true if the latest received response body is the previously buffered response body.
+  ///
+  /// This is true when a previous filter in the chain stopped and buffered the response body,
+  /// then resumed, and this filter is now receiving that buffered body.
+  ///
+  /// NOTE: This is only meaningful inside [`HttpFilter::on_response_body`].
+  fn received_buffered_response_body(&mut self) -> bool;
+
+  /// Clear the route cache calculated during a previous phase of the filter chain.
+  ///
+  /// This is useful when the filter wants to force a re-evaluation of the route selection after
+  /// modifying the request headers, etc that affect the routing decision.
+  fn clear_route_cache(&mut self);
+
+  /// Get the value of the attribute with the given ID as a string.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_string<'a>(
+    &'a self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the value of the attribute with the given ID as an integer.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64>;
+
+  /// Get the value of the attribute with the given ID as a boolean.
+  ///
+  /// If the attribute is not found, not supported or is the wrong type, this returns `None`.
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool>;
+
+  /// Get a snapshot of the current stream timing information.
+  ///
+  /// Unavailable fields are `None` at the current event hook. See [`TimingInfo`] for units and
+  /// offset semantics.
+  fn get_timing_info(&self) -> TimingInfo;
+
+  /// Send an HTTP callout to the given cluster with the given headers and body.
+  /// Multiple callouts can be made from the same filter. Different callouts can be
+  /// distinguished by the returned callout id.
+  ///
+  /// Headers must contain the `:method`, ":path", and `host` headers.
+  ///
+  /// This returns the status and callout id of the callout. The id is used to
+  /// distinguish different callouts made from the same filter and is generated by Envoy.
+  /// The meaning of the status is:
+  ///
+  ///   * Success: The callout was sent successfully.
+  ///   * MissingRequiredHeaders: One of the required headers is missing: `:method`, `:path`, or
+  ///     `host`.
+  ///   * ClusterNotFound: The cluster with the given name was not found.
+  ///   * DuplicateCalloutId: The callout ID is already in use.
+  ///   * CouldNotCreateRequest: The request could not be created. This happens when, for example,
+  ///     there's no healthy upstream host in the cluster.
+  ///
+  /// The callout result will be delivered to the [`HttpFilter::on_http_callout_done`] method.
+  fn send_http_callout<'a>(
+    &mut self,
+    _cluster_name: &'a str,
+    _headers: &'a [(&'a str, &'a [u8])],
+    _body: Option<&'a [u8]>,
+    _timeout_milliseconds: u64,
+  ) -> (
+    abi::envoy_dynamic_module_type_http_callout_init_result,
+    u64, // callout handle
+  );
+
+  /// Start a streamable HTTP callout to the given cluster with the given headers and optional
+  /// body. Multiple concurrent streams can be created from the same filter.
+  ///
+  /// Headers must contain the `:method`, `:path`, and `host` headers.
+  ///
+  /// This returns a tuple of (status, stream_handle):
+  ///   * Success + valid stream_handle: The stream was started successfully.
+  ///   * MissingRequiredHeaders + null: One of the required headers is missing.
+  ///   * ClusterNotFound + null: The cluster with the given name was not found.
+  ///   * CannotCreateRequest + null: The stream could not be created (e.g., no healthy upstream).
+  ///
+  /// After starting the stream, use the returned stream_handle to send data/trailers or reset.
+  /// Stream events will be delivered to the [`HttpFilter::on_http_stream_*`] methods.
+  ///
+  /// When the HTTP stream ends (either successfully or via reset), no further callbacks will
+  /// be invoked for that stream.
+  fn start_http_stream<'a>(
+    &mut self,
+    _cluster_name: &'a str,
+    _headers: &'a [(&'a str, &'a [u8])],
+    _body: Option<&'a [u8]>,
+    _end_stream: bool,
+    _timeout_milliseconds: u64,
+  ) -> (
+    abi::envoy_dynamic_module_type_http_callout_init_result,
+    u64, // stream handle
+  );
+
+  /// Send data on an active HTTP stream.
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from [`EnvoyHttpFilter::start_http_stream`].
+  /// * `data` is the data to send.
+  /// * `end_stream` indicates whether this is the final frame of the request.
+  ///
+  /// Returns true if the data was sent successfully, false otherwise.
+  unsafe fn send_http_stream_data(
+    &mut self,
+    _stream_handle: u64,
+    _data: &[u8],
+    _end_stream: bool,
+  ) -> bool;
+
+  /// Send trailers on an active HTTP stream (implicitly ends the stream).
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from [`EnvoyHttpFilter::start_http_stream`].
+  /// * `trailers` is a list of key-value pairs for the trailers.
+  ///
+  /// Returns true if the trailers were sent successfully, false otherwise.
+  unsafe fn send_http_stream_trailers<'a>(
+    &mut self,
+    _stream_handle: u64,
+    _trailers: &'a [(&'a str, &'a [u8])],
+  ) -> bool;
+
+  /// Reset (cancel) an active HTTP stream.
+  ///
+  /// # Safety
+  ///
+  /// * `stream_handle` must be a valid handle returned from [`EnvoyHttpFilter::start_http_stream`].
+  ///
+  /// This will trigger the [`HttpFilter::on_http_stream_reset`] callback.
+  unsafe fn reset_http_stream(&mut self, _stream_handle: u64);
+
+  /// Get the most specific route configuration for the current route.
+  ///
+  /// Returns None if no per-route configuration is present on this route. Otherwise,
+  /// returns the most specific per-route configuration (i.e. the one most up along the config
+  /// hierarchy) created by the filter.
+  fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>>;
+
+  /// This can be called to continue the decoding of the HTTP request when the processing is
+  /// stopped.
+  ///
+  /// For example, this can be used inside the [`HttpFilter::on_http_callout_done`] or
+  /// [`HttpFilter::on_scheduled`] methods to continue the decoding of the request body
+  /// after the callout or scheduled event is done.
+  fn continue_decoding(&mut self);
+
+  /// This is exactly the same as [`EnvoyHttpFilter::continue_decoding`], but it is
+  /// used to continue the encoding of the HTTP response.
+  fn continue_encoding(&mut self);
+
+  /// Create a new implementation of the [`EnvoyHttpFilterScheduler`] trait.
+  ///
+  /// ## Example Usage
+  ///
+  /// ```
+  /// use abi::*;
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  /// use std::thread;
+  ///
+  /// struct TestFilter;
+  /// impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestFilter {
+  ///   fn on_request_headers(
+  ///     &self,
+  ///     envoy_filter: &mut EHF,
+  ///     _end_of_stream: bool,
+  ///   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+  ///     let scheduler = envoy_filter.new_scheduler();
+  ///     let _ = std::thread::spawn(move || {
+  ///       // Do some work in a separate thread.
+  ///       // ...
+  ///       // Then schedule the event to continue processing.
+  ///       scheduler.commit(12345);
+  ///     });
+  ///     // Stops the iteration and schedules the event from the separate thread.
+  ///     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  ///   }
+  ///   fn on_scheduled(&self, envoy_filter: &mut EHF, event_id: u64) {
+  ///     // The event_id should match the one we scheduled.
+  ///     assert_eq!(event_id, 12345);
+  ///     // Then we can continue processing the request.
+  ///     envoy_filter.continue_decoding();
+  ///   }
+  /// }
+  /// ```
+  fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static;
+
+  /// Get the current value of a generic secret subscribed to by the filter config via
+  /// [`EnvoyHttpFilterConfig::subscribe_generic_secret`].
+  ///
+  /// Returns `None` if the id does not correspond to a subscribed secret. The value is empty when
+  /// the secret has been subscribed to but not yet delivered by the SDS server.
+  ///
+  /// The returned buffer must not be retained across events: a secret rotation replaces the value
+  /// in between events on this worker thread. Copy the value if it needs to outlive the current
+  /// event hook.
+  fn get_generic_secret<'a>(&'a self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'a>>;
+
+  /// Increment the counter with the given id.
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter vec with the given id.
+  fn increment_counter_vec<'a>(
+    &self,
+    id: EnvoyCounterVecId,
+    label_values: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge with the given id.
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge vec with the given id.
+  fn increase_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge with the given id.
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge vec with the given id.
+  fn decrease_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge with the given id.
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge vec with the given id.
+  fn set_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram with the given id.
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram vec with the given id.
+  fn record_histogram_value_vec<'a>(
+    &self,
+    id: EnvoyHistogramVecId,
+    label_values: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Get the index of the current worker thread.
+  fn get_worker_index(&self) -> u32;
+
+  /// Set an integer socket option with the given level, name, state, and direction.
+  /// Direction specifies whether to apply to upstream (outgoing to backend) or
+  /// downstream (incoming from client) socket.
+  fn set_socket_option_int(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: i64,
+  ) -> bool;
+
+  /// Set a bytes socket option with the given level, name, state, and direction.
+  /// Direction specifies whether to apply to upstream (outgoing to backend) or
+  /// downstream (incoming from client) socket.
+  fn set_socket_option_bytes(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: &[u8],
+  ) -> bool;
+
+  /// Get an integer socket option value.
+  fn get_socket_option_int(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<i64>;
+
+  /// Get a bytes socket option value.
+  fn get_socket_option_bytes(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<Vec<u8>>;
+
+  // ------------------- Buffer limit methods -------------------------
+
+  /// Get the current buffer limit for body data.
+  ///
+  /// This is the maximum amount of data that can be buffered for body data before backpressure
+  /// is applied. A buffer limit of 0 bytes indicates no limits are applied.
+  fn get_buffer_limit(&self) -> u64;
+
+  /// Set the buffer limit for body data.
+  ///
+  /// This controls the maximum amount of data that can be buffered for body data before
+  /// backpressure is applied.
+  ///
+  /// It is recommended (but not required) that filters calling this function should generally
+  /// only perform increases to the buffer limit, to avoid potentially conflicting with the
+  /// buffer requirements of other filters in the chain. For example:
+  ///
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  ///
+  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// envoy_filter.expect_get_buffer_limit().return_const(0u64);
+  /// envoy_filter.expect_set_buffer_limit().return_const(());
+  /// let desired_limit: u64 = 1024;
+  /// if desired_limit > envoy_filter.get_buffer_limit() {
+  ///   envoy_filter.set_buffer_limit(desired_limit);
+  /// }
+  /// ```
+  fn set_buffer_limit(&mut self, limit: u64);
+
+  // ----------------------------- Tracing methods -----------------------------
+
+  /// Get the active tracing span for the current HTTP stream.
+  ///
+  /// Returns `Some(Box<dyn EnvoySpan>)` if tracing is enabled and a span is available,
+  /// otherwise returns `None`.
+  ///
+  /// The returned span can be used to add tags, logs, or spawn child spans.
+  /// The active span is managed by Envoy and should not be finished by the module.
+  ///
+  /// The span may be stored and used in a later event hook on the same worker thread. Do not use
+  /// the active span after the stream has ended and do not move a span to another thread.
+  fn get_active_span(&self) -> Option<Box<dyn EnvoySpan>>;
+
+  /// Create a child span from the active span with the given operation name.
+  ///
+  /// Returns `Some(Box<dyn EnvoyChildSpan>)` if the child span was created successfully,
+  /// otherwise returns `None`.
+  ///
+  /// The returned child span must be finished by calling [`EnvoyChildSpan::finish`]
+  /// when done. Failing to finish the span will result in incomplete trace data.
+  ///
+  /// The child span is owned by the module, so it may be stored and finished in a later event hook
+  /// on the same worker thread. This is how a span can cover off-thread work, by keeping it in the
+  /// filter and finishing it from [`HttpFilter::on_scheduled`]. Do not move a span to another
+  /// thread.
+  ///
+  /// ```
+  /// use abi::*;
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  /// use std::cell::RefCell;
+  ///
+  /// struct MyFilter {
+  ///   active_span: RefCell<Option<Box<dyn EnvoySpan>>>,
+  ///   child_span: RefCell<Option<Box<dyn EnvoyChildSpan>>>,
+  /// }
+  /// impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for MyFilter {
+  ///   fn on_request_headers(
+  ///     &self,
+  ///     envoy_filter: &mut EHF,
+  ///     _end_of_stream: bool,
+  ///   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+  ///     // Keep the active and child spans so on_scheduled can use them after off-thread work.
+  ///     *self.active_span.borrow_mut() = envoy_filter.get_active_span();
+  ///     *self.child_span.borrow_mut() = envoy_filter.spawn_child_span("off_thread_work");
+  ///     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  ///   }
+  ///   fn on_scheduled(&self, envoy_filter: &mut EHF, _event_id: u64) {
+  ///     if let Some(span) = self.active_span.borrow().as_ref() {
+  ///       span.set_tag("completed", "true");
+  ///     }
+  ///     if let Some(mut child) = self.child_span.borrow_mut().take() {
+  ///       child.finish();
+  ///     }
+  ///     envoy_filter.continue_decoding();
+  ///   }
+  /// }
+  /// ```
+  fn spawn_child_span(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>>;
+
+  // ------------------- Cluster/Upstream Information methods -------------------------
+
+  /// Get the name of the cluster that the current request is routed to.
+  ///
+  /// Returns `None` if no route has been selected yet or if the cluster information
+  /// is not available.
+  ///
+  /// This is useful for making routing decisions or for logging.
+  fn get_cluster_name<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get host counts for the cluster that the current request is routed to.
+  ///
+  /// Returns a tuple of (total_count, healthy_count, degraded_count) for the specified
+  /// priority level. Returns `None` if the cluster is not available or if the priority
+  /// level does not exist.
+  ///
+  /// This is useful for implementing scale-to-zero logic or custom load balancing decisions.
+  fn get_cluster_host_count(&self, priority: u32) -> Option<ClusterHostCount>;
+
+  /// Set the override host to be used by the upstream load balancer.
+  ///
+  /// If the target host exists in the host list of the routed cluster, this host should
+  /// be selected first. This is useful for implementing sticky sessions, host affinity,
+  /// or custom load balancing logic.
+  ///
+  /// * `host` - The host address to override (e.g., "10.0.0.1:8080"). Must be a valid IP address.
+  /// * `strict` - If true, the request will fail if the override host is not available. If false,
+  ///   normal load balancing will be used as a fallback.
+  ///
+  /// Returns `true` if the override was set successfully, `false` if the host address is invalid.
+  fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool;
+
+  /// Get the upstream connection ID, or `None` if not available.
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>>;
+
+  /// Get the remote address of the connected upstream socket, including the port.
+  ///
+  /// This can differ from
+  /// [`abi::envoy_dynamic_module_type_attribute_id::UpstreamAddress`], which exposes the selected
+  /// upstream host address.
+  ///
+  /// Returns `None` if the address is unavailable. The buffer is valid until the current event
+  /// hook returns.
+  fn get_upstream_remote_address<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the downstream socket peer address, including the port, before XFF processing.
+  ///
+  /// Returns `None` if the address is unavailable. The buffer is valid until the current event
+  /// hook returns.
+  fn get_downstream_direct_remote_address<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the upstream host addresses in attempt order.
+  ///
+  /// Returns an empty vector if upstream information is unavailable or no hosts were attempted.
+  /// The buffers are valid until the current event hook returns.
+  fn get_upstream_hosts_attempted<'a>(&'a self) -> Vec<EnvoyBuffer<'a>>;
+
+  /// Get the upstream connection IDs in attempt order.
+  ///
+  /// Returns an empty vector if upstream information is unavailable or no connections were
+  /// attempted.
+  fn get_upstream_connection_ids_attempted(&self) -> Vec<u64>;
+
+  // ------------------- Stream Control methods -------------------------
+
+  /// Reset the HTTP stream with the specified reason.
+  ///
+  /// This is useful for terminating the stream when an error condition is detected or when
+  /// the filter needs to abort processing.
+  ///
+  /// After calling this function, no further filter callbacks will be invoked for this stream
+  /// except for the destroy callback.
+  ///
+  /// * `reason` - The reason for resetting the stream.
+  /// * `details` - Details string explaining the reset reason. Can be empty.
+  fn reset_stream(
+    &mut self,
+    reason: abi::envoy_dynamic_module_type_http_filter_stream_reset_reason,
+    details: &str,
+  );
+
+  /// Attempt to send a GOAWAY frame to the downstream and close the connection.
+  ///
+  /// This is a connection-level operation that affects all streams on the connection. When called,
+  /// the current filter chain iteration is aborted immediately and no subsequent filters will be
+  /// invoked for the current callback. This effectively pauses all streams on the connection.
+  ///
+  /// # Protocol-specific behavior
+  ///
+  /// - **HTTP/2**: Sends an actual GOAWAY frame to notify the client that the connection is being
+  ///   closed and no new streams should be initiated.
+  /// - **HTTP/1**: Since HTTP/1 does not have a GOAWAY frame, the connection is closed directly.
+  ///   The `graceful` parameter still controls whether in-flight requests are allowed to complete.
+  ///
+  /// # Arguments
+  ///
+  /// * `graceful` - If true, initiates a graceful drain sequence that allows in-flight streams to
+  ///   complete before closing the connection. If false, sends GOAWAY (for HTTP/2) and closes the
+  ///   connection immediately.
+  ///
+  /// # Filter chain behavior
+  ///
+  /// Once called, the filter chain iteration is stopped and no further filters will process
+  /// the current request/response. The stream may still receive the `on_destroy` callback for
+  /// cleanup purposes.
+  ///
+  /// # Multiple calls
+  ///
+  /// Multiple calls to this method are safe and the operation is idempotent. Subsequent calls are
+  /// no-ops once the first call has been made.
+  fn send_go_away_and_close(&mut self, graceful: bool);
+
+  /// Recreate the HTTP stream, optionally with new headers.
+  ///
+  /// This is useful for implementing internal redirects or request retries.
+  ///
+  /// After calling this function successfully, the current filter chain will be destroyed and a new
+  /// stream will be created. The filter should return StopIteration from the current event hook.
+  ///
+  /// The filter itself stays valid until the hook returns, and the callbacks it makes after the
+  /// teardown are safe and do not affect the recreated stream.
+  ///
+  /// * `headers` - Optional list of new headers for the recreated stream. If None, the original
+  ///   headers will be reused.
+  ///
+  /// Returns `true` if the stream recreation was initiated successfully, `false` otherwise (e.g.,
+  /// if the request body has not been fully received yet or if the stream cannot be recreated).
+  fn recreate_stream<'a>(&mut self, headers: Option<&'a [(&'a str, &'a [u8])]>) -> bool;
+
+  /// Clear only the cluster selection for the current route without clearing the entire route
+  /// cache.
+  ///
+  /// This is a subset of [`EnvoyHttpFilter::clear_route_cache`]. Use this when a filter modifies
+  /// headers that affect cluster selection but not the route itself. This is more efficient than
+  /// clearing the entire route cache.
+  fn clear_route_cluster_cache(&mut self);
+}
+
+/// Trait representing a tracing span.
+///
+/// This trait provides methods to interact with a tracing span, such as setting tags,
+/// logging events, and spawning child spans.
+///
+/// The span is managed by Envoy and should not be finished by the module. A span may be stored and
+/// used in a later event hook on the same worker thread. Do not use a span after the stream has
+/// ended or move it to another thread.
+pub trait EnvoySpan {
+  /// Set a tag on this span.
+  ///
+  /// Tags are key-value pairs that provide metadata about the span.
+  fn set_tag(&self, key: &str, value: &str);
+
+  /// Set multiple tags on this span.
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    for (key, value) in tags {
+      self.set_tag(key, value);
+    }
+  }
+
+  /// Set the operation name on this span.
+  fn set_operation(&self, operation: &str);
+
+  /// Log an event on this span with the current timestamp.
+  fn log(&self, event: &str);
+
+  /// Override the sampling decision for this span.
+  ///
+  /// If sampled is false, this span and any subsequent child spans will not be
+  /// reported to the tracing system.
+  fn set_sampled(&self, sampled: bool);
+
+  /// Stop using the Envoy local tracing decision for this span.
+  ///
+  /// Combined with [`EnvoySpan::set_sampled`], this keeps a filter's sampling decision when Envoy
+  /// refreshes tracing after a route cache change. With the OpenTelemetry tracer the connection
+  /// manager does not re-derive the decision after a route cache change. Other tracers may not
+  /// support this.
+  fn disable_local_decision(&self);
+
+  /// Get a baggage value from this span.
+  ///
+  /// Baggage data may have been set by this span or any parent spans.
+  /// Returns `None` if the key was not found.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_baggage(&self, key: &str) -> Option<String>;
+
+  /// Set a baggage value on this span.
+  ///
+  /// All subsequent child spans will have access to this baggage.
+  fn set_baggage(&self, key: &str, value: &str);
+
+  /// Get the trace ID from this span.
+  ///
+  /// Returns `None` if the trace ID is not available.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_trace_id(&self) -> Option<String>;
+
+  /// Get the span ID from this span.
+  ///
+  /// Returns `None` if the span ID is not available.
+  ///
+  /// Note: The returned string is temporary and should be copied if needed
+  /// beyond immediate use.
+  fn get_span_id(&self) -> Option<String>;
+
+  /// Create a child span with the given operation name.
+  ///
+  /// The child span must be finished by calling [`EnvoyChildSpan::finish`] when done.
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>>;
+}
+
+/// Implementation of [`EnvoySpan`] that wraps the raw span pointer from Envoy.
+struct EnvoySpanImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_span_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+}
+
+impl EnvoySpan for EnvoySpanImpl {
+  fn set_tag(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    type TagPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: TagPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<TagPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
+        self.raw_ptr,
+        tags.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        tags.len(),
+      );
+    }
+  }
+
+  fn set_operation(&self, operation: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_operation(
+        self.raw_ptr,
+        str_to_module_buffer(operation),
+      );
+    }
+  }
+
+  fn log(&self, event: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_log(
+        self.filter_ptr,
+        self.raw_ptr,
+        str_to_module_buffer(event),
+      );
+    }
+  }
+
+  fn set_sampled(&self, sampled: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_sampled(self.raw_ptr, sampled);
+    }
+  }
+
+  fn disable_local_decision(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_disable_local_decision(self.raw_ptr);
+    }
+  }
+
+  fn get_baggage(&self, key: &str) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_baggage(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn set_baggage(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_baggage(
+        self.raw_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn get_trace_id(&self) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_trace_id(
+        self.raw_ptr,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn get_span_id(&self) -> Option<String> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_get_span_id(
+        self.raw_ptr,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
+      Some(String::from_utf8_lossy(slice).to_string())
+    } else {
+      None
+    }
+  }
+
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>> {
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.filter_ptr,
+        self.raw_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.filter_ptr,
+        finished: false,
+      }))
+    }
+  }
+}
+
+/// Trait representing a child tracing span created by the module.
+///
+/// Child spans are owned by the module and must be finished by calling
+/// [`EnvoyChildSpan::finish`] when done. A child span may be stored and finished in a later event
+/// hook on the same worker thread, for example to cover off-thread work. Do not move a span to
+/// another thread.
+pub trait EnvoyChildSpan {
+  /// Set a tag on this span.
+  fn set_tag(&self, key: &str, value: &str);
+
+  /// Set multiple tags on this span.
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    for (key, value) in tags {
+      self.set_tag(key, value);
+    }
+  }
+
+  /// Set the operation name on this span.
+  fn set_operation(&self, operation: &str);
+
+  /// Log an event on this span with the current timestamp.
+  fn log(&self, event: &str);
+
+  /// Override the sampling decision for this span.
+  fn set_sampled(&self, sampled: bool);
+
+  /// Set a baggage value on this span.
+  fn set_baggage(&self, key: &str, value: &str);
+
+  /// Create a child span from this span with the given operation name.
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>>;
+
+  /// Finish and release this span.
+  ///
+  /// After calling this method, the span is no longer valid and should not be used.
+  /// Note: This takes `&mut self` instead of `self` to maintain object-safety.
+  /// The implementation should ensure the span is not used after this call.
+  fn finish(&mut self);
+}
+
+/// Implementation of [`EnvoyChildSpan`] that wraps the raw span pointer.
+struct EnvoyChildSpanImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_child_span_module_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  finished: bool,
+}
+
+impl EnvoyChildSpan for EnvoyChildSpanImpl {
+  fn set_tag(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn set_tags(&self, tags: &[(&str, &str)]) {
+    type TagPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: TagPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<TagPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_tag_batch(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        tags.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        tags.len(),
+      );
+    }
+  }
+
+  fn set_operation(&self, operation: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_operation(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(operation),
+      );
+    }
+  }
+
+  fn log(&self, event: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_log(
+        self.filter_ptr,
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(event),
+      );
+    }
+  }
+
+  fn set_sampled(&self, sampled: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_sampled(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        sampled,
+      );
+    }
+  }
+
+  fn set_baggage(&self, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_span_set_baggage(
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      );
+    }
+  }
+
+  fn spawn_child(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>> {
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.filter_ptr,
+        self.raw_ptr as abi::envoy_dynamic_module_type_span_envoy_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.filter_ptr,
+        finished: false,
+      }))
+    }
+  }
+
+  fn finish(&mut self) {
+    if !self.finished {
+      unsafe {
+        abi::envoy_dynamic_module_callback_http_child_span_finish(self.raw_ptr);
+      }
+      self.finished = true;
+    }
+  }
+}
+
+impl Drop for EnvoyChildSpanImpl {
+  fn drop(&mut self) {
+    // If the span was not explicitly finished, finish it now.
+    if !self.finished {
+      unsafe {
+        abi::envoy_dynamic_module_callback_http_child_span_finish(self.raw_ptr);
+      }
+    }
+  }
+}
+
+/// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
+/// filter object.
+///
+/// This is not meant to be used directly.
+pub struct EnvoyHttpFilterImpl {
+  pub(crate) raw_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+}
+
+impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
+  fn get_request_header_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
+    )
+  }
+
+  fn get_request_header_values(&self, key: &str) -> Vec<EnvoyBuffer<'_>> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
+    )
+  }
+
+  fn get_request_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    self.get_headers_impl(abi::envoy_dynamic_module_type_http_header_type::RequestHeader)
+  }
+
+  fn set_request_header(&mut self, key: &str, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_request_header(&mut self, key: &str, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_request_trailer_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
+    )
+  }
+
+  fn get_request_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer<'_>> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
+    )
+  }
+
+  fn get_request_trailers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    self.get_headers_impl(abi::envoy_dynamic_module_type_http_header_type::RequestTrailer)
+  }
+
+  fn set_request_trailer(&mut self, key: &str, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_request_trailer(&mut self, key: &str, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_response_header_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
+    )
+  }
+
+  fn get_response_header_values(&self, key: &str) -> Vec<EnvoyBuffer<'_>> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
+    )
+  }
+
+  fn get_response_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    self.get_headers_impl(abi::envoy_dynamic_module_type_http_header_type::ResponseHeader)
+  }
+
+  fn set_response_header(&mut self, key: &str, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_response_header(&mut self, key: &str, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_response_trailer_value(&self, key: &str) -> Option<EnvoyBuffer<'_>> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
+    )
+  }
+
+  fn get_response_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer<'_>> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
+    )
+  }
+
+  fn get_response_trailers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    self.get_headers_impl(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer)
+  }
+
+  fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_response_trailer(&mut self, key: &str, value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn send_response(
+    &mut self,
+    status_code: u32,
+    headers: &[(&str, &[u8])],
+    body: Option<&[u8]>,
+    details: Option<&str>,
+  ) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let details_ptr = details.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let details_length = details.map(|s| s.len()).unwrap_or(0);
+
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response(
+        self.raw_ptr,
+        status_code,
+        headers_ptr as *mut _,
+        headers_len,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: details_ptr as *mut _,
+          length: details_length,
+        },
+      )
+    }
+  }
+
+  fn send_response_headers(&mut self, headers: &[(&str, &[u8])], end_stream: bool) {
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_headers(
+        self.raw_ptr,
+        headers_ptr as *mut _,
+        headers_len,
+        end_stream,
+      )
+    }
+  }
+
+  fn send_response_data(&mut self, body: &[u8], end_stream: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_data(
+        self.raw_ptr,
+        bytes_to_module_buffer(body),
+        end_stream,
+      )
+    }
+  }
+
+  fn send_response_trailers(&mut self, trailers: &[(&str, &[u8])]) {
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response_trailers(
+        self.raw_ptr,
+        trailers_ptr as *mut _,
+        trailers_len,
+      )
+    }
+  }
+
+  fn add_custom_flag(&mut self, flag: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_custom_flag(
+        self.raw_ptr,
+        str_to_module_buffer(flag),
+      );
+    }
+  }
+
+  fn get_metadata_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<f64> {
+    let mut value: f64 = 0f64;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_number(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_string(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_string(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_bytes(&mut self, namespace: &str, key: &str, value: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
+    type KvPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: KvPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<KvPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        entries.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        entries.len(),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_any),
+      )
+    }
+  }
+
+  fn get_typed_metadata(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    let mut type_url = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let mut value = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_typed_metadata(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        &mut type_url as *mut _,
+        &mut value as *mut _,
+      )
+    };
+    if found {
+      Some(unsafe {
+        (
+          EnvoyBuffer::new_from_raw(type_url.ptr as *const _, type_url.length),
+          EnvoyBuffer::new_from_raw(value.ptr as *const _, value.length),
+        )
+      })
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<bool> {
+    let mut value: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_bool(&mut self, namespace: &str, key: &str, value: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_keys(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+  ) -> Option<Vec<EnvoyBuffer<'_>>> {
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_keys_count(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+      )
+    };
+    if count == 0 {
+      return None;
+    }
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(count);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_keys(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if success {
+      unsafe {
+        buffers.set_len(count);
+      }
+      Some(buffers)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_namespaces(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+  ) -> Option<Vec<EnvoyBuffer<'_>>> {
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_namespaces_count(self.raw_ptr, source)
+    };
+    if count == 0 {
+      return None;
+    }
+    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(count);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_namespaces(
+        self.raw_ptr,
+        source,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if success {
+      unsafe {
+        buffers.set_len(count);
+      }
+      Some(buffers)
+    } else {
+      None
+    }
+  }
+
+  fn add_dynamic_metadata_list_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_string(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        str_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn add_dynamic_metadata_list_bool(&mut self, namespace: &str, key: &str, value: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_add_dynamic_metadata_list_bool(
+        self.raw_ptr,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        value,
+      )
+    }
+  }
+
+  fn get_metadata_list_size(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<usize> {
+    let mut result: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_size(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<f64> {
+    let mut value: f64 = 0f64;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_number(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_string(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_string(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_metadata_list_bool(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+    index: usize,
+  ) -> Option<bool> {
+    let mut value: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_metadata_list_bool(
+        self.raw_ptr,
+        source,
+        str_to_module_buffer(namespace),
+        str_to_module_buffer(key),
+        index,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_filter_state_bytes(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_filter_state_bytes(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_bytes(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn set_filter_state_value(
+    &mut self,
+    key: &[u8],
+    value: &[u8],
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+    stream_sharing: abi::envoy_dynamic_module_type_filter_state_stream_sharing,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_value(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+        life_span,
+        stream_sharing,
+      )
+    }
+  }
+
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_typed(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_filter_state_typed(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn has_filter_state(&self, key: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_has_filter_state(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+      )
+    }
+  }
+
+  unsafe fn set_filter_state_object(
+    &mut self,
+    key: &[u8],
+    object: *mut c_void,
+    destructor: extern "C" fn(*mut c_void),
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  ) -> bool {
+    let destructor: unsafe extern "C" fn(*mut c_void) = destructor;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_object(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        object,
+        Some(destructor),
+        life_span,
+      )
+    }
+  }
+
+  fn get_filter_state_object(&self, key: &[u8]) -> Option<*mut c_void> {
+    let object = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_filter_state_object(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+      )
+    };
+    if object.is_null() {
+      None
+    } else {
+      Some(object)
+    }
+  }
+
+  fn get_received_request_body(&mut self) -> Option<Vec<EnvoyMutBuffer<'_>>> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
+      )
+    };
+    if size == 0 {
+      return None;
+    }
+
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_chunks(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if success {
+      unsafe {
+        buffers.set_len(size);
+      }
+      Some(buffers)
+    } else {
+      None
+    }
+  }
+
+  fn get_buffered_request_body(&mut self) -> Option<Vec<EnvoyMutBuffer<'_>>> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
+      )
+    };
+    if size == 0 {
+      return None;
+    }
+
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_chunks(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if success {
+      unsafe {
+        buffers.set_len(size);
+      }
+      Some(buffers)
+    } else {
+      None
+    }
+  }
+
+  fn get_received_request_body_size(&mut self) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_size(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
+      )
+    }
+  }
+
+  fn get_buffered_request_body_size(&mut self) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_size(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
+      )
+    }
+  }
+
+  fn drain_received_request_body(&mut self, number_of_bytes: usize) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_drain_body(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
+        number_of_bytes,
+      )
+    }
+  }
+
+  fn drain_buffered_request_body(&mut self, number_of_bytes: usize) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_drain_body(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
+        number_of_bytes,
+      )
+    }
+  }
+
+  fn append_received_request_body(&mut self, data: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_append_body(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedRequestBody,
+        bytes_to_module_buffer(data),
+      )
+    }
+  }
+
+  fn append_buffered_request_body(&mut self, data: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_append_body(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedRequestBody,
+        bytes_to_module_buffer(data),
+      )
+    }
+  }
+
+  fn get_received_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer<'_>>> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
+      )
+    };
+    if size == 0 {
+      return None;
+    }
+
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_chunks(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if success {
+      unsafe {
+        buffers.set_len(size);
+      }
+      Some(buffers)
+    } else {
+      None
+    }
+  }
+
+  fn get_buffered_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer<'_>>> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_chunks_size(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
+      )
+    };
+    if size == 0 {
+      return None;
+    }
+
+    let mut buffers: Vec<EnvoyMutBuffer> = Vec::with_capacity(size);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_chunks(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
+        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if success {
+      unsafe {
+        buffers.set_len(size);
+      }
+      Some(buffers)
+    } else {
+      None
+    }
+  }
+
+  fn get_received_response_body_size(&mut self) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_size(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
+      )
+    }
+  }
+
+  fn get_buffered_response_body_size(&mut self) -> usize {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_get_body_size(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
+      )
+    }
+  }
+
+  fn drain_received_response_body(&mut self, number_of_bytes: usize) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_drain_body(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
+        number_of_bytes,
+      )
+    }
+  }
+
+  fn drain_buffered_response_body(&mut self, number_of_bytes: usize) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_drain_body(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
+        number_of_bytes,
+      )
+    }
+  }
+
+  fn append_received_response_body(&mut self, data: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_append_body(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::ReceivedResponseBody,
+        bytes_to_module_buffer(data),
+      )
+    }
+  }
+
+  fn append_buffered_response_body(&mut self, data: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_append_body(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_body_type::BufferedResponseBody,
+        bytes_to_module_buffer(data),
+      )
+    }
+  }
+
+  fn received_buffered_request_body(&mut self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_http_received_buffered_request_body(self.raw_ptr) }
+  }
+
+  fn received_buffered_response_body(&mut self) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_http_received_buffered_response_body(self.raw_ptr) }
+  }
+
+  fn clear_route_cache(&mut self) {
+    unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cache(self.raw_ptr) }
+  }
+
+  fn remove_request_header(&mut self, key: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::RequestHeader,
+        str_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        },
+      )
+    }
+  }
+
+  fn remove_request_trailer(&mut self, key: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::RequestTrailer,
+        str_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        },
+      )
+    }
+  }
+
+  fn remove_response_header(&mut self, key: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::ResponseHeader,
+        str_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        },
+      )
+    }
+  }
+
+  fn remove_response_trailer(&mut self, key: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_header(
+        self.raw_ptr,
+        abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer,
+        str_to_module_buffer(key),
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null_mut(),
+          length: 0,
+        },
+      )
+    }
+  }
+
+  fn get_attribute_string(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_attribute_string(
+        self.raw_ptr,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_int(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<i64> {
+    let mut result: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_attribute_int(
+        self.raw_ptr,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_attribute_bool(
+    &self,
+    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
+  ) -> Option<bool> {
+    let mut result: bool = false;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_attribute_bool(
+        self.raw_ptr,
+        attribute_id,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(result)
+    } else {
+      None
+    }
+  }
+
+  fn get_timing_info(&self) -> TimingInfo {
+    let mut info = crate::timing::unavailable_timing_info();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_get_timing_info(self.raw_ptr, &mut info);
+    }
+    info.into()
+  }
+
+  fn send_http_callout<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: &'a [(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let mut callout_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_http_callout(
+        self.raw_ptr,
+        &mut callout_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        headers_ptr as *const _ as *mut _,
+        headers_len,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        timeout_milliseconds,
+      )
+    };
+
+    (result, callout_id)
+  }
+
+  fn start_http_stream<'a>(
+    &mut self,
+    cluster_name: &'a str,
+    headers: &'a [(&'a str, &'a [u8])],
+    body: Option<&'a [u8]>,
+    end_stream: bool,
+    timeout_milliseconds: u64,
+  ) -> (abi::envoy_dynamic_module_type_http_callout_init_result, u64) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+    let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+    let mut stream_id: u64 = 0;
+
+    let result = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_start_http_stream(
+        self.raw_ptr,
+        &mut stream_id as *mut _ as *mut _,
+        str_to_module_buffer(cluster_name),
+        headers_ptr as *const _ as *mut _,
+        headers_len,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: body_ptr as *mut _,
+          length: body_length,
+        },
+        end_stream,
+        timeout_milliseconds,
+      )
+    };
+
+    (result, stream_id)
+  }
+
+  unsafe fn send_http_stream_data(
+    &mut self,
+    stream_handle: u64,
+    data: &[u8],
+    end_stream: bool,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_stream_send_data(
+        self.raw_ptr,
+        stream_handle,
+        bytes_to_module_buffer(data),
+        end_stream,
+      )
+    }
+  }
+
+  unsafe fn send_http_stream_trailers<'a>(
+    &mut self,
+    stream_handle: u64,
+    trailers: &'a [(&'a str, &'a [u8])],
+  ) -> bool {
+    let HeaderPairSlice(trailers_ptr, trailers_len) = trailers.into();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_stream_send_trailers(
+        self.raw_ptr,
+        stream_handle,
+        trailers_ptr as *const _ as *mut _,
+        trailers_len,
+      )
+    }
+  }
+
+  unsafe fn reset_http_stream(&mut self, stream_handle: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_reset_http_stream(self.raw_ptr, stream_handle);
+    }
+  }
+
+  fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>> {
+    unsafe {
+      let filter_config_ptr =
+        abi::envoy_dynamic_module_callback_get_most_specific_route_config(self.raw_ptr)
+          as *mut std::sync::Arc<dyn Any>;
+
+      filter_config_ptr.as_ref().cloned()
+    }
+  }
+
+  fn continue_decoding(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_continue_decoding(self.raw_ptr);
+    }
+  }
+
+  fn continue_encoding(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_continue_encoding(self.raw_ptr);
+    }
+  }
+
+  fn new_scheduler(&self) -> impl EnvoyHttpFilterScheduler + 'static {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_http_filter_scheduler_new(self.raw_ptr);
+      EnvoyHttpFilterSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      }
+    }
+  }
+
+  fn get_generic_secret(&self, id: EnvoyGenericSecretId) -> Option<EnvoyBuffer<'_>> {
+    let EnvoyGenericSecretId(id) = id;
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_get_generic_secret(
+        self.raw_ptr,
+        id,
+        &mut result as *mut _,
+      )
+    };
+    if !success {
+      return None;
+    }
+    // Safety: Envoy owns the buffer and keeps it alive until the module returns from the current
+    // event hook, which outlives the borrow of `self`.
+    Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length) })
+  }
+
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_counter(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_counter(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_gauge(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_decrement_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_decrement_gauge(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_set_gauge(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_set_gauge(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value(
+        self.raw_ptr,
+        id,
+        std::ptr::null_mut(),
+        0,
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    label_values: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    let mut label_values = strs_to_module_buffers(label_values);
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value(
+        self.raw_ptr,
+        id,
+        label_values.as_mut_ptr(),
+        label_values.len(),
+        value,
+      )
+    })?;
+    Ok(())
+  }
+
+  fn get_worker_index(&self) -> u32 {
+    unsafe { abi::envoy_dynamic_module_callback_http_filter_get_worker_index(self.raw_ptr) }
+  }
+
+  fn set_socket_option_int(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: i64,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option_int(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        value,
+      )
+    }
+  }
+
+  fn set_socket_option_bytes(
+    &mut self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+    value: &[u8],
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_socket_option_bytes(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        abi::envoy_dynamic_module_type_module_buffer {
+          ptr: value.as_ptr() as *const _,
+          length: value.len(),
+        },
+      )
+    }
+  }
+
+  fn get_socket_option_int(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<i64> {
+    let mut value: i64 = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option_int(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        &mut value,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn get_socket_option_bytes(
+    &self,
+    level: i64,
+    name: i64,
+    state: abi::envoy_dynamic_module_type_socket_option_state,
+    direction: abi::envoy_dynamic_module_type_socket_direction,
+  ) -> Option<Vec<u8>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_socket_option_bytes(
+        self.raw_ptr,
+        level,
+        name,
+        state,
+        direction,
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      let slice = unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(result.ptr as *const u8, result.length)
+      };
+      Some(slice.to_vec())
+    } else {
+      None
+    }
+  }
+
+  fn get_buffer_limit(&self) -> u64 {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_buffer_limit(self.raw_ptr) }
+  }
+
+  fn set_buffer_limit(&mut self, limit: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_http_set_buffer_limit(self.raw_ptr, limit) }
+  }
+
+  fn get_active_span(&self) -> Option<Box<dyn EnvoySpan>> {
+    let raw_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoySpanImpl {
+        raw_ptr,
+        filter_ptr: self.raw_ptr,
+      }))
+    }
+  }
+
+  fn spawn_child_span(&self, operation_name: &str) -> Option<Box<dyn EnvoyChildSpan>> {
+    // Get the active span pointer directly.
+    let span_ptr = unsafe { abi::envoy_dynamic_module_callback_http_get_active_span(self.raw_ptr) };
+    if span_ptr.is_null() {
+      return None;
+    }
+    // Spawn the child span directly from the raw pointer.
+    let raw_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_http_span_spawn_child(
+        self.raw_ptr,
+        span_ptr,
+        str_to_module_buffer(operation_name),
+      )
+    };
+    if raw_ptr.is_null() {
+      None
+    } else {
+      Some(Box::new(EnvoyChildSpanImpl {
+        raw_ptr,
+        filter_ptr: self.raw_ptr,
+        finished: false,
+      }))
+    }
+  }
+
+  fn get_cluster_name(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_cluster_name(self.raw_ptr, &mut result as *mut _)
+    };
+    if success && !result.ptr.is_null() {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_cluster_host_count(&self, priority: u32) -> Option<ClusterHostCount> {
+    let mut total: usize = 0;
+    let mut healthy: usize = 0;
+    let mut degraded: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_cluster_host_count(
+        self.raw_ptr,
+        priority,
+        &mut total as *mut _,
+        &mut healthy as *mut _,
+        &mut degraded as *mut _,
+      )
+    };
+    if success {
+      Some(ClusterHostCount {
+        total,
+        healthy,
+        degraded,
+      })
+    } else {
+      None
+    }
+  }
+
+  fn set_upstream_override_host(&mut self, host: &str, strict: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_upstream_override_host(
+        self.raw_ptr,
+        str_to_module_buffer(host),
+        strict,
+      )
+    }
+  }
+
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_connection_id(self.raw_ptr)
+    })
+  }
+
+  fn get_upstream_remote_address(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_remote_address(
+        self.raw_ptr,
+        &mut result as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_downstream_direct_remote_address(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+        self.raw_ptr,
+        &mut result as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_upstream_hosts_attempted(&self) -> Vec<EnvoyBuffer<'_>> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(self.raw_ptr)
+    };
+    if size == 0 {
+      return Vec::new();
+    }
+    let mut hosts: Vec<EnvoyBuffer> = Vec::with_capacity(size);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+        self.raw_ptr,
+        hosts.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if !success {
+      return Vec::new();
+    }
+    unsafe {
+      hosts.set_len(size);
+    }
+    hosts
+  }
+
+  fn get_upstream_connection_ids_attempted(&self) -> Vec<u64> {
+    let size = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+        self.raw_ptr,
+      )
+    };
+    if size == 0 {
+      return Vec::new();
+    }
+    let mut connection_ids = Vec::with_capacity(size);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+        self.raw_ptr,
+        connection_ids.as_mut_ptr(),
+      )
+    };
+    if !success {
+      return Vec::new();
+    }
+    unsafe {
+      connection_ids.set_len(size);
+    }
+    connection_ids
+  }
+
+  fn reset_stream(
+    &mut self,
+    reason: abi::envoy_dynamic_module_type_http_filter_stream_reset_reason,
+    details: &str,
+  ) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_reset_stream(
+        self.raw_ptr,
+        reason,
+        str_to_module_buffer(details),
+      )
+    }
+  }
+
+  fn send_go_away_and_close(&mut self, graceful: bool) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_send_go_away_and_close(self.raw_ptr, graceful)
+    }
+  }
+
+  fn recreate_stream<'a>(&mut self, headers: Option<&'a [(&'a str, &'a [u8])]>) -> bool {
+    match headers {
+      Some(headers) => {
+        let HeaderPairSlice(headers_ptr, headers_len) = headers.into();
+        unsafe {
+          abi::envoy_dynamic_module_callback_http_filter_recreate_stream(
+            self.raw_ptr,
+            headers_ptr as *mut _,
+            headers_len,
+          )
+        }
+      },
+      None => unsafe {
+        abi::envoy_dynamic_module_callback_http_filter_recreate_stream(
+          self.raw_ptr,
+          std::ptr::null_mut(),
+          0,
+        )
+      },
+    }
+  }
+
+  fn clear_route_cluster_cache(&mut self) {
+    unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cluster_cache(self.raw_ptr) }
+  }
+}
+
+impl EnvoyHttpFilterImpl {
+  pub(crate) fn new(raw_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr) -> Self {
+    Self { raw_ptr }
+  }
+
+  /// Implement the common logic for getting all headers/trailers.
+  fn get_headers_impl(
+    &self,
+    header_type: abi::envoy_dynamic_module_type_http_header_type,
+  ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    crate::utility::collect_headers(
+      || unsafe {
+        abi::envoy_dynamic_module_callback_http_get_headers_size(self.raw_ptr, header_type)
+      },
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_http_get_headers(self.raw_ptr, header_type, headers)
+      },
+    )
+  }
+
+  /// This implements the common logic for getting the header/trailer values.
+  fn get_header_value_impl(
+    &self,
+    key: &str,
+    header_type: abi::envoy_dynamic_module_type_http_header_type,
+  ) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_get_header(
+        self.raw_ptr,
+        header_type,
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+        0, // Only the first value is needed.
+        std::ptr::null_mut(),
+      )
+    };
+
+    if result.ptr.is_null() {
+      None
+    } else {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    }
+  }
+
+  /// This implements the common logic for getting the header/trailer values.
+  ///
+  /// TODO: use smallvec or similar to avoid the heap allocations for majority of the cases.
+  fn get_header_values_impl(
+    &self,
+    key: &str,
+    header_type: abi::envoy_dynamic_module_type_http_header_type,
+  ) -> Vec<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+
+    let mut count: usize = 0;
+
+    // The indexed getter reports the total number of values via its size output.
+    let found = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_header(
+        self.raw_ptr,
+        header_type,
+        str_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+        0,
+        &mut count as *mut _ as *mut _,
+      )
+    };
+
+    if !found || count == 0 {
+      return Vec::new();
+    }
+
+    // A single value is already in hand from the first crossing so skip the batch call.
+    if count == 1 {
+      return vec![unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) }];
+    }
+
+    // Fill all values in a single crossing instead of one call per value.
+    let mut results: Vec<EnvoyBuffer> = Vec::with_capacity(count);
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_header_values(
+        self.raw_ptr,
+        header_type,
+        str_to_module_buffer(key),
+        results.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if !success {
+      return Vec::new();
+    }
+    unsafe {
+      results.set_len(count);
+    }
+    results
+  }
+}
+
+/// This represents a thin thread-safe object that can be used to schedule a generic event to the
+/// Envoy HTTP filter on the work thread.
+///
+/// For example, this can be used to offload some blocking work from the HTTP filter processing
+/// thread to a module-managed thread, and then schedule an event to continue
+/// processing the request.
+///
+/// Since this is primarily designed to be used from a different thread than the one
+/// where the [`HttpFilter`] instance was created, it is marked as `Send` so that
+/// the [`Box<dyn EnvoyHttpFilterScheduler>`] can be sent across threads.
+///
+/// It is also safe to be called concurrently, so it is marked as `Sync` as well.
+#[cfg_attr(any(test, feature = "mock"), automock)]
+pub trait EnvoyHttpFilterScheduler: Send + Sync {
+  /// Commit the scheduled event to the worker thread where [`HttpFilter`] is running.
+  ///
+  /// It accepts an `event_id` which can be used to distinguish different events
+  /// scheduled by the same filter. The `event_id` can be any value.
+  ///
+  /// Once this is called, [`HttpFilter::on_scheduled`] will be called with
+  /// the same `event_id` on the worker thread where the filter is running IF
+  /// by the time the event is committed, the filter is still alive.
+  ///
+  /// This is safe to call from any thread and is a no-op once the filter has been destroyed. The
+  /// module must join or quiesce any thread that may call this before worker shutdown so a
+  /// scheduled event cannot race the worker dispatcher teardown.
+  fn commit(&self, event_id: u64);
+}
+
+/// This implements the [`EnvoyHttpFilterScheduler`] trait with the given raw pointer to the Envoy
+/// HTTP filter scheduler object.
+struct EnvoyHttpFilterSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_http_filter_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyHttpFilterSchedulerImpl {}
+unsafe impl Sync for EnvoyHttpFilterSchedulerImpl {}
+
+impl Drop for EnvoyHttpFilterSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyHttpFilterScheduler for EnvoyHttpFilterSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_scheduler_commit(self.raw_ptr, event_id);
+    }
+  }
+}
+
+// Box<dyn EnvoyHttpFilterScheduler> is returned by mockall, so we need to implement
+// EnvoyHttpFilterScheduler for it as well.
+impl EnvoyHttpFilterScheduler for Box<dyn EnvoyHttpFilterScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
+}
+
+/// This represents a thread-safe object that can be used to schedule a generic event to the
+/// Envoy HTTP filter config on the main thread.
+#[cfg_attr(any(test, feature = "mock"), automock)]
+pub trait EnvoyHttpFilterConfigScheduler: Send + Sync {
+  /// Commit the scheduled event to the main thread.
+  fn commit(&self, event_id: u64);
+}
+
+struct EnvoyHttpFilterConfigSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyHttpFilterConfigSchedulerImpl {}
+unsafe impl Sync for EnvoyHttpFilterConfigSchedulerImpl {}
+
+impl Drop for EnvoyHttpFilterConfigSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyHttpFilterConfigScheduler for EnvoyHttpFilterConfigSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_scheduler_commit(
+        self.raw_ptr,
+        event_id,
+      );
+    }
+  }
+}
+
+impl EnvoyHttpFilterConfigScheduler for Box<dyn EnvoyHttpFilterConfigScheduler> {
+  fn commit(&self, event_id: u64) {
+    (**self).commit(event_id);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_new(
+    envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
+    // The name is sourced from a protobuf string field (and thus UTF-8 by contract); we still
+    // route through `str_lossy_from_raw` so a malformed input on the FFI seam produces a lossy
+    // decode rather than undefined behaviour.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+
+    let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
+      raw_ptr: envoy_filter_config_ptr,
+    };
+
+    envoy_dynamic_module_on_http_filter_config_new_impl(
+      &mut envoy_filter_config,
+      name_str.as_ref(),
+      config_slice,
+      NEW_HTTP_FILTER_CONFIG_FUNCTION
+        .get()
+        .expect("NEW_HTTP_FILTER_CONFIG_FUNCTION must be set"),
+    )
+  }
+  on_panic = std::ptr::null()
+}
+
+pub fn envoy_dynamic_module_on_http_filter_config_new_impl(
+  envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
+  name: &str,
+  config: &[u8],
+  new_fn: &NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
+) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
+  if let Some(config) = new_fn(envoy_filter_config, name, config) {
+    crate::wrap_into_c_void_ptr!(config)
+  } else {
+    std::ptr::null()
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_destroy(
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  ) {
+    crate::drop_wrapped_c_void_ptr!(config_ptr, HttpFilterConfig<EnvoyHttpFilterImpl>);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_scheduled(
+    _envoy_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    event_id: u64,
+  ) {
+    let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let config = &**config;
+    config.on_scheduled(event_id);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_per_route_config_new(
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
+    // See `envoy_dynamic_module_on_http_filter_config_new`: route through `str_lossy_from_raw`
+    // so a malformed input on the FFI seam produces a lossy decode rather than undefined
+    // behaviour.
+    let name_str =
+      unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
+    let config_slice = unsafe {
+      crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+    };
+
+    envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
+      name_str.as_ref(),
+      config_slice,
+      NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
+        .get()
+        .expect("NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION must be set"),
+    )
+  }
+  on_panic = std::ptr::null()
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_per_route_config_destroy(
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr,
+  ) {
+    let ptr = config_ptr as *mut std::sync::Arc<dyn Any>;
+    std::mem::drop(Box::from_raw(ptr));
+  }
+}
+
+pub fn envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
+  name: &str,
+  config: &[u8],
+  new_fn: &NewHttpFilterPerRouteConfigFunction,
+) -> abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
+  if let Some(config) = new_fn(name, config) {
+    let arc: std::sync::Arc<dyn Any> = std::sync::Arc::from(config);
+    let ptr = Box::into_raw(Box::new(arc));
+    ptr as abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
+  } else {
+    std::ptr::null()
+  }
+}
+
+/// Shared handle to the in-module HTTP filter.
+///
+/// Behind an [`Rc`] so that a hook which triggers a synchronous `on_http_filter_destroy` (e.g. via
+/// `recreate_stream`) only drops Envoy's reference; the hook's own clone keeps the filter alive
+/// until it returns, preventing a use-after-free. Single-threaded, so `Rc` (not `Arc`) suffices.
+///
+/// `Box<dyn HttpFilter>` is sized, so this `Rc` is a thin pointer and round-trips through the
+/// opaque module handle as-is, with no outer `Box`.
+type InModuleHttpFilter = Rc<Box<dyn HttpFilter<EnvoyHttpFilterImpl>>>;
+
+/// Run `hook` against the in-module filter behind `filter_ptr`, catching panics.
+///
+/// The reference is taken before the guarded call and released in a second guarded frame rather
+/// than inside the first. If Envoy's reference was already dropped mid-hook then this one is the
+/// last, so releasing it runs the filter's `Drop`; doing that while unwinding a hook panic would be
+/// a panic during unwind, which aborts the process. Here each panic is caught and logged instead.
+///
+/// Returns `Err(())` if the hook panicked, leaving the caller to supply a fallback value.
+///
+/// # Safety
+///
+/// `filter_ptr` must be a pointer previously returned by `envoy_dynamic_module_on_http_filter_new`
+/// and not yet fully released.
+unsafe fn with_in_module_filter<R>(
+  name: &'static str,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  hook: impl FnOnce(&InModuleHttpFilter) -> R,
+) -> Result<R, ()> {
+  let raw = filter_ptr as *const Box<dyn HttpFilter<EnvoyHttpFilterImpl>>;
+  Rc::increment_strong_count(raw);
+  let filter = Rc::from_raw(raw);
+
+  let result = catch_unwind(AssertUnwindSafe(|| hook(&filter))).map_err(|panic| {
+    crate::log_ffi_panic(name, panic);
+  });
+
+  let _ = catch_unwind(AssertUnwindSafe(move || drop(filter))).map_err(|panic| {
+    crate::log_ffi_panic(name, panic);
+  });
+
+  result
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_new(
+    filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
+    let mut envoy_filter = EnvoyHttpFilterImpl {
+      raw_ptr: filter_envoy_ptr,
+    };
+    let filter_config = {
+      let raw = filter_config_ptr as *const *const dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+      &**raw
+    };
+    envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter, filter_config)
+  }
+  on_panic = std::ptr::null()
+}
+
+pub fn envoy_dynamic_module_on_http_filter_new_impl(
+  envoy_filter: &mut EnvoyHttpFilterImpl,
+  filter_config: &dyn HttpFilterConfig<EnvoyHttpFilterImpl>,
+) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
+  let filter = filter_config.new_http_filter(envoy_filter);
+  let shared: InModuleHttpFilter = Rc::new(filter);
+  Rc::into_raw(shared) as abi::envoy_dynamic_module_type_http_filter_module_ptr
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_destroy(
+    filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  ) {
+    // Drops Envoy's reference; if a hook is still on the stack it holds its own clone, so the
+    // filter is not freed until the last reference is released.
+    let shared = Rc::from_raw(filter_ptr as *const Box<dyn HttpFilter<EnvoyHttpFilterImpl>>);
+    drop(shared);
+  }
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_stream_complete(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_stream_complete",
+    filter_ptr,
+    |filter| filter.on_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr)),
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+  with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_request_headers",
+    filter_ptr,
+    |filter| filter.on_request_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
+  )
+  // Fail-closed: stop iteration so the request never reaches upstream after a panic.
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+  with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_request_body",
+    filter_ptr,
+    |filter| filter.on_request_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
+  )
+  // Fail-closed: stop iteration without buffering further data.
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationNoBuffer)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+  with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_request_trailers",
+    filter_ptr,
+    |filter| filter.on_request_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr)),
+  )
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::StopIteration)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+  with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_response_headers",
+    filter_ptr,
+    |filter| filter.on_response_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
+  )
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+  with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_response_body",
+    filter_ptr,
+    |filter| filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
+  )
+  .unwrap_or(
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationNoBuffer,
+  )
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+  with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_response_trailers",
+    filter_ptr,
+    |filter| filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr)),
+  )
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::StopIteration)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  callout_id: u64,
+  result: abi::envoy_dynamic_module_type_http_callout_result,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  body_chunks_size: usize,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_http_callout_done",
+    filter_ptr,
+    |filter| {
+      let headers = if headers_size > 0 {
+        Some(unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(
+            headers as *const (EnvoyBuffer, EnvoyBuffer),
+            headers_size,
+          )
+        })
+      } else {
+        None
+      };
+      let body = if body_chunks_size > 0 {
+        Some(unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(
+            body_chunks as *const EnvoyBuffer,
+            body_chunks_size,
+          )
+        })
+      } else {
+        None
+      };
+      filter.on_http_callout_done(
+        &mut EnvoyHttpFilterImpl::new(envoy_ptr),
+        callout_id,
+        result,
+        headers,
+        body,
+      )
+    },
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  event_id: u64,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_scheduled",
+    filter_ptr,
+    |filter| {
+      filter.on_scheduled(&mut EnvoyHttpFilterImpl::new(envoy_ptr), event_id);
+    },
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_downstream_above_write_buffer_high_watermark",
+    filter_ptr,
+    |filter| {
+      filter
+        .on_downstream_above_write_buffer_high_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
+    },
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_downstream_below_write_buffer_low_watermark",
+    filter_ptr,
+    |filter| {
+      filter
+        .on_downstream_below_write_buffer_low_watermark(&mut EnvoyHttpFilterImpl::new(envoy_ptr));
+    },
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_local_reply(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  response_code: u32,
+  details: abi::envoy_dynamic_module_type_envoy_buffer,
+  reset_imminent: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_local_reply_status {
+  with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_local_reply",
+    filter_ptr,
+    |filter| {
+      let details_buffer = EnvoyBuffer::new_from_raw(details.ptr as *const u8, details.length);
+      filter.on_local_reply(
+        &mut EnvoyHttpFilterImpl::new(envoy_ptr),
+        response_code,
+        details_buffer,
+        reset_imminent,
+      )
+    },
+  )
+  // Continue with the planned local reply; do not escalate to a stream reset on panic.
+  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_local_reply_status::Continue)
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_headers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  stream_handle: u64,
+  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  headers_size: usize,
+  end_stream: bool,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_http_stream_headers",
+    filter_ptr,
+    |filter| {
+      let headers = if headers_size > 0 {
+        unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(
+            headers as *const (EnvoyBuffer, EnvoyBuffer),
+            headers_size,
+          )
+        }
+      } else {
+        &[]
+      };
+      filter.on_http_stream_headers(
+        &mut EnvoyHttpFilterImpl::new(envoy_ptr),
+        stream_handle,
+        headers,
+        end_stream,
+      );
+    },
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_data(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  stream_handle: u64,
+  data: *const abi::envoy_dynamic_module_type_envoy_buffer,
+  data_count: usize,
+  end_stream: bool,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_http_stream_data",
+    filter_ptr,
+    |filter| {
+      let data = if data_count > 0 {
+        unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(data as *const EnvoyBuffer, data_count)
+        }
+      } else {
+        &[]
+      };
+      filter.on_http_stream_data(
+        &mut EnvoyHttpFilterImpl::new(envoy_ptr),
+        stream_handle,
+        data,
+        end_stream,
+      );
+    },
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_trailers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  stream_handle: u64,
+  trailers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+  trailers_size: usize,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_http_stream_trailers",
+    filter_ptr,
+    |filter| {
+      let trailers = if trailers_size > 0 {
+        unsafe {
+          crate::ffi_helpers::slice_from_raw_or_empty(
+            trailers as *const (EnvoyBuffer, EnvoyBuffer),
+            trailers_size,
+          )
+        }
+      } else {
+        &[]
+      };
+      filter.on_http_stream_trailers(
+        &mut EnvoyHttpFilterImpl::new(envoy_ptr),
+        stream_handle,
+        trailers,
+      );
+    },
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_complete(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  stream_handle: u64,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_http_stream_complete",
+    filter_ptr,
+    |filter| {
+      filter.on_http_stream_complete(&mut EnvoyHttpFilterImpl::new(envoy_ptr), stream_handle);
+    },
+  );
+}
+
+/// # Safety
+///
+/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+/// by the Envoy dynamic module ABI.
+#[no_mangle]
+pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_stream_reset(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  stream_handle: u64,
+  reset_reason: abi::envoy_dynamic_module_type_http_stream_reset_reason,
+) {
+  let _ = with_in_module_filter(
+    "envoy_dynamic_module_on_http_filter_http_stream_reset",
+    filter_ptr,
+    |filter| {
+      filter.on_http_stream_reset(
+        &mut EnvoyHttpFilterImpl::new(envoy_ptr),
+        stream_handle,
+        reset_reason,
+      );
+    },
+  );
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_http_callout_done(
+    envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    callout_id: u64,
+    result: abi::envoy_dynamic_module_type_http_callout_result,
+    headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+    headers_size: usize,
+    body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+    body_chunks_size: usize,
+  ) {
+    let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let config = &**config;
+    let headers = if headers_size > 0 {
+      Some(unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          headers as *const (EnvoyBuffer, EnvoyBuffer),
+          headers_size,
+        )
+      })
+    } else {
+      None
+    };
+    let body = if body_chunks_size > 0 {
+      Some(unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          body_chunks as *const EnvoyBuffer,
+          body_chunks_size,
+        )
+      })
+    } else {
+      None
+    };
+    config.on_http_callout_done(
+      &mut EnvoyHttpFilterConfigImpl {
+        raw_ptr: envoy_config_ptr,
+      },
+      callout_id,
+      result,
+      headers,
+      body,
+    );
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_http_stream_headers(
+    envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    stream_handle: u64,
+    headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+    headers_size: usize,
+    end_stream: bool,
+  ) {
+    let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let config = &**config;
+    let headers = if headers_size > 0 {
+      unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          headers as *const (EnvoyBuffer, EnvoyBuffer),
+          headers_size,
+        )
+      }
+    } else {
+      &[]
+    };
+    config.on_http_stream_headers(
+      &mut EnvoyHttpFilterConfigImpl {
+        raw_ptr: envoy_config_ptr,
+      },
+      stream_handle,
+      headers,
+      end_stream,
+    );
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_http_stream_data(
+    envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    stream_handle: u64,
+    data: *const abi::envoy_dynamic_module_type_envoy_buffer,
+    data_count: usize,
+    end_stream: bool,
+  ) {
+    let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let config = &**config;
+    let data = if data_count > 0 {
+      unsafe { crate::ffi_helpers::slice_from_raw_or_empty(data as *const EnvoyBuffer, data_count) }
+    } else {
+      &[]
+    };
+    config.on_http_stream_data(
+      &mut EnvoyHttpFilterConfigImpl {
+        raw_ptr: envoy_config_ptr,
+      },
+      stream_handle,
+      data,
+      end_stream,
+    );
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_http_stream_trailers(
+    envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    stream_handle: u64,
+    trailers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+    trailers_size: usize,
+  ) {
+    let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let config = &**config;
+    let trailers = if trailers_size > 0 {
+      unsafe {
+        crate::ffi_helpers::slice_from_raw_or_empty(
+          trailers as *const (EnvoyBuffer, EnvoyBuffer),
+          trailers_size,
+        )
+      }
+    } else {
+      &[]
+    };
+    config.on_http_stream_trailers(
+      &mut EnvoyHttpFilterConfigImpl {
+        raw_ptr: envoy_config_ptr,
+      },
+      stream_handle,
+      trailers,
+    );
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_http_stream_complete(
+    envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    stream_handle: u64,
+  ) {
+    let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let config = &**config;
+    config.on_http_stream_complete(
+      &mut EnvoyHttpFilterConfigImpl {
+        raw_ptr: envoy_config_ptr,
+      },
+      stream_handle,
+    );
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_http_filter_config_http_stream_reset(
+    envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    stream_handle: u64,
+    reset_reason: abi::envoy_dynamic_module_type_http_stream_reset_reason,
+  ) {
+    let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let config = &**config;
+    config.on_http_stream_reset(
+      &mut EnvoyHttpFilterConfigImpl {
+        raw_ptr: envoy_config_ptr,
+      },
+      stream_handle,
+      reset_reason,
+    );
+  }
+}

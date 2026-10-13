@@ -1,0 +1,1031 @@
+#include "source/extensions/filters/http/ext_proc/processor_state.h"
+
+#include <utility>
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/common/processing_effect/processing_effect.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExternalProcessing {
+
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode;
+using Filters::Common::ProcessingEffect::Effect;
+
+using envoy::service::ext_proc::v3::BodyResponse;
+using envoy::service::ext_proc::v3::CommonResponse;
+using envoy::service::ext_proc::v3::HeadersResponse;
+using envoy::service::ext_proc::v3::TrailersResponse;
+
+void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
+                                          CallbackState callback_state, bool send_body) {
+  ENVOY_STREAM_LOG(debug, "Start external processing call", *filterCallbacks());
+  callback_state_ = callback_state;
+
+  // Skip starting timer For FULL_DUPLEX_STREAMED body mode.
+  if (bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
+    if (message_timer_ == nullptr) {
+      message_timer_ = filterCallbacks()->dispatcher().createTimer(cb);
+    }
+    message_timer_->enableTimer(timeout);
+    ENVOY_STREAM_LOG(debug, "Traffic direction {}: {} ms timer enabled", *filterCallbacks(),
+                     trafficDirectionDebugStr(), timeout.count());
+  }
+  ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+  if (send_body && logging_info != nullptr) {
+    if (trafficDirection() == envoy::config::core::v3::TrafficDirection::INBOUND) {
+      logging_info->incrementRequestBodySentCount();
+    } else {
+      logging_info->incrementResponseBodySentCount();
+    }
+  }
+
+  call_start_time_ = filterCallbacks()->dispatcher().timeSource().monotonicTime();
+  new_timeout_received_ = false;
+}
+
+void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
+                                           CallbackState next_state) {
+  ENVOY_STREAM_LOG(debug, "Finish external processing call. Next state: {}", *filterCallbacks(),
+                   static_cast<int>(next_state));
+  filter_.logStreamInfo();
+
+  stopMessageTimer();
+
+  if (call_start_time_.has_value() && callback_state_ != CallbackState::Idle) {
+    std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
+        filterCallbacks()->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
+    ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+    if (logging_info != nullptr) {
+      logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection());
+    }
+  }
+  callback_state_ = next_state;
+  new_timeout_received_ = false;
+}
+
+void ProcessorState::stopMessageTimer() {
+  if (message_timer_) {
+    ENVOY_STREAM_LOG(debug, "Traffic direction {}: timer disabled", *filterCallbacks(),
+                     trafficDirectionDebugStr());
+    message_timer_->disableTimer();
+  }
+}
+
+void ProcessorState::logMutation(CallbackState callback_state, Effect processing_effect) {
+  ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+  if (logging_info != nullptr) {
+    logging_info->recordProcessingEffect(callback_state, trafficDirection(), processing_effect);
+  }
+}
+
+// Server sends back response to stop the original timer and start a new timer.
+// Do not change call_start_time_ since that call has not been responded yet.
+// Do not change callback_state_ either.
+bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
+  if (message_timer_ && message_timer_->enabled() && !new_timeout_received_) {
+    ENVOY_STREAM_LOG(debug,
+                     "Traffic direction {}: Server needs more time to process the request, start a "
+                     "new timer with timeout {} ms",
+                     *filterCallbacks(), trafficDirectionDebugStr(), message_timeout_ms);
+    message_timer_->disableTimer();
+    message_timer_->enableTimer(std::chrono::milliseconds(message_timeout_ms));
+    // Setting this flag to true to make sure Envoy ignore the future such
+    // messages when in the same state.
+    new_timeout_received_ = true;
+    return true;
+  } else {
+    ENVOY_STREAM_LOG(
+        debug,
+        "Traffic direction {}: Ignoring server new timeout message {} ms due to timer not "
+        "enabled or not the 1st such message",
+        *filterCallbacks(), trafficDirectionDebugStr(), message_timeout_ms);
+    return false;
+  }
+}
+
+// Process the data being buffered in STREAMED or FULL_DUPLEX_STREAMED mode.
+void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
+  if (hasBufferedData() ||
+      // This is to avoid send an empty body chunk which is created by filter manager
+      // after end_of_stream is already sent to the ext_proc server.
+      (bufferedData() && end_stream && !eosSentToServerWithBody())) {
+    Buffer::OwnedImpl buffered_chunk;
+    modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
+    ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
+                     buffered_chunk.length());
+    auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
+    if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
+      // Move the current buffer into the queue for remote processing and clear the buffered data.
+      enqueueStreamingChunk(buffered_chunk, end_stream);
+    } else {
+      buffered_chunk.drain(buffered_chunk.length());
+    }
+    filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
+  }
+  if (queueBelowLowLimit()) {
+    clearWatermark();
+  }
+}
+
+absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_response,
+                                                   Effect& processing_effect) {
+  ENVOY_STREAM_LOG(debug, "Applying header mutations", *filterCallbacks());
+  const auto mut_status = MutationUtils::applyHeaderMutations(
+      common_response.header_mutation(), *headers_,
+      common_response.status() == CommonResponse::CONTINUE_AND_REPLACE,
+      filter_.config().mutationChecker(), filter_.stats().rejected_header_mutations_,
+      processing_effect, shouldRemoveContentLength());
+  return mut_status;
+}
+
+ProcessorState::CallbackState
+ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_response) const {
+  if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
+    return ProcessorState::CallbackState::Idle;
+  }
+  return getCallbackStateAfterHeaderResp();
+}
+
+ProcessorState::CallbackState ProcessorState::getCallbackStateAfterHeaderResp() const {
+  if ((bodyMode() == ProcessingMode::STREAMED &&
+       filter_.config().sendBodyWithoutWaitingForHeaderResponse()) &&
+      !chunk_queue_.empty()) {
+    return ProcessorState::CallbackState::StreamedBodyCallback;
+  }
+
+  if (bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
+    if (bodyReceived()) {
+      return ProcessorState::CallbackState::StreamedBodyCallback;
+    }
+    if (trailers_ != nullptr) {
+      return ProcessorState::CallbackState::TrailersCallback;
+    }
+  }
+
+  return ProcessorState::CallbackState::Idle;
+}
+
+absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
+  if (callback_state_ != CallbackState::HeadersCallback) {
+    return absl::FailedPreconditionError("spurious message");
+  }
+
+  ENVOY_STREAM_LOG(debug, "applying headers response. body mode = {}", *filterCallbacks(),
+                   ProcessingMode::BodySendMode_Name(body_mode_));
+
+  const auto& common_response = response.response();
+
+  // Process header mutation if present
+  if (common_response.has_header_mutation()) {
+    Effect header_processing_effect = Effect::None;
+    const auto mut_status = processHeaderMutation(common_response, header_processing_effect);
+    logMutation(callback_state_, header_processing_effect);
+    if (!mut_status.ok()) {
+      filter_.onProcessHeadersResponse(response, mut_status, trafficDirection());
+      return mut_status;
+    }
+  }
+
+  clearRouteCache(common_response);
+  onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response));
+
+  if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
+    return handleHeaderContinueAndReplace(response);
+  }
+
+  filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
+  return handleHeaderContinue();
+}
+
+absl::Status ProcessorState::handleHeaderContinueAndReplace(const HeadersResponse& response) {
+  ENVOY_STREAM_LOG(debug, "Replacing complete message", *filterCallbacks());
+  const auto& common_response = response.response();
+
+  // Completely replace the body that may already exist.
+  if (common_response.has_body_mutation()) {
+    // Remove the content length here because in this case external processor probably won't
+    // properly set the content-length header to match the length of the new body that replaces
+    // the original one.
+    headers_->removeContentLength();
+    body_replaced_ = true;
+    Effect body_processing_effect = Effect::None;
+    if (bufferedData() == nullptr) {
+      Buffer::OwnedImpl new_body;
+      body_processing_effect =
+          MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
+      addBufferedData(new_body);
+    } else {
+      modifyBufferedData([&common_response, &body_processing_effect](Buffer::Instance& buf) {
+        body_processing_effect =
+            MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
+      });
+    }
+    logMutation(CallbackState::BufferedBodyCallback, body_processing_effect);
+  }
+
+  // In case any data left over in the chunk queue, clear them.
+  clearStreamingChunk();
+  // Once this message is received, we won't send anything more on this request
+  // or response to the processor. Clear flags to make sure.
+  body_mode_ = ProcessingMode::NONE;
+  send_trailers_ = false;
+  clearWatermark();
+
+  // If we got here, then the processor doesn't care about the body or is not ready for
+  // trailers, so we can just continue.
+  ENVOY_STREAM_LOG(trace, "Clearing stored headers", *filterCallbacks());
+  headers_ = nullptr;
+  filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
+  continueIfNecessary();
+  return absl::OkStatus();
+}
+
+absl::Status ProcessorState::handleHeaderContinue() {
+  if (no_body_) {
+    // Fall through if there was never a body in the first place.
+    ENVOY_STREAM_LOG(debug, "The message had no body", *filterCallbacks());
+  } else if (complete_body_available_ && body_mode_ != ProcessingMode::NONE) {
+    return handleCompleteBodyAvailable();
+  } else if (body_mode_ == ProcessingMode::BUFFERED) {
+    // Here, we're not ready to continue processing because then
+    // we won't be able to modify the headers any more, so do nothing and
+    // let the doData callback handle body chunks until the end is reached.
+    clearWatermark();
+    return absl::OkStatus();
+  } else if (body_mode_ == ProcessingMode::STREAMED ||
+             body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
+    sendBufferedDataInStreamedMode(false);
+    injectHeadersToFilterChain(false);
+    return absl::OkStatus();
+  } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
+    return handleBufferedPartialMode();
+  }
+
+  return handleTrailersAndCleanup();
+}
+
+absl::Status ProcessorState::handleCompleteBodyAvailable() {
+  if (callback_state_ == CallbackState::Idle) {
+    // If we get here, then all the body data came in before the header message
+    // was complete, and the server wants the body. It doesn't matter whether the
+    // processing mode is buffered, streamed, or partially buffered.
+    if (bufferedData()) {
+      // Get here, no_body_ = false, and complete_body_available_ = true, the end_stream
+      // flag of decodeData() can be determined by whether the trailers are received.
+      // Also, bufferedData() is not nullptr means decodeData() is called, even though
+      // the data can be an empty chunk.
+      auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
+      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+      clearWatermark();
+    } else {
+      return handleTrailersAndCleanup();
+    }
+  } else {
+    // StreamedBodyCallback state. There is pending body response.
+    // Check whether there is buffered data. If there is, send them.
+    // Do not continue filter chain here so the pending body response have chance to be
+    // served.
+    sendBufferedDataInStreamedMode(trailers_ == nullptr);
+  }
+  return absl::OkStatus();
+}
+
+absl::Status ProcessorState::handleBufferedPartialMode() {
+  if (hasBufferedData()) {
+    // Put the data buffered so far into the buffer queue. When more data comes in
+    // we'll check to see if we have reached the watermark.
+    ENVOY_STREAM_LOG(debug, "Enqueuing body data buffered so far", *filterCallbacks());
+    Buffer::OwnedImpl buffered_chunk;
+    modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
+    enqueueStreamingChunk(buffered_chunk, false);
+  }
+
+  if (queueOverHighLimit()) {
+    // We reached the limit so send what we have. This is different from the buffered
+    // case because we need to be set up to handle data that might come in while
+    // waiting for the callback, so the chunk needs to stay on the queue.
+    const auto& all_data = consolidateStreamedChunks();
+    ENVOY_STREAM_LOG(
+        debug, "Sending {} bytes of data end_stream {} in buffered partial mode before end stream",
+        *filterCallbacks(), chunkQueue().receivedData().length(), all_data.end_stream);
+    auto req = filter_.setupBodyChunk(*this, chunkQueue().receivedData(), false);
+    filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedPartialBodyCallback, req);
+  } else {
+    // Let data continue to flow, but don't resume yet -- we would like to hold
+    // the headers while we buffer the body up to the limit.
+    clearWatermark();
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status ProcessorState::handleTrailersAndCleanup() {
+  if (send_trailers_ && trailers_ != nullptr) {
+    // Trailers came in while we were waiting for this response, and the server
+    // is not interested in the body, so send them now.
+    filter_.sendTrailers(*this, *trailers_);
+    clearWatermark();
+    return absl::OkStatus();
+  }
+
+  // If we got here, then the processor doesn't care about the body or is not ready for
+  // trailers, so we can just continue.
+  ENVOY_STREAM_LOG(trace, "Clearing stored headers", *filterCallbacks());
+  headers_ = nullptr;
+  continueIfNecessary();
+  clearWatermark();
+  return absl::OkStatus();
+}
+
+absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
+  if (!isValidBodyCallbackState()) {
+    return absl::FailedPreconditionError("spurious message");
+  }
+
+  ENVOY_STREAM_LOG(debug, "Processing body response", *filterCallbacks());
+  const auto& common_response = response.response();
+
+  absl::StatusOr<bool> result;
+  switch (callback_state_) {
+  case CallbackState::BufferedBodyCallback:
+    result = handleBufferedBodyCallback(common_response);
+    break;
+  case CallbackState::StreamedBodyCallback:
+    result = handleStreamedBodyCallback(common_response);
+    break;
+  case CallbackState::BufferedPartialBodyCallback:
+    result = handleBufferedPartialBodyCallback(common_response);
+    break;
+  default:
+    // Fake a grpc error when processor state and received message type doesn't match
+    onFinishProcessorCall(Grpc::Status::FailedPrecondition);
+    IS_ENVOY_BUG("Unexpected callback_state in handleBodyResponse() of ext_proc filter");
+    break;
+  }
+
+  if (!result.ok()) {
+    filter_.onProcessBodyResponse(response, result.status(), trafficDirection());
+    return result.status();
+  }
+
+  // Clear route cache before finalizing
+  clearRouteCache(common_response);
+  finalizeBodyResponse(*result);
+
+  filter_.onProcessBodyResponse(response, absl::OkStatus(), trafficDirection());
+  return absl::OkStatus();
+}
+
+bool ProcessorState::isValidBodyCallbackState() const {
+  return callback_state_ == CallbackState::BufferedBodyCallback ||
+         callback_state_ == CallbackState::StreamedBodyCallback ||
+         callback_state_ == CallbackState::BufferedPartialBodyCallback;
+}
+
+absl::StatusOr<bool>
+ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response) {
+
+  // Handle header mutations if present
+  if (common_response.has_header_mutation()) {
+    Effect header_processing_effect = Effect::None;
+    const absl::Status mutation_status =
+        processHeaderMutationIfAvailable(common_response, header_processing_effect);
+    logMutation(CallbackState::HeadersCallback, header_processing_effect);
+    if (!mutation_status.ok()) {
+      return mutation_status;
+    }
+  }
+
+  // Handle body mutations if present
+  if (common_response.has_body_mutation()) {
+    const absl::Status validation_status = validateContentLength(common_response);
+    if (!validation_status.ok()) {
+      return validation_status;
+    }
+    Effect body_processing_effect = Effect::None;
+    applyBufferedBodyMutation(common_response, body_processing_effect);
+    logMutation(callback_state_, body_processing_effect);
+  }
+
+  clearWatermark();
+  onFinishProcessorCall(Grpc::Status::Ok);
+  return true;
+}
+
+absl::StatusOr<bool>
+ProcessorState::handleStreamedBodyCallback(const CommonResponse& common_response) {
+  if (common_response.has_body_mutation() &&
+      common_response.body_mutation().has_streamed_response()) {
+    ENVOY_STREAM_LOG(debug, "FULL_DUPLEX_STREAMED body response is received and body_mode_: {} ",
+                     *filterCallbacks(), ProcessingMode::BodySendMode_Name(body_mode_));
+    // streamed_response will only be supported if the ext_proc filter has body_mode set to
+    // FULL_DUPLEX_STREAMED.
+    if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
+      return absl::FailedPreconditionError(
+          "spurious message: streamed_response is received while body_mode_ is not "
+          "FULL_DUPLEX_STREAMED");
+    }
+    return handleDuplexStreamedBodyResponse(common_response);
+  }
+
+  if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
+    return absl::FailedPreconditionError(
+        "spurious message: Normal body mutation response is received while body_mode_ is "
+        "FULL_DUPLEX_STREAMED");
+  }
+  return handleStreamedBodyResponse(common_response);
+}
+
+absl::StatusOr<bool>
+ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_response) {
+  Buffer::OwnedImpl chunk_data;
+  std::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
+  if (!chunk) {
+    ENVOY_BUG(false, "Bad partial body callback state");
+    return absl::InternalError("Invalid chunk in partial body callback");
+  }
+
+  // Process header mutations if present
+  if (common_response.has_header_mutation()) {
+    Effect header_processing_effect = Effect::None;
+    const absl::Status mutation_status =
+        processHeaderMutationIfAvailable(common_response, header_processing_effect);
+    logMutation(CallbackState::HeadersCallback, header_processing_effect);
+    if (!mutation_status.ok()) {
+      return mutation_status;
+    }
+  }
+
+  // Apply body mutations and process data
+  Effect body_processing_effect = Effect::None;
+  if (common_response.has_body_mutation()) {
+    body_processing_effect =
+        MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
+  }
+  logMutation(callback_state_, body_processing_effect);
+
+  // Process chunk data
+  if (chunk_data.length() > 0) {
+    ENVOY_STREAM_LOG(trace, "Injecting {} bytes of processed data to filter stream",
+                     *filterCallbacks(), chunk_data.length());
+    injectDataToFilterChain(chunk_data, chunk->end_stream);
+  }
+  onFinishProcessorCall(Grpc::Status::Ok);
+
+  if (chunkQueue().receivedData().length() > 0) {
+    const QueuedChunk& all_data = consolidateStreamedChunks();
+    ENVOY_STREAM_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
+                     *filterCallbacks(), chunkQueue().receivedData().length());
+    injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
+  }
+
+  clearWatermark();
+  partial_body_processed_ = true;
+  return true;
+}
+
+absl::Status ProcessorState::processHeaderMutationIfAvailable(const CommonResponse& common_response,
+                                                              Effect& effect) {
+  if (headers_ != nullptr) {
+    absl::Status mut_status = processHeaderMutation(common_response, effect);
+    return mut_status;
+  }
+  ENVOY_STREAM_LOG(debug, "Response had header mutations but headers aren't available",
+                   *filterCallbacks());
+  return absl::OkStatus();
+}
+
+absl::Status ProcessorState::validateContentLength(const CommonResponse& common_response) {
+  if (!headers_ || !headers_->ContentLength()) {
+    return absl::OkStatus();
+  }
+
+  size_t content_length = 0;
+  if (!absl::SimpleAtoi(headers_->getContentLengthValue(), &content_length)) {
+    return absl::OkStatus();
+  }
+
+  if (content_length != common_response.body_mutation().body().size()) {
+    return absl::InternalError(
+        "mismatch between content length and the length of the mutated body");
+  }
+
+  return absl::OkStatus();
+}
+
+void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response,
+                                               Effect& effect) {
+  ENVOY_STREAM_LOG(debug, "Applying body response to buffered data. State = {}", *filterCallbacks(),
+                   static_cast<int>(callback_state_));
+  modifyBufferedData([&common_response, &effect](Buffer::Instance& data) {
+    effect = MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
+  });
+}
+
+void ProcessorState::finalizeBodyResponse(bool should_continue) {
+  headers_ = nullptr;
+  if (send_trailers_ && trailers_ != nullptr && chunk_queue_.empty()) {
+    filter_.sendTrailers(*this, *trailers_);
+  } else if (should_continue || (trailers_ != nullptr && chunk_queue_.empty())) {
+    continueIfNecessary();
+  }
+}
+
+bool ProcessorState::isValidTrailersCallbackState() const {
+  return callback_state_ == CallbackState::TrailersCallback ||
+         bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED;
+}
+
+// If the body mode is FULL_DUPLEX_STREAMED, then the trailers response may come back when
+// the state is still waiting for body response.
+absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
+  if (isValidTrailersCallbackState()) {
+    callback_state_ = CallbackState::TrailersCallback;
+    ENVOY_STREAM_LOG(debug, "Applying response to buffered trailers, body_mode_ {}",
+                     *filterCallbacks(), ProcessingMode::BodySendMode_Name(body_mode_));
+    if (response.has_header_mutation() && trailers_ != nullptr) {
+      Effect processing_effect = Effect::None;
+      auto mut_status = MutationUtils::applyHeaderMutations(
+          response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
+          filter_.stats().rejected_header_mutations_, processing_effect);
+      logMutation(callback_state_, processing_effect);
+      if (!mut_status.ok()) {
+        filter_.onProcessTrailersResponse(response, mut_status, trafficDirection());
+        return mut_status;
+      }
+    }
+    trailers_ = nullptr;
+    onFinishProcessorCall(Grpc::Status::Ok);
+    filter_.onProcessTrailersResponse(response, absl::OkStatus(), trafficDirection());
+    continueIfNecessary();
+    return absl::OkStatus();
+  }
+  return absl::FailedPreconditionError("spurious message");
+}
+
+void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream) {
+  chunk_queue_.push(data, end_stream);
+  if (queueOverHighLimit()) {
+    requestWatermark();
+  }
+}
+
+std::optional<QueuedChunk> ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
+  return chunk_queue_.pop(out_data);
+}
+
+void ProcessorState::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
+  onFinishProcessorCall(call_status);
+  if (!chunkQueue().empty()) {
+    const auto& all_data = consolidateStreamedChunks();
+    ENVOY_STREAM_LOG(trace, "Injecting leftover buffer of {} bytes", *filterCallbacks(),
+                     chunkQueue().receivedData().length());
+    injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
+  }
+  clearWatermark();
+  continueIfNecessary();
+}
+
+void ProcessorState::setBodyMode(ProcessingMode_BodySendMode body_mode) { body_mode_ = body_mode; }
+
+void ProcessorState::continueIfNecessary() {
+  if (paused_) {
+    ENVOY_STREAM_LOG(debug, "Continuing processing", *filterCallbacks());
+    paused_ = false;
+    continueProcessing();
+  }
+}
+
+bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_response) {
+  Buffer::OwnedImpl chunk_data;
+  std::optional<QueuedChunk> chunk = dequeueStreamingChunk(chunk_data);
+  if (!chunk.has_value()) {
+    IS_ENVOY_BUG("Bad streamed body callback state");
+    return false;
+  }
+  if (common_response.has_body_mutation()) {
+    Effect processing_effect;
+    ENVOY_STREAM_LOG(debug, "Applying body response to chunk of data. Size = {}",
+                     *filterCallbacks(), chunk->length);
+    processing_effect =
+        MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
+    logMutation(callback_state_, processing_effect);
+  }
+  bool should_continue = chunk->end_stream;
+  ENVOY_STREAM_LOG(trace, "Injecting {} bytes of data to filter stream", *filterCallbacks(),
+                   chunk_data.length());
+  injectDataToFilterChain(chunk_data, chunk->end_stream);
+
+  if (queueBelowLowLimit()) {
+    clearWatermark();
+  }
+  if (chunk_queue_.empty()) {
+    onFinishProcessorCall(Grpc::Status::Ok);
+  } else {
+    onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+  }
+
+  return should_continue;
+}
+
+bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& common_response) {
+  const envoy::service::ext_proc::v3::StreamedBodyResponse& streamed_response =
+      common_response.body_mutation().streamed_response();
+  const std::string& body = streamed_response.body();
+  const bool end_of_stream = streamed_response.end_of_stream();
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(body);
+  ENVOY_STREAM_LOG(trace,
+                   "Injecting {} bytes of data to filter stream in FULL_DUPLEX_STREAMED mode. "
+                   "end_of_stream is {}",
+                   *filterCallbacks(), buffer.length(), end_of_stream);
+  injectDataToFilterChain(buffer, end_of_stream);
+  // Assume mutations are applied in FULL_DUPLEX_STREAMED_MODE.
+  logMutation(callback_state_, Effect::MutationApplied);
+
+  if (end_of_stream) {
+    onFinishProcessorCall(Grpc::Status::Ok);
+  } else {
+    // Set the state to CallbackState::StreamedBodyCallback to wait for more bodies.
+    // However, this could be the last chunk of body, and trailers are right after it.
+    // The function to handle trailers response needs to consider this.
+    onFinishProcessorCall(Grpc::Status::Ok, CallbackState::StreamedBodyCallback);
+  }
+  // If end_of_stream is true, Envoy should continue the filter chain operations.
+  return end_of_stream;
+}
+
+bool ProcessorState::isLastResponseAfterHeaderResp() const {
+  if (callbackState() != ProcessorState::CallbackState::Idle) {
+    return false;
+  }
+  if (hasNoBody()) {
+    return true;
+  }
+
+  const bool send_trailers = shouldSendTrailers().send_trailers;
+  if (bodyMode() == ProcessingMode::NONE && !send_trailers) {
+    return true;
+  }
+  if (bodyMode() == ProcessingMode::NONE && send_trailers) {
+    if (completeBodyAvailable() && (responseTrailers() == nullptr)) {
+      return true;
+    }
+  }
+  if (bodyMode() != ProcessingMode::NONE && !send_trailers) {
+    if (responseTrailers() != nullptr) {
+      // If callback state is idle, and trailers are already received,
+      // then there is no more body chunks to send.
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ProcessorState::isLastResponseAfterBodyResp(bool eos_seen_in_body) const {
+  if (callbackState() != ProcessorState::CallbackState::Idle) {
+    return false;
+  }
+  if (eos_seen_in_body) {
+    return true;
+  }
+
+  if (!shouldSendTrailers().send_trailers && responseTrailers() != nullptr) {
+    // If callback state is idle, and trailers are already received,
+    // then there is no more body chunks to send.
+    return true;
+  }
+  return false;
+}
+
+// Return the status of onData() call for STREAMED and FULL_DUPLEX_STREAMED mode.
+Http::FilterDataStatus ProcessorState::getBodyCallbackResultInStreamedMode(bool end_stream) {
+  const bool return_stop_iteration =
+      (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_return_stop_iteration") ||
+       end_stream || callbackState() == ProcessorState::CallbackState::HeadersCallback);
+  if (return_stop_iteration) {
+    setPaused(true);
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+  return Http::FilterDataStatus::Continue;
+}
+
+bool ProcessorState::canFailOpen() const {
+  return bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED || !bodyReceived();
+}
+
+Http::FilterDataStatus
+DecodingProcessorState::getBodyCallbackResultInStreamedMode(bool end_stream) {
+  Http::FilterDataStatus result = ProcessorState::getBodyCallbackResultInStreamedMode(end_stream);
+  if (local_response_started_) {
+    // During local response streaming ext_proc filter acts as a terminal filter and should never
+    // return Continue status. Instead ext_proc tells filter manager to discard current body chunk,
+    // as it was either sent to ext_proc server or needs to be discarded in the NONE send mode.
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+  return result;
+}
+
+void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
+  // Account for the different default behaviors of headers and trailers --
+  // headers are sent by default and trailers are not.
+  send_headers_ = mode.request_header_mode() != ProcessingMode::SKIP;
+  send_trailers_ = mode.request_trailer_mode() == ProcessingMode::SEND;
+  setBodyMode(mode.request_body_mode());
+}
+
+void DecodingProcessorState::requestWatermark() {
+  if (!watermark_requested_) {
+    ENVOY_STREAM_LOG(debug, "Watermark raised on decoding", *decoder_callbacks_);
+    watermark_requested_ = true;
+    decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
+  }
+}
+
+void DecodingProcessorState::clearWatermark() {
+  if (watermark_requested_) {
+    ENVOY_STREAM_LOG(debug, "Watermark lowered on decoding", *decoder_callbacks_);
+    watermark_requested_ = false;
+    decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
+  }
+}
+
+void DecodingProcessorState::clearRouteCache(const CommonResponse& common_response) {
+  bool response_clear_route_cache = common_response.clear_route_cache();
+  if (filter_.config().isUpstream()) {
+    if (response_clear_route_cache) {
+      filter_.stats().clear_route_cache_upstream_ignored_.inc();
+      ENVOY_STREAM_LOG(debug, "NOT clearing route cache. The filter is in upstream filter chain.",
+                       *decoder_callbacks_);
+    }
+    return;
+  }
+
+  if (!common_response.has_header_mutation()) {
+    if (response_clear_route_cache) {
+      filter_.stats().clear_route_cache_ignored_.inc();
+      ENVOY_STREAM_LOG(debug, "NOT clearing route cache. No header mutation in the response",
+                       *decoder_callbacks_);
+    }
+    return;
+  }
+
+  // Filter is in downstream and response has header mutation.
+  switch (filter_.config().routeCacheAction()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT:
+    if (response_clear_route_cache) {
+      ENVOY_STREAM_LOG(debug,
+                       "Clearing route cache due to the filter RouterCacheAction is configured "
+                       "with DEFAULT and response has clear_route_cache set.",
+                       *decoder_callbacks_);
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+    }
+    break;
+  case envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::CLEAR:
+    ENVOY_STREAM_LOG(
+        debug, "Clearing route cache due to the filter RouterCacheAction is configured with CLEAR",
+        *decoder_callbacks_);
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+    break;
+  case envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RETAIN:
+    if (response_clear_route_cache) {
+      filter_.stats().clear_route_cache_disabled_.inc();
+      ENVOY_STREAM_LOG(debug, "NOT clearing route cache, it is disabled by the filter config",
+                       *decoder_callbacks_);
+    }
+    break;
+  }
+}
+
+bool DecodingProcessorState::isValidBodyCallbackState() const {
+  if (!local_response_started_) {
+    return ProcessorState::isValidBodyCallbackState();
+  }
+  // Local response streaming has to use the local_response_body field.
+  return false;
+}
+
+bool DecodingProcessorState::isValidTrailersCallbackState() const {
+  if (!local_response_started_) {
+    return ProcessorState::isValidTrailersCallbackState();
+  }
+  // Local response streaming has to use the local_response_trailers field.
+  return false;
+}
+
+bool DecodingProcessorState::handleStandaloneModeOverride(
+    const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
+        old_body_mode) {
+  if (callbackState() == ProcessorState::CallbackState::HeadersCallback &&
+      (old_body_mode == ProcessingMode::STREAMED || old_body_mode == ProcessingMode::NONE) &&
+      body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED && send_trailers_) {
+    // Stop the timer, as per-message timeouts are not applicable in FULL_DUPLEX_STREAMED mode.
+    stopMessageTimer();
+    bool end_stream = (complete_body_available_ && trailers_ == nullptr);
+    if (hasBufferedData() || (bufferedData() && end_stream)) {
+      // Body came in while we were waiting for this response.
+      Buffer::OwnedImpl buffered_chunk;
+      modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
+      ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
+                       buffered_chunk.length());
+      auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
+      buffered_chunk.drain(buffered_chunk.length());
+      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::HeadersCallback, req);
+    }
+
+    if (trailers_ != nullptr) {
+      // Trailers came in while we were waiting for this response.
+      filter_.sendTrailers(*this, *trailers_);
+    }
+    return true;
+  }
+
+  ENVOY_STREAM_LOG(debug, "Invalid standalone mode_override message received on gRPC stream",
+                   *decoder_callbacks_);
+  return false;
+}
+
+void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
+  // Account for the different default behaviors of headers and trailers --
+  // headers are sent by default and trailers are not.
+  send_headers_ = mode.response_header_mode() != ProcessingMode::SKIP;
+  send_trailers_ = mode.response_trailer_mode() == ProcessingMode::SEND;
+  setBodyMode(mode.response_body_mode());
+}
+
+void EncodingProcessorState::requestWatermark() {
+  if (!watermark_requested_) {
+    ENVOY_STREAM_LOG(debug, "Watermark raised on encoding", *encoder_callbacks_);
+    watermark_requested_ = true;
+    encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
+  }
+}
+
+void EncodingProcessorState::clearWatermark() {
+  if (watermark_requested_) {
+    ENVOY_STREAM_LOG(debug, "Watermark lowered on encoding", *encoder_callbacks_);
+    watermark_requested_ = false;
+    encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+  }
+}
+
+void EncodingProcessorState::setLocalResponseStreaming() {
+  local_response_streaming_ = true;
+  ProcessingMode mode;
+  mode.set_response_header_mode(ProcessingMode::SKIP);
+  mode.set_response_body_mode(ProcessingMode::NONE);
+  mode.set_response_trailer_mode(ProcessingMode::SKIP);
+  setProcessingMode(mode);
+}
+
+void ChunkQueue::push(Buffer::Instance& data, bool end_stream) {
+  // Adding the chunk into the queue.
+  queue_.push_back({end_stream, static_cast<uint32_t>(data.length())});
+  bytes_enqueued_ += data.length();
+
+  // Adding the data to the buffer.
+  received_data_.move(data);
+}
+
+std::optional<QueuedChunk> ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
+  if (queue_.empty()) {
+    return std::nullopt;
+  }
+
+  QueuedChunk chunk = queue_.front();
+  queue_.pop_front();
+  bytes_enqueued_ -= chunk.length;
+
+  // Move the corresponding data out.
+  out_data.move(received_data_, chunk.length);
+  return chunk;
+}
+
+const QueuedChunk& ChunkQueue::consolidate() {
+  if (queue_.size() > 1) {
+    bool end_stream = queue_.back().end_stream;
+    queue_.clear();
+    queue_.push_front({end_stream, bytes_enqueued_});
+  }
+  auto& chunk = queue_.front();
+  return chunk;
+}
+
+void ChunkQueue::clear() {
+  if (!queue_.empty()) {
+    received_data_.drain(received_data_.length());
+    queue_.clear();
+    bytes_enqueued_ = 0;
+  }
+}
+
+ProcessingResult DecodingProcessorState::startLocalResponse(
+    const ::envoy::service::ext_proc::v3::StreamedImmediateResponse& response) {
+  const ::envoy::service::ext_proc::v3::HttpHeaders& response_headers = response.headers_response();
+  if (callback_state_ != CallbackState::HeadersCallback) {
+    return ProcessingResult{.status = absl::FailedPreconditionError("spurious message"),
+                            .processing_complete = true};
+  }
+  const bool end_stream = response_headers.end_of_stream();
+  if (!end_stream && body_mode_ != ProcessingMode::NONE &&
+      body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
+    return ProcessingResult{
+        .status = absl::FailedPreconditionError("streaming local response body is only supported "
+                                                "in NONE or FULL_DUPLEX_STREAMED modes"),
+        .processing_complete = true};
+  }
+
+  ENVOY_STREAM_LOG(debug, "applying local response headers response. body mode = {}",
+                   *decoder_callbacks_, ProcessingMode::BodySendMode_Name(body_mode_));
+  auto local_response_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>({});
+  const auto mut_status = MutationUtils::protoToHeaders(
+      response_headers.headers(), *local_response_headers, filter_.config().mutationChecker(),
+      filter_.stats().rejected_header_mutations_);
+
+  if (!mut_status.ok()) {
+    filter_.onProcessStreamingImmediateResponse(response, mut_status);
+    return ProcessingResult{.status = mut_status, .processing_complete = true};
+  }
+
+  local_response_started_ = true;
+  onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp());
+  filter_.onProcessStreamingImmediateResponse(response, absl::OkStatus());
+
+  decoder_callbacks_->encodeHeaders(std::move(local_response_headers), end_stream,
+                                    "ext_proc_local_response");
+  return ProcessingResult{.status = handleHeaderContinue(), .processing_complete = end_stream};
+}
+
+ProcessingResult DecodingProcessorState::processLocalBodyResponse(
+    const ::envoy::service::ext_proc::v3::StreamedImmediateResponse& response) {
+  const ::envoy::service::ext_proc::v3::StreamedBodyResponse& response_body =
+      response.body_response();
+  if (!local_response_started_) {
+    return ProcessingResult{
+        .status = absl::FailedPreconditionError("local response body received before headers"),
+        .processing_complete = true};
+  }
+
+  filter_.onProcessStreamingImmediateResponse(response, absl::OkStatus());
+  const bool end_stream = response_body.end_of_stream();
+
+  // We can only get here if body mode is either FULL_DUPLEX_STREAMED or NONE. In both cases there
+  // is no buffering on the client and there is no local state to clean up (such as queue in
+  // STREAMED mode). Just the encode the received local response data.
+  Buffer::OwnedImpl data(response_body.body());
+  decoder_callbacks_->encodeData(data, end_stream);
+  return ProcessingResult{.status = absl::OkStatus(), .processing_complete = end_stream};
+}
+
+ProcessingResult DecodingProcessorState::processLocalTrailersResponse(
+    const ::envoy::service::ext_proc::v3::StreamedImmediateResponse& response) {
+  const envoy::config::core::v3::HeaderMap& response_trailers = response.trailers_response();
+  if (!local_response_started_) {
+    return ProcessingResult{
+        .status = absl::FailedPreconditionError("local response trailers received before headers"),
+        .processing_complete = true};
+  }
+  auto local_response_trailers = Http::createHeaderMap<Http::ResponseTrailerMapImpl>({});
+  const auto mut_status = MutationUtils::protoToHeaders(response_trailers, *local_response_trailers,
+                                                        filter_.config().mutationChecker(),
+                                                        filter_.stats().rejected_header_mutations_);
+
+  filter_.onProcessStreamingImmediateResponse(response, mut_status);
+  if (!mut_status.ok()) {
+    return ProcessingResult{.status = mut_status, .processing_complete = true};
+  }
+
+  decoder_callbacks_->encodeTrailers(std::move(local_response_trailers));
+  return ProcessingResult{.status = absl::OkStatus(), .processing_complete = true};
+}
+
+void DecodingProcessorState::continueProcessing() const {
+  // If a local response was started the ext_proc becomes the terminal filter and
+  // will never continue the decoder filter chain.
+  if (!local_response_started_) {
+    decoder_callbacks_->continueDecoding();
+  }
+}
+
+bool DecodingProcessorState::canFailOpen() const {
+  // After streaming local response started the ext_proc becomes the terminal filter and
+  // should not fail open.
+  return !local_response_started_ &&
+         (bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED || !bodyReceived());
+}
+
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

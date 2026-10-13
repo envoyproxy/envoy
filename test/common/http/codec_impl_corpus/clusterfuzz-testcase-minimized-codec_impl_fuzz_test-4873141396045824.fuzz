@@ -1,0 +1,44 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "upgrade"
+        value: ":path"
+      }
+      headers {
+        key: "connection"
+        value: "upgRade"
+      }
+    }
+  }
+}
+actions {
+  mutate {
+    buffer: 2
+    offset: 4
+    value: 98
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+        headers {
+          key: "upgrade"
+        }
+        headers {
+          key: ":status"
+          value: "upgRade"
+        }
+        headers {
+          key: "connection"
+          value: "upgRade"
+        }
+      }
+    }
+  }
+}

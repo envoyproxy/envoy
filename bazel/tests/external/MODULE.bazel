@@ -1,0 +1,43 @@
+module(name = "envoy_external")
+
+bazel_dep(name = "envoy", version = "1.40.0-dev")
+bazel_dep(name = "envoy_api", version = "1.40.0-dev")
+bazel_dep(name = "envoy-docs", version = "1.40.0-dev")
+bazel_dep(name = "envoy_toolshed", version = "0.5.3.envoy")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
+bazel_dep(name = "rules_python", version = "2.3.3")
+
+bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True, repo_name = "buildifier")
+bazel_dep(name = "google_benchmark", version = "1.9.5", dev_dependency = True, repo_name = "benchmark")
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1", dev_dependency = True)
+bazel_dep(name = "tclap", version = "1.2.5.bcr.1", dev_dependency = True)
+
+local_path_override(
+    module_name = "envoy",
+    path = "../../../",
+)
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "../../../api",
+)
+
+local_path_override(
+    module_name = "envoy-docs",
+    path = "../../../docs",
+)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.12",
+)
+use_repo(
+    python,
+    "python_3_12",
+    python = "python_versions",
+)
+
+envoy_toolchains_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_toolchains_extension")
+use_repo(envoy_toolchains_ext, "clang_platform")

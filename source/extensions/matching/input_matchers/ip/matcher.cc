@@ -1,0 +1,55 @@
+#include "source/extensions/matching/input_matchers/ip/matcher.h"
+
+#include "envoy/matcher/matcher.h"
+
+#include "source/common/network/utility.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Matching {
+namespace InputMatchers {
+namespace IP {
+
+namespace {
+using ::Envoy::Matcher::MatchResult;
+
+MatcherStats generateStats(absl::string_view prefix, Stats::Scope& scope) {
+  return MatcherStats{IP_MATCHER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+}
+
+} // namespace
+
+Matcher::Matcher(std::vector<Network::Address::CidrRange> const& ranges,
+                 absl::string_view stat_prefix,
+                 Stats::Scope& stat_scope)
+    : // We could put "false" instead of "true". What matters is that the IP
+      // belongs to the trie. We could further optimize the storage of LcTrie in
+      // this case by implementing an LcTrie<void> specialization that doesn't
+      // store any associated data.
+      trie_({{true, ranges}}), stats_(generateStats(stat_prefix, stat_scope)) {}
+
+MatchResult Matcher::match(const Envoy::Matcher::DataInputGetResult& input) {
+  auto data = input.stringData();
+  if (!data) {
+    return MatchResult::NoMatch;
+  }
+  if (data->empty()) {
+    return MatchResult::NoMatch;
+  }
+  const auto ip = Network::Utility::parseInternetAddressNoThrow(std::string(*data));
+  if (!ip) {
+    stats_.ip_parsing_failed_.inc();
+    ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", *data);
+    return MatchResult::NoMatch;
+  }
+  if (!trie_.getData(ip).empty()) {
+    return MatchResult::Matched;
+  }
+  return MatchResult::NoMatch;
+}
+
+} // namespace IP
+} // namespace InputMatchers
+} // namespace Matching
+} // namespace Extensions
+} // namespace Envoy

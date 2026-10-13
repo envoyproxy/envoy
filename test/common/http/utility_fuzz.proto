@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package test.common.http;
+
+import "validate/validate.proto";
+import "envoy/config/core/v3/protocol.proto";
+
+// Structured input for utility_fuzz_test.
+
+message CookiesKey {
+  repeated string cookies = 1;
+  string key = 2;
+}
+
+message GetLastAddressFromXff {
+  string xff = 1;
+  uint32 num_to_skip = 2;
+}
+
+message Parameter {
+  string data = 1;
+  uint32 start = 2;
+}
+
+message CookieValue {
+  string key = 1;
+  string value = 2;
+  string path = 3;
+  int64 max_age = 4;
+  bool httponly = 5;
+}
+
+message UtilityTestCase {
+  reserved 3; // formerly has_set_cookie
+
+  oneof utility_selector {
+    string parse_query_string = 1;
+    CookiesKey parse_cookie_value = 2;
+    GetLastAddressFromXff get_last_address_from_xff = 4;
+    string extract_host_path_from_uri = 5;
+    string percent_encoding_string = 6;
+    string percent_decoding_string = 7;
+    Parameter parse_parameters = 8;
+    string find_query_string = 9
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE, strict: false}];
+    CookieValue make_set_cookie_value = 10;
+    string parse_authority_string = 11;
+    envoy.config.core.v3.Http2ProtocolOptions initialize_and_validate = 12;
+  }
+}

@@ -1,0 +1,26 @@
+#include "source/extensions/matching/common_inputs/environment_variable/input.h"
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Matching {
+namespace CommonInputs {
+namespace EnvironmentVariable {
+
+TEST(InputTest, BasicUsage) {
+  {
+    auto foo = "foo";
+    Input input(foo);
+    EXPECT_EQ(input.get().stringData().value(), "foo");
+  }
+
+  auto foo = "foo";
+  Input input(foo);
+  EXPECT_EQ(input.get().stringData().value(), "foo");
+}
+} // namespace EnvironmentVariable
+} // namespace CommonInputs
+} // namespace Matching
+} // namespace Extensions
+} // namespace Envoy

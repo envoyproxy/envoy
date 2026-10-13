@@ -1,0 +1,184 @@
+format : "%DYNAMIC_METADATA()%" stream_info {
+  dynamic_metadata {
+    filter_metadata {
+    key:
+      "" value {
+        fields {
+        key:
+          "" value {
+            list_value {
+              values {
+                struct_value {
+                  fields {
+                  key:
+                    "" value {
+                      list_value {
+                        values {
+                          struct_value {
+                            fields {
+                            key:
+                              "" value {
+                                list_value {
+                                  values {
+                                    struct_value {
+                                      fields {
+                                      key:
+                                        "" value {
+                                          list_value {
+                                            values {
+                                              list_value {
+                                                values {
+                                                  struct_value {
+                                                    fields {
+                                                    key:
+                                                      "" value {
+                                                        list_value {
+                                                          values {
+                                                            struct_value {
+                                                              fields {
+                                                              key:
+                                                                "" value {
+                                                                  list_value {
+                                                                    values {
+                                                                      struct_value {
+                                                                        fields {
+                                                                        key:
+                                                                          "" value {
+                                                                            struct_value {
+                                                                              fields {
+                                                                              key:
+                                                                                "" value {
+                                                                                  list_value {
+                                                                                    values {
+                                                                                      list_value {
+                                                                                        values {
+                                                                                          struct_value {
+                                                                                            fields {
+                                                                                            key:
+                                                                                              "" value {
+                                                                                                list_value {
+                                                                                                  values {
+                                                                                                    struct_value {
+                                                                                                      fields {
+                                                                                                      key:
+                                                                                                        "" value {
+                                                                                                          list_value {
+                                                                                                            values {
+                                                                                                              struct_value {
+                                                                                                                fields {
+                                                                                                                key:
+                                                                                                                  "" value {
+                                                                                                                    list_value {
+                                                                                                                      values {
+                                                                                                                        struct_value {
+                                                                                                                          fields {
+                                                                                                                          key:
+                                                                                                                            "" value {
+                                                                                                                              list_value {
+                                                                                                                                values {
+                                                                                                                                  struct_value {
+                                                                                                                                    fields {
+                                                                                                                                    key:
+                                                                                                                                      "" value {
+                                                                                                                                        list_value {
+                                                                                                                                          values {
+                                                                                                                                            struct_value {
+                                                                                                                                              fields {
+                                                                                                                                              key:
+                                                                                                                                                "" value {
+                                                                                                                                                  list_value {
+                                                                                                                                                    values {
+                                                                                                                                                      list_value {
+                                                                                                                                                        values {
+                                                                                                                                                          struct_value {
+                                                                                                                                                            fields {
+                                                                                                                                                              key: ""
+                                                                                                                                                              value {
+                                                                                                                                                                list_value {
+                                                                                                                                                                  values {
+                                                                                                                                                                    list_value {
+                                                                                                                                                                      values {
+                                                                                                                                                                      }
+                                                                                                                                                                    }
+                                                                                                                                                                  }
+                                                                                                                                                                }
+                                                                                                                                                              }
+                                                                                                                                                            }
+                                                                                                                                                          }
+                                                                                                                                                        }
+                                                                                                                                                      }
+                                                                                                                                                    }
+                                                                                                                                                  }
+                                                                                                                                                }
+                                                                                                                                              }
+                                                                                                                                            }
+                                                                                                                                          }
+                                                                                                                                        }
+                                                                                                                                      }
+                                                                                                                                    }
+                                                                                                                                  }
+                                                                                                                                }
+                                                                                                                              }
+                                                                                                                            }
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      }
+                                                                                                                    }
+                                                                                                                  }
+                                                                                                                }
+                                                                                                              }
+                                                                                                            }
+                                                                                                          }
+                                                                                                        }
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

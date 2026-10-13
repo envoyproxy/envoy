@@ -1,0 +1,39 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.validate.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace AdmissionControl {
+
+/**
+ * Config registration for the adaptive concurrency limit filter. @see NamedHttpFilterConfigFactory.
+ */
+class AdmissionControlFilterFactory
+    : public Common::UnifiedFactoryBase<
+          envoy::extensions::filters::http::admission_control::v3::AdmissionControl> {
+public:
+  AdmissionControlFilterFactory() : UnifiedFactoryBase("envoy.filters.http.admission_control") {}
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+private:
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& proto_config,
+      const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& context,
+      Stats::Scope& scope);
+};
+
+using UpstreamAdmissionControlFilterFactory = AdmissionControlFilterFactory;
+
+} // namespace AdmissionControl
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

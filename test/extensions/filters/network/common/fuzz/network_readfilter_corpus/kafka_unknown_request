@@ -1,0 +1,21 @@
+config {
+  name: "envoy.filters.network.kafka_broker"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker"
+    value: "\n\"envoy.filters.network.kafka_broker"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+    data:"\x0\x0\x0\x1d\x7f\xff\x0\x0\x0\x0\x0\x0\x0\x9\x63\x6c\x69\x65\x6e\x74\x2d\x69\x64\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 10000
+  }
+}

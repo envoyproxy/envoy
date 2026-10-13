@@ -1,0 +1,47 @@
+#include "source/extensions/filters/http/cors/config.h"
+
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.validate.h"
+#include "envoy/registry/registry.h"
+#include "envoy/router/router.h"
+
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
+#include "source/extensions/filters/http/cors/cors_filter.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace Cors {
+
+using CorsPolicyImpl =
+    Router::CorsPolicyImplBase<envoy::extensions::filters::http::cors::v3::CorsPolicy>;
+
+absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::cors::v3::Cors&,
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  CorsFilterConfigSharedPtr config = std::make_shared<CorsFilterConfig>(
+      extra_context.statsPrefixOr(), extra_context.statsPrefixScopeOr(context));
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<CorsFilter>(config));
+  };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+CorsFilterFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::cors::v3::CorsPolicy& policy,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<CorsPolicyImpl>(policy, context);
+}
+
+/**
+ * Static registration for the cors filter. @see RegisterFactory.
+ */
+LEGACY_REGISTER_FACTORY(CorsFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.cors");
+
+} // namespace Cors
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

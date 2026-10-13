@@ -1,0 +1,59 @@
+base {
+  config {
+    grpc_service {
+      envoy_grpc {
+        cluster_name: "ext_authz_server"
+      }
+    }
+    stat_prefix: "with_stat_prefix"
+  }
+  request_data {
+    headers {
+      headers {
+        key: ":host"
+        value: "example.com"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/users"
+      }
+      headers {
+        key: ":scheme"
+        value: "https"
+      }
+    }
+  }
+}
+response {
+  status {
+    code: 0
+    message: "LGTM!"
+  }
+  ok_response {
+    headers {
+      header {
+        key: "added-upstream-request-header"
+        value: "this should be added by ext_authz to the upstream request!"
+      }
+      append_action: APPEND_IF_EXISTS_OR_ADD
+    }
+    headers_to_remove: "blah"
+    headers_to_remove: "bleh"
+    response_headers_to_add {
+      header {
+        key: "added-downstream-response-header"
+        value: "this should be added by ext_authz to the downstream response!"
+      }
+      append_action: APPEND_IF_EXISTS_OR_ADD
+    }
+    query_parameters_to_set {
+      key: "new-query-param-key"
+      value: "query param value"
+    }
+    query_parameters_to_remove: "query-param-key-remove-me"
+  }
+}

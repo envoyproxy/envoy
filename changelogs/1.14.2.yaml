@@ -1,0 +1,18 @@
+date: June 8, 2020
+
+changes:
+- area: http
+  change: |
+    fixed CVE-2020-11080 by rejecting HTTP/2 SETTINGS frames with too many parameters.
+- area: http
+  change: |
+    the :ref:`stream_idle_timeout
+    <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>` now also
+    defends against an HTTP/2 peer that does not open stream window once an entire response has been buffered to be sent to
+    a downstream client.
+- area: listener
+  change: |
+    Add runtime support for :ref:`per-listener limits <config_listeners>` on active/accepted connections.
+- area: overload management
+  change: |
+    Add runtime support for :ref:`global limits <config_overload_manager>` on active/accepted connections.

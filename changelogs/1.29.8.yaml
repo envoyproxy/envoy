@@ -1,0 +1,9 @@
+date: September 14, 2024
+
+bug_fixes:
+- area: stateful_session
+  change: |
+    Support 0 TTL for proto-encoded cookies, which disables cookie expiration by Envoy.
+- area: dependencies
+  change: |
+    Update curl to mitigate CVE-2024-7264.

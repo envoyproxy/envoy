@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.listener.tls_inspector.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.listener.tls_inspector.v3";
+option java_outer_classname = "TlsInspectorProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/listener/tls_inspector/v3;tls_inspectorv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: TLS Inspector Filter]
+// Allows detecting whether the transport appears to be TLS or plaintext.
+// [#extension: envoy.filters.listener.tls_inspector]
+
+// [#next-free-field: 6]
+message TlsInspector {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.listener.tls_inspector.v2.TlsInspector";
+
+  // Populate ``JA3`` fingerprint hash using data from the TLS Client Hello packet. Default is false.
+  google.protobuf.BoolValue enable_ja3_fingerprinting = 1;
+
+  // Populate ``JA4`` fingerprint hash using data from the TLS Client Hello packet.
+  // ``JA4`` is an improved version of ``JA3`` that includes TLS version, ciphers, extensions,
+  // and ALPN information in a hex format. Default is false.
+  google.protobuf.BoolValue enable_ja4_fingerprinting = 3;
+
+  // The size in bytes of the initial buffer requested by the tls_inspector.
+  // If the filter needs to read additional bytes from the socket, the
+  // filter will double the buffer up to it's default maximum of 16KiB.
+  // If this size is not defined, defaults to maximum 16KiB that the
+  // tls inspector will consume.
+  google.protobuf.UInt32Value initial_read_buffer_size = 2
+      [(validate.rules).uint32 = {lt: 65537 gt: 255}];
+
+  // Close connection when TLS ClientHello message could not be parsed.
+  // This flag should be enabled only if it is known that incoming connections are expected to use
+  // TLS protocol, as Envoy does not distinguish between a plain text message or a malformed TLS
+  // ClientHello message.
+  // By default this flag is false and TLS ClientHello parsing errors are interpreted as a
+  // plain text connection.
+  // Setting this to true will cause connections to be terminated and the ``client_hello_too_large``
+  // counter to be incremented if the ClientHello message is over implementation defined limit
+  // (currently 16Kb).
+  bool close_connection_on_client_hello_parsing_errors = 4;
+
+  // The maximum size in bytes of the ClientHello that the tls_inspector will
+  // process. If the ClientHello is larger than this size, the tls_inspector
+  // will stop processing and indicate failure. If not defined, defaults to
+  // 16KiB.
+  google.protobuf.UInt32Value max_client_hello_size = 5
+      [(validate.rules).uint32 = {lte: 16384 gt: 255}];
+}

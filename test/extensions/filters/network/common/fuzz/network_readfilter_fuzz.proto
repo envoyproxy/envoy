@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package test.extensions.filters.network;
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+import "envoy/config/listener/v3/listener_components.proto";
+
+message OnData {
+  bytes data = 1;
+  bool end_stream = 2;
+}
+
+message AdvanceTime {
+  // Advance the system time by (0,24] hours.
+  uint32 milliseconds = 1 [(validate.rules).uint32 = {gt: 0 lt: 86400000}];
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+    // Call onNewConnection()
+    google.protobuf.Empty on_new_connection = 1;
+    // Call onData()
+    OnData on_data = 2;
+    // Advance time_source_
+    AdvanceTime advance_time = 3;
+  }
+}
+
+// Helper to mutate actions in FilterFuzzTestCase, because mutate() does not apply to repeated members.
+message FuzzHelperForActions {
+  repeated Action actions = 1;
+}
+
+message FilterFuzzTestCase {
+  // This is actually a protobuf type for the config of network filters.
+  envoy.config.listener.v3.Filter config = 1;
+  repeated Action actions = 2;
+}

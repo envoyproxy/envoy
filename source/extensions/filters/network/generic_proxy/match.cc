@@ -1,0 +1,102 @@
+#include "source/extensions/filters/network/generic_proxy/match.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace GenericProxy {
+
+REGISTER_FACTORY(ServiceMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
+
+REGISTER_FACTORY(HostMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
+
+REGISTER_FACTORY(PathMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
+
+REGISTER_FACTORY(MethodMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
+
+REGISTER_FACTORY(PropertyMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
+
+REGISTER_FACTORY(RequestMatchDataInputFactory, Matcher::DataInputFactory<MatchInput>);
+
+RequestMatchInputMatcher::RequestMatchInputMatcher(
+    const RequestMatcherProto& proto_config, Server::Configuration::CommonFactoryContext& context) {
+
+  if (proto_config.has_host()) {
+    host_ = std::make_unique<Matchers::StringMatcherImpl>(proto_config.host(), context);
+  }
+  if (proto_config.has_path()) {
+    path_ = std::make_unique<Matchers::StringMatcherImpl>(proto_config.path(), context);
+  }
+  if (proto_config.has_method()) {
+    method_ = std::make_unique<Matchers::StringMatcherImpl>(proto_config.method(), context);
+  }
+
+  for (const auto& property : proto_config.properties()) {
+    properties_.push_back({property.name(), std::make_unique<Matchers::StringMatcherImpl>(
+                                                property.string_match(), context)});
+  }
+}
+
+Matcher::MatchResult RequestMatchInputMatcher::match(const Matcher::DataInputGetResult& input) {
+  auto data = input.customData<RequestMatchData>();
+  if (!data) {
+    return Matcher::MatchResult::NoMatch;
+  }
+
+  return match(data->data().requestHeader());
+}
+
+Matcher::MatchResult RequestMatchInputMatcher::match(const RequestHeaderFrame& request) {
+  // TODO(wbpcode): may add more debug log for request match?
+  if (host_ != nullptr) {
+    if (!host_->match(request.host())) {
+      // Host does not match.
+      return Matcher::MatchResult::NoMatch;
+    }
+  }
+
+  if (path_ != nullptr) {
+    if (!path_->match(request.path())) {
+      // Path does not match.
+      return Matcher::MatchResult::NoMatch;
+    }
+  }
+
+  if (method_ != nullptr) {
+    if (!method_->match(request.method())) {
+      // Method does not match.
+      return Matcher::MatchResult::NoMatch;
+    }
+  }
+
+  for (const auto& property : properties_) {
+    if (auto val = request.get(property.first); val.has_value()) {
+      if (!property.second->match(val.value())) {
+        // Property does not match.
+        return Matcher::MatchResult::NoMatch;
+      }
+    } else {
+      // Property does not exist.
+      return Matcher::MatchResult::NoMatch;
+    }
+  }
+
+  // All matchers passed.
+  return Matcher::MatchResult::Matched;
+}
+
+Matcher::InputMatcherFactoryCb RequestMatchDataInputMatcherFactory::createInputMatcherFactoryCb(
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& factory_context) {
+  const auto& proto_config = MessageUtil::downcastAndValidate<const RequestMatcherProto&>(
+      config, factory_context.messageValidationVisitor());
+
+  return [proto_config, &factory_context]() -> Matcher::InputMatcherPtr {
+    return std::make_unique<RequestMatchInputMatcher>(proto_config, factory_context);
+  };
+}
+
+REGISTER_FACTORY(RequestMatchDataInputMatcherFactory, Matcher::InputMatcherFactory);
+
+} // namespace GenericProxy
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

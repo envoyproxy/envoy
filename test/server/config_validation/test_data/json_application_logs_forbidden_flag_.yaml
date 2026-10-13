@@ -1,0 +1,11 @@
+---
+application_log_config:
+  log_format:
+    json_format:
+      MessageFromProto: "%_"
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9000

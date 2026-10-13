@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.resource_monitors.fixed_heap.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.fixed_heap.v3";
+option java_outer_classname = "FixedHeapProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/fixed_heap/v3;fixed_heapv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Fixed heap]
+// [#extension: envoy.resource_monitors.fixed_heap]
+
+// The fixed heap resource monitor reports the Envoy process memory pressure, computed as a
+// fraction of currently reserved heap memory divided by a statically configured maximum
+// specified in the FixedHeapConfig.
+message FixedHeapConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig";
+
+  // Static value for max heap size in bytes set at startup.
+  // Exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must be set.
+  // If set, the expected value must be greater than ``0``, otherwise validation will fail.
+  uint64 max_heap_size_bytes = 1;
+
+  // Runtime overlay for max heap size in bytes. When set, the value can be overridden
+  // at runtime during startup or later without restart.
+  // Exactly one of max_heap_size_bytes or max_heap_size_bytes_runtime must be set.
+  // If set, the expected value must be greater than ``0``, otherwise validation will fail.
+  config.core.v3.RuntimeUInt64 max_heap_size_bytes_runtime = 2;
+}

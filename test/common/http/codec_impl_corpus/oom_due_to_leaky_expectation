@@ -1,0 +1,4552 @@
+h2_settings {
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 4127178752
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 4127178752
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "T"
+      }
+      headers {
+        key: ":authority"
+        value: "T"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      read_disable: true
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 1024
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: "ckie"
+        value: "cookie"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 16765696
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: "/"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "ookie"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "Kie"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: ":path"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 1600746016
+    server: true
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: "nosniff"
+        value: "ookcie"
+      }
+      headers {
+        key: "http"
+        value: "/"
+      }
+      headers {
+        key: "cooe"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    request {
+      data: 1793
+    }
+    dispatching_action {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 7
+    response {
+      data: 196544
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 100663295
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  mutate {
+    server: true
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":metlod"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "ookie"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "ckie"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cooe"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 256
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 16384
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1809
+    request {
+      read_disable: true
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 7565160
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 7
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "htp"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+        value: "foo=.ar"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data_value: "/"
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 1024
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":hrity"
+        value: "cookie"
+      }
+      headers {
+        key: "T"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3004096
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: "foo2=bar2"
+        value: "cooe"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "http"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    request {
+      data: 16765696
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1308624641
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "ookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+    dispatching_action {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    response {
+      headers {
+        headers {
+          key: "co-length"
+          value: "5"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  swap_buffer {
+    server: true
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+        value: "foo=.ar"
+      }
+      headers {
+        key: "cooe"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "h"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: ":authority"
+        value: "5"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+    server: true
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":autho:ity"
+        value: ":path"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 263
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 16765696
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 218105601
+    request {
+      data: 1315267631
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: ":path"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+        value: ":method"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 218105601
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 9729
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "http"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "http"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+    dispatching_action {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 16765696
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "htth"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "http"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cooe"
+      }
+      headers {
+        key: "htp"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "blah"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  mutate {
+    value: 170012532
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3004096
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+    dispatching_action {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data_value: "/"
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 16765696
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1942256896
+    response {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "htp"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+        value: "foo=.ar"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  swap_buffer {
+    server: true
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  swap_buffer {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 12987840
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cooe"
+      }
+      headers {
+        key: "htp"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "b*h"
+        value: "lah"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 4127178752
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 1600746016
+    server: true
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+        value: "foo=.ar"
+      }
+      headers {
+        key: "cooe"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 218105601
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  swap_buffer {
+    server: true
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  mutate {
+    server: true
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  mutate {
+    offset: 246
+  }
+}
+actions {
+  mutate {
+    value: 32768
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: ":path"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 7
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  mutate {
+    offset: 4
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cooe"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 2606784
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data_value: "/"
+    }
+  }
+}
+actions {
+  mutate {
+    offset: 4
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":mhoaethoa"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: "tacdG"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 50880
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+      end_stream: true
+    }
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 1024
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+    value: 256
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "ethod"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "htp"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+        value: "foo=.ar"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    request {
+      reset_stream: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 2999872
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  mutate {
+    server: true
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 2999872
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 9729
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  swap_buffer {
+    buffer: 7565160
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 50880
+    }
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 3000000
+    response {
+      data: 0
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 196544
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 45
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "ookie"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "ckie"
+        value: "Q"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 243597313
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "ookie"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "ckie"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: "blah"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cooe"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "http"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 41
+    response {
+      headers {
+        headers {
+          key: "content-length"
+          value: "5"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data_value: "/"
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 8323072
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  mutate {
+    server: true
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "ookie"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3004096
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 4127178752
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 0
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  mutate {
+    value: 1597121140
+  }
+}
+actions {
+  mutate {
+    server: true
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 32512
+    }
+  }
+}
+actions {
+  swap_buffer {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":ahority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "blah"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 1793
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "/"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "cookie"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "/"
+      }
+      headers {
+        key: "blah"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "CONNECT"
+      }
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1793
+    request {
+      data: 3000000
+    }
+  }
+}

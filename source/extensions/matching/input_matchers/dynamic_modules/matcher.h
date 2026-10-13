@@ -1,0 +1,79 @@
+#pragma once
+
+#include <memory>
+
+#include "envoy/matcher/matcher.h"
+
+#include "source/common/common/logger.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
+#include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/matching/http/dynamic_modules/data_input.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Matching {
+namespace InputMatchers {
+namespace DynamicModules {
+
+// Type aliases for function pointers resolved from the module.
+using OnMatcherConfigNewType = decltype(&envoy_dynamic_module_on_matcher_config_new);
+using OnMatcherConfigDestroyType = decltype(&envoy_dynamic_module_on_matcher_config_destroy);
+using OnMatcherMatchType = decltype(&envoy_dynamic_module_on_matcher_match);
+
+// Shared ownership of the dynamic module to keep it loaded while any matcher references it.
+using DynamicModuleSharedPtr = std::shared_ptr<Extensions::DynamicModules::DynamicModule>;
+
+/**
+ * Context passed to the dynamic module during a match evaluation. The matcher_input_envoy_ptr
+ * points to this struct, and the module accesses the matching data via ABI callbacks.
+ *
+ * This struct is only valid during the envoy_dynamic_module_on_matcher_match callback.
+ */
+struct MatchContext {
+  const ::Envoy::Http::RequestHeaderMap* request_headers{};
+  const ::Envoy::Http::ResponseHeaderMap* response_headers{};
+  const ::Envoy::Http::ResponseTrailerMap* response_trailers{};
+  // Set through envoy_dynamic_module_callback_matcher_set_error when the module could not complete
+  // the evaluation, for example after a panic caught by the SDK barrier. The matcher then applies
+  // its on_error policy instead of reading the hook return value.
+  bool module_error{false};
+};
+
+/**
+ * InputMatcher implementation that delegates matching logic to a dynamic module.
+ * The module is loaded and configured during construction, and match() calls the
+ * module's event hook on each evaluation.
+ */
+class DynamicModuleInputMatcher : public ::Envoy::Matcher::InputMatcher,
+                                  public Logger::Loggable<Logger::Id::matcher> {
+public:
+  DynamicModuleInputMatcher(DynamicModuleSharedPtr module, OnMatcherMatchType on_match,
+                            std::shared_ptr<const void> in_module_config,
+                            ::Envoy::Matcher::MatchResult on_error_result);
+
+  ::Envoy::Matcher::MatchResult match(const ::Envoy::Matcher::DataInputGetResult& input) override;
+
+  bool supportsDataInputType(absl::string_view data_type) const override {
+    return data_type == "dynamic_module_data_input";
+  }
+
+private:
+  // Prevent copy/move.
+  DynamicModuleInputMatcher(const DynamicModuleInputMatcher&) = delete;
+  DynamicModuleInputMatcher& operator=(const DynamicModuleInputMatcher&) = delete;
+
+  DynamicModuleSharedPtr module_;
+  OnMatcherMatchType on_match_;
+  // Shared owner of the in-module configuration. The configuration is destroyed exactly once, after
+  // the last matcher instance and the factory callback that built it are released.
+  std::shared_ptr<const void> in_module_config_;
+  // Result applied for an evaluation the module could not complete, per the configured on_error
+  // policy.
+  const ::Envoy::Matcher::MatchResult on_error_result_;
+};
+
+} // namespace DynamicModules
+} // namespace InputMatchers
+} // namespace Matching
+} // namespace Extensions
+} // namespace Envoy

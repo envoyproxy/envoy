@@ -1,0 +1,93 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
+
+envoy_cc_library(
+    name = "bridge_status_lib",
+    srcs = ["bridge_status.cc"],
+    hdrs = ["bridge_status.h"],
+    deps = [
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "mcp_json_rest_bridge_filter_lib",
+    srcs = ["mcp_json_rest_bridge_filter.cc"],
+    hdrs = ["mcp_json_rest_bridge_filter.h"],
+    deps = [
+        ":bridge_status_lib",
+        ":http_request_builder_lib",
+        ":sse_response_extractor_lib",
+        ":trace_context_lib",
+        "//envoy/common:optref_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/server:filter_config_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/common/mcp:constants_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_extension(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":mcp_json_rest_bridge_filter_lib",
+        "//envoy/registry",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "http_request_builder_lib",
+    srcs = ["http_request_builder.cc"],
+    hdrs = ["http_request_builder.h"],
+    deps = [
+        ":bridge_status_lib",
+        "//source/common/common:regex_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/http:header_utility_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
+        "@envoy_api//envoy/extensions/filters/http/mcp_json_rest_bridge/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "trace_context_lib",
+    srcs = ["trace_context.cc"],
+    hdrs = ["trace_context.h"],
+    deps = [
+        "//source/common/tracing:tracing_validation_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
+    name = "sse_response_extractor_lib",
+    srcs = ["sse_response_extractor.cc"],
+    hdrs = ["sse_response_extractor.h"],
+    deps = [
+        "//source/common/http/sse:sse_parser_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+    ],
+)

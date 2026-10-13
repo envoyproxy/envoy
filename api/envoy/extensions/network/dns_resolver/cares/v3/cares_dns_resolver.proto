@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package envoy.extensions.network.dns_resolver.cares.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/resolver.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.dns_resolver.cares.v3";
+option java_outer_classname = "CaresDnsResolverProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/dns_resolver/cares/v3;caresv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: c-ares DNS resolver]
+// [#extension: envoy.network.dns_resolver.cares]
+
+// Configuration for c-ares DNS resolver.
+// [#next-free-field: 13]
+message CaresDnsResolverConfig {
+  // A list of DNS resolver addresses.
+  // :ref:`use_resolvers_as_fallback <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
+  // below dictates if the DNS client should override system defaults or only use the provided
+  // resolvers if the system defaults are not available, i.e., as a fallback.
+  repeated config.core.v3.Address resolvers = 1;
+
+  // If true use the resolvers listed in the
+  // :ref:`resolvers <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.resolvers>`
+  // field only if c-ares is unable to obtain a
+  // nameserver from the system (e.g., ``/etc/resolv.conf``).
+  // Otherwise, the resolvers listed in the resolvers list will override the default system
+  // resolvers. Defaults to false.
+  bool use_resolvers_as_fallback = 3;
+
+  // The resolver will query available network interfaces and determine if there are no available
+  // interfaces for a given IP family. It will then filter these addresses from the results it
+  // presents. e.g., if there are no available IPv4 network interfaces, the resolver will not
+  // provide IPv4 addresses.
+  bool filter_unroutable_families = 4;
+
+  // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+  config.core.v3.DnsResolverOptions dns_resolver_options = 2;
+
+  // This option allows the number of UDP based DNS queries to be capped.
+  //
+  // .. note::
+  //   This is only applicable to c-ares DNS resolver currently.
+  //
+  google.protobuf.UInt32Value udp_max_queries = 5;
+
+  // The number of seconds each name server is given to respond to a query on the first try of any given server.
+  //
+  // .. note::
+  //   While the c-ares library defaults to 2 seconds, Envoy's default (if this field is unset) is 5 seconds.
+  //   This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
+  //
+  google.protobuf.UInt64Value query_timeout_seconds = 6 [(validate.rules).uint64 = {gte: 1}];
+
+  // The maximum number of query attempts the resolver will make before giving up.
+  // Each attempt may use a different name server.
+  //
+  // .. note::
+  //   While the c-ares library defaults to 3 attempts, Envoy's default (if this field is unset) is 4 attempts.
+  //   This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
+  //
+  google.protobuf.UInt32Value query_tries = 7 [(validate.rules).uint32 = {gte: 1}];
+
+  // Enable round-robin selection of name servers for DNS resolution. When enabled, the resolver will cycle through the
+  // list of name servers for each resolution request. This can help distribute the query load across multiple name
+  // servers. If disabled (default), the resolver will try name servers in the order they are configured.
+  //
+  // .. note::
+  //   This setting overrides any system configuration for name server rotation.
+  //
+  bool rotate_nameservers = 8;
+
+  // Maximum EDNS0 UDP payload size in bytes.
+  // If set, c-ares will include EDNS0 in DNS queries and use this value as the maximum UDP response size.
+  //
+  // Recommended values:
+  //
+  // * **1232**: Safe default (avoids fragmentation).
+  // * **4096**: Maximum allowed.
+  //
+  // If unset, c-ares uses its internal default (usually 1232).
+  google.protobuf.UInt32Value edns0_max_payload_size = 9
+      [(validate.rules).uint32 = {lte: 4096 gte: 512}];
+
+  // The maximum duration for which a UDP channel will be kept alive before being refreshed.
+  //
+  // If set, the DNS resolver will periodically reinitialize its c-ares channel after the
+  // specified duration. This can help with avoiding stale socket states, and providing
+  // better load distribution across UDP ports.
+  //
+  // If not specified, no periodic refresh will be performed.
+  google.protobuf.Duration max_udp_channel_duration = 10 [(validate.rules).duration = {gte {}}];
+
+  // If true, reinitialize the c-ares channel when a DNS query fails with ``ARES_ETIMEOUT``.
+  //
+  // This can help recover from rare cases where the UDP sockets held by the c-ares
+  // channel become unusable after timeouts, causing subsequent queries to fail or
+  // Envoy to keep serving stale DNS results. When enabled, a timeout-triggered
+  // reinitialization attempts to restore healthy state quickly. In environments
+  // where timeouts are caused by intermittent network issues, enabling this may
+  // increase channel churn; consider using
+  // :ref:`max_udp_channel_duration <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
+  // for periodic refresh instead.
+  //
+  // Default is false.
+  bool reinit_channel_on_timeout = 11;
+
+  // The maximum duration (in seconds) for which DNS responses will be cached by c-ares.
+  //
+  // If set to a non-zero value, the query cache is enabled and will respect the
+  // TTL provided in the DNS response, up to this maximum limit.
+  //
+  // .. note::
+  //   While the underlying c-ares library defaults to 1 hour, Envoy's default
+  //   for this field is 0, which disables the query cache entirely.
+  google.protobuf.UInt32Value qcache_max_ttl = 12 [(validate.rules).uint32 = {gte: 0}];
+}

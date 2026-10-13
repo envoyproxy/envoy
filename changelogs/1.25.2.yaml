@@ -1,0 +1,20 @@
+date: March 1, 2023
+
+bug_fixes:
+- area: dependency
+  change: |
+    update Kafka to resolve CVE-2023-25194.
+
+new_features:
+- area: docker
+  change: |
+    unify published images as tag variants. For example, ``envoyproxy/envoy-dev`` is now available
+    as ``envoyproxy/envoy:dev``.
+
+deprecated:
+- area: ext_authz
+  change: |
+    deprecated (1.25.0) :ref:`ext_authz.v3.AuthorizationRequest.allowed_headers
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` in favour
+    of :ref:`ext_authz.v3.ExtAuthz.allowed_headers
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.

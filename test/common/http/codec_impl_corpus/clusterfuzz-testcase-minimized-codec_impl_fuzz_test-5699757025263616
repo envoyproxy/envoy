@@ -1,0 +1,69 @@
+actions {
+  client_drain {
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":scheme"
+        value: "T"
+      }
+      headers {
+        key: ":method"
+        value: "%"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+    metadata {
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 16761078
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 142541011
+    }
+    dispatching_action {
+      continue_headers {
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      trailers {
+      }
+    }
+    dispatching_action {
+      data: 0
+    }
+  }
+}

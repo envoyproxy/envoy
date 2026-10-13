@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.quic.v3;
+
+import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.quic.v3";
+option java_outer_classname = "QuicTransportProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/quic/v3;quicv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: quic transport]
+// [#extension: envoy.transport_sockets.quic]
+// The QUIC configurations below provide the transport socket configuration for downstream/upstream QUIC.
+
+// Configuration for Downstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.
+message QuicDownstreamTransport {
+  tls.v3.DownstreamTlsContext downstream_tls_context = 1
+      [(validate.rules).message = {required: true}];
+
+  // If false, QUIC will tell TLS to reject any early data and to stop issuing 0-RTT credentials
+  // with resumption session tickets. This will prevent clients from sending 0-RTT requests.
+  // Defaults to true, except when a client certificate validation context is configured, in which
+  // case it defaults to false. Early data requires resumption, so it cannot be enabled unless
+  // :ref:`enable_resumption
+  // <envoy_v3_api_field_extensions.transport_sockets.quic.v3.QuicDownstreamTransport.enable_resumption>`
+  // is also true.
+  google.protobuf.BoolValue enable_early_data = 2;
+
+  // If false, TLS session tickets are not issued and accepted by QUIC.
+  // Defaults to true, except when a client certificate validation context is configured, in which
+  // case it defaults to false. QUIC does not re-validate the client certificate when a session is
+  // resumed. A resumed connection reuses the certificate verdict of the original handshake until the
+  // ticket expires, so certificate revocation or expiry and validation context changes are not
+  // rechecked. Setting this to true on a filter chain that validates a client certificate opts into
+  // that trade-off in exchange for cheaper handshakes. Resumption also requires
+  // :ref:`disable_stateless_session_resumption
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+  // to be false, because that field controls the underlying TLS session tickets.
+  google.protobuf.BoolValue enable_resumption = 3;
+}
+
+// Configuration for Upstream QUIC transport socket. This provides Google's implementation of Google QUIC and IETF QUIC to Envoy.
+message QuicUpstreamTransport {
+  tls.v3.UpstreamTlsContext upstream_tls_context = 1 [(validate.rules).message = {required: true}];
+}

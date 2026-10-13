@@ -1,0 +1,113 @@
+name: Request/load
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      lock-app-id:
+        required: true
+      lock-app-key:
+        required: true
+
+    inputs:
+      branch-name:
+        type: string
+        default: main
+      cache-docker:
+        type: boolean
+        default: true
+      config-file:
+        type: string
+        default: ./.github/config.yml
+      event-name:
+        type: string
+        default: ${{ github.workflow }}
+      event-type:
+        type: string
+        default: ${{ github.event_name == 'workflow_dispatch' && 'dispatch' || 'scheduled' }}
+      trusted:
+        type: boolean
+        default: true
+
+    outputs:
+      build-image:
+        value: ${{ jobs.request.outputs.build-image }}
+      build-image-mobile:
+        value: ${{ jobs.request.outputs.build-image-mobile }}
+      request:
+        value: ${{ jobs.request.outputs.request }}
+      trusted:
+        value: ${{ jobs.request.outputs.trusted }}
+
+concurrency:
+  group: |
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.head_ref
+        || github.run_id
+    }}-${{ github.workflow }}-env
+  cancel-in-progress: true
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG && true || false }}
+
+
+jobs:
+  request:
+    runs-on: ubuntu-24.04
+    outputs:
+      build-image: ${{ toJSON(fromJSON(steps.env.outputs.data).request.build-image) }}
+      build-image-mobile: ${{ fromJSON(steps.env.outputs.data).request.build-image-mobile }}
+      request: ${{ steps.env.outputs.data }}
+      trusted: true
+    steps:
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      id: started
+      name: Create timestamp
+      with:
+        options: -r
+        filter: |
+          now
+    - uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      id: checkout
+      name: Checkout Envoy repository
+    - name: Generate environment variables
+      uses: envoyproxy/toolshed/actions/envoy/ci/env@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      id: env
+      with:
+        branch-name: ${{ inputs.branch-name }}
+        config-file: ${{ inputs.config-file }}
+        started: ${{ steps.started.outputs.value }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        vars: ${{ toJSON(vars) }}
+        trusted: ${{ inputs.trusted }}
+
+    - name: Request summary
+      id: summary
+      uses: envoyproxy/toolshed/actions/github/env/summary@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
+        base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
+        event-name: ${{ inputs.event-name }}
+        event-type: ${{ inputs.event-type }}
+        link: ${{ format('https://github.com/{0}/actions/runs/{1}', github.repository, github.run_id) }}
+        output-path: GITHUB_STEP_SUMMARY
+        data: ${{ steps.env.outputs.data }}
+        tables: ${{ toJSON(fromJSON(steps.env.outputs.data).config.tables) }}
+        icon: ${{ fromJSON(steps.env.outputs.data).config.envoy.icon }}
+        message: ${{ fromJSON(steps.env.outputs.data).request.message }}
+        ref: ${{ fromJSON(steps.env.outputs.data).request.ref }}
+        sha: ${{ fromJSON(steps.env.outputs.data).request.sha }}
+        target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
+
+  cache:
+    secrets:
+      app-id: ${{ secrets.lock-app-id }}
+      app-key: ${{ secrets.lock-app-key }}
+    uses: ./.github/workflows/_request_cache_docker.yml
+    needs: request
+    if: ${{ inputs.cache-docker }}
+    with:
+      caches: ${{ needs.request.outputs.caches }}
+      image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}

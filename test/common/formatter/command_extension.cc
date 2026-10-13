@@ -1,0 +1,123 @@
+#include "test/common/formatter/command_extension.h"
+
+#include "source/common/protobuf/utility.h"
+
+namespace Envoy {
+namespace Formatter {
+
+std::optional<std::string> TestFormatter::format(const Context&,
+                                                 const StreamInfo::StreamInfo&) const {
+  return "TestFormatter";
+}
+
+Protobuf::Value TestFormatter::formatValue(const Context& context,
+                                           const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::stringValue(format(context, stream_info).value());
+}
+
+bool TestFormatter::formatTo(std::string& sink, const Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const {
+  sink.append(format(context, stream_info).value());
+  return true;
+}
+
+void TestFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                  const StreamInfo::StreamInfo& stream_info) const {
+  sink.addString(format(context, stream_info).value());
+}
+
+absl::StatusOr<FormatterProviderPtr> TestCommandParser::parse(absl::string_view command,
+                                                              absl::string_view,
+                                                              std::optional<size_t>) const {
+  if (command == "COMMAND_EXTENSION") {
+    return std::make_unique<TestFormatter>();
+  }
+
+  return nullptr;
+}
+
+CommandParserPtr
+TestCommandFactory::createCommandParserFromProto(const Protobuf::Message& message,
+                                                 Server::Configuration::GenericFactoryContext&) {
+  // Cast the config message to the actual type to test that it was constructed properly.
+  [[maybe_unused]] const auto& config =
+      *Envoy::Protobuf::DynamicCastMessage<const Protobuf::StringValue>(&message);
+  return std::make_unique<TestCommandParser>();
+}
+
+std::set<std::string> TestCommandFactory::configTypes() { return {"google.protobuf.StringValue"}; }
+
+ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
+  return std::make_unique<Protobuf::StringValue>();
+}
+
+std::string TestCommandFactory::name() const { return "envoy.formatter.TestFormatter"; }
+
+std::optional<std::string> AdditionalFormatter::format(const Context&,
+                                                       const StreamInfo::StreamInfo&) const {
+  return "AdditionalFormatter";
+}
+
+Protobuf::Value AdditionalFormatter::formatValue(const Context& context,
+                                                 const StreamInfo::StreamInfo& stream_info) const {
+  return ValueUtil::stringValue(format(context, stream_info).value());
+}
+
+bool AdditionalFormatter::formatTo(std::string& sink, const Context& context,
+                                   const StreamInfo::StreamInfo& stream_info) const {
+  sink.append(format(context, stream_info).value());
+  return true;
+}
+
+void AdditionalFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                        const StreamInfo::StreamInfo& stream_info) const {
+  sink.addString(format(context, stream_info).value());
+}
+
+absl::StatusOr<FormatterProviderPtr> AdditionalCommandParser::parse(absl::string_view command,
+                                                                    absl::string_view,
+                                                                    std::optional<size_t>) const {
+  if (command == "ADDITIONAL_EXTENSION") {
+    return std::make_unique<AdditionalFormatter>();
+  }
+
+  return nullptr;
+}
+
+CommandParserPtr AdditionalCommandFactory::createCommandParserFromProto(
+    const Protobuf::Message& message, Server::Configuration::GenericFactoryContext&) {
+  // Cast the config message to the actual type to test that it was constructed properly.
+  [[maybe_unused]] const auto& config =
+      *Envoy::Protobuf::DynamicCastMessage<const Protobuf::UInt32Value>(&message);
+  return std::make_unique<AdditionalCommandParser>();
+}
+
+std::set<std::string> AdditionalCommandFactory::configTypes() {
+  return {"google.protobuf.UInt32Value"};
+}
+
+ProtobufTypes::MessagePtr AdditionalCommandFactory::createEmptyConfigProto() {
+  return std::make_unique<Protobuf::UInt32Value>();
+}
+
+std::string AdditionalCommandFactory::name() const { return "envoy.formatter.AdditionalFormatter"; }
+
+CommandParserPtr
+FailCommandFactory::createCommandParserFromProto(const Protobuf::Message& message,
+                                                 Server::Configuration::GenericFactoryContext&) {
+  // Cast the config message to the actual type to test that it was constructed properly.
+  [[maybe_unused]] const auto& config =
+      *Envoy::Protobuf::DynamicCastMessage<const Protobuf::UInt64Value>(&message);
+  return nullptr;
+}
+
+std::set<std::string> FailCommandFactory::configTypes() { return {"google.protobuf.UInt64Value"}; }
+
+ProtobufTypes::MessagePtr FailCommandFactory::createEmptyConfigProto() {
+  return std::make_unique<Protobuf::UInt64Value>();
+}
+
+std::string FailCommandFactory::name() const { return "envoy.formatter.FailFormatter"; }
+
+} // namespace Formatter
+} // namespace Envoy

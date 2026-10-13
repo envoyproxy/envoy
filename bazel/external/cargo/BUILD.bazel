@@ -1,0 +1,21 @@
+load("@rules_rust//crate_universe:defs.bzl", "crates_vendor")
+
+exports_files(
+    [
+        "Cargo.toml",
+        "Cargo.Bazel.lock",
+    ],
+)
+
+# Run this target to regenerate cargo_lockfile and vendor_path/*.
+# $ bazelisk run bazel/external/cargo:crates_vendor -- --repin
+crates_vendor(
+    name = "crates_vendor",
+    cargo_lockfile = ":Cargo.Bazel.lock",
+    generate_target_compatible_with = False,
+    manifests = [":Cargo.toml"],
+    mode = "remote",
+    repository_name = "cu",
+    tags = ["manual"],
+    vendor_path = "remote",
+)

@@ -1,0 +1,124 @@
+#include "source/extensions/filters/network/common/redis/utility.h"
+
+#include <memory>
+#include <string>
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Common {
+namespace Redis {
+namespace Utility {
+
+AuthRequest::AuthRequest(const std::string& password) {
+  std::vector<RespValue> values(2);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "auth";
+  values[1].type(RespType::BulkString);
+  values[1].asString() = password;
+  type(RespType::Array);
+  asArray().swap(values);
+}
+
+AuthRequest::AuthRequest(const std::string& username, const std::string& password) {
+  std::vector<RespValue> values(3);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "auth";
+  values[1].type(RespType::BulkString);
+  values[1].asString() = username;
+  values[2].type(RespType::BulkString);
+  values[2].asString() = password;
+  type(RespType::Array);
+  asArray().swap(values);
+}
+
+RespValuePtr makeError(const std::string& error) {
+  auto response = std::make_unique<RespValue>();
+  response->type(Common::Redis::RespType::Error);
+  // ``makeError`` echoes attacker-influenced text (unknown command / option / subcommand) into a
+  // length-prefix-free RESP inline error, so it shares the codec's control-byte sanitizer (single
+  // source of truth) to strip CR/LF and other control bytes.
+  response->asString() = sanitizeControlBytes(error);
+  return response;
+}
+
+RespValue makeBulkString(absl::string_view value) {
+  RespValue v;
+  v.type(RespType::BulkString);
+  v.asString() = std::string(value);
+  return v;
+}
+
+RespValue makeInteger(int64_t value) {
+  RespValue v;
+  v.type(RespType::Integer);
+  v.asInteger() = value;
+  return v;
+}
+
+RespValue makeRequest(absl::string_view command, const std::vector<std::string>& args) {
+  RespValue request;
+  request.type(RespType::Array);
+  std::vector<RespValue> values(args.size() + 1);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = std::string(command);
+  for (size_t i = 0; i < args.size(); i++) {
+    values[i + 1].type(RespType::BulkString);
+    values[i + 1].asString() = args[i];
+  }
+  request.asArray().swap(values);
+  return request;
+}
+
+ReadOnlyRequest::ReadOnlyRequest() {
+  std::vector<RespValue> values(1);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "readonly";
+  type(RespType::Array);
+  asArray().swap(values);
+}
+
+const ReadOnlyRequest& ReadOnlyRequest::instance() {
+  static const ReadOnlyRequest* instance = new ReadOnlyRequest{};
+  return *instance;
+}
+
+AskingRequest::AskingRequest() {
+  std::vector<RespValue> values(1);
+  values[0].type(RespType::BulkString);
+  values[0].asString() = "asking";
+  type(RespType::Array);
+  asArray().swap(values);
+}
+
+const AskingRequest& AskingRequest::instance() {
+  static const AskingRequest* instance = new AskingRequest{};
+  return *instance;
+}
+
+GetRequest::GetRequest() {
+  type(RespType::BulkString);
+  asString() = "get";
+}
+
+const GetRequest& GetRequest::instance() {
+  static const GetRequest* instance = new GetRequest{};
+  return *instance;
+}
+
+SetRequest::SetRequest() {
+  type(RespType::BulkString);
+  asString() = "set";
+}
+
+const SetRequest& SetRequest::instance() {
+  static const SetRequest* instance = new SetRequest{};
+  return *instance;
+}
+
+} // namespace Utility
+} // namespace Redis
+} // namespace Common
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

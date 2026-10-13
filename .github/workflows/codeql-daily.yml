@@ -1,0 +1,24 @@
+name: CodeQL/daily
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+  - cron: '0 12 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  CodeQL-Build:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      pull-requests: read
+    uses: ./.github/workflows/_codeql.yml
+    with:
+      targets: '@envoy//source/common/http/...'

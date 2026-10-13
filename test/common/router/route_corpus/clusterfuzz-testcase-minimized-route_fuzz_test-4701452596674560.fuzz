@@ -1,0 +1,10 @@
+config {
+  virtual_hosts {
+    name: "&\006\000\000\000"
+    domains: "-"
+    require_tls: ALL
+    response_headers_to_remove: "\0Ï3\022\362\211\245\247V\036"
+    request_headers_to_remove: "\003\022\360\234\254\265V\036"
+  }
+}
+random_value: 67070975

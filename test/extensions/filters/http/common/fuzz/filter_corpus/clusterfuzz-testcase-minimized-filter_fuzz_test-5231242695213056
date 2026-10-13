@@ -1,0 +1,24 @@
+config {
+  name: "envoy.filters.http.grpc_json_reverse_transcoder"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.grpc_json_reverse_transcoder.v3.GrpcJsonReverseTranscoder"
+  }
+}
+data {
+  headers {
+    headers {
+      key: ":path"
+    }
+    headers {
+      key: "content-type"
+      value: "application/grpc"
+    }
+  }
+  http_body {
+    data: "\177\177\177\177\177\177\177\177"
+  }
+  trailers {
+  }
+}
+upstream_data {
+}

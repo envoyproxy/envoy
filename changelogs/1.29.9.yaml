@@ -1,0 +1,27 @@
+date: September 19, 2024
+
+behavior_changes:
+- area: http
+  change: |
+    The default configuration of Envoy will continue to trust internal addresses while in the future it will not trust them by default.
+    If you have tooling such as probes on your private network which need to be treated as trusted (e.g. changing arbitrary ``x-envoy``
+    headers) please explictily include those addresses or CIDR ranges into :ref:`internal_address_config
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
+    See the config examples from the above ``internal_address_config`` link. This default no trust internal address can be turned on by
+    setting runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` to ``true``.
+
+minor_behavior_changes:
+- area: access_log
+  change: |
+    Sanitize SNI for potential log injection. The invalid character will be replaced by ``_`` with an ``invalid:`` marker. If runtime
+    flag ``envoy.reloadable_features.sanitize_sni_in_access_log`` is set to ``false``, the sanitize behavior is disabled.
+
+bug_fixes:
+- area: jwt
+  change: |
+    Fixed a bug where using ``clear_route_cache`` with remote JWKs works
+    incorrectly and may cause a crash when the modified request does not match
+    any route.
+- area: http_async_client
+  change: |
+    Fixed the local reply and destroy order crashes when using the http async client for websocket handshake.

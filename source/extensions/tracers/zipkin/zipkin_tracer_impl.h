@@ -1,0 +1,194 @@
+#pragma once
+
+#include <memory>
+
+#include "envoy/common/random_generator.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/tracing/trace_driver.h"
+#include "envoy/upstream/cluster_manager.h"
+
+#include "source/common/http/async_client_utility.h"
+#include "source/common/http/http_service_headers.h"
+#include "source/common/upstream/cluster_update_tracker.h"
+#include "source/extensions/tracers/zipkin/span_buffer.h"
+#include "source/extensions/tracers/zipkin/tracer.h"
+#include "source/extensions/tracers/zipkin/tracer_interface.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Tracers {
+namespace Zipkin {
+
+#define ZIPKIN_TRACER_STATS(COUNTER)                                                               \
+  COUNTER(spans_sent)                                                                              \
+  COUNTER(timer_flushed)                                                                           \
+  COUNTER(reports_skipped_no_cluster)                                                              \
+  COUNTER(reports_sent)                                                                            \
+  COUNTER(reports_dropped)                                                                         \
+  COUNTER(reports_failed)
+
+struct ZipkinTracerStats {
+  ZIPKIN_TRACER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+using ZipkinTracerStatsSharedPtr = std::shared_ptr<ZipkinTracerStats>;
+
+/**
+ * Information about the Zipkin collector.
+ */
+struct CollectorInfo {
+  std::string cluster_; // The cluster to use to reach the collector.
+
+  // The Zipkin collector endpoint/path to receive the collected trace data.
+  // For legacy configuration: from collector_endpoint field.
+  // For HttpService configuration: from http_service_.http_uri().uri().
+  std::string endpoint_;
+
+  // The hostname to use when sending spans to the collector.
+  // For legacy configuration: from collector_hostname field or cluster name.
+  // For HttpService configuration: cluster name.
+  std::string hostname_;
+
+  // The version of the collector. This is related to endpoint's supported payload specification and
+  // transport.
+  envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_{
+      envoy::config::trace::v3::ZipkinConfig::HTTP_JSON};
+
+  bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
+
+  // Additional custom headers to include in requests to the Zipkin collector.
+  // Only available when using HttpService configuration via request_headers_to_add.
+  // Legacy configuration does not support custom headers.
+  std::unique_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator_;
+};
+
+using CollectorInfoConstSharedPtr = std::shared_ptr<const CollectorInfo>;
+
+/**
+ * Class for a Zipkin-specific Driver.
+ */
+class Driver : public Tracing::Driver {
+public:
+  /**
+   * Thread-local store containing ZipkinDriver and Zipkin::Tracer objects.
+   */
+  struct TlsTracer : ThreadLocal::ThreadLocalObject {
+    TlsTracer(TracerPtr tracer) : tracer_(std::move(tracer)) {}
+    TracerPtr tracer_;
+  };
+
+  /**
+   * Constructor. It adds itself and a newly-created Zipkin::Tracer object to a thread-local store.
+   * Also, it associates the given random-number generator to the Zipkin::Tracer object it creates.
+   */
+  Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
+         Server::Configuration::ServerFactoryContext& context);
+
+  /**
+   * This function is inherited from the abstract Driver class.
+   *
+   * It starts a new Zipkin span. Depending on the request headers, it can create a root span,
+   * a child span, or a shared-context span.
+   *
+   * The third parameter (operation_name) does not actually make sense for Zipkin.
+   * Thus, this implementation of the virtual function startSpan() ignores the operation name
+   * ("ingress" or "egress") passed by the caller.
+   */
+  Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
+                             const StreamInfo::StreamInfo& stream_info,
+                             const std::string& operation_name,
+                             Tracing::Decision tracing_decision) override;
+
+  bool w3cFallbackEnabled() const {
+    return trace_context_option_ ==
+           envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION;
+  }
+  TraceContextOption traceContextOption() const { return trace_context_option_; }
+
+  const std::string& hostnameForTest() { return collector_->hostname_; }
+
+private:
+  std::shared_ptr<CollectorInfo> collector_;
+  ThreadLocal::SlotSharedPtr tls_;
+  TraceContextOption trace_context_option_;
+};
+
+/**
+ * This class derives from the abstract Zipkin::Reporter.
+ * It buffers spans and relies on Http::AsyncClient to send spans to
+ * Zipkin using JSON over HTTP.
+ *
+ * Two runtime parameters control the span buffering/flushing behavior, namely:
+ * tracing.zipkin.min_flush_spans and tracing.zipkin.flush_interval_ms.
+ *
+ * Up to `tracing.zipkin.min_flush_spans` will be buffered. Spans are flushed (sent to Zipkin)
+ * either when the buffer is full, or when a timer, set to `tracing.zipkin.flush_interval_ms`,
+ * expires, whichever happens first.
+ *
+ * The default values for the runtime parameters are 5 spans and 5000ms.
+ */
+class ReporterImpl : Logger::Loggable<Logger::Id::tracing>,
+                     public Reporter,
+                     public Http::AsyncClient::Callbacks {
+public:
+  /**
+   * Constructor.
+   *
+   * @param dispatcher Controls the timer used to flush buffered spans.
+   * @param cm Reference to the cluster manager. This is used to get a handle
+   * to the cluster that contains the Zipkin collector.
+   * @param runtime Reference to the runtime. This is used to get the values
+   * of the runtime parameters that control the span-buffering/flushing behavior.
+   * @param tracer_stats Reference to the structure used to record Zipkin-related stats.
+   * @param collector holds the endpoint version and path information.
+   * when making HTTP POST requests carrying spans. This value comes from the
+   * Zipkin-related tracing configuration.
+   */
+  ReporterImpl(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
+               Runtime::Loader& runtime, ZipkinTracerStatsSharedPtr tracer_stats,
+               CollectorInfoConstSharedPtr collector);
+
+  /**
+   * Implementation of Zipkin::Reporter::reportSpan().
+   *
+   * Buffers the given span and calls flushSpans() if the buffer is full.
+   *
+   * @param span The span to be buffered.
+   */
+  void reportSpan(Span&& span) override;
+
+  // Http::AsyncClient::Callbacks.
+  // The callbacks below record Zipkin-span-related stats.
+  void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
+  void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
+  void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
+
+private:
+  /**
+   * Enables the span-flushing timer.
+   */
+  void enableTimer();
+
+  /**
+   * Removes all spans from the span buffer and sends them to Zipkin using Http::AsyncClient.
+   */
+  void flushSpans();
+
+  Runtime::Loader& runtime_;
+  ZipkinTracerStatsSharedPtr tracer_stats_;
+  CollectorInfoConstSharedPtr collector_;
+
+  Event::TimerPtr flush_timer_;
+  SpanBufferPtr span_buffer_;
+  Upstream::ClusterUpdateTracker collector_cluster_;
+  // Track active HTTP requests to be able to cancel them on destruction.
+  Http::AsyncClientRequestTracker active_requests_;
+};
+} // namespace Zipkin
+} // namespace Tracers
+} // namespace Extensions
+} // namespace Envoy

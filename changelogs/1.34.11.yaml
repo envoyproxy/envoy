@@ -1,0 +1,28 @@
+date: December 3, 2025
+
+behavior_changes:
+- area: dynamic modules
+  change: |
+    The dynamic module ABI has been updated to support streaming body manipulation. This change also
+    fixed potential incorrect behavior when access or modify the request or response body. See
+    https://github.com/envoyproxy/envoy/issues/40918 for more details.
+- area: http
+  change: |
+    Added runtime flag ``envoy.reloadable_features.reject_early_connect_data`` to reject ``CONNECT`` requests
+    that receive data before Envoy sent a ``200`` response to the client. While this is not a strictly compliant behavior
+    it is very common as a latency reducing measure. As such the option is disabled by default.
+
+bug_fixes:
+- area: tcp_proxy
+  change: |
+    Fixed a connection leak in the TCP proxy when the ``receive_before_connect`` feature is enabled and the
+    downstream connection closes before the upstream connection is established.
+
+deprecated:
+- area: tls
+  change: |
+    Fixed an issue where SANs of type ``OTHERNAME`` in a TLS cert were truncated if there was
+    an embedded null octet, leading to incorrect SAN validation.
+- area: http
+  change: |
+    Fixed a remote ``jwt_auth`` token fetch crash with two or more auth headers when ``allow_missing_or_failed`` is set.

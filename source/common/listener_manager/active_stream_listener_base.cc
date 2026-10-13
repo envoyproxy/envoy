@@ -1,0 +1,229 @@
+#include "source/common/listener_manager/active_stream_listener_base.h"
+
+#include "envoy/network/filter.h"
+
+#include "source/common/stats/timespan_impl.h"
+
+namespace Envoy {
+namespace Server {
+
+ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& parent,
+                                                   Event::Dispatcher& dispatcher,
+                                                   Network::ListenerPtr&& listener,
+                                                   Network::ListenerConfig& config)
+    : ActiveListenerImplBase(parent, &config), parent_(parent),
+      listener_filters_timeout_(config.listenerFiltersTimeout()),
+      continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()),
+      listener_(std::move(listener)), dispatcher_(dispatcher) {}
+
+void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
+                                        StreamInfo::StreamInfo& stream_info) {
+  stream_info.onRequestComplete();
+  for (const auto& access_log : config.accessLogs()) {
+    access_log->log({}, stream_info);
+  }
+}
+
+void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& socket,
+                                             std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+  // Find matching filter chain.
+  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket, *stream_info);
+  if (filter_chain == nullptr) {
+    RELEASE_ASSERT(socket->connectionInfoProvider().remoteAddress() != nullptr, "");
+    ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
+              socket->connectionInfoProvider().remoteAddress()->asString());
+    stats_.no_filter_chain_match_.inc();
+    stream_info->setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
+    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
+    emitLogs(*config_, *stream_info);
+    socket->close();
+    return;
+  }
+
+  socket->connectionInfoProvider().setFilterChainInfo(filter_chain->filterChainInfo());
+
+  auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
+  auto server_conn_ptr = dispatcher().createServerConnection(
+      std::move(socket), std::move(transport_socket), *stream_info);
+  if (const auto timeout = filter_chain->transportSocketConnectTimeout();
+      timeout != std::chrono::milliseconds::zero()) {
+    server_conn_ptr->setTransportSocketConnectTimeout(
+        timeout, stats_.downstream_cx_transport_socket_connect_timeout_);
+  }
+  server_conn_ptr->setBufferLimits(config_->perConnectionBufferLimitBytes());
+  const auto timeout = config_->perConnectionBufferHighWatermarkTimeout();
+  if (timeout.count() > 0) {
+    server_conn_ptr->setBufferHighWatermarkTimeout(timeout);
+  }
+  RELEASE_ASSERT(server_conn_ptr->connectionInfoProvider().remoteAddress() != nullptr, "");
+  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
+      *server_conn_ptr, filter_chain->networkFilterFactories());
+  if (empty_filter_chain) {
+    ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *server_conn_ptr,
+                   server_conn_ptr->connectionInfoProvider().remoteAddress()->asString());
+    server_conn_ptr->close(Network::ConnectionCloseType::NoFlush, "no_filters");
+  } else if (drain_event_.has_value()) {
+    // The listener began draining before this connection was accepted. Notify it now (the network
+    // filter chain, and thus any drain-aware callbacks, has just been created) so connection-level
+    // drain logic applies to connections accepted during the drain window.
+    server_conn_ptr->onDrain(*drain_event_);
+  }
+  newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
+}
+
+ActiveConnections::ActiveConnections(OwnedActiveStreamListenerBase& listener,
+                                     const Network::FilterChain& filter_chain)
+    : listener_(listener), filter_chain_(filter_chain) {}
+
+ActiveConnections::~ActiveConnections() {
+  // connections should be defer deleted already.
+  ASSERT(connections_.empty());
+}
+
+ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
+                                         Network::ConnectionPtr&& new_connection,
+                                         TimeSource& time_source,
+                                         std::unique_ptr<StreamInfo::StreamInfo>&& stream_info)
+    : stream_info_(std::move(stream_info)), active_connections_(active_connections),
+      connection_(std::move(new_connection)),
+      conn_length_(new Stats::HistogramCompletableTimespanImpl(
+          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
+  // We just universally set no delay on connections. Theoretically we might at some point want
+  // to make this configurable.
+  connection_->noDelay(true);
+  auto& listener = active_connections_.listener_;
+  listener.stats_.downstream_cx_total_.inc();
+  listener.stats_.downstream_cx_active_.inc();
+  listener.per_worker_stats_.downstream_cx_total_.inc();
+  listener.per_worker_stats_.downstream_cx_active_.inc();
+
+  // Active connections on the handler (not listener). The per listener connections have already
+  // been incremented at this point either via the connection balancer or in the socket accept
+  // path if there is no configured balancer.
+  listener.parent_.incNumConnections();
+}
+
+ActiveTcpConnection::~ActiveTcpConnection() {
+  ActiveStreamListenerBase::emitLogs(*active_connections_.listener_.config_, *stream_info_);
+  auto& listener = active_connections_.listener_;
+  listener.stats_.downstream_cx_active_.dec();
+  listener.stats_.downstream_cx_destroy_.inc();
+  listener.per_worker_stats_.downstream_cx_active_.dec();
+  conn_length_->complete();
+
+  // Active listener connections (not handler).
+  listener.decNumConnections();
+
+  // Active handler connections (not listener).
+  listener.parent_.decNumConnections();
+}
+
+void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
+  ENVOY_CONN_LOG(trace, "tcp connection on event {}", *connection_, static_cast<int>(event));
+  // Any event leads to destruction of the connection.
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+    // NOTE: Transport failure reason is set in ConnectionImpl::closeSocket() before events
+    // are raised, so it should already be available in stream_info_ at this point.
+    active_connections_.listener_.removeConnection(*this);
+  }
+}
+
+void OwnedActiveStreamListenerBase::removeConnection(ActiveTcpConnection& connection) {
+  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
+  ActiveConnections& active_connections = connection.active_connections_;
+  ActiveConnectionPtr removed = connection.removeFromList(active_connections.connections_);
+  dispatcher().deferredDelete(std::move(removed));
+  // Delete map entry if and only if connections_ becomes empty.
+  if (active_connections.connections_.empty()) {
+    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
+    ASSERT(iter != connections_by_context_.end());
+    // To cover the lifetime of every single connection, Connections need to be deferred deleted
+    // because the previously contained connection is deferred deleted.
+    dispatcher().deferredDelete(std::move(iter->second));
+    // The erase will break the iteration over the connections_by_context_ during the deletion.
+    if (!is_deleting_) {
+      connections_by_context_.erase(iter);
+    }
+  }
+}
+
+ActiveConnections& OwnedActiveStreamListenerBase::getOrCreateActiveConnections(
+    const Network::FilterChain& filter_chain) {
+  ActiveConnectionCollectionPtr& connections = connections_by_context_[&filter_chain];
+  if (connections == nullptr) {
+    connections = std::make_unique<ActiveConnections>(*this, filter_chain);
+  }
+  return *connections;
+}
+
+void OwnedActiveStreamListenerBase::onFilterChainDrainStart(
+    const std::list<const Network::FilterChain*>& draining_filter_chains,
+    Network::ConnectionDrainEvent drain_event) {
+  // A drain callback may synchronously close the current connection, which removes it from
+  // `connections_` via removeConnection(). Capture `next` before invoking onDrain() so the
+  // std::list iteration survives erasure of the current node. Pin `is_deleting_` while
+  // iterating so removeConnection() does not also erase the map entry mid-loop if the
+  // filter chain's last connection closes.
+  const bool was_deleting = is_deleting_;
+  is_deleting_ = true;
+  for (const auto* filter_chain : draining_filter_chains) {
+    auto map_iter = connections_by_context_.find(filter_chain);
+    if (map_iter == connections_by_context_.end()) {
+      continue;
+    }
+    auto& connections = map_iter->second->connections_;
+    for (auto it = connections.begin(); it != connections.end();) {
+      auto next = std::next(it);
+      (*it)->connection_->onDrain(drain_event);
+      it = next;
+    }
+  }
+  is_deleting_ = was_deleting;
+}
+
+void OwnedActiveStreamListenerBase::onListenerDrainStart(
+    Network::ConnectionDrainEvent drain_event) {
+  // Remember the drain so connections accepted after this point are also notified (see
+  // ActiveStreamListenerBase::newConnection). A listener can be notified more than once (a server
+  // drain escalating from InboundOnly to All re-notifies inbound listeners); the first event wins,
+  // and a later notification neither pushes the drain back nor re-notifies connections, all of
+  // which have already been notified of the first event.
+  if (drain_event_.has_value()) {
+    return;
+  }
+  drain_event_ = drain_event;
+  // See onFilterChainDrainStart for why `next` is captured and `is_deleting_` is pinned.
+  const bool was_deleting = is_deleting_;
+  is_deleting_ = true;
+  for (auto& entry : connections_by_context_) {
+    auto& connections = entry.second->connections_;
+    for (auto it = connections.begin(); it != connections.end();) {
+      auto next = std::next(it);
+      (*it)->connection_->onDrain(drain_event);
+      it = next;
+    }
+  }
+  is_deleting_ = was_deleting;
+}
+
+void OwnedActiveStreamListenerBase::removeFilterChain(const Network::FilterChain* filter_chain) {
+  auto iter = connections_by_context_.find(filter_chain);
+  if (iter == connections_by_context_.end()) {
+    // It is possible when listener is stopping.
+  } else {
+    auto& connections = iter->second->connections_;
+    while (!connections.empty()) {
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush,
+                                              "filter_chain_is_being_removed");
+    }
+    // Since is_deleting_ is on, we need to manually remove the map value and drive the
+    // iterator. Defer delete connection container to avoid race condition in destroying
+    // connection.
+    dispatcher().deferredDelete(std::move(iter->second));
+    connections_by_context_.erase(iter);
+  }
+}
+
+} // namespace Server
+} // namespace Envoy

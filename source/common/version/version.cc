@@ -1,0 +1,78 @@
+#include "source/common/version/version.h"
+
+#include <map>
+#include <regex>
+#include <string>
+
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/version/version_string.h"
+
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
+#include "openssl/crypto.h"
+
+extern const char build_scm_revision[];
+extern const char build_scm_status[];
+extern const char build_version_suffix[];
+
+namespace Envoy {
+const std::string& VersionInfo::revision() {
+  CONSTRUCT_ON_FIRST_USE(std::string, build_scm_revision);
+}
+
+const std::string& VersionInfo::revisionStatus() {
+  CONSTRUCT_ON_FIRST_USE(std::string, build_scm_status);
+}
+
+const std::string& VersionInfo::version() { return envoyVersionString(); }
+
+const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
+  static const auto* result = new envoy::config::core::v3::BuildVersion(
+      makeBuildVersion(fmt::format("{}{}", BUILD_VERSION_NUMBER, build_version_suffix).c_str()));
+  return *result;
+}
+
+bool VersionInfo::sslFipsCompliant() { return FIPS_mode() == 1; }
+
+const std::string& VersionInfo::buildType() { return envoyBuildType(); }
+
+const std::string& VersionInfo::sslVersion() { return envoySSLVersion(); }
+
+envoy::config::core::v3::BuildVersion VersionInfo::makeBuildVersion(const char* version) {
+  envoy::config::core::v3::BuildVersion result;
+  // Split BUILD_VERSION_NUMBER into version and an optional build label after the '-'
+  std::regex ver_regex("([\\d]+)\\.([\\d]+)\\.([\\d]+)(-(.*))?");
+  // Match indexes, given the regex above
+  constexpr std::cmatch::size_type major = 1;
+  constexpr std::cmatch::size_type minor = 2;
+  constexpr std::cmatch::size_type patch = 3;
+  constexpr std::cmatch::size_type label = 5;
+  std::cmatch match;
+  if (std::regex_match(version, match, ver_regex)) {
+    int value = 0;
+    if (absl::SimpleAtoi(match.str(major), &value)) {
+      result.mutable_version()->set_major_number(value);
+    }
+    if (absl::SimpleAtoi(match.str(minor), &value)) {
+      result.mutable_version()->set_minor_number(value);
+    }
+    if (absl::SimpleAtoi(match.str(patch), &value)) {
+      result.mutable_version()->set_patch(value);
+    }
+  }
+  std::map<std::string, std::string> fields;
+  if (!match.str(label).empty()) {
+    fields[BuildVersionMetadataKeys::get().BuildLabel] = match.str(label);
+  }
+  fields[BuildVersionMetadataKeys::get().BuildType] = buildType();
+  fields[BuildVersionMetadataKeys::get().SslVersion] = sslVersion();
+  fields[BuildVersionMetadataKeys::get().RevisionSHA] = revision();
+  fields[BuildVersionMetadataKeys::get().RevisionStatus] = revisionStatus();
+  *result.mutable_metadata() = MessageUtil::keyValueStruct(fields);
+  return result;
+}
+
+} // namespace Envoy

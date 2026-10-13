@@ -1,0 +1,1393 @@
+#include <string>
+#include <vector>
+
+#include "source/common/tls/cert_validator/default_validator.h"
+#include "source/common/tls/cert_validator/san_matcher.h"
+
+#include "test/common/tls/cert_validator/test_common.h"
+#include "test/common/tls/ssl_test_utility.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
+#include "openssl/ssl.h"
+#include "openssl/x509v3.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
+using TestCertificateValidationContextConfigPtr =
+    std::unique_ptr<TestCertificateValidationContextConfig>;
+using X509StoreContextPtr = CSmartPtr<X509_STORE_CTX, X509_STORE_CTX_free>;
+using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
+using SSLContextPtr = CSmartPtr<SSL_CTX, SSL_CTX_free>;
+
+TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameDNSMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  std::vector<std::string> verify_subject_alt_name_list = {"server1.example.com",
+                                                           "server2.example.com"};
+  EXPECT_TRUE(DefaultCertValidator::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDNSMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// All OtherName SAN tests below are matched against an expected OID
+// and an expected SAN value
+
+// Test to check if the cert has an OtherName SAN
+// of UTF8String type with value containing "example.com"
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a Boolean type value "true"
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBooleanTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.5.5.7.8.7", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("true"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with an Enumerated type value "5"
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameEnumeratedTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.1", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("5"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with an Integer type value "5464".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIntegerTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.5.5.7.8.3", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("5464"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with an Object type value "1.3.6.1.4.1.311.20.2.3".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameObjectTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.5.2.2", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("1.3.6.1.4.1.311.20.2.3"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN with a NULL type.
+// NULL value is matched against an empty string since matcher is required.
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameNullTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher(""));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a BitString type value "01010101".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBitStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("01010101"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with an OctetString type value "48656C6C6F20576F726C64".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameOctetStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.4", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("48656C6C6F20576F726C64"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a PrintableString type value "PrintableStringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNamePrintableStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.5", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("PrintableStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a T61String type value "T61StringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameT61StringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.6", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("T61StringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a IA5String type value "IA5StringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIA5StringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.7", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("IA5StringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a GeneralStringExample type value "GeneralStringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.8", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("GeneralStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with an UniversalStringExample type value "UniversalStringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUniversalStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.9", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("UniversalStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with an UTCTime type value "230616120000Z".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUtcTimeTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.10", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("230616120000Z"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a GeneralizedTime type value "20230616120000Z".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralizedTimeTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.11", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("20230616120000Z"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a VisibleString type value "VisibleStringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameVisibleStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.12", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("VisibleStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with an UTF8 String type value "UTF8StringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUTF8StringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.13", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("UTF8StringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN
+// with a `BMPString` type value "BMPStringExample".
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBmpStringTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.14", 0));
+  matcher.MergeFrom(TestUtility::createExactMatcher("BMPStringExample"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN with a SET type
+// containing select values "test1" and "test2".
+// SET is a non-primitive type containing multiple values and is DER-encoded.
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSetTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(.*test1.*test2.*)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+// Test to check if the cert has an OtherName SAN with a SEQUENCE type
+// containing select values "test3" and "test4".
+// SEQUENCE is a non-primitive type containing multiple values and is DER-encoded.
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSequenceTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_multiple_othername_string_type_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(.*test3.*test4.*)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDnsAndOtherNameMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_dns_and_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIncorrectOidMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.2", 0));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIncorrectValueMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/san_othername_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.net)raw"));
+  bssl::UniquePtr<ASN1_OBJECT> oid(OBJ_txt2obj("1.3.6.1.4.1.311.20.2.3", 0));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(SanMatcherPtr{
+      std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameIncorrectTypeMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameExactDNSFailure) {
+  // This will only be tested under debug (assertion is triggered) to ensure
+  // that the class will not be initialized in the DNS-exact mode.
+#ifndef NDEBUG
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("api.example.com");
+  EXPECT_DEATH(std::ignore = std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context),
+               "general_name_type != 2 || matcher.match_pattern_case() != "
+               "envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact");
+#endif
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/common/tls/test_data/san_multiple_dns_cert.pem"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>("api.example.com")});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMultiLevelMatch) {
+  // san_multiple_dns_cert matches *.example.com
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/common/tls/test_data/san_multiple_dns_cert.pem"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>("foo.api.example.com")});
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameURIMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+  std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
+                                                           "spiffe://lyft.com/test-team"};
+  EXPECT_TRUE(DefaultCertValidator::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
+}
+
+TEST(DefaultCertValidatorTest, TestVerifySubjectAltMultiDomain) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/common/tls/test_data/san_multiple_dns_cert.pem"));
+  std::vector<std::string> verify_subject_alt_name_list = {"https://a.www.example.com"};
+  EXPECT_FALSE(
+      DefaultCertValidator::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameURIMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(spiffe://lyft.com/[^/]*-team)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameNotMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  std::vector<std::string> verify_subject_alt_name_list = {"foo", "bar"};
+  EXPECT_FALSE(
+      DefaultCertValidator::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example\.net)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_IPADD, matcher, context)});
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_EMAIL, matcher, context)});
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(*test_store.rootScope());
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example.com)raw"));
+  std::vector<SanMatcherPtr> san_matchers;
+  san_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+  // Verify the certificate with correct SAN regex matcher.
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers,
+                                                 {}, nullptr, nullptr),
+            Envoy::Ssl::ClientValidationStatus::Validated);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 0);
+
+  matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
+  std::vector<SanMatcherPtr> invalid_san_matchers;
+  invalid_san_matchers.push_back(
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>(matcher.exact())});
+  std::string error;
+  // Verify the certificate with incorrect SAN exact matcher.
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
+                                                 invalid_san_matchers, {}, &error, nullptr),
+            Envoy::Ssl::ClientValidationStatus::Failed);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 1);
+}
+
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContext) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(*test_store.rootScope());
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+
+  EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
+                                                 /*subject_alt_name_matchers=*/{}, {}, nullptr,
+                                                 nullptr),
+            Envoy::Ssl::ClientValidationStatus::NotValidated);
+  bssl::UniquePtr<X509> cert(X509_new());
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  ASSERT_TRUE(bssl::PushToStack(cert_chain.get(), std::move(cert)));
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+            default_validator
+                ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr,
+                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
+                .status);
+}
+
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(*test_store.rootScope());
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  TestSslExtendedSocketInfo extended_socket_info;
+  ValidationResults results = default_validator->doVerifyCertChain(
+      *cert_chain, /*callback=*/nullptr,
+      /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
+  EXPECT_EQ(Ssl::ClientValidationStatus::NoClientCertificate, results.detailed_status);
+}
+
+TEST(DefaultCertValidatorTest, NoSanInCert) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example\.net)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, WithVerifyDepth) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(*test_store.rootScope());
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
+
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain = readCertChainFromFile(
+      TestEnvironment::substitute("{{ test_rundir "
+                                  "}}/test/common/tls/test_data/test_long_cert_chain.pem"));
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/test_random_cert.pem"));
+  bssl::UniquePtr<X509> ca_cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  // Create the default validator object.
+  // Config includes ca_cert and the verify-depth.
+  // Set verify depth < 3, so verification fails. ( There are 3 intermediate certs )
+
+  std::string ca_cert_str(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  TestCertificateValidationContextConfigPtr test_config =
+      std::make_unique<TestCertificateValidationContextConfig>(typed_conf, false, san_matchers,
+                                                               ca_cert_str, 2);
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(test_config.get(),
+                                                                                stats, context);
+
+  STACK_OF(X509)* intermediates = cert_chain.get();
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
+
+  X509_STORE* storep = SSL_CTX_get_cert_store(ssl_ctx.get());
+  X509_STORE_add_cert(storep, ca_cert.get());
+  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));
+
+  ASSERT_OK(default_validator->addClientValidationContext(ssl_ctx.get(), false));
+  X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(store_ctx.get()),
+                         SSL_CTX_get0_param(ssl_ctx.get()));
+
+  EXPECT_EQ(X509_verify_cert(store_ctx.get()), 0);
+
+  // Now, create config with no depth configuration, verification should pass.
+  test_config = std::make_unique<TestCertificateValidationContextConfig>(typed_conf, false,
+                                                                         san_matchers, ca_cert_str);
+  default_validator = std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+      test_config.get(), stats, context);
+
+  // Re-initialize context
+  ssl_ctx = SSL_CTX_new(TLS_method());
+  store_ctx = X509_STORE_CTX_new();
+  storep = SSL_CTX_get_cert_store(ssl_ctx.get());
+  X509_STORE_add_cert(storep, ca_cert.get());
+  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), storep, cert.get(), intermediates));
+
+  ASSERT_OK(default_validator->addClientValidationContext(ssl_ctx.get(), false));
+  X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(store_ctx.get()),
+                         SSL_CTX_get0_param(ssl_ctx.get()));
+
+  EXPECT_EQ(X509_verify_cert(store_ctx.get()), 1);
+  EXPECT_EQ(X509_STORE_CTX_get_error(store_ctx.get()), X509_V_OK);
+}
+
+class MockCertificateValidationContextConfig : public Ssl::CertificateValidationContextConfig {
+public:
+  MockCertificateValidationContextConfig() : MockCertificateValidationContextConfig("") {}
+
+  explicit MockCertificateValidationContextConfig(const std::string& s) : s_(s) {
+    auto matcher = envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher();
+    matcher.set_san_type(
+        static_cast<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher_SanType>(
+            123));
+    matchers_.emplace_back(matcher);
+  };
+  const std::string& caCert() const override { return s_; }
+  const std::string& caCertPath() const override { return s_; }
+  const std::string& caCertName() const override { return s_; }
+  const std::string& certificateRevocationList() const override { return s_; }
+  const std::string& certificateRevocationListPath() const override { return s_; }
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
+  subjectAltNameMatchers() const override {
+    return matchers_;
+  }
+  const std::vector<std::string>& verifyCertificateHashList() const override { return strs_; }
+  const std::vector<std::string>& verifyCertificateSpkiList() const override { return strs_; }
+  bool allowExpiredCertificate() const override { return false; }
+  MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                  TrustChainVerification,
+              trustChainVerification, (), (const override));
+  MOCK_METHOD(const std::optional<envoy::config::core::v3::TypedExtensionConfig>&,
+              customValidatorConfig, (), (const override));
+  MOCK_METHOD(Api::Api&, api, (), (const override));
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return std::nullopt; }
+  bool autoSniSanMatch() const override { return false; }
+  bool suppressClientCaList() const override { return false; }
+
+private:
+  std::string s_;
+  std::vector<std::string> strs_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> matchers_;
+};
+
+TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto mock_context_config = std::make_unique<MockCertificateValidationContextConfig>();
+  EXPECT_CALL(*mock_context_config.get(), trustChainVerification())
+      .WillRepeatedly(testing::Return(envoy::extensions::transport_sockets::tls::v3::
+                                          CertificateValidationContext::ACCEPT_UNTRUSTED));
+  auto matchers =
+      std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
+  Stats::TestUtil::TestStore store;
+  auto ssl_stats = generateSslStats(*store.rootScope());
+  auto validator =
+      std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
+  auto ctx = std::vector<SSL_CTX*>();
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
+              testing::ContainsRegex("Unhandled case in createStringSanMatcher.*"));
+}
+
+TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto mock_context_config = std::make_unique<MockCertificateValidationContextConfig>(
+      "-----BEGIN CERTIFICATE-----\nincomplete payload");
+  EXPECT_CALL(*mock_context_config.get(), trustChainVerification())
+      .WillRepeatedly(testing::Return(envoy::extensions::transport_sockets::tls::v3::
+                                          CertificateValidationContext::ACCEPT_UNTRUSTED));
+
+  Stats::TestUtil::TestStore store;
+  auto ssl_stats = generateSslStats(*store.rootScope());
+  auto validator =
+      std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
+  auto ctx = std::vector<SSL_CTX*>();
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
+              testing::ContainsRegex("Failed to load trusted CA certificates from.*"));
+}
+
+class CleanMockCertValidationConfig : public Ssl::CertificateValidationContextConfig {
+public:
+  explicit CleanMockCertValidationConfig(const std::string& ca_name) : ca_name_(ca_name) {}
+
+  const std::string& caCert() const override { return empty_; }
+  const std::string& caCertPath() const override { return empty_; }
+  const std::string& caCertName() const override { return ca_name_; }
+  const std::string& certificateRevocationList() const override { return empty_; }
+  const std::string& certificateRevocationListPath() const override { return empty_; }
+
+  // Return EMPTY vectors to avoid validation errors
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
+  subjectAltNameMatchers() const override {
+    return empty_matchers_;
+  }
+  const std::vector<std::string>& verifyCertificateHashList() const override { return empty_strs_; }
+  const std::vector<std::string>& verifyCertificateSpkiList() const override { return empty_strs_; }
+
+  bool allowExpiredCertificate() const override { return false; }
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+      TrustChainVerification
+      trustChainVerification() const override {
+    return envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+        ACCEPT_UNTRUSTED;
+  }
+  const std::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  customValidatorConfig() const override {
+    return custom_config_;
+  }
+  Api::Api& api() const override { return *api_; }
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
+  std::optional<uint32_t> maxVerifyDepth() const override { return std::nullopt; }
+  bool autoSniSanMatch() const override { return false; }
+  bool suppressClientCaList() const override { return false; }
+
+private:
+  std::string ca_name_;
+  std::string empty_;
+  std::vector<std::string> empty_strs_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> empty_matchers_;
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_config_;
+  Api::ApiPtr api_ = Api::createApiForTest();
+};
+
+TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  auto config = std::make_unique<CleanMockCertValidationConfig>("test_ca_cert");
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  std::vector<SSL_CTX*> ssl_contexts;
+  auto result = validator->initializeSslContexts(ssl_contexts, true, *store.rootScope());
+  ASSERT_OK(result);
+
+  std::string expected_metric_name = "ssl.certificate.test_ca_cert.expiration_unix_time_seconds";
+  auto gauge_opt = store.findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  // No real certificate, so should get sentinel max value
+  EXPECT_EQ(gauge_opt->value(), std::chrono::seconds::max().count());
+}
+
+// Test that ValidationResults contains detailed error information when SAN validation fails.
+TEST(DefaultCertValidatorTest, TestCertificateValidationErrorDetailsForSanFailure) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(*test_store.rootScope());
+
+  // Load a certificate with DNS SANs
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+
+  // Create SAN matchers that won't match the certificate (using regex as DNS requires it)
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw(nomatch\.example\.com)raw"));
+  std::vector<SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+
+  // Create the validator with no config (so verify_trusted_ca_ is false)
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+
+  // Call verifyCertificate directly which populates error_details on SAN mismatch
+  std::string error_details;
+  uint8_t tls_alert;
+  Ssl::ClientValidationStatus status = default_validator->verifyCertificate(
+      cert.get(), /*verify_san_list=*/{}, subject_alt_name_matchers, /*stream_info=*/{},
+      &error_details, &tls_alert);
+
+  // Validation should fail because the SAN doesn't match
+  EXPECT_EQ(Ssl::ClientValidationStatus::Failed, status);
+
+  // The error_details should be populated with a meaningful error message including cert SANs
+  EXPECT_EQ(error_details,
+            "verify cert failed: SAN matcher, certificate SANs are [server1.example.com]");
+}
+
+// Test that TestSslExtendedSocketInfo properly stores and retrieves certificate validation errors.
+TEST(DefaultCertValidatorTest, TestSslExtendedSocketInfoCertValidationError) {
+  TestSslExtendedSocketInfo extended_socket_info;
+
+  // Initially the error should be empty
+  EXPECT_TRUE(extended_socket_info.certificateValidationError().empty());
+
+  // Set an error
+  const std::string error_msg = "verify cert failed: X509_verify_cert: certificate has expired";
+  extended_socket_info.setCertificateValidationError(error_msg);
+
+  // Verify the error is stored and retrievable
+  EXPECT_EQ(error_msg, extended_socket_info.certificateValidationError());
+}
+
+// Test that empty cert chain returns appropriate error details.
+TEST(DefaultCertValidatorTest, TestEmptyCertChainErrorDetails) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(*test_store.rootScope());
+
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats, context);
+
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+
+  ValidationResults results = default_validator->doVerifyCertChain(
+      *cert_chain, /*callback=*/nullptr,
+      /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
+
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
+  EXPECT_TRUE(results.error_details.has_value());
+  EXPECT_EQ(results.error_details.value(), "verify cert failed: empty cert chain");
+}
+
+namespace {
+
+TestCertificateValidationContextConfigPtr makeSuppressConfig(const std::string& ca_cert,
+                                                             bool suppress) {
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
+  return std::make_unique<TestCertificateValidationContextConfig>(
+      typed_conf, /*allow_expired_certificate=*/false, san_matchers, ca_cert,
+      /*verify_depth=*/std::nullopt, suppress);
+}
+
+// Runs updateDigestForSessionId against the validator and returns the resulting
+// digest bytes. Lets tests compare digests produced under different configs.
+std::vector<uint8_t> computeSessionIdDigest(DefaultCertValidator& validator) {
+  bssl::ScopedEVP_MD_CTX md;
+  int rc = EVP_DigestInit_ex(md.get(), EVP_sha256(), nullptr);
+  RELEASE_ASSERT(rc == 1, "EVP_DigestInit_ex failed");
+  uint8_t scratch[EVP_MAX_MD_SIZE];
+  validator.updateDigestForSessionId(md, scratch, SHA256_DIGEST_LENGTH);
+  std::vector<uint8_t> out(EVP_MAX_MD_SIZE);
+  unsigned out_len = 0;
+  rc = EVP_DigestFinal_ex(md.get(), out.data(), &out_len);
+  RELEASE_ASSERT(rc == 1, "EVP_DigestFinal_ex failed");
+  out.resize(out_len);
+  return out;
+}
+
+} // namespace
+
+// Test that when suppress_client_ca_list is enabled, SSL_CTX_get_client_CA_list returns NULL
+TEST(DefaultCertValidatorTest, SuppressClientCaListEnabled) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config = makeSuppressConfig(ca_cert, true);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  ASSERT_OK(validator->addClientValidationContext(ssl_ctx.get(), true));
+
+  // When suppressed, the validator must not populate the CA list. Depending on the
+  // BoringSSL version, SSL_CTX_new may leave the list as nullptr or as an empty stack;
+  // both outcomes satisfy the guarantee that no CA names will be advertised.
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+  if (ca_list != nullptr) {
+    EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
+  }
+}
+
+// Test that when suppress_client_ca_list is disabled (default), CA list is set correctly
+TEST(DefaultCertValidatorTest, SuppressClientCaListDisabled) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config = makeSuppressConfig(ca_cert, false);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  ASSERT_OK(validator->addClientValidationContext(ssl_ctx.get(), true));
+
+  STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+  ASSERT_NE(ca_list, nullptr);
+  EXPECT_GT(sk_X509_NAME_num(ca_list), 0);
+}
+
+// Test that addClientValidationContext returns an error when the CA cert PEM is malformed
+// (valid PEM header but corrupt base64 content).
+TEST(DefaultCertValidatorTest, AddClientValidationContextWithMalformedCaCert) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  // Valid PEM envelope but garbage base64 inside — triggers a decode error
+  // that is NOT PEM_R_NO_START_LINE, hitting the else-branch error return.
+  std::string ca_cert = "-----BEGIN CERTIFICATE-----\n"
+                        "not valid base64 content!!!\n"
+                        "-----END CERTIFICATE-----\n";
+
+  auto config = makeSuppressConfig(ca_cert, false);
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  EXPECT_THAT(validator->addClientValidationContext(ssl_ctx.get(), true), Not(IsOk()));
+}
+
+// Test that session ID hash differs when suppress_client_ca_list differs.
+// This prevents session resumption across contexts with different security settings.
+TEST(DefaultCertValidatorTest, SuppressClientCaListSessionIdDiffers) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config_suppressed = makeSuppressConfig(ca_cert, true);
+  auto config_not_suppressed = makeSuppressConfig(ca_cert, false);
+
+  DefaultCertValidator validator_suppressed(config_suppressed.get(), stats, context);
+  DefaultCertValidator validator_not_suppressed(config_not_suppressed.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx_suppressed(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ssl_ctx_not_suppressed(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> ctxs1 = {ssl_ctx_suppressed.get()};
+  std::vector<SSL_CTX*> ctxs2 = {ssl_ctx_not_suppressed.get()};
+  ASSERT_OK(validator_suppressed.initializeSslContexts(ctxs1, true, *store.rootScope()));
+  ASSERT_OK(validator_not_suppressed.initializeSslContexts(ctxs2, true, *store.rootScope()));
+
+  auto digest_suppressed = computeSessionIdDigest(validator_suppressed);
+  auto digest_not_suppressed = computeSessionIdDigest(validator_not_suppressed);
+
+  EXPECT_NE(digest_suppressed, digest_not_suppressed)
+      << "Session ID digests must differ when suppress_client_ca_list differs";
+}
+
+namespace {
+
+std::string readTestCaCert(const std::string& file_name) {
+  return TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/" + file_name));
+}
+
+// Builds a validator whose trusted CA bundle is `ca_cert`, initializes its SSL
+// contexts so the bundle is actually parsed, and stores the resulting session
+// ID digest in `digest`.
+void sessionIdDigestForCaBundle(const std::string& ca_cert,
+                                NiceMock<Server::Configuration::MockServerFactoryContext>& context,
+                                SslStats& stats, Stats::TestUtil::TestStore& store,
+                                std::vector<uint8_t>& digest) {
+  envoy::config::core::v3::TypedExtensionConfig typed_conf;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers{};
+  auto config = std::make_unique<TestCertificateValidationContextConfig>(
+      typed_conf, /*allow_expired_certificate=*/false, san_matchers, ca_cert,
+      /*verify_depth=*/std::nullopt, /*suppress_client_ca_list=*/false);
+  DefaultCertValidator validator(config.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  ASSERT_NE(ssl_ctx, nullptr);
+  // `provides_certificates` is false so that the trusted CA bundle is loaded and
+  // included in the digest, mirroring a server context validating peers.
+  std::vector<SSL_CTX*> ctxs = {ssl_ctx.get()};
+  ASSERT_OK(
+      validator.initializeSslContexts(ctxs, /*provides_certificates=*/false, *store.rootScope()));
+  digest = computeSessionIdDigest(validator);
+}
+
+} // namespace
+
+// Every CA in the trusted bundle must contribute to the session ID digest, not
+// just the first one. Otherwise rotating or removing any CA after the first one
+// leaves previously issued session IDs valid against a changed trust bundle.
+TEST(DefaultCertValidatorTest, SessionIdDigestCoversAllCaCertificates) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  const std::string ca = readTestCaCert("ca_cert.pem");
+  const std::string intermediate_ca = readTestCaCert("intermediate_ca_cert.pem");
+  const std::string fake_ca = readTestCaCert("fake_ca_cert.pem");
+
+  // The first CA of the bundle is the same in all three cases, so before the fix
+  // all digests were computed from ca_cert_ alone and came out identical.
+  std::vector<uint8_t> digest_single;
+  std::vector<uint8_t> digest_two_with_intermediate;
+  std::vector<uint8_t> digest_two_with_fake;
+  sessionIdDigestForCaBundle(ca, context, stats, store, digest_single);
+  sessionIdDigestForCaBundle(ca + intermediate_ca, context, stats, store,
+                             digest_two_with_intermediate);
+  sessionIdDigestForCaBundle(ca + fake_ca, context, stats, store, digest_two_with_fake);
+
+  // A CA added after the first one changes the digest.
+  EXPECT_NE(digest_single, digest_two_with_intermediate);
+  EXPECT_NE(digest_single, digest_two_with_fake);
+  // Changing only the non-first CA changes the digest.
+  EXPECT_NE(digest_two_with_intermediate, digest_two_with_fake);
+}
+
+// Certificate validation context config that reports a fixed CRL blob, used to
+// exercise CRL sharing across validators.
+class CrlValidationContextConfig : public TestCertificateValidationContextConfig {
+public:
+  explicit CrlValidationContextConfig(std::string crl) : crl_(std::move(crl)) {}
+  const std::string& certificateRevocationList() const override { return crl_; }
+
+private:
+  const std::string crl_;
+};
+
+// The CRL cache returns one shared parsed representation for identical content,
+// so a CRL referenced from many contexts is materialized in memory only once.
+TEST(CrlCacheTest, SharesIdenticalCrlContent) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> first = cache->getOrCreate(crl, "ca_cert.crl");
+  ASSERT_OK(first);
+  absl::StatusOr<CrlListSharedPtr> second = cache->getOrCreate(crl, "ca_cert.crl");
+  ASSERT_OK(second);
+
+  // Both lookups return the same CrlList and the same parsed X509_CRL.
+  EXPECT_EQ(first->get(), second->get());
+  ASSERT_FALSE((*first)->crls.empty());
+  EXPECT_EQ((*first)->crls[0].get(), (*second)->crls[0].get());
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Distinct CRL content is cached separately.
+TEST(CrlCacheTest, SeparatesDistinctCrlContent) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl1 = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+  const std::string crl2 = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> first = cache->getOrCreate(crl1, "ca_cert.crl");
+  ASSERT_OK(first);
+  absl::StatusOr<CrlListSharedPtr> second = cache->getOrCreate(crl2, "intermediate_ca_cert.crl");
+  ASSERT_OK(second);
+
+  EXPECT_NE(first->get(), second->get());
+  EXPECT_EQ(cache->size(), 2);
+}
+
+// An entry is released once the last reference to it is dropped, so the cache
+// does not grow without bound as CRLs are rotated via xDS.
+TEST(CrlCacheTest, ReleasesUnreferencedEntries) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+
+  {
+    absl::StatusOr<CrlListSharedPtr> entry = cache->getOrCreate(crl, "ca_cert.crl");
+    ASSERT_OK(entry);
+    EXPECT_EQ(cache->size(), 1);
+  }
+  // The only reference is gone, so the entry is released.
+  EXPECT_EQ(cache->size(), 0);
+
+  // Re-adding the same content succeeds and repopulates the cache.
+  absl::StatusOr<CrlListSharedPtr> reloaded = cache->getOrCreate(crl, "ca_cert.crl");
+  ASSERT_OK(reloaded);
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Invalid CRL content returns an error and is not cached.
+TEST(CrlCacheTest, ReturnsErrorForInvalidCrl) {
+  auto cache = std::make_shared<CrlCache>();
+  const std::string invalid = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/not_a_crl.crl"));
+
+  absl::StatusOr<CrlListSharedPtr> result = cache->getOrCreate(invalid, "not_a_crl.crl");
+  EXPECT_THAT(result,
+              HasStatusMessage(testing::HasSubstr("Failed to load CRL from not_a_crl.crl")));
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// A returned CrlList keeps the cache alive, so a caller only needs to hold the
+// CrlList (this is what lets the validator store a single shared_ptr).
+TEST(CrlCacheTest, CrlListKeepsCacheAlive) {
+  std::weak_ptr<CrlCache> weak_cache;
+  CrlListSharedPtr crl_list;
+  {
+    auto cache = std::make_shared<CrlCache>();
+    weak_cache = cache;
+    const std::string crl = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+    absl::StatusOr<CrlListSharedPtr> result = cache->getOrCreate(crl, "ca_cert.crl");
+    ASSERT_OK(result);
+    crl_list = std::move(*result);
+  }
+  // The local cache reference is gone, but the CrlList still holds it alive.
+  EXPECT_FALSE(weak_cache.expired());
+  EXPECT_EQ(crl_list->cache.get(), weak_cache.lock().get());
+
+  // Dropping the CrlList releases the cache.
+  crl_list.reset();
+  EXPECT_TRUE(weak_cache.expired());
+}
+
+// Two validators created from the same factory context share a single parsed
+// CRL, which is the behavior that prevents a separate copy per TLS context.
+TEST(DefaultCertValidatorTest, SharesCrlAcrossContexts) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  const std::string crl = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"));
+
+  auto config1 = std::make_unique<CrlValidationContextConfig>(crl);
+  auto config2 = std::make_unique<CrlValidationContextConfig>(crl);
+  DefaultCertValidator validator1(config1.get(), stats, context);
+  DefaultCertValidator validator2(config2.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx1(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ssl_ctx2(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> contexts1 = {ssl_ctx1.get()};
+  std::vector<SSL_CTX*> contexts2 = {ssl_ctx2.get()};
+  ASSERT_OK(validator1.initializeSslContexts(contexts1, false, *store.rootScope()));
+  ASSERT_OK(validator2.initializeSslContexts(contexts2, false, *store.rootScope()));
+
+  // Both validators reference the same parsed CRL, cached exactly once.
+  EXPECT_EQ(getCrlCache(context.singletonManager())->size(), 1);
+
+  // A validator using different CRL content adds a second cache entry.
+  const std::string other_crl =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.crl"));
+  auto config3 = std::make_unique<CrlValidationContextConfig>(other_crl);
+  DefaultCertValidator validator3(config3.get(), stats, context);
+  bssl::UniquePtr<SSL_CTX> ssl_ctx3(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> contexts3 = {ssl_ctx3.get()};
+  ASSERT_OK(validator3.initializeSslContexts(contexts3, false, *store.rootScope()));
+  EXPECT_EQ(getCrlCache(context.singletonManager())->size(), 2);
+}
+
+// The trusted CA cache returns one shared parsed representation for identical
+// content, so a trust bundle referenced from many contexts is materialized in
+// memory only once.
+TEST(CaCertCacheTest, SharesIdenticalCaContent) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> first = cache->getOrCreate(ca_cert, "ca_cert.pem");
+  ASSERT_OK(first);
+  absl::StatusOr<CaCertListSharedPtr> second = cache->getOrCreate(ca_cert, "ca_cert.pem");
+  ASSERT_OK(second);
+
+  // Both lookups return the same CaCertList and the same parsed X509.
+  EXPECT_EQ(first->get(), second->get());
+  ASSERT_FALSE((*first)->certs.empty());
+  EXPECT_EQ((*first)->certs[0].get(), (*second)->certs[0].get());
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Distinct CA content is cached separately.
+TEST(CaCertCacheTest, SeparatesDistinctCaContent) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  const std::string fake_ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> first = cache->getOrCreate(ca_cert, "ca_cert.pem");
+  ASSERT_OK(first);
+  absl::StatusOr<CaCertListSharedPtr> second = cache->getOrCreate(fake_ca_cert, "fake_ca_cert.pem");
+  ASSERT_OK(second);
+
+  EXPECT_NE(first->get(), second->get());
+  EXPECT_EQ(cache->size(), 2);
+}
+
+// A trust bundle carrying several certificates is parsed into one entry holding
+// all of them.
+TEST(CaCertCacheTest, KeepsEveryCertificateInABundle) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string bundle = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> entry = cache->getOrCreate(bundle, "ca_certificates.pem");
+  ASSERT_OK(entry);
+  EXPECT_GT((*entry)->certs.size(), 1);
+}
+
+// A CA blob is allowed to carry CRLs alongside the certificates; both are kept
+// on the shared entry.
+TEST(CaCertCacheTest, KeepsCrlsCarriedInTheCaBlob) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert_with_crl =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"));
+
+  absl::StatusOr<CaCertListSharedPtr> entry =
+      cache->getOrCreate(ca_cert_with_crl, "ca_cert_with_crl.pem");
+  ASSERT_OK(entry);
+  EXPECT_FALSE((*entry)->certs.empty());
+  EXPECT_FALSE((*entry)->crls.empty());
+}
+
+// An entry is released once the last reference to it is dropped, so the cache
+// does not grow without bound as certificates are rotated via xDS.
+TEST(CaCertCacheTest, ReleasesUnreferencedEntries) {
+  auto cache = std::make_shared<CaCertCache>();
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  {
+    absl::StatusOr<CaCertListSharedPtr> entry = cache->getOrCreate(ca_cert, "ca_cert.pem");
+    ASSERT_OK(entry);
+    EXPECT_EQ(cache->size(), 1);
+  }
+  // The only reference is gone, so the entry is released.
+  EXPECT_EQ(cache->size(), 0);
+
+  // Re-adding the same content succeeds and repopulates the cache.
+  absl::StatusOr<CaCertListSharedPtr> reloaded = cache->getOrCreate(ca_cert, "ca_cert.pem");
+  ASSERT_OK(reloaded);
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Content that carries no usable certificate returns an error and is not cached.
+TEST(CaCertCacheTest, ReturnsErrorForInvalidCaCert) {
+  auto cache = std::make_shared<CaCertCache>();
+  // Valid PEM envelope but garbage base64 inside, so nothing parses out of it.
+  const std::string invalid = "-----BEGIN CERTIFICATE-----\n"
+                              "not valid base64 content!!!\n"
+                              "-----END CERTIFICATE-----\n";
+
+  absl::StatusOr<CaCertListSharedPtr> result = cache->getOrCreate(invalid, "invalid_ca_cert.pem");
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr(
+                          "Failed to load trusted CA certificates from invalid_ca_cert.pem")));
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// A returned CaCertList keeps the cache alive, so a caller only needs to hold
+// the CaCertList (this is what lets the validator store a single shared_ptr).
+TEST(CaCertCacheTest, CaCertListKeepsCacheAlive) {
+  std::weak_ptr<CaCertCache> weak_cache;
+  CaCertListSharedPtr ca_cert_list;
+  {
+    auto cache = std::make_shared<CaCertCache>();
+    weak_cache = cache;
+    const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+    absl::StatusOr<CaCertListSharedPtr> result = cache->getOrCreate(ca_cert, "ca_cert.pem");
+    ASSERT_OK(result);
+    ca_cert_list = std::move(*result);
+  }
+  // The local cache reference is gone, but the CaCertList still holds it alive.
+  EXPECT_FALSE(weak_cache.expired());
+  EXPECT_EQ(ca_cert_list->cache.get(), weak_cache.lock().get());
+
+  // Dropping the CaCertList releases the cache.
+  ca_cert_list.reset();
+  EXPECT_TRUE(weak_cache.expired());
+}
+
+// Two validators created from the same factory context share a single parsed
+// trust bundle, which is the behavior that prevents a separate copy of the CA
+// certificates per TLS context.
+TEST(DefaultCertValidatorTest, SharesCaCertsAcrossContexts) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  const std::string ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  auto config1 = makeSuppressConfig(ca_cert, false);
+  auto config2 = makeSuppressConfig(ca_cert, false);
+  DefaultCertValidator validator1(config1.get(), stats, context);
+  DefaultCertValidator validator2(config2.get(), stats, context);
+
+  bssl::UniquePtr<SSL_CTX> ssl_ctx1(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL_CTX> ssl_ctx2(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> contexts1 = {ssl_ctx1.get()};
+  std::vector<SSL_CTX*> contexts2 = {ssl_ctx2.get()};
+  ASSERT_OK(validator1.initializeSslContexts(contexts1, false, *store.rootScope()));
+  ASSERT_OK(validator2.initializeSslContexts(contexts2, false, *store.rootScope()));
+
+  // Both validators reference the same parsed CA certificates, cached exactly
+  // once, and each still reports the CA it was configured with.
+  EXPECT_EQ(getCaCertCache(context.singletonManager())->size(), 1);
+  EXPECT_FALSE(validator1.getCaCertInformation().empty());
+  EXPECT_FALSE(validator2.getCaCertInformation().empty());
+
+  // A validator using different CA content adds a second cache entry.
+  const std::string other_ca_cert = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"));
+  auto config3 = makeSuppressConfig(other_ca_cert, false);
+  DefaultCertValidator validator3(config3.get(), stats, context);
+  bssl::UniquePtr<SSL_CTX> ssl_ctx3(SSL_CTX_new(TLS_method()));
+  std::vector<SSL_CTX*> contexts3 = {ssl_ctx3.get()};
+  ASSERT_OK(validator3.initializeSslContexts(contexts3, false, *store.rootScope()));
+  EXPECT_EQ(getCaCertCache(context.singletonManager())->size(), 2);
+}
+
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
+} // namespace Envoy

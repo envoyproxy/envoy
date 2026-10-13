@@ -1,0 +1,36 @@
+#pragma once
+
+#include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
+#include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
+#include "envoy/thread_local/thread_local.h"
+
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace RateLimitQuota {
+
+inline constexpr absl::string_view FilterName = "envoy.filters.http.rate_limit_quota";
+
+class RateLimitQuotaFilterFactory
+    : public Common::UnifiedFactoryBase<
+          envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig,
+          envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride>,
+      public Logger::Loggable<Logger::Id::rate_limit_quota> {
+public:
+  RateLimitQuotaFilterFactory() : UnifiedFactoryBase(std::string(FilterName)) {}
+
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
+          filter_config,
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+};
+
+} // namespace RateLimitQuota
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+message NonTerminalEncodingFilterConfig {
+  enum WhereToStartEncoding {
+    DECODE_HEADERS = 0;
+    DECODE_DATA = 1;
+    DECODE_TRAILERS = 2;
+  }
+
+  enum HowToEncode {
+    SKIP_ENCODING = 0;
+    SYNCHRONOUSLY = 1;
+    IN_TIMER_CALLBACK = 2;
+  }
+
+  WhereToStartEncoding where_to_start_encoding = 1;
+  HowToEncode encode_body = 2;
+  HowToEncode encode_trailers = 3;
+}

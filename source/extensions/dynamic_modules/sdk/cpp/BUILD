@@ -1,0 +1,74 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+licenses(["notice"])  # Apache 2
+
+# All necessary abstractions for creating plugins.
+cc_library(
+    name = "sdk",
+    srcs = [
+        "sdk.cc",
+        "sdk_early_header_mutation.cc",
+        "sdk_header_formatter.cc",
+        "sdk_listener.cc",
+        "sdk_network.cc",
+    ],
+    hdrs = [
+        "sdk.h",
+        "sdk_common.h",
+        "sdk_early_header_mutation.h",
+        "sdk_header_formatter.h",
+        "sdk_listener.h",
+        "sdk_network.h",
+    ],
+    visibility = ["//visibility:public"],
+    alwayslink = True,
+)
+
+# Shared helpers for the ABI export implementations, including the exception barrier. Header only so
+# it can be linked into unit tests without pulling in the ABI exports.
+cc_library(
+    name = "sdk_internal_common",
+    hdrs = [
+        "sdk_internal_common.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":sdk",
+        "//source/extensions/dynamic_modules/abi",
+    ],
+)
+
+# SDK implementation and underlying ABI selection.
+# Link this library and the :sdk to final output binaries.
+# The example practice is to link against :sdk only in plugins,
+# then you can test the plugins with mocks.
+# And then you a new bazel target to link the :sdk_abi and
+# the plugins lib.
+cc_library(
+    name = "sdk_abi",
+    srcs = [
+        "sdk_internal.cc",
+        "sdk_internal_early_header_mutation.cc",
+        "sdk_internal_header_formatter.cc",
+        "sdk_internal_listener.cc",
+        "sdk_internal_network.cc",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":sdk",
+        ":sdk_internal_common",
+        "//source/extensions/dynamic_modules/abi",
+    ],
+    alwayslink = True,
+)
+
+# Fake implementations for simple type like header map or buffer.
+# Used for testing.
+cc_library(
+    name = "sdk_fake",
+    hdrs = ["sdk_fake.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":sdk",
+    ],
+)

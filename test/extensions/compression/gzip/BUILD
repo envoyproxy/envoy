@@ -1,0 +1,37 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_package",
+    "envoy_proto_library",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_proto_library(
+    name = "compressor_fuzz_input_proto",
+    srcs = ["compressor_fuzz_input.proto"],
+)
+
+envoy_extension_cc_fuzz_test(
+    name = "compressor_fuzz_test",
+    srcs = ["compressor_fuzz_test.cc"],
+    corpus = "compressor_corpus",
+    extension_names = [
+        "envoy.compression.gzip.compressor",
+        "envoy.compression.gzip.decompressor",
+    ],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":compressor_fuzz_input_proto_cc_proto",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/extensions/compression/gzip/compressor:compressor_lib",
+        "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",
+        "//test/fuzz:utility_lib",
+    ],
+)

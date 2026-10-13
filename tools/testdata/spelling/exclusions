@@ -1,0 +1,81 @@
+// Lots of things are excluded:
+
+// Github user names:
+// TODO(speeling): is ok
+// TODO(@speeling): is ok
+// TODO(speeling) is ok
+// TODO(@speeling) is ok
+// NOTE(speeling): is ok
+// NOTE(@speeling): is ok
+// NOTE(speeling) is ok
+// NOTE(@speeling) is ok
+// Even just bare @speeling is ok
+
+// Documentation comments:
+// @param speeling is ignored here
+// @return speeling is ignored here
+
+// Base64:
+// ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/+=
+// ABCDEFGHIJKLMN12
+
+// Hex:
+// ACEFBCDA   acefbcda
+// (ACEFBCDA) (acefbcda)
+// AB:CD:EF   ab:cd:ef
+// 0xABCD     0xabcd
+// 0xD        0xd
+// ABCDEFAB-ABCD-ABCD-ABCD-ABCDEFABCDEF
+// abcdefab-abcd-abcd-abcd-abcdefabcdef
+
+// Bit fields:
+// 00xxxxxx 00XXXXX
+// 11yyyyyy 11YYYYY
+// AABBAABB
+
+// IPv6:
+// FC00::/8
+// 2001::abcd/64
+
+// Quoted words:
+// "speeling"          'speeling'          *speeling*
+// "speeling-is-fun-1" 'speeling-is-fun-1' *speeling-is-fun-1*
+// "speeling:is:fun:1" 'speeling:is:fun:1' *speeling:is:fun:1*
+// "speeling.is.fun.1" 'speeling.is.fun.1' *speeling.is.fun.1*
+
+// Quoted expressions:
+// `std::speeling`
+// `namespace::speeling<T>`
+
+// Tuple expressions
+// (speeling, phun)
+// (speeling,phun)
+
+// Flags:
+// %speeling
+// -speeling
+
+// RST links:
+// `speeling <https://speeling.com>`_
+// :ref:`speeling <speeling>`
+
+// RST literals:
+// ``speeling``
+
+// Paths:
+// /usr/local/speeling
+// /dev/speeling/*
+// envoy/speeling.h
+// envoy/speeling.cc
+// envoy/speeling.py
+// envoy/speeling.sh
+
+// Ordinals:
+// 1st, 2nd, 3rd, 4th, 10th, 11th, 1525th.
+
+// Affixes:
+// un-comment
+// uncomment
+// verb-ing
+// verbing
+

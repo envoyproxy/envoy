@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/cert_mappers/filter_state_override/v3;filter_state_overridev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Filter state certificate mapper]
+// [#extension: envoy.tls.upstream_certificate_mappers.filter_state_override]
+
+// Uses a filter state value for the key ``envoy.tls.certificate_mappers.on_demand_secret`` as the
+// secret resource name. This filter state is expected to be shared from the downstream connection.
+message Config {
+  // The value to use as the secret name when the filter state is absent.
+  string default_value = 1 [(validate.rules).string = {min_len: 1}];
+}

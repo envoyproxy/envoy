@@ -1,0 +1,100 @@
+#include "source/extensions/filters/http/ext_authz/config.h"
+
+#include <chrono>
+#include <string>
+
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
+#include "envoy/grpc/async_client_manager.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/http/ext_authz/ext_authz.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExtAuthz {
+
+absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  absl::Status creation_status = absl::OkStatus();
+  // Like the router, this filter charges response code stats to the scope it is given, under names
+  // of their own rather than under its stat prefix, so that scope stays the server's one and the
+  // prefix of the filter chain is carried in the stat prefix instead.
+  const auto filter_config =
+      std::make_shared<FilterConfig>(proto_config, server_context.scope(),
+                                     extra_context.stats_prefix, server_context, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  // The callback is created in main thread and executed in worker thread, variables except factory
+  // context must be captured by value into the callback.
+  Http::FilterFactoryCb callback;
+  if (proto_config.has_http_service()) {
+    // Raw HTTP client.
+    // A timeout of 0 means infinite (no timeout).
+    const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.http_service().server_uri(),
+                                                           timeout, DefaultTimeout);
+    const auto client_config =
+        std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
+            proto_config, timeout_ms, proto_config.http_service().path_prefix(), server_context);
+    callback = [filter_config = std::move(filter_config), client_config,
+                &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
+      auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
+          server_context.clusterManager(), client_config);
+      callbacks.addStreamFilter(
+          std::make_shared<Filter>(filter_config, std::move(client), server_context));
+    };
+  } else {
+    // gRPC client.
+    // A timeout of 0 means infinite (no timeout). Convert to nullopt in that case.
+    const uint32_t timeout_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
+    const std::optional<std::chrono::milliseconds> timeout =
+        timeout_ms == 0
+            ? std::nullopt
+            : std::optional<std::chrono::milliseconds>(std::chrono::milliseconds(timeout_ms));
+    RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
+    Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+        Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
+    callback = [&server_context, filter_config = std::move(filter_config), timeout,
+                config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
+      auto client_or_error = server_context.clusterManager()
+                                 .grpcAsyncClientManager()
+                                 .getOrCreateRawAsyncClientWithHashKey(
+                                     config_with_hash_key, server_context.scope(), true);
+      RELEASE_ASSERT(client_or_error.ok(), "failed to create ext_authz gRPC client");
+      auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
+          client_or_error.value(), timeout, filter_config->emitClientSpan());
+      callbacks.addStreamFilter(
+          std::make_shared<Filter>(filter_config, std::move(client), server_context));
+    };
+  }
+  return callback;
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<FilterConfigPerRoute>(proto_config, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return config;
+}
+
+/**
+ * Static registration for the external authorization filter. @see RegisterFactory.
+ */
+LEGACY_REGISTER_FACTORY(ExtAuthzFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.ext_authz");
+
+} // namespace ExtAuthz
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

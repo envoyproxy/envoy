@@ -1,0 +1,21 @@
+config {
+       name: "envoy.buffer"
+typed_config {
+  [type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] {
+    max_request_bytes {
+      value: 1048576
+    }
+  }
+}
+}
+data {
+  headers {
+    headers {
+    key:
+      "a" value : "b"
+    }
+  }
+  http_body {
+    data: "hello"
+  }
+}

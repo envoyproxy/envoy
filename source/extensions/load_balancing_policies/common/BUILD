@@ -1,0 +1,127 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_extension_package()
+
+envoy_cc_library(
+    name = "factory_base",
+    hdrs = ["factory_base.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/upstream:load_balancer_interface",
+        "//source/common/upstream:load_balancer_factory_base_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "thread_aware_lb_lib",
+    srcs = ["thread_aware_lb_impl.cc"],
+    hdrs = ["thread_aware_lb_impl.h"],
+    deps = [
+        ":load_balancer_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/http:hash_policy_lib",
+        "//source/common/http:headers_lib",
+        "@abseil-cpp//absl/synchronization",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "locality_wrr_lib",
+    srcs = ["locality_wrr.cc"],
+    hdrs = ["locality_wrr.h"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/upstream:scheduler_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "orca_weight_manager_lib",
+    srcs = ["orca_weight_manager.cc"],
+    hdrs = ["orca_weight_manager.h"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/orca:orca_load_metrics_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "orca_oob_manager_lib",
+    srcs = ["orca_oob_manager.cc"],
+    hdrs = ["orca_oob_manager.h"],
+    deps = [
+        "//envoy/common:random_generator_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/grpc:status",
+        "//envoy/http:codec_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:macros",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/grpc:codec_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/grpc:status_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:host_utility_lib",
+        "@abseil-cpp//absl/container:node_hash_map",
+        "@abseil-cpp//absl/status",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",
+        "@xds//xds/data/orca/v3:pkg_cc_proto",
+        "@xds//xds/service/orca/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "load_balancer_lib",
+    srcs = ["load_balancer_impl.cc"],
+    hdrs = ["load_balancer_impl.h"],
+    # previously considered core code and used by mobile.
+    visibility = ["//visibility:public"],
+    deps = [
+        ":locality_wrr_lib",
+        "//envoy/common:random_generator_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_protos_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/common/upstream:scheduler_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
+    ],
+)

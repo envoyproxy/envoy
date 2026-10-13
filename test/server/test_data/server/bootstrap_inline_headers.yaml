@@ -1,0 +1,9 @@
+inline_headers:
+- inline_header_name: test1
+  inline_header_type: REQUEST_HEADER
+- inline_header_name: test2
+  inline_header_type: REQUEST_TRAILER
+- inline_header_name: test3
+  inline_header_type: RESPONSE_HEADER
+- inline_header_name: test4
+  inline_header_type: RESPONSE_TRAILER

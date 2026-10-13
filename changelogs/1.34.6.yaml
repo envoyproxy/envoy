@@ -1,0 +1,11 @@
+date: September 2, 2025
+
+bug_fixes:
+- area: oauth2
+  change: |
+    Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
+    Secure attribute.
+- area: dns
+  change: |
+    Fixed an UAF in DNS cache that can occur when the Host header is modified between the Dynamic Forwarding and Router
+    filters.

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.filters.process_ratelimit.v3;
+
+import "envoy/config/core/v3/config_source.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.filters.process_ratelimit.v3";
+option java_outer_classname = "ProcessRatelimitProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/filters/process_ratelimit/v3;process_ratelimitv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: ProcessRateLimiter]
+// [#extension: envoy.access_loggers.extension_filters.process_ratelimit]
+
+// Filters for rate limiting the access log emission using global token buckets per process and shared across all listeners.
+message ProcessRateLimitFilter {
+  // The dynamic config for the token bucket.
+  DynamicTokenBucket dynamic_config = 1;
+}
+
+message DynamicTokenBucket {
+  // the key used to find the token bucket in the singleton map.
+  string resource_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The configuration source for the :ref:`token_bucket <envoy_v3_api_msg_type.v3.TokenBucket>`.
+  // It should stay the same through the process lifetime.
+  config.core.v3.ConfigSource config_source = 2 [(validate.rules).message = {required: true}];
+}

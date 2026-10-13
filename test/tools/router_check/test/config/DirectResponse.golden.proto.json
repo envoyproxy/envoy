@@ -1,0 +1,120 @@
+{
+  "tests": [
+    {
+      "test_name": "Direct Response",
+      "input": {
+        "authority": "lyft.com",
+        "path": "/ping",
+        "method": "GET"
+      },
+      "validate": {
+        "path_redirect": "http://lyft.com/ping",
+        "code_redirect": 200,
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "response_header_matches": [
+          {
+            "name": "content-type",
+            "string_match": {
+              "exact": "text/plain"
+            }
+          },
+          {
+            "name": "content-length",
+            "string_match": {
+              "exact": "8"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "Direct Response custom content-type",
+      "input": {
+        "authority": "lyft.com",
+        "path": "/ping-json",
+        "method": "GET"
+      },
+      "validate": {
+        "path_redirect": "http://lyft.com/ping-json",
+        "code_redirect": 200,
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "response_header_matches": [
+          {
+            "name": "content-type",
+            "string_match": {
+              "exact": "application/json"
+            }
+          },
+          {
+            "name": "content-length",
+            "string_match": {
+              "exact": "25"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "Direct Response custom content-type appended",
+      "input": {
+        "authority": "lyft.com",
+        "path": "/ping-json2",
+        "method": "GET"
+      },
+      "validate": {
+        "path_redirect": "http://lyft.com/ping-json2",
+        "code_redirect": 200,
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "response_header_matches": [
+          {
+            "name": "content-type",
+            "string_match": {
+              "exact": "text/plain,application/json"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "test_name": "Direct Response empty body",
+      "input": {
+        "authority": "lyft.com",
+        "path": "/ping-empty",
+        "method": "GET"
+      },
+      "validate": {
+        "path_redirect": "http://lyft.com/ping-empty",
+        "code_redirect": 200,
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "response_header_matches": [
+          {
+            "name": "content-type",
+            "present_match": true,
+            "invert_match": true
+          },
+          {
+            "name": "content-length",
+            "present_match": true,
+            "invert_match": true
+          }
+        ]
+      }
+    }
+  ]
+}

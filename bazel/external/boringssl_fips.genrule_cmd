@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+set -eo pipefail
+
+# BoringSSL build as described in the Security Policy for BoringCrypto module "update stream":
+# https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md#update-stream
+
+OS=$(uname)
+ARCH=$(uname -m)
+# This works only on Linux-x86_64 and Linux-aarch64.
+if [[ "$OS" != "Linux" || ("$ARCH" != "x86_64" && "$ARCH" != "aarch64") ]]; then
+    echo "ERROR: BoringSSL FIPS is currently supported only on Linux-x86_64 and Linux-aarch64." >&2
+    echo "  found: $OS-$ARCH" >&2
+    exit 1
+fi
+
+if [[ -z "$CRYPTO_OUT" ]]; then
+    echo "ERROR: CRYPTO_OUT not set for crypto lib path." >&2
+    exit
+fi
+
+if [[ -z "$SSL_OUT" ]]; then
+    echo "ERROR: SSL_OUT not set for ssl lib path." >&2
+    exit
+fi
+
+build_boringssl_fips() {
+    cd "$BSSL_SRC" || exit 1
+    export HOME="${BSSL_SRC}"
+
+    # The security policy recommends using the recent compiler versions:
+    # "The latest stable versions of Clang, Go, Ninja, and CMake should be used".
+    # This build makes use of the same LLVM toolchain as the rest of Envoy.
+    printf "set(CMAKE_C_COMPILER \"${CC}\")\nset(CMAKE_CXX_COMPILER \"${CC}\")\n" > "${BSSL_SRC}/toolchain"
+
+    # Go tests use go:embed directives which fail to compile in a Bazel sandbox because Go refuses to embed symlinks.
+    # (see issue https://github.com/golang/go/issues/59924). As a workaround, replace symlinks with the file copies.
+    for pem in $(ls ssl/test/runner/*.pem); do
+        cp --dereference "${pem}" tmp.pem; mv tmp.pem "${pem}";
+    done
+    for testdata in $(ls ssl/test/runner/hpke/testdata/*.json); do
+        cp --dereference "${testdata}" tmp.json; mv tmp.json "${testdata}";
+    done
+
+    # Build BoringSSL.
+    # Setting -fPIC only affects the compilation of the non-module code in libcrypto.a,
+    # because the FIPS module itself is already built with -fPIC.
+    mkdir build
+    cd build
+    cmake -GNinja \
+          -DCMAKE_TOOLCHAIN_FILE="${BSSL_SRC}/toolchain" \
+          -DFIPS=1 \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_FLAGS="-fPIC" \
+          -DCMAKE_CXX_FLAGS="${CXXFLAGS} -fPIC" \
+          -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+          -DCMAKE_SHARED_LINKER_FLAGS="${LDFLAGS}" \
+          -DBUILD_TESTING=off \
+          ..
+    ninja -j "${NINJA_CORES:-1}"
+}
+
+validate_fips() {
+    cd "$BSSL_SRC/build" || exit 1
+    # Verify correctness of the FIPS build.
+    IS_FIPS="$(./bssl isfips)"
+    if [[ "${IS_FIPS}" != "1" ]]; then
+        echo "ERROR: BoringSSL tool didn't report FIPS build." >&2
+        echo "  expected: 1" >&2
+        echo "  found: ${IS_FIPS}" >&2
+        return 1
+    fi
+}
+
+output_libs() {
+    # Move compiled libraries to the expected destinations.
+    mv "${BSSL_SRC}/build/libcrypto.a" "$CRYPTO_OUT"
+    mv "${BSSL_SRC}/build/libssl.a" "$SSL_OUT"
+}
+
+build_boringssl_fips
+validate_fips
+output_libs

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.config.common.key_value.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.common.key_value.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/common/key_value/v3;key_valuev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Key/value store storage plugin]
+
+// This shared configuration for Envoy key value stores.
+message KeyValueStoreConfig {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
+  // [#extension-category: envoy.common.key_value]
+  core.v3.TypedExtensionConfig config = 1 [(validate.rules).message = {required: true}];
+}

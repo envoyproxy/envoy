@@ -1,0 +1,101 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_cc_library(
+    name = "deferred_deletable",
+    hdrs = ["deferred_deletable.h"],
+)
+
+envoy_cc_library(
+    name = "dispatcher_thread_deletable",
+    hdrs = ["dispatcher_thread_deletable.h"],
+)
+
+envoy_cc_library(
+    name = "dispatcher_interface",
+    hdrs = ["dispatcher.h"],
+    deps = [
+        ":deferred_deletable",
+        ":dispatcher_thread_deletable",
+        ":evwatch_interface",
+        ":file_event_interface",
+        ":scaled_timer",
+        ":schedulable_cb_interface",
+        ":signal_interface",
+        ":timer_interface",
+        "//envoy/common:scope_tracker_interface",
+        "//envoy/common:time_interface",
+        "//envoy/filesystem:watcher_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:listen_socket_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/server:watchdog_interface",
+        "@abseil-cpp//absl/functional:any_invocable",
+    ],
+)
+
+envoy_cc_library(
+    name = "evwatch_interface",
+    hdrs = ["evwatch.h"],
+    deps = [
+        "//envoy/common:time_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "evwatch_observer_manager_interface",
+    hdrs = ["evwatch_observer_manager.h"],
+    deps = [
+        ":evwatch_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "file_event_interface",
+    hdrs = ["file_event.h"],
+)
+
+envoy_cc_library(
+    name = "scaled_timer",
+    hdrs = ["scaled_timer.h"],
+    deps = [
+        "//source/common/common:interval_value",
+    ],
+)
+
+envoy_cc_library(
+    name = "scaled_range_timer_manager_interface",
+    hdrs = ["scaled_range_timer_manager.h"],
+    deps = [
+        ":dispatcher_interface",
+        ":scaled_timer",
+        ":timer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "schedulable_cb_interface",
+    hdrs = ["schedulable_cb.h"],
+    deps = ["//envoy/common:pure_lib"],
+)
+
+envoy_cc_library(
+    name = "signal_interface",
+    hdrs = ["signal.h"],
+)
+
+envoy_cc_library(
+    name = "timer_interface",
+    hdrs = ["timer.h"],
+    deps = [
+        ":schedulable_cb_interface",
+        "//envoy/common:time_interface",
+    ],
+)

@@ -1,0 +1,4 @@
+compression_level: BEST
+compression_strategy: FILTERED
+window_bits: 9
+memory_level: 1

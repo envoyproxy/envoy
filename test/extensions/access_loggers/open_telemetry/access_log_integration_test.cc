@@ -1,0 +1,407 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
+
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/version/version.h"
+
+#include "test/common/grpc/grpc_client_integration.h"
+#include "test/integration/http_integration.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
+
+#include "absl/strings/match.h"
+#include "gtest/gtest.h"
+#include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
+
+using testing::AssertionResult;
+using testing::Eq;
+
+constexpr char EXPECTED_REQUEST_MESSAGE[] = R"EOF(
+    resource_logs:
+      resource:
+        attributes:
+          - key: "log_name"
+            value:
+              string_value: "foo"
+          - key: "zone_name"
+            value:
+              string_value: "zone_name"
+          - key: "cluster_name"
+            value:
+              string_value: "cluster_name"
+          - key: "node_name"
+            value:
+              string_value: "node_name"
+          - key: "service.name"
+            value:
+              string_value: "my-service"
+      scope_logs:
+        - log_records:
+            body:
+              string_value: "GET HTTP/1.1 404"
+            attributes:
+              - key: "response_code_details"
+                value:
+                  string_value: "route_not_found"
+  )EOF";
+
+namespace Envoy {
+namespace {
+
+enum class ExporterType { GRPC, HTTP };
+
+struct TransportDriver {
+  std::function<void(
+      envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&,
+      Network::Address::InstanceConstSharedPtr)>
+      configureExporter;
+  std::function<AssertionResult(
+      FakeStreamPtr&, Event::Dispatcher&,
+      opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest&)>
+      waitForRequest;
+  std::function<void(FakeStreamPtr&)> sendResponse;
+};
+
+class AccessLogIntegrationTest
+    : public Grpc::BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, ExporterType>>,
+      public HttpIntegrationTest {
+  TransportDriver driver_;
+
+public:
+  AccessLogIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {
+    skip_tag_extraction_rule_check_ = true;
+    driver_ = (std::get<2>(GetParam()) == ExporterType::GRPC) ? makeGrpcDriver() : makeHttpDriver();
+    TestEnvironment::setEnvVar("OTEL_RESOURCE_ATTRIBUTES", "service.name=my-service", 1);
+  }
+
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      accesslog_cluster->set_name("accesslog");
+      ConfigHelper::setHttp2(*accesslog_cluster);
+    });
+
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* access_log = hcm.add_access_log();
+          access_log->set_name("otel_accesslog");
+
+          envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
+              config;
+          config.set_log_name("foo");
+          auto* detector = config.add_resource_detectors();
+          detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
+          envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+              EnvironmentResourceDetectorConfig env_config;
+          std::ignore = detector->mutable_typed_config()->PackFrom(env_config);
+          driver_.configureExporter(config, fake_upstreams_.back()->localAddress());
+          auto* body_config = config.mutable_body();
+          body_config->set_string_value("%REQ(:METHOD)% %PROTOCOL% %RESPONSE_CODE%");
+          auto* attr_config = config.mutable_attributes();
+          auto* value = attr_config->add_values();
+          value->set_key("response_code_details");
+          value->mutable_value()->set_string_value("%RESPONSE_CODE_DETAILS%");
+          std::ignore = access_log->mutable_typed_config()->PackFrom(config);
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForAccessLogConnection() {
+    return fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_access_log_connection_);
+  }
+
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForAccessLogStream() {
+    return fake_access_log_connection_->waitForNewStream(*dispatcher_, access_log_request_);
+  }
+
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
+    opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
+    VERIFY_ASSERTION(driver_.waitForRequest(access_log_request_, *dispatcher_, request_msg));
+
+    opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest expected_request_msg;
+    TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
+    // Clear start time which is not deterministic.
+    request_msg.mutable_resource_logs(0)
+        ->mutable_scope_logs(0)
+        ->mutable_log_records(0)
+        ->clear_time_unix_nano();
+
+    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
+                                        /*ignore_repeated_field_ordering=*/false));
+    driver_.sendResponse(access_log_request_);
+    return AssertionSuccess();
+  }
+
+  void cleanup() {
+    if (fake_access_log_connection_ != nullptr) {
+      AssertionResult result = fake_access_log_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_access_log_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+  }
+
+private:
+  TransportDriver makeGrpcDriver() {
+    return {[this](auto& config, auto addr) {
+              setGrpcService(*config.mutable_grpc_service(), "accesslog", addr);
+            },
+            [](auto& stream, auto& dispatcher, auto& request) -> AssertionResult {
+              VERIFY_ASSERTION(stream->waitForGrpcMessage(dispatcher, request));
+              EXPECT_EQ("POST", stream->headers().getMethodValue());
+              EXPECT_EQ("/opentelemetry.proto.collector.logs.v1.LogsService/Export",
+                        stream->headers().getPathValue());
+              EXPECT_EQ("application/grpc", stream->headers().getContentTypeValue());
+              return AssertionSuccess();
+            },
+            [](auto& stream) {
+              opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse response;
+              stream->startGrpcStream();
+              stream->sendGrpcMessage(response);
+              stream->finishGrpcStream(Grpc::Status::Ok);
+            }};
+  }
+
+  TransportDriver makeHttpDriver() {
+    return {[this](auto& config, auto addr) {
+              auto* http = config.mutable_http_service();
+              http->mutable_http_uri()->set_uri(fmt::format(
+                  "http://{}:{}/v1/logs", Network::Test::getLoopbackAddressUrlString(ipVersion()),
+                  addr->ip()->port()));
+              http->mutable_http_uri()->set_cluster("accesslog");
+              http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+            },
+            [](auto& stream, auto& dispatcher, auto& request) -> AssertionResult {
+              VERIFY_ASSERTION(stream->waitForEndStream(dispatcher));
+              EXPECT_EQ("POST", stream->headers().getMethodValue());
+              EXPECT_EQ("/v1/logs", stream->headers().getPathValue());
+              EXPECT_EQ("application/x-protobuf", stream->headers().getContentTypeValue());
+              EXPECT_TRUE(absl::StartsWith(stream->headers().getUserAgentValue(),
+                                           "OTel-OTLP-Exporter-Envoy/"));
+              EXPECT_TRUE(request.ParseFromString(stream->body().toString()));
+              return AssertionSuccess();
+            },
+            [](auto& stream) {
+              stream->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+            }};
+  }
+
+  FakeHttpConnectionPtr fake_access_log_connection_;
+  FakeStreamPtr access_log_request_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeExporterType, AccessLogIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     testing::Values(ExporterType::GRPC, ExporterType::HTTP)),
+    [](const auto& info) {
+      return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(info.param)),
+                         std::get<1>(info.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                                 : "EnvoyGrpc",
+                         std::get<2>(info.param) == ExporterType::GRPC ? "gRPC" : "HTTP");
+    });
+
+// Test a basic full access logging flow.
+TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
+  testRouterNotFound();
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
+
+  // Make another request and expect a new stream to be used.
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
+  cleanup();
+}
+
+// Tests that access logger stats persist across listener updates.
+TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
+  const std::string expected_access_log_results = R"EOF(
+    resource_logs:
+      resource:
+        attributes:
+          - key: "log_name"
+            value:
+              string_value: "foo"
+          - key: "zone_name"
+            value:
+              string_value: "zone_name"
+          - key: "cluster_name"
+            value:
+              string_value: "cluster_name"
+          - key: "node_name"
+            value:
+              string_value: "node_name"
+          - key: "service.name"
+            value:
+              string_value: "my-service"
+      scope_logs:
+        - log_records:
+            body:
+              string_value: "GET HTTP/1.1 200"
+            attributes:
+              - key: "response_code_details"
+                value:
+                  string_value: "via_upstream"
+  )EOF";
+  autonomous_upstream_ = true;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response1->waitForEndStream());
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(waitForAccessLogRequest(expected_access_log_results));
+
+  // LDS update to modify the listener and corresponding drain.
+  // The config has the same access logger so it is not removed from the cache.
+  {
+    ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
+    new_config_helper.addConfigModifier(
+        [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          listener->mutable_listener_filters_timeout()->set_seconds(10);
+        });
+    new_config_helper.setLds("1");
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(1));
+  }
+
+  // Make another request, the existing access logger should be used.
+  auto codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response2->waitForEndStream());
+
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(waitForAccessLogRequest(expected_access_log_results));
+  codec_client_->close();
+  cleanup();
+
+  test_server_->waitForCounter("access_logs.open_telemetry_access_log.logs_written", Eq(2));
+}
+
+class AccessLogFormatterHeaderTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                     public HttpIntegrationTest {
+public:
+  AccessLogFormatterHeaderTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    skip_tag_extraction_rule_check_ = true;
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      accesslog_cluster->set_name("accesslog");
+      ConfigHelper::setHttp2(*accesslog_cluster);
+    });
+
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* access_log = hcm.add_access_log();
+          access_log->set_name("otel_accesslog");
+
+          envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
+              config;
+          config.set_log_name("foo");
+
+          auto* http = config.mutable_http_service();
+          http->mutable_http_uri()->set_uri(fmt::format(
+              "http://{}:{}/v1/logs", Network::Test::getLoopbackAddressUrlString(GetParam()),
+              fake_upstreams_.back()->localAddress()->ip()->port()));
+          http->mutable_http_uri()->set_cluster("accesslog");
+          http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+
+          auto* header = http->add_request_headers_to_add();
+          header->mutable_header()->set_key("x-custom-formatter");
+          header->mutable_header()->set_value("%HOSTNAME%");
+
+          auto* body_config = config.mutable_body();
+          body_config->set_string_value("%REQ(:METHOD)% %PROTOCOL% %RESPONSE_CODE%");
+          std::ignore = access_log->mutable_typed_config()->PackFrom(config);
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void cleanup() {
+    if (access_log_connection_) {
+      AssertionResult result = access_log_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = access_log_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+  }
+
+  FakeHttpConnectionPtr access_log_connection_;
+  FakeStreamPtr access_log_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AccessLogFormatterHeaderTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that request_headers_to_add with a substitution formatter is applied to HTTP exports.
+TEST_P(AccessLogFormatterHeaderTest, HttpExportWithFormatterHeader) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  codec_client_->close();
+
+  // Wait for the access log export HTTP request.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, access_log_connection_));
+  ASSERT_TRUE(access_log_connection_->waitForNewStream(*dispatcher_, access_log_stream_));
+  ASSERT_TRUE(access_log_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ("POST", access_log_stream_->headers().getMethodValue());
+  EXPECT_EQ("/v1/logs", access_log_stream_->headers().getPathValue());
+
+  // Verify the custom formatter header was applied.
+  auto values = access_log_stream_->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  ASSERT_FALSE(values.empty());
+  EXPECT_FALSE(values[0]->value().empty());
+  EXPECT_NE(values[0]->value(), "%HOSTNAME%");
+
+  access_log_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  cleanup();
+}
+
+} // namespace
+} // namespace Envoy

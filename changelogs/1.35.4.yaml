@@ -1,0 +1,22 @@
+date: October 14, 2025
+
+bug_fixes:
+- area: dependency
+  change: |
+    Resolve dependency CVEs:
+    - CVE-2025-0913: fips/go
+    - CVE-2024-25176: luajit
+    - CVE-2024-25177: luajit
+    - CVE-2024-25178: luajit
+    - CVE-2025-27817: kafka
+    - CVE-2025-27818: kafka.
+- area: tls_inspector
+  change: |
+    Fixed regression in tls_inspector that caused plain text connections to be closed if more than 16Kb is read at once.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.tls_inspector_no_length_check_on_error``
+    to false.
+
+new_features:
+- area: tls_inspector
+  change: |
+    Added dynamic metadata when failing to parse the ``ClientHello``.

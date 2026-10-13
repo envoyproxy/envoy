@@ -1,0 +1,312 @@
+#include "envoy/admin/v3/certs.pb.h"
+#include "envoy/admin/v3/memory.pb.h"
+
+#include "source/common/tls/context_config_impl.h"
+
+#include "test/common/tls/test_data/ca_cert_info.h"
+#include "test/common/tls/test_data/fake_ca_cert_info.h"
+#include "test/server/admin/admin_instance.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
+
+using testing::Ge;
+using testing::HasSubstr;
+using testing::Property;
+using testing::Return;
+
+namespace Envoy {
+namespace Server {
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  // Setup a context that returns null cert details.
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
+  auto cfg =
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context);
+  Stats::IsolatedStoreImpl store(server_.serverFactoryContext().serverScope().symbolTable());
+  Envoy::Ssl::ClientContextSharedPtr client_ctx(
+      *server_.sslContextManager().createSslClientContext(*store.rootScope(), *cfg));
+
+  const std::string expected_empty_json = R"EOF({
+ "certificates": [
+  {
+   "ca_cert": [],
+   "cert_chain": []
+  }
+ ]
+}
+)EOF";
+
+  // Validate that cert details are null and /certs handles it correctly.
+  EXPECT_TRUE(client_ctx->getCaCertInformation().empty());
+  EXPECT_TRUE(client_ctx->getCertChainInformation().empty());
+  EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
+  EXPECT_EQ(expected_empty_json, response.toString());
+  server_.sslContextManager().removeContext(client_ctx);
+}
+
+TEST_P(AdminInstanceTest, CertsEndpointWithMultipleCaCerts) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  // Setup a context that has a trusted_ca bundle with two CA certificates.
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+
+  // Read cert data and inline it to avoid filesystem access issues with mock factory context.
+  const std::string cert_chain = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"));
+  const std::string key = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"));
+  const std::string ca_certs = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem"));
+
+  auto* tls_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_inline_bytes(cert_chain);
+  tls_cert->mutable_private_key()->set_inline_bytes(key);
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_inline_bytes(ca_certs);
+
+  auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context,
+                                                                                 factory_context);
+  Stats::IsolatedStoreImpl store(server_.serverFactoryContext().serverScope().symbolTable());
+  Envoy::Ssl::ClientContextSharedPtr client_ctx(
+      *server_.sslContextManager().createSslClientContext(*store.rootScope(), *cfg));
+
+  EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
+
+  // Parse the JSON response and verify we get both CA certificates.
+  envoy::admin::v3::Certificates certs_proto;
+  TestUtility::loadFromJson(response.toString(), certs_proto);
+
+  // Find the certificate entry that has ca_cert entries (our context).
+  bool found = false;
+  for (const auto& certificate : certs_proto.certificates()) {
+    if (certificate.ca_cert_size() == 2) {
+      found = true;
+      EXPECT_EQ(certificate.ca_cert(0).serial_number(), TEST_FAKE_CA_CERT_SERIAL);
+      EXPECT_EQ(certificate.ca_cert(1).serial_number(), TEST_CA_CERT_SERIAL);
+    }
+  }
+  EXPECT_TRUE(found) << "Expected a certificate entry with 2 CA certs";
+
+  server_.sslContextManager().removeContext(client_ctx);
+}
+
+TEST_P(AdminInstanceTest, Memory) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
+  const std::string output_json = response.toString();
+  envoy::admin::v3::Memory output_proto;
+  TestUtility::loadFromJson(output_json, output_proto);
+  EXPECT_THAT(output_proto, AllOf(Property(&envoy::admin::v3::Memory::allocated, Ge(0)),
+                                  Property(&envoy::admin::v3::Memory::heap_size, Ge(0)),
+                                  Property(&envoy::admin::v3::Memory::pageheap_unmapped, Ge(0)),
+                                  Property(&envoy::admin::v3::Memory::pageheap_free, Ge(0)),
+                                  Property(&envoy::admin::v3::Memory::total_thread_cache, Ge(0))));
+}
+
+TEST_P(AdminInstanceTest, MemoryTcmalloc) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  auto result_code = getCallback("/memory/tcmalloc", header_map, response);
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
+  EXPECT_EQ(Http::Code::OK, result_code);
+  EXPECT_THAT(response.toString(), HasSubstr("Bytes in use by application"));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, result_code);
+  EXPECT_EQ("Envoy was not built with tcmalloc.\n", response.toString());
+#endif
+}
+
+TEST_P(AdminInstanceTest, GetReadyRequest) {
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+
+  {
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/ready", "GET", response_headers, body));
+    EXPECT_EQ(body, "LIVE\n");
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
+    EXPECT_EQ(Http::Code::ServiceUnavailable,
+              admin_.request("/ready", "GET", response_headers, body));
+    EXPECT_EQ(body, "PRE_INITIALIZING\n");
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
+  }
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string body;
+
+  ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            admin_.request("/ready", "GET", response_headers, body));
+  EXPECT_EQ(body, "INITIALIZING\n");
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
+}
+
+TEST_P(AdminInstanceTest, GetRequest) {
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  EXPECT_CALL(server_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([&local_info] {
+    Server::CommandLineOptionsPtr command_line_options =
+        std::make_unique<envoy::admin::v3::CommandLineOptions>();
+    command_line_options->set_restart_epoch(2);
+    command_line_options->set_service_cluster(local_info.clusterName());
+    return command_line_options;
+  }));
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+  ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
+
+  {
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v3::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
+
+    // We only test that it parses as the proto and that some fields are correct, since
+    // values such as timestamps + Envoy version are tricky to test for.
+    TestUtility::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::LIVE);
+    EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
+    EXPECT_FALSE(server_info_proto.hot_restart_initializing());
+    EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
+              server_info_proto.node().cluster());
+    EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+    EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+    EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+    EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v3::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
+
+    // We only test that it parses as the proto and that some fields are correct, since
+    // values such as timestamps + Envoy version are tricky to test for.
+    TestUtility::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::PRE_INITIALIZING);
+    EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
+              server_info_proto.node().cluster());
+    EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+    EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+    EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+    EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
+  }
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string body;
+
+  ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
+  EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+  envoy::admin::v3::ServerInfo server_info_proto;
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
+
+  // We only test that it parses as the proto and that some fields are correct, since
+  // values such as timestamps + Envoy version are tricky to test for.
+  TestUtility::loadFromJson(body, server_info_proto);
+  EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::INITIALIZING);
+  EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+  EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), local_info.clusterName());
+  EXPECT_EQ(server_info_proto.command_line_options().service_cluster(),
+            server_info_proto.node().cluster());
+  EXPECT_EQ(server_info_proto.command_line_options().service_node(), "");
+  EXPECT_EQ(server_info_proto.command_line_options().service_zone(), "");
+  EXPECT_EQ(server_info_proto.node().id(), local_info.nodeName());
+  EXPECT_EQ(server_info_proto.node().locality().zone(), local_info.zoneName());
+}
+
+TEST_P(AdminInstanceTest, ServerInfoHotRestartInitializing) {
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  EXPECT_CALL(server_, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([&local_info] {
+    Server::CommandLineOptionsPtr command_line_options =
+        std::make_unique<envoy::admin::v3::CommandLineOptions>();
+    command_line_options->set_restart_epoch(2);
+    command_line_options->set_service_cluster(local_info.clusterName());
+    return command_line_options;
+  }));
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+  ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
+
+  {
+    // Test when hot restart is initializing
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
+    ON_CALL(server_.hot_restart_, isInitializing()).WillByDefault(Return(true));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v3::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
+
+    TestUtility::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::INITIALIZING);
+    EXPECT_TRUE(server_info_proto.hot_restart_initializing());
+    EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
+  }
+
+  {
+    // Test when hot restart is not initializing
+    Http::TestResponseHeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    ON_CALL(server_.hot_restart_, isInitializing()).WillByDefault(Return(false));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v3::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("application/json"));
+
+    TestUtility::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v3::ServerInfo::LIVE);
+    EXPECT_FALSE(server_info_proto.hot_restart_initializing());
+    EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
+  }
+}
+
+TEST_P(AdminInstanceTest, PostRequest) {
+  // Load TestScopedRuntime to suppress warnings related to runtime features.
+  TestScopedRuntime scoped_runtime;
+  Http::TestResponseHeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
+                           admin_.request("/healthcheck/fail", "POST", response_headers, body)));
+  EXPECT_EQ(body, "OK\n");
+  EXPECT_THAT(std::string(response_headers.getContentTypeValue()), HasSubstr("text/plain"));
+}
+
+} // namespace Server
+} // namespace Envoy

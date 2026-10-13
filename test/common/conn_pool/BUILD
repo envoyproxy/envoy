@@ -1,0 +1,27 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
+    "envoy_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_cc_test(
+    name = "conn_pool_base_test",
+    srcs = ["conn_pool_base_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/conn_pool:conn_pool_base_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/queue_policy:queue_policy_base_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/server:overload_manager_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/queue_policy/fifo/v3:pkg_cc_proto",
+    ],
+)

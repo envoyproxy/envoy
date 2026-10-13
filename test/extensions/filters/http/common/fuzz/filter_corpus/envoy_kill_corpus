@@ -1,0 +1,15 @@
+config {
+  name: "envoy.filters.http.kill_request"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest"
+    value: "\n\010\010\200\200\204\253\007\020\001\022\001_\030\001"
+  }
+}
+upstream_data {
+  headers {
+    headers {
+      key: "_"
+      value: "t"
+    }
+  }
+}

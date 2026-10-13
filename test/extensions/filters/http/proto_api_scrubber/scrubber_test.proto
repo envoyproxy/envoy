@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package test.extensions.filters.http.proto_api_scrubber;
+
+import "google/protobuf/any.proto";
+
+message InnerDetails {
+  string deep_secret = 1;
+  string deep_public = 2;
+}
+
+// A message mimicking a sensitive data structure.
+message SensitiveMessage {
+  string secret = 1;
+  string public_field = 2;
+  string other_info = 3;
+  InnerDetails internal_details = 4;
+
+  // Field for testing nested Any scrubbing.
+  google.protobuf.Any nested_any = 5;
+
+  // Field for testing path collision with top-level request.
+  string duplicate_field = 6;
+
+  // Field for testing recursive messages.
+  SensitiveMessage recursive_child = 7;
+}
+
+message ScrubRequest {
+  map<string, string> tags = 1;
+  map<string, int32> int_map = 2;
+  map<string, int32> safe_int_map = 3;
+
+  map<string, SensitiveMessage> deep_map = 4;
+  map<string, SensitiveMessage> object_map = 5;
+  map<string, SensitiveMessage> full_scrub_map = 6;
+
+  repeated string repeated_secrets = 7;
+  repeated SensitiveMessage repeated_messages = 8;
+
+  oneof single_choice {
+    string choice_a_string = 10;
+    int32 choice_b_int = 11;
+  }
+
+  // Field for testing Any scrubbing.
+  google.protobuf.Any any_field = 12;
+
+  // Field for testing path collision.
+  string duplicate_field = 13;
+}
+
+service ScrubberTestService {
+  rpc Scrub(ScrubRequest) returns (ScrubRequest);
+}

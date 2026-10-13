@@ -1,0 +1,270 @@
+#pragma once
+
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/ssl/context.h"
+#include "envoy/ssl/parsed_x509_name.h"
+#include "envoy/ssl/tls_certificate_config.h"
+
+#include "source/common/common/utility.h"
+
+#include "openssl/ssl.h"
+#include "openssl/x509v3.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+namespace Utility {
+
+Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path,
+                                                     TimeSource& time_source);
+
+/**
+ * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard
+ * or contain a wildcard inside the pattern's first label.
+ * See: https://www.rfc-editor.org/rfc/rfc6125#section-6.4.3.
+ * @param dns_name the DNS name to match
+ * @param pattern the pattern to match against (*.example.com) or (test*.example.com)
+ * @return true if the san matches pattern
+ */
+bool dnsNameMatch(absl::string_view dns_name, absl::string_view pattern);
+
+/**
+ * Determines whether the given DNS label matches 'pattern' which may contain a wildcard. e.g.,
+ * patterns "baz*" and "*baz" and "b*z" would match DNS labels "baz1" and "foobaz" and "buzz",
+ * respectively.
+ * @param dns_label the DNS name label to match in lower case
+ * @param pattern the pattern to match against in lower case
+ * @return true if the dns_label matches pattern
+ */
+bool labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern);
+
+/**
+ * Retrieves the serial number of a certificate.
+ * @param cert the certificate
+ * @return std::string the serial number field of the certificate. Returns "" if
+ *         there is no serial number.
+ */
+std::string getSerialNumberFromCertificate(X509& cert);
+
+/**
+ * Computes the SHA-256 digest of a certificate and returns it as a hex-encoded string.
+ * @param cert the certificate
+ * @return std::string the hex-encoded SHA-256 digest of the certificate.
+ */
+std::string getSha256DigestFromCertificate(X509& cert);
+
+/**
+ * Computes the SHA-1 digest of a certificate and returns it as a hex-encoded string.
+ * @param cert the certificate
+ * @return std::string the hex-encoded SHA-1 digest of the certificate.
+ */
+std::string getSha1DigestFromCertificate(X509& cert);
+
+/**
+ * Maps a stack of x509 certificates to a vector of strings extracted from the certificates.
+ * @param stack the stack of certificates
+ * @param field_extractor the function to extract the field from each certificate.
+ * @return std::vector<std::string> returns the list of fields extracted from the certificates.
+ */
+std::vector<std::string> mapX509Stack(stack_st_X509& stack,
+                                      std::function<std::string(X509&)> field_extractor);
+
+/**
+ * Retrieves the subject alternate names of a certificate.
+ * @param cert the certificate
+ * @param type type of subject alternate name
+ * @return std::vector returns the list of subject alternate names.
+ */
+std::vector<std::string> getSubjectAltNames(X509& cert, int type);
+
+/**
+ * Converts the Subject Alternate Name to string.
+ * @param general_name the subject alternate name
+ * @return std::string returns the string representation of subject alt names.
+ */
+std::string generalNameAsString(const GENERAL_NAME* general_name);
+
+/**
+ * Retrieves the issuer from certificate.
+ * @param cert the certificate
+ * @return std::string the issuer field for the certificate.
+ */
+std::string getIssuerFromCertificate(X509& cert);
+
+/**
+ * Retrieves the subject from certificate.
+ * @param cert the certificate
+ * @return std::string the subject field for the certificate.
+ */
+std::string getSubjectFromCertificate(X509& cert);
+
+/**
+ * Parse the well-known attribute values of issuer from certificate.
+ * @param cert the certificate
+ * @return Envoy::Ssl::ParsedX509NameConstSharedPtr the struct contains the parsed values.
+ */
+Envoy::Ssl::ParsedX509NamePtr parseIssuerFromCertificate(X509& cert);
+
+/**
+ * Parse the well-known attribute values of subject from certificate.
+ * @param cert the certificate
+ * @return Envoy::Ssl::ParsedX509NameConstSharedPtr the struct contains the parsed values.
+ */
+Envoy::Ssl::ParsedX509NamePtr parseSubjectFromCertificate(X509& cert);
+
+/**
+ * Retrieves the extension OIDs from certificate.
+ * @param cert the certificate
+ * @return std::vector returns the string list of ASN.1 object identifiers.
+ */
+std::vector<std::string> getCertificateExtensionOids(X509& cert);
+
+/**
+ * Retrieves the value of a specific X509 extension from the cert, if present.
+ * @param cert the certificate.
+ * @param extension_name the name of the extension to extract in dotted number format
+ * @return absl::string_view the DER-encoded value of the extension field or empty if not present.
+ */
+absl::string_view getCertificateExtensionValue(X509& cert, absl::string_view extension_name);
+
+/**
+ * Returns the seconds since unix epoch of the expiration time of this certificate.
+ * @param cert the certificate
+ * @return the seconds since unix epoch as a duration, or max duration if cert is null.
+ */
+std::chrono::seconds getExpirationUnixTime(const X509* cert);
+
+/**
+ * Returns the days until this certificate is valid.
+ * @param cert the certificate
+ * @param time_source the time source to use for current time calculation.
+ * @return the number of days till this certificate is valid, the value is set when not expired.
+ */
+std::optional<uint32_t> getDaysUntilExpiration(const X509* cert, TimeSource& time_source);
+
+/**
+ * Returns the time from when this certificate is valid.
+ * @param cert the certificate.
+ * @return time from when this certificate is valid.
+ */
+SystemTime getValidFrom(const X509& cert);
+
+/**
+ * Returns the time when this certificate expires.
+ * @param cert the certificate.
+ * @return time after which the certificate expires.
+ */
+SystemTime getExpirationTime(const X509& cert);
+
+/**
+ * Returns the last crypto error from ERR_get_error(), or `std::nullopt`
+ * if the error stack is empty.
+ * @return std::string error message
+ */
+std::optional<std::string> getLastCryptoError();
+
+/**
+ * Returns error string corresponding error code derived from OpenSSL.
+ * @param err error code
+ * @return string message corresponding error code.
+ */
+absl::string_view getErrorDescription(int err);
+
+/**
+ * Extracts the X509 certificate validation error information.
+ *
+ * @param ctx the store context
+ * @return the error details
+ */
+std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
+
+/**
+ * Returns a list of all Subject Alternative Names from the certificate.
+ * @param cert the certificate
+ * @return std::vector returns the list of subject alternate names as strings.
+ */
+std::vector<std::string> getCertificateSansForLogging(X509* cert);
+
+/**
+ * Returns a list of all CRL Distribution Points from the certificate.
+ * @param cert the certificate
+ * @return std::vector returns the list of CRL distribution points as strings.
+ */
+std::vector<std::string> getCertificateCrlDpsForLogging(X509* cert);
+
+/**
+ * Extracts at most one CompliancePolicy from a TlsParameters proto. Returns nullopt when none are
+ * set, and the first policy when exactly one is set. Cardinality is enforced by the proto's
+ * max_items rule, so more than one is only reachable for protos built without PGV validation and
+ * logs an ENVOY_BUG.
+ */
+std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+compliancePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params);
+
+/**
+ * Validates cipher_suites, ecdh_curves, and signature_algorithms strings against ssl_ctx,
+ * returning an error if BoringSSL rejects any of them. Skips empty strings. On cipher_suites
+ * failure, retries each token individually to produce a detailed bad-cipher list in the error.
+ */
+absl::Status validateCipherCurveAndSigalgsOnSslCtx(absl::string_view cipher_suites,
+                                                   absl::string_view ecdh_curves,
+                                                   absl::string_view signature_algorithms,
+                                                   SSL_CTX* ssl_ctx);
+
+/**
+ * Maps a CompliancePolicy proto enum to the corresponding BoringSSL constant. Returns an error
+ * for unknown values, which can occur when newer proto values arrive via xDS before code handles
+ * them.
+ */
+absl::StatusOr<ssl_compliance_policy_t> compliancePolicyToSslPolicy(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy);
+
+/**
+ * Maps a TlsProtocol proto enum to a BoringSSL version constant (e.g. TLS1_2_VERSION).
+ * TLS_AUTO maps to default_version. Unknown values return default_version and log an ENVOY_BUG.
+ */
+unsigned tlsVersionFromProto(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol version,
+    unsigned default_version);
+
+/**
+ * Maps policy to its BoringSSL constant and applies it to ssl_ctx. Compliance policies must be
+ * applied after all other TLS parameters, since they may override them.
+ */
+absl::Status applyCompliancePolicyToSslCtx(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL_CTX* ssl_ctx);
+
+/**
+ * Per-connection twin of applyCompliancePolicyToSslCtx, for use after SSL_set_SSL_CTX, which
+ * transfers only certificate material and so leaves the policy unapplied.
+ */
+absl::Status applyCompliancePolicyToSsl(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL* ssl);
+
+/**
+ * The subset of certificate-level params that Envoy is responsible for applying. Fields a custom
+ * handshaker owns (per its capabilities) are returned empty so callers skip them rather than
+ * overwriting the handshaker's configuration. The references alias params, which must outlive them.
+ */
+struct EffectiveTlsParams {
+  const std::string& cipher_suites;
+  const std::string& ecdh_curves;
+  const std::string& signature_algorithms;
+};
+
+EffectiveTlsParams effectiveTlsParams(const Ssl::TlsParams& params,
+                                      bool provides_ciphers_and_curves, bool provides_sigalgs);
+
+} // namespace Utility
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
+} // namespace Envoy

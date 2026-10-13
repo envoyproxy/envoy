@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.proto_api_scrubber.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "xds/type/matcher/v3/matcher.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/proto_api_scrubber/v3;proto_api_scrubberv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Proto API Scrubber]
+// [#extension: envoy.filters.http.proto_api_scrubber]
+
+// ProtoApiScrubber filter supports filtering of the request and
+// response payloads based on the configured field restrictions and actions.
+// The field restrictions and actions can be defined using unified matcher API.
+// The filter evaluates the configured restriction for each field
+// to produce the filtered output using the configured actions.
+// The design doc for this filter is available
+// `here <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_
+
+message ProtoApiScrubberConfig {
+  // An enum enlisting all the filtering modes supported by this filter.
+  enum FilteringMode {
+    // Override the original request/response body with the filtered
+    // request/response body.
+    OVERRIDE = 0;
+  }
+
+  // The proto descriptor set for the proto services.
+  DescriptorSet descriptor_set = 1;
+
+  // Contains the restrictions for the supported proto elements.
+  Restrictions restrictions = 2;
+
+  // Specifies the filtering mode of this filter.
+  FilteringMode filtering_mode = 3;
+
+  // If true, the filter will scrub unknown fields from the protobuf messages.
+  bool scrub_unknown_fields = 4;
+}
+
+// Specifies the descriptor set for proto services.
+message DescriptorSet {
+  // It could be passed by a local file through ``Datasource.filename`` or
+  // embedded in the ``Datasource.inline_bytes``.
+  config.core.v3.DataSource data_source = 1;
+}
+
+// Contains the restrictions for the methods.
+message Restrictions {
+  // Specifies the method restrictions.
+  // Key - Fully qualified method name e.g., ``endpoints.examples.bookstore.BookStore/GetShelf``.
+  // Value - Method restrictions.
+  map<string, MethodRestrictions> method_restrictions = 1;
+
+  // Specifies the message restrictions.
+  // Key - Fully qualified message name e.g., ``endpoints.examples.bookstore.Book``.
+  // Value - Message restrictions.
+  map<string, MessageRestrictions> message_restrictions = 2;
+}
+
+// Contains the method restrictions which include the field level restrictions
+// for the request and response fields.
+message MethodRestrictions {
+  // Restrictions that apply to request fields of the method.
+  // Key - field mask like path of the field e.g., foo.bar.baz
+  // Value - Restrictions map containing the mapping from restriction name to
+  // the restriction values.
+  map<string, RestrictionConfig> request_field_restrictions = 1;
+
+  // Restrictions that apply to response fields of the method.
+  // Key - field mask like path of the field e.g., foo.bar.baz
+  // Value - Restrictions map containing the mapping from restriction name to
+  // the restriction values.
+  map<string, RestrictionConfig> response_field_restrictions = 2;
+
+  // Optional restriction that applies to the entire method. If present, this
+  // rule takes precedence for the method itself over field-level or
+  // message-level rules. The 'matcher' within RestrictionConfig will determine
+  // if the method is denied/scrubbed. If the matcher evaluates to true:
+  //
+  // - The request is **denied**, and further processing is stopped.
+  // - The implementation should generate an immediate error response
+  //   (e.g., an HTTP 403 Forbidden status) and send it to the client.
+  RestrictionConfig method_restriction = 3;
+}
+
+// Contains message-level restrictions.
+message MessageRestrictions {
+  // The core restriction to apply to this message type.
+  // The 'matcher' within RestrictionConfig will determine if the message is
+  // scrubbed/denied/allowed.
+  RestrictionConfig config = 1;
+
+  // Restrictions that apply to specific fields within this message type.
+  // Key - field mask (e.g. "social_security_number").
+  // Value - The restriction configuration for that field.
+  map<string, RestrictionConfig> field_restrictions = 2;
+}
+
+// The restriction configuration.
+message RestrictionConfig {
+  // Matcher tree for matching requests and responses with the configured restrictions.
+  xds.type.matcher.v3.Matcher matcher = 1;
+}

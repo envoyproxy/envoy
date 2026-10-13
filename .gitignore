@@ -1,0 +1,130 @@
+#############################
+# Repository ignore strategy
+# - Global rules live here.
+# - Dotfiles are ignored by default; explicitly allow tracked ones below.
+# - Subdirectory .gitignore files should contain only folder-specific exceptions
+#   not covered by the root rules.
+# - Prefer short, commented sections; avoid duplicates.
+#############################
+
+#############################
+# Dotfiles: ignore by default
+#############################
+\.*
+!.azure-pipelines
+!.bazelci
+!.bazelignore
+!.bazelrc
+!.bazelproject
+!.bazelversion
+!.bcr
+!.circleci
+!.clang-format
+!.clang-tidy
+!.coveragerc
+!.devcontainer
+!.dockerignore
+!.eslintrc.yml
+!.flake8
+!.gitattributes
+!.github
+!.gitignore
+!.python-version
+!.yamllint
+!.zuul
+!.zuul.yaml
+
+#############################
+# Bazel & build system
+#############################
+/api/bazel-*
+/bazel-*
+/ci/bazel-*
+/mobile/bazel-*
+bazel.output.txt
+clang.bazelrc
+compile_commands.json
+user.bazelrc
+*.bzlc
+
+#############################
+# Build artifacts and tooling
+#############################
+/build
+/build_*
+BROWSE
+CMakeLists.txt
+cmake-build-debug
+cscope.*
+/clang-tidy-fixes.yaml
+/generated
+SOURCE_VERSION
+/test/coverage/BUILD
+/tools/spelling/.aspell.en.pws
+tags
+TAGS
+
+#############################
+# Language-specific
+#############################
+# Python
+*.pyc
+__pycache__/
+**/pyformat
+
+# Node / frontend
+dist
+node_modules
+
+# Java/JetBrains
+**/*.iml
+
+# Rust
+**/rust/**/target
+target
+
+#############################
+# OS/editor cruft
+#############################
+**/.DS_Store
+*~
+*.bak
+*.swap*
+*.swp
+*.swo
+
+#############################
+# Logs
+#############################
+*.log
+lerna-debug.log*
+logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+#############################
+# Project-specific
+#############################
+/contrib/golang/**/test_data/go.sum
+/contrib/golang/**/test_data/*/go.sum
+/devcontainer/devcontainer.env
+/docs/landing_source/.bundle
+/linux
+distribution/custom
+examples/single-page-app/xds/lds.yml
+examples/websocket/certs
+tools/dev/src
+tools/dependency/cve_data
+mobile/build_*
+mobile/generated
+mobile/test/coverage/BUILD
+mobile/tmp
+mobile/*.xcodeproj
+mobile/*.xcframework
+mobile/*.doccarchive
+mobile/*.tulsiconf-user
+mobile/tulsi-workspace
+test/extensions/dynamic_modules/test_data/rust/Cargo.lock
+.devcontainer/Dockerfile

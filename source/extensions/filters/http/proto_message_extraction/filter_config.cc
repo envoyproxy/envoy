@@ -1,0 +1,145 @@
+#include "source/extensions/filters/http/proto_message_extraction/filter_config.h"
+
+#include <memory>
+#include <utility>
+
+#include "envoy/api/api.h"
+
+#include "source/common/common/logger.h"
+#include "source/common/grpc/common.h"
+#include "source/extensions/filters/http/proto_message_extraction/extractor.h"
+
+#include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "grpc_transcoding/type_helper.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ProtoMessageExtraction {
+namespace {
+
+using ::envoy::extensions::filters::http::proto_message_extraction::v3::
+    ProtoMessageExtractionConfig;
+using ::google::grpc::transcoding::TypeHelper;
+} // namespace
+
+FilterConfig::FilterConfig(const ProtoMessageExtractionConfig& proto_config,
+                           std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api,
+                           absl::Status& creation_status)
+    : proto_config_(proto_config) {
+  creation_status = initDescriptorPool(api);
+  if (!creation_status.ok()) {
+    return;
+  }
+
+  type_helper_ =
+      std::make_unique<const TypeHelper>(Envoy::Protobuf::util::NewTypeResolverForDescriptorPool(
+          Envoy::Grpc::Common::typeUrlPrefix(), descriptor_pool_.get()));
+
+  type_finder_ = std::make_unique<const TypeFinder>(
+      [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
+        return type_helper_->Info()->GetTypeByTypeUrl(type_url);
+      });
+
+  creation_status = initExtractors(*extractor_factory);
+}
+
+const Extractor* FilterConfig::findExtractor(absl::string_view proto_path) const {
+  if (!proto_path_to_extractor_.contains(proto_path)) {
+    return nullptr;
+  }
+  return proto_path_to_extractor_.find(proto_path)->second.get();
+}
+
+absl::Status FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
+  for (const auto& it : proto_config_.extraction_by_method()) {
+    auto* method = descriptor_pool_->FindMethodByName(it.first);
+
+    if (method == nullptr) {
+      return absl::InvalidArgumentError(fmt::format(
+          "couldn't find the gRPC method `{}` defined in the proto descriptor", it.first));
+    }
+
+    for (const auto& request_field : it.second.request_extraction_by_field()) {
+      if (request_field.second == ::envoy::extensions::filters::http::proto_message_extraction::v3::
+                                      MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
+        return absl::InvalidArgumentError(fmt::format(
+            "method `{}`: EXTRACT_REPEATED_CARDINALITY is not supported for request fields.",
+            it.first));
+      }
+    }
+
+    int response_extract_cardinality_count = 0;
+    for (const auto& response_field : it.second.response_extraction_by_field()) {
+      if (response_field.second == ::envoy::extensions::filters::http::proto_message_extraction::
+                                       v3::MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
+        response_extract_cardinality_count++;
+      }
+    }
+
+    if (response_extract_cardinality_count > 1) {
+      return absl::InvalidArgumentError(
+          fmt::format("method `{}`: only one field can be tagged with "
+                      "EXTRACT_REPEATED_CARDINALITY for response.",
+                      it.first));
+    }
+
+    auto extractor = extractor_factory.createExtractor(
+        *type_helper_, *type_finder_,
+        absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->input_type()->full_name()),
+        absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->output_type()->full_name()),
+        it.second);
+    if (!extractor.ok()) {
+      return absl::InvalidArgumentError(fmt::format("couldn't init extractor for method `{}`: {}",
+                                                    it.first, extractor.status().message()));
+    }
+
+    ENVOY_LOG_MISC(debug, "registered field extraction for gRPC method `{}`", it.first);
+    proto_path_to_extractor_.emplace(it.first, std::move(extractor.value()));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status FilterConfig::initDescriptorPool(Api::Api& api) {
+  Envoy::Protobuf::FileDescriptorSet descriptor_set;
+  const ::envoy::config::core::v3::DataSource& descriptor_config = proto_config_.data_source();
+
+  auto pool = std::make_unique<Envoy::Protobuf::DescriptorPool>();
+
+  switch (descriptor_config.specifier_case()) {
+  case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
+    auto file_or_error = api.fileSystem().fileReadToEnd(descriptor_config.filename());
+    if (!file_or_error.status().ok() || !descriptor_set.ParseFromString(file_or_error.value())) {
+      return absl::InvalidArgumentError(fmt::format(
+          "unable to parse proto descriptor from file `{}`", descriptor_config.filename()));
+    }
+    break;
+  }
+  case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
+    if (!descriptor_set.ParseFromString(descriptor_config.inline_bytes())) {
+      return absl::InvalidArgumentError(
+          fmt::format("unable to parse proto descriptor from inline bytes: {}",
+                      descriptor_config.inline_bytes()));
+    }
+    break;
+  }
+  default: {
+    return absl::InvalidArgumentError(
+        fmt::format("unsupported DataSource case `{}` for configuring `descriptor_set`",
+                    static_cast<int>(descriptor_config.specifier_case())));
+  }
+  }
+
+  for (const auto& file : descriptor_set.file()) {
+    pool->BuildFile(file);
+  }
+  descriptor_pool_ = std::move(pool);
+  return absl::OkStatus();
+}
+
+} // namespace ProtoMessageExtraction
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

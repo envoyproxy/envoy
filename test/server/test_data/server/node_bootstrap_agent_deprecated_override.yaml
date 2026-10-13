@@ -1,0 +1,10 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+  user_agent_name: test-ci-user-agent
+  user_agent_version: test
+admin:
+  address:
+    socket_address:
+      address: "{{ ntop_ip_loopback_address }}"
+      port_value: 0

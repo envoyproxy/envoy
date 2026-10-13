@@ -1,0 +1,219 @@
+#include <memory>
+
+#include "envoy/network/address.h"
+
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/filters/http/set_filter_state/config.h"
+#include "source/server/generic_factory_context.h"
+
+#include "test/mocks/http/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace SetFilterState {
+
+class ObjectFooFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "foo"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(ObjectFooFactory, StreamInfo::FilterState::ObjectFactory);
+
+class SetMetadataIntegrationTest : public testing::Test {
+public:
+  SetMetadataIntegrationTest() = default;
+
+  void runFilter(const std::string& yaml_config) {
+    envoy::extensions::filters::http::set_filter_state::v3::Config proto_config;
+    TestUtility::loadFromYaml(yaml_config, proto_config);
+
+    // Test the factory method.
+    {
+      SetFilterStateConfig factory;
+      auto cb_1 = factory.createFilterFactoryFromProto(proto_config, "", context_);
+      Server::Configuration::ExtraFactoryContext extra_context{
+          context_.server_factory_context_.messageValidationVisitor(), ""};
+      auto cb_2 = factory
+                      .createHttpFilterFactoryFromProto(
+                          proto_config, context_.server_factory_context_, extra_context)
+                      .value();
+
+      NiceMock<Http::MockFilterChainFactoryCallbacks> filter_chain_factory_callbacks;
+
+      EXPECT_CALL(filter_chain_factory_callbacks, addStreamDecoderFilter(_)).Times(2);
+      cb_1.value()(filter_chain_factory_callbacks);
+      cb_2(filter_chain_factory_callbacks);
+    }
+
+    Server::GenericFactoryContextImpl generic_context(context_);
+
+    auto config = std::make_shared<Filters::Common::SetFilterState::Config>(
+        proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+        generic_context, proto_config.clear_route_cache());
+    auto filter = std::make_shared<SetFilterState>(config);
+
+    filter->setDecoderFilterCallbacks(decoder_callbacks_);
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(info_));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
+  }
+
+  void runPerRouteFilter(const std::string& filter_yaml_config,
+                         const std::string& per_route_yaml_config) {
+    Server::GenericFactoryContextImpl generic_context(context_);
+
+    envoy::extensions::filters::http::set_filter_state::v3::Config filter_proto_config;
+    TestUtility::loadFromYaml(filter_yaml_config, filter_proto_config);
+    auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+        filter_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+        generic_context, filter_proto_config.clear_route_cache());
+
+    envoy::extensions::filters::http::set_filter_state::v3::Config route_proto_config;
+    TestUtility::loadFromYaml(per_route_yaml_config, route_proto_config);
+    Filters::Common::SetFilterState::Config route_config(
+        route_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+        generic_context, route_proto_config.clear_route_cache());
+
+    EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+        .WillOnce(testing::Invoke(
+            [&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+    auto filter = std::make_shared<SetFilterState>(filter_config);
+    filter->setDecoderFilterCallbacks(decoder_callbacks_);
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(info_));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
+
+    // Test the factory method.
+    {
+      NiceMock<Server::Configuration::MockServerFactoryContext> context;
+      SetFilterStateConfig factory;
+      Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+          factory
+              .createRouteSpecificFilterConfig(route_proto_config, context,
+                                               ProtobufMessage::getNullValidationVisitor())
+              .value();
+      EXPECT_TRUE(route_config.get());
+    }
+  }
+
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  Http::TestRequestHeaderMapImpl headers_{{"test-header", "test-value"}};
+  NiceMock<StreamInfo::MockStreamInfo> info_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+};
+
+TEST_F(SetMetadataIntegrationTest, FromHeader) {
+  const std::string yaml_config = R"EOF(
+  on_request_headers:
+  - object_key: foo
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(test-header)%"
+  )EOF";
+  runFilter(yaml_config);
+  const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("foo");
+  ASSERT_NE(nullptr, foo);
+  EXPECT_EQ(foo->serializeAsString(), "test-value");
+}
+
+TEST_F(SetMetadataIntegrationTest, RouteLevel) {
+  const std::string filter_config = R"EOF(
+  on_request_headers:
+  - object_key: both
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "filter-%REQ(test-header)%"
+  - object_key: filter-only
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "filter"
+  )EOF";
+  const std::string route_config = R"EOF(
+  on_request_headers:
+  - object_key: both
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "route-%REQ(test-header)%"
+  - object_key: route-only
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "route"
+  )EOF";
+  runPerRouteFilter(filter_config, route_config);
+
+  const auto* both = info_.filterState()->getDataReadOnly<Router::StringAccessor>("both");
+  ASSERT_NE(nullptr, both);
+  // Route takes precedence
+  EXPECT_EQ(both->serializeAsString(), "route-test-value");
+
+  const auto* filter = info_.filterState()->getDataReadOnly<Router::StringAccessor>("filter-only");
+  ASSERT_NE(nullptr, filter);
+  // Only set on filter
+  EXPECT_EQ(filter->serializeAsString(), "filter");
+
+  const auto* route = info_.filterState()->getDataReadOnly<Router::StringAccessor>("route-only");
+  ASSERT_NE(nullptr, route);
+  // Only set on route
+  EXPECT_EQ(route->serializeAsString(), "route");
+}
+
+TEST_F(SetMetadataIntegrationTest, FromHeaderIpAddress) {
+  headers_ = Http::TestRequestHeaderMapImpl{{"client-ip", "127.0.0.1"}};
+  const std::string yaml_config = R"EOF(
+  on_request_headers:
+  - object_key: envoy.client.ip
+    factory_key: envoy.network.ip
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(client-ip)%"
+  )EOF";
+  runFilter(yaml_config);
+  const auto* ip_address =
+      info_.filterState()->getDataReadOnly<Network::Address::InstanceAccessor>("envoy.client.ip");
+  ASSERT_NE(nullptr, ip_address);
+  EXPECT_EQ(ip_address->serializeAsString(), "127.0.0.1:0");
+}
+
+TEST_F(SetMetadataIntegrationTest, ClearRouteCache) {
+  headers_ = Http::TestRequestHeaderMapImpl{{"client-ip", "127.0.0.1"}};
+  const std::string yaml_config = R"EOF(
+  on_request_headers:
+  - object_key: envoy.client.ip
+    factory_key: envoy.network.ip
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(client-ip)%"
+  clear_route_cache: true
+  )EOF";
+
+  EXPECT_CALL(decoder_callbacks_, downstreamCallbacks()).Times(2);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  runFilter(yaml_config);
+  const auto* ip_address =
+      info_.filterState()->getDataReadOnly<Network::Address::InstanceAccessor>("envoy.client.ip");
+  ASSERT_NE(nullptr, ip_address);
+  EXPECT_EQ(ip_address->serializeAsString(), "127.0.0.1:0");
+}
+
+} // namespace SetFilterState
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

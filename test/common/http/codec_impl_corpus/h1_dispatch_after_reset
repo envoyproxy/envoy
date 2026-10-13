@@ -1,0 +1,37 @@
+h1_settings {
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":scheme"
+        value: "blah"
+      }
+      headers {
+        key: "content-length"
+        value: "55"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    stream_id: 1
+    request {
+      data: 73711616
+      end_stream: true
+    }
+  }
+}

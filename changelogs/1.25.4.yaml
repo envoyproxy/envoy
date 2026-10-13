@@ -1,0 +1,38 @@
+date: April 5, 2023
+
+behavior_changes:
+- area: http
+  change: |
+    Validate upstream request header names and values. The new runtime flag
+    ``envoy.reloadable_features.validate_upstream_headers`` can be used for revert this behavior.
+
+bug_fixes:
+- area: oauth2
+  change: |
+    fixed a bug where the oauth2 filter would crash if it received a redirect URL without a state query param set.
+- area: lua
+  change: |
+    lua coroutine should not execute after local reply is sent.
+- area: grpc
+  change: |
+    when Envoy was configured to use ext_authz, ext_proc, tap, ratelimit filters, and grpc access log service and an http
+    header with non-UTF-8 data was received, Envoy would generate an invalid protobuf message and send it to the configured
+    service. The receiving service would typically generate an error when decoding the protobuf message. For ext_authz that
+    was configured with ``failure_mode_allow: true``, the request would have been allowed in this case. For the other services,
+    this could have resulted in other unforseen errors such as a lack of visibility into requests (eg request not logged). Envoy
+    will now by default sanitize the values sent in gRPC service calls to be valid UTF-8, replacing data that is not valid UTF-8
+    with a '!' character. This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.service_sanitize_non_utf8_strings`` to false.
+- area: http
+  change: |
+    stop forwarding ``:method`` value which is not a valid token defined in https://www.rfc-editor.org/rfc/rfc9110#section-5.6.2.
+    Also, reject ``:method`` and ``:scheme`` headers with multiple values.
+- area: http3
+  change: |
+    reject pseudo headers violating RFC 9114. Specifically, pseudo-header fields with more than one value for the ``:method``
+    (non-``CONNECT``), ``:scheme``, and ``:path``; or pseudo-header fields after regular header fields; or undefined
+    pseudo-headers.
+- area: http
+  change: |
+    fixed a bug where ``x-envoy-original-path`` was not being sanitized when sent from untrusted users. This behavioral change
+    can be temporarily reverted by setting ``envoy.reloadable_features.sanitize_original_path`` to false.

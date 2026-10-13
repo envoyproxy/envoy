@@ -1,0 +1,202 @@
+static_resources {
+  clusters {
+    name: "ser"
+    type: STRICT_DNS
+    connect_timeout {
+      seconds: 1025
+      nanos: 262239
+    }
+    lb_policy: RING_HASH
+    health_checks {
+      timeout {
+        nanos: 262239
+      }
+      interval {
+        seconds: 10838081697
+        nanos: 2655
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\037\001\037\037\037\037\037\037\037\037\037\037\037\037\037f\037\037\037\037"
+        path: "&"
+      }
+      no_traffic_interval {
+        nanos: 32
+      }
+      healthy_edge_interval {
+        nanos: 95
+      }
+      interval_jitter_percent: 687361
+      tls_options {
+        alpn_protocols: ""
+      }
+      no_traffic_healthy_interval {
+        seconds: 1025
+        nanos: 95
+      }
+    }
+    dns_refresh_rate {
+      nanos: 2555904
+    }
+    dns_resolvers {
+      socket_address {
+        address: "127.0.0.1"
+        port_value: 9901
+      }
+    }
+    lb_subset_config {
+      subset_selectors {
+      }
+    }
+    metadata {
+    }
+    common_lb_config {
+      healthy_panic_threshold {
+        value: 1.39067116059563e-309
+      }
+      ignore_new_hosts_until_first_hc: true
+      consistent_hashing_lb_config {
+        hash_balance_factor {
+          value: 2752512
+        }
+      }
+    }
+    load_assignment {
+      cluster_name: "."
+      endpoints {
+        locality {
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                protocol: UDP
+                address: "127.0.0.1"
+                port_value: 16
+              }
+            }
+          }
+          health_status: DEGRADED
+          load_balancing_weight {
+            value: 1
+          }
+        }
+        proximity {
+          value: 8388608
+        }
+      }
+      endpoints {
+        lb_endpoints {
+          health_status: UNHEALTHY
+        }
+        proximity {
+          value: 50
+        }
+      }
+      endpoints {
+        locality {
+        }
+        priority: 1
+      }
+      endpoints {
+        locality {
+        }
+        lb_endpoints {
+          health_status: HEALTHY
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                address: "\025"
+                ipv4_compat: true
+              }
+            }
+            health_check_config {
+              hostname: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+            }
+          }
+          health_status: HEALTHY
+        }
+        lb_endpoints {
+          endpoint {
+            address {
+              socket_address {
+                protocol: UDP
+                address: "127.0.0.1"
+                port_value: 16
+              }
+            }
+          }
+          health_status: HEALTHY
+        }
+        priority: 16
+      }
+      endpoints {
+        locality {
+        }
+        lb_endpoints {
+          metadata {
+            filter_metadata {
+              key: ""
+              value {
+              }
+            }
+            filter_metadata {
+              key: "\025"
+              value {
+              }
+            }
+            filter_metadata {
+              key: "l"
+              value {
+              }
+            }
+          }
+          load_balancing_weight {
+            value: 1
+          }
+        }
+        priority: 1
+      }
+    }
+    respect_dns_ttl: true
+    load_balancing_policy {
+    }
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        upstream_http_protocol_options {
+        }
+      }
+    }
+    track_timeout_budgets: true
+    preconnect_policy {
+    }
+  }
+}
+dynamic_resources {
+}
+flags_path: "."
+admin {
+}
+enable_dispatcher_stats: true
+stats_server_version_override {
+}
+default_config_source {
+  self {
+  }
+}
+watchdogs {
+  worker_watchdog {
+    miss_timeout {
+      nanos: 262239
+    }
+    multikill_timeout {
+      seconds: 2949120
+    }
+  }
+}

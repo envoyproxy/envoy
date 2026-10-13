@@ -1,0 +1,186 @@
+.. _building:
+
+Building
+========
+
+To build Envoy Mobile, your system must also be set up for building Envoy.
+To get started, you can use `this quick start guide
+<https://github.com/envoyproxy/envoy/tree/master/bazel#quick-start-bazel-build-for-developers>`_.
+
+Ensure that the ``envoy`` **submodule** is initialized when cloning by using ``--recursive``:
+
+``git clone https://github.com/envoyproxy/envoy-mobile.git --recursive``
+
+If the repo was not initially cloned recursively, you can manually initialize the Envoy submodule:
+
+``git submodule update --init``
+
+.. _releases: https://github.com/envoyproxy/envoy-mobile/releases
+
+------------------
+Bazel requirements
+------------------
+
+Envoy Mobile is compiled using the version of Bazel specified in the
+:repo:`.bazelversion <.bazelversion>` file.
+
+We recommend using `bazelisk <https://github.com/bazelbuild/bazelisk>`_ to
+automatically manage the correct Bazel version.
+
+--------------------
+Java requirements
+--------------------
+
+Bazel provisions a hermetic JDK 21 for Envoy Mobile builds via
+``--java_runtime_version=remotejdk_21`` and ``--tool_java_runtime_version=remotejdk_21``
+in :repo:`.bazelrc <.bazelrc>`, so no local JDK installation or ``JAVA_HOME``/``PATH``
+setup is required to build.
+
+A local JDK 21+ is only needed if you want IDE integration or to run Java-based tools
+outside Bazel.
+
+--------------------
+Android requirements
+--------------------
+
+The Android SDK (platform 30, build-tools 35.0.0) and NDK (r29, api level 23) are fetched
+automatically by Bazel via hermetic toolchains. No local Android SDK/NDK installation or
+``ANDROID_HOME``/``ANDROID_NDK_HOME`` environment variables are required for local builds.
+
+.. _ios_requirements:
+
+----------------
+iOS requirements
+----------------
+
+- Xcode 14.1
+- iOS 13.0 or later
+- Note: Requirements are listed in the :repo:`.bazelrc file <.bazelrc>` and CI scripts
+
+.. _android_aar:
+
+-----------
+Android AAR
+-----------
+
+Envoy Mobile can be compiled into an ``.aar`` file for use with Android apps.
+This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
+
+``bazel build android_dist --config=android --fat_apk_cpu=<arch1,arch2>``
+
+Upon completion of the build, you'll see an ``envoy.aar`` file at :repo:`bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar`.
+
+Alternatively, you can use the **prebuilt artifact** from Envoy Mobile's releases_
+or from :ref:`Maven <maven>`.
+
+The ``envoy_mobile_android`` Bazel rule defined in the :repo:`root BUILD file <BUILD>` provides
+an example of how this artifact may be used.
+
+**When building the artifact for release** (usage outside of development), be sure to include the
+``--config=release-android`` option, along with the architectures for which the artifact is being built:
+
+``bazel build android_dist --config=release-android --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a``
+
+For a demo of a working app using this artifact, see the :ref:`hello_world` example.
+
+.. _ios_framework:
+
+--------------------
+iOS static framework
+--------------------
+
+Envoy Mobile supports being compiled into a ``.framework`` for consumption by iOS apps.
+This command is defined in the main :repo:`BUILD <BUILD>` file of the repo, and may be run locally:
+
+``bazel build ios_dist --config=ios``
+
+Upon completion of the build, you'll see a ``ios_framework.zip`` file at output in a path bazel picks.
+
+Alternatively, you can use the prebuilt artifact from Envoy Mobile's releases_ (Envoy.xcframework.zip)
+or from :ref:`SwiftPM <swiftpm>`.
+
+**When building the artifact for release** (usage outside of development), be sure to include the
+``--config=release-ios`` option, along with the architectures for which the artifact is being built:
+
+``bazel build ios_dist --config=release-ios --ios_multi_cpus=i386,x86_64,armv7,arm64``
+
+For a demo of a working app using this artifact, see the :ref:`hello_world` example.
+
+.. _maven:
+
+-----
+Maven
+-----
+
+Envoy Mobile Android artifacts are also uploaded to Maven, and can be accessed/downloaded
+`here <https://mvnrepository.com/artifact/io.envoyproxy.envoymobile/envoy>`_.
+
+.. _swiftpm:
+
+---------------------
+Swift Package Manager
+---------------------
+
+If you use the Swift Package Manager on iOS, you can add the following to your ``Package.swift`` to
+use a version of the prebuilt Envoy Mobile framework.
+
+.. code-block:: swift
+
+  .binaryTarget(
+    name: "Envoy",
+    url: "https://github.com/envoyproxy/envoy-mobile/releases/download/<version>/Envoy.xcframework.zip",
+    checksum: "..."
+  )
+
+
+---------------------------------------------
+Building Envoy Mobile with private Extensions
+---------------------------------------------
+
+Similar to Envoy, Envoy Mobile has bazel targets that allows the library to be built as a git
+submodule in a consuming project. This setup enables creating private extensions, such as filters.
+
+~~~~~~~~~~
+Extensions
+~~~~~~~~~~
+
+The top-level `envoy_build_config` directory allows Envoy Mobile to tap into Envoy's already
+existing `selective extensions system <https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#disabling-extensions>`_.
+
+.. attention::
+
+  Envoy Mobile requires force registration
+  of extensions in the extension_registry.cc/h files due to static linking.
+  For example, installing the XffIpDetection extension in this `PR <https://github.com/envoyproxy/envoy-mobile/pull/1481/files#diff-267d81747f176dadc207207f586f1924c0d472d182a5ba041c077454764b4449>`_.
+
+In order to override the extensions built into Envoy Mobile create an ``envoy_build_config`` directory
+and override the generated repository from the command line or your ``user.bazelrc``::
+
+  build --override_repository=+envoy_build_config_ext+envoy_build_config=/somewhere/on/filesystem/envoy_build_config
+
+The ``envoy_build_config`` repository is generated by a module extension, so it must be referenced by
+its canonical (mangled) name as shown above rather than by its apparent name.
+
+------------------------------
+Deploying Envoy Mobile Locally
+------------------------------
+
+~~~~~~~
+Android
+~~~~~~~
+
+To deploy Envoy Mobile's aar to your local maven repository, run the following commands::
+
+    # To build Envoy Mobile. --fat_apk_cpu takes in a list of architectures: [x86|armeabi-v7a|arm64-v8a].
+    bazel build android_dist --config=android --fat_apk_cpu=x86
+
+    # To publish to local maven.
+    ci/sonatype_nexus_upload.py --local --files bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy.aar bazel-bin/library/kotlin/io/envoyproxy/envoymobile/envoy-pom.xml
+
+
+The version deployed will be ``LOCAL-SNAPSHOT``. These artifacts can be found in your local maven directory (``~/.m2/repository/io/envoyproxy/envoymobile/envoy/LOCAL-SNAPSHOT/``)
+
+~~~
+iOS
+~~~
+TODO :issue:`#980 <980>`

@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+licenses(["notice"])  # Apache 2
+
+go_library(
+    name = "passthrough",
+    srcs = [
+        "filter.go",
+    ],
+    cgo = True,
+    importpath = "example.com/test-data/passthrough",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//contrib/golang/common/go/api",
+        "//contrib/golang/filters/http/source/go/pkg/http",
+        "@org_golang_google_protobuf//types/known/anypb",
+        "@xds_go//udpa/type/v1:type",
+    ],
+)

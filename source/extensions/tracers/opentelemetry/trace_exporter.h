@@ -1,0 +1,89 @@
+#pragma once
+
+#include "envoy/config/typed_config.h"
+#include "envoy/server/tracer_config.h"
+
+#include "source/common/common/logger.h"
+
+#include "absl/status/statusor.h"
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+
+using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
+using opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse;
+
+namespace Envoy {
+namespace Extensions {
+namespace Tracers {
+namespace OpenTelemetry {
+
+/**
+ * @brief Base class for all OpenTelemetry Protocol (OTLP) exporters.
+ * @see
+ * https://github.com/open-telemetry/opentelemetry-proto/blob/v1.0.0/docs/specification.md#otlphttp
+ */
+class OpenTelemetryTraceExporter : public Logger::Loggable<Logger::Id::tracing> {
+public:
+  virtual ~OpenTelemetryTraceExporter() = default;
+
+  /**
+   * @brief Exports the trace request to the configured OTLP service.
+   *
+   * @param request The protobuf-encoded OTLP trace request.
+   * @return true When the request was sent.
+   * @return false When sending the request failed.
+   */
+  virtual bool log(const ExportTraceServiceRequest& request) = 0;
+
+  /**
+   * @brief Logs as debug the number of exported spans.
+   *
+   * @param request The protobuf-encoded OTLP trace request.
+   */
+  void logExportedSpans(const ExportTraceServiceRequest& request) {
+    if (request.resource_spans(0).has_resource()) {
+      if (request.resource_spans(0).scope_spans(0).has_scope()) {
+        ENVOY_LOG(debug, "Number of exported spans: {}",
+                  request.resource_spans(0).scope_spans(0).spans_size());
+      }
+    }
+  }
+};
+
+using OpenTelemetryTraceExporterPtr = std::unique_ptr<OpenTelemetryTraceExporter>;
+
+/**
+ * A factory for creating an OpenTelemetryTraceExporter.
+ *
+ * `createExporter` is invoked concurrently from multiple worker threads during
+ * TLS initialization. Implementations MUST be stateless, re-entrant, and
+ * thread-safe.
+ */
+class OpenTelemetryTraceExporterFactory : public Envoy::Config::TypedFactory {
+public:
+  ~OpenTelemetryTraceExporterFactory() override = default;
+
+  /**
+   * @brief Creates an OpenTelemetryTraceExporter.
+   *
+   * `createExporter` is invoked concurrently from multiple worker threads
+   * during TLS initialization and implementations MUST be stateless,
+   * re-entrant, and thread-safe.
+   *
+   * @param config The exporter protobuf config.
+   * @param context The TracerFactoryContext.
+   * @return absl::StatusOr<OpenTelemetryTraceExporterPtr> A trace exporter. Errors must be reported
+   * via absl::Status inside absl::StatusOr and never via thrown C++ exceptions.
+   */
+  virtual absl::StatusOr<OpenTelemetryTraceExporterPtr>
+  createExporter(const Protobuf::Message& config,
+                 Server::Configuration::TracerFactoryContext& context) const PURE;
+
+  std::string category() const override { return "envoy.tracers.opentelemetry.exporters"; }
+};
+
+using OpenTelemetryTraceExporterFactoryPtr = std::unique_ptr<OpenTelemetryTraceExporterFactory>;
+
+} // namespace OpenTelemetry
+} // namespace Tracers
+} // namespace Extensions
+} // namespace Envoy

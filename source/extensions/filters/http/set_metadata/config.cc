@@ -1,0 +1,43 @@
+#include "source/extensions/filters/http/set_metadata/config.h"
+
+#include <string>
+
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
+#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.validate.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace SetMetadataFilter {
+
+absl::StatusOr<Http::FilterFactoryCb> SetMetadataConfig::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  ConfigSharedPtr filter_config(
+      std::make_shared<Config>(proto_config, extra_context.statsPrefixScopeOr(server_context),
+                               extra_context.statsPrefixOr()));
+
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(
+        Http::StreamDecoderFilterSharedPtr{new SetMetadataFilter(filter_config)});
+  };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+SetMetadataConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<Config>(proto_config, context.scope(), "");
+}
+
+REGISTER_FACTORY(SetMetadataConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+
+} // namespace SetMetadataFilter
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

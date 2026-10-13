@@ -1,0 +1,21 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+  locality:
+    zone: bootstrap_zone
+    sub_zone: bootstrap_sub_zone
+admin:
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{{ null_device_path }}"
+  address:
+    socket_address:
+      address: "{{ ntop_ip_loopback_address }}"
+      port_value: 0
+stats_sinks:
+- name: envoy.callbacks_stats_sink
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stats_flush_interval: 1s

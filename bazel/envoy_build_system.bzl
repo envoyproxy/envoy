@@ -1,0 +1,288 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
+    "EXTENSION_PACKAGE_VISIBILITY",
+)
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+
+# The main Envoy bazel file. Load this file for all Envoy-specific build macros
+# and rules that you'd like to use in your BUILD files.
+load("@rules_foreign_cc//foreign_cc:cmake.bzl", "cmake")
+load(":envoy_binary.bzl", _envoy_cc_binary = "envoy_cc_binary")
+load(":envoy_internal.bzl", "envoy_external_dep_path", _envoy_linkstatic = "envoy_linkstatic")
+load(
+    ":envoy_library.bzl",
+    _envoy_basic_cc_library = "envoy_basic_cc_library",
+    _envoy_cc_contrib_extension = "envoy_cc_contrib_extension",
+    _envoy_cc_extension = "envoy_cc_extension",
+    _envoy_cc_library = "envoy_cc_library",
+    _envoy_cc_linux_library = "envoy_cc_linux_library",
+    _envoy_cc_posix_library = "envoy_cc_posix_library",
+    _envoy_cc_posix_without_linux_library = "envoy_cc_posix_without_linux_library",
+    _envoy_cc_win32_library = "envoy_cc_win32_library",
+    _envoy_proto_library = "envoy_proto_library",
+)
+load(
+    ":envoy_mobile_defines.bzl",
+    _envoy_mobile_defines = "envoy_mobile_defines",
+)
+load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
+load(":envoy_proto_descriptor.bzl", "envoy_proto_descriptor_rule")
+load(
+    ":envoy_select.bzl",
+    _envoy_select_admin_functionality = "envoy_select_admin_functionality",
+    _envoy_select_admin_html = "envoy_select_admin_html",
+    _envoy_select_admin_no_html = "envoy_select_admin_no_html",
+    _envoy_select_disable_exceptions = "envoy_select_disable_exceptions",
+    _envoy_select_disable_logging = "envoy_select_disable_logging",
+    _envoy_select_enable_exceptions = "envoy_select_enable_exceptions",
+    _envoy_select_enable_http3 = "envoy_select_enable_http3",
+    _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
+    _envoy_select_enable_yaml = "envoy_select_enable_yaml",
+    _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
+    _envoy_select_envoy_mobile_xds = "envoy_select_envoy_mobile_xds",
+    _envoy_select_google_grpc = "envoy_select_google_grpc",
+    _envoy_select_hot_restart = "envoy_select_hot_restart",
+    _envoy_select_nghttp2 = "envoy_select_nghttp2",
+    _envoy_select_signal_trace = "envoy_select_signal_trace",
+    _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
+    _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
+    _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
+    _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
+    _envoy_select_wasm_wamr = "envoy_select_wasm_wamr",
+    _envoy_select_wasm_wasmtime = "envoy_select_wasm_wasmtime",
+)
+load(
+    ":envoy_test.bzl",
+    _envoy_benchmark_test = "envoy_benchmark_test",
+    _envoy_cc_benchmark_binary = "envoy_cc_benchmark_binary",
+    _envoy_cc_benchmark_dyn_module_binary = "envoy_cc_benchmark_dyn_module_binary",
+    _envoy_cc_dyn_module_test = "envoy_cc_dyn_module_test",
+    _envoy_cc_fuzz_test = "envoy_cc_fuzz_test",
+    _envoy_cc_mock = "envoy_cc_mock",
+    _envoy_cc_test = "envoy_cc_test",
+    _envoy_cc_test_binary = "envoy_cc_test_binary",
+    _envoy_cc_test_library = "envoy_cc_test_library",
+    _envoy_py_test = "envoy_py_test",
+    _envoy_py_test_binary = "envoy_py_test_binary",
+    _envoy_sh_test = "envoy_sh_test",
+)
+load(
+    ":execution_context_transition.bzl",
+    _execution_context_dual_test = "execution_context_dual_test",
+)
+
+_DBG_BUILD = Label("//bazel:dbg_build")
+_LINUX = Label("//bazel:linux")
+_WINDOWS_DBG_BUILD = Label("//bazel:windows_dbg_build")
+_WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
+
+def envoy_package(default_visibility = ["//visibility:public"]):
+    native.package(default_visibility = default_visibility)
+
+def envoy_extension_package(enabled_default = True, default_visibility = EXTENSION_PACKAGE_VISIBILITY):
+    native.package(default_visibility = default_visibility)
+
+    bool_flag(
+        name = "enabled",
+        build_setting_default = enabled_default,
+    )
+
+    native.config_setting(
+        name = "is_enabled",
+        flag_values = {":enabled": "True"},
+    )
+
+def envoy_mobile_package(default_visibility = ["//visibility:public"]):
+    envoy_extension_package(default_visibility = default_visibility)
+
+def envoy_contrib_package():
+    envoy_extension_package(default_visibility = CONTRIB_EXTENSION_PACKAGE_VISIBILITY)
+
+# External CMake C++ library targets should be specified with this function. This defaults
+# to building the dependencies with ninja
+def envoy_cmake(
+        name,
+        cache_entries = {},
+        debug_cache_entries = {},
+        default_cache_entries = {"CMAKE_BUILD_TYPE": "Bazel"},
+        lib_source = "",
+        postfix_script = "",
+        copy_pdb = False,
+        pdb_name = "",
+        cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
+        generate_crosstool_file = False,
+        generate_args = ["-GNinja"],
+        targets = ["", "install"],
+        **kwargs):
+    # If cache_entries is a dict, merge defaults and wrap for debug builds.
+    # If it's a select(), pass it through directly.
+    if hasattr(cache_entries, "update"):
+        cache_entries.update(default_cache_entries)
+        cache_entries_debug = dict(cache_entries)
+        cache_entries_debug.update(debug_cache_entries)
+        final_cache_entries = select({
+            _DBG_BUILD: cache_entries_debug,
+            "//conditions:default": cache_entries,
+        })
+    else:
+        final_cache_entries = cache_entries
+
+    pf = ""
+    if copy_pdb:
+        # TODO: Add iterator of the first list presented of these options;
+        # static_libraries[.pdb], pdb_names, name[.pdb] files
+        if pdb_name == "":
+            pdb_name = name
+
+        copy_command = "cp {cmake_files_dir}/{pdb_name}.dir/{pdb_name}.pdb $$INSTALLDIR/lib/{pdb_name}.pdb".format(cmake_files_dir = cmake_files_dir, pdb_name = pdb_name)
+        if postfix_script != "":
+            copy_command = copy_command + " && " + postfix_script
+
+        pf = select({
+            _WINDOWS_DBG_BUILD: copy_command,
+            "//conditions:default": postfix_script,
+        })
+    else:
+        pf = postfix_script
+
+    cmake(
+        name = name,
+        cache_entries = final_cache_entries,
+        generate_args = generate_args,
+        targets = targets,
+        # TODO: Remove install target and make this work
+        install = False,
+        # TODO(lizan): Make this always true
+        generate_crosstool_file = select({
+            _WINDOWS_X86_64: True,
+            "//conditions:default": generate_crosstool_file,
+        }),
+        lib_source = lib_source,
+        postfix_script = pf,
+        **kwargs
+    )
+
+# Used to select a dependency that has different implementations on POSIX vs Windows.
+# The platform-specific implementations should be specified with envoy_cc_posix_library
+# and envoy_cc_win32_library respectively
+def envoy_cc_platform_dep(name):
+    return select({
+        _WINDOWS_X86_64: [name + "_win32"],
+        "//conditions:default": [name + "_posix"],
+    })
+
+# Used to select a dependency that has different implementations on Linux vs rest of POSIX vs Windows.
+# The platform-specific implementations should be specified with envoy_cc_linux_library,
+# envoy_cc_posix_without_library and envoy_cc_win32_library respectively
+def envoy_cc_platform_specific_dep(name):
+    return select({
+        _WINDOWS_X86_64: [name + "_win32"],
+        _LINUX: [name + "_linux"],
+        "//conditions:default": [name + "_posix"],
+    })
+
+# Shorthand names for commonly used bundles of external proto_library deps,
+# for use with the `external_deps` arg of `envoy_proto_descriptor`.
+_ENVOY_PROTO_DESCRIPTOR_EXTERNAL_DEPS = {
+    "api_httpbody_protos": ["@googleapis//google/api:httpbody_proto"],
+    "http_api_protos": [
+        "@googleapis//google/api:annotations_proto",
+        "@googleapis//google/api:http_proto",
+    ],
+    "well_known_protos": [
+        "@protobuf//:any_proto",
+        "@protobuf//:descriptor_proto",
+        "@protobuf//:duration_proto",
+        "@protobuf//:empty_proto",
+        "@protobuf//:struct_proto",
+        "@protobuf//:timestamp_proto",
+        "@protobuf//:wrappers_proto",
+    ],
+}
+
+# Envoy proto descriptor targets should be specified with this function.
+# This is used for testing only.
+def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
+    deps = []
+    for external_dep in external_deps:
+        deps.extend(_ENVOY_PROTO_DESCRIPTOR_EXTERNAL_DEPS[external_dep])
+
+    proto_library(
+        name = name + "_proto_lib",
+        srcs = srcs,
+        deps = deps,
+        visibility = ["//visibility:private"],
+    )
+    envoy_proto_descriptor_rule(
+        name = name,
+        out = out,
+        deps = [":%s_proto_lib" % name],
+    )
+
+# Dependencies on Google grpc should be wrapped with this function.
+def envoy_google_grpc_external_deps():
+    return envoy_select_google_grpc([envoy_external_dep_path("grpc")])
+
+# Here we create wrappers for each of the public targets within the separate bazel
+# files loaded above. This maintains envoy_build_system.bzl as the preferred import
+# for BUILD files that need these build macros. Do not use the imports directly
+# from the other bzl files (e.g. envoy_select.bzl, envoy_binary.bzl, etc.)
+
+# Select wrappers (from envoy_select.bzl)
+envoy_select_admin_html = _envoy_select_admin_html
+envoy_select_admin_no_html = _envoy_select_admin_no_html
+envoy_select_admin_functionality = _envoy_select_admin_functionality
+envoy_select_static_extension_registration = _envoy_select_static_extension_registration
+envoy_select_envoy_mobile_listener = _envoy_select_envoy_mobile_listener
+envoy_select_envoy_mobile_xds = _envoy_select_envoy_mobile_xds
+envoy_select_disable_logging = _envoy_select_disable_logging
+envoy_select_google_grpc = _envoy_select_google_grpc
+envoy_select_enable_http3 = _envoy_select_enable_http3
+envoy_select_enable_yaml = _envoy_select_enable_yaml
+envoy_select_disable_exceptions = _envoy_select_disable_exceptions
+envoy_select_enable_exceptions = _envoy_select_enable_exceptions
+envoy_select_hot_restart = _envoy_select_hot_restart
+envoy_select_nghttp2 = _envoy_select_nghttp2
+envoy_select_enable_http_datagrams = _envoy_select_enable_http_datagrams
+envoy_select_signal_trace = _envoy_select_signal_trace
+envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
+envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
+envoy_select_wasm_v8 = _envoy_select_wasm_v8
+envoy_select_wasm_wamr = _envoy_select_wasm_wamr
+envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
+envoy_select_linkstatic = _envoy_linkstatic
+
+# Binary wrappers (from envoy_binary.bzl)
+envoy_cc_binary = _envoy_cc_binary
+
+# Library wrappers (from envoy_library.bzl)
+envoy_basic_cc_library = _envoy_basic_cc_library
+envoy_cc_extension = _envoy_cc_extension
+envoy_cc_contrib_extension = _envoy_cc_contrib_extension
+envoy_cc_library = _envoy_cc_library
+envoy_cc_linux_library = _envoy_cc_linux_library
+envoy_cc_posix_library = _envoy_cc_posix_library
+envoy_cc_posix_without_linux_library = _envoy_cc_posix_without_linux_library
+envoy_cc_win32_library = _envoy_cc_win32_library
+envoy_proto_library = _envoy_proto_library
+envoy_pch_library = _envoy_pch_library
+
+# Test wrappers (from envoy_test.bzl)
+envoy_cc_dyn_module_test = _envoy_cc_dyn_module_test
+envoy_cc_fuzz_test = _envoy_cc_fuzz_test
+envoy_cc_mock = _envoy_cc_mock
+envoy_cc_test = _envoy_cc_test
+envoy_cc_test_binary = _envoy_cc_test_binary
+envoy_cc_test_library = _envoy_cc_test_library
+envoy_cc_benchmark_binary = _envoy_cc_benchmark_binary
+envoy_cc_benchmark_dyn_module_binary = _envoy_cc_benchmark_dyn_module_binary
+envoy_benchmark_test = _envoy_benchmark_test
+envoy_py_test = _envoy_py_test
+envoy_py_test_binary = _envoy_py_test_binary
+envoy_sh_test = _envoy_sh_test
+execution_context_dual_test = _execution_context_dual_test
+
+# Envoy Mobile defines (from envoy_mobile_defines.bz)
+envoy_mobile_defines = _envoy_mobile_defines

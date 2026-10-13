@@ -1,0 +1,10 @@
+date: April 27, 2022
+
+minor_behavior_changes:
+- area: cryptomb
+  change: |
+    remove RSA PKCS1 v1.5 padding support.
+- area: perf
+  change: |
+    ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret
+    update.

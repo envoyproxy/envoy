@@ -1,0 +1,52 @@
+#pragma once
+
+#include <string>
+
+#include "envoy/config/typed_config.h"
+#include "envoy/registry/registry.h"
+
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Formatter {
+
+class CELFormatter : public ::Envoy::Formatter::FormatterProvider {
+public:
+  CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
+               Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder,
+               const cel::expr::Expr& input_expr, std::optional<size_t>& max_length, bool typed);
+
+  std::optional<std::string> format(const Envoy::Formatter::Context& context,
+                                    const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const Envoy::Formatter::Context& context,
+                              const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Envoy::Formatter::Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(Envoy::Formatter::ValueSink& sink, const Envoy::Formatter::Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  const ::Envoy::LocalInfo::LocalInfo& local_info_;
+  const std::optional<size_t> max_length_;
+  const Extensions::Filters::Common::Expr::CompiledExpression compiled_expr_;
+  const bool typed_;
+};
+
+class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
+public:
+  CELFormatterCommandParser() = default;
+  explicit CELFormatterCommandParser(
+      Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder);
+  absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view subcommand,
+        std::optional<size_t> max_length) const override;
+
+private:
+  const Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr configured_expr_builder_;
+};
+
+} // namespace Formatter
+} // namespace Extensions
+} // namespace Envoy

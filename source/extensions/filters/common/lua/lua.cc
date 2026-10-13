@@ -1,0 +1,184 @@
+#include "source/extensions/filters/common/lua/lua.h"
+
+#include <memory>
+
+#include "envoy/common/exception.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+
+#include "absl/strings/str_cat.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
+namespace Lua {
+
+void LuaLoggable::scriptLog(spdlog::level::level_enum level, absl::string_view message) {
+  switch (level) {
+  case spdlog::level::trace:
+    ENVOY_LOG(trace, "script log: {}", message);
+    return;
+  case spdlog::level::debug:
+    ENVOY_LOG(debug, "script log: {}", message);
+    return;
+  case spdlog::level::info:
+    ENVOY_LOG(info, "script log: {}", message);
+    return;
+  case spdlog::level::warn:
+    ENVOY_LOG(warn, "script log: {}", message);
+    return;
+  case spdlog::level::err:
+    ENVOY_LOG(error, "script log: {}", message);
+    return;
+  case spdlog::level::critical:
+    ENVOY_LOG(critical, "script log: {}", message);
+    return;
+  case spdlog::level::off:
+    PANIC("unsupported");
+    return;
+  case spdlog::level::n_levels:
+    PANIC("unsupported");
+  }
+}
+
+Coroutine::Coroutine(const std::pair<lua_State*, lua_State*>& new_thread_state)
+    : coroutine_state_(new_thread_state, false) {}
+
+absl::Status Coroutine::start(int function_ref, int num_args, const YieldCallback& yield_callback) {
+  ASSERT(state_ == State::NotStarted);
+
+  state_ = State::Yielded;
+  lua_rawgeti(coroutine_state_.get(), LUA_REGISTRYINDEX, function_ref);
+  ASSERT(lua_isfunction(coroutine_state_.get(), -1));
+
+  // The function needs to come before the arguments but the arguments are already on the stack,
+  // so we need to move it into position.
+  lua_insert(coroutine_state_.get(), -(num_args + 1));
+  return resume(num_args, yield_callback);
+}
+
+absl::Status Coroutine::resume(int num_args, const YieldCallback& yield_callback) {
+  ASSERT(state_ == State::Yielded);
+  int rc = lua_resume(coroutine_state_.get(), num_args);
+
+  if (0 == rc) {
+    state_ = State::Finished;
+    ENVOY_LOG(debug, "coroutine finished");
+    return absl::OkStatus();
+  } else if (LUA_YIELD == rc) {
+    state_ = State::Yielded;
+    ENVOY_LOG(debug, "coroutine yielded");
+    return yield_callback();
+  } else {
+    state_ = State::Finished;
+    const char* error = lua_tostring(coroutine_state_.get(), -1);
+    if (!error) {
+      error = "unspecified lua error";
+    }
+    return absl::InternalError(error);
+  }
+}
+
+namespace {
+
+// Prepends patterns to one of the package table's search paths, keeping the interpreter's built-in
+// value after them so that a module found in both places resolves to the configured one.
+void prependPackagePath(lua_State* state, const char* field, const std::string& patterns) {
+  if (patterns.empty()) {
+    return;
+  }
+
+  lua_getglobal(state, "package");
+  ASSERT(lua_istable(state, -1), "the package library is opened by luaL_openlibs()");
+  lua_getfield(state, -1, field);
+  const char* existing = lua_tostring(state, -1);
+  const std::string updated =
+      existing == nullptr ? patterns : absl::StrCat(patterns, ";", existing);
+  lua_pop(state, 1);
+  lua_pushstring(state, updated.c_str());
+  lua_setfield(state, -2, field);
+  lua_pop(state, 1);
+}
+
+// Must be called on every state, and before the state runs any code, so that the search paths a
+// require() sees do not depend on which state it runs in.
+void applyPackagePaths(lua_State* state, const PackagePaths& package_paths) {
+  prependPackagePath(state, "path", package_paths.path);
+  prependPackagePath(state, "cpath", package_paths.cpath);
+}
+
+} // namespace
+
+ThreadLocalState::ThreadLocalState(const std::string& code, const PackagePaths& package_paths,
+                                   ThreadLocal::SlotAllocator& tls, absl::Status& creation_status)
+    : tls_slot_(ThreadLocal::TypedSlot<LuaThreadLocal>::makeUnique(tls)) {
+
+  // First verify that the supplied code can be parsed.
+  CSmartPtr<lua_State, lua_close> state(luaL_newstate());
+  RELEASE_ASSERT(state.get() != nullptr, "unable to create new Lua state object");
+  luaL_openlibs(state.get());
+  applyPackagePaths(state.get(), package_paths);
+
+  if (0 != luaL_dostring(state.get(), code.c_str())) {
+    SET_AND_RETURN(absl::InvalidArgumentError(
+                       fmt::format("script load error: {}", lua_tostring(state.get(), -1))),
+                   creation_status);
+  }
+
+  // Now initialize on all threads.
+  tls_slot_->set([code, package_paths](Event::Dispatcher&) {
+    return std::make_shared<LuaThreadLocal>(code, package_paths);
+  });
+}
+
+int ThreadLocalState::getGlobalRef(uint64_t slot) {
+  LuaThreadLocal& tls = **tls_slot_;
+  ASSERT(tls.global_slots_.size() > slot);
+  return tls.global_slots_[slot];
+}
+
+uint64_t ThreadLocalState::registerGlobal(const std::string& global,
+                                          const InitializerList& initializers) {
+  tls_slot_->runOnAllThreads([global, initializers](OptRef<LuaThreadLocal> tls) {
+    lua_getglobal(tls->state_.get(), global.c_str());
+    if (lua_isfunction(tls->state_.get(), -1)) {
+      for (const auto& initialize : initializers) {
+        initialize(tls->state_.get());
+      }
+      tls->global_slots_.push_back(luaL_ref(tls->state_.get(), LUA_REGISTRYINDEX));
+    } else {
+      ENVOY_LOG(debug, "definition for '{}' not found in script", global);
+      lua_pop(tls->state_.get(), 1);
+      tls->global_slots_.push_back(LUA_REFNIL);
+    }
+  });
+
+  return current_global_slot_++;
+}
+
+CoroutinePtr ThreadLocalState::createCoroutine() {
+  lua_State* state = tlsState().get();
+  return std::make_unique<Coroutine>(std::make_pair(lua_newthread(state), state));
+}
+
+ThreadLocalState::LuaThreadLocal::LuaThreadLocal(const std::string& code,
+                                                 const PackagePaths& package_paths)
+    : state_(luaL_newstate()) {
+
+  RELEASE_ASSERT(state_.get() != nullptr, "unable to create new Lua state object");
+  luaL_openlibs(state_.get());
+  applyPackagePaths(state_.get(), package_paths);
+  // The assert holds because ThreadLocalState's constructor already ran this code, with the same
+  // search paths, on the main thread.
+  int rc = luaL_dostring(state_.get(), code.c_str());
+  ASSERT(rc == 0);
+}
+
+} // namespace Lua
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
+} // namespace Envoy
