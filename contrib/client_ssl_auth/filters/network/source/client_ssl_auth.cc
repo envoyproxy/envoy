@@ -11,12 +11,15 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 
 namespace Envoy {
@@ -64,10 +67,11 @@ const AllowedPrincipals& ClientSslAuthConfig::allowedPrincipals() {
 }
 
 GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::string& prefix) {
-  std::string final_prefix = std::format("auth.clientssl.{}.", prefix);
-  GlobalStats stats{ALL_CLIENT_SSL_AUTH_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                              POOL_GAUGE_PREFIX(scope, final_prefix))};
-  return stats;
+  // auth.clientssl.(<stat_prefix>.)*: the stat prefix is the tag of every stat.
+  const Stats::TagStringView tag{Envoy::Config::TagNames::get().CLIENTSSL_PREFIX, prefix};
+  Stats::LiteScopeHelper helper(scope, "auth.clientssl", {tag},
+                                absl::StrCat("auth.clientssl.", prefix));
+  return {ALL_CLIENT_SSL_AUTH_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 
 void ClientSslAuthConfig::parseResponse(const Http::ResponseMessage& message) {

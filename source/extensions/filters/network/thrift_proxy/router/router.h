@@ -13,6 +13,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
@@ -116,9 +117,14 @@ struct RouterNamedStats {
   ALL_THRIFT_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 
   static RouterNamedStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return RouterNamedStats{ALL_THRIFT_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                                    POOL_GAUGE_PREFIX(scope, prefix),
-                                                    POOL_HISTOGRAM_PREFIX(scope, prefix))};
+    // The prefix is the parent's flat prefix, "thrift.(<stat_prefix>.)*": the stat prefix is the
+    // tag of every stat.
+    const Stats::TaggedStatName tagged_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix,
+                                                                       /*base_name=*/"");
+    Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
+                                  tagged_prefix.name());
+    return RouterNamedStats{
+        ALL_THRIFT_ROUTER_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper), POOL_HISTOGRAM(helper))};
   }
 };
 
