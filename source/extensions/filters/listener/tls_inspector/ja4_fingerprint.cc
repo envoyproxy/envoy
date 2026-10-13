@@ -305,8 +305,7 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
   return Envoy::Hex::encode(absl::Span<const uint8_t>(hash.data(), JA4_HASH_LENGTH / 2));
 }
 
-std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello,
-                                     Protocol protocol) {
+std::string JA4Fingerprinter::create(const SSL_CLIENT_HELLO* ssl_client_hello, Protocol protocol) {
   return absl::StrCat(
       // Protocol type: ``t`` for TLS, ``q`` for QUIC, ``d`` for DTLS. Chosen by
       // the caller based on the transport carrying the handshake.

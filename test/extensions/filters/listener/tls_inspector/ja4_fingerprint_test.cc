@@ -1,7 +1,6 @@
-#include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
-
 #include "source/common/common/hex.h"
 #include "source/common/ssl/ssl.h"
+#include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 
@@ -31,7 +30,7 @@ TEST(JA4Fingerprinter, GreaseValueFiltering) {
 
 // The optional ``protocol`` parameter to ``JA4Fingerprinter::create`` must:
 //   - default to ``Protocol::TLS`` so existing callers see no behavior change,
-//   - drive only the first character of the fingerprint (per the JA4 spec),
+//   - drive only the first character of the fingerprint (per the ``JA4`` spec),
 //   - map ``TLS`` -> ``t``, ``QUIC`` -> ``q``, ``DTLS`` -> ``d``.
 TEST(JA4Fingerprinter, ProtocolParameterControlsFirstCharacter) {
   // Two 16-bit ciphers: TLS 1.2 ECDHE-RSA-AES128-GCM-SHA256 and -AES256-GCM-SHA384.
@@ -46,8 +45,10 @@ TEST(JA4Fingerprinter, ProtocolParameterControlsFirstCharacter) {
 
   const std::string default_output = JA4Fingerprinter::create(&hello);
   const std::string tls_output = JA4Fingerprinter::create(&hello, JA4Fingerprinter::Protocol::TLS);
-  const std::string quic_output = JA4Fingerprinter::create(&hello, JA4Fingerprinter::Protocol::QUIC);
-  const std::string dtls_output = JA4Fingerprinter::create(&hello, JA4Fingerprinter::Protocol::DTLS);
+  const std::string quic_output =
+      JA4Fingerprinter::create(&hello, JA4Fingerprinter::Protocol::QUIC);
+  const std::string dtls_output =
+      JA4Fingerprinter::create(&hello, JA4Fingerprinter::Protocol::DTLS);
 
   // Default is TLS: no-arg and Protocol::TLS overloads produce byte-identical output.
   EXPECT_EQ(default_output, tls_output);
@@ -67,28 +68,28 @@ TEST(JA4Fingerprinter, ProtocolParameterControlsFirstCharacter) {
 
 // End-to-end wire-format integration test for the ``protocol`` parameter added
 // to ``JA4Fingerprinter::create``. Decodes a real captured Chrome-stable
-// ClientHello (Browser-1 from tls_inspector_ja4_test.cc's JA4_TEST_VECTORS)
+// ClientHello (Browser-1 from ``tls_inspector_ja4_test.cc``'s ``JA4_TEST_VECTORS``)
 // through BoringSSL's ``SSL_parse_client_hello`` -- the same parse path Envoy
-// hits when the listener filter feeds ClientHello bytes into the JA4 code --
+// hits when the listener filter feeds ClientHello bytes into the ``JA4`` code --
 // and then asserts that the ``protocol`` argument selects the fingerprint's
 // first character while leaving every other byte unchanged.
 TEST(JA4Fingerprinter, ProtocolParameterEndToEndFromWireBytes) {
-  // Same captured hex as tls_inspector_ja4_test.cc's Browser-1 vector. Includes
+  // Same captured hex as ``tls_inspector_ja4_test.cc``'s Browser-1 vector. Includes
   // the 5-byte TLS record header and 4-byte handshake header preceding the
   // ClientHello body.
   const std::string wire_hex =
-      "1603010200010001fc0303528b4e00213672e534980dfed836dd5b375ab164dcc65ba6a3c87e7e2a1f9d61201bf29"
-      "c9dffaa31ed2df524d3a113edb4e6fd3b7fb3d6d57d5d9aafb213e83c420020aaaa130113021303c02bc02fc02cc0"
-      "30cca9cca8c013c014009c009d002f0035010001936a6a0000000d001200100403080404010503080505010806060"
-      "1000000170015000012656467652e6d6963726f736f66742e636f6d000a000a00084a4a001d001700180005000501"
-      "00000000000b00020100002b0007069a9a03040303001b0003020002ff010001000033002b00294a4a000100001d0"
-      "020c4ce4268d58f0c703855163f4754b883742487a5ce87a6016a30208c18e07f69446900050003026832002d0002"
-      "01010023000000170000001200000010000e000c02683208687474702f312e310a0a000100001500c500000000000"
-      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-      "00000000000";
+      "1603010200010001fc0303528b4e00213672e534980dfed836dd5b375ab164dcc65ba6a3c87e7e2a1f9d61201bf2"
+      "9c9dffaa31ed2df524d3a113edb4e6fd3b7fb3d6d57d5d9aafb213e83c420020aaaa130113021303c02bc02fc02c"
+      "c030cca9cca8c013c014009c009d002f0035010001936a6a0000000d001200100403080404010503080505010806"
+      "0601000000170015000012656467652e6d6963726f736f66742e636f6d000a000a00084a4a001d00170018000500"
+      "050100000000000b00020100002b0007069a9a03040303001b0003020002ff010001000033002b00294a4a000100"
+      "001d0020c4ce4268d58f0c703855163f4754b883742487a5ce87a6016a30208c18e07f6944690005000302683200"
+      "2d000201010023000000170000001200000010000e000c02683208687474702f312e310a0a000100001500c50000"
+      "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "0000000000000000000000";
   const std::vector<uint8_t> wire = Hex::decode(wire_hex);
   ASSERT_GT(wire.size(), 9u);
   // Skip the 5-byte record header + 4-byte handshake header;
@@ -113,9 +114,9 @@ TEST(JA4Fingerprinter, ProtocolParameterEndToEndFromWireBytes) {
       JA4Fingerprinter::create(&client_hello, JA4Fingerprinter::Protocol::DTLS);
 
   // Backward-compatible default: no-arg call matches the pinned Browser-1
-  // fingerprint from tls_inspector_ja4_test.cc.
-  const std::string expected_tls_fp = SSL_SELECT(
-      "t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3");
+  // fingerprint from ``tls_inspector_ja4_test.cc``.
+  const std::string expected_tls_fp =
+      SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3");
   EXPECT_EQ(default_fp, expected_tls_fp);
   EXPECT_EQ(tls_fp, expected_tls_fp);
 

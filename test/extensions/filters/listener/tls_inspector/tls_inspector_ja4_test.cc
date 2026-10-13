@@ -362,7 +362,7 @@ TEST_P(TlsInspectorJA4Test, JA4FingerprintFromCapturedClientHello) {
   }
 }
 
-// Replays each captured ClientHello from JA4_TEST_VECTORS against
+// Replays each captured ClientHello from ``JA4_TEST_VECTORS`` against
 // ``JA4Fingerprinter::create`` with every value of the ``Protocol`` enum and
 // asserts the parameter's contract holds for every capture in the corpus:
 //   - the no-arg overload is byte-identical to ``Protocol::TLS`` (backward
@@ -376,7 +376,7 @@ TEST_P(TlsInspectorJA4Test, JA4FingerprintFromCapturedClientHello) {
 // above: that one drives captured bytes end-to-end through the listener filter
 // (which always calls ``create`` with the default ``Protocol::TLS``); this one
 // reuses the same corpus but exercises the caller-visible overload directly,
-// so downstream integrators that pass ``Protocol::QUIC`` (or a hypothetical
+// so downstream callers that pass ``Protocol::QUIC`` (or a hypothetical
 // future in-tree QUIC listener filter) get coverage against the same real
 // captures the filter suite already trusts. Assertions are deliberately
 // relative to the fingerprint each capture actually produces, not to a pinned
@@ -399,13 +399,13 @@ TEST_P(TlsInspectorJA4ProtocolArgTest, ProtocolArgSelectsFirstCharacter) {
   // TLS record header and 4-byte handshake header) to BoringSSL's parser -- the
   // same parse path the listener filter uses via its ssl-early callback.
   //
-  // A few entries in JA4_TEST_VECTORS have malformed hex (odd length) or
+  // A few entries in ``JA4_TEST_VECTORS`` have malformed hex (odd length) or
   // produce ClientHello bodies that BoringSSL's SSL_parse_client_hello
   // rejects; the pre-existing ``JA4FingerprintFromCapturedClientHello`` suite
   // tolerates that silently via ``EXPECT_CALL(...).Times(AtMost(1))`` on
   // ``setJA4Hash``, so those broken vectors have never actually been checked.
   // Skip them here rather than fail, since the Protocol parameter's contract
-  // only applies to inputs that actually reach the JA4 code path.
+  // only applies to inputs that actually reach the ``JA4`` code path.
   const std::vector<uint8_t> wire = Hex::decode(client_hello_hex);
   if (wire.size() <= 9) {
     GTEST_SKIP() << client_name
