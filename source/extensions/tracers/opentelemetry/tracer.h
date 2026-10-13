@@ -199,6 +199,7 @@ private:
   bool sampled_;
   bool use_local_decision_{false};
   bool parent_context_is_remote_{false};
+  bool preserve_headers_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
