@@ -666,6 +666,18 @@ TEST_P(DynamicModuleHttpLanguageTests, FilterStateCallbacks) {
       "envoy.test.http_typed_object_for_rust");
   ASSERT_NE(typed_value, nullptr);
   EXPECT_EQ(typed_value->serializeAsString(), "typed_value");
+  const auto* shared_value =
+      stream_info.filterState()->getDataReadOnly<Router::StringAccessor>("shared_filter_state_key");
+  ASSERT_NE(shared_value, nullptr);
+  EXPECT_EQ(shared_value->serializeAsString(), "shared_filter_state_value");
+  EXPECT_TRUE(stream_info.filterState()->hasDataAtOrAboveLifeSpan(
+      StreamInfo::FilterState::LifeSpan::Connection));
+  const auto shared_objects = stream_info.filterState()->objectsSharedWithUpstreamConnection();
+  ASSERT_NE(shared_objects, nullptr);
+  ASSERT_EQ(shared_objects->size(), 1);
+  EXPECT_EQ(shared_objects->at(0).name_, "shared_filter_state_key");
+  EXPECT_EQ(shared_objects->at(0).stream_sharing_,
+            StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
   filter->onStreamComplete();
   const auto* stream_complete_value =

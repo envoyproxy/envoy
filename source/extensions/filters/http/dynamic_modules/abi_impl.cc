@@ -536,6 +536,20 @@ toFilterStateLifeSpan(envoy_dynamic_module_type_filter_state_life_span life_span
   return StreamInfo::FilterState::LifeSpan::FilterChain;
 }
 
+StreamInfo::StreamSharingMayImpactPooling
+toFilterStateStreamSharing(envoy_dynamic_module_type_filter_state_stream_sharing stream_sharing) {
+  switch (stream_sharing) {
+  case envoy_dynamic_module_type_filter_state_stream_sharing_None:
+    return StreamInfo::StreamSharingMayImpactPooling::None;
+  case envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnection:
+    return StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection;
+  case envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnectionOnce:
+    return StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce;
+  }
+  IS_ENVOY_BUG("unknown filter state stream_sharing");
+  return StreamInfo::StreamSharingMayImpactPooling::None;
+}
+
 } // namespace
 
 extern "C" {
@@ -1632,6 +1646,24 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
   }
   return ContextAccessor::setFilterStateBytes(*stream_info, absl::string_view(key.ptr, key.length),
                                               absl::string_view(value.ptr, value.length));
+}
+
+bool envoy_dynamic_module_callback_http_set_filter_state_value(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_filter_state_life_span life_span,
+    envoy_dynamic_module_type_filter_state_stream_sharing stream_sharing) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  return ContextAccessor::setFilterStateBytes(*stream_info, absl::string_view(key.ptr, key.length),
+                                              absl::string_view(value.ptr, value.length),
+                                              toFilterStateLifeSpan(life_span),
+                                              toFilterStateStreamSharing(stream_sharing));
 }
 
 bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
