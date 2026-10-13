@@ -152,6 +152,12 @@ TagNameValues::TagNameValues() {
   addRe2(HEALTH_CHECK_NAME, R"(^cluster\.<TAG_VALUE>\.health_check(\.name\.(<TAG_VALUE>))\..+)",
          ".health_check.");
 
+  // cluster.[<cluster_name>.[<alt_prefix>.]]zone.(<from_zone>.)<to_zone>.*
+  addTokenized(UPSTREAM_FROM_ZONE, "cluster.**.zone.$.*.**");
+
+  // cluster.[<cluster_name>.[<alt_prefix>.]]zone.[<from_zone>.](<to_zone>.)*
+  addTokenized(UPSTREAM_TO_ZONE, "cluster.**.zone.*.$.**");
+
   // listener.[<address>.]http.(<stat_prefix>.)*
   // The <address> part can be anything here (.*?) for the sake of a simpler
   // internal state of the regex which performs better.
