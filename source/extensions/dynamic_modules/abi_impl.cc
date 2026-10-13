@@ -3408,6 +3408,9 @@ WEAK_STUB(uint64_t, envoy_dynamic_module_callback_http_get_upstream_connection_i
 WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_upstream_remote_address, false,
           envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_downstream_direct_remote_address, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*)
+
 WEAK_STUB(size_t, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size, 0,
           envoy_dynamic_module_type_http_filter_envoy_ptr)
 

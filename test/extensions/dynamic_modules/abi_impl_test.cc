@@ -2159,6 +2159,8 @@ WEAK_STUB(HttpGetUpstreamConnectionId,
           envoy_dynamic_module_callback_http_get_upstream_connection_id(nullptr))
 WEAK_STUB(HttpGetUpstreamRemoteAddress,
           envoy_dynamic_module_callback_http_get_upstream_remote_address(nullptr, nullptr))
+WEAK_STUB(HttpGetDownstreamDirectRemoteAddress,
+          envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(nullptr, nullptr))
 WEAK_STUB(HttpGetUpstreamHostsAttemptedSize,
           envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(nullptr))
 WEAK_STUB(HttpGetUpstreamHostsAttempted,

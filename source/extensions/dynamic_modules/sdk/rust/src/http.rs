@@ -2143,6 +2143,12 @@ pub trait EnvoyHttpFilter {
   /// hook returns.
   fn get_upstream_remote_address<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
+  /// Get the downstream socket peer address, including the port, before XFF processing.
+  ///
+  /// Returns `None` if the address is unavailable. The buffer is valid until the current event
+  /// hook returns.
+  fn get_downstream_direct_remote_address<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
   /// Get the upstream host addresses in attempt order.
   ///
   /// Returns an empty vector if upstream information is unavailable or no hosts were attempted.
@@ -4346,6 +4352,24 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     };
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_upstream_remote_address(
+        self.raw_ptr,
+        &mut result as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_downstream_direct_remote_address(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
         self.raw_ptr,
         &mut result as *mut _,
       )

@@ -2921,6 +2921,23 @@ bool envoy_dynamic_module_callback_http_get_upstream_remote_address(
   return true;
 }
 
+bool envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* stream_info = filter->streamInfo();
+  if (stream_info == nullptr) {
+    return false;
+  }
+  const auto& remote_address = stream_info->downstreamAddressProvider().directRemoteAddress();
+  if (remote_address == nullptr) {
+    return false;
+  }
+  const auto address = remote_address->asStringView();
+  *result = {.ptr = const_cast<char*>(address.data()), .length = address.size()};
+  return true;
+}
+
 size_t envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
