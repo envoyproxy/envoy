@@ -178,6 +178,8 @@ require_client_certificate: true
   EXPECT_EQ(id, session_context_id("ca_cert.pem"));
 }
 
+#ifndef ENVOY_SSL_OPENSSL
+// Uses BoringSSL-only APIs (CBB, SSL_parse_client_hello).
 namespace {
 
 // Builds a ClientHello body (starting at legacy_version) that lists ecdsa_secp256r1_sha256 first in
@@ -288,6 +290,7 @@ TEST_F(SslContextImplTest, EcdsaCapabilitiesHonorSupportedVersionsContent) {
       {{"envoy.reloadable_features.tls_ecdsa_selection_check_supported_versions", "false"}});
   EXPECT_TRUE(ecdsa_capable({ecdhe_rsa}, tls12_only));
 }
+#endif // ENVOY_SSL_OPENSSL
 
 TEST_F(SslContextImplTest, TestCipherSuites) {
   const std::string yaml = R"EOF(
