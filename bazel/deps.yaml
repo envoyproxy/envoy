@@ -3,7 +3,7 @@ abseil-cpp:
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
   apparent_name: abseil_cpp
-  release_date: "2026-02-11"
+  release_date: "2026-08-18"
   use_category:
   - dataplane_core
   - controlplane
@@ -113,7 +113,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2026-04-14"
+  release_date: "2026-09-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -125,7 +125,7 @@ brotli:
   project_name: "brotli"
   project_desc: "brotli compression library"
   project_url: "https://brotli.org"
-  release_date: "2025-10-27"
+  release_date: "2026-09-30"
   use_category:
   - dataplane_core
   - dataplane_ext
@@ -860,7 +860,7 @@ proto-converter:
   project_desc: "Library that supports the conversion between protobuf binary and json"
   project_url: "https://github.com/grpc-ecosystem/proto-converter"
   apparent_name: proto-converter
-  release_date: "2024-06-25"
+  release_date: "2026-09-12"
   use_category:
   - dataplane_core
   - controlplane
@@ -1011,7 +1011,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-08-31"
+  release_date: "2026-10-06"
   use_category:
   - controlplane
   - dataplane_core
@@ -1465,7 +1465,7 @@ zstd:
   project_name: "zstd"
   project_desc: "zstd compression library"
   project_url: "https://facebook.github.io/zstd"
-  release_date: "2026-10-06"
+  release_date: "2025-02-19"
   use_category:
   - dataplane_ext
   extensions:
