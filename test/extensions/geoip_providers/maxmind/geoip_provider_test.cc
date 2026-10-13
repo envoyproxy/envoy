@@ -391,6 +391,53 @@ TEST_F(GeoipProviderTest, CityDbExtendedFieldsUsAddress) {
   expectStats("city_db");
 }
 
+TEST_F(GeoipProviderTest, CityDbSubregionAndFixedPrecisionLookup) {
+  // 2.125.160.216 (Boxford, GB) has two subdivisions (England + West Berkshire),
+  // postal code, and round lat/lon that distinguish {:.4f} from shortest round-trip
+  // (51.7500 vs 51.75, -1.2500 vs -1.25).
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+        city: "x-geo-city"
+        region: "x-geo-region"
+        latitude: "x-geo-latitude"
+        longitude: "x-geo-longitude"
+        time_zone: "x-geo-time-zone"
+        postal_code: "x-geo-postal-code"
+        city_geoname_id: "x-geo-city-geoname-id"
+        region_name: "x-geo-region-name"
+        region_geoname_id: "x-geo-region-geoname-id"
+        subregion_geoname_id: "x-geo-subregion-geoname-id"
+        country_geoname_id: "x-geo-country-geoname-id"
+        continent_geoname_id: "x-geo-continent-geoname-id"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("2.125.160.216");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  ASSERT_EQ(13, captured_lookup_response_.size());
+  EXPECT_EQ("GB", captured_lookup_response_["x-geo-country"]);
+  EXPECT_EQ("Boxford", captured_lookup_response_["x-geo-city"]);
+  EXPECT_EQ("ENG", captured_lookup_response_["x-geo-region"]);
+  EXPECT_EQ("51.7500", captured_lookup_response_["x-geo-latitude"]);
+  EXPECT_EQ("-1.2500", captured_lookup_response_["x-geo-longitude"]);
+  EXPECT_EQ("Europe/London", captured_lookup_response_["x-geo-time-zone"]);
+  EXPECT_EQ("OX1", captured_lookup_response_["x-geo-postal-code"]);
+  EXPECT_EQ("2655045", captured_lookup_response_["x-geo-city-geoname-id"]);
+  EXPECT_EQ("England", captured_lookup_response_["x-geo-region-name"]);
+  EXPECT_EQ("6269131", captured_lookup_response_["x-geo-region-geoname-id"]);
+  EXPECT_EQ("3333217", captured_lookup_response_["x-geo-subregion-geoname-id"]);
+  EXPECT_EQ("2635167", captured_lookup_response_["x-geo-country-geoname-id"]);
+  EXPECT_EQ("6255148", captured_lookup_response_["x-geo-continent-geoname-id"]);
+  expectStats("city_db");
+}
+
 TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
