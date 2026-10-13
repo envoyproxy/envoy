@@ -4,7 +4,8 @@ the hot restart RPC. Connectionless UDP listeners no longer stop functioning bet
 drain start and parent shutdown. The set of served sessions is the set a listener filter has
 registered. Currently only :ref:`udp_proxy <config_udp_listener_filters_udp_proxy>` registers
 its sticky sessions, which the parent keeps serving until they reach the
-:ref:`idle timeout <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>`.
+:ref:`idle timeout
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>`.
 Forwarding to the child can be disabled with the
 ``envoy.reloadable_features.udp_hot_restart_session_handoff`` runtime guard, in which case the
 draining parent keeps serving all datagrams itself until it exits.

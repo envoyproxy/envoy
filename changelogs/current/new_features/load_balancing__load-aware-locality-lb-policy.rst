@@ -1,4 +1,4 @@
-load_balancing: implemented the
+Implemented the
 :ref:`envoy.load_balancing_policies.load_aware_locality
 <envoy_v3_api_msg_extensions.load_balancing_policies.load_aware_locality.v3.LoadAwareLocality>`
 locality-picking load balancer. It weights localities by ORCA-derived utilization headroom

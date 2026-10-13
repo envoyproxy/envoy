@@ -1,5 +1,6 @@
 Upstream QUIC connections now present the client certificate configured in the cluster's
-:ref:`upstream TLS context <envoy_v3_api_msg_extensions.transport_sockets.quic.v3.QuicUpstreamTransport>`
+:ref:`upstream TLS context
+<envoy_v3_api_msg_extensions.transport_sockets.quic.v3.QuicUpstreamTransport>`
 when the upstream server requests one. Previously configured client certificates were silently
 not sent over HTTP/3. Client certificates using a private key provider are not supported over
 QUIC and are now rejected at configuration load time. This behavior change can be reverted by

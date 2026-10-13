@@ -7,7 +7,7 @@ encode callbacks against a bounded side copy), and normalized usage is
 published as typed dynamic metadata (default namespace
 ``envoy.ai.token_usage``): the authoritative record is
 :ref:`envoy.data.ai.v3.TokenUsage <envoy_v3_api_msg_data.ai.v3.TokenUsage>`,
-consumable via ext_proc typed metadata forwarding or any filter reading
+consumable via ``ext_proc`` typed metadata forwarding or any filter reading
 typed dynamic metadata. Inspection is scoped to
 routes carrying an
 :ref:`AiProtocolManagerPerRoute

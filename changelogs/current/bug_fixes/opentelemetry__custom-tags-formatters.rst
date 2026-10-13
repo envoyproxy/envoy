@@ -1,5 +1,6 @@
 Fixed the OpenTelemetry access loggers (both the gRPC and HTTP variants) ignoring configured
-:ref:`formatters <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.formatters>`
+:ref:`formatters
+<envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.formatters>`
 when building
 :ref:`custom_tags
 <envoy_v3_api_field_extensions.access_loggers.open_telemetry.v3.OpenTelemetryAccessLogConfig.custom_tags>`.
