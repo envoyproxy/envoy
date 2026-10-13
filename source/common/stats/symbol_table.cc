@@ -50,15 +50,6 @@ SymbolTable::Encoding::~Encoding() {
   ASSERT(mem_block_.capacity() == 0);
 }
 
-size_t SymbolTable::Encoding::encodingSizeBytes(uint64_t number) {
-  size_t num_bytes = 0;
-  do {
-    ++num_bytes;
-    number >>= 7;
-  } while (number != 0);
-  return num_bytes;
-}
-
 void SymbolTable::Encoding::appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
   // byte. For higher values we write the low-order 7 bits with a 1 in
@@ -681,16 +672,15 @@ SymbolTable::StoragePtr SymbolTable::join(absl::Span<const StatName> stat_names)
       num_bytes += stat_name.dataSize();
     }
   }
-  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
-  Encoding::appendEncoding(num_bytes, mem_block);
-  for (StatName stat_name : stat_names) {
-    stat_name.appendDataToMemBlock(mem_block);
-  }
-  ASSERT(mem_block.capacityRemaining() == 0);
-  return mem_block.release();
+  return heapJoin(stat_names, num_bytes);
 }
 
 void StatNameJoiner::join(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
+  // The elided path below drops storage_ without copying anything out of it, so it needs the same
+  // aliasing check that SymbolTable::inlineJoin() makes for the assembling path.
+  ASSERT(!storage_.checkStatNameOverlaps(stat_names),
+         "stat_names should not contain name overlapping with the storage");
+
   // A join with at most one non-empty name produces bytes identical to that name, so the
   // allocation can be skipped and the name referenced directly.
   StatName sole_name;
@@ -707,10 +697,13 @@ void StatNameJoiner::join(absl::Span<const StatName> stat_names, const SymbolTab
   }
 
   if (needs_join) {
-    storage_ = symbol_table.join(stat_names);
-    stat_name_ = StatName(storage_.get());
+    // Assemble straight into storage_. Taking the returned-by-value form here would cost a copy:
+    // the bytes land at runtime-varying offsets, so the compiler can fold the result into an
+    // initialization but not into an assignment.
+    symbol_table.inlineJoin(stat_names, storage_);
+    stat_name_ = storage_.statName();
   } else {
-    storage_.reset();
+    storage_ = SymbolTable::InlineStorage{};
     stat_name_ = sole_name;
   }
 }

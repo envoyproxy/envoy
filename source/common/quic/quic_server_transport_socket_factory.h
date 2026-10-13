@@ -69,6 +69,11 @@ public:
 
   bool requiresClientCertificate() const { return config_->requireClientCertificate(); }
 
+  // True when a validation context is configured, independent of `requiresClientCertificate()`.
+  bool clientCertificateValidationConfigured() const {
+    return config_->validationContextConfigured();
+  }
+
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, bool enable_resumption,
                                    Stats::Scope& store, Ssl::ServerContextConfigPtr config,

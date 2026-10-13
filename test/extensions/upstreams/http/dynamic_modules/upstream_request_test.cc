@@ -453,6 +453,55 @@ TEST_F(HttpTcpBridgeAbiEdgeCasesTest, EdgeCaseCallbacksExercised) {
 }
 
 // =============================================================================
+// HttpTcpBridge tests for terminal send_response_headers and send_response_trailers deferral.
+// =============================================================================
+
+class HttpTcpBridgeTerminalResponseTest : public HttpTcpBridgeTest {
+public:
+  HttpTcpBridgeTerminalResponseTest() { createBridge("upstream_bridge_terminal_response"); }
+};
+
+// The module ends the stream with headers only during encode_headers, so the deferred response is a
+// single headers frame with end_stream set and no body.
+TEST_F(HttpTcpBridgeTerminalResponseTest, EncodeHeadersSendsTerminalHeaders) {
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, true));
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, _)).Times(0);
+
+  Envoy::Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/test"}};
+  EXPECT_OK(bridge_->encodeHeaders(headers, false));
+}
+
+// The module ends the stream with trailers during encode_data, so the deferred response is a
+// trailers frame.
+TEST_F(HttpTcpBridgeTerminalResponseTest, EncodeDataSendsTerminalTrailers) {
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeTrailers(_));
+
+  Buffer::OwnedImpl data("request data");
+  bridge_->encodeData(data, false);
+}
+
+// A non terminal data send keeps the stream open, so it is applied inline during the hook.
+TEST_F(HttpTcpBridgeTerminalResponseTest, OnUpstreamDataSendsNonTerminalData) {
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, false));
+
+  Buffer::OwnedImpl data("upstream response");
+  bridge_->onUpstreamData(data, false);
+}
+
+// A send_response called outside a module hook is applied inline, since no hook borrow is live.
+TEST_F(HttpTcpBridgeTest, SendResponseOutsideHookWithBodyIsInline) {
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, false));
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, true));
+  bridge_->sendResponse(200, nullptr, 0, "body");
+}
+
+TEST_F(HttpTcpBridgeTest, SendResponseOutsideHookWithoutBodyIsInline) {
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders(_, true));
+  EXPECT_CALL(mock_upstream_to_downstream_, decodeData(_, _)).Times(0);
+  bridge_->sendResponse(200, nullptr, 0, "");
+}
+
+// =============================================================================
 // Edge case tests for connection and event handling.
 // =============================================================================
 

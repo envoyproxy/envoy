@@ -18,7 +18,6 @@ envoy_cc_library(
         ],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
             "@envoy//source/common/common:assert_lib",

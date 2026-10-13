@@ -1,5 +1,7 @@
 #include "source/extensions/common/async_files/async_file_manager_thread_pool.h"
 
+#include <fcntl.h>
+
 #include <memory>
 #include <queue>
 #include <thread>

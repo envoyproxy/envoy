@@ -77,7 +77,7 @@ public:
     auto secret_provider =
         factory_context.serverFactoryContext().secretManager().findOrCreateGenericSecretProvider(
             config_source_, "encryption_key", factory_context.serverFactoryContext(),
-            factory_context.initManager());
+            factory_context.initManager(), true);
     return
         [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
           callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::SdsGenericSecretTestFilter>(

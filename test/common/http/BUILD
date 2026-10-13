@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/router:context_lib",
+        "//source/common/router:router_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -58,6 +59,16 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:character_set_validation_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "codec_helper_test",
+    srcs = ["codec_helper_test.cc"],
+    deps = [
+        "//source/common/http:codec_helper_lib",
+        "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -145,6 +156,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -178,11 +190,15 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:empty_string",
+        "//source/common/config:well_known_names",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stats:tag_producer_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
 
@@ -295,6 +311,7 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/request_id/uuid:config",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
@@ -464,6 +481,18 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "route_config_update_requster_test",
+    srcs = ["route_config_update_requster_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/http:rds_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

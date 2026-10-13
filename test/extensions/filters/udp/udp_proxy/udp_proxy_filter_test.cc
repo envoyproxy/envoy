@@ -12,6 +12,7 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/extensions/filters/udp/udp_proxy/mocks.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
@@ -19,6 +20,7 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/network/socket.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/listener_factory_context.h"
@@ -29,6 +31,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -45,6 +48,7 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::Throw;
 
 namespace Envoy {
@@ -628,6 +632,111 @@ matcher:
   filter_.reset();
   ASSERT_EQ(output_.size(), 1);
   EXPECT_EQ(output_[0], "20.0.0.1:443 127.0.0.1:12345");
+}
+
+TEST_F(UdpProxyFilterTest, ConfiguredUpstreamSourceAddress) {
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF"));
+
+  const auto source_address = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:0");
+  auto socket_option = std::make_shared<StrictMock<Network::MockSocketOption>>();
+  auto socket_options = std::make_shared<Network::Socket::Options>();
+  socket_options->push_back(socket_option);
+  auto& host =
+      *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_;
+  EXPECT_CALL(*host.cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_, _))
+      .WillOnce(Return(Upstream::UpstreamLocalAddress{source_address, socket_options}));
+
+  expectSessionCreate(upstream_address_);
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*test_sessions_[0].socket_, bind(source_address))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+TEST_F(UdpProxyFilterTest, UpstreamSocketOptionFailure) {
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF",
+                        "%RESPONSE_FLAGS%", ""));
+
+  auto socket_option = std::make_shared<StrictMock<Network::MockSocketOption>>();
+  auto socket_options = std::make_shared<Network::Socket::Options>();
+  socket_options->push_back(socket_option);
+  auto& host =
+      *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_;
+  EXPECT_CALL(*host.cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_, _))
+      .WillOnce(Return(Upstream::UpstreamLocalAddress{nullptr, socket_options}));
+
+  expectSessionCreate(upstream_address_);
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*test_sessions_[0].socket_, bind(_)).Times(0);
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(1, TestUtility::findCounter(factory_context_.server_factory_context_.cluster_manager_
+                                            .thread_local_cluster_.cluster_.info_->stats_store_,
+                                        "udp.sess_tx_errors")
+                   ->value());
+  ASSERT_EQ(1, output_.size());
+  EXPECT_EQ(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE, output_.front());
+}
+
+TEST_F(UdpProxyFilterTest, UpstreamBindFailure) {
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+  )EOF",
+                        "%RESPONSE_FLAGS%", ""));
+
+  const auto source_address =
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:12345");
+  auto& host =
+      *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_;
+  EXPECT_CALL(*host.cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_, _))
+      .WillOnce(Return(Upstream::UpstreamLocalAddress{source_address, nullptr}));
+
+  expectSessionCreate(upstream_address_);
+  EXPECT_CALL(*test_sessions_[0].socket_, bind(source_address))
+      .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_ADDR_IN_USE}));
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(1, TestUtility::findCounter(factory_context_.server_factory_context_.cluster_manager_
+                                            .thread_local_cluster_.cluster_.info_->stats_store_,
+                                        "udp.sess_tx_errors")
+                   ->value());
+  ASSERT_EQ(1, output_.size());
+  EXPECT_EQ(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE, output_.front());
 }
 
 // Route with source IP.
@@ -1290,6 +1399,41 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
   InSequence s;
 
   ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
+}
+
+TEST_F(UdpProxyFilterTest, OriginalSourcePrecedesConfiguredBinding) {
+  if (!isTransparentSocketOptionsSupported()) {
+    GTEST_SKIP();
+  }
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
+
+  auto& host =
+      *factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_;
+  host.cluster_.source_address_ =
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.2:12345");
+  EXPECT_CALL(*host.cluster_.upstream_local_address_selector_, getUpstreamLocalAddressImpl(_, _))
+      .Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_original_src_ip: true
+  )EOF"));
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectSetIpTransparentSocketOption();
+  EXPECT_CALL(*test_sessions_[0].socket_, bind(_)).Times(0);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, peer_address_->ip());
+  recvDataFromDownstream(peer_address_->asString(), "10.0.0.2:80", "hello");
+
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 }
 
 TEST_F(UdpProxyFilterTest, MutualExcludePerPacketLoadBalancingAndSessionFilters) {
@@ -2861,6 +3005,101 @@ TEST(TunnelingConfigImplTest, TargetHostFromFilterState) {
   TunnelingConfigImpl config(proto_config, context);
 
   EXPECT_EQ("test.host.com", config.targetHost(stream_info));
+}
+
+TEST(TunnelingConfigImplTest, FormatterExtension) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%COMMAND_EXTENSION()%");
+  auto* formatter = proto_config.add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  TunnelingConfigImpl config(proto_config, context);
+
+  auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
+  config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
+  EXPECT_EQ("TestFormatter", headers.get_("test_key"));
+}
+
+TEST(TunnelingConfigImplTest, FormatterExtensionMixedWithBuiltinCommands) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  stream_info.filterState()->setData(
+      "test_key", std::make_shared<Envoy::Router::StringAccessorImpl>("test_val"));
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%COMMAND_EXTENSION()%-%FILTER_STATE(test_key:PLAIN)%");
+  auto* formatter = proto_config.add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  TunnelingConfigImpl config(proto_config, context);
+
+  auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
+  config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
+  EXPECT_EQ("TestFormatter-test_val", headers.get_("test_key"));
+}
+
+TEST(TunnelingConfigImplTest, MultipleFormatterExtensions) {
+  Envoy::Formatter::TestCommandFactory test_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_factory(test_factory);
+  Envoy::Formatter::AdditionalCommandFactory additional_factory;
+  Registry::InjectFactory<Envoy::Formatter::CommandParserFactory> register_additional_factory(
+      additional_factory);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%COMMAND_EXTENSION()%-%ADDITIONAL_EXTENSION()%");
+
+  auto* formatter = proto_config.add_formatters();
+  formatter->set_name("envoy.formatter.TestFormatter");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+  auto* additional = proto_config.add_formatters();
+  additional->set_name("envoy.formatter.AdditionalFormatter");
+  ASSERT_TRUE(additional->mutable_typed_config()->PackFrom(Protobuf::UInt32Value()));
+
+  TunnelingConfigImpl config(proto_config, context);
+
+  auto headers = Http::TestRequestHeaderMapImpl{{":scheme", "http"}, {":authority", "host.com"}};
+  config.headerEvaluator().evaluateHeaders(headers, {}, stream_info);
+  EXPECT_EQ("TestFormatter-AdditionalFormatter", headers.get_("test_key"));
+}
+
+TEST(TunnelingConfigImplTest, UnknownFormatterExtension) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  TunnelingConfig proto_config;
+  auto* header_to_add = proto_config.add_headers_to_add();
+  auto* header = header_to_add->mutable_header();
+  header->set_key("test_key");
+  header->set_value("%COMMAND_EXTENSION()%");
+  auto* formatter = proto_config.add_formatters();
+  formatter->set_name("envoy.formatter.does_not_exist");
+  ASSERT_TRUE(formatter->mutable_typed_config()->PackFrom(Protobuf::StringValue()));
+
+  EXPECT_THROW_WITH_REGEX(TunnelingConfigImpl(proto_config, context), EnvoyException,
+                          "envoy.formatter.does_not_exist");
 }
 
 TEST(TunnelingConfigImplTest, BufferingState) {

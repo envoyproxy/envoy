@@ -24,7 +24,7 @@ public:
   ~BalsaParser() override = default;
 
   // Http1::Parser implementation
-  size_t execute(const char* slice, int len) override;
+  size_t execute(const char* slice, size_t len) override;
   void resume() override;
   CallbackResult pause() override;
   ParserStatus getStatus() const override;

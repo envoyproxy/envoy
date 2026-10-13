@@ -20,6 +20,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_no_op",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_stop_and_buffer",
+        "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_terminal_response",
     ],
     rbe_pool = "linux_x64_small",
     deps = [

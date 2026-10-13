@@ -369,7 +369,7 @@ public:
 
   void log(LogLevel level, std::string_view message, std::source_location location) override {
     const std::string_view source_file(location.file_name());
-    envoy_dynamic_module_callback_log(
+    envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
         envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
@@ -424,7 +424,7 @@ private:
   const envoy_dynamic_module_type_listener_filter_envoy_ptr host_plugin_ptr_ = nullptr;
 };
 
-class ListenerFilterConfigHandleImpl : public ListenerFilterConfigHandle {
+class ListenerFilterConfigHandleImpl : public CommonHandleImpl<ListenerFilterConfigHandle> {
 public:
   explicit ListenerFilterConfigHandleImpl(
       envoy_dynamic_module_type_listener_filter_config_envoy_ptr host_config_ptr)
@@ -471,7 +471,7 @@ public:
 
   void log(LogLevel level, std::string_view message, std::source_location location) override {
     const std::string_view source_file(location.file_name());
-    envoy_dynamic_module_callback_log(
+    envoy_dynamic_module_callback_log_v2(
         static_cast<envoy_dynamic_module_type_log_level>(level),
         envoy_dynamic_module_type_module_buffer{message.data(), message.size()},
         envoy_dynamic_module_type_module_buffer{source_file.data(), source_file.size()},
@@ -497,115 +497,141 @@ envoy_dynamic_module_type_listener_filter_config_module_ptr
 envoy_dynamic_module_on_listener_filter_config_new(
     envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
-  auto config_handle = std::make_unique<ListenerFilterConfigHandleImpl>(filter_config_envoy_ptr);
-  const std::string_view name_view(name.ptr, name.length);
-  const std::string_view config_view(config.ptr, config.length);
+  return failClosed(
+      "envoy_dynamic_module_on_listener_filter_config_new", nullptr,
+      [&]() -> envoy_dynamic_module_type_listener_filter_config_module_ptr {
+        auto config_handle =
+            std::make_unique<ListenerFilterConfigHandleImpl>(filter_config_envoy_ptr);
+        const std::string_view name_view(name.ptr, name.length);
+        const std::string_view config_view(config.ptr, config.length);
 
-  auto config_factory = ListenerFilterConfigFactoryRegistry::getRegistry().find(name_view);
-  if (config_factory == ListenerFilterConfigFactoryRegistry::getRegistry().end()) {
-    DYM_LOG((*config_handle), LogLevel::Warn,
-            "Listener plugin config factory not found for name: {}", name_view);
-    return nullptr;
-  }
+        auto config_factory = ListenerFilterConfigFactoryRegistry::getRegistry().find(name_view);
+        if (config_factory == ListenerFilterConfigFactoryRegistry::getRegistry().end()) {
+          DYM_LOG((*config_handle), LogLevel::Warn,
+                  "Listener plugin config factory not found for name: {}", name_view);
+          return nullptr;
+        }
 
-  auto plugin_factory = config_factory->second->create(*config_handle, config_view);
-  if (!plugin_factory) {
-    DYM_LOG((*config_handle), LogLevel::Warn,
-            "Failed to create listener plugin factory for name: {}", name_view);
-    return nullptr;
-  }
+        auto plugin_factory = config_factory->second->create(*config_handle, config_view);
+        if (!plugin_factory) {
+          DYM_LOG((*config_handle), LogLevel::Warn,
+                  "Failed to create listener plugin factory for name: {}", name_view);
+          return nullptr;
+        }
 
-  auto factory = std::make_unique<ListenerFilterFactoryWrapper>();
-  factory->config_handle_ = std::move(config_handle);
-  factory->factory_ = std::move(plugin_factory);
-  return wrapPointer(factory.release());
+        auto factory = std::make_unique<ListenerFilterFactoryWrapper>();
+        factory->config_handle_ = std::move(config_handle);
+        factory->factory_ = std::move(plugin_factory);
+        return wrapPointer(factory.release());
+      });
 }
 
 void envoy_dynamic_module_on_listener_filter_config_destroy(
     envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_ptr) {
-  auto* factory_wrapper = unwrapPointer<ListenerFilterFactoryWrapper>(filter_config_ptr);
-  if (factory_wrapper == nullptr) {
-    return;
-  }
-  if (factory_wrapper->factory_) {
-    factory_wrapper->factory_->onDestroy();
-  }
-  delete factory_wrapper;
+  failClosedVoid("envoy_dynamic_module_on_listener_filter_config_destroy", [&]() {
+    auto* factory_wrapper = unwrapPointer<ListenerFilterFactoryWrapper>(filter_config_ptr);
+    if (factory_wrapper == nullptr) {
+      return;
+    }
+    if (factory_wrapper->factory_) {
+      factory_wrapper->factory_->onDestroy();
+    }
+    delete factory_wrapper;
+  });
 }
 
 envoy_dynamic_module_type_listener_filter_module_ptr envoy_dynamic_module_on_listener_filter_new(
     envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_ptr,
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr) {
-  auto* factory_wrapper = unwrapPointer<ListenerFilterFactoryWrapper>(filter_config_ptr);
-  if (factory_wrapper == nullptr) {
-    return nullptr;
-  }
+  return failClosed(
+      "envoy_dynamic_module_on_listener_filter_new", nullptr,
+      [&]() -> envoy_dynamic_module_type_listener_filter_module_ptr {
+        auto* factory_wrapper = unwrapPointer<ListenerFilterFactoryWrapper>(filter_config_ptr);
+        if (factory_wrapper == nullptr) {
+          return nullptr;
+        }
 
-  auto plugin_handle = std::make_unique<ListenerFilterHandleImpl>(filter_envoy_ptr);
-  auto plugin = factory_wrapper->factory_->create(*plugin_handle);
-  if (!plugin) {
-    DYM_LOG((*plugin_handle), LogLevel::Warn, "Failed to create listener plugin instance");
-    return nullptr;
-  }
-  plugin_handle->plugin_ = std::move(plugin);
-  return wrapPointer(plugin_handle.release());
+        auto plugin_handle = std::make_unique<ListenerFilterHandleImpl>(filter_envoy_ptr);
+        auto plugin = factory_wrapper->factory_->create(*plugin_handle);
+        if (!plugin) {
+          DYM_LOG((*plugin_handle), LogLevel::Warn, "Failed to create listener plugin instance");
+          return nullptr;
+        }
+        plugin_handle->plugin_ = std::move(plugin);
+        return wrapPointer(plugin_handle.release());
+      });
 }
 
 envoy_dynamic_module_type_on_listener_filter_status
 envoy_dynamic_module_on_listener_filter_on_accept(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return envoy_dynamic_module_type_on_listener_filter_status_Continue;
-  }
-  return static_cast<envoy_dynamic_module_type_on_listener_filter_status>(
-      plugin_handle->plugin_->onAccept());
+  return failClosed("envoy_dynamic_module_on_listener_filter_on_accept",
+                    envoy_dynamic_module_type_on_listener_filter_status_StopIteration, [&]() {
+                      static_cast<void>(filter_envoy_ptr);
+                      auto* plugin_handle =
+                          unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
+                      if (!plugin_handle) {
+                        return envoy_dynamic_module_type_on_listener_filter_status_Continue;
+                      }
+                      return static_cast<envoy_dynamic_module_type_on_listener_filter_status>(
+                          plugin_handle->plugin_->onAccept());
+                    });
 }
 
 envoy_dynamic_module_type_on_listener_filter_status envoy_dynamic_module_on_listener_filter_on_data(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, size_t data_length) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return envoy_dynamic_module_type_on_listener_filter_status_Continue;
-  }
-  return static_cast<envoy_dynamic_module_type_on_listener_filter_status>(
-      plugin_handle->plugin_->onData(data_length));
+  return failClosed("envoy_dynamic_module_on_listener_filter_on_data",
+                    envoy_dynamic_module_type_on_listener_filter_status_StopIteration, [&]() {
+                      static_cast<void>(filter_envoy_ptr);
+                      auto* plugin_handle =
+                          unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
+                      if (!plugin_handle) {
+                        return envoy_dynamic_module_type_on_listener_filter_status_Continue;
+                      }
+                      return static_cast<envoy_dynamic_module_type_on_listener_filter_status>(
+                          plugin_handle->plugin_->onData(data_length));
+                    });
 }
 
 void envoy_dynamic_module_on_listener_filter_on_close(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return;
-  }
-  plugin_handle->plugin_->onClose();
+  failClosedVoid("envoy_dynamic_module_on_listener_filter_on_close", [&]() {
+    static_cast<void>(filter_envoy_ptr);
+    auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
+    if (!plugin_handle) {
+      return;
+    }
+    plugin_handle->plugin_->onClose();
+  });
 }
 
 size_t envoy_dynamic_module_on_listener_filter_get_max_read_bytes(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return 0;
-  }
-  return plugin_handle->plugin_->maxReadBytes();
+  return failClosed(
+      "envoy_dynamic_module_on_listener_filter_get_max_read_bytes", size_t{0}, [&]() -> size_t {
+        static_cast<void>(filter_envoy_ptr);
+        auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
+        if (!plugin_handle) {
+          return 0;
+        }
+        return plugin_handle->plugin_->maxReadBytes();
+      });
 }
 
 void envoy_dynamic_module_on_listener_filter_destroy(
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr) {
-  auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return;
-  }
-  plugin_handle->plugin_->onDestroy();
-  delete plugin_handle;
+  failClosedVoid("envoy_dynamic_module_on_listener_filter_destroy", [&]() {
+    auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
+    if (!plugin_handle) {
+      return;
+    }
+    plugin_handle->plugin_->onDestroy();
+    delete plugin_handle;
+  });
 }
 
 void envoy_dynamic_module_on_listener_filter_http_callout_done(
@@ -614,46 +640,52 @@ void envoy_dynamic_module_on_listener_filter_http_callout_done(
     envoy_dynamic_module_type_http_callout_result result,
     envoy_dynamic_module_type_envoy_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_chunks, size_t body_chunks_size) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle) {
-    return;
-  }
+  failClosedVoid("envoy_dynamic_module_on_listener_filter_http_callout_done", [&]() {
+    static_cast<void>(filter_envoy_ptr);
+    auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
+    if (!plugin_handle) {
+      return;
+    }
 
-  auto it = plugin_handle->callout_callbacks_.find(callout_id);
-  if (it == plugin_handle->callout_callbacks_.end()) {
-    return;
-  }
+    auto it = plugin_handle->callout_callbacks_.find(callout_id);
+    if (it == plugin_handle->callout_callbacks_.end()) {
+      return;
+    }
 
-  auto* callback = it->second;
-  plugin_handle->callout_callbacks_.erase(it);
-  callback->onHttpCalloutDone(static_cast<HttpCalloutResult>(result),
-                              {reinterpret_cast<HeaderView*>(headers), headers_size},
-                              {reinterpret_cast<BufferView*>(body_chunks), body_chunks_size});
+    auto* callback = it->second;
+    plugin_handle->callout_callbacks_.erase(it);
+    callback->onHttpCalloutDone(static_cast<HttpCalloutResult>(result),
+                                {reinterpret_cast<HeaderView*>(headers), headers_size},
+                                {reinterpret_cast<BufferView*>(body_chunks), body_chunks_size});
+  });
 }
 
 void envoy_dynamic_module_on_listener_filter_scheduled(
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_listener_filter_module_ptr filter_module_ptr, uint64_t event_id) {
-  static_cast<void>(filter_envoy_ptr);
-  auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
-  if (!plugin_handle || !plugin_handle->scheduler_) {
-    return;
-  }
-  plugin_handle->scheduler_->onScheduled(event_id);
+  failClosedVoid("envoy_dynamic_module_on_listener_filter_scheduled", [&]() {
+    static_cast<void>(filter_envoy_ptr);
+    auto* plugin_handle = unwrapPointer<ListenerFilterHandleImpl>(filter_module_ptr);
+    if (!plugin_handle || !plugin_handle->scheduler_) {
+      return;
+    }
+    plugin_handle->scheduler_->onScheduled(event_id);
+  });
 }
 
 void envoy_dynamic_module_on_listener_filter_config_scheduled(
     envoy_dynamic_module_type_listener_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_listener_filter_config_module_ptr filter_config_ptr,
     uint64_t event_id) {
-  static_cast<void>(filter_config_envoy_ptr);
-  auto* factory_wrapper = unwrapPointer<ListenerFilterFactoryWrapper>(filter_config_ptr);
-  if (factory_wrapper == nullptr || factory_wrapper->config_handle_ == nullptr ||
-      factory_wrapper->config_handle_->scheduler_ == nullptr) {
-    return;
-  }
-  factory_wrapper->config_handle_->scheduler_->onScheduled(event_id);
+  failClosedVoid("envoy_dynamic_module_on_listener_filter_config_scheduled", [&]() {
+    static_cast<void>(filter_config_envoy_ptr);
+    auto* factory_wrapper = unwrapPointer<ListenerFilterFactoryWrapper>(filter_config_ptr);
+    if (factory_wrapper == nullptr || factory_wrapper->config_handle_ == nullptr ||
+        factory_wrapper->config_handle_->scheduler_ == nullptr) {
+      return;
+    }
+    factory_wrapper->config_handle_->scheduler_->onScheduled(event_id);
+  });
 }
 
 } // extern "C"

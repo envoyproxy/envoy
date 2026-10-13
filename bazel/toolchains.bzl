@@ -1,13 +1,21 @@
-load("@envoy_repo//:compiler.bzl", "LLVM_LIB_DIR", "LLVM_PATH", "LLVM_VERSION_LOCAL", "USE_LIBSTDCPP")
+load("@envoy_repo//:compiler.bzl", _USE_LIBSTDCPP = "USE_LIBSTDCPP")
+load(
+    "@llvm_toolchain_llvm//:llvm.bzl",
+    _LLVM_IS_HOST = "LLVM_IS_HOST",
+    _LLVM_LIB_DIR = "LLVM_LIB_DIR",
+    _LLVM_MAJOR = "LLVM_MAJOR",
+    _LLVM_MAJOR_MINOR = "LLVM_MAJOR_MINOR",
+    _LLVM_VERSION = "LLVM_VERSION",
+)
 
-_LLVM_VERSION_HERMETIC = "22.1.8"
-LLVM_VERSION = LLVM_VERSION_LOCAL if LLVM_VERSION_LOCAL else _LLVM_VERSION_HERMETIC
-LLVM_MAJOR = LLVM_VERSION.split(".")[0]
-LLVM_MAJOR_MINOR = ".".join(LLVM_VERSION.split(".")[:2])
+LLVM_IS_HOST = _LLVM_IS_HOST
+LLVM_LIB_DIR = _LLVM_LIB_DIR
+LLVM_MAJOR = _LLVM_MAJOR
+LLVM_MAJOR_MINOR = _LLVM_MAJOR_MINOR
+LLVM_VERSION = _LLVM_VERSION
+USE_LIBSTDCPP = _USE_LIBSTDCPP
 
-_LLVM_LIB_PREFIX = LLVM_LIB_DIR if LLVM_PATH else "lib"
-LIBCLANG_CPP = "@llvm_toolchain_llvm//:" + _LLVM_LIB_PREFIX + "/libclang-cpp.so." + LLVM_MAJOR_MINOR
+LIBCLANG_CPP = "@llvm_toolchain_llvm//:%s/libclang-cpp.so.%s" % (LLVM_LIB_DIR, LLVM_MAJOR_MINOR)
 
-# On distro-packaged LLVM, libclang-cpp.so dynamically links against libLLVM.so
-# (they're split). The hermetic LLVM bundles everything into libclang-cpp.so.
-LIBLLVM = ("@llvm_toolchain_llvm//:" + _LLVM_LIB_PREFIX + "/libLLVM.so." + LLVM_MAJOR_MINOR) if LLVM_PATH else None
+# Distro-packaged LLVM splits libLLVM.so out of libclang-cpp.so; the hermetic bundle folds it in.
+LIBLLVM = ("@llvm_toolchain_llvm//:%s/libLLVM.so.%s" % (LLVM_LIB_DIR, LLVM_MAJOR_MINOR)) if LLVM_IS_HOST else None

@@ -2796,7 +2796,7 @@ TEST_F(ConnectionHandlerTest, HotRestartShutdownUdpListenerKeepsListening) {
 
   // A packet of an unregistered session is forwarded instead of being dropped by a shut down
   // listener or delivered locally.
-  EXPECT_CALL(packet_handler, handle(0, _));
+  EXPECT_CALL(packet_handler, handle(0, _, _));
   EXPECT_CALL(*filter_ptr, onData(_)).Times(0);
   Network::UdpRecvData data;
   data.addresses_.local_ = local_address_;

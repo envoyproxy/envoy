@@ -1,16 +1,20 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
+    extension_names = ["envoy.upstreams.http.udp"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/http:protocol_interface",
@@ -35,9 +39,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_names = ["envoy.upstreams.http.udp"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/upstreams/http/udp:config",

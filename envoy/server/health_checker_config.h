@@ -59,6 +59,11 @@ public:
   virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
+   * @return HealthFlagCallbacks& callbacks for health flag operations on hosts.
+   */
+  virtual Upstream::HealthFlagCallbacks& healthFlagCallbacks() PURE;
+
+  /**
    * Set the event logger to the context, nullptr is accepted since
    * the default in the context is nullptr.
    * @param event_logger the health check event logger.

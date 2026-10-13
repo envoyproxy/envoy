@@ -128,6 +128,14 @@ public:
         typed_config:
            "@type": "type.googleapis.com/envoy.extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config"
     )EOF"};
+  const std::string ignore_request_cache_control_config{R"EOF(
+    name: "envoy.filters.http.cache_v2"
+    typed_config:
+        "@type": "type.googleapis.com/envoy.extensions.filters.http.cache_v2.v3.CacheV2Config"
+        typed_config:
+           "@type": "type.googleapis.com/envoy.extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config"
+        ignore_request_cache_control_header: true
+    )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   OptRef<const std::string> no_body_;
   OptRef<const Http::TestResponseTrailerMapImpl> no_trailers_;
@@ -175,6 +183,85 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
                 HasSubstr("RFCF cache.response_from_cache_filter"));
   }
+}
+
+TEST_P(CacheIntegrationTest, RequestNoStoreDoesNotInsert) {
+  initializeFilter(default_config);
+  Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", "RequestNoStoreDoesNotInsert");
+  request_headers.addCopy(Http::CustomHeaders::get().CacheControl, "no-store");
+  const std::string response_body = "must not be stored";
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
+
+  IntegrationStreamDecoderPtr response = sendHeaderOnlyRequestAwaitResponse(
+      request_headers,
+      simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
+  EXPECT_EQ(response->body(), response_body);
+  // Uncacheable pass-through logs " via_upstream". Do not match "via_upstream" alone;
+  // that substring also appears in cache.insert_via_upstream.
+  ASSERT_THAT(waitForAccessLog(access_log_name_),
+              AllOf(HasSubstr(" via_upstream"), Not(HasSubstr("cache.insert_via_upstream"))));
+
+  // Removing no-store must not serve the previous response from cache. The
+  // in-memory session for this key stays uncacheable, so this request is also a
+  // pass-through rather than an insert.
+  request_headers.remove(Http::CustomHeaders::get().CacheControl);
+  const std::string next_body = "fresh upstream response";
+  Http::TestResponseHeaderMapImpl next_headers = httpResponseHeadersForBody(next_body);
+  IntegrationStreamDecoderPtr next_response = sendHeaderOnlyRequestAwaitResponse(
+      request_headers, simulateUpstreamResponse(next_headers, makeOptRef(next_body), no_trailers_));
+  EXPECT_EQ(next_response->body(), next_body);
+  // Advance simulated time to flush the second access log entry.
+  simTime().advanceTimeWait(Seconds(1));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
+              AllOf(HasSubstr(" via_upstream"), Not(HasSubstr("cache.response_from_cache_filter")),
+                    Not(HasSubstr("cache.insert_via_upstream"))));
+}
+
+TEST_P(CacheIntegrationTest, IgnoringRequestCacheControlAllowsNoStoreInsert) {
+  initializeFilter(ignore_request_cache_control_config);
+  Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", "IgnoringRequestCacheControlAllowsNoStoreInsert");
+  request_headers.addCopy(Http::CustomHeaders::get().CacheControl, "no-store");
+  const std::string response_body = "explicitly allowed to be stored";
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
+
+  IntegrationStreamDecoderPtr response = sendHeaderOnlyRequestAwaitResponse(
+      request_headers,
+      simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
+  EXPECT_EQ(response->body(), response_body);
+  ASSERT_THAT(waitForAccessLog(access_log_name_), HasSubstr("cache.insert_via_upstream"));
+
+  IntegrationStreamDecoderPtr cached_response =
+      sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
+  EXPECT_EQ(cached_response->body(), response_body);
+  // Advance simulated time to flush the second access log entry.
+  simTime().advanceTimeWait(Seconds(1));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("cache.response_from_cache_filter"));
+}
+
+TEST_P(CacheIntegrationTest, RequestNoStoreCanReadExistingCacheEntry) {
+  // Request Cache-Control: no-store forbids storing this exchange; it does not
+  // prevent serving a response that was already in the cache.
+  initializeFilter(default_config);
+  Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", "RequestNoStoreCanReadExistingCacheEntry");
+  const std::string response_body = "previously cached response";
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
+
+  IntegrationStreamDecoderPtr response = sendHeaderOnlyRequestAwaitResponse(
+      request_headers,
+      simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
+  EXPECT_EQ(response->body(), response_body);
+  ASSERT_THAT(waitForAccessLog(access_log_name_), HasSubstr("cache.insert_via_upstream"));
+
+  request_headers.addCopy(Http::CustomHeaders::get().CacheControl, "no-store");
+  IntegrationStreamDecoderPtr cached_response =
+      sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
+  EXPECT_EQ(cached_response->body(), response_body);
+  // Advance simulated time to flush the second access log entry.
+  simTime().advanceTimeWait(Seconds(1));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("cache.response_from_cache_filter"));
 }
 
 TEST_P(CacheIntegrationTest, ParallelRequestsShareInsert) {

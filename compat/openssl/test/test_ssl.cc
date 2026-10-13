@@ -670,7 +670,6 @@ TEST(SSLTest, test_SSL_get_curve_name) {
   EXPECT_STREQ("P-521", SSL_get_curve_name(SSL_CURVE_SECP521R1));
   EXPECT_STREQ("X25519", SSL_get_curve_name(SSL_CURVE_X25519));
   EXPECT_STREQ("X25519MLKEM768", SSL_get_curve_name(SSL_GROUP_X25519_MLKEM768));
-  EXPECT_STREQ("X25519Kyber768Draft00", SSL_get_curve_name(SSL_GROUP_X25519_KYBER768_DRAFT00));
 }
 
 TEST(SSLTest, test_SSL_get_group_name) {
@@ -679,7 +678,6 @@ TEST(SSLTest, test_SSL_get_group_name) {
   EXPECT_STREQ("P-521", SSL_get_group_name(SSL_CURVE_SECP521R1));
   EXPECT_STREQ("X25519", SSL_get_group_name(SSL_CURVE_X25519));
   EXPECT_STREQ("X25519MLKEM768", SSL_get_group_name(SSL_GROUP_X25519_MLKEM768));
-  EXPECT_STREQ("X25519Kyber768Draft00", SSL_get_group_name(SSL_GROUP_X25519_KYBER768_DRAFT00));
 }
 
 struct Sigalgs {
@@ -986,6 +984,53 @@ TEST(SSLTest, test_SSL_set_chain_and_key) {
   }
 
   server.join();
+}
+
+TEST(SSLTest, test_SSL_CTX_use_PrivateKey_rejects_mismatched_key) {
+  static const char ec_key_pem_str[] = R"""(-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgYaVOdS9hbIFQie36
+RSm360v6DgYB+b/4/tEzFSYWjemhRANCAAQ5AnLARcrAxmDFO0+41L1Nw+EAXTDj
+PFQ4tz10wG0kw1Wh6tloaV+ei1ZBmdOI8igUST8Pc/FtQFDkF92E9OmK
+-----END PRIVATE KEY-----
+)""";
+
+  auto read_key = [](const char* pem_str) {
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(pem_str, strlen(pem_str)));
+    return bssl::UniquePtr<EVP_PKEY>(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  };
+
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_server_method()));
+  ASSERT_TRUE(ctx);
+
+  bssl::UniquePtr<BIO> cert_bio(
+      BIO_new_mem_buf(server_1_cert_pem_str, strlen(server_1_cert_pem_str)));
+  bssl::UniquePtr<X509> cert(PEM_read_bio_X509(cert_bio.get(), nullptr, nullptr, nullptr));
+  ASSERT_TRUE(cert);
+  ASSERT_EQ(1, SSL_CTX_use_certificate(ctx.get(), cert.get()));
+
+  // An EC key does not match the RSA certificate. OpenSSL would otherwise accept
+  // it into a separate slot, leaving SSL_CTX_get0_certificate() returning nullptr.
+  bssl::UniquePtr<EVP_PKEY> ec_key = read_key(ec_key_pem_str);
+  ASSERT_TRUE(ec_key);
+  EXPECT_EQ(0, SSL_CTX_use_PrivateKey(ctx.get(), ec_key.get()));
+  ASSERT_NE(nullptr, SSL_CTX_get0_certificate(ctx.get()));
+  EXPECT_EQ(0, X509_cmp(cert.get(), SSL_CTX_get0_certificate(ctx.get())));
+  ERR_clear_error();
+
+  // An RSA key that belongs to a different certificate is also rejected.
+  bssl::UniquePtr<EVP_PKEY> other_rsa_key = read_key(server_2_key_pem_str);
+  ASSERT_TRUE(other_rsa_key);
+  EXPECT_EQ(0, SSL_CTX_use_PrivateKey(ctx.get(), other_rsa_key.get()));
+  ASSERT_NE(nullptr, SSL_CTX_get0_certificate(ctx.get()));
+  EXPECT_EQ(0, X509_cmp(cert.get(), SSL_CTX_get0_certificate(ctx.get())));
+  ERR_clear_error();
+
+  // The matching key is accepted.
+  bssl::UniquePtr<EVP_PKEY> rsa_key = read_key(server_1_key_pem_str);
+  ASSERT_TRUE(rsa_key);
+  EXPECT_EQ(1, SSL_CTX_use_PrivateKey(ctx.get(), rsa_key.get()));
+  ASSERT_NE(nullptr, SSL_CTX_get0_certificate(ctx.get()));
+  EXPECT_EQ(0, X509_cmp(cert.get(), SSL_CTX_get0_certificate(ctx.get())));
 }
 
 TEST(SSLTest, test_SSL_SESSION_from_bytes) {

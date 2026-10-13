@@ -749,6 +749,46 @@ TEST(LeafAwaitableTest, CancellationDuringTryImmediatePreservesResultAndSubseque
   EXPECT_TRUE(absl::IsCancelled(*final_status));
 }
 
+class SyncOnStartLeaf : public LeafAwaitable<absl::StatusOr<int>> {
+public:
+  explicit SyncOnStartLeaf(int val) : val_(val) {}
+
+protected:
+  void onStart() override {
+    started_ = true;
+    complete(val_);
+  }
+  void onCancel() override {}
+
+public:
+  int val_;
+  bool started_ = false;
+};
+
+TEST(LeafAwaitableTest, SynchronousCompleteInsideOnStartResumesCleanly) {
+  auto exec = std::make_shared<ManualExecutor>();
+  int sum = 0;
+
+  // Awaiting many leaves that call complete() synchronously inside onStart() must return false
+  // from await_suspend() and resume on the caller frame without stack overflow or undefined
+  // behavior.
+  auto coro = [&]() -> Task<absl::Status> {
+    for (int i = 1; i <= 1000; ++i) {
+      SyncOnStartLeaf leaf(i);
+      ASSIGN_OR_CO_RETURN(int val, co_await leaf);
+      EXPECT_TRUE(leaf.started_);
+      sum += val;
+    }
+    co_return absl::OkStatus();
+  };
+
+  absl::Status final_status = absl::UnknownError("not finished");
+  DetachedHandle handle = launch(
+      coro(), exec, [&final_status](absl::Status s) { final_status = s; }, StartMode::Inline);
+  EXPECT_OK(final_status);
+  EXPECT_EQ(sum, 1000 * 1001 / 2);
+}
+
 } // namespace
 } // namespace Coroutine
 } // namespace Envoy

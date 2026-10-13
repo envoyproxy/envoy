@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <memory>
 #include <stack>
 #include <string>
@@ -15,6 +16,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/stats/recent_lookups.h"
 
+#include "absl/base/attributes.h"
 #include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/inlined_vector.h"
@@ -97,6 +99,46 @@ public:
   using StoragePtr = std::unique_ptr<Storage>;
 
   /**
+   * Storage for a stat-name assembled on the fly, e.g. by inlineJoin(). The bytes are held
+   * inline unless they don't fit, in which case they spill onto the heap, so the common case
+   * of a short name costs no allocation.
+   *
+   * WARNING: The bytes live in this object, so statName() must not outlive it, and a StatName
+   * fetched before a move does not refer to the moved-to object's bytes; call statName() again
+   * after a move.
+   */
+  struct InlineStorage {
+    /**
+     * @return the assembled name, or an empty name if nothing has been assembled yet.
+     */
+    inline StatName statName() const;
+
+    /**
+     * Determines whether any of stat_names is backed by the bytes this storage owns. Assembling
+     * into this storage overwrites its inline bytes as it goes, and replacing the storage
+     * releases its heap buffer, so such a name is a self-overlapping copy or a use-after-free,
+     * and the caller must assemble into a different destination.
+     *
+     * @param stat_names the names about to be joined into this storage.
+     * @return whether any of them aliases this storage.
+     */
+    inline bool checkStatNameOverlaps(absl::Span<const StatName> stat_names) const;
+
+  private:
+    // The bytes are assembled only by the SymbolTable, e.g. by inlineJoin(); everyone else
+    // reads the result through statName().
+    friend class SymbolTable;
+
+    // Names longer than this spill into a heap allocation. This covers the names Envoy
+    // assembles on hot paths, whose tokens are typically one byte each, while keeping the
+    // object small enough to be a cheap stack temporary.
+    static constexpr size_t InlineCapacity = 24;
+
+    uint8_t inline_[InlineCapacity] = {0};
+    StoragePtr heap_ = nullptr;
+  };
+
+  /**
    * Intermediate representation for a stat-name. This helps store multiple
    * names in a single packed allocation. First we encode each desired name,
    * then sum their sizes for the single packed allocation. This is used to
@@ -159,7 +201,14 @@ public:
      * @param number A number to encode in a variable length byte-array.
      * @return The number of bytes it would take to encode the number.
      */
-    static size_t encodingSizeBytes(uint64_t number);
+    ABSL_ATTRIBUTE_ALWAYS_INLINE static size_t encodingSizeBytes(uint64_t number) {
+      size_t num_bytes = 0;
+      do {
+        ++num_bytes;
+        number >>= 7;
+      } while (number != 0);
+      return num_bytes;
+    }
 
     /**
      * @param num_data_bytes The number of bytes in a data-block.
@@ -212,6 +261,25 @@ public:
         number |= (uc & Low7Bits) << shift;
       }
       return std::make_pair(number, encoding - start);
+    }
+
+    /**
+     * As above, but writes into a raw buffer, which must have room for
+     * encodingSizeBytes(number) bytes.
+     *
+     * Defined inline in the header so that callers assembling a name in place write the bytes
+     * straight into their destination, rather than through a temporary.
+     *
+     * @param number the number to write.
+     * @param p the buffer to write into.
+     * @return the first byte past the encoding.
+     */
+    static uint8_t* appendEncoding(uint64_t number, uint8_t* p) {
+      do {
+        *p++ = (number < (1 << 7)) ? number : ((number & Low7Bits) | SpilloverMask);
+        number >>= 7;
+      } while (number != 0);
+      return p;
     }
 
     // Masks used for variable-length encoding of arbitrary-sized integers into a
@@ -305,6 +373,46 @@ public:
    * @return Storage allocated for the joined name.
    */
   StoragePtr join(absl::Span<const StatName> stat_names) const;
+
+  /**
+   * Joins two or more StatNames into a buffer held by the returned object, which is normally
+   * inline, so that no heap allocation is needed for the common case of a short joined name.
+   * The joined bytes are identical to those produced by join().
+   *
+   * This is for joins whose result is consumed locally -- looking up or creating a stat in a
+   * scope, say -- where the storage never needs to be stored or handed to anyone else:
+   *
+   *   scope.counterFromStatName(symbol_table.inlineJoin({prefix, name}).statName()).inc();
+   *
+   * The returned name points into the returned storage, so see the warning on InlineStorage
+   * before doing anything with it other than consuming it in the same expression. Use
+   * StatNameJoiner when the joined bytes must outlive the joining expression, or join() when
+   * their ownership must be transferred.
+   *
+   * As with join(), this does not bump reference counts on the referenced Symbols, so the
+   * result is only valid for the lifetime of the joined StatNames.
+   *
+   * @param stat_names the names to join.
+   * @return storage holding the joined name.
+   */
+  ABSL_ATTRIBUTE_ALWAYS_INLINE inline InlineStorage
+  inlineJoin(absl::Span<const StatName> stat_names) const;
+
+  /**
+   * As above, but assembles the joined name into caller-provided storage, replacing whatever it
+   * held. This is for a destination that outlives the call and is joined into repeatedly, where
+   * returning by value would cost a copy: the bytes land at runtime-varying offsets, so the
+   * compiler cannot fold the returned object into an assignment the way it folds it into an
+   * initialization.
+   *
+   * WARNING: stat_names must not alias storage, i.e., it must not contain the name storage
+   * currently holds.
+   *
+   * @param stat_names the names to join.
+   * @param storage the destination to assemble into.
+   */
+  ABSL_ATTRIBUTE_ALWAYS_INLINE inline void inlineJoin(absl::Span<const StatName> stat_names,
+                                                      InlineStorage& storage) const;
 
   /**
    * Populates a StatNameList from a list of encodings. This is not done at
@@ -412,6 +520,14 @@ public:
   }
 
 private:
+  /**
+   * Builds the joined name of stat_names, whose data occupies num_bytes, on the heap. Shared by
+   * join() and by inlineJoin()'s spill path, which has already measured the names and would
+   * otherwise have to measure them again.
+   */
+  ABSL_ATTRIBUTE_ALWAYS_INLINE inline StoragePtr heapJoin(absl::Span<const StatName> stat_names,
+                                                          size_t num_bytes) const;
+
   friend class StatName;
   friend class StatNameTest;
   friend class StatNameDeathTest;
@@ -742,6 +858,81 @@ private:
   const uint8_t* size_and_data_;
 };
 
+// Always inlined so that join() and inlineJoin()'s spill path each build the name directly
+// rather than paying a call to reach it.
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline SymbolTable::StoragePtr
+SymbolTable::heapJoin(absl::Span<const StatName> stat_names, size_t num_bytes) const {
+  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
+  Encoding::appendEncoding(num_bytes, mem_block);
+  for (StatName stat_name : stat_names) {
+    stat_name.appendDataToMemBlock(mem_block);
+  }
+  ASSERT(mem_block.capacityRemaining() == 0);
+  return mem_block.release();
+}
+
+// Both overloads are always inlined: assembling the name straight into its destination is the
+// whole point, and left out-of-line the caller has to zero a temporary, call, and read the bytes
+// back out of it.
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline void
+SymbolTable::inlineJoin(absl::Span<const StatName> stat_names, InlineStorage& storage) const {
+  ASSERT(!storage.checkStatNameOverlaps(stat_names),
+         "stat_names should not contain name overlapping with the storage");
+
+  size_t num_bytes = 0;
+  for (StatName stat_name : stat_names) {
+    num_bytes += stat_name.dataSize();
+  }
+  const size_t total_bytes = Encoding::totalSizeBytes(num_bytes);
+
+  if (total_bytes > InlineStorage::InlineCapacity) {
+    // Too long for the inline buffer, so spill onto the heap.
+    storage.heap_ = heapJoin(stat_names, num_bytes);
+    storage.inline_[0] = 0;
+    return;
+  }
+
+  uint8_t* p = Encoding::appendEncoding(num_bytes, storage.inline_);
+  for (StatName stat_name : stat_names) {
+    const size_t nbytes = stat_name.dataSize();
+    memcpy(p, stat_name.data(), nbytes); // NOLINT(safe-memcpy)
+    p += nbytes;
+  }
+  storage.heap_ = nullptr;
+  ASSERT(p == storage.inline_ + total_bytes);
+}
+
+ABSL_ATTRIBUTE_ALWAYS_INLINE inline SymbolTable::InlineStorage
+SymbolTable::inlineJoin(absl::Span<const StatName> stat_names) const {
+  InlineStorage storage;
+  inlineJoin(stat_names, storage);
+  return storage;
+}
+
+StatName SymbolTable::InlineStorage::statName() const {
+  // A zero first byte means a zero-length name, which is what unassembled storage holds and
+  // also what an assembled empty name encodes; StatName() has those same bytes, so the two
+  // cases need not be told apart.
+  if (heap_ != nullptr) {
+    return StatName(heap_.get());
+  }
+  if (inline_[0] != 0) {
+    return StatName(inline_);
+  }
+  return {};
+}
+
+bool SymbolTable::InlineStorage::checkStatNameOverlaps(
+    absl::Span<const StatName> stat_names) const {
+  for (StatName stat_name : stat_names) {
+    const uint8_t* begin = stat_name.dataIncludingSize();
+    if (begin == inline_ || begin == heap_.get()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 StatName StatNameStorageBase::statName() const { return StatName(bytes_.get()); }
 
 /**
@@ -786,8 +977,9 @@ private:
  * storage is allocated and statName() references the caller's name directly. Callers must
  * therefore keep the joined names valid for the lifetime of this object.
  *
- * Movable but not copyable: the joined bytes live on the heap, so a move transfers ownership
- * without invalidating statName(). Copying would mean duplicating that storage.
+ * NOTE: neither copyable nor movable. statName() points at bytes held inside this object (see
+ * SymbolTable::InlineStorage), so relocating the joiner would dangle every StatName already taken
+ * from it. This is designed to assemble a temporary stat name and should be kept on the stack.
  */
 class StatNameJoiner {
 public:
@@ -795,31 +987,26 @@ public:
   StatNameJoiner(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table) {
     join(stat_names, symbol_table);
   }
-  StatNameJoiner(StatNameJoiner&& other) noexcept
-      : storage_(std::move(other.storage_)), stat_name_(other.stat_name_) {
-    other.stat_name_ = StatName();
-  }
-  StatNameJoiner& operator=(StatNameJoiner&& other) noexcept {
-    if (this != &other) {
-      storage_ = std::move(other.storage_);
-      stat_name_ = other.stat_name_;
-      other.stat_name_ = StatName();
-    }
-    return *this;
-  }
+
+  // Not copyable or movable.
   StatNameJoiner(const StatNameJoiner&) = delete;
   StatNameJoiner& operator=(const StatNameJoiner&) = delete;
+  StatNameJoiner(StatNameJoiner&&) = delete;
+  StatNameJoiner& operator=(StatNameJoiner&&) = delete;
 
   /**
    * Joins stat_names, replacing any previously joined value. stat_names is consumed here and never
    * retained, so it is safe to pass a braced initializer list.
+   *
+   * WARNING: stat_names must not contain the name this StatNameJoiner currently holds to avoid
+   * a use-after-free or self-overlapping copy.
    */
   void join(absl::Span<const StatName> stat_names, const SymbolTable& symbol_table);
 
   StatName statName() const { return stat_name_; }
 
 private:
-  SymbolTable::StoragePtr storage_;
+  SymbolTable::InlineStorage storage_;
   StatName stat_name_;
 };
 

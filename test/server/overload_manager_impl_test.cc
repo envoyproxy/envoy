@@ -14,6 +14,7 @@
 #include "source/server/overload_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -33,11 +34,14 @@ using testing::ByMove;
 using testing::DoAll;
 using testing::FloatNear;
 using testing::Invoke;
+using testing::IsNull;
 using testing::NiceMock;
+using testing::NotNull;
 using testing::Pointee;
 using testing::Property;
 using testing::Return;
 using testing::SaveArg;
+using testing::StrictMock;
 using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
@@ -45,6 +49,12 @@ namespace Server {
 namespace {
 
 using TimerType = Event::ScaledTimerType;
+
+class MockSynchronousFeedbackResourceMonitor : public SynchronousFeedbackResourceMonitor {
+public:
+  MOCK_METHOD(ResourceUsage, getResourceUsage, (), (override));
+  MOCK_METHOD(void, onLoadAccepted, (absl::string_view), (override));
+};
 
 class FakeResourceMonitor : public ResourceMonitor {
 public:
@@ -90,7 +100,7 @@ private:
   Event::Dispatcher& dispatcher_;
   absl::variant<double, absl::Status> response_;
   bool update_async_ = false;
-  std::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
+  OptRef<ResourceUpdateCallbacks> callbacks_;
 };
 
 class FakeProactiveResourceMonitor : public ProactiveResourceMonitor {
@@ -145,6 +155,34 @@ public:
   std::string name() const override { return name_; }
 
   FakeResourceMonitor* monitor_{nullptr}; // not owned
+  const std::string name_;
+};
+
+template <class ConfigType>
+class FakeSynchronousFeedbackResourceMonitorFactory
+    : public Server::Configuration::ResourceMonitorFactory {
+public:
+  FakeSynchronousFeedbackResourceMonitorFactory(const std::string& name) : name_(name) {}
+
+  absl::StatusOr<Server::ResourceMonitorPtr>
+  createResourceMonitor(const Protobuf::Message&,
+                        Server::Configuration::ResourceMonitorFactoryContext&) override {
+    if (!status_.ok()) {
+      return status_;
+    }
+    auto monitor = std::make_unique<StrictMock<MockSynchronousFeedbackResourceMonitor>>();
+    monitor_ = monitor.get();
+    return monitor;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ConfigType()};
+  }
+
+  std::string name() const override { return name_; }
+
+  StrictMock<MockSynchronousFeedbackResourceMonitor>* monitor_{nullptr}; // not owned
+  absl::Status status_{absl::OkStatus()};
   const std::string name_;
 };
 
@@ -208,9 +246,17 @@ protected:
         factory3_("envoy.resource_monitors.fake_resource3"),
         factory4_("envoy.resource_monitors.fake_resource4"),
         factory5_("envoy.resource_monitors.global_downstream_max_connections"),
+        sf_factory1_("envoy.resource_monitors.fake_synchronous_feedback_resource1"),
+        sf_factory2_("envoy.resource_monitors.fake_synchronous_feedback_resource2"),
         register_factory1_(factory1_), register_factory2_(factory2_), register_factory3_(factory3_),
         register_factory4_(factory4_), register_factory5_(factory5_),
-        api_(Api::createApiForTest(stats_)) {}
+        register_sf_factory1_(sf_factory1_), register_sf_factory2_(sf_factory2_),
+        api_(Api::createApiForTest(stats_)) {
+    ON_CALL(dispatcher_, createTimer_(_)).WillByDefault(Invoke([&](Event::TimerCb cb) {
+      timer_cb_ = cb;
+      return new NiceMock<Event::MockTimer>();
+    }));
+  }
 
   void setDispatcherExpectation() {
     timer_ = new NiceMock<Event::MockTimer>();
@@ -226,11 +272,16 @@ protected:
     return proto;
   }
 
-  std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
+  std::unique_ptr<TestOverloadManager>
+  createOverloadManager(const envoy::config::overload::v3::OverloadManager& config) {
     absl::Status creation_status = absl::OkStatus();
     return std::make_unique<TestOverloadManager>(dispatcher_, *stats_.rootScope(), thread_local_,
-                                                 parseConfig(config), validation_visitor_, *api_,
-                                                 options_, runtime_, creation_status);
+                                                 config, validation_visitor_, *api_, options_,
+                                                 runtime_, creation_status);
+  }
+
+  std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
+    return createOverloadManager(parseConfig(config));
   }
 
   FakeResourceMonitorFactory<Envoy::Protobuf::Struct> factory1_;
@@ -238,11 +289,15 @@ protected:
   FakeResourceMonitorFactory<Envoy::Protobuf::Duration> factory3_;
   FakeResourceMonitorFactory<Envoy::Protobuf::StringValue> factory4_;
   FakeProactiveResourceMonitorFactory<Envoy::Protobuf::BoolValue> factory5_;
+  FakeSynchronousFeedbackResourceMonitorFactory<Envoy::Protobuf::DoubleValue> sf_factory1_;
+  FakeSynchronousFeedbackResourceMonitorFactory<Envoy::Protobuf::Int64Value> sf_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory4_;
   Registry::InjectFactory<Configuration::ProactiveResourceMonitorFactory> register_factory5_;
+  Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_sf_factory1_;
+  Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_sf_factory2_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::TestUtil::TestStore stats_;
@@ -826,14 +881,15 @@ TEST_F(OverloadManagerImplTest, ShrinkHeapWithoutTypedConfig) {
   EXPECT_FALSE(config_opt.has_value());
 }
 
-TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutAction) {
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithoutTypedConfig) {
   const std::string config = R"EOF(
     actions:
       - name: "envoy.overload_actions.reduce_timeouts"
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Overload action \"envoy.overload_actions.reduce_timeouts\" requires typed_config");
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithWrongTypedConfigMessage) {
@@ -841,11 +897,26 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithWrongTypedConfigMessage) {
     actions:
       - name: "envoy.overload_actions.reduce_timeouts"
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Empty
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            key: value
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
-                          "Unable to unpack as .*ScaleTimersOverloadActionConfig");
+  EXPECT_THROW_WITH_MESSAGE(createOverloadManager(config), EnvoyException,
+                            "typed_config resolves to google.protobuf.Struct instead of "
+                            "envoy.config.overload.v3.ScaleTimersOverloadActionConfig");
+}
+
+TEST_F(OverloadManagerImplTest, ActionWithEmptyTypedConfigIsRejected) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(createOverloadManager(config), EnvoyException,
+                            "Overload action \"connection_idle_timeouts\" has an invalid "
+                            "typed_config: type_url is empty");
 }
 
 TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
@@ -858,6 +929,456 @@ TEST_F(OverloadManagerImplTest, ReduceTimeoutsWithNoTimersSpecified) {
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           ".* constraint validation failed.*");
+}
+
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithTypedStructConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          type_url: type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          value:
+            timer_scale_factors:
+              - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+                min_timeout: 1s
+  )EOF";
+
+  EXPECT_NO_THROW(createOverloadManager(config));
+}
+
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithLegacyTypedStructConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          value:
+            timer_scale_factors:
+              - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+                min_timeout: 1s
+  )EOF";
+
+  EXPECT_NO_THROW(createOverloadManager(config));
+}
+
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsWithMalformedTypedStructConfig) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          type_url: type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          value:
+            timer_scale_factors:
+              - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+                min_timeout: 1s
+  )EOF";
+
+  auto proto = parseConfig(config);
+  proto.mutable_actions(0)->mutable_typed_config()->set_value("malformed");
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(proto), EnvoyException,
+                          "Overload action \"connection_idle_timeouts\" has an invalid "
+                          "typed_config: Unable to unpack as xds.type.v3.TypedStruct");
+}
+
+TEST_F(OverloadManagerImplTest, NamedActionWithoutScaleTimersConfigIsRejected) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Unknown Overload Manager Action connection_idle_timeouts");
+}
+
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsCannotUseAnotherWellKnownActionName) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.stop_accepting_requests"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Overload action name \"envoy.overload_actions.stop_accepting_requests\" conflicts with its "
+      "typed config");
+}
+
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsCannotUseReservedActionName) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.custom_reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Overload action name \"envoy.overload_actions.custom_reduce_timeouts\" uses reserved prefix "
+      "\"envoy.overload_actions.\"");
+}
+
+TEST_F(OverloadManagerImplTest, OverloadActionCannotShareNameWithLoadShedPoint) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+    loadshed_points:
+      - name: "connection_idle_timeouts"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Load shed point \"connection_idle_timeouts\" conflicts with an overload action of the same "
+      "name");
+}
+
+TEST_F(OverloadManagerImplTest, ReduceTimeoutsTimerConfiguredByMultipleActions) {
+  const std::string config = R"EOF(
+    actions:
+      - name: "envoy.overload_actions.reduce_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+      - name: "connection_idle_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 2s
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Timer type is configured by both overload actions "
+      "\"envoy.overload_actions.reduce_timeouts\" and \"connection_idle_timeouts\"");
+}
+
+TEST_F(OverloadManagerImplTest, TimerConfiguredByMultipleNamedReduceTimeoutsActions) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.fake_resource1"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "first_connection_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 1s
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.8
+      - name: "second_connection_timeouts"
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+          timer_scale_factors:
+            - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+              min_timeout: 2s
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createOverloadManager(config), EnvoyException,
+      "Timer type is configured by both overload actions \"first_connection_timeouts\" and "
+      "\"second_connection_timeouts\"");
+}
+
+constexpr char kMultipleReduceTimeoutsActionsConfig[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+    - name: envoy.resource_monitors.fake_resource2
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+  actions:
+    - name: envoy.overload_actions.reduce_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_STREAM_IDLE
+            min_scale: { value: 10 }
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+    - name: connection_idle_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 1s
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource2"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+)YAML";
+
+constexpr char kOnlyNamedReduceTimeoutsActionConfig[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+  actions:
+    - name: connection_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 1s
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_timeout: 2s
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+)YAML";
+
+constexpr char kTwoNamedReduceTimeoutsActionsConfig[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+    - name: envoy.resource_monitors.fake_resource2
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
+  actions:
+    - name: connection_idle_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_IDLE
+            min_timeout: 1s
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource1"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+    - name: connection_max_timeouts
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.overload.v3.ScaleTimersOverloadActionConfig
+        timer_scale_factors:
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_timeout: 2s
+      triggers:
+        - name: "envoy.resource_monitors.fake_resource2"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 1.0
+)YAML";
+
+TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsCreateStats) {
+  auto manager(createOverloadManager(kMultipleReduceTimeoutsActionsConfig));
+
+  const auto active_gauge = stats_.findGaugeByString("overload.connection_idle_timeouts.active");
+  ASSERT_TRUE(active_gauge.has_value());
+  EXPECT_EQ(0, active_gauge->value());
+  const auto scale_percent_gauge =
+      stats_.findGaugeByString("overload.connection_idle_timeouts.scale_percent");
+  ASSERT_TRUE(scale_percent_gauge.has_value());
+  EXPECT_EQ(0, scale_percent_gauge->value());
+}
+
+TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsAdjustScaleFactorIndependently) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kMultipleReduceTimeoutsActionsConfig));
+
+  auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_named_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})))
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_named_manager})));
+
+  NiceMock<Event::MockDispatcher> mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  manager->start();
+
+  EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
+
+  EXPECT_CALL(*mock_main_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
+  factory1_.monitor_->setPressure(0.6);
+  timer_cb_();
+
+  EXPECT_CALL(*mock_named_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.4, 0.00001))));
+  factory2_.monitor_->setPressure(0.8);
+  timer_cb_();
+}
+
+TEST_F(OverloadManagerImplTest, MultipleReduceTimeoutsActionsCreateTimerRouting) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kMultipleReduceTimeoutsActionsConfig));
+
+  auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_named_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})))
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_named_manager})));
+
+  NiceMock<Event::MockDispatcher> mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  manager->start();
+
+  EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
+
+  // Explicit-minimum timers use the main manager.
+  Event::MockTimer* min_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_main_manager, createTimer_(_, _)).WillOnce(Return(min_timer));
+  auto t1 =
+      scaled_timer_manager->createTimer(Event::AbsoluteMinimum(std::chrono::seconds(1)), []() {});
+  EXPECT_EQ(t1.get(), min_timer);
+
+  Event::MockTimer* action_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_main_manager, createTypedTimer_(_, _)).WillOnce(Return(action_timer));
+  auto t2 = scaled_timer_manager->createTimer(Event::ScaledTimerType::TransportSocketConnectTimeout,
+                                              []() {});
+  EXPECT_EQ(t2.get(), action_timer);
+
+  Event::MockTimer* named_action_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_named_manager, createTypedTimer_(_, _)).WillOnce(Return(named_action_timer));
+  auto t3 = scaled_timer_manager->createTimer(
+      Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout, []() {});
+  EXPECT_EQ(t3.get(), named_action_timer);
+}
+
+TEST_F(OverloadManagerImplTest, NamedReduceTimeoutsActionGroupsTimerTypes) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kOnlyNamedReduceTimeoutsActionConfig));
+
+  auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_named_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager)
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})))
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_named_manager})));
+
+  NiceMock<Event::MockDispatcher> mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  Event::MockTimer* idle_timer = new NiceMock<Event::MockTimer>();
+  Event::MockTimer* max_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_named_manager, createTypedTimer_(_, _))
+      .WillOnce(Return(idle_timer))
+      .WillOnce(Return(max_timer));
+  auto routed_idle_timer = scaled_timer_manager->createTimer(
+      Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout, []() {});
+  auto routed_max_timer = scaled_timer_manager->createTimer(
+      Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout, []() {});
+  EXPECT_EQ(routed_idle_timer.get(), idle_timer);
+  EXPECT_EQ(routed_max_timer.get(), max_timer);
+
+  manager->start();
+
+  EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
+  EXPECT_CALL(*mock_named_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.4, 0.00001))));
+  factory1_.monitor_->setPressure(0.8);
+  timer_cb_();
+}
+
+TEST_F(OverloadManagerImplTest, TwoNamedReduceTimeoutsActionsRouteAndScaleIndependently) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(kTwoNamedReduceTimeoutsActionsConfig));
+
+  auto* mock_main_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_idle_manager = new Event::MockScaledRangeTimerManager();
+  auto* mock_max_manager = new Event::MockScaledRangeTimerManager();
+  EXPECT_CALL(*manager, createScaledRangeTimerManager(_, IsNull()))
+      .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})));
+  EXPECT_CALL(*manager, createScaledRangeTimerManager(_, NotNull()))
+      .Times(2)
+      .WillRepeatedly(Invoke([mock_idle_manager, mock_max_manager](
+                                 Event::Dispatcher&,
+                                 const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) {
+        if (timer_minimums->contains(Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout)) {
+          return Event::ScaledRangeTimerManagerPtr{mock_idle_manager};
+        }
+        ASSERT(
+            timer_minimums->contains(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout));
+        return Event::ScaledRangeTimerManagerPtr{mock_max_manager};
+      }));
+
+  NiceMock<Event::MockDispatcher> mock_dispatcher;
+  auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);
+
+  EXPECT_CALL(*mock_main_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.25, 0.00001))));
+  EXPECT_CALL(*mock_idle_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.25, 0.00001))));
+  EXPECT_CALL(*mock_max_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.25, 0.00001))));
+  scaled_timer_manager->setScaleFactor(UnitFloat(0.25));
+
+  Event::MockTimer* idle_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_idle_manager, createTypedTimer_(_, _)).WillOnce(Return(idle_timer));
+  auto routed_idle_timer = scaled_timer_manager->createTimer(
+      Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout, []() {});
+  EXPECT_EQ(routed_idle_timer.get(), idle_timer);
+
+  Event::MockTimer* max_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mock_max_manager, createTypedTimer_(_, _)).WillOnce(Return(max_timer));
+  auto routed_max_timer = scaled_timer_manager->createTimer(
+      Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout, []() {});
+  EXPECT_EQ(routed_max_timer.get(), max_timer);
+
+  manager->start();
+  EXPECT_CALL(mock_dispatcher, post).WillRepeatedly([](Event::PostCb cb) { cb(); });
+
+  EXPECT_CALL(*mock_idle_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.8, 0.00001))));
+  factory1_.monitor_->setPressure(0.6);
+  timer_cb_();
+
+  EXPECT_CALL(*mock_max_manager,
+              setScaleFactor(Property(&UnitFloat::value, FloatNear(0.4, 0.00001))));
+  factory2_.monitor_->setPressure(0.8);
+  timer_cb_();
 }
 
 // A scaled trigger action's thresholds must conform to scaling < saturation.
@@ -1347,6 +1868,364 @@ TEST_F(OverloadManagerLoadShedPointImplTest, LoadShedPointShouldUseCurrentReadin
   other_dispatcher->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(overload_action_states[0], UnitFloat(1));
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, SynchronousFeedbackResourceMonitorCreationFailure) {
+  sf_factory1_.status_ = absl::InternalError("sf_creation_error");
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "sf_creation_error");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, DuplicateSynchronousFeedbackResourceMonitor) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Duplicate resource monitor .*");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest,
+       DuplicateRegularAndSynchronousFeedbackResourceMonitor) {
+  // Regular monitor first, then synchronous feedback monitor with the same name.
+  const std::string config_regular_first = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.resource_monitors.fake_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config_regular_first), EnvoyException,
+                          "Duplicate resource monitor envoy.resource_monitors.fake_resource1");
+
+  // Synchronous feedback monitor first, then regular monitor with the same name.
+  const std::string config_synchronous_feedback_first = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(
+      createOverloadManager(config_synchronous_feedback_first), EnvoyException,
+      "Duplicate resource monitor envoy.resource_monitors.fake_synchronous_feedback_resource1");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest,
+       SynchronousFeedbackResourceMonitorWithOverloadActionAndStats) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            threshold:
+              value: 0.9
+    actions:
+      - name: envoy.overload_actions.stop_accepting_requests
+        triggers:
+          - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+
+  Event::DispatcherPtr other_dispatcher{api_->allocateDispatcher("other_dispatcher")};
+  std::vector<UnitFloat> overload_action_states;
+  manager->registerForAction(
+      "envoy.overload_actions.stop_accepting_requests", *other_dispatcher,
+      [&](OverloadActionState state) { overload_action_states.push_back(state.value()); });
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Gauge& pressure_gauge =
+      stats_.gauge("overload.envoy.resource_monitors.fake_synchronous_feedback_resource1.pressure",
+                   Stats::Gauge::ImportMode::NeverImport);
+  Stats::Gauge& scale_percent =
+      stats_.gauge("overload.test_point.scale_percent", Stats::Gauge::ImportMode::Accumulate);
+
+  // 1. Periodic timer poll updates pressure gauge and triggers OverloadAction, while
+  // LoadShedPoint synchronous feedback triggers are not mutated by periodic main-thread updates.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.95}));
+  timer_cb_();
+  other_dispatcher->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(95, pressure_gauge.value());
+  EXPECT_EQ(0, scale_percent.value());
+  ASSERT_EQ(1, overload_action_states.size());
+  EXPECT_EQ(UnitFloat(1), overload_action_states[0]);
+
+  // 2. Even though periodic state was 0.95, hot-path shouldShedLoad() queries instantaneous
+  // getResourceUsage() without being stuck on stale periodic state.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.20}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+
+  // Exercise base class default no-op onLoadAccepted.
+  sf_factory1_.monitor_->SynchronousFeedbackResourceMonitor::onLoadAccepted("test_point");
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, SynchronousFeedbackResourceMonitorThresholdTrigger) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Gauge& scale_percent =
+      stats_.gauge("overload.test_point.scale_percent", Stats::Gauge::ImportMode::Accumulate);
+  Stats::Counter& shed_load_count = stats_.counter("overload.test_point.shed_load_count");
+
+  // Pressure below threshold: shouldShedLoad() returns false, onLoadAccepted() is called.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.5}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(0, shed_load_count.value());
+  EXPECT_EQ(0, scale_percent.value());
+
+  // Pressure above threshold: shouldShedLoad() returns true, onLoadAccepted() is NOT called.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.95}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(1, shed_load_count.value());
+  EXPECT_EQ(0, scale_percent.value());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest,
+       SynchronousFeedbackResourceMonitorScaledTriggerAndBernoulli) {
+  StrictMock<Random::MockRandomGenerator> mock_random;
+  api_ = Api::createApiForTest(stats_, mock_random);
+
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  Stats::Counter& shed_load_count = stats_.counter("overload.test_point.shed_load_count");
+
+  // 1. Pressure <= scaling_threshold (0.4): probability is 0, load accepted without random call.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.4}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(0, shed_load_count.value());
+
+  // 2. Pressure >= saturation_threshold (1.0): probability is 1.0, load shed immediately without
+  // random call or onLoadAccepted().
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{1.0}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(1, shed_load_count.value());
+
+  // 3. Pressure in scaling range (0.75 -> probability 0.5), bernoulli returns true.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.75}));
+  EXPECT_CALL(mock_random, random()).WillOnce(Return(0));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+  EXPECT_EQ(2, shed_load_count.value());
+
+  // 4. Pressure in scaling range (0.75 -> probability 0.5), bernoulli returns false.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.75}));
+  EXPECT_CALL(mock_random, random()).WillOnce(Return(Random::RandomGenerator::max()));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+  EXPECT_EQ(2, shed_load_count.value());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest,
+       SynchronousFeedbackResourceMonitorMaxWithAsyncProbability) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_resource1"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  // Set async pressure to 1.0 so probability_shed_load_ becomes 1.0.
+  factory1_.monitor_->setPressure(1.0);
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.0}));
+  timer_cb_();
+
+  // Even when synchronous feedback pressure is 0.0, probability = std::max(1.0f, 0.0f) = 1.0f, so
+  // load is shed.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.0}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, MultipleSynchronousFeedbackResourceMonitors) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource2
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Int64Value
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            threshold:
+              value: 0.9
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource2"
+            scaled:
+              scaling_threshold: 0.5
+              saturation_threshold: 1.0
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  ASSERT_NE(sf_factory2_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  // Both monitors report low pressure -> load accepted, onLoadAccepted() called on BOTH.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.1}));
+  EXPECT_CALL(*sf_factory2_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.2}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_CALL(*sf_factory2_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+
+  // Monitor 2 reports saturated pressure -> load shed, onLoadAccepted() called on NEITHER.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.1}));
+  EXPECT_CALL(*sf_factory2_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{1.0}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_CALL(*sf_factory2_.monitor_, onLoadAccepted(_)).Times(0);
+  EXPECT_TRUE(point->shouldShedLoad());
+}
+
+TEST_F(OverloadManagerLoadShedPointImplTest, SynchronousFeedbackResourceMonitorSafeAfterStop) {
+  setDispatcherExpectation();
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: envoy.resource_monitors.fake_synchronous_feedback_resource1
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.DoubleValue
+    loadshed_points:
+      - name: "test_point"
+        triggers:
+          - name: "envoy.resource_monitors.fake_synchronous_feedback_resource1"
+            threshold:
+              value: 0.9
+  )EOF";
+
+  auto manager{createOverloadManager(config)};
+  manager->start();
+
+  ASSERT_NE(sf_factory1_.monitor_, nullptr);
+  LoadShedPoint* point = manager->getLoadShedPoint("test_point");
+  ASSERT_NE(point, nullptr);
+
+  EXPECT_CALL(*timer_, disableTimer());
+  manager->stop();
+
+  // Worker threads may still invoke shouldShedLoad() after overload_manager_->stop()
+  // before workers are stopped; verify the monitor remains alive.
+  EXPECT_CALL(*sf_factory1_.monitor_, getResourceUsage()).WillOnce(Return(ResourceUsage{0.5}));
+  EXPECT_CALL(*sf_factory1_.monitor_, onLoadAccepted("test_point"));
+  EXPECT_FALSE(point->shouldShedLoad());
+}
+
+TEST(TriggerTest, EvaluateIsStateless) {
+  envoy::config::overload::v3::Trigger threshold_config;
+  threshold_config.set_name("test_threshold");
+  threshold_config.mutable_threshold()->set_value(0.8);
+  auto threshold_trigger = createTriggerFromConfig(threshold_config);
+  ASSERT_TRUE(threshold_trigger.ok());
+  EXPECT_EQ(OverloadActionState::inactive().value(), (*threshold_trigger)->actionState().value());
+  EXPECT_EQ(OverloadActionState::saturated().value(), (*threshold_trigger)->evaluate(0.85).value());
+  // Calling evaluate() does not mutate actionState().
+  EXPECT_EQ(OverloadActionState::inactive().value(), (*threshold_trigger)->actionState().value());
+
+  envoy::config::overload::v3::Trigger scaled_config;
+  scaled_config.set_name("test_scaled");
+  scaled_config.mutable_scaled()->set_scaling_threshold(0.5);
+  scaled_config.mutable_scaled()->set_saturation_threshold(0.9);
+  auto scaled_trigger = createTriggerFromConfig(scaled_config);
+  ASSERT_TRUE(scaled_trigger.ok());
+  EXPECT_EQ(OverloadActionState::inactive().value(), (*scaled_trigger)->actionState().value());
+  EXPECT_EQ(UnitFloat(0.5f), (*scaled_trigger)->evaluate(0.7).value());
+  EXPECT_EQ(OverloadActionState::saturated().value(), (*scaled_trigger)->evaluate(0.95).value());
+  // Calling evaluate() does not mutate actionState().
+  EXPECT_EQ(OverloadActionState::inactive().value(), (*scaled_trigger)->actionState().value());
 }
 
 } // namespace

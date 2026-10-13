@@ -1,7 +1,6 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=22.04
-ARG BUILD_SHA=0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982
-ARG ENVOY_VRP_BASE_IMAGE=envoy-base
+ARG BUILD_SHA=b8b6ee6aa931ecd9d0d952abc34dc0e5f7c6a30c6bb71b079fe399fde0329c02
 
 
 FROM scratch AS binary
@@ -10,7 +9,7 @@ ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 # See https://github.com/docker/buildx/issues/510 for why this _must_ be this way
 ARG TARGETPLATFORM
 ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
-ADD "${TARGETPLATFORM}/release.docker.tar.zst" /usr/local/bin/
+ADD "${TARGETPLATFORM}/release.tar.zst" /usr/local/bin/
 
 
 # STAGE: envoy-base
@@ -59,7 +58,7 @@ COPY --chown=0:0 --chmod=755 \
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian13:nonroot@sha256:86554c46a420d507ff2d678fd261ab8691fba4875a20302f38a49e684b42a33f AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian13:nonroot@sha256:8c563c1fb5e120606f0d85733049775faed6192e2bd2223ef283a5393eec22b9 AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
@@ -71,46 +70,6 @@ ARG ENVOY_BINARY=envoy
 ARG ENVOY_BINARY_PREFIX=
 COPY --from=binary --chown=0:0 --chmod=755 \
     "/usr/local/bin/${ENVOY_BINARY_PREFIX}${ENVOY_BINARY}" /usr/local/bin/envoy
-
-
-# STAGE: envoy-google-vrp-base
-FROM ${ENVOY_VRP_BASE_IMAGE} AS envoy-google-vrp-base
-EXPOSE 10000
-EXPOSE 10001
-CMD ["supervisord", "-c", "/etc/supervisor.conf"]
-ENTRYPOINT []
-ADD --chown=0:0 --chmod=644 \
-    configs/google-vrp/*.yaml /etc/envoy/
-ADD --chown=0:0 --chmod=755 \
-    configs/google-vrp/launch_envoy.sh /usr/local/bin/launch_envoy.sh
-# These certs come from //distribution/binary:vrp_cert_files (via the
-# `release.docker.tar.zst` release tarball added in the `binary` stage above).
-# They are generated, publicly-known TEST credentials -- not secret -- used
-# only by this fuzzing image, and are not shipped in signed release artifacts.
-COPY --from=binary --chown=0:0 --chmod=644 \
-    /usr/local/bin/certs/serverkey.pem /etc/envoy/certs/serverkey.pem
-COPY --from=binary --chown=0:0 --chmod=644 \
-    /usr/local/bin/certs/servercert.pem /etc/envoy/certs/servercert.pem
-RUN --mount=type=tmpfs,target=/var/cache/apt \
-    --mount=type=tmpfs,target=/var/lib/apt/lists \
-    apt-get -qq update \
-    && apt-get -qq upgrade -y \
-    && apt-get -qq install -y libc++1 supervisor gdb strace tshark \
-    && apt-get autoremove -y \
-    && chmod 777 /var/log/supervisor
-ADD --chown=0:0 --chmod=755 configs/google-vrp/supervisor.conf /etc/supervisor.conf
-
-
-# STAGE: envoy-google-vrp
-FROM envoy-google-vrp-base AS envoy-google-vrp
-COPY  --from=binary --chown=0:0 --chmod=755 \
-    /usr/local/bin/envoy /usr/local/bin/envoy
-
-
-# STAGE: envoy-google-vrp-custom
-FROM envoy-google-vrp-base AS envoy-google-vrp-custom
-ARG ENVOY_CTX_BINARY_PATH
-ADD "${ENVOY_CTX_BINARY_PATH}" /usr/local/bin/envoy
 
 
 # Make envoy image as last stage so it is built by default

@@ -20,8 +20,8 @@ void ConnectionImplBase::addConnectionCallbacks(ConnectionCallbacks& cb) {
   // would otherwise never learn that the connection is draining. This is not a corner case: the
   // HTTP codec (and any wrapper around it) is created lazily on the first byte of data, so any
   // connection that is idle when its listener starts draining registers callbacks afterwards.
-  // Implementations of onDrain() must therefore only record the event and must not assume that
-  // construction of their owner has completed.
+  // Implementations of onDrain() must therefore only record the event, or schedule work for
+  // later, and must not assume that construction of their owner has completed.
   if (drain_event_.has_value()) {
     cb.onDrain(*drain_event_);
   }

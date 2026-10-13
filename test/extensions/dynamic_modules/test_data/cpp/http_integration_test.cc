@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <format>
 #include <map>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -169,6 +171,26 @@ public:
 };
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(PassthroughConfigFactory, "passthrough");
+
+// A filter factory whose create throws so the exception barrier around the filter constructor
+// export can be exercised. Without the barrier the exception would cross the ABI boundary and abort
+// the worker. The caught exception leaves a null filter, so the host fails the request closed with
+// a 500.
+class ThrowOnNewFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle&) override {
+    throw std::runtime_error("filter constructor failed on purpose");
+  }
+};
+
+class ThrowOnNewConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<ThrowOnNewFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(ThrowOnNewConfigFactory, "throw_on_filter_new");
 
 // Only records that its response-headers callback ran. Used to check that the callback still fires
 // when the response is a local reply the module did not send, such as a `direct_response` route.
@@ -1189,6 +1211,155 @@ public:
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(StatsCallbacksConfigFactory, "stats_callbacks");
 
 // -----------------------------------------------------------------------------
+// StreamTiming
+// -----------------------------------------------------------------------------
+
+class StreamTimingFilter : public HttpFilter {
+public:
+  StreamTimingFilter(HttpFilterHandle& handle, MetricID timing_observed_total)
+      : handle_(handle), timing_observed_total_(timing_observed_total) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+
+  void onStreamComplete() override {
+    const TimingInfo timing = handle_.getTimingInfo();
+    assertTrue(timing.start_time_unix_ns.value() > 0, "start time");
+    assertTrue(timing.downstream_connection_begin_ns.has_value(), "downstream connection accepted");
+    assertTrue(!timing.downstream_handshake_start_ns.has_value(),
+               "no downstream TLS handshake start");
+    assertTrue(!timing.downstream_handshake_complete_ns.has_value(),
+               "no downstream TLS handshake completion");
+    assertTrue(timing.last_downstream_header_rx_byte_received_ns.value() >= 0,
+               "request headers received");
+    assertTrue(timing.last_downstream_rx_byte_received_ns.value() >=
+                   timing.last_downstream_header_rx_byte_received_ns.value(),
+               "request received");
+    assertTrue(timing.upstream_connect_start_ns.value() >= 0, "upstream connect start");
+    assertTrue(timing.upstream_connect_complete_ns.value() >=
+                   timing.upstream_connect_start_ns.value(),
+               "upstream connect complete");
+    assertTrue(!timing.upstream_handshake_complete_ns.has_value(), "no upstream TLS handshake");
+    assertTrue(timing.first_upstream_tx_byte_sent_ns.value() >= 0, "upstream request start");
+    assertTrue(timing.last_upstream_tx_byte_sent_ns.value() >=
+                   timing.first_upstream_tx_byte_sent_ns.value(),
+               "upstream request complete");
+    assertTrue(timing.first_upstream_rx_byte_received_ns.value() >= 0, "upstream response start");
+    assertTrue(timing.first_upstream_rx_body_byte_received_ns.value() >=
+                   timing.first_upstream_rx_byte_received_ns.value(),
+               "upstream response body start");
+    assertTrue(timing.last_upstream_rx_byte_received_ns.value() >=
+                   timing.first_upstream_rx_body_byte_received_ns.value(),
+               "upstream response complete");
+    assertTrue(timing.first_downstream_tx_byte_sent_ns.value() >= 0, "downstream response start");
+    assertTrue(timing.last_downstream_tx_byte_sent_ns.value() >=
+                   timing.first_downstream_tx_byte_sent_ns.value(),
+               "downstream response complete");
+    assertTrue(!timing.last_downstream_ack_received_ns.has_value(), "no TCP final ACK marker");
+    assertTrue(timing.request_complete_duration_ns.value() >= 0, "request complete duration");
+    assertTrue(!timing.downstream_connection_end_ns.has_value(), "connection remains open");
+    assertEq(static_cast<size_t>(handle_.incrementCounterValue(timing_observed_total_, 1)),
+             static_cast<size_t>(MetricsResult::Success), "timing counter");
+  }
+
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  MetricID timing_observed_total_;
+};
+
+class StreamTimingFilterFactory : public HttpFilterFactory {
+public:
+  StreamTimingFilterFactory(MetricID timing_observed_total)
+      : timing_observed_total_(timing_observed_total) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<StreamTimingFilter>(handle, timing_observed_total_);
+  }
+
+private:
+  MetricID timing_observed_total_;
+};
+
+class StreamTimingConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view) override {
+    const auto result = handle.defineCounter("stream_timing_observed_total");
+    assertEq(static_cast<size_t>(result.second), static_cast<size_t>(MetricsResult::Success),
+             "timing counter definition");
+    return std::make_unique<StreamTimingFilterFactory>(result.first);
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(StreamTimingConfigFactory, "stream_timing");
+
+// -----------------------------------------------------------------------------
+// UpstreamConnectionAttempts
+// -----------------------------------------------------------------------------
+
+class UpstreamConnectionAttemptsFilter : public HttpFilter {
+public:
+  UpstreamConnectionAttemptsFilter(HttpFilterHandle& handle, MetricID observed_total)
+      : handle_(handle), observed_total_(observed_total) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+
+  void onStreamComplete() override {
+    const auto remote_address = handle_.getUpstreamRemoteAddress();
+    assertTrue(remote_address.has_value() && !remote_address->empty(), "upstream remote address");
+    assertEq(handle_.getUpstreamHostsAttempted().size(), 1, "upstream hosts attempted");
+    assertEq(handle_.getUpstreamConnectionIdsAttempted().size(), 1,
+             "upstream connection IDs attempted");
+    assertEq(static_cast<size_t>(handle_.incrementCounterValue(observed_total_, 1)),
+             static_cast<size_t>(MetricsResult::Success), "upstream attempts counter");
+  }
+
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+  MetricID observed_total_;
+};
+
+class UpstreamConnectionAttemptsFilterFactory : public HttpFilterFactory {
+public:
+  UpstreamConnectionAttemptsFilterFactory(MetricID observed_total)
+      : observed_total_(observed_total) {}
+
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<UpstreamConnectionAttemptsFilter>(handle, observed_total_);
+  }
+
+private:
+  MetricID observed_total_;
+};
+
+class UpstreamConnectionAttemptsConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view) override {
+    const auto result = handle.defineCounter("upstream_connection_attempts_observed_total");
+    assertEq(static_cast<size_t>(result.second), static_cast<size_t>(MetricsResult::Success),
+             "upstream attempts counter definition");
+    return std::make_unique<UpstreamConnectionAttemptsFilterFactory>(result.first);
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(UpstreamConnectionAttemptsConfigFactory,
+                                    "upstream_connection_attempts");
+
+// -----------------------------------------------------------------------------
 // StreamingTerminal
 // -----------------------------------------------------------------------------
 
@@ -1999,6 +2170,76 @@ public:
 
 REGISTER_HTTP_FILTER_CONFIG_FACTORY(GenericSecretCallbacksConfigFactory,
                                     "generic_secret_callbacks");
+
+// -----------------------------------------------------------------------------
+// RuntimeValues
+// -----------------------------------------------------------------------------
+
+// Reads every runtime type at config creation, which is where the runtime is reachable, and
+// echoes the cached values back as response headers so the integration test can confirm both the
+// configured-value and the fall-back-to-default paths.
+struct RuntimeValues {
+  bool bool_value;
+  uint64_t int_value;
+  double number_value;
+  bool missing_bool;
+  uint64_t missing_int;
+  double missing_number;
+};
+
+class RuntimeValuesFilter : public HttpFilter {
+public:
+  explicit RuntimeValuesFilter(const RuntimeValues& values) : values_(values) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap& headers, bool) override {
+    headers.set("x-runtime-bool", values_.bool_value ? "true" : "false");
+    headers.set("x-runtime-int", std::format("{}", values_.int_value));
+    headers.set("x-runtime-number", std::format("{}", values_.number_value));
+    headers.set("x-runtime-missing-bool", values_.missing_bool ? "true" : "false");
+    headers.set("x-runtime-missing-int", std::format("{}", values_.missing_int));
+    headers.set("x-runtime-missing-number", std::format("{}", values_.missing_number));
+    return HeadersStatus::Continue;
+  }
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  const RuntimeValues values_;
+};
+
+class RuntimeValuesFilterFactory : public HttpFilterFactory {
+public:
+  explicit RuntimeValuesFilterFactory(const RuntimeValues& values) : values_(values) {}
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle&) override {
+    return std::make_unique<RuntimeValuesFilter>(values_);
+  }
+
+private:
+  const RuntimeValues values_;
+};
+
+class RuntimeValuesConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle& handle,
+                                            std::string_view) override {
+    const RuntimeValues values{
+        handle.getRuntimeBool("test.runtime_bool", false),
+        handle.getRuntimeInt("test.runtime_int", 7),
+        handle.getRuntimeNumber("test.runtime_number", 0.5),
+        handle.getRuntimeBool("test.runtime_missing_bool", true),
+        handle.getRuntimeInt("test.runtime_missing_int", 1234),
+        handle.getRuntimeNumber("test.runtime_missing_number", 2.5),
+    };
+    return std::make_unique<RuntimeValuesFilterFactory>(values);
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(RuntimeValuesConfigFactory, "runtime_values");
 
 } // namespace DynamicModules
 } // namespace Envoy

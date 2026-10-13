@@ -15,7 +15,6 @@ envoy_extension_cc_test(
         "@envoy//test/common/tls/test_data:certs",
     ],
     extension_names = ["envoy_mobile.cert_validator.platform_bridge_cert_validator"],
-    repository = "@envoy",
     deps = [
         "//library/common/extensions/cert_validator/platform_bridge:config",
         "//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto",

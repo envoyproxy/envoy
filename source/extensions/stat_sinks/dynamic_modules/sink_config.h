@@ -2,17 +2,15 @@
 
 #include <atomic>
 #include <memory>
-#include <vector>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/stat_sinks/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/stats/symbol_table.h"
-#include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
+#include "source/extensions/dynamic_modules/metric_registry.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -63,17 +61,6 @@ public:
   // The main thread dispatcher used by the scheduler to post events back to the main thread.
   Event::Dispatcher& main_thread_dispatcher_;
 
-  // Wraps a Stats::Gauge resolved during configuration creation so the module can publish values to
-  // it later from the main thread.
-  class ModuleGaugeHandle {
-  public:
-    explicit ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
-    void set(uint64_t value) const { gauge_.set(value); }
-
-  private:
-    Stats::Gauge& gauge_;
-  };
-
   /**
    * Defines a gauge with the given name and returns its 1-based id via gauge_id_out. Valid only
    * before stat creation is frozen, which happens once the configuration is created.
@@ -104,13 +91,13 @@ private:
   // The config owns its scope so the gauges created from it stay valid for the config's lifetime,
   // regardless of server teardown order, and so do the gauge references cached from it.
   const Stats::ScopeSharedPtr stats_scope_;
-  Stats::StatNamePool stat_name_pool_;
+  // Shared metrics registry composed from stats_scope_.
+  Extensions::DynamicModules::MetricRegistry metrics_;
   // Gauges are defined only during on_stat_sink_config_new and read afterwards, so the storage
   // needs no lock. The flag is stored with release ordering once creation finishes and loaded with
   // acquire ordering in defineGauge() so a module that defines gauges after the freeze is rejected.
   // This mirrors the HTTP filter config contract.
   std::atomic<bool> stat_creation_frozen_{false};
-  std::vector<ModuleGaugeHandle> gauges_;
 };
 
 using DynamicModuleStatsSinkConfigSharedPtr = std::shared_ptr<DynamicModuleStatsSinkConfig>;

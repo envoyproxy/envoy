@@ -60,9 +60,9 @@ public:
 };
 
 /** Host interface exposed while a thread-safe early header mutation is being created. */
-class EarlyHeaderMutationConfigHandle {
+class EarlyHeaderMutationConfigHandle : public CommonHandle {
 public:
-  virtual ~EarlyHeaderMutationConfigHandle();
+  ~EarlyHeaderMutationConfigHandle() override;
 
   /** Returns whether Envoy logging is enabled for the supplied level. */
   virtual bool logEnabled(LogLevel level) = 0;

@@ -458,20 +458,20 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostMapConstSharedPtr map, UnitFloat drop_overload,
+                                HostLookupMapConstSharedPtr map, UnitFloat drop_overload,
                                 absl::string_view drop_category);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-        LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
         UnitFloat drop_overload, absl::string_view drop_category);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
-    const HostMapConstSharedPtr cross_priority_host_map_;
+    const HostLookupMapConstSharedPtr cross_priority_host_map_;
     UnitFloat drop_overload_{0};
     const std::string drop_category_;
   };
@@ -632,7 +632,7 @@ private:
                        const HostVector& hosts_added, const HostVector& hosts_removed,
                        std::optional<bool> weighted_priority_health,
                        std::optional<uint32_t> overprovisioning_factor,
-                       HostMapConstSharedPtr cross_priority_host_map);
+                       HostLookupMapConstSharedPtr cross_priority_host_map);
 
       // Applies a set of per-priority host updates to the priority set as a single batch (see
       // PrioritySetImpl::batchHostUpdate()). Unlike calling updateHosts() once per priority, the
@@ -643,7 +643,7 @@ private:
       void updateHosts(
           const std::vector<
               std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
-          HostMapConstSharedPtr cross_priority_host_map);
+          HostLookupMapConstSharedPtr cross_priority_host_map);
 
       // Drains any connection pools associated with the removed hosts. All connections will be
       // closed gracefully and no new connections will be created.
@@ -669,7 +669,7 @@ private:
         BatchUpdateHelper(
             const std::vector<
                 std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
-            HostMapConstSharedPtr cross_priority_host_map)
+            HostLookupMapConstSharedPtr cross_priority_host_map)
             : updates_(updates), cross_priority_host_map_(std::move(cross_priority_host_map)) {}
 
         // PrioritySet::BatchUpdateCb
@@ -690,7 +690,7 @@ private:
       private:
         const std::vector<
             std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates_;
-        const HostMapConstSharedPtr cross_priority_host_map_;
+        const HostLookupMapConstSharedPtr cross_priority_host_map_;
       };
 
       Http::ConnectionPool::Instance*
@@ -766,7 +766,7 @@ private:
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  bool weighted_priority_health, uint64_t overprovisioning_factor,
-                                 HostMapConstSharedPtr cross_priority_host_map);
+                                 HostLookupMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
@@ -980,7 +980,7 @@ private:
    */
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-      LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+      LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
       UnitFloat drop_overload, absl::string_view drop_category);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
@@ -1013,6 +1013,10 @@ private:
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
   Router::Context& router_context_;
+  // The router filter config shared by the async clients of every cluster on every worker thread.
+  // It is constructed from server-wide state only (see the constructor) and is immutable after
+  // construction, so a single instance is enough.
+  Router::FilterConfigSharedPtr async_client_router_config_;
   ClusterTrafficStatNames cluster_stat_names_;
   ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
   ClusterLbStatNames cluster_lb_stat_names_;

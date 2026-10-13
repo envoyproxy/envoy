@@ -18,7 +18,6 @@ envoy_cc_extension(
     name = "network_configuration_retry_options_predicate_lib",
     srcs = ["predicate.cc"],
     hdrs = ["predicate.h"],
-    repository = "@envoy",
     deps = [
         ":predicate_cc_proto",
         "//library/common/network:connectivity_manager_lib",
@@ -31,7 +30,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":network_configuration_retry_options_predicate_lib",
         ":predicate_cc_proto",

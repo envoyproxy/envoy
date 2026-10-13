@@ -32,6 +32,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Server {
@@ -441,6 +442,14 @@ private:
 class IntegrationTestServer;
 using IntegrationTestServerPtr = std::unique_ptr<IntegrationTestServer>;
 
+struct TestRandomValue {
+  uint64_t value;
+};
+struct TestRandomSeed {
+  uint64_t value;
+};
+using TestRandomGeneratorConfig = absl::variant<absl::monostate, TestRandomValue, TestRandomSeed>;
+
 /**
  * Wrapper for running the real server for the purpose of integration tests.
  * This class is an Abstract Base Class and delegates ownership and management
@@ -455,7 +464,7 @@ public:
   static IntegrationTestServerPtr
   create(const std::string& config_path, const Network::Address::IpVersion version,
          std::function<void(IntegrationTestServer&)> on_server_ready_function,
-         std::function<void()> on_server_init_function, std::optional<uint64_t> deterministic_value,
+         std::function<void()> on_server_init_function, TestRandomGeneratorConfig random_config,
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
          ProcessObjectOptRef process_object = std::nullopt,
@@ -493,11 +502,10 @@ public:
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
-             std::function<void()> on_server_init_function,
-             std::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
-             ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
-             uint32_t concurrency, std::chrono::seconds drain_time,
-             Server::DrainStrategy drain_strategy,
+             std::function<void()> on_server_init_function, TestRandomGeneratorConfig random_config,
+             bool defer_listener_finalization, ProcessObjectOptRef process_object,
+             Server::FieldValidationConfig validation_config, uint32_t concurrency,
+             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
              Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
              bool use_admin_server);
 
@@ -655,8 +663,7 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version,
-                     std::optional<uint64_t> deterministic_value,
-                     ProcessObjectOptRef process_object,
+                     TestRandomGeneratorConfig random_config, ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
                      Buffer::WatermarkFactorySharedPtr watermark_factory,

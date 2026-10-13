@@ -5108,6 +5108,148 @@ TEST_P(ExtProcIntegrationTest, RequestHeaderModeIgnoredInModeOverrideComparison)
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideNormal) {
+  performStandAloneModeOverrideNormal(ProcessingMode::STREAMED);
+}
+
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithHeaderDelay) {
+  performStandAloneModeOverrideNormal(ProcessingMode::STREAMED, /*delay_header_response=*/true);
+}
+
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideNormalWithInitialBodyModeNone) {
+  performStandAloneModeOverrideNormal(ProcessingMode::NONE);
+}
+
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithTrailers) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = "hello world";
+  auto response = sendDownstreamRequestWithBodyAndTrailer(body_str);
+
+  // Process request headers message and send back only mode_override (no response_case set).
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_request_headers());
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+        return true;
+      });
+
+  ProcessingRequest request;
+  // First, ext_proc server receives the body message since processing body mode transitioned
+  // to FULL_DUPLEX_STREAMED.
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  EXPECT_TRUE(request.has_request_body());
+  EXPECT_FALSE(request.request_body().end_of_stream());
+
+  // Next, ext_proc server receives the trailers message since request trailer mode transitioned to
+  // SEND.
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  EXPECT_TRUE(request.has_request_trailers());
+
+  // The server sends back the header response first:
+  ProcessingResponse resp_headers;
+  resp_headers.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp_headers);
+
+  // Then, it streams back the body responses:
+  ProcessingResponse resp_body;
+  auto* streamed_response = resp_body.mutable_request_body()
+                                ->mutable_response()
+                                ->mutable_body_mutation()
+                                ->mutable_streamed_response();
+  streamed_response->set_body(body_str);
+  streamed_response->set_end_of_stream(false);
+  processor_stream_->sendGrpcMessage(resp_body);
+
+  // Send trailers response
+  ProcessingResponse resp_trailers;
+  resp_trailers.mutable_request_trailers();
+  processor_stream_->sendGrpcMessage(resp_trailers);
+
+  handleUpstreamRequestWithTrailer();
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideWithEmptyBody) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("POST");
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Send empty data frame with end_stream = true
+  codec_client_->sendData(*request_encoder_, "", true);
+
+  // Process request headers message and send back only mode_override (no response_case set).
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_request_headers());
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+        return true;
+      });
+
+  ProcessingRequest request;
+  // ext_proc server receives the empty body message since processing body mode transitioned
+  // to FULL_DUPLEX_STREAMED, and end_stream is true!
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+  EXPECT_TRUE(request.has_request_body());
+  EXPECT_TRUE(request.request_body().end_of_stream());
+  EXPECT_EQ(0, request.request_body().body().size());
+
+  // The server sends back the header response first:
+  ProcessingResponse resp_headers;
+  resp_headers.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(resp_headers);
+
+  // Then, it streams back the empty body response:
+  ProcessingResponse resp_body;
+  auto* streamed_response = resp_body.mutable_request_body()
+                                ->mutable_response()
+                                ->mutable_body_mutation()
+                                ->mutable_streamed_response();
+  streamed_response->set_end_of_stream(true);
+  processor_stream_->sendGrpcMessage(resp_body);
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, StandAloneModeOverrideIgnoredIfBuffered) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = "hello world";
+  auto response = sendDownstreamRequestWithBody(body_str, std::nullopt);
+
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        EXPECT_TRUE(req.has_request_headers());
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        resp.mutable_mode_override()->set_request_trailer_mode(ProcessingMode::SEND);
+        return true;
+      });
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_EQ(1, test_server_->counter("http.config_test.ext_proc.spurious_msgs_received")->value());
+}
+
 TEST_P(ExtProcIntegrationTest, BufferedModeOverSizeRequestLocalReply) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
@@ -5817,6 +5959,78 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
   processResponseBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
   verifyDownstreamResponse(*response, 200);
   EXPECT_EQ("mmmmmnnnn", response->body());
+}
+
+TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithTrailers) {
+  two_ext_proc_filters_ = true;
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-1
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode_1->set_request_body_mode(ProcessingMode::STREAMED);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
+                               "envoy.filters.http.ext_proc_1");
+    // Filter-0
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
+                               "envoy.filters.http.ext_proc");
+  });
+
+  initializeConfigDuplexStreamed(false);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  // The ext_proc_server_0 receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+  // The ext_proc_server_0 sends back the header response.
+  serverSendHeaderResp();
+
+  timeSystem().advanceTimeWaitImpl(20ms);
+  codec_client_->sendData(*request_encoder_, "sss", false);
+  codec_client_->sendData(*request_encoder_, "xxx", false);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+
+  timeSystem().advanceTimeWaitImpl(20ms);
+  // The ext_proc_server_1 receives the headers.
+  server1ReceiveHeaderReq(header_request);
+  // The ext_proc_server_1 sends back the header response.
+  server1SendHeaderResp();
+
+  timeSystem().advanceTimeWaitImpl(50ms);
+  // The ext_proc_server_0 now sends back the last chunk of the body responses.
+  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+
+  for (int i = 0; i < 2; i++) {
+    ProcessingRequest body_request;
+    ProcessingResponse body_response;
+    // The ext_proc_server_1 receives one body chunk.
+    EXPECT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, body_request));
+    EXPECT_TRUE(body_request.has_request_body());
+    // Send back the body response from ext_proc_1 server.
+    body_response.mutable_request_body();
+    processor_stream_1_->sendGrpcMessage(body_response);
+  }
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), "sssxxx");
+  verifyDownstreamResponse(*response, 200);
 }
 
 TEST_P(ExtProcIntegrationTest, PackImmediateResponseWithResponseTrailers) {

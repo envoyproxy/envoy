@@ -30,10 +30,7 @@ void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
     IdleSessionInterface& next_session = idle_sessions_.next_session_to_terminate();
     absl::Duration time_since_enqueue = absl::FromChrono(
         dispatcher_.approximateMonotonicTime() - idle_sessions_.GetEnqueueTime(next_session));
-    // If the resource pressure is scaling but not saturated, we should respect
-    // the min_time_before_termination_allowed_ and only terminate connections
-    // that have been idle longer than the threshold.
-    if (!is_saturated && time_since_enqueue < min_time_before_termination_allowed_) {
+    if (time_since_enqueue < MinTimeBeforeTerminationAllowed(is_saturated)) {
       break;
     }
     next_session.TerminateIdleSession();
@@ -49,7 +46,13 @@ size_t SessionIdleList::MaxSessionsToTerminateInOneRound(bool is_saturated) cons
                       : max_sessions_to_terminate_in_one_round_;
 };
 
-absl::Duration SessionIdleList::MinTimeBeforeTerminationAllowed() const {
+absl::Duration SessionIdleList::MinTimeBeforeTerminationAllowed(bool is_saturated) const {
+  if (is_saturated) {
+    // Leave some time for session to complete handshake and possibly serve some
+    // requests. Handshake rejection should be the responsibility of the health
+    // check handler and not the idle session list.
+    return absl::Seconds(10);
+  }
   return min_time_before_termination_allowed_;
 };
 

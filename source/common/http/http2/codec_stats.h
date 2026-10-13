@@ -20,11 +20,15 @@ namespace Http2 {
   COUNTER(header_overflow)                                                                         \
   COUNTER(header_list_size_too_large)                                                              \
   COUNTER(headers_cb_no_stream)                                                                    \
+  COUNTER(nghttp2_downstream_connections)                                                          \
+  COUNTER(nghttp2_upstream_connections)                                                            \
   COUNTER(inbound_empty_frames_flood)                                                              \
   COUNTER(inbound_priority_frames_flood)                                                           \
   COUNTER(inbound_window_update_frames_flood)                                                      \
   COUNTER(keepalive_timeout)                                                                       \
   COUNTER(metadata_empty_frames)                                                                   \
+  COUNTER(oghttp2_downstream_connections)                                                          \
+  COUNTER(oghttp2_upstream_connections)                                                            \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \

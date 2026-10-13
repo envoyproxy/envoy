@@ -45,6 +45,16 @@ protected:
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
+  void TearDown() override {
+    // Stop the server before fixture destruction starts. Otherwise, late xDS work on the server
+    // thread can race with the vptr update in HttpIntegrationTest's destructor.
+    resetConnections();
+    cleanupUpstreamAndDownstream();
+    upstream_request_.reset();
+    codec_client_.reset();
+    test_server_.reset();
+  }
+
   void setupModifications() {
     if (modifications_set_up_) {
       return;
@@ -229,21 +239,22 @@ fragments:
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
-    if (upstream_info->upstream_ == nullptr) {
-      return;
+    if (upstream_info->connection_ != nullptr) {
+      AssertionResult result = upstream_info->connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = upstream_info->connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      result = upstream_info->connection_->waitForNoPost();
+      RELEASE_ASSERT(result, result.message());
+      upstream_info->connection_.reset();
     }
 
-    AssertionResult result = upstream_info->connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = upstream_info->connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    upstream_info->connection_.reset();
+    upstream_info->stream_by_resource_name_.clear();
+    upstream_info->upstream_ = nullptr;
   }
 
   void resetConnections() {
-    if (rds_upstream_info_.upstream_ != nullptr) {
-      resetFakeUpstreamInfo(&rds_upstream_info_);
-    }
+    resetFakeUpstreamInfo(&rds_upstream_info_);
     resetFakeUpstreamInfo(&scoped_rds_upstream_info_);
   }
 

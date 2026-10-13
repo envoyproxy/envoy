@@ -36,9 +36,11 @@ absl::StatusOr<Http::FilterFactoryCb> GolangFilterConfig::createHttpFilterFactor
   }
 
   Server::GenericFactoryContextImpl generic_context(
-      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+      context, extra_context.statsPrefixScopeOr(context), extra_context.visitor,
+      extra_context.init_manager);
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      proto_config, dso_lib, std::format("{}golang.", extra_context.stats_prefix), generic_context);
+      proto_config, dso_lib, std::format("{}golang.", extra_context.statsPrefixOr()),
+      generic_context);
   RETURN_IF_NOT_OK(config->newGoPluginConfig());
   return [config, dso_lib](Http::FilterChainFactoryCallbacks& callbacks) {
     const std::string& worker_name = callbacks.dispatcher().name();

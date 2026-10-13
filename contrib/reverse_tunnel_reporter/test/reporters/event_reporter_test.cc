@@ -1,5 +1,7 @@
 #include <limits>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/api/api_impl.h"
 
 #include "test/mocks/common.h"
@@ -305,7 +307,7 @@ TEST_F(EventReporterTest, PullsBeforeConnectionEvents) {
 }
 
 TEST_F(EventReporterTest, RemoveNonExistentConnection) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::warn);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::warn);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
   EXPECT_CALL(sink, log(_, _))
@@ -344,7 +346,7 @@ TEST_F(EventReporterTest, RemoveNonExistentConnection) {
 }
 
 TEST_F(EventReporterTest, OnServerInitialized) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
 
   EXPECT_CALL(sink, log(_, _))

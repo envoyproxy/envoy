@@ -10,3 +10,4 @@ uncomment.sh "$1" \
   --comment-gtest-func DigestTest Getters \
   --comment-gtest-func DigestTest ASN1 \
   --comment-gtest-func DigestTest TransformBlocks \
+  --comment-gtest-func DigestTest Uninitialized \

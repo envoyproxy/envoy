@@ -991,6 +991,11 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
 
 FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
                                                     bool end_stream) {
+  // For empty data chunk with end_stream false, do not send it to the ext_proc server.
+  if (emptyDataWithFalseEos(data, end_stream)) {
+    return state.getBodyCallbackResultInStreamedMode(end_stream);
+  }
+
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterDataStatus::StopIterationNoBuffer;
@@ -1091,7 +1096,10 @@ FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  state.setBodyReceived(true);
+  // Don't count empty body chunk with false end_stream.
+  if (!emptyDataWithFalseEos(data, end_stream)) {
+    state.setBodyReceived(true);
+  }
 
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
@@ -1503,7 +1511,7 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
       logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
     }
     // Only set upstream host in logging info once.
-    if (logging_info_->upstreamHost() == nullptr) {
+    if (logging_info_->upstreamHost() == nullptr && stream_info->upstreamInfo().has_value()) {
       logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
     }
 
@@ -1884,6 +1892,9 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     return;
   }
 
+  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
+                   responseCaseToString(response->response_case()), response->DebugString());
+
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
@@ -1901,16 +1912,24 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     if (config_->isAllowedOverrideMode(mode_override)) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server for this request",
                        *decoder_callbacks_);
+      const auto old_decoding_body_mode = decoding_state_.bodyMode();
       decoding_state_.setProcessingMode(mode_override);
       encoding_state_.setProcessingMode(mode_override);
+
+      // If the response case is not set, this response message is for overriding the
+      // processing mode only.
+      if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
+        // If this function call returns false, it's a spurious response, and is handled
+        // by the default case of the switch statement below.
+        if (decoding_state_.handleStandaloneModeOverride(old_decoding_body_mode)) {
+          return;
+        }
+      }
     } else {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server is disallowed",
                        *decoder_callbacks_);
     }
   }
-
-  ENVOY_STREAM_LOG(debug, "Received {} response {}", *decoder_callbacks_,
-                   responseCaseToString(response->response_case()), response->DebugString());
 
   bool eos_seen_in_body = false;
   absl::Status processing_status;

@@ -4,4 +4,4 @@ use ``format_string`` instead of a static ``value``. These entries are now evalu
 upstream connection stream info and emitted in the proxy protocol v2 header. An entry that sets
 both ``value`` and ``format_string``, or neither, is now rejected at configuration load. This
 behavior can be reverted by setting the runtime guard
-``envoy.reloadable_features.proxy_protocol_added_tlvs_format_string`` to false.
+``envoy.reloadable_features.proxy_protocol_added_tlvs_format_string`` to ``false``.

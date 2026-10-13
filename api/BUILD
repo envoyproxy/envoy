@@ -5,6 +5,12 @@ load("@rules_proto//proto:defs.bzl", "proto_descriptor_set")
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    ".bazelrc",
+    "MODULE.bazel",
+    "MODULE.bazel.lock",
+])
+
 proto_library(
     name = "v2_protos",
     visibility = ["//visibility:public"],
@@ -78,6 +84,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/common/workload_discovery/v3:pkg",
         "//contrib/envoy/extensions/filters/http/alpn/v3:pkg",
         "//contrib/envoy/extensions/filters/http/checksum/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/http/client_cert/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
         "//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/istio_stats/v3:pkg",
@@ -178,6 +185,7 @@ proto_library(
         "//envoy/extensions/compression/gzip/decompressor/v3:pkg",
         "//envoy/extensions/compression/zstd/compressor/v3:pkg",
         "//envoy/extensions/compression/zstd/decompressor/v3:pkg",
+        "//envoy/extensions/config/validators/dynamic_modules/v3:pkg",
         "//envoy/extensions/config/validators/minimum_clusters/v3:pkg",
         "//envoy/extensions/content_parsers/json/v3:pkg",
         "//envoy/extensions/dynamic_modules/v3:pkg",
@@ -333,6 +341,9 @@ proto_library(
         "//envoy/extensions/health_checkers/redis/v3:pkg",
         "//envoy/extensions/health_checkers/thrift/v3:pkg",
         "//envoy/extensions/health_checkers/udp/v3:pkg",
+        "//envoy/extensions/http/ai_filters/request_info/v3:pkg",
+        "//envoy/extensions/http/ai_filters/schema_validation/v3:pkg",
+        "//envoy/extensions/http/ai_filters/transcoder/v3:pkg",
         "//envoy/extensions/http/cache/file_system_http_cache/v3:pkg",
         "//envoy/extensions/http/cache/simple_http_cache/v3:pkg",
         "//envoy/extensions/http/cache_v2/file_system_http_cache/v3:pkg",
@@ -343,6 +354,7 @@ proto_library(
         "//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg",
         "//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg",
         "//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg",
+        "//envoy/extensions/http/header_formatters/dynamic_modules/v3:pkg",
         "//envoy/extensions/http/header_formatters/preserve_case/v3:pkg",
         "//envoy/extensions/http/header_validators/envoy_default/v3:pkg",
         "//envoy/extensions/http/injected_credentials/generic/v3:pkg",
@@ -422,6 +434,8 @@ proto_library(
         "//envoy/extensions/router/cluster_specifiers/dynamic_modules/v3:pkg",
         "//envoy/extensions/router/cluster_specifiers/lua/v3:pkg",
         "//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg",
+        "//envoy/extensions/router/cluster_specifiers/priority_group/v3:pkg",
+        "//envoy/extensions/router/route_specifiers/dynamic_modules/v3:pkg",
         "//envoy/extensions/stat_sinks/dynamic_modules/v3:pkg",
         "//envoy/extensions/stat_sinks/graphite_statsd/v3:pkg",
         "//envoy/extensions/stat_sinks/open_telemetry/v3:pkg",
@@ -447,6 +461,7 @@ proto_library(
         "//envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3:pkg",
+        "//envoy/extensions/transport_sockets/tls/handshakers/dynamic_modules/v3:pkg",
         "//envoy/extensions/transport_sockets/tls/v3:pkg",
         "//envoy/extensions/udp_packet_writer/v3:pkg",
         "//envoy/extensions/upstreams/http/dynamic_modules/v3:pkg",

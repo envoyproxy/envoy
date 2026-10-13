@@ -17,6 +17,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/coroutine:executor_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
 

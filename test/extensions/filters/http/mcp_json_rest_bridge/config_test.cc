@@ -119,6 +119,68 @@ TEST(McpJsonRestBridgeFilterPerRouteConfigTest, PerRouteConfigDuplicateToolNames
                                    HasSubstr("Duplicate tool name: my_tool")));
 }
 
+TEST(McpJsonRestBridgeFilterConfigTest, InvalidMaxSupportedProtocolVersion) {
+  McpJsonRestBridgeFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  const std::vector<std::string> invalid_versions = {
+      "invalid-version", "2024-11-05", "2025-03-26", "2025-06-18", "2026-99-99", "", "2026-11-25"};
+
+  for (const auto& version : invalid_versions) {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+    TestUtility::loadFromYaml(fmt::format(R"EOF(
+      server_info:
+        max_supported_protocol_version: "{}"
+    )EOF",
+                                          version),
+                              proto_config);
+
+    // Proto-level validation (PGV) fails when loaded via factory.
+    EXPECT_THROW_WITH_REGEX(
+        factory.createFilterFactoryFromProto(proto_config, "stats", context).IgnoreError(),
+        Envoy::ProtoValidationException, "Proto constraint validation failed");
+  }
+}
+
+TEST(McpJsonRestBridgeFilterConfigTest, MaxSupportedProtocolVersionBehavior) {
+  // Default when not provided: 2025-11-25
+  {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+    absl::StatusOr<McpJsonRestBridgeFilterConfigSharedPtr> config =
+        McpJsonRestBridgeFilterConfig::create(proto_config);
+    ASSERT_OK(config);
+    EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2025-11-25");
+  }
+
+  // Version 2025-11-25 is effective
+  {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+    TestUtility::loadFromYaml(R"EOF(
+      server_info:
+        max_supported_protocol_version: "2025-11-25"
+    )EOF",
+                              proto_config);
+    absl::StatusOr<McpJsonRestBridgeFilterConfigSharedPtr> config =
+        McpJsonRestBridgeFilterConfig::create(proto_config);
+    ASSERT_OK(config);
+    EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2025-11-25");
+  }
+
+  // Version 2026-07-28 is effective
+  {
+    envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
+    TestUtility::loadFromYaml(R"EOF(
+      server_info:
+        max_supported_protocol_version: "2026-07-28"
+    )EOF",
+                              proto_config);
+    absl::StatusOr<McpJsonRestBridgeFilterConfigSharedPtr> config =
+        McpJsonRestBridgeFilterConfig::create(proto_config);
+    ASSERT_OK(config);
+    EXPECT_EQ((*config)->maxSupportedProtocolVersion(), "2026-07-28");
+  }
+}
+
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters

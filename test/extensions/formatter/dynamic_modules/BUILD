@@ -1,12 +1,23 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_dyn_module_test",
+    "envoy_cc_test",
     "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_test(
+    name = "abi_impl_test",
+    srcs = ["abi_impl_test.cc"],
+    deps = [
+        "//source/extensions/formatter/dynamic_modules:formatter_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
 
 envoy_cc_dyn_module_test(
     name = "config_test",

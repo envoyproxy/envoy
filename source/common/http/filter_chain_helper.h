@@ -191,7 +191,7 @@ private:
 
     auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
         config_discovery, name, server_context_, factory_context_, cluster_manager_,
-        last_filter_in_current_config, filter_chain_type, nullptr);
+        last_filter_in_current_config, filter_chain_type, nullptr, stats_prefix_);
     filter_factories.push_back({std::move(filter_config_provider), disabled_by_default});
     return absl::OkStatus();
   }

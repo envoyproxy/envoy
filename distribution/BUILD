@@ -1,6 +1,8 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@envoy_repo//:version.bzl", "VERSION")
 load("@envoy_toolshed//pgp:defs.bzl", "pgp_public_key", "pgp_sign_checksums")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(":changes.bzl", "envoy_signed_changes")
@@ -186,7 +188,14 @@ genrule(
     rm -rf "$${tmpdir}/deb/"
     rm -f "$${tmpdir}"/*.changes
     %s
-    tar czf $@ -C "$${tmpdir}" .
+    chmod 0644 "$${tmpdir}"/*
+    tar czf $@ \
+        --owner=0 \
+        --group=0 \
+        --numeric-owner \
+        --mtime='2000-01-01 00:00:00Z' \
+        --sort=name \
+        -C "$${tmpdir}" .
     """ % _SIGNED_CHANGES_COPY_CMD,
     tags = ["manual"],
 )
@@ -245,32 +254,53 @@ pgp_sign_checksums(
     tags = ["manual"],
 )
 
-# Final release bundle layout contract (matches prior `envoy.gpg.sign` output):
+# Final release bundle layout contract (matches prior `envoy.gpg.sign` output,
+# with pkg_tar normalizing modes, owners, and mtimes):
 # - `signing.key` at archive root.
 # - `bin/` contains `debs.tar.gz`, 4 release binaries, and `checksums.txt.asc`.
 # Publisher uploads `bin/*` non-recursively, and distro verification reads
 # `bin/debs.tar.gz` plus `signing.key`.
-genrule(
-    name = "signed",
+pkg_files(
+    name = "signed_bin_files",
+    srcs = [
+        ":release_binaries",
+    ],
+    attributes = pkg_attributes(mode = "0755"),
+    prefix = "bin",
+    tags = ["manual"],
+)
+
+pkg_files(
+    name = "signed_bin_data",
     srcs = [
         ":multi_arch_debs",
-        ":release_binaries",
         ":signed_checksums",
-        ":signing_key_file",
     ],
-    outs = ["release.signed.tar.zst"],
-    cmd = """
-    tmpdir=$$(mktemp -d)
-    mkdir -p "$$tmpdir/bin"
-    cp $(location :multi_arch_debs) "$$tmpdir/bin/debs.tar.gz"
-    for f in $(locations :release_binaries); do
-        cp "$$f" "$$tmpdir/bin/"
-    done
-    cp $(location :signed_checksums) "$$tmpdir/bin/checksums.txt.asc"
-    cp $(location :signing_key_file) "$$tmpdir/signing.key"
-    ZSTD=$(location @zstd//:zstd_cli)
-    tar -C "$$tmpdir" -cf - . | "$$ZSTD" -T0 -o $@ -
-    """,
+    attributes = pkg_attributes(mode = "0644"),
+    prefix = "bin",
     tags = ["manual"],
-    tools = ["@zstd//:zstd_cli"],
+)
+
+pkg_files(
+    name = "signed_key_file",
+    srcs = [":signing_key_file"],
+    attributes = pkg_attributes(mode = "0644"),
+    renames = {
+        ":signing_key_file": "signing.key",
+    },
+    tags = ["manual"],
+)
+
+pkg_tar(
+    name = "signed",
+    srcs = [
+        ":signed_bin_data",
+        ":signed_bin_files",
+        ":signed_key_file",
+    ],
+    out = "release.signed.tar.zst",
+    compressor = "@zstd//:zstd_cli",
+    compressor_args = "-T0",
+    extension = "tar.zst",
+    tags = ["manual"],
 )

@@ -60,6 +60,20 @@ public:
   const std::string name_;
 };
 
+// A fake config validator that reports a fixed type url. The xDS tests only exercise the
+// config_validators wiring, so the validate() methods are no-ops.
+class FakeConfigValidator : public Config::ConfigValidator {
+public:
+  absl::string_view typeUrl() const override {
+    return "type.googleapis.com/envoy.fake_validator.v3.FakeValidator";
+  }
+
+  void validate(const Server::Instance&, const std::vector<Config::DecodedResourcePtr>&) override {}
+
+  void validate(const Server::Instance&, const std::vector<Config::DecodedResourcePtr>&,
+                const Protobuf::RepeatedPtrField<std::string>&) override {}
+};
+
 // A fake cluster validator that exercises the code that uses ADS with
 // config_validators.
 class FakeConfigValidatorFactory : public Config::ConfigValidatorFactory {
@@ -68,7 +82,7 @@ public:
 
   Config::ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
                                                    ProtobufMessage::ValidationVisitor&) override {
-    return nullptr;
+    return std::make_unique<FakeConfigValidator>();
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -77,10 +91,6 @@ public:
   }
 
   std::string name() const override { return "envoy.fake_validator"; }
-
-  std::string typeUrl() const override {
-    return "type.googleapis.com/envoy.fake_validator.v3.FakeValidator";
-  }
 };
 
 // A ConfigSubscriptionFactory for the xDS-TP based config-sources.

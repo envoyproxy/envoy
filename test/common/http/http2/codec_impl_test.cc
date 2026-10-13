@@ -1400,6 +1400,144 @@ TEST_P(Http2CodecImplTest, NoMetadataEndStreamTest) {
   driveToCompletion();
 }
 
+TEST_P(Http2CodecImplTest, ConnectionMetadataIsSentToServer) {
+  allow_metadata_ = true;
+  initialize();
+  MetadataMapVector metadata_vector;
+  MetadataMap metadata_map = {{"key", "value"}};
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_))
+      .Times(1)
+      .WillOnce(Invoke([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), "value");
+      }));
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataInterleavedWithStreamData) {
+  allow_metadata_ = true;
+  initialize();
+
+  MetadataMapVector metadata_vector;
+  MetadataMap metadata_map = {{"key", "value"}};
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).WillOnce(InvokeWithoutArgs([&]() {
+    server_->encodeMetadata(metadata_vector);
+  }));
+  EXPECT_CALL(client_callbacks_, onMetadata(_))
+      .Times(1)
+      .WillOnce(Invoke([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), "value");
+      }));
+
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_))
+      .Times(1)
+      .WillOnce(Invoke([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), "value");
+      }));
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataExceedsMax) {
+  allow_metadata_ = true;
+  server_http2_options_.mutable_max_metadata_size()->set_value(10);
+  expect_buffered_data_on_teardown_ = true;
+  initialize();
+
+  MetadataMapVector metadata_vector;
+  MetadataMap metadata_map = {{"key", std::string(100, 'a')}};
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_)).Times(0);
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+
+  EXPECT_TRUE(isCodecProtocolError(server_wrapper_->status_));
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataMultipleMaps) {
+  allow_metadata_ = true;
+  initialize();
+
+  size_t sz{5};
+  MetadataMapVector metadata_vector;
+  for (size_t i = 0; i < sz; i++) {
+    MetadataMap metadata_map = {{"key", std::to_string(i)}};
+    metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+  }
+
+  size_t cur{0};
+  EXPECT_CALL(server_callbacks_, onMetadata(_))
+      .Times(sz)
+      .WillRepeatedly(Invoke([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), std::to_string(cur++));
+      }));
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataLargeVec) {
+  allow_metadata_ = true;
+  initialize();
+
+  size_t sz{10};
+  MetadataMapVector metadata_vector;
+  for (size_t i = 0; i < sz; i++) {
+    MetadataMap metadata_map = {{"key", std::string(50 * 1024, 'a')}};
+    metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+  }
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_))
+      .Times(sz)
+      .WillRepeatedly(Invoke([&](MetadataMapPtr&& metadata_map_ptr) {
+        EXPECT_EQ(metadata_map_ptr->size(), 1);
+        EXPECT_EQ(metadata_map_ptr->at("key"), std::string(50 * 1024, 'a'));
+      }));
+  client_->encodeMetadata(metadata_vector);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataHasEnvoyBugWhenNotAllowed) {
+  allow_metadata_ = false;
+  initialize();
+
+  MetadataMapVector metadata_vector;
+  MetadataMap metadata_map = {{"key", "value"}};
+  metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
+
+  EXPECT_ENVOY_BUG(client_->encodeMetadata(metadata_vector),
+                   "metadata not allowed on this connection");
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ConnectionMetadataEmptyMapIsIgnored) {
+  allow_metadata_ = true;
+  initialize();
+
+  const Http::MetadataMap empty_metadata_map;
+  const Http2Frame empty_metadata_frame = Http2Frame::makeMetadataFrameFromMetadataMap(
+      0, empty_metadata_map, Http2Frame::MetadataFlags::EndMetadata);
+  Buffer::OwnedImpl buffer(std::string(empty_metadata_frame.begin(), empty_metadata_frame.end()));
+
+  EXPECT_CALL(server_callbacks_, onMetadata(_)).Times(0);
+  client_connection_.write(buffer, false);
+  driveToCompletion();
+  EXPECT_EQ(server_stats_store_.counter("http2.metadata_empty_frames").value(), 1);
+}
+
 // Validate the keepalive PINGs are sent and received correctly.
 TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   expect_buffered_data_on_teardown_ = true;
@@ -4556,6 +4694,61 @@ TEST_P(Http2CodecImplTest, ShouldTrackWhichStreamLeastRecentlyEncodedIfDeferProc
   EXPECT_THAT(getActiveStreamsIds(*server_), ElementsAre(1, 3));
 }
 
+// Regression test for reentrant encoding during connection-level watermark callbacks. The callback
+// fanout must tolerate an encode operation reordering active_streams_ while still notifying every
+// stream exactly once in the original order.
+TEST_P(Http2CodecImplTest, LowWatermarkCallbackCanReorderActiveStreams) {
+  initialize();
+
+  RequestEncoder* request_encoder1 = request_encoder_;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder1->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder2->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  RequestEncoder* request_encoder3 = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder3->encodeHeaders(request_headers, false));
+  driveToCompletion();
+
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(5, 3, 1));
+
+  MockStreamCallbacks callbacks1;
+  MockStreamCallbacks callbacks2;
+  MockStreamCallbacks callbacks3;
+  request_encoder1->getStream().addCallbacks(callbacks1);
+  request_encoder2->getStream().addCallbacks(callbacks2);
+  request_encoder3->getStream().addCallbacks(callbacks3);
+
+  Buffer::OwnedImpl high_watermark_data("a");
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_CALL(callbacks1, onAboveWriteBufferHighWatermark()).WillOnce([&]() {
+    request_encoder1->encodeData(high_watermark_data, false);
+  });
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks3, onAboveWriteBufferHighWatermark());
+  client_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(1, 5, 3));
+  driveToCompletion();
+
+  Buffer::OwnedImpl low_watermark_data("a");
+  EXPECT_CALL(request_decoder_, decodeData(_, false));
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).WillOnce([&]() {
+    request_encoder2->encodeData(low_watermark_data, false);
+  });
+  EXPECT_CALL(callbacks1, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
+  client_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+  EXPECT_THAT(getActiveStreamsIds(*client_), ElementsAre(3, 1, 5));
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, ChunksLargeBodyDuringDeferredProcessing) {
   server_settings_.emplace(smallWindowHttp2Settings());
   // We must initialize before dtor, otherwise we'll touch uninitialized
@@ -5129,10 +5322,6 @@ TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
   MetadataMap metadata_map = {{"key", "value"}};
   MetadataMapVector metadata_vector;
   metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
-  // Validate both the ID = 0 special case and a non-zero ID not already bound to a stream (any ID >
-  // 0 for this test).
-  EXPECT_TRUE(client_->submitMetadata(metadata_vector, 0));
-  driveToCompletion();
   EXPECT_TRUE(client_->submitMetadata(metadata_vector, 1000));
   driveToCompletion();
 }
@@ -5387,6 +5576,26 @@ TEST_P(Http2CodecImplTest, StreamResetRateLimitConfigurable) {
     }
     driveToCompletion();
   }
+}
+
+TEST_P(Http2CodecImplTest, TrackCodecConnections) {
+  initialize();
+
+  std::string active_impl = (http2_implementation_ == Http2Impl::Oghttp2) ? "oghttp2" : "nghttp2";
+  std::string inactive_impl = (http2_implementation_ == Http2Impl::Oghttp2) ? "nghttp2" : "oghttp2";
+
+  // Client stats store: Envoy acts as client, so only upstream should have counts for active_impl.
+  EXPECT_EQ(1,
+            client_stats_store_.counter("http2." + active_impl + "_upstream_connections").value());
+  EXPECT_EQ(
+      0, client_stats_store_.counter("http2." + inactive_impl + "_upstream_connections").value());
+
+  // Server stats store: Envoy acts as server, so only downstream should have counts for
+  // active_impl.
+  EXPECT_EQ(
+      1, server_stats_store_.counter("http2." + active_impl + "_downstream_connections").value());
+  EXPECT_EQ(
+      0, server_stats_store_.counter("http2." + inactive_impl + "_downstream_connections").value());
 }
 
 } // namespace Http2

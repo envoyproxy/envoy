@@ -1,4 +1,4 @@
-Added support for evaluating CEL connection attributes and filter state in network external processor.
+Added support for evaluating CEL connection attributes and filter state in the network external processor.
 Configured via :ref:`connection_attributes
 <envoy_v3_api_field_extensions.filters.network.ext_proc.v3.NetworkExternalProcessor.connection_attributes>`
 and sent in :ref:`ProcessingRequest.attributes
