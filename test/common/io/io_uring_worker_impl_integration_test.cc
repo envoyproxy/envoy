@@ -1,5 +1,8 @@
+#include <poll.h>
 #include <sys/socket.h>
 
+#include <algorithm>
+#include <functional>
 #include <queue>
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -86,6 +89,14 @@ public:
   bool is_shutdown_injected_completion_{false};
 };
 
+class IoUringReceiveTuningSocket : public IoUringServerSocket {
+public:
+  IoUringReceiveTuningSocket(os_fd_t fd, IoUringWorkerImpl& worker, Event::FileReadyCb cb)
+      : IoUringServerSocket(fd, worker, std::move(cb), 1000, 131072, 16384, false) {}
+
+  bool receiveStopped() const { return read_req_ == nullptr && read_cancel_req_ == nullptr; }
+};
+
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
 public:
   IoUringWorkerTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher)
@@ -96,6 +107,11 @@ public:
   }
 
   const std::list<IoUringSocketEntryPtr>& getSockets() const { return sockets_; }
+
+  IoUringReceiveTuningSocket& addTuningSocket(os_fd_t fd, Event::FileReadyCb cb) {
+    return static_cast<IoUringReceiveTuningSocket&>(
+        addSocket(std::make_unique<IoUringReceiveTuningSocket>(fd, *this, std::move(cb))));
+  }
 };
 
 class IoUringWorkerIntegrationTest : public testing::Test {
@@ -221,6 +237,104 @@ protected:
   Event::GlobalTimeSystem time_system_;
   std::unique_ptr<IoUringWorkerTestImpl> io_uring_worker_;
 };
+
+class IoUringReceiveTuningIntegrationTest : public IoUringWorkerIntegrationTest,
+                                            public testing::WithParamInterface<bool> {
+public:
+  void SetUp() override {
+    IoUringWorkerIntegrationTest::SetUp();
+    if (should_skip_) {
+      return;
+    }
+    api_ = Api::createApiForTest(time_system_);
+    dispatcher_ = api_->allocateDispatcher("receive_tuning");
+    io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
+        std::make_unique<IoUringImpl>(512, false, true, 64), *dispatcher_);
+    if (!io_uring_worker_->isMultishotEnabled()) {
+      GTEST_SKIP() << "Kernel lacks provided buffer rings";
+    }
+    createListenerAndConnectedSocketPair();
+    socket_ = &io_uring_worker_->addTuningSocket(server_socket_, [this](uint32_t events) {
+      if (events & Event::FileReadyType::Closed) {
+        ++close_events_;
+      }
+      if (events & Event::FileReadyType::Read) {
+        const ReadParam& param = socket_->getReadParam().ref();
+        if (param.result_ == 0) {
+          ++eof_events_;
+        } else {
+          EXPECT_GT(param.result_, 0);
+          const uint64_t count = std::min(max_read_bytes_, param.buf_.length());
+          received_.append(param.buf_.toString(), 0, count);
+          param.buf_.drain(count);
+        }
+      }
+      return absl::OkStatus();
+    });
+    socket_->enableRead();
+  }
+
+  void TearDown() override {
+    io_uring_worker_.reset();
+    server_socket_ = INVALID_SOCKET;
+    cleanup();
+  }
+
+  bool pumpUntil(const std::function<bool()>& condition) {
+    Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+    while (!condition()) {
+      if (!bound.withinBound()) {
+        return false;
+      }
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    return true;
+  }
+
+  bool finArrived() {
+    pollfd descriptor{server_socket_, POLLRDHUP, 0};
+    return poll(&descriptor, 1, 0) == 1 && (descriptor.revents & POLLRDHUP) != 0;
+  }
+
+  IoUringReceiveTuningSocket* socket_{nullptr};
+  std::string received_;
+  uint64_t max_read_bytes_{65536};
+  unsigned eof_events_{0};
+  unsigned close_events_{0};
+};
+
+TEST_P(IoUringReceiveTuningIntegrationTest, PausedPayloadAndHalfCloseDrainAfterResume) {
+  ASSERT_EQ(6, send(client_socket_, "before", 6, MSG_NOSIGNAL));
+  ASSERT_TRUE(pumpUntil([this] { return received_ == "before"; }));
+  socket_->disableRead();
+  ASSERT_TRUE(pumpUntil([this] { return socket_->receiveStopped(); }));
+  ASSERT_EQ(5, send(client_socket_, "after", 5, MSG_NOSIGNAL));
+  ASSERT_EQ(0, shutdown(client_socket_, SHUT_WR));
+  ASSERT_TRUE(pumpUntil([this] { return finArrived(); }));
+  EXPECT_EQ("before", received_);
+  EXPECT_EQ(0, eof_events_);
+  max_read_bytes_ = 2;
+  socket_->enableRead();
+  ASSERT_TRUE(pumpUntil([this] { return eof_events_ != 0; }));
+  EXPECT_EQ("beforeafter", received_);
+  EXPECT_EQ(1, eof_events_);
+  EXPECT_EQ(0, close_events_);
+}
+
+TEST_P(IoUringReceiveTuningIntegrationTest, PausedPeerCloseNotifiesWithoutReadResume) {
+  socket_->enableCloseEvent(true);
+  socket_->disableRead();
+  ASSERT_TRUE(pumpUntil([this] { return socket_->receiveStopped(); }));
+  ASSERT_EQ(6, send(client_socket_, "unread", 6, MSG_NOSIGNAL));
+  ASSERT_EQ(0, shutdown(client_socket_, SHUT_WR));
+  ASSERT_TRUE(pumpUntil([this] { return close_events_ != 0; }));
+  EXPECT_EQ(1, close_events_);
+  EXPECT_TRUE(received_.empty());
+  EXPECT_EQ(0, eof_events_);
+}
+
+INSTANTIATE_TEST_SUITE_P(ImmediateAndDeferred, IoUringReceiveTuningIntegrationTest,
+                         testing::Values(false));
 
 TEST_F(IoUringWorkerIntegrationTest, WorkerShutdownWithBlockedWrite) {
   initialize();

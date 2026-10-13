@@ -44,6 +44,7 @@ envoy_cc_library(
         ":io_uring_impl_lib",
         "//envoy/common/io:io_uring_interface",
         "//envoy/event:file_event_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:linked_object",
     ],

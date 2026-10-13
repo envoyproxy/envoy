@@ -210,6 +210,8 @@ protected:
   Event::FileReadyCb cb_;
 };
 
+struct IoUringPausedCloseWatch;
+
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
@@ -226,6 +228,7 @@ public:
   void cancelWriteOnWorkerShutdown() override;
   void enableRead() override;
   void disableRead() override;
+  void enableCloseEvent(bool enable) override;
   void write(Buffer::Instance& data) override;
   uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   void shutdown(int how) override;
@@ -254,6 +257,9 @@ protected:
   uint32_t next_read_size_{0};
   // Whether the in-flight read request is a `multishot` read drawing from the provided buffer pool.
   bool read_is_multishot_{false};
+  // The cancellation acknowledgment can arrive before the receive terminates. Keep this state
+  // until a new read is armed to avoid duplicate cancellation of the current receive.
+  bool read_cancellation_requested_{false};
   // Set when a `multishot` read ends with an exhausted buffer pool. The next read uses a readv that
   // re-arms `multishot` once buffers are recycled.
   bool multishot_fallback_{false};
@@ -293,6 +299,9 @@ protected:
   // Whether the write buffer is above the high watermark and backpressure is being applied.
   bool above_write_high_watermark_{false};
 
+  std::shared_ptr<IoUringPausedCloseWatch> paused_close_watch_;
+
+  void armPausedCloseWatch();
   void maybeCloseIfReady();
   void closeInternal();
   void submitReadRequest();

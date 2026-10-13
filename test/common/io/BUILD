@@ -33,10 +33,13 @@ envoy_cc_test(
     }),
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/api:os_sys_calls_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/io:io_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ] + select({
         "//bazel:linux": [
