@@ -5483,6 +5483,113 @@ TEST_F(McpJsonRestBridgeFilterTest,
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
+constexpr absl::string_view kMissingClientCapabilitiesError =
+    R"json({"code":-32602,"message":"Missing required params._meta field: io.modelcontextprotocol/clientCapabilities"})json";
+
+class StatelessClientCapabilitiesTest : public McpJsonRestBridgeFilterTest {
+protected:
+  void SetUp() override {
+    McpJsonRestBridgeFilterTest::SetUp();
+    proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+        "2026-07-28");
+    ASSERT_OK(makeFilter());
+  }
+
+  void setToolsCallHeaders() {
+    request_headers_ = {{":method", "POST"},
+                        {":path", "/mcp"},
+                        {"content-type", "application/json"},
+                        {"mcp-method", "tools/call"},
+                        {"mcp-name", "create_api_key"},
+                        {"mcp-protocol-version", "2026-07-28"}};
+  }
+};
+
+TEST_F(StatelessClientCapabilitiesTest, EmptyClientCapabilitiesIsAccepted) {
+  setToolsCallHeaders();
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/v1/projects/test-codelab/apiKeys"));
+}
+
+TEST_F(StatelessClientCapabilitiesTest, MissingClientCapabilitiesReturnsInvalidParams) {
+  setToolsCallHeaders();
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kMissingClientCapabilitiesError), _, _,
+                     StrEq("mcp_json_rest_bridge_request_mcp_client_capabilities_missing")));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/mcp"));
+
+  response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body(kMissingClientCapabilitiesError);
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"error":{"code":-32602,"message":"Missing required params._meta field: io.modelcontextprotocol/clientCapabilities"},"id":123,"jsonrpc":"2.0"})json"));
+}
+
+TEST_F(StatelessClientCapabilitiesTest,
+       MissingClientCapabilitiesTakesPrecedenceOverUnsupportedMethod) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"mcp-method", "resources/list"},
+                      {"mcp-protocol-version", "2026-07-28"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kMissingClientCapabilitiesError), _, _,
+                     StrEq("mcp_json_rest_bridge_request_mcp_client_capabilities_missing")));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":5,"method":"resources/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(StatelessClientCapabilitiesTest, NotificationWithoutClientCapabilitiesIsNotChecked) {
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"mcp-method", "notifications/initialized"},
+                      {"mcp-protocol-version", "2026-07-28"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"code":-32601,"message":"MCP method notifications/initialized is not supported"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","method":"notifications/initialized","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters

@@ -231,6 +231,13 @@ private:
                                                 absl::string_view method,
                                                 Http::RequestHeaderMapOptConstRef request_headers);
 
+  // Validates that a stateless (2026-07-28) JSON-RPC request carries the required
+  // params._meta["io.modelcontextprotocol/clientCapabilities"] field. Only the presence of the
+  // field is checked. Messages without an id (notifications) are not subject to the requirement.
+  // Returns true when the message is valid. Otherwise sends a local error response and returns
+  // false.
+  bool validateClientCapabilitiesMeta(const nlohmann::json& json_rpc, absl::string_view method);
+
   // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
   // field. Returns true when the header is valid. Otherwise sends a local error response and
   // returns false.

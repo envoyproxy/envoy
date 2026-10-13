@@ -1359,6 +1359,30 @@ absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
   return absl::OkStatus();
 }
 
+bool McpJsonRestBridgeFilter::validateClientCapabilitiesMeta(const nlohmann::json& json_rpc,
+                                                             absl::string_view method) {
+
+  if (!json_rpc.contains(McpConstants::ID_FIELD)) {
+    return true;
+  }
+
+  const nlohmann::json& params = json_rpc[McpConstants::PARAMS_FIELD];
+  if (params[McpConstants::META_FIELD].contains(McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD)) {
+    return true;
+  }
+
+  ENVOY_STREAM_LOG(debug, "Stateless MCP request is missing params._meta[\"{}\"].",
+                   *decoder_callbacks_, McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD);
+  sendErrorResponse(
+      Http::Code::BadRequest, BridgeStatus::RequestMcpClientCapabilitiesMissing,
+      generateErrorJsonResponse(McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE,
+                                absl::StrCat("Missing required params._meta field: ",
+                                             McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD))
+          .dump(),
+      nullptr, method, params);
+  return false;
+}
+
 bool McpJsonRestBridgeFilter::validateMcpMethodHeader(
     const nlohmann::json& json_rpc, absl::string_view method,
     Http::RequestHeaderMapOptRef request_headers) {
@@ -1457,6 +1481,10 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
 
   if (is_stateless_request_ && method == McpConstants::Methods::TOOLS_CALL &&
       !validateMcpNameHeader(json_rpc, method, request_headers)) {
+    return;
+  }
+
+  if (is_stateless_request_ && !validateClientCapabilitiesMeta(json_rpc, method)) {
     return;
   }
 

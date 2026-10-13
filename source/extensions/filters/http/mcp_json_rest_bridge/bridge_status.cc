@@ -19,6 +19,8 @@ absl::string_view bridgeStatusToString(BridgeStatus status) {
     return BridgeStatusValues::REQUEST_UNSUPPORTED_MCP_VERSION;
   case BridgeStatus::RequestMcpHeaderMismatch:
     return BridgeStatusValues::REQUEST_MCP_HEADER_MISMATCH;
+  case BridgeStatus::RequestMcpClientCapabilitiesMissing:
+    return BridgeStatusValues::REQUEST_MCP_CLIENT_CAPABILITIES_MISSING;
   case BridgeStatus::RequestInitializeNotValid:
     return BridgeStatusValues::REQUEST_INITIALIZE_NOT_VALID;
   case BridgeStatus::RequestMcpMethodNotSupported:
