@@ -89,6 +89,17 @@ public:
                         const std::string& fingerprint, Callbacks& callbacks) PURE;
 
   /**
+   * Fetch an IAM Access Token for a target service account.
+   *
+   * @param audience the Audience proto containing the IAM access token request details.
+   * @param authorization is the token to pass to IAM for authentication
+   * @param callbacks the callbacks to be notified when the token fetch completes.
+   */
+  virtual void
+  fetchIamAccessToken(const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
+                      const std::string& authorization, Callbacks& callbacks) PURE;
+
+  /**
    * Cancel the active request.
    */
   virtual void cancel() PURE;

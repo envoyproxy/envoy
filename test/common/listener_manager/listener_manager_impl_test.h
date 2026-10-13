@@ -72,7 +72,13 @@ protected:
   ListenerManagerImplTest()
       : listener_factory_ptr_(std::make_unique<NiceMock<MockListenerComponentFactory>>()),
         listener_factory_(*listener_factory_ptr_),
-        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
+        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()),
+        network_config_provider_manager_(
+            std::make_shared<Filter::NetworkFilterConfigProviderManagerImpl>()),
+        tcp_listener_config_provider_manager_(
+            std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()),
+        quic_listener_config_provider_manager_(
+            std::make_shared<Filter::QuicListenerFilterConfigProviderManagerImpl>()) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -80,8 +86,8 @@ protected:
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     // Drain notifications are scheduled whenever a listener or its filter chains begin draining.
     // They are not the focus of these tests, so allow them in any number.
-    EXPECT_CALL(*worker_, onListenerDrain(_)).Times(::testing::AnyNumber());
-    EXPECT_CALL(*worker_, onFilterChainDrain(_, _)).Times(::testing::AnyNumber());
+    EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(::testing::AnyNumber());
+    EXPECT_CALL(*worker_, onFilterChainDrain(_, _, _)).Times(::testing::AnyNumber());
     ON_CALL(server_.validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
@@ -96,12 +102,12 @@ protected:
             [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
               return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, filter_chain_factory_context, network_config_provider_manager_);
+                  filters, filter_chain_factory_context, *network_config_provider_manager_);
             }));
     ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
-        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
+        .WillByDefault(Return(tcp_listener_config_provider_manager_.get()));
     ON_CALL(listener_factory_, getQuicListenerConfigProviderManager())
-        .WillByDefault(Return(&quic_listener_config_provider_manager_));
+        .WillByDefault(Return(quic_listener_config_provider_manager_.get()));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -497,9 +503,11 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
-  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
-  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
-  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
+  std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
+  std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::QuicListenerFilterConfigProviderManagerImpl>
+      quic_listener_config_provider_manager_;
 };
 } // namespace Server
 } // namespace Envoy

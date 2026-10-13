@@ -160,6 +160,9 @@ private:
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
   const bool always_consume_default_token_bucket_{};
   bool always_deny_default_{false};
+  // If true, an exhausted shadow mode descriptor doesn't stop the evaluation of the remaining
+  // descriptors and the default token bucket.
+  const bool shadow_mode_no_short_circuit_{false};
 };
 
 class AlwaysDenyLocalRateLimiter : public LocalRateLimiter {

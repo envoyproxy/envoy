@@ -32,6 +32,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
+using testing::Key;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -1250,32 +1253,31 @@ TEST_F(StreamingLocalReplyTest, ProcessingStreamingLocalResponse) {
         // Indicate to the client that there is body to follow.
         makeLocalResponseHeaders(header_resp, false);
       });
-  EXPECT_TRUE(dynamic_metadata_.filter_metadata().contains(
-      "envoy-test-ext_proc-streaming_immediate_response"));
-
-  EXPECT_TRUE(dynamic_metadata_.filter_metadata()
+  EXPECT_THAT(dynamic_metadata_.filter_metadata(),
+              Contains(Key("envoy-test-ext_proc-streaming_immediate_response")));
+  EXPECT_THAT(dynamic_metadata_.filter_metadata()
                   .at("envoy-test-ext_proc-streaming_immediate_response")
-                  .fields()
-                  .contains("headers_response"));
+                  .fields(),
+              Contains(Key("headers_response")));
   EXPECT_CALL(decoder_callbacks_, encodeData(_, false));
   sendStreamingLocalResponseBody([](const ProcessingResponse&, StreamedBodyResponse& body_resp) {
     makeLocalResponseDuplexBody(body_resp, "local response body", false);
   });
 
-  EXPECT_TRUE(dynamic_metadata_.filter_metadata()
+  EXPECT_THAT(dynamic_metadata_.filter_metadata()
                   .at("envoy-test-ext_proc-streaming_immediate_response")
-                  .fields()
-                  .contains("body_response"));
+                  .fields(),
+              Contains(Key("body_response")));
   EXPECT_CALL(decoder_callbacks_, encodeTrailers_(_));
   sendStreamingLocalResponseTrailers(
       [](const ProcessingResponse&, envoy::config::core::v3::HeaderMap& trailers_resp) {
         makeLocalResponseTrailers(trailers_resp);
       });
 
-  EXPECT_TRUE(dynamic_metadata_.filter_metadata()
+  EXPECT_THAT(dynamic_metadata_.filter_metadata()
                   .at("envoy-test-ext_proc-streaming_immediate_response")
-                  .fields()
-                  .contains("trailers_response"));
+                  .fields(),
+              Contains(Key("trailers_response")));
   filter_->onDestroy();
 }
 

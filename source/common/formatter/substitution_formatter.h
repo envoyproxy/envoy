@@ -41,6 +41,10 @@ public:
     sink.append(str_.string_value());
     return true;
   }
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo&) const override {
+    sink.addString(str_.string_value());
+  }
   Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override {
     return str_;
   }
@@ -63,6 +67,14 @@ public:
   }
   Protobuf::Value formatValue(const Context&, const StreamInfo::StreamInfo&) const override {
     return num_;
+  }
+  bool formatTo(std::string& sink, const Context&, const StreamInfo::StreamInfo&) const override {
+    sink.append(absl::StrCat(num_.number_value()));
+    return true;
+  }
+  void formatValueTo(ValueSink& sink, const Context&,
+                     const StreamInfo::StreamInfo&) const override {
+    sink.addNumber(num_.number_value());
   }
 
 private:
@@ -165,6 +177,8 @@ public:
 
   // Formatter
   std::string format(const Context& context, const StreamInfo::StreamInfo& info) const override;
+  void formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& info) const override;
 
 private:
   const std::unique_ptr<JsonFormatMapNode> root_;

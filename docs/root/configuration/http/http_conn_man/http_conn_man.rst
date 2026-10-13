@@ -8,6 +8,7 @@ HTTP connection manager
 
   overview
   route_matching
+  route_specifiers
   traffic_splitting
   header_casing
   headers

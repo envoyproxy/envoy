@@ -18,7 +18,7 @@ public:
   CpuUtilizationMonitorFactory() : FactoryBase("envoy.resource_monitors.cpu_utilization") {}
 
 private:
-  Server::ResourceMonitorPtr createResourceMonitorFromProtoTyped(
+  absl::StatusOr<Server::ResourceMonitorPtr> createResourceMonitorFromProtoTyped(
       const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
       Server::Configuration::ResourceMonitorFactoryContext& context) override;
 };

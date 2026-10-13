@@ -158,7 +158,8 @@ public:
         server_factory_context_);
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-    context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
     Network::TransportSocketPtr transport_socket;
     transport_socket =
         context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(

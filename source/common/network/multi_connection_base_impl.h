@@ -85,7 +85,7 @@ public:
   void write(Buffer::Instance& data, bool end_stream) override;
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void removeConnectionCallbacks(ConnectionCallbacks& cb) override;
-  void onDrain() override;
+  void onDrain(ConnectionDrainEvent drain_event) override;
 
   // Methods which are applied to each connection attempt.
   void enableHalfClose(bool enabled) override;
@@ -248,6 +248,10 @@ private:
 
   // True when connect() has finished, either success or failure.
   bool connect_finished_ = false;
+  // Set if the wrapper is notified of a drain sequence before the final connection has been
+  // chosen. Retained so that deferred callbacks registered after the notification are replayed it,
+  // and so that the event can be handed to the chosen connection once the connect completes.
+  std::optional<ConnectionDrainEvent> drain_event_;
   Event::TimerPtr next_attempt_timer_;
 };
 

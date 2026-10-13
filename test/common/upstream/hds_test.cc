@@ -25,6 +25,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -33,6 +34,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -1335,8 +1337,8 @@ TEST_F(HdsTest, TestSendResponseWithHealthMetadata) {
       msg.endpoint_health_response().cluster_endpoints_health(0).locality_endpoints_health(0);
   const auto& structured_endpoint = cluster_endpoint.endpoints_health(0);
   ASSERT_TRUE(structured_endpoint.has_health_metadata());
-  EXPECT_EQ(structured_endpoint.health_metadata().fields().at("http_status_code").number_value(),
-            200.0);
+  EXPECT_THAT(structured_endpoint.health_metadata().fields(),
+              Contains(IsStructNumber("http_status_code", 200.0)));
 }
 
 // Test that sendResponse does not include health_metadata when no metadata

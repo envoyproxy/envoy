@@ -89,6 +89,8 @@ public:
 
   // Cluster name tag
   const std::string CLUSTER_NAME = "envoy.cluster_name";
+  // Health check name tag
+  const std::string HEALTH_CHECK_NAME = "envoy.health_check_name";
   // Listener port tag
   const std::string LISTENER_ADDRESS = "envoy.listener_address";
   // Stats prefix for HttpConnectionManager

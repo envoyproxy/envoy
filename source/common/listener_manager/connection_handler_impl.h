@@ -32,9 +32,8 @@ class ConnectionHandlerImpl : public ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  using UdpListenerCallbacksOptRef =
-      std::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
-  using ActiveTcpListenerOptRef = std::optional<std::reference_wrapper<ActiveTcpListener>>;
+  using UdpListenerCallbacksOptRef = OptRef<Network::UdpListenerCallbacks>;
+  using ActiveTcpListenerOptRef = OptRef<ActiveTcpListener>;
 
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index);
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index,
@@ -54,8 +53,9 @@ public:
                      const Network::ExtraShutdownListenerOptions& options) override;
   void stopListeners() override;
   void onFilterChainDrain(uint64_t listener_tag,
-                          const std::list<const Network::FilterChain*>& filter_chains) override;
-  void onListenerDrain(uint64_t listener_tag) override;
+                          const std::list<const Network::FilterChain*>& filter_chains,
+                          Network::ConnectionDrainEvent drain_event) override;
+  void onListenerDrain(uint64_t listener_tag, Network::ConnectionDrainEvent drain_event) override;
   void disableListeners() override;
   void enableListeners() override;
   void setListenerRejectFraction(UnitFloat reject_fraction) override;
@@ -145,11 +145,10 @@ private:
     }
   };
 
-  using ActiveListenerDetailsOptRef = std::optional<std::reference_wrapper<ActiveListenerDetails>>;
+  using ActiveListenerDetailsOptRef = OptRef<ActiveListenerDetails>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
-  using PerAddressActiveListenerDetailsOptRef =
-      std::optional<std::reference_wrapper<PerAddressActiveListenerDetails>>;
+  using PerAddressActiveListenerDetailsOptRef = OptRef<PerAddressActiveListenerDetails>;
   PerAddressActiveListenerDetailsOptRef
   findPerAddressActiveListenerDetails(const ActiveListenerDetailsOptRef active_listener_details,
                                       const Network::Address::Instance& address);

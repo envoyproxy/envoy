@@ -12,34 +12,27 @@ https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/externa
 ## Declaring external dependencies
 
 In general, all external dependencies for the Envoy proxy binary build and test should be declared
-in either [bazel/repository_locations.bzl](bazel/repository_locations.bzl) or
-[api/bazel/repository_locations.bzl](api/bazel/repository_locations.bzl), unless listed under
-[policy exceptions](#policy-exceptions).
+in [`MODULE.bazel`](MODULE.bazel) and the Bazel registry, unless listed under
+[policy exceptions](#policy-exceptions). Dependency metadata is maintained in
+[`bazel/deps.yaml`](bazel/deps.yaml) and [`api/bazel/deps.yaml`](api/bazel/deps.yaml).
 
-An example entry for the `nghttp2` dependency is:
+An example metadata entry for the `nghttp2` dependency is:
 
-```python
-nghttp2 = dict(
-    project_name = "Nghttp2",
-    project_desc = "Implementation of HTTP/2 and its header compression ...",
-    project_url = "https://nghttp2.org",
-    version = "1.41.0",
-    sha256 = "eacc6f0f8543583ecd659faf0a3f906ed03826f1d4157b536b4b385fe47c5bb8",
-    strip_prefix = "nghttp2-{version}",
-    urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
-    use_category = ["dataplane"],
-    last_updated = "2020-06-02",
-    cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
-),
+```yaml
+nghttp2:
+  project_name: "Nghttp2"
+  project_desc: "Implementation of HTTP/2 and its header compression ..."
+  project_url: "https://nghttp2.org"
+  version: "1.41.0"
+  release_date: "2020-06-02"
+  use_category: ["dataplane_core"]
+  cpe: "cpe:2.3:a:nghttp2:nghttp2:*"
 ```
 
 Dependency declarations must:
 
 * Provide a meaningful project name and URL.
-* State the version in the `version` field. String interpolation should be used in `strip_prefix`
-  and `urls` to reference the version. If you need to reference version `X.Y.Z` as `X_Y_Z`, this
-  may appear in a string as `{underscore_version}`, similarly for `X-Y-Z` you can use
-  `{dash_version}`.
+* State the version in the `version` field and keep the registry module version in sync.
 * Versions should prefer release versions over main branch GitHub SHA tarballs. A comment is
   necessary if the latter is used. This comment should contain the reason that a non-release
   version is being used.
@@ -58,9 +51,9 @@ Dependency declarations must:
   be used if no CPE for the project is available in the CPE database. CPEs should be _versionless_
   with a `:*` suffix, since the version can be computed from `version`.
 
-When build or test code references Python modules, they should be specified via `pip_install` in
-[bazel/repositories_extra.bzl](bazel/repositories_extra.bzl). Python modules should not be listed in
-`repository_locations.bzl` entries. `requirements.txt` files for Python dependencies must pin to
+When build or test code references Python modules, they should be specified via `pip_parse` in
+[bazel/python_dependencies.bzl](bazel/python_dependencies.bzl). Python modules should not be listed in
+`deps.yaml` entries. `requirements.txt` files for Python dependencies must pin to
 exact versions, e.g. `PyYAML==5.4.1` and ideally also include a [SHA256
 checksum](https://davidwalsh.name/hashin).
 
@@ -133,7 +126,8 @@ kept up-to-date.
 ## Dependency patches
 
 Occasionally it is necessary to introduce an Envoy-side patch to a dependency in a `.patch` file.
-These are typically applied in [bazel/repositories.bzl](bazel/repositories.bzl). Our policy on this
+These are typically applied by the dependency's module entry in the
+[Envoy Bazel registry](https://github.com/envoyproxy/bazel-registry). Our policy on this
 is as follows:
 
 * Patch files impede dependency updates. They are expedient at creation time but are a maintenance
@@ -146,7 +140,8 @@ is as follows:
 * There should exist a plan-of-record, filed as an issue in Envoy or the upstream GitHub tracking
   elimination of the patch.
 
-* Every patch must have comments at its point-of-use in [bazel/repositories.bzl](bazel/repositories.bzl)
+* Every patch must have comments at its point-of-use in the
+  [Envoy Bazel registry](https://github.com/envoyproxy/bazel-registry)
   providing a rationale and detailing the tracking issue.
 
 ## Policy exceptions

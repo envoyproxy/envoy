@@ -8,7 +8,6 @@ envoy_cc_library(
     name = "provisional_dispatcher_lib",
     srcs = ["provisional_dispatcher.cc"],
     hdrs = ["provisional_dispatcher.h"],
-    repository = "@envoy",
     deps = [
         "//library/common/types:c_types_lib",
         "@envoy//envoy/event:deferred_deletable",

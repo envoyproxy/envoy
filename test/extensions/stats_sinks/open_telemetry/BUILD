@@ -56,7 +56,7 @@ envoy_extension_cc_test(
     name = "open_telemetry_integration_test",
     srcs = ["open_telemetry_integration_test.cc"],
     extension_names = ["envoy.stat_sinks.open_telemetry"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:config",
         "//test/integration:http_integration_lib",

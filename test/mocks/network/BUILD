@@ -13,9 +13,10 @@ envoy_cc_mock(
     name = "connection_mocks",
     srcs = ["connection.cc"],
     hdrs = ["connection.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/network:connection_interface",
+        "//envoy/network:drain_decision_interface",
         "//source/common/network:filter_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -53,7 +54,7 @@ envoy_cc_mock(
     name = "network_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":connection_mocks",
         ":io_handle_mocks",

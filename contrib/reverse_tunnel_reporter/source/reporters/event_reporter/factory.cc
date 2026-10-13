@@ -1,5 +1,7 @@
 #include "contrib/reverse_tunnel_reporter/source/reporters/event_reporter/factory.h"
 
+#include <format>
+
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
@@ -40,7 +42,7 @@ EventReporterFactory::createClient(Server::Configuration::ServerFactoryContext& 
       Config::Utility::getFactoryByName<ReverseTunnelReporterClientFactory>(client_config.name());
   if (!factory) {
     throw EnvoyException(
-        fmt::format("Unknown Reporter Client Factory: '{}'. "
+        std::format("Unknown Reporter Client Factory: '{}'. "
                     "Make sure it is registered as a ReverseTunnelReporterClientFactory.",
                     client_config.name()));
   }

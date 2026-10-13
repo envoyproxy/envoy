@@ -133,6 +133,11 @@ expensive benchmarks to quickly verify that the binary is able to run to
 completion. In order to collect meaningful bechmarks, `bazel run -c opt` the
 benchmark binary target on a quiescent machine.
 
+`envoy_cc_benchmark_binary` targets must list `@benchmark` in their `deps`; the macro
+deliberately does not inject it. Downstream bzlmod consumers must therefore declare
+`bazel_dep(name = "google_benchmark", version = "1.9.5", repo_name = "benchmark")` and
+`bazel_dep(name = "tclap", version = "1.2.5")` in their `MODULE.bazel`.
+
 If you would like to detect when your benchmark test is running under the
 wrapper, call
 [`Envoy::benchmark::skipExpensiveBechmarks()`](https://github.com/envoyproxy/envoy/blob/main/test/benchmark/main.h).

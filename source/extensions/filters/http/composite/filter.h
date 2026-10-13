@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
@@ -22,14 +23,18 @@ constexpr absl::string_view MatchedActionsFilterStateKey =
 
 class CompositePerRouteConfig : public Router::RouteSpecificFilterConfig {
 public:
-  CompositePerRouteConfig(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
-      : match_tree_(std::move(match_tree)) {}
+  CompositePerRouteConfig(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree,
+                          Event::Dispatcher& main_dispatcher)
+      : main_dispatcher_(main_dispatcher), match_tree_(std::move(match_tree)) {}
+  ~CompositePerRouteConfig() override;
+
   const Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>& matchTree() const {
     return match_tree_;
   }
 
 private:
-  const Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
+  Event::Dispatcher& main_dispatcher_;
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
 
 struct FactoryCallbacksWrapper;

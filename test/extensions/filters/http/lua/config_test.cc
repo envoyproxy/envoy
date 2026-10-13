@@ -71,6 +71,53 @@ TEST(LuaFilterConfigTest, LuaFilterWithDefaultSourceCodeWithServerContext) {
   cb(filter_callback);
 }
 
+// An empty search pattern would contribute nothing but a stray ';' to package.path, so the
+// package path fields reject one rather than silently accepting it.
+TEST(LuaFilterConfigTest, EmptyPackagePathPatternIsRejected) {
+  {
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.add_package_paths("");
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(proto_config), ProtoValidationException,
+                            "PackagePaths.*value length must be at least 1");
+  }
+  {
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.add_package_cpaths("");
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(proto_config), ProtoValidationException,
+                            "PackageCpaths.*value length must be at least 1");
+  }
+  {
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute proto_config;
+    proto_config.add_package_paths("");
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(proto_config), ProtoValidationException,
+                            "PackagePaths.*value length must be at least 1");
+  }
+  {
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute proto_config;
+    proto_config.add_package_cpaths("");
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(proto_config), ProtoValidationException,
+                            "PackageCpaths.*value length must be at least 1");
+  }
+}
+
+// The rule is per entry, so several non-empty patterns are accepted on both messages. Without this
+// the test above would also pass against a rule which rejected everything.
+TEST(LuaFilterConfigTest, PackagePathPatternsAreAccepted) {
+  {
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.add_package_paths("/etc/envoy/lua/?.lua");
+    proto_config.add_package_paths("/etc/envoy/lua/?/init.lua");
+    proto_config.add_package_cpaths("/etc/envoy/lua/?.so");
+    EXPECT_NO_THROW(TestUtility::validate(proto_config));
+  }
+  {
+    envoy::extensions::filters::http::lua::v3::LuaPerRoute proto_config;
+    proto_config.add_package_paths("/etc/envoy/lua/?.lua");
+    proto_config.add_package_cpaths("/etc/envoy/lua/?.so");
+    EXPECT_NO_THROW(TestUtility::validate(proto_config));
+  }
+}
+
 #ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
 TEST(LuaFilterConfigTest, LuaFilterInJson) {
   const std::string yaml_string = R"EOF(

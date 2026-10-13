@@ -220,7 +220,7 @@ Filter::HandleDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance& data,
 
     extractor_->processRequest(*message_data->message());
 
-    ExtractedMessageResult result = extractor_->GetResult();
+    const ExtractedMessageResult& result = extractor_->GetResult();
 
     if (result.request_data.empty()) {
       return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
@@ -336,7 +336,7 @@ Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
 
     extractor_->processResponse(*stream_message->message());
 
-    ExtractedMessageResult result = extractor_->GetResult();
+    const ExtractedMessageResult& result = extractor_->GetResult();
 
     if (result.response_data.empty()) {
       return HandleDataStatus(Envoy::Http::FilterDataStatus::StopIterationNoBuffer);
@@ -372,14 +372,14 @@ void Filter::handleRequestExtractionResult(const std::vector<ExtractedMessageMet
 
   auto addResultToMetadata = [&](const std::string& category, const std::string& key,
                                  const ExtractedMessageMetadata& metadata) {
-    RELEASE_ASSERT(metadata.extracted_message.IsInitialized(),
+    RELEASE_ASSERT(metadata.extracted_message->IsInitialized(),
                    "`extracted_message` should be initialized");
 
     auto* category_field = (*dest_metadata.mutable_fields())[category].mutable_struct_value();
 
     auto* key_field = (*category_field->mutable_fields())[key].mutable_struct_value();
 
-    for (const auto& field : metadata.extracted_message.fields()) {
+    for (const auto& field : metadata.extracted_message->fields()) {
       (*key_field->mutable_fields())[field.first] = field.second;
     }
   };
@@ -406,14 +406,14 @@ void Filter::handleResponseExtractionResult(const std::vector<ExtractedMessageMe
 
   auto addResultToMetadata = [&](const std::string& category, const std::string& key,
                                  const ExtractedMessageMetadata& metadata) {
-    RELEASE_ASSERT(metadata.extracted_message.IsInitialized(),
+    RELEASE_ASSERT(metadata.extracted_message->IsInitialized(),
                    "`extracted_message` should be initialized");
 
     auto* category_field = (*dest_metadata.mutable_fields())[category].mutable_struct_value();
 
     auto* key_field = (*category_field->mutable_fields())[key].mutable_struct_value();
 
-    for (const auto& field : metadata.extracted_message.fields()) {
+    for (const auto& field : metadata.extracted_message->fields()) {
       (*key_field->mutable_fields())[field.first] = field.second;
     }
 

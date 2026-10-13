@@ -188,6 +188,12 @@ public:
   UpstreamSocketManager& pickLeastLoadedSocketManager(const std::string& node_id,
                                                       const std::string& cluster_id);
 
+  /**
+   * Handle a go away event for a specific socket.
+   * @param fd the file descriptor of the connection that sent the go away.
+   */
+  void onGoAway(int fd);
+
 private:
   /**
    * Helper method to check if a node has any reverse connection sockets (idle or used).

@@ -1,5 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
 
+#include <format>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -16,7 +18,7 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
   if (!metadata.header(HeaderType::To).empty()) {
     metadata.parseHeader(HeaderType::To);
     auto to = metadata.header(HeaderType::To);
-    output << fmt::format("To: {}", to.text());
+    output << std::format("To: {}", to.text());
 
     if (!to.hasParam("tag")) {
 
@@ -26,13 +28,13 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
       // character of the proxy's IP address
       output << ";tag=";
       if (metadata.ep().has_value() && !metadata.ep().value().empty()) {
-        output << fmt::format("{}-", metadata.ep().value());
+        output << std::format("{}-", metadata.ep().value());
       }
       std::time_t t;
       long s = 0;
       t = time(&t);
       s = std::labs(t - s);
-      output << fmt::format("{}", s);
+      output << std::format("{}", s);
     }
     output << "\r\n";
   } else {
@@ -41,32 +43,32 @@ DirectResponse::ResponseType AppException::encode(MessageMetadata& metadata,
 
   // From
   if (!metadata.header(HeaderType::From).empty()) {
-    output << fmt::format("From: {}\r\n", metadata.header(HeaderType::From).text());
+    output << std::format("From: {}\r\n", metadata.header(HeaderType::From).text());
   } else {
     ENVOY_LOG(error, "No \"From\" in received message");
   }
 
   // Call-ID
   if (!metadata.header(HeaderType::CallId).empty()) {
-    output << fmt::format("Call-ID: {}\r\n", metadata.header(HeaderType::CallId).text());
+    output << std::format("Call-ID: {}\r\n", metadata.header(HeaderType::CallId).text());
   } else {
     ENVOY_LOG(error, "No \"Call-ID\" in received message");
   }
 
   // Via
   for (const auto& via : metadata.listHeader(HeaderType::Via)) {
-    output << fmt::format("Via: {}\r\n", via.text());
+    output << std::format("Via: {}\r\n", via.text());
   }
 
   // CSeq
   if (!metadata.header(HeaderType::Cseq).empty()) {
-    output << fmt::format("CSeq: {}\r\n", metadata.header(HeaderType::Cseq).text());
+    output << std::format("CSeq: {}\r\n", metadata.header(HeaderType::Cseq).text());
   } else {
     ENVOY_LOG(error, "No \"Cseq\" in received message");
   }
 
   // Failed Reason
-  output << fmt::format("Reason: {}\r\n", what());
+  output << std::format("Reason: {}\r\n", what());
 
   // Content-length
   output << "Content-Length: 0\r\n";

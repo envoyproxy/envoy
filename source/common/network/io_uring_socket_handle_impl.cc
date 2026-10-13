@@ -52,6 +52,19 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   }
 }
 
+void IoUringSocketHandleImpl::setAbortiveClose() {
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+  // Enabling SO_LINGER with a timeout of zero results in an abortive close.
+  struct linger l;
+  l.l_onoff = 1;
+  l.l_linger = 0;
+  auto res = setOption(SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+  if (res.return_value_ < 0) {
+    ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on fd {}", fd_);
+  }
+#endif
+}
+
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ENVOY_LOG(trace, "close, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
@@ -142,6 +155,11 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
     return {0, IoSocketError::getIoSocketEagainError()};
   }
   return {bytes_written, IoSocketError::none()};
+}
+
+Api::IoCallUint64Result IoUringSocketHandleImpl::send(const void* buffer, size_t length) {
+  Buffer::RawSlice slice{const_cast<void*>(buffer), length};
+  return writev(&slice, 1);
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,

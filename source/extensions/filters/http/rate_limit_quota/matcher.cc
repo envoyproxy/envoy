@@ -12,7 +12,7 @@ using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota:
 
 absl::StatusOr<BucketId>
 RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                                         Server::Configuration::FactoryContext& factory_context,
+                                         ProtobufMessage::ValidationVisitor& validation_visitor,
                                          RateLimitQuotaValidationVisitor& visitor) const {
   BucketId bucket_id;
   std::unique_ptr<Matcher::MatchInputFactory<Http::HttpMatchingData>> input_factory_ptr = nullptr;
@@ -32,7 +32,7 @@ RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataI
       // Initialize the pointer to input factory on first use.
       if (input_factory_ptr == nullptr) {
         input_factory_ptr = std::make_unique<Matcher::MatchInputFactory<Http::HttpMatchingData>>(
-            factory_context.messageValidationVisitor(), visitor);
+            validation_visitor, visitor);
       }
       // Create `DataInput` factory callback from the config.
       Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =

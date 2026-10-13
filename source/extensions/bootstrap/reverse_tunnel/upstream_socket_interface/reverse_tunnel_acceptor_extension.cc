@@ -2,6 +2,7 @@
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/network/socket_impl.h"
+#include "source/common/network/socket_interface.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -283,6 +284,23 @@ UpstreamSocketThreadLocal* ReverseTunnelAcceptorExtension::getLocalRegistry() co
   }
 
   return nullptr;
+}
+
+UpstreamSocketManager* ReverseTunnelAcceptorExtension::getThreadLocalSocketManager() {
+  auto* upstream_interface =
+      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+  if (upstream_interface == nullptr) {
+    return nullptr;
+  }
+
+  auto* acceptor = const_cast<ReverseTunnelAcceptor*>(
+      dynamic_cast<const ReverseTunnelAcceptor*>(upstream_interface));
+  if (acceptor == nullptr) {
+    return nullptr;
+  }
+
+  auto* tls_registry = acceptor->getLocalRegistry();
+  return (tls_registry != nullptr) ? tls_registry->socketManager() : nullptr;
 }
 
 std::pair<std::vector<std::string>, std::vector<std::string>>

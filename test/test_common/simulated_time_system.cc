@@ -180,9 +180,7 @@ private:
       return true;
     }
 
-    bool contains(Alarm& alarm) const {
-      return alarm_registrations_map_.find(&alarm) != alarm_registrations_map_.end();
-    }
+    bool contains(Alarm& alarm) const { return alarm_registrations_map_.contains(&alarm); }
 
   private:
     std::set<AlarmRegistration> sorted_alarms_;

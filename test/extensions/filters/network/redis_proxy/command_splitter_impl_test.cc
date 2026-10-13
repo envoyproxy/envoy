@@ -1728,6 +1728,40 @@ TEST_F(RedisSingleServerRequestTest, NonSimpleCommandInTransactionRejected) {
   EXPECT_EQ(nullptr, handle_);
 }
 
+// A bare WATCH (a single-element request with no key argument) outside a transaction must be
+// rejected with a wrong-number-of-arguments error.
+TEST_F(RedisSingleServerRequestTest, WatchWithoutKeyRejected) {
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "wrong number of arguments for 'watch' command";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"watch"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+// The first command of a transaction with no key argument must be rejected rather than indexing
+// past the request array when deriving the transaction key.
+TEST_F(RedisSingleServerRequestTest, TransactionFirstCommandWithoutKeyRejected) {
+  callbacks_.transaction().start();
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "wrong number of arguments for 'watch' command";
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"watch"});
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
 MATCHER_P(CompositeArrayEq, rhs, "CompositeArray should be equal") {
   const ConnPool::RespVariant& obj = arg;
   const auto& lhs = absl::get<const Common::Redis::RespValue>(obj);
@@ -3090,6 +3124,22 @@ TEST_F(RandomShardRequestTest, ClusterNodes) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.cluster.success").value());
 }
 
+TEST_F(RandomShardRequestTest, ClusterShards) {
+  InSequence s;
+
+  setup({"cluster", "shards"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.cluster.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[0]->onResponse(response());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.cluster.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.cluster.success").value());
+}
+
 TEST_F(RandomShardRequestTest, UnsupportedSubcommand) {
   // Test unsupported subcommand for random shard commands (e.g., cluster reset)
   Common::Redis::RespValue expected_response;
@@ -4090,7 +4140,7 @@ TEST_F(ClusterScopeCommandRoutingTest, NoShardsAvailable) {
 
 TEST_F(ClusterScopeCommandRoutingTest, InvalidSubcommand) {
   // Test that CLUSTER command with invalid subcommand is rejected
-  // Only "cluster" has subcommand validation: {"info", "slots", "keyslot", "nodes"}
+  // Only "cluster" has subcommand validation: {"info", "slots", "keyslot", "nodes", "shards"}
   InSequence s;
 
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};

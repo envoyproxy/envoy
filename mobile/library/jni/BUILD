@@ -14,7 +14,6 @@ envoy_cc_library(
     hdrs = [
         "jni_utility.h",
     ],
-    repository = "@envoy",
     deps = [
         ":jni_helper_lib",
         "//library/common/types:c_types_lib",
@@ -35,7 +34,6 @@ envoy_cc_library(
     hdrs = [
         "jni_helper.h",
     ],
-    repository = "@envoy",
     deps = select({
         # On Android, we should use the JNI provided by the system.
         "@envoy//bazel:android": [],
@@ -57,7 +55,6 @@ envoy_cc_library(
     hdrs = [
         "jni_init.h",
     ],
-    repository = "@envoy",
     deps = [
         ":jni_helper_lib",
         ":jni_utility_lib",
@@ -72,7 +69,6 @@ envoy_cc_library(
     srcs = [
         "jni_impl.cc",
     ],
-    repository = "@envoy",
     deps = [
         ":android_network_utility_lib",
         ":jni_init_lib",
@@ -84,6 +80,7 @@ envoy_cc_library(
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
         "//library/common/types:managed_types_lib",
+        "@envoy//envoy/common:logger",
         "@envoy//source/common/protobuf",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -99,7 +96,6 @@ envoy_cc_library(
     hdrs = [
         "android_network_utility.h",
     ],
-    repository = "@envoy",
     deps = [
         ":jni_helper_lib",
         ":jni_utility_lib",
@@ -118,7 +114,6 @@ envoy_cc_library(
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = [
         ":android_network_utility_lib",
         ":jni_impl_lib",
@@ -167,7 +162,6 @@ envoy_cc_library(
     hdrs = [
         "android_jni_utility.h",
     ],
-    repository = "@envoy",
     deps = [
         "//library/common/types:c_types_lib",
         "@envoy//source/common/common:assert_lib",
@@ -191,5 +185,4 @@ cc_import(
 envoy_cc_library(
     name = "pthread",
     srcs = ["//bazel:objc_dummy"],
-    repository = "@envoy",
 )

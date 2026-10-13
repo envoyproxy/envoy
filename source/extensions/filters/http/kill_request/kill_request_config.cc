@@ -11,12 +11,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace KillRequest {
 
-absl::StatusOr<Http::FilterFactoryCb> KillRequestFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+KillRequestFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   return [proto_config, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<KillRequestFilter>(
-        proto_config, context.serverFactoryContext().api().randomGenerator()));
+    callbacks.addStreamFilter(
+        std::make_shared<KillRequestFilter>(proto_config, context.api().randomGenerator()));
   };
 }
 

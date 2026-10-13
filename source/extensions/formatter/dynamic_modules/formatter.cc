@@ -101,6 +101,43 @@ DynamicModuleFormatterProvider::formatValue(const ::Envoy::Formatter::Context& c
   return ValueUtil::stringValue(value.value());
 }
 
+bool DynamicModuleFormatterProvider::formatTo(std::string& sink,
+                                              const ::Envoy::Formatter::Context& context,
+                                              const StreamInfo::StreamInfo& stream_info) const {
+  const auto value = formatView(context, stream_info);
+  if (!value.has_value()) {
+    return false;
+  }
+  sink.append(*value);
+  return true;
+}
+
+void DynamicModuleFormatterProvider::formatValueTo(
+    ::Envoy::Formatter::ValueSink& sink, const ::Envoy::Formatter::Context& context,
+    const StreamInfo::StreamInfo& stream_info) const {
+  const auto value = formatView(context, stream_info);
+  if (!value.has_value()) {
+    return;
+  }
+  sink.addString(*value);
+}
+
+std::optional<absl::string_view>
+DynamicModuleFormatterProvider::formatView(const ::Envoy::Formatter::Context& context,
+                                           const StreamInfo::StreamInfo& stream_info) const {
+  FormatterContext formatter_context{&context, &stream_info};
+  envoy_dynamic_module_type_module_buffer result{nullptr, 0};
+  if (!config_->on_format_(provider_, static_cast<void*>(&formatter_context), &result)) {
+    return std::nullopt;
+  }
+  if (result.length == 0) {
+    // In the previous implementation, the empty string was returned as a valid value rather than an
+    // nullopt. To maintain compatibility, we return an empty string_view here.
+    return absl::string_view();
+  }
+  return absl::string_view(result.ptr, result.length);
+}
+
 DynamicModuleCommandParser::DynamicModuleCommandParser(DynamicModuleFormatterConfigSharedPtr config)
     : config_(std::move(config)) {}
 

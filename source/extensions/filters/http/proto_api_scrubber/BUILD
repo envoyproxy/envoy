@@ -39,7 +39,6 @@ envoy_cc_library(
         "filter_config",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
-        "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_lib",
         "//source/extensions/filters/http/proto_api_scrubber/scrubbing_util_lib",
@@ -55,6 +54,7 @@ envoy_cc_extension(
     deps = [
         "filter",
         "filter_config",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
     ],
 )

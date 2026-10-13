@@ -21,7 +21,6 @@ envoy_cc_library(
         "host_data.h",
         "peak_ewma_lb.h",
     ],
-    repository = "@envoy",
     visibility = [
         "//contrib/peak_ewma/filters/http/source:__pkg__",
         "//contrib/peak_ewma/filters/http/test:__pkg__",

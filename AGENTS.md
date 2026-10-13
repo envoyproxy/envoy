@@ -59,7 +59,7 @@ See `bazel/README.md` for full build documentation. Common commands:
 
 # Local (requires local dependencies)
 bazel test -c dbg //test/common/http/...                         # run tests
-bazel build --config=clang -c opt //source/exe:envoy-static      # optimized binary
+bazel build -c opt //source/exe:envoy-static                    # optimized binary
 ```
 
 Sanitizers, coverage, GDB debugging, and profiling are resource-intensive. Do **not** run
@@ -204,7 +204,7 @@ See `bazel/DEVELOPER.md` for full BUILD file rules. Key points:
 ## Updating dependencies
 
 See `bazel/EXTERNAL_DEPS.md` and `DEPENDENCY_POLICY.md`. When updating a version:
-1. Update version, sha256, and urls in `bazel/repository_locations.bzl`
+1. Update the module version in `MODULE.bazel`, registry metadata, and the corresponding `deps.yaml` entry
 2. Update `release_date` in `bazel/deps.yaml` to the UTC date of the new release
 3. Prefer maintainer-provided tarballs over GitHub auto-generated ones
 

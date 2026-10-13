@@ -10,7 +10,7 @@ namespace Lua {
 
 PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
                                  absl::Status& creation_status)
-    : lua_state_(lua_code, tls, creation_status) {
+    : lua_state_(lua_code, Filters::Common::Lua::PackagePaths{}, tls, creation_status) {
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
 
   lua_state_.registerType<HeaderMapWrapper>();

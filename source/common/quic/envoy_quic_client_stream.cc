@@ -122,7 +122,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 #else
   spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-  if (headers.Method()->value() == "HEAD") {
+  if (headers.getMethodValue() == "HEAD") {
     sent_head_request_ = true;
   }
 #endif
@@ -565,7 +565,8 @@ bool EnvoyQuicClientStream::useCapsuleProtocol() {
     return false;
   }
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  http_datagram_handler_->setStreamDecoder(getResponseDecoder());
+  http_datagram_handler_->setStreamDecoderProvider(
+      [this]() -> Http::StreamDecoder* { return getResponseDecoder(); });
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
   return true;
 }

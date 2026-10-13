@@ -18,8 +18,10 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/registry",
         "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_monitor",
+        "//source/extensions/resource_monitors/cgroup_memory:cgroup_memory_stats_reader",
         "//source/extensions/resource_monitors/cgroup_memory:config",
         "//source/server:resource_monitor_config_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",

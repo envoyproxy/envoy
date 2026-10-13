@@ -15,15 +15,16 @@ namespace Assertion {
 /**
  * Config registration for the assertion filter. @see NamedHttpFilterConfigFactory.
  */
-class AssertionFilterFactory
-    : public Common::FactoryBase<envoymobile::extensions::filters::http::assertion::Assertion> {
+class AssertionFilterFactory : public Common::UnifiedFactoryBase<
+                                   envoymobile::extensions::filters::http::assertion::Assertion> {
 public:
-  AssertionFilterFactory() : FactoryBase("assertion") {}
+  AssertionFilterFactory() : UnifiedFactoryBase("assertion") {}
 
 private:
-  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<::Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::assertion::Assertion& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(AssertionFilterFactory);

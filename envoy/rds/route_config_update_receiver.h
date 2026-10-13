@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/init/manager.h"
@@ -39,25 +40,37 @@ public:
    * are warmed up first, and only then is the observer notified. Note that the observer may be
    * notified before this method returns, i.e. synchronously, if there is nothing to warm up.
    * @param rc supplies the RouteConfiguration.
-   * @param version_info supplies RouteConfiguration version.
-   * @return bool whether the hash of the new config has been different than
-   * the hash of the current one and RouteConfiguration has been updated.
+   * @param version supplies RouteConfiguration version.
+   * @return a failure status if the update couldn't be applied. An update whose configuration is
+   * unchanged is applied as a no-op, which leaves an update that is still warming up alone; use
+   * configWarming() to tell whether anything is warming up.
    * @throw EnvoyException if the new config is invalid and can't be applied.
    */
-  virtual bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) PURE;
+  virtual absl::Status onRdsUpdate(const Protobuf::Message& rc, const std::string& version) PURE;
+
+  /**
+   * Called when the subscription stops waiting for a RouteConfiguration and signals that whatever
+   * warms up with it may proceed, without any configuration having been published - because the
+   * initial fetch timed out, because the update was rejected, or because the resource list was
+   * empty.
+   *
+   * This matters because the owning init manager is no longer waiting afterwards: a later update
+   * must not hold its configuration back in order to warm resources up, since nothing is warming
+   * on it any more and doing so would only starve a listener that is already serving.
+   */
+  virtual void onRdsFailure() PURE;
 
   /**
    * Sets the observer of updates to the RouteConfiguration.
    * @param observer supplies the observer. This should have a lifetime that is at least as long as
-   * the lifetime of this receiver.
+   * the lifetime of this receiver. nullopt means that there is no observer.
    */
-  virtual void setObserver(RouteConfigUpdateObserver& observer) PURE;
+  virtual void setObserver(OptRef<RouteConfigUpdateObserver> observer) PURE;
 
   /**
    * @return bool whether the RouteConfiguration built by a previous RDS update is still warming up,
    * i.e. whether the observer hasn't been notified about it yet. An update that turns out to be a
-   * no-op leaves such an update alone, so this may be true even if the last onRdsUpdate() call
-   * returned false.
+   * no-op leaves such an update alone.
    */
   virtual bool configWarming() const PURE;
 

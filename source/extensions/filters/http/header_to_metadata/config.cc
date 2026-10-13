@@ -28,17 +28,11 @@ absl::StatusOr<Http::FilterFactoryCb> HeaderToMetadataConfig::createFilterFactor
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, context.serverFactoryContext(), context.scope());
-}
-
 absl::StatusOr<Http::FilterFactoryCb> HeaderToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
     Server::Configuration::ServerFactoryContext& context,
-    Server::Configuration::ExtraFactoryContext&) {
-  return createFilterFactory(proto_config, context, context.scope());
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactory(proto_config, context, extra_context.scopeOr(context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

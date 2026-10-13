@@ -22,7 +22,7 @@ envoy_extension_cc_test(
     name = "cel_matcher_test",
     srcs = ["cel_matcher_test.cc"],
     extension_names = ["envoy.matching.matchers.cel_matcher"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":cel_matcher_test_lib",

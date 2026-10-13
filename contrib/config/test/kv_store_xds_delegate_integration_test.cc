@@ -1,3 +1,4 @@
+#include <format>
 #include <optional>
 
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -33,7 +34,7 @@ std::string kvStoreDelegateConfig() {
   const std::string filename = TestEnvironment::temporaryPath("xds_kv_store.txt");
   Api::OsSysCallsSingleton().get().unlink(filename.c_str());
 
-  return fmt::format(R"EOF(
+  return std::format(R"EOF(
     name: envoy.config.config.KeyValueStoreXdsDelegate
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.config.v3alpha.KeyValueStoreXdsDelegateConfig
@@ -437,7 +438,7 @@ public:
 
     // 9999 is an invalid enum value for LbPolicy.
     auto cluster_resource = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
-        fmt::format(R"EOF(
+        std::format(R"EOF(
          name: {}
          connect_timeout: 5s
          type: STATIC
@@ -503,7 +504,7 @@ public:
       ConfigHelper::setHttp2(*xds_cluster);
 
       auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
-      const std::string cds_yaml = fmt::format(R"EOF(
+      const std::string cds_yaml = std::format(R"EOF(
         api_config_source:
           api_type: GRPC
           grpc_services:

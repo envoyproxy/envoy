@@ -37,7 +37,7 @@ The following procedure will be used when proposing new extensions for inclusion
   [DEPENDENCY_POLICY.md](DEPENDENCY_POLICY.md), please follow the steps detailed there.
   6. If an extension depends on platform specific functionality, be sure to guard it in the build
   system. See [platform specific features](./PULL_REQUESTS.md#platform-specific-features).
-  Add the extension to the necessary `*_SKIP_TARGETS` in [bazel/repositories.bzl](bazel/repositories.bzl)
+  Add the extension to the necessary `*_SKIP_TARGETS` in [bazel/extension_configs.bzl](bazel/extension_configs.bzl)
   and tag tests to be skipped/failed on the unsupported platform.
 
 ## Removing existing extensions

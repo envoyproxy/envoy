@@ -16,15 +16,16 @@ namespace RouteCacheReset {
  * Config registration for the route_cache_reset filter. @see NamedHttpFilterConfigFactory.
  */
 class RouteCacheResetFilterFactory
-    : public Common::FactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset> {
 public:
-  RouteCacheResetFilterFactory() : FactoryBase("route_cache_reset") {}
+  RouteCacheResetFilterFactory() : UnifiedFactoryBase("route_cache_reset") {}
 
 private:
-  ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<::Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(RouteCacheResetFilterFactory);

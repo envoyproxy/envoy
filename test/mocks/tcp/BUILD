@@ -12,7 +12,7 @@ envoy_cc_mock(
     name = "tcp_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/tcp:conn_pool_interface",

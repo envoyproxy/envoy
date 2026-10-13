@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "access_log_base_test",
     srcs = ["access_log_base_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/access_loggers/common:access_log_base",
         "//test/mocks/access_log:access_log_mocks",
@@ -22,13 +22,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "grpc_access_logger_test",
     srcs = ["grpc_access_logger_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/access_loggers/common:grpc_access_logger",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",

@@ -49,17 +49,12 @@ absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactory(
   };
 }
 
-absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(proto_config, stat_prefix, context);
-}
-
 absl::StatusOr<Http::FilterFactoryCb> GeoipFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::geoip::v3::Geoip& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
   return createFilterFactory(proto_config, extra_context.stats_prefix, generic_context);
 }
 

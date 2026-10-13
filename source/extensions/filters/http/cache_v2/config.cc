@@ -28,8 +28,10 @@ absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactory(
     absl::StatusOr<std::shared_ptr<CacheSessions>> status_or_cache =
         http_cache_factory->getCache(config, context);
     if (!status_or_cache.ok()) {
-      return absl::InvalidArgumentError(
-          fmt::format("Couldn't initialize cache: {}", status_or_cache.status()));
+      const absl::Status& status = status_or_cache.status();
+      return absl::InvalidArgumentError(fmt::format("Couldn't initialize cache: {}: {}",
+                                                    absl::StatusCodeToString(status.code()),
+                                                    status.message()));
     }
     cache = *std::move(status_or_cache);
   }
@@ -37,12 +39,6 @@ absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactory(
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));
   };
-}
-
-absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-    const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& context) {
-  return createFilterFactory(config, context.serverFactoryContext());
 }
 
 absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createHttpFilterFactoryFromProtoTyped(

@@ -43,6 +43,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        # Used by stats_integration_test to configure a Google gRPC client at server startup.
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/common/common:assert_lib",

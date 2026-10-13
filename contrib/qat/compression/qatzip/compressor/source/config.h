@@ -57,7 +57,7 @@ private:
   };
 
   const uint32_t chunk_size_;
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::SlotSharedPtr tls_slot_;
 };
 #endif
 

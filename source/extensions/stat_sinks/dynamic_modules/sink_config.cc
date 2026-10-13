@@ -4,11 +4,15 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/thread.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace DynamicModules {
+
+using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 DynamicModuleStatsSinkConfig::DynamicModuleStatsSinkConfig(
     absl::string_view sink_name, absl::string_view sink_config,
@@ -16,7 +20,7 @@ DynamicModuleStatsSinkConfig::DynamicModuleStatsSinkConfig(
     Server::Configuration::ServerFactoryContext& server)
     : main_thread_dispatcher_(server.mainThreadDispatcher()), sink_name_(sink_name),
       sink_config_(sink_config), dynamic_module_(std::move(dynamic_module)),
-      stats_scope_(server.scope().createScope("")), stat_name_pool_(stats_scope_->symbolTable()) {}
+      stats_scope_(server.scope().createScope("")), metrics_(*stats_scope_) {}
 
 DynamicModuleStatsSinkConfig::~DynamicModuleStatsSinkConfig() {
   if (in_module_config_ != nullptr && on_config_destroy_ != nullptr) {
@@ -37,11 +41,10 @@ DynamicModuleStatsSinkConfig::defineGauge(absl::string_view name, size_t* gauge_
   if (stat_creation_frozen_.load(std::memory_order_acquire)) {
     return envoy_dynamic_module_type_metrics_result_Frozen;
   }
-  Stats::StatName stat_name = stat_name_pool_.add(name);
-  Stats::Gauge& gauge = Stats::Utility::gaugeFromStatNames(*stats_scope_, {stat_name},
+  Stats::StatName stat_name = metrics_.statNamePool().add(name);
+  Stats::Gauge& gauge = Stats::Utility::gaugeFromStatNames(metrics_.scope(), {stat_name},
                                                            Stats::Gauge::ImportMode::Accumulate);
-  gauges_.emplace_back(gauge);
-  *gauge_id_out = gauges_.size(); // 1-based id so 0 stays reserved as invalid.
+  *gauge_id_out = metrics_.addGauge(MetricRegistry::GaugeHandle(gauge));
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 
@@ -53,10 +56,11 @@ envoy_dynamic_module_type_metrics_result DynamicModuleStatsSinkConfig::setGauge(
                  "main thread");
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  if (gauge_id == 0 || gauge_id > gauges_.size()) {
+  auto gauge = metrics_.getGaugeById(gauge_id);
+  if (!gauge.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  gauges_[gauge_id - 1].set(value);
+  gauge->set(value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
 

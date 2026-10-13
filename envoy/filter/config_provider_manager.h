@@ -48,6 +48,9 @@ public:
    * @param filter_chain_type is the filter chain type
    * @param listener_filter_matcher is the filter matcher for TCP listener filter. nullptr for other
    * filter types.
+   * @param stat_prefix is the stats prefix of the parent of the filter, e.g. the
+   * ``http.<stat_prefix>.`` of the HTTP connection manager. It is propagated to the underlying
+   * filter factory and is only used by the filter types whose factory takes a stats prefix.
    */
   virtual DynamicFilterConfigProviderPtr<FactoryCb> createDynamicFilterConfigProvider(
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
@@ -55,7 +58,8 @@ public:
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
       Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) PURE;
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      absl::string_view stat_prefix) PURE;
 
   /**
    * Get an FilterConfigProviderPtr for a statically inlined filter config.

@@ -14,17 +14,13 @@ namespace Mcp {
 /**
  * Config factory for MCP filter.
  */
-class McpFilterConfigFactory : public Common::ExceptionFreeFactoryBase<
-                                   envoy::extensions::filters::http::mcp::v3::Mcp,
-                                   envoy::extensions::filters::http::mcp::v3::McpOverride> {
+class McpFilterConfigFactory
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::mcp::v3::Mcp,
+                                        envoy::extensions::filters::http::mcp::v3::McpOverride> {
 public:
-  McpFilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.http.mcp") {}
+  McpFilterConfigFactory() : UnifiedFactoryBase("envoy.filters.http.mcp") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
       Server::Configuration::ServerFactoryContext& context,

@@ -32,6 +32,9 @@ public:
   // Used by both the initiator (request `Upgrade:` header) and responder (`101` response).
   static constexpr absl::string_view REVERSE_TUNNEL_UPGRADE_PROTOCOL = "reverse-tunnel";
 
+  // Historical default for the host re-check when ``maintain_interval`` is unset.
+  static constexpr uint64_t kDefaultMaintainIntervalMs{10000};
+
   struct TenantScopedIdentifierView {
     absl::string_view tenant;
     absl::string_view identifier;

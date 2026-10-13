@@ -1,5 +1,8 @@
 #pragma once
 
+#include <optional>
+#include <string>
+
 #include "envoy/http/header_map.h"
 
 #include "absl/strings/string_view.h"
@@ -19,6 +22,10 @@ public:
   // Merges two or more adjacent slashes in path part of URI into one.
   // Requires the Path header be present.
   static void mergeSlashes(RequestHeaderMap& headers);
+  // Removes URL path parameters in dot and dotdot segments to allow canonicalization to
+  // interpret them correctly.
+  // Requires the Path header be present.
+  static void stripParametersFromDotSegments(RequestHeaderMap& headers);
 
   enum class UnescapeSlashesResult {
     // No escaped slash sequences were found and URL path has not been modified.
@@ -33,6 +40,12 @@ public:
   // Removes the query and/or fragment string (if present) from the input path.
   // For example, this function returns "/data" for the input path "/data?param=value#fragment".
   static absl::string_view removeQueryAndFragment(const absl::string_view path);
+
+  // Removes path parameters (characters following and including ';' in path segments)
+  // from the :path request header.
+  // Returns std::nullopt if the path did not contain parameters, or the modified path if changed.
+  static std::optional<std::string> removePathParameters(const RequestHeaderMap& headers);
+  static std::optional<std::string> removePathParameters(const absl::string_view path);
 };
 
 } // namespace Http

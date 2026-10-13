@@ -1,5 +1,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 
+#include <algorithm>
+
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 
@@ -13,9 +15,10 @@ namespace ReverseConnection {
 // DownstreamReverseConnectionIOHandle constructor implementation
 DownstreamReverseConnectionIOHandle::DownstreamReverseConnectionIOHandle(
     Network::ConnectionSocketPtr socket, ReverseConnectionIOHandle* parent,
-    const std::string& connection_key, uint64_t connection_id)
+    const std::string& connection_key, uint64_t connection_id, Buffer::InstancePtr residual_bytes)
     : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), owned_socket_(std::move(socket)),
-      parent_(parent), connection_key_(connection_key), connection_id_(connection_id) {
+      parent_(parent), connection_key_(connection_key), connection_id_(connection_id),
+      residual_bytes_(std::move(residual_bytes)) {
   ENVOY_LOG(debug,
             "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {} for "
             "connection key: {}",
@@ -26,12 +29,56 @@ DownstreamReverseConnectionIOHandle::DownstreamReverseConnectionIOHandle(
   }
 }
 
+Api::IoCallUint64Result
+DownstreamReverseConnectionIOHandle::read(Buffer::Instance& buffer,
+                                          std::optional<uint64_t> max_length) {
+  if (residual_bytes_ != nullptr) {
+    const uint64_t available = residual_bytes_->length();
+    const uint64_t to_move =
+        max_length.has_value() ? std::min<uint64_t>(*max_length, available) : available;
+    buffer.move(*residual_bytes_, to_move);
+    if (residual_bytes_->length() == 0) {
+      residual_bytes_.reset();
+    }
+    // Residual bytes are application data, so RPING echo stops.
+    ping_echo_active_ = false;
+    return Api::IoCallUint64Result{to_move, Api::IoError::none()};
+  }
+  return RpingInterceptor::read(buffer, max_length);
+}
+
+Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::readv(uint64_t max_length,
+                                                                   Buffer::RawSlice* slices,
+                                                                   uint64_t num_slice) {
+  if (residual_bytes_ != nullptr) {
+    const uint64_t to_copy = std::min<uint64_t>(max_length, residual_bytes_->length());
+    uint64_t copied = 0;
+    for (uint64_t i = 0; i < num_slice && copied < to_copy; i++) {
+      const uint64_t n = std::min<uint64_t>(slices[i].len_, to_copy - copied);
+      residual_bytes_->copyOut(copied, n, slices[i].mem_);
+      copied += n;
+    }
+    residual_bytes_->drain(copied);
+    if (residual_bytes_->length() == 0) {
+      residual_bytes_.reset();
+    }
+    // Residual bytes are application data, so RPING echo stops.
+    ping_echo_active_ = false;
+    return Api::IoCallUint64Result{copied, Api::IoError::none()};
+  }
+  return RpingInterceptor::readv(max_length, slices, num_slice);
+}
+
 // DownstreamReverseConnectionIOHandle destructor implementation
 DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
   ENVOY_LOG(
       debug,
       "DownstreamReverseConnectionIOHandle: destroying handle for FD: {} with connection key: {}",
       fd_, connection_key_);
+  // A handle disposed without an explicit close(), for example a listener filter timeout or
+  // rejection, must still run the terminal cleanup so the parent drops the tunnel key and redials.
+  // close() is idempotent through its fd_ guard, so this is a no-op when close() already ran.
+  close();
   if (parent_ != nullptr) {
     parent_->unregisterChildIoHandle(*this);
   }
@@ -97,6 +144,12 @@ Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
   }
 
   return Api::SysCallIntResult{0, 0};
+}
+
+void DownstreamReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement() {
+  if (parent_) {
+    parent_->markTunnelDrainingAndDialReplacement(connection_key_, connection_id_);
+  }
 }
 
 } // namespace ReverseConnection

@@ -184,9 +184,11 @@ public:
 
 // We use platform-specific functions to determine whether the current thread is
 // the "test thread". It is only valid to call isTestThread() on platforms where
-// these functions are available. Currently this is available only on apple and
-// linux.
-#if defined(__linux__) || defined(__APPLE__)
+// these functions are available. Currently this is available on apple, linux and
+// Windows. On Windows there is no API to identify the first thread of the
+// process, so the test thread must be registered with registerTestThread() when
+// the gtest framework is initialized.
+#if defined(__linux__) || defined(__APPLE__) || defined(WIN32)
 #define TEST_THREAD_SUPPORTED 1
 #else
 #define TEST_THREAD_SUPPORTED 0
@@ -205,6 +207,14 @@ public:
    */
   static bool isTestThread();
 #endif
+
+  /**
+   * Records the current thread as the test thread. This must be called from the
+   * first thread of the process when the test framework is initialized. It is
+   * only needed on platforms where the first thread of the process cannot be
+   * identified directly (Windows), and is a no-op elsewhere.
+   */
+  static void registerTestThread();
 };
 
 // RAII object to declare the MainThread. This should be declared in the thread
@@ -236,6 +246,8 @@ public:
    * is not supported.
    */
   static bool isMainOrTestThread() { return isMainThread() || TestThread::isTestThread(); }
+#else
+  static bool isMainOrTestThread() { return isMainThread(); }
 #endif
 
   /**

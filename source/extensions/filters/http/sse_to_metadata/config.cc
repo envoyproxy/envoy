@@ -9,16 +9,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SseToMetadata {
 
-absl::StatusOr<Http::FilterFactoryCb> SseToMetadataConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  // This filter only uses the server factory context, so delegate to the server-context variant.
-  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
-                                                           stats_prefix};
-  return createHttpFilterFactoryFromProtoTyped(proto_config, context.serverFactoryContext(),
-                                               extra_context);
-}
-
 absl::StatusOr<Http::FilterFactoryCb> SseToMetadataConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::sse_to_metadata::v3::SseToMetadata& proto_config,
     Server::Configuration::ServerFactoryContext& context,

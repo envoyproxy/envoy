@@ -3,16 +3,20 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/environment.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -84,7 +88,7 @@ class GrpcAccessLoggerImplTest : public testing::Test {
 public:
   GrpcAccessLoggerImplTest()
       : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
-        grpc_access_logger_impl_test_helper_(local_info_, async_client_, true) {
+        grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
     *config_.mutable_common_config()->mutable_log_name() = "test_log_name";
     config_.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
@@ -94,7 +98,7 @@ public:
 
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
   std::unique_ptr<GrpcAccessLoggerImpl> logger_;
@@ -102,9 +106,9 @@ public:
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config_;
 
   void setUpLogger() {
-    logger_ =
-        std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_}, config_,
-                                               dispatcher_, local_info_, *stats_store_.rootScope());
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
+                                                     config_, dispatcher_,
+                                                     *stats_store_.rootScope(), server_context_);
   }
 };
 
@@ -237,8 +241,8 @@ class GrpcAccessLoggerCacheImplTest : public testing::Test {
 public:
   GrpcAccessLoggerCacheImplTest()
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
-        logger_cache_(async_client_manager_, scope_, tls_, local_info_),
-        grpc_access_logger_impl_test_helper_(local_info_, async_client_, true) {
+        logger_cache_(async_client_manager_, scope_, tls_, server_context_),
+        grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
@@ -251,7 +255,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncClientFactory* factory_;
   Grpc::MockAsyncClientManager async_client_manager_;
-  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Stats::Scope& scope_{*stats_store_.rootScope()};
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -370,8 +374,8 @@ class GrpcAccessLoggerDisableBuiltinImplTest : public testing::Test {
 public:
   GrpcAccessLoggerDisableBuiltinImplTest()
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
-        logger_cache_(async_client_manager_, scope_, tls_, local_info_),
-        grpc_access_logger_impl_test_helper_(local_info_, async_client_, false) {
+        logger_cache_(async_client_manager_, scope_, tls_, server_context_),
+        grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, false) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
@@ -384,7 +388,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncClientFactory* factory_;
   Grpc::MockAsyncClientManager async_client_manager_;
-  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Stats::Scope& scope_{*stats_store_.rootScope()};
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -480,8 +484,8 @@ class GrpcAccessLoggerTopLevelLogNameTest : public testing::Test {
 public:
   GrpcAccessLoggerTopLevelLogNameTest()
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
-        logger_cache_(async_client_manager_, scope_, tls_, local_info_),
-        grpc_access_logger_impl_test_helper_(local_info_, async_client_, true) {
+        logger_cache_(async_client_manager_, scope_, tls_, server_context_),
+        grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
@@ -494,7 +498,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncClientFactory* factory_;
   Grpc::MockAsyncClientManager async_client_manager_;
-  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Stats::Scope& scope_{*stats_store_.rootScope()};
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -544,6 +548,88 @@ TEST_F(GrpcAccessLoggerTopLevelLogNameTest, TopLevelLogNamePreferred) {
                 .get()
                 .value(),
             1);
+}
+
+// Verifies that resource detectors are properly instantiated and populate resource attributes in
+// GrpcAccessLoggerCacheImpl.
+class GrpcAccessLoggerResourceDetectorsTest : public testing::Test {
+public:
+  GrpcAccessLoggerResourceDetectorsTest()
+      : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
+        logger_cache_(async_client_manager_, scope_, tls_, server_context_),
+        grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
+            return Grpc::RawAsyncClientPtr{async_client_};
+          }));
+          return Grpc::AsyncClientFactoryPtr{factory_};
+        }));
+  }
+
+  Grpc::MockAsyncClient* async_client_;
+  Grpc::MockAsyncClientFactory* factory_;
+  Grpc::MockAsyncClientManager async_client_manager_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Stats::Scope& scope_{*stats_store_.rootScope()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  GrpcAccessLoggerCacheImpl logger_cache_;
+  GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
+};
+
+TEST_F(GrpcAccessLoggerResourceDetectorsTest, ResourceDetectorsPopulated) {
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_log_name("test_log");
+  config.mutable_common_config()->set_transport_api_version(
+      envoy::config::core::v3::ApiVersion::V3);
+  config.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
+
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
+  envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+      EnvironmentResourceDetectorConfig env_config;
+  std::ignore = detector->mutable_typed_config()->PackFrom(env_config);
+
+  TestEnvironment::setEnvVar("OTEL_RESOURCE_ATTRIBUTES", "service.name=my-service", 1);
+
+  GrpcAccessLoggerSharedPtr logger =
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+
+  grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
+  resource_logs:
+    resource:
+      attributes:
+        - key: "log_name"
+          value:
+            string_value: "test_log"
+        - key: "zone_name"
+          value:
+            string_value: "zone_name"
+        - key: "cluster_name"
+          value:
+            string_value: "cluster_name"
+        - key: "node_name"
+          value:
+            string_value: "node_name"
+        - key: "service.name"
+          value:
+            string_value: "my-service"
+    scope_logs:
+      - log_records:
+          - severity_text: "test-severity-text"
+  )EOF");
+
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity-text");
+  logger->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
+                .value()
+                .get()
+                .value(),
+            1);
+
+  TestEnvironment::unsetEnvVar("OTEL_RESOURCE_ATTRIBUTES");
 }
 
 } // namespace

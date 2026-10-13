@@ -33,6 +33,7 @@ Checks: >
   performance-type-promotion-in-math-fn,
   performance-unnecessary-copy-initialization,
   readability-braces-around-statements,
+  readability-container-contains,
   readability-container-size-empty,
   readability-identifier-naming,
   readability-redundant-control-flow,
