@@ -297,7 +297,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-09-03"
+  release_date: "2026-10-08"
   use_category:
   - build
   - controlplane
@@ -320,7 +320,7 @@ fast_float:
     Fast and exact implementation of the C++ from_chars functions for number types: 4x to 10x faster than strtod,
     part of GCC 12, Chromium, Redis and WebKit/Safari
   project_url: "https://github.com/fastfloat/fast_float"
-  release_date: "2024-11-21"
+  release_date: "2026-03-10"
   use_category:
   - dataplane_ext
   extensions:
@@ -330,7 +330,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -343,7 +343,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -356,7 +356,7 @@ fips_go_linux_amd64:
   project_name: "Go (Linux amd64)"
   project_desc: "Go programming language (Linux amd64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -369,7 +369,7 @@ fips_go_linux_arm64:
   project_name: "Go (Linux arm64)"
   project_desc: "Go programming language (Linux arm64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -662,7 +662,7 @@ libpfm:
   project_name: "libpfm"
   project_desc: "A helper library to develop monitoring tools"
   project_url: "https://sourceforge.net/projects/perfmon2"
-  release_date: "2020-09-02"
+  release_date: "2020-09-03"
   use_category:
   - test_only
 
