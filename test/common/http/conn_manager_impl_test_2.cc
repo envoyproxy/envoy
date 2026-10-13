@@ -421,14 +421,26 @@ TEST_F(HttpConnectionManagerImplTest, DrainClosesConnectionWithoutCodec) {
   drain_timeout_ = std::chrono::milliseconds(20);
   Event::MockTimer* idle_timer = setUpTimer();
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
   setup();
 
-  Event::MockTimer* drain_timer = setUpTimer();
-  EXPECT_CALL(*idle_timer, disableTimer()).Times(2);
-  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(20), _));
-  filter_callbacks_.connection_.raiseConnectionDrain(
-      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+  Event::MockTimer* proactive_drain_timer;
+  Event::MockTimer* drain_timer;
+  {
+    testing::InSequence sequence;
+    proactive_drain_timer = setUpTimer();
+    EXPECT_CALL(*proactive_drain_timer, enableTimer(_, _));
+    EXPECT_CALL(*idle_timer, disableTimer());
+    drain_timer = setUpTimer();
+    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(20), _));
+  }
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime(),
+      Server::DrainStrategy::Immediate});
 
+  EXPECT_CALL(*idle_timer, disableTimer());
+  EXPECT_CALL(*proactive_drain_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWrite,
@@ -552,24 +564,36 @@ TEST_F(HttpConnectionManagerImplTest, DrainStartsImmediatelyForIdleConnection) {
   drain_timeout_ = std::chrono::milliseconds(20);
   Event::MockTimer* idle_timer = setUpTimer();
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10), _));
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
   setup();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(Http::okStatus()));
   Buffer::OwnedImpl input;
   conn_manager_->onData(input, false);
 
-  Event::MockTimer* drain_timer = setUpTimer();
-  EXPECT_CALL(*idle_timer, disableTimer()).Times(2);
-  EXPECT_CALL(*codec_, shutdownNotice());
-  EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(20), _));
-  filter_callbacks_.connection_.raiseConnectionDrain(
-      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+  Event::MockTimer* proactive_drain_timer;
+  Event::MockTimer* drain_timer;
+  {
+    testing::InSequence sequence;
+    proactive_drain_timer = setUpTimer();
+    EXPECT_CALL(*proactive_drain_timer, enableTimer(_, _));
+    EXPECT_CALL(*idle_timer, disableTimer());
+    EXPECT_CALL(*codec_, shutdownNotice());
+    drain_timer = setUpTimer();
+    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(20), _));
+  }
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime(),
+      Server::DrainStrategy::Immediate});
 
   EXPECT_EQ(0U, stats_.named_.downstream_cx_idle_timeout_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(*idle_timer, disableTimer());
+  EXPECT_CALL(*proactive_drain_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
 }
@@ -617,7 +641,7 @@ TEST_F(HttpConnectionManagerImplTest, ZeroDrainTimeoutClosesConnectionWithoutCod
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamCompletes) {
+TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamResets) {
   drain_timeout_ = std::chrono::milliseconds(20);
   setup();
   ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
@@ -640,17 +664,13 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutStartsAfterActiveStreamComplet
   Event::MockTimer* proactive_drain_timer = setUpTimer();
   EXPECT_CALL(*proactive_drain_timer, enableTimer(_, _));
   filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
-      test_time_.timeSystem().monotonicTime(), Server::DrainStrategy::Gradual});
+      test_time_.timeSystem().monotonicTime(), Server::DrainStrategy::Immediate});
   EXPECT_EQ(0U, stats_.named_.downstream_cx_drain_close_.value());
 
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(20), _));
-  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-  filter->callbacks_->streamInfo().setResponseCodeDetails("");
-  filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-  EXPECT_EQ(0U, stats_.named_.downstream_cx_drain_close_.value());
-
-  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  EXPECT_CALL(*codec_, shutdownNotice());
+  response_encoder_.stream_.resetStream(StreamResetReason::RemoteReset);
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
 

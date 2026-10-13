@@ -142,6 +142,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, IdleTimeoutIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(IdleTimeoutIntegrationTest, ClosesIdleConnectionWithinOneDrainTimeout) {
+  drain_strategy_ = Server::DrainStrategy::Immediate;
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -171,6 +172,7 @@ TEST_P(IdleTimeoutIntegrationTest, ClosesIdleConnectionWithinOneDrainTimeout) {
 }
 
 TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodecAfterDrainTimeout) {
+  drain_strategy_ = Server::DrainStrategy::Immediate;
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
     GTEST_SKIP() << "The no-codec timeout is covered with HTTP/1";
   }
@@ -197,6 +199,7 @@ TEST_P(IdleTimeoutIntegrationTest, DrainingClosesConnectionWithoutCodecAfterDrai
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
+  drain_strategy_ = Server::DrainStrategy::Immediate;
   if (downstream_protocol_ == Http::CodecType::HTTP3) {
     GTEST_SKIP() << "The raw request requires HTTP/1 or HTTP/2";
   }
@@ -251,6 +254,35 @@ TEST_P(IdleTimeoutIntegrationTest, RequestRacingServerDrainCompletesAndCloses) {
   tcp_client->waitForDisconnect(true);
   EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_cx_idle_timeout")->value());
   test_server_->waitForCounter("http.config_test.downstream_cx_drain_close", testing::Eq(1));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
+}
+
+// QUIC creates its codec before processing the client's handshake. A drain replayed to a new
+// connection must allow that handshake and its first request to complete before sending GOAWAY.
+TEST_P(IdleTimeoutIntegrationTest, Http3ConnectionAcceptedDuringImmediateDrain) {
+  if (downstream_protocol_ != Http::CodecType::HTTP3) {
+    GTEST_SKIP() << "Requires HTTP/3";
+  }
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(30);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_drain_timeout()->CopyFrom(
+            ProtobufUtil::TimeUtil::MillisecondsToDuration(DrainTimeoutMs * 2));
+      });
+  autonomous_upstream_ = true;
+  initialize();
+  startServerDrain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  ASSERT_TRUE(codec_client_->connected());
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(codec_client_->sawGoAway());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_cx_drain_close")->value());
 }
 

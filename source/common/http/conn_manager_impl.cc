@@ -485,11 +485,14 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.response_encoder_->getStream().removeCallbacks(stream);
   }
 
-  if (streams_.empty() && !connection_close_started_) {
-    if (connection_drain_event_.has_value() && codec_ && drain_state_ == DrainState::NotDraining) {
+  if (streams_.empty() && drain_state_ != DrainState::Closing) {
+    const bool immediate_drain =
+        connection_drain_event_.has_value() &&
+        connection_drain_event_->strategy == Server::DrainStrategy::Immediate;
+    if (immediate_drain && codec_ && drain_state_ == DrainState::NotDraining) {
       stats_.named_.downstream_cx_drain_close_.inc();
       startDrainSequence();
-    } else if (connection_idle_timer_ && !connection_drain_event_.has_value()) {
+    } else if (connection_idle_timer_ && !immediate_drain) {
       connection_idle_timer_->enableTimer(config_->idleTimeout().value());
     }
   }
@@ -562,6 +565,16 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->filter_manager_.aboveHighWatermark());
   LinkedList::moveIntoList(std::move(new_stream), streams_);
+  if (drain_no_codec_close_timer_) {
+    // QUIC creates its codec before the handshake. Wait for the first stream before sending
+    // GOAWAY so that a connection accepted during draining can complete its handshake.
+    drain_no_codec_close_timer_->disableTimer();
+    drain_no_codec_close_timer_.reset();
+    if (drain_state_ == DrainState::NotDraining) {
+      stats_.named_.downstream_cx_drain_close_.inc();
+      startDrainSequence();
+    }
+  }
   return **streams_.begin();
 }
 
@@ -588,7 +601,6 @@ void ConnectionManagerImpl::handleCodecOverloadError(absl::string_view error) {
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   ASSERT(!codec_);
-  ASSERT(streams_.empty());
   codec_ = config_->createCodec(read_callbacks_->connection(), data, *this, overload_manager_);
 
   switch (codec_->protocol()) {
@@ -607,10 +619,10 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
     break;
   }
 
-  if (drain_no_codec_close_timer_) {
+  if (drain_no_codec_close_timer_ && codec_->protocol() != Protocol::Http3) {
     drain_no_codec_close_timer_->disableTimer();
     drain_no_codec_close_timer_.reset();
-    if (drain_state_ == DrainState::NotDraining && !connection_close_started_) {
+    if (drain_state_ == DrainState::NotDraining) {
       stats_.named_.downstream_cx_drain_close_.inc();
       startDrainSequence();
     }
@@ -762,32 +774,37 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 }
 
 void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
-  if (connection_drain_event_.has_value()) {
+  // The legacy path polls the DrainDecision instead and never looks at the event.
+  if (!use_connection_event_drain_ || connection_drain_event_.has_value() ||
+      (drain_state_ == DrainState::Closing && streams_.empty())) {
     return;
   }
   connection_drain_event_ = drain_event;
-  if (!streams_.empty() && !connection_close_started_ && use_connection_event_drain_) {
-    // Active streams may not produce another response on which to make a drain decision.
-    const std::chrono::milliseconds delay = Network::proactiveDrainDelay(
-        server_context_, drain_event, config_->drainTimeout(), ProactiveDrainWindowStart);
-    if (delay.count() > 0) {
-      proactive_drain_timer_ =
-          dispatcher_->createTimer([this]() -> void { onProactiveDrainTimeout(); });
-      proactive_drain_timer_->enableTimer(delay);
-    }
+  // The drain-close decision is otherwise only made when a response is encoded, so a connection
+  // that is idle, has a low request rate or only carries long-lived streams would stay open until
+  // the end of the drain sequence and then be closed without notice, together with every other
+  // connection like it. Arrange for the connection to drain itself in the last part of the drain
+  // window instead, early enough for the drain sequence (drainTimeout()) to complete. A connection
+  // accepted after that part of the window has begun is not drained proactively.
+  // Keep this timer for both strategies: an idle connection may accept a tunneling stream before
+  // its HTTP drain sequence completes.
+  const std::chrono::milliseconds delay = Network::proactiveDrainDelay(
+      server_context_, drain_event, config_->drainTimeout(), ProactiveDrainWindowStart);
+  if (delay.count() > 0) {
+    proactive_drain_timer_ =
+        dispatcher_->createTimer([this]() -> void { onProactiveDrainTimeout(); });
+    proactive_drain_timer_->enableTimer(delay);
   }
-  if (!streams_.empty() || connection_close_started_) {
+  if (!streams_.empty() || drain_state_ != DrainState::NotDraining ||
+      drain_event.strategy != Server::DrainStrategy::Immediate) {
     return;
   }
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
-  if (codec_) {
-    if (drain_state_ == DrainState::NotDraining) {
-      // Drain idle HTTP connections immediately, even if the strategy is Gradual.
-      stats_.named_.downstream_cx_drain_close_.inc();
-      startDrainSequence();
-    }
+  if (codec_ && (codec_->protocol() != Protocol::Http3 || accumulated_requests_ > 0)) {
+    stats_.named_.downstream_cx_drain_close_.inc();
+    startDrainSequence();
     return;
   }
   drain_no_codec_close_timer_ = dispatcher_->createTimer([this]() {
@@ -810,7 +827,7 @@ bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
 void ConnectionManagerImpl::doConnectionClose(
     std::optional<Network::ConnectionCloseType> close_type,
     std::optional<StreamInfo::CoreResponseFlag> response_flag, absl::string_view details) {
-  connection_close_started_ = true;
+  drain_state_ = DrainState::Closing;
 
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
@@ -996,7 +1013,7 @@ void ConnectionManagerImpl::onProactiveDrainTimeout() {
   ENVOY_CONN_LOG(debug, "drain deadline approaching, draining connection",
                  read_callbacks_->connection());
   proactive_drain_ = true;
-  if (!codec_) {
+  if (!codec_ || (codec_->protocol() == Protocol::Http3 && accumulated_requests_ == 0)) {
     // Nothing was ever received on this connection, so there is no peer to drain gracefully.
     stats_.named_.downstream_cx_drain_close_.inc();
     doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
