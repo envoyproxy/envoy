@@ -3,7 +3,9 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/upstream_impl.h"
 
+#include "test/common/upstream/snapshot_host_set.h"
 #include "test/config/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
 #include "test/integration/clusters/custom_static_cluster.h"
@@ -43,6 +45,7 @@ public:
         config.set_priority(10);
         config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
         config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
+        config.set_use_snapshot_host_set(use_snapshot_host_set_);
         std::ignore = cluster_type.mutable_typed_config()->PackFrom(config);
       } else {
         test::integration::clusters::CustomStaticConfig2 config;
@@ -53,13 +56,25 @@ public:
       }
 
       cluster_0->mutable_cluster_type()->CopyFrom(cluster_type);
+      bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(
+          deferred_cluster_creation_);
     });
     HttpIntegrationTest::initialize();
     test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(1));
   }
 
   Network::Address::IpVersion ipVersion() const { return version_; }
+
+  // The main-thread host set at the cluster's configured priority.
+  const Upstream::HostSet& clusterHostSet() {
+    const auto& cluster_maps = test_server_->server().clusterManager().clusters();
+    const auto& cluster_ref = cluster_maps.active_clusters_.find("cluster_0")->second;
+    return *cluster_ref.get().prioritySet().hostSetsPerPriority()[10];
+  }
+
   bool cluster_provided_lb_{};
+  bool use_snapshot_host_set_{};
+  bool deferred_cluster_creation_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CustomClusterIntegrationTest,
@@ -90,6 +105,34 @@ TEST_P(CustomClusterIntegrationTest, TestCustomConfig) {
   EXPECT_EQ(1, host_set->hosts().size());
   EXPECT_EQ(1, host_set->healthyHosts().size());
   EXPECT_EQ(10, host_set->priority());
+}
+
+// A cluster whose host sets hand workers snapshots adds its host as a delta, and the host serves
+// traffic with the same membership accounting as the flat path.
+TEST_P(CustomClusterIntegrationTest, SnapshotHostSetServesTraffic) {
+  use_snapshot_host_set_ = true;
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
+
+  const Upstream::HostSet& host_set = clusterHostSet();
+  EXPECT_NE(nullptr, dynamic_cast<const Upstream::SnapshotHostSet*>(&host_set));
+  EXPECT_NE(nullptr, host_set.persistentPartitions());
+  EXPECT_EQ(1, host_set.hostCount());
+  EXPECT_EQ(1, host_set.healthyHostCount());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
+
+// With deferred cluster creation, workers build the cluster from the initialization object on first
+// use. That object carries the snapshot, so the host must still serve traffic.
+TEST_P(CustomClusterIntegrationTest, SnapshotHostSetWithDeferredClusterCreation) {
+  use_snapshot_host_set_ = true;
+  deferred_cluster_creation_ = true;
+  testTwoRequests(false);
+
+  const Upstream::HostSet& host_set = clusterHostSet();
+  EXPECT_NE(nullptr, dynamic_cast<const Upstream::SnapshotHostSet*>(&host_set));
+  EXPECT_NE(nullptr, host_set.persistentPartitions());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
 
 } // namespace

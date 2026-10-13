@@ -673,6 +673,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//test/test_common:status_utility_lib",
+        ":snapshot_host_set_lib",
         ":test_local_address_selector",
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -730,6 +731,15 @@ envoy_cc_test(
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",
     ]),
+)
+
+envoy_cc_test_library(
+    name = "snapshot_host_set_lib",
+    hdrs = ["snapshot_host_set.h"],
+    deps = [
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+    ],
 )
 
 envoy_cc_test_library(

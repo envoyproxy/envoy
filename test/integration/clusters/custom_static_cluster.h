@@ -27,9 +27,10 @@ class CustomStaticCluster : public Upstream::ClusterImplBase {
 public:
   CustomStaticCluster(const envoy::config::cluster::v3::Cluster& cluster,
                       Upstream::ClusterFactoryContext& context, uint32_t priority,
-                      std::string address, uint32_t port, absl::Status& creation_status)
+                      std::string address, uint32_t port, bool use_snapshot_host_set,
+                      absl::Status& creation_status)
       : ClusterImplBase(cluster, context, creation_status), priority_(priority),
-        address_(std::move(address)), port_(port) {
+        address_(std::move(address)), port_(port), use_snapshot_host_set_(use_snapshot_host_set) {
     THROW_IF_NOT_OK_REF(creation_status);
     host_ = makeHost();
   }
@@ -47,6 +48,7 @@ private:
   const uint32_t priority_;
   const std::string address_;
   const uint32_t port_;
+  const bool use_snapshot_host_set_;
   Upstream::HostSharedPtr host_;
 
   friend class CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig1>;
@@ -69,7 +71,7 @@ private:
     absl::Status creation_status = absl::OkStatus();
     auto new_cluster = std::make_shared<CustomStaticCluster>(
         cluster, context, proto_config.priority(), proto_config.address(),
-        proto_config.port_value(), creation_status);
+        proto_config.port_value(), proto_config.use_snapshot_host_set(), creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
     return std::make_pair(new_cluster, create_lb_ ? new_cluster->threadAwareLb() : nullptr);
   }
