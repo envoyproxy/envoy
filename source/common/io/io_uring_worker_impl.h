@@ -38,7 +38,7 @@ public:
                     bool enable_multishot_receive, uint32_t read_buffer_size,
                     uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
                     uint32_t write_low_watermark_bytes, Event::Dispatcher& dispatcher,
-                    uint32_t provided_buffer_count = 0);
+                    uint32_t provided_buffer_count = 0, bool enable_deferred_taskrun = false);
   IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size, uint32_t write_timeout_ms,
                     uint32_t write_high_watermark_bytes, uint32_t write_low_watermark_bytes,
                     Event::Dispatcher& dispatcher);

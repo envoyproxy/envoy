@@ -246,10 +246,22 @@ public:
     if (should_skip_) {
       return;
     }
+    if (GetParam()) {
+      io_uring probe{};
+      io_uring_params params{};
+      params.flags =
+          IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_TASKRUN_FLAG;
+      const int result = io_uring_queue_init_params(2, &probe, &params);
+      if (result == -EINVAL) {
+        GTEST_SKIP() << "Kernel lacks deferred task work";
+      }
+      ASSERT_EQ(0, result);
+      io_uring_queue_exit(&probe);
+    }
     api_ = Api::createApiForTest(time_system_);
     dispatcher_ = api_->allocateDispatcher("receive_tuning");
     io_uring_worker_ = std::make_unique<IoUringWorkerTestImpl>(
-        std::make_unique<IoUringImpl>(512, false, true, 64, 128), *dispatcher_);
+        std::make_unique<IoUringImpl>(512, false, true, 64, 128, GetParam()), *dispatcher_);
     if (!io_uring_worker_->isMultishotEnabled()) {
       GTEST_SKIP() << "Kernel lacks provided buffer rings";
     }
@@ -334,7 +346,7 @@ TEST_P(IoUringReceiveTuningIntegrationTest, PausedPeerCloseNotifiesWithoutReadRe
 }
 
 INSTANTIATE_TEST_SUITE_P(ImmediateAndDeferred, IoUringReceiveTuningIntegrationTest,
-                         testing::Values(false));
+                         testing::Bool());
 
 TEST_F(IoUringWorkerIntegrationTest, WorkerShutdownWithBlockedWrite) {
   initialize();

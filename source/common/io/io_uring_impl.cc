@@ -116,12 +116,17 @@ bool isIoUringSupported() {
 
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                          bool enable_multishot_receive, uint32_t multishot_buffer_size,
-                         uint32_t provided_buffer_count) {
+                         uint32_t provided_buffer_count, bool enable_deferred_taskrun) {
   struct io_uring_params p{};
 
   // Size the completion queue at twice the submission queue to reduce the chance of overflow.
   p.flags |= IORING_SETUP_CQSIZE;
   p.cq_entries = io_uring_size * 2;
+
+  if (enable_deferred_taskrun) {
+    RELEASE_ASSERT(!use_submission_queue_polling, "deferred task work cannot use SQPOLL");
+    p.flags |= IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_TASKRUN_FLAG;
+  }
 
   if (use_submission_queue_polling) {
     p.flags |= IORING_SETUP_SQPOLL;
@@ -217,6 +222,12 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   }
 
   checkCqOverflow();
+  if ((ring_.flags & IORING_SETUP_DEFER_TASKRUN) && io_uring_cq_ready(&ring_) == 0) {
+    // Reading eventfd does not run deferred work. An empty CQ needs an explicit enter.
+    const int ret = io_uring_get_events(&ring_);
+    RELEASE_ASSERT(ret >= 0,
+                   fmt::format("unable to process io_uring task work: {}", errorDetails(-ret)));
+  }
   unsigned count = io_uring_peek_batch_cqe(&ring_, cqes_.data(), cqes_.size());
   for (unsigned i = 0; i < count; ++i) {
     struct io_uring_cqe* cqe = cqes_[i];
@@ -244,7 +255,11 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   }
 }
 
-bool IoUringImpl::hasReadyCompletions() const { return io_uring_cq_ready(&ring_) > 0; }
+bool IoUringImpl::hasReadyCompletions() const {
+  // The drained eventfd may not produce another edge for a CQ backlog or pending task work.
+  return io_uring_cq_ready(&ring_) > 0 || (io_uring_smp_load_acquire(ring_.sq.kflags) &
+                                           (IORING_SQ_CQ_OVERFLOW | IORING_SQ_TASKRUN)) != 0;
+}
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
                                          socklen_t* remote_addr_len, Request* user_data) {

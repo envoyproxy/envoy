@@ -1,7 +1,10 @@
+#include <poll.h>
+#include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include <array>
+#include <chrono>
 #include <functional>
 #include <vector>
 
@@ -19,12 +22,49 @@ namespace Io {
 
 class IoUringImplTestPeer {
 public:
+  static int resetRing(IoUringImpl& instance, unsigned entries, unsigned flags) {
+    io_uring_queue_exit(&instance.ring_);
+    instance.ring_ = {};
+    io_uring_params params{};
+    params.flags = flags | IORING_SETUP_CQSIZE;
+    params.cq_entries = entries * 2;
+    const int result = io_uring_queue_init_params(entries, &instance.ring_, &params);
+    if (result != 0) {
+      // Leave a valid ring for fixture cleanup when the kernel cannot support these test flags.
+      RELEASE_ASSERT(io_uring_queue_init(entries, &instance.ring_, 0) == 0,
+                     "unable to restore test io_uring");
+    }
+    return result;
+  }
+
+  static unsigned ready(const IoUringImpl& instance) { return io_uring_cq_ready(&instance.ring_); }
+
+  static unsigned setupFlags(const IoUringImpl& instance) { return instance.ring_.flags; }
+
   static std::array<unsigned, 2> queueEntries(const IoUringImpl& instance) {
     return {*instance.ring_.sq.kring_entries, *instance.ring_.cq.kring_entries};
   }
 
+  static unsigned pendingFlags(const IoUringImpl& instance) {
+    return io_uring_smp_load_acquire(instance.ring_.sq.kflags);
+  }
+
   static unsigned dropped(const IoUringImpl& instance) {
     return io_uring_smp_load_acquire(instance.ring_.cq.koverflow);
+  }
+
+  static bool prepareNop(IoUringImpl& instance, Request* request) {
+    io_uring_sqe* sqe = io_uring_get_sqe(&instance.ring_);
+    if (sqe == nullptr) {
+      return false;
+    }
+    io_uring_prep_nop(sqe);
+    io_uring_sqe_set_data(sqe, request);
+    return true;
+  }
+
+  static void setCompletionBudget(IoUringImpl& instance, unsigned count) {
+    instance.cqes_.resize(count, nullptr);
   }
 };
 
@@ -86,6 +126,115 @@ public:
 class IoUringImplParamTest
     : public IoUringImplTest,
       public testing::WithParamInterface<std::function<IoUringResult(IoUring&, os_fd_t)>> {};
+
+class IoUringDeferredCompletionTest : public IoUringImplTest {
+public:
+  void SetUp() override {
+    IoUringImplTest::SetUp();
+    if (should_skip_) {
+      return;
+    }
+    const int result = IoUringImplTestPeer::resetRing(
+        impl(), 2,
+        IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_TASKRUN_FLAG);
+    if (result == -EINVAL) {
+      GTEST_SKIP() << "Kernel lacks deferred taskrun support";
+    }
+    ASSERT_EQ(0, result);
+    event_fd_ = impl().registerEventfd();
+    ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, sockets_));
+  }
+
+  void TearDown() override {
+    for (int fd : sockets_) {
+      if (fd != -1) {
+        close(fd);
+      }
+    }
+    IoUringImplTest::TearDown();
+    if (SOCKET_VALID(event_fd_)) {
+      close(event_fd_);
+    }
+  }
+
+  IoUringImpl& impl() { return *static_cast<IoUringImpl*>(io_uring_.get()); }
+
+  void wakePendingRead(Request& request, iovec& iov) {
+    ASSERT_EQ(IoUringResult::Ok, impl().prepareReadv(sockets_[0], &iov, 1, 0, &request));
+    ASSERT_EQ(IoUringResult::Ok, impl().submit());
+    eventfd_t previous;
+    while (eventfd_read(event_fd_, &previous) == 0) {
+    }
+    ASSERT_EQ(EAGAIN, errno);
+    ASSERT_EQ(3, write(sockets_[1], "abc", 3));
+    pollfd notified{event_fd_, POLLIN, 0};
+    ASSERT_EQ(1, poll(&notified, 1, 1000));
+    ASSERT_NE(0, notified.revents & POLLIN);
+    ASSERT_NE(0, IoUringImplTestPeer::pendingFlags(impl()) & IORING_SQ_TASKRUN);
+  }
+
+  int sockets_[2]{-1, -1};
+  os_fd_t event_fd_{INVALID_SOCKET};
+};
+
+TEST_F(IoUringDeferredCompletionTest, EmptyCqWithPendingWorkRearmsAfterNotificationIsDrained) {
+  int data = 0;
+  TestRequest request(data);
+  char buffer[3]{};
+  iovec iov{buffer, sizeof(buffer)};
+  ASSERT_NO_FATAL_FAILURE(wakePendingRead(request, iov));
+  ASSERT_EQ(0, IoUringImplTestPeer::ready(impl()));
+  eventfd_t notified;
+  ASSERT_EQ(0, eventfd_read(event_fd_, &notified));
+  ASSERT_EQ(-1, eventfd_read(event_fd_, &notified));
+  ASSERT_EQ(EAGAIN, errno);
+
+  // No new packet or eventfd edge is required to process the already-pending work.
+  EXPECT_TRUE(impl().hasReadyCompletions());
+  unsigned completions = 0;
+  impl().forEveryCompletion([&](Request* completed, int32_t result, bool injected) {
+    EXPECT_EQ(&request, completed);
+    EXPECT_EQ(3, result);
+    EXPECT_FALSE(injected);
+    ++completions;
+  });
+  EXPECT_EQ(1, completions);
+  EXPECT_EQ("abc", std::string(buffer, sizeof(buffer)));
+  EXPECT_FALSE(impl().hasReadyCompletions());
+}
+
+TEST_F(IoUringDeferredCompletionTest, PublishedCompletionsAreDrainedBeforeProducingDeferredOnes) {
+  int nop_data = 0;
+  int read_data = 0;
+  TestRequest nop_request(nop_data);
+  TestRequest read_request(read_data);
+  ASSERT_TRUE(IoUringImplTestPeer::prepareNop(impl(), &nop_request));
+  ASSERT_EQ(IoUringResult::Ok, impl().submit());
+  ASSERT_EQ(1, IoUringImplTestPeer::ready(impl()));
+
+  char buffer[3]{};
+  iovec iov{buffer, sizeof(buffer)};
+  ASSERT_NO_FATAL_FAILURE(wakePendingRead(read_request, iov));
+  ASSERT_EQ(1, IoUringImplTestPeer::ready(impl()));
+  std::vector<Request*> order;
+  impl().forEveryCompletion([&](Request* completed, int32_t result, bool injected) {
+    EXPECT_EQ(&nop_request, completed);
+    EXPECT_EQ(0, result);
+    EXPECT_FALSE(injected);
+    order.push_back(completed);
+  });
+  EXPECT_EQ(std::vector<Request*>({&nop_request}), order);
+  EXPECT_TRUE(impl().hasReadyCompletions());
+
+  impl().forEveryCompletion([&](Request* completed, int32_t result, bool injected) {
+    EXPECT_EQ(&read_request, completed);
+    EXPECT_EQ(3, result);
+    EXPECT_FALSE(injected);
+    order.push_back(completed);
+  });
+  EXPECT_EQ(std::vector<Request*>({&nop_request, &read_request}), order);
+  EXPECT_FALSE(impl().hasReadyCompletions());
+}
 
 TEST_F(IoUringImplTest, ProvidedBufferCountDoesNotReduceQueueCapacity) {
   IoUringImpl ring(512, false, true, 64, 128);
@@ -165,6 +314,14 @@ TEST_F(IoUringImplTest, ConfiguredProvidedPoolExhaustsAndRecyclesWithoutReducing
       EXPECT_TRUE(ring.isMultishotEnabled());
     }
   }
+}
+
+TEST_F(IoUringImplTest, DeferredTaskrunConfigurationUsesOwnerThread) {
+  IoUringImpl ring(8, false, false, 0, 0, true);
+  EXPECT_EQ((std::array<unsigned, 2>{8, 16}), IoUringImplTestPeer::queueEntries(ring));
+  const unsigned expected =
+      IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_TASKRUN_FLAG;
+  EXPECT_EQ(expected, IoUringImplTestPeer::setupFlags(ring) & expected);
 }
 
 INSTANTIATE_TEST_SUITE_P(
