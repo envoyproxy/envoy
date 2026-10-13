@@ -302,12 +302,9 @@ public:
     router_->onDestroy();
     router_.reset();
   }
-  void destroyRouterOutofRange() {
-    // std::out_of_range Exception
-    EXPECT_CALL(callbacks_, transactionId())
-        .Times(2)
-        .WillOnce(Return("test"))
-        .WillOnce(Return("test1"));
+  void destroyRouterUnknownTransaction() {
+    // Ending a transaction that is not in the table leaves the table alone.
+    EXPECT_CALL(callbacks_, transactionId()).WillOnce(Return("test1"));
 
     router_->onDestroy();
     router_.reset();
@@ -502,7 +499,7 @@ TEST_F(SipRouterTest, CallNoRoute) {
     EXPECT_EQ(1U, store_.counterFromString("test.route_missing").value());
   }
 
-  destroyRouterOutofRange();
+  destroyRouterUnknownTransaction();
 }
 
 TEST_F(SipRouterTest, CallNoCluster) {
@@ -969,6 +966,100 @@ TEST_F(SipRouterTest, RouteHeaderWildcardDomain) {
   EXPECT_NE(nullptr, matcher_ptr->route(*metadata_));
 }
 
+// A response for a transaction whose ActiveTrans has been destroyed must not reach it, even
+// when another transaction is still using the same upstream connection.
+TEST_F(SipRouterTest, ResponseForDestroyedTransactionOnSharedUpstream) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+
+  // First transaction (branch=cluster) opens the upstream connection.
+  auto first_callbacks = std::make_unique<NiceMock<SipFilters::MockDecoderFilterCallbacks>>();
+  EXPECT_CALL(*first_callbacks, settings()).WillRepeatedly(Return(sip_settings_));
+  EXPECT_CALL(*first_callbacks, transactionInfos()).WillOnce(Return(transaction_infos_));
+  EXPECT_CALL(*first_callbacks, traHandler()).WillRepeatedly(Return(tra_handler_));
+  EXPECT_CALL(*first_callbacks, transactionId()).WillRepeatedly(Return("cluster"));
+  EXPECT_CALL(*first_callbacks, route()).WillRepeatedly(Return(route_ptr_));
+  EXPECT_CALL(*route_, routeEntry()).WillRepeatedly(Return(&route_entry_));
+  EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
+  auto first_router = std::make_unique<Router>(
+      router_filter_config_, context_.server_factory_context_.clusterManager(), context_);
+  first_router->setDecoderFilterCallbacks(*first_callbacks);
+
+  initializeMetadata(MsgType::Request);
+  EXPECT_EQ(FilterStatus::Continue, first_router->transportBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, first_router->messageBegin(metadata_));
+  connectUpstream();
+
+  // Second transaction (branch=other) reuses the same upstream request.
+  EXPECT_CALL(callbacks_, route()).WillRepeatedly(Return(route_ptr_));
+  EXPECT_CALL(callbacks_, transactionId()).WillRepeatedly(Return("other"));
+  initializeMetadata(MsgType::Request);
+  metadata_->setTransactionId("<branch=other>");
+  EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
+  EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
+
+  // The first transaction ends (e.g. its downstream connection closed) and is freed.
+  first_router->onDestroy();
+  first_router.reset();
+  first_callbacks.reset();
+
+  // Its late response must be dropped, not delivered to the freed transaction.
+  EXPECT_CALL(callbacks_, startUpstreamResponse()).Times(0);
+  EXPECT_CALL(callbacks_, upstreamData(_)).Times(0);
+  returnResponse();
+
+  destroyRouter();
+}
+
+TEST_F(SipRouterTest, EmptyTransactionIdRemovedOnDestroy) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  metadata_->setTransactionId("branch=;");
+  startRequest();
+  connectUpstream();
+
+  auto& transaction_info = (*transaction_infos_)[cluster_name_];
+  EXPECT_EQ(&callbacks_, transaction_info->getTransaction(""));
+  router_->onDestroy();
+  EXPECT_EQ(nullptr, transaction_info->getTransaction(""));
+  router_.reset();
+}
+
+TEST_F(SipRouterTest, UpstreamRequestLeftByTransactionDoesNotReachIt) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  EXPECT_CALL(callbacks_, transactionId()).WillRepeatedly(Return("cluster"));
+  // The first upstream request is still connecting.
+  startRequest();
+  auto& transaction_info = (*transaction_infos_)[cluster_name_];
+  std::shared_ptr<UpstreamRequest> first = transaction_info->getUpstreamRequest("10.0.0.1");
+  ASSERT_NE(nullptr, first);
+
+  // The transaction is handled again and moves to another upstream request.
+  transaction_info->deleteUpstreamRequest("10.0.0.1");
+  auto pool = context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcpConnPool(
+      Upstream::ResourcePriority::Default, nullptr);
+  ASSERT_TRUE(pool.has_value());
+  auto second =
+      std::make_shared<UpstreamRequest>(std::make_shared<Upstream::TcpPoolData>(*pool), transaction_info);
+  second->setConnectionState(ConnectionState::Connected);
+  transaction_info->insertUpstreamRequest("10.0.0.1", second);
+  metadata_->resetAffinityIteration();
+  router_->messageBegin(metadata_);
+
+  // The transaction ends; the first upstream request's late pool result must not reach it.
+  router_->onDestroy();
+  EXPECT_CALL(callbacks_, continueHandling(_, _)).Times(0);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  router_.reset();
+}
+
 TEST_F(SipRouterTest, Audit) {
   initializeTrans();
   initializeRouter();
@@ -982,16 +1073,67 @@ TEST_F(SipRouterTest, Audit) {
       transaction_info_ptr->getUpstreamRequest("10.0.0.1");
   EXPECT_NE(nullptr, upstream_request_ptr);
 
-  std::shared_ptr<TransactionInfoItem> item =
-      std::make_shared<TransactionInfoItem>(&callbacks_, upstream_request_ptr);
-  std::shared_ptr<TransactionInfoItem> itemToDelete =
-      std::make_shared<TransactionInfoItem>(&callbacks_, upstream_request_ptr);
-  itemToDelete->toDelete();
+  NiceMock<SipFilters::MockDecoderFilterCallbacks> expired;
+  NiceMock<SipFilters::MockDecoderFilterCallbacks> live;
+  NiceMock<StreamInfo::MockStreamInfo> expired_info;
+  NiceMock<StreamInfo::MockStreamInfo> live_info;
+  ON_CALL(expired, streamInfo()).WillByDefault(ReturnRef(expired_info));
+  ON_CALL(live, streamInfo()).WillByDefault(ReturnRef(live_info));
+  ON_CALL(expired_info, startTime()).WillByDefault(Return(SystemTime()));
+  ON_CALL(live_info, startTime()).WillByDefault(Return(dispatcher_.timeSource().systemTime()));
+  EXPECT_CALL(expired, onReset());
+  EXPECT_CALL(live, onReset()).Times(0);
+
   ThreadLocalTransactionInfo threadInfo(transaction_info_ptr, dispatcher_,
-                                        std::chrono::milliseconds(0));
-  threadInfo.transaction_info_map_.emplace(cluster_name_, item);
-  threadInfo.transaction_info_map_.emplace("test1", itemToDelete);
+                                        std::chrono::milliseconds(1000));
+  threadInfo.transaction_info_map_.emplace(
+      "expired", std::make_shared<TransactionInfoItem>(&expired, upstream_request_ptr));
+  threadInfo.transaction_info_map_.emplace(
+      "live", std::make_shared<TransactionInfoItem>(&live, upstream_request_ptr));
   threadInfo.auditTimerAction();
+}
+
+TEST_F(SipRouterTest, TransactionEndRemovesOnlyItsOwnEntry) {
+  initializeTrans();
+  initializeTransaction();
+  auto& transaction_info = (*transaction_infos_)[cluster_name_];
+
+  NiceMock<SipFilters::MockDecoderFilterCallbacks> first;
+  NiceMock<SipFilters::MockDecoderFilterCallbacks> duplicate;
+  transaction_info->insertTransaction("branch", &first, nullptr);
+  // A second transaction with the same id does not replace the first one...
+  transaction_info->insertTransaction("branch", &duplicate, nullptr);
+  EXPECT_EQ(&first, transaction_info->getTransaction("branch"));
+  // ...and its end does not remove the first one's entry.
+  transaction_info->deleteTransaction("branch", duplicate);
+  EXPECT_EQ(&first, transaction_info->getTransaction("branch"));
+
+  // Once the first one ends it is never returned again.
+  transaction_info->deleteTransaction("branch", first);
+  EXPECT_EQ(nullptr, transaction_info->getTransaction("branch"));
+
+  // A new transaction can reuse the id of one that ended.
+  NiceMock<SipFilters::MockDecoderFilterCallbacks> next;
+  transaction_info->insertTransaction("branch", &next, nullptr);
+  EXPECT_EQ(&next, transaction_info->getTransaction("branch"));
+}
+
+TEST_F(SipRouterTest, ResponseAfterAllTransactionsEnded) {
+  initializeTrans();
+  initializeRouter();
+  initializeTransaction();
+  initializeMetadata(MsgType::Request);
+  EXPECT_CALL(callbacks_, transactionId()).WillRepeatedly(Return("cluster"));
+  startRequest();
+  connectUpstream();
+  completeRequest();
+
+  // The only transaction on this upstream connection ends before its response arrives.
+  EXPECT_CALL(callbacks_, startUpstreamResponse()).Times(0);
+  EXPECT_CALL(callbacks_, upstreamData(_)).Times(0);
+  router_->onDestroy();
+  returnResponse();
+  router_.reset();
 }
 
 } // namespace Router
