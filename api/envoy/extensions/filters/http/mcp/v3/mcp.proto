@@ -84,8 +84,6 @@ message Mcp {
     // This is useful for gateways that want to emit a span that captures time
     // spent in the gateway itself, rather than simply forwarding the
     // traceparent from the incoming body.
-    //
-    // [#not-implemented-hide:]
     bool reparent_active_span = 1;
   }
 
