@@ -21,6 +21,7 @@
 
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -1494,6 +1495,10 @@ TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListe
   on_server_init_function_ = [this]() {
     createLdsStream();
 
+    envoy::service::discovery::v3::DiscoveryRequest initial_request;
+    ASSERT_TRUE(lds_upstream_info_.stream_->waitForGrpcMessage(*dispatcher_, initial_request));
+    EXPECT_FALSE(initial_request.has_error_detail());
+
     envoy::config::listener::v3::Listener listener;
     listener.set_name("out_of_range_reverse_conn_listener");
     listener.set_stat_prefix("out_of_range_reverse_conn_listener");
@@ -1528,6 +1533,12 @@ TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListe
     HttpIntegrationTest::initialize();
     test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
   });
+
+  // Consume and assert the NACK sent by Envoy in response to the rejected listener config.
+  envoy::service::discovery::v3::DiscoveryRequest nack;
+  ASSERT_TRUE(lds_upstream_info_.stream_->waitForGrpcMessage(*dispatcher_, nack));
+  EXPECT_TRUE(nack.has_error_detail());
+  EXPECT_THAT(nack.error_detail().message(), HasSubstr("outside the supported range"));
 
   cleanupLdsConnection();
 }
