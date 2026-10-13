@@ -1081,7 +1081,6 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
         // any upstream spans are descendants of the active span.
         Tracing::Span& active_span = decoder_callbacks_->activeSpan();
         if (config_->propagateTraceContext()->reparent_active_span() &&
-            active_span.exportedSpan() &&
             meta_fields.contains(Filters::Common::Mcp::McpConstants::TRACEPARENT_FIELD)) {
           Tracing::HttpTraceContext trace_context(*headers);
           active_span.updateParent(trace_context);
