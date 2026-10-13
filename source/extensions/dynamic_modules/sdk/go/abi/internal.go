@@ -1378,6 +1378,21 @@ func (h *dymHttpFilterHandle) GetUpstreamRemoteAddress() (shared.UnsafeEnvoyBuff
 	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
 }
 
+func (h *dymHttpFilterHandle) GetDownstreamDirectRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
 func (h *dymHttpFilterHandle) GetUpstreamHostsAttempted() []shared.UnsafeEnvoyBuffer {
 	size := C.envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(h.hostPluginPtr)
 	if size == 0 {

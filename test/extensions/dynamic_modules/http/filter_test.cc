@@ -4,6 +4,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/http/message_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
@@ -1002,6 +1003,42 @@ TEST_P(DynamicModuleHttpLanguageTests, SpanAcrossCallbacks) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
 
   filter->onDestroy();
+}
+
+TEST_P(DynamicModuleHttpLanguageTests, DownstreamDirectRemoteAddress) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
+  ASSERT_OK(dynamic_module);
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "downstream_direct_remote_address", "", DefaultMetricsNamespace, false,
+      std::move(dynamic_module.value()), *stats_store.createScope(""), context);
+  ASSERT_OK(filter_config_or_status);
+
+  for (const std::string address : {"192.0.2.40:54321", "[2001:db8::40]:54321", ""}) {
+    SCOPED_TRACE(address);
+    auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                            stats_store.symbolTable(), 0);
+    filter->initializeInModuleFilter();
+
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+    testing::StrictMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setRemoteAddress(
+        Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 0));
+    stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
+        address.empty() ? nullptr : Network::Utility::parseInternetAddressAndPortNoThrow(address));
+    EXPECT_CALL(callbacks, streamInfo()).WillOnce(testing::ReturnRef(stream_info));
+    EXPECT_CALL(stream_info, downstreamAddressProvider())
+        .WillOnce(testing::ReturnRef(*stream_info.downstream_connection_info_provider_));
+    Http::TestRequestHeaderMapImpl request_headers{};
+    EXPECT_CALL(callbacks, requestHeaders())
+        .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+    filter->setDecoderFilterCallbacks(callbacks);
+
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, true));
+    EXPECT_EQ(request_headers.get_("x-downstream-peer"), address.empty() ? "unavailable" : address);
+    filter->onDestroy();
+  }
 }
 
 TEST_P(DynamicModuleHttpLanguageTests, ClusterCallbacks) {

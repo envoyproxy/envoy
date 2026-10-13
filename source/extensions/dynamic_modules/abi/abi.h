@@ -3753,6 +3753,18 @@ bool envoy_dynamic_module_callback_http_get_upstream_remote_address(
     envoy_dynamic_module_type_envoy_buffer* result);
 
 /**
+ * Get the downstream socket peer address, including the port, before XFF processing.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param result is the pointer to store the address. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the downstream direct remote address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
  * Get the number of upstream host addresses attempted for the current request.
  *
  * Hosts without an address are excluded from the count.

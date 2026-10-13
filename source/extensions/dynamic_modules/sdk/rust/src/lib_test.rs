@@ -2279,6 +2279,54 @@ const HTTP_UPSTREAM_REMOTE_ADDRESS: &[u8] = b"10.0.0.3:9443";
 const HTTP_UPSTREAM_HOSTS_ATTEMPTED: [&[u8]; 2] = [b"10.0.0.1:443", b"10.0.0.2:8443"];
 const HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED: [u64; 3] = [10, 20, 30];
 
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE: usize = 4;
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL: usize = 5;
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS: &[u8] = b"[2001:db8::40]:54321";
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  match filter_envoy_ptr as usize {
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE => {
+      unsafe {
+        *result = abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS.as_ptr() as *mut _,
+          length: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS.len(),
+        };
+      }
+      true
+    },
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL => true,
+    _ => false,
+  }
+}
+
+#[test]
+fn test_http_get_downstream_direct_remote_address() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE as *mut _,
+  };
+  assert_eq!(
+    filter
+      .get_downstream_direct_remote_address()
+      .unwrap()
+      .as_slice(),
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS
+  );
+}
+
+#[test]
+fn test_http_get_downstream_direct_remote_address_unavailable() {
+  for raw_ptr in [0, HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL] {
+    let filter = http::EnvoyHttpFilterImpl {
+      raw_ptr: raw_ptr as *mut _,
+    };
+    assert!(filter.get_downstream_direct_remote_address().is_none());
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_remote_address(
   filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,

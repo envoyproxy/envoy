@@ -193,6 +193,7 @@ public:
   MOCK_METHOD(std::optional<ClusterHostCounts>, getClusterHostCounts, (uint32_t priority),
               (override));
   MOCK_METHOD(std::optional<std::string_view>, getUpstreamRemoteAddress, (), (override));
+  MOCK_METHOD(std::optional<std::string_view>, getDownstreamDirectRemoteAddress, (), (override));
   MOCK_METHOD(std::vector<std::string_view>, getUpstreamHostsAttempted, (), (override));
   MOCK_METHOD(std::vector<uint64_t>, getUpstreamConnectionIdsAttempted, (), (override));
   MOCK_METHOD(bool, setUpstreamOverrideHost, (std::string_view host, bool strict), (override));
