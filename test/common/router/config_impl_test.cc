@@ -10640,6 +10640,33 @@ virtual_hosts:
   EXPECT_EQ(creation_status_.message(), "Cannot use prefix_rewrite with matcher extension");
 }
 
+TEST_F(RouteConfigurationV2, RouteMatcherExtensionAndRedirectPrefixRewrite) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/bar/{country}/{hang}"
+        redirect:
+          prefix_rewrite: "!"
+
+  )EOF";
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.disallow_redirect_prefix_rewrite_with_path_match_policy",
+        "true"}});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_EQ(creation_status_.message(),
+            "Cannot use redirect.prefix_rewrite with path_match_policy");
+}
+
 TEST_F(RouteConfigurationV2, TemplatePatternIsFilledFromConfigInRouteAction) {
   const std::string yaml = R"EOF(
 virtual_hosts:
