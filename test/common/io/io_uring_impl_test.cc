@@ -1,6 +1,9 @@
 #include <sys/socket.h>
+#include <unistd.h>
 
+#include <array>
 #include <functional>
+#include <vector>
 
 #include "source/common/io/io_uring_impl.h"
 #include "source/common/network/address_impl.h"
@@ -13,6 +16,18 @@
 
 namespace Envoy {
 namespace Io {
+
+class IoUringImplTestPeer {
+public:
+  static std::array<unsigned, 2> queueEntries(const IoUringImpl& instance) {
+    return {*instance.ring_.sq.kring_entries, *instance.ring_.cq.kring_entries};
+  }
+
+  static unsigned dropped(const IoUringImpl& instance) {
+    return io_uring_smp_load_acquire(instance.ring_.cq.koverflow);
+  }
+};
+
 namespace {
 
 class TestRequest : public Request {
@@ -71,6 +86,86 @@ public:
 class IoUringImplParamTest
     : public IoUringImplTest,
       public testing::WithParamInterface<std::function<IoUringResult(IoUring&, os_fd_t)>> {};
+
+TEST_F(IoUringImplTest, ProvidedBufferCountDoesNotReduceQueueCapacity) {
+  IoUringImpl ring(512, false, true, 64, 128);
+  if (!ring.isMultishotEnabled()) {
+    GTEST_SKIP() << "Kernel lacks provided buffer ring support";
+  }
+  EXPECT_EQ((std::array<unsigned, 2>{512, 1024}), IoUringImplTestPeer::queueEntries(ring));
+  ASSERT_NE(nullptr, ring.bufferPool());
+  EXPECT_EQ(64, ring.bufferPool()->bufferSize());
+}
+
+TEST_F(IoUringImplTest, ConfiguredProvidedPoolExhaustsAndRecyclesWithoutReducingQueues) {
+  for (uint32_t count : {128u, 256u}) {
+    SCOPED_TRACE(count);
+    IoUringImpl ring(512, false, true, 1, count);
+    if (!ring.isMultishotEnabled()) {
+      GTEST_SKIP() << "Kernel lacks provided buffer ring support";
+    }
+    EXPECT_EQ((std::array<unsigned, 2>{512, 1024}), IoUringImplTestPeer::queueEntries(ring));
+    const os_fd_t event_fd = ring.registerEventfd();
+    int sockets[2];
+    ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, sockets));
+    struct Cleanup {
+      IoUringImpl& ring;
+      os_fd_t event_fd;
+      int* sockets;
+      ~Cleanup() {
+        ring.unregisterEventfd();
+        close(event_fd);
+        close(sockets[0]);
+        close(sockets[1]);
+      }
+    } cleanup{ring, event_fd, sockets};
+    int data = 0;
+    TestRequest request(data);
+    auto pool = ring.bufferPool();
+    const std::string payload(count + 1, 'x');
+    for (unsigned cycle = 0; cycle < 3; ++cycle) {
+      ASSERT_EQ(IoUringResult::Ok, ring.prepareReadMultishot(sockets[0], &request));
+      ASSERT_EQ(IoUringResult::Ok, ring.submit());
+      const size_t bytes = count + (cycle == 0 ? 1 : 0);
+      ASSERT_EQ(static_cast<ssize_t>(bytes), send(sockets[1], payload.data(), bytes, MSG_NOSIGNAL));
+      std::vector<uint32_t> held;
+      std::vector<bool> seen(count, false);
+      bool terminal = false;
+      Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+      while (!terminal && bound.withinBound()) {
+        ring.forEveryCompletion([&](Request* completed, int32_t result, bool injected) {
+          ASSERT_EQ(&request, completed);
+          EXPECT_FALSE(injected);
+          EXPECT_FALSE(terminal);
+          if (result > 0) {
+            ASSERT_EQ(1, result);
+            ASSERT_GE(completed->bufferId(), 0);
+            const uint32_t id = completed->bufferId();
+            ASSERT_LT(id, count);
+            EXPECT_FALSE(seen[id]);
+            seen[id] = true;
+            held.push_back(id);
+            EXPECT_EQ('x', *pool->getBuffer(id));
+          } else {
+            EXPECT_EQ(-ENOBUFS, result);
+            EXPECT_FALSE(completed->moreCompletions());
+            terminal = true;
+          }
+        });
+        if (HasFatalFailure()) {
+          return;
+        }
+      }
+      ASSERT_TRUE(terminal);
+      ASSERT_EQ(count, held.size());
+      for (auto it = held.rbegin(); it != held.rend(); ++it) {
+        pool->releaseBuffer(pool->getBuffer(*it));
+      }
+      EXPECT_EQ(0, IoUringImplTestPeer::dropped(ring));
+      EXPECT_TRUE(ring.isMultishotEnabled());
+    }
+  }
+}
 
 INSTANTIATE_TEST_SUITE_P(
     InvalidPrepareMethodParamsTest, IoUringImplParamTest,

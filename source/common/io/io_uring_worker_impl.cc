@@ -98,9 +98,10 @@ IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission
                                      bool enable_multishot_receive, uint32_t read_buffer_size,
                                      uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
                                      uint32_t write_low_watermark_bytes,
-                                     Event::Dispatcher& dispatcher)
+                                     Event::Dispatcher& dispatcher, uint32_t provided_buffer_count)
     : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling,
-                                                      enable_multishot_receive, read_buffer_size),
+                                                      enable_multishot_receive, read_buffer_size,
+                                                      provided_buffer_count),
                         read_buffer_size, write_timeout_ms, write_high_watermark_bytes,
                         write_low_watermark_bytes, dispatcher) {}
 

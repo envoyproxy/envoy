@@ -115,7 +115,8 @@ bool isIoUringSupported() {
 }
 
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                         bool enable_multishot_receive, uint32_t multishot_buffer_size) {
+                         bool enable_multishot_receive, uint32_t multishot_buffer_size,
+                         uint32_t provided_buffer_count) {
   struct io_uring_params p{};
 
   // Size the completion queue at twice the submission queue to reduce the chance of overflow.
@@ -141,12 +142,14 @@ IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polli
   // pass keeps those read re-arms within the submission queue. A larger burst is reaped across
   // later passes, which the worker re-arms while hasReadyCompletions stays true.
   cqes_.resize(io_uring_size, nullptr);
-
   // Set up the provided buffer ring for `multishot` reads when requested. A failure here means the
   // running kernel lacks provided buffer ring support, in which case `multishot` reads stay
   // disabled and the readv-based read path is used instead.
   if (enable_multishot_receive && multishot_buffer_size > 0) {
-    const uint32_t buffer_count = providedBufferCount(io_uring_size);
+    const uint32_t buffer_count =
+        provided_buffer_count == 0 ? providedBufferCount(io_uring_size) : provided_buffer_count;
+    RELEASE_ASSERT(buffer_count <= 4096 && (buffer_count & (buffer_count - 1)) == 0,
+                   "provided buffer count must be a power of two no larger than 4096");
     auto pool = std::make_shared<IoUringBufferPoolImpl>(ring_, ProvidedBufferGroupId, buffer_count,
                                                         multishot_buffer_size);
     if (pool->valid()) {
