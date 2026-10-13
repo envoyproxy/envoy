@@ -33,10 +33,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // What Envoy does when the decision of the module cannot be honored.
 //
-// This covers a module that reports an error, which is what the SDK does when the module panics, a
-// decision that selects no template or an unknown one, a template whose ``match`` does not hold for
-// the request, an override of a route that route matching did not resolve, route entry overrides
-// recorded for a direct response, and route metadata a typed metadata factory rejects.
+// This covers a module that reports an error, which is what the SDK does when the module panics,
+// a decision or a status Envoy does not know, a template selection that names an identifier that
+// is not declared, a template whose ``match`` does not hold for the request, an override recorded
+// without a template while route matching resolved no route, route entry overrides recorded for a
+// direct response, and route metadata a typed metadata factory rejects.
 enum FailurePolicy {
   // Must be set explicitly.
   FAILURE_POLICY_UNSPECIFIED = 0;
@@ -119,7 +120,8 @@ message RouteOverride {
   // CORS is not configured through per filter configuration.
   config.route.v3.CorsPolicy cors = 8;
 
-  // Regex rewrite of the request path, replacing the path the produced route sends upstream. The
+  // Regex rewrite of the request path, replacing the path the produced route sends upstream,
+  // unless the module records a path of its own, which wins. The
   // pattern is compiled once when the specifier is configured. It applies to the path without the
   // query string, which is preserved, and the result is capped at
   // :ref:`max_rewritten_path_bytes
@@ -132,8 +134,9 @@ message RouteOverride {
   config.route.v3.Tracing tracing = 10;
 
   // Metadata layered onto the metadata of the produced route, per namespace, so consumers such as
-  // the rate limit ROUTE_ENTRY action, ext_authz and the METADATA(ROUTE) formatter observe it. It
-  // is a route level property. An empty message layers nothing.
+  // the rate limit ROUTE_ENTRY action, ext_authz and the METADATA(ROUTE) formatter observe it.
+  // Metadata the module records itself layers on top of it. It is a route level property. An
+  // empty message layers nothing.
   config.core.v3.Metadata metadata = 11;
 }
 

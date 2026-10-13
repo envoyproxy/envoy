@@ -1,5 +1,5 @@
 The ``ConfigValidatorFactory::typeUrl()`` method is deprecated in favor of
-``ConfigValidator::typeUrl()``, which resolves the xDS type url from the validator instance and can
+``ConfigValidator::typeUrl()``, which resolves the xDS type URL from the validator instance and can
 therefore depend on the validator's configuration. This only affects extension code, not
 configuration. Both methods are now non-pure and default to an empty value. Envoy calls
 ``ConfigValidator::typeUrl()`` first and falls back to the deprecated

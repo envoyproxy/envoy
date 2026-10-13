@@ -89,7 +89,7 @@ envoy_cc_test_library(
 # We have targets for the tests of SDK itself here so that //test/... will be able to run them.
 rust_test(
     name = "rust_sdk_test",
-    crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+    crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk_mock",
     tags = [
         # It is a known issue that TSAN detectes a false positive in the test runner of Rust toolchain:
         # https://github.com/rust-lang/rust/issues/39608
@@ -106,7 +106,7 @@ rust_test(
 
 rust_doc_test(
     name = "rust_sdk_doc_test",
-    crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+    crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk_mock",
     tags = [
         "no_san",
         "nocoverage",

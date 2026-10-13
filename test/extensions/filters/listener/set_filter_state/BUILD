@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -12,9 +11,10 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "set_filter_state_test",
     srcs = ["set_filter_state_test.cc"],
+    extension_names = ["envoy.filters.listener.set_filter_state"],
     deps = [
         "//source/common/network:listener_filter_buffer_lib",
         "//source/extensions/filters/listener/set_filter_state:config",

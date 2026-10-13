@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/transport_sockets/dynamic_modules/v3/dynamic_modules.pb.h"
 
@@ -38,6 +40,7 @@ constexpr char kRustModulesPath[] =
     "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust";
 constexpr char kCModulesPath[] = "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c";
 constexpr char kReferenceModule[] = "transport_socket_integration_test";
+constexpr char kSpliceModule[] = "transport_socket_splice";
 constexpr uint8_t kXorKey = 0x5a;
 
 envoy::extensions::transport_sockets::dynamic_modules::v3::DynamicModuleTransportSocket
@@ -62,6 +65,38 @@ extern "C" envoy_dynamic_module_type_transport_socket_module_ptr
 returnNullTransportSocket(envoy_dynamic_module_type_transport_socket_factory_config_module_ptr,
                           envoy_dynamic_module_type_transport_socket_envoy_ptr) {
   return nullptr;
+}
+
+// Hooks of a stand-in module whose do_read and do_write return the I/O result that its factory
+// config points to.
+extern "C" envoy_dynamic_module_type_transport_socket_module_ptr
+newStubTransportSocket(envoy_dynamic_module_type_transport_socket_factory_config_module_ptr config,
+                       envoy_dynamic_module_type_transport_socket_envoy_ptr) {
+  return config;
+}
+
+extern "C" void destroyStubTransportSocket(envoy_dynamic_module_type_transport_socket_module_ptr) {}
+
+// Reaches for the stream info, which a client connection constructs only after this returns.
+extern "C" void
+setStubTransportSocketCallbacks(envoy_dynamic_module_type_transport_socket_envoy_ptr envoy_ptr,
+                                envoy_dynamic_module_type_transport_socket_module_ptr) {
+  uint64_t upstream_connection_id = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+      envoy_ptr, &upstream_connection_id));
+  envoy_dynamic_module_callback_transport_socket_add_wire_bytes(envoy_ptr, 1, 1);
+}
+
+extern "C" envoy_dynamic_module_type_transport_socket_io_result
+stubTransportSocketDoRead(envoy_dynamic_module_type_transport_socket_envoy_ptr,
+                          envoy_dynamic_module_type_transport_socket_module_ptr socket) {
+  return *static_cast<const envoy_dynamic_module_type_transport_socket_io_result*>(socket);
+}
+
+extern "C" envoy_dynamic_module_type_transport_socket_io_result
+stubTransportSocketDoWrite(envoy_dynamic_module_type_transport_socket_envoy_ptr,
+                           envoy_dynamic_module_type_transport_socket_module_ptr socket, bool) {
+  return *static_cast<const envoy_dynamic_module_type_transport_socket_io_result*>(socket);
 }
 
 // Tests for the upstream and downstream config factories.
@@ -211,11 +246,13 @@ public:
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
                                TestEnvironment::substitute(kRustModulesPath), 1);
     ON_CALL(callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
+    ON_CALL(io_handle_, isOpen()).WillByDefault(testing::Return(true));
   }
 
   Network::TransportSocketPtr createSocket(const std::string& socket_name,
-                                           std::optional<std::string> config_bytes = std::nullopt) {
-    auto config = buildProtoConfig(kReferenceModule, socket_name);
+                                           std::optional<std::string> config_bytes = std::nullopt,
+                                           const std::string& module_name = kReferenceModule) {
+    auto config = buildProtoConfig(module_name, socket_name);
     if (config_bytes.has_value()) {
       Protobuf::BytesValue bytes_value;
       bytes_value.set_value(*config_bytes);
@@ -227,6 +264,18 @@ public:
     auto socket = factory_ptr_->createDownstreamTransportSocket();
     socket->setTransportSocketCallbacks(callbacks_);
     return socket;
+  }
+
+  std::unique_ptr<DynamicModuleTransportSocket>
+  createStubSocket(const envoy_dynamic_module_type_transport_socket_io_result& io_result) {
+    auto config = std::make_shared<DynamicModuleTransportSocketConfig>(false, nullptr);
+    config->in_module_config_ = &io_result;
+    config->on_new_ = newStubTransportSocket;
+    config->on_destroy_ = destroyStubTransportSocket;
+    config->on_set_callbacks_ = setStubTransportSocketCallbacks;
+    config->on_do_read_ = stubTransportSocketDoRead;
+    config->on_do_write_ = stubTransportSocketDoWrite;
+    return std::make_unique<DynamicModuleTransportSocket>(config);
   }
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
@@ -514,6 +563,24 @@ TEST_F(DynamicModuleTransportSocketTest, ConnectionCallbacksWithoutCallbacksAreS
   EXPECT_FALSE(
       envoy_dynamic_module_callback_transport_socket_get_local_address(envoy_ptr, &address, &port));
   EXPECT_EQ(0, port);
+
+  io_bytes = 7;
+  EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Error,
+            envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(envoy_ptr, 4,
+                                                                                  &io_bytes));
+  EXPECT_EQ(0, io_bytes);
+  io_bytes = 7;
+  EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Error,
+            envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(envoy_ptr,
+                                                                                      &io_bytes));
+  EXPECT_EQ(0, io_bytes);
+  uint64_t connection_id = 7;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_transport_socket_get_connection_id(envoy_ptr, &connection_id));
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+      envoy_ptr, &connection_id));
+  EXPECT_EQ(7, connection_id);
+  envoy_dynamic_module_callback_transport_socket_add_wire_bytes(envoy_ptr, 1, 1);
 }
 
 TEST_F(DynamicModuleTransportSocketTest, IoReadReturnsStatusForEachOutcome) {
@@ -616,6 +683,18 @@ TEST_F(DynamicModuleTransportSocketTest, BufferCallbacksWithoutActiveBufferAreNo
                                                                          &slices_count);
   EXPECT_EQ(0, slices_count);
   EXPECT_EQ(0, envoy_dynamic_module_callback_transport_socket_write_buffer_length(envoy_ptr));
+
+  // The buffer I/O callbacks report an error instead.
+  size_t io_bytes = 7;
+  EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Error,
+            envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(envoy_ptr, 4,
+                                                                                  &io_bytes));
+  EXPECT_EQ(0, io_bytes);
+  io_bytes = 7;
+  EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Error,
+            envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(envoy_ptr,
+                                                                                      &io_bytes));
+  EXPECT_EQ(0, io_bytes);
 }
 
 TEST_F(DynamicModuleTransportSocketTest, GetFdReturnsNativeDescriptor) {
@@ -639,6 +718,161 @@ TEST_F(DynamicModuleTransportSocketTest, OnConnectedRecordsFailureWhenFdUnavaila
   EXPECT_CALL(callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   socket->onConnected();
   EXPECT_EQ("missing socket fd", socket->failureReason());
+}
+
+TEST_F(DynamicModuleTransportSocketTest, WakeupsBeforeConnectAndAfterCloseAreNoOps) {
+  auto socket = createSocket("passthrough");
+  auto* envoy_ptr = static_cast<DynamicModuleTransportSocket*>(socket.get());
+  EXPECT_CALL(callbacks_, setTransportSocketIsReadable()).Times(0);
+  EXPECT_CALL(io_handle_, activateFileEvents(testing::_)).Times(0);
+
+  // An event before the connection completes would be taken for its completion.
+  EXPECT_CALL(callbacks_.connection_, connecting()).WillRepeatedly(testing::Return(true));
+  envoy_dynamic_module_callback_transport_socket_set_is_readable(envoy_ptr);
+  envoy_dynamic_module_callback_transport_socket_set_is_writable(envoy_ptr);
+
+  // A closed connection has no file event left to activate.
+  EXPECT_CALL(callbacks_.connection_, connecting()).WillRepeatedly(testing::Return(false));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(testing::Return(false));
+  envoy_dynamic_module_callback_transport_socket_set_is_readable(envoy_ptr);
+  envoy_dynamic_module_callback_transport_socket_set_is_writable(envoy_ptr);
+}
+
+TEST_F(DynamicModuleTransportSocketTest, GetConnectionIds) {
+  auto socket = createSocket("passthrough");
+  auto* envoy_ptr = static_cast<DynamicModuleTransportSocket*>(socket.get());
+  ON_CALL(callbacks_.connection_, id()).WillByDefault(testing::Return(1234));
+  uint64_t connection_id = 0;
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_transport_socket_get_connection_id(envoy_ptr, &connection_id));
+  EXPECT_EQ(1234, connection_id);
+
+  // The TCP proxy has not recorded an upstream connection yet.
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+      envoy_ptr, &connection_id));
+  callbacks_.connection_.stream_info_.upstream_info_->setUpstreamConnectionId(42);
+  EXPECT_TRUE(envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+      envoy_ptr, &connection_id));
+  EXPECT_EQ(42, connection_id);
+
+  // A connection without upstream info has no upstream connection either.
+  callbacks_.connection_.stream_info_.upstream_info_ = nullptr;
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+      envoy_ptr, &connection_id));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, AddWireBytesCountsStreamInfoBytes) {
+  auto socket = createSocket("passthrough");
+  auto* envoy_ptr = static_cast<DynamicModuleTransportSocket*>(socket.get());
+  auto& stream_info = callbacks_.connection_.stream_info_;
+  stream_info.upstream_bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
+
+  // Without a downstream bytes meter, as on an upstream connection, only the totals grow.
+  envoy_dynamic_module_callback_transport_socket_add_wire_bytes(envoy_ptr, 3, 4);
+  EXPECT_EQ(3, stream_info.bytesReceived());
+  EXPECT_EQ(4, stream_info.bytesSent());
+  EXPECT_EQ(0, stream_info.upstream_bytes_meter_->wireBytesSent());
+  EXPECT_EQ(0, stream_info.upstream_bytes_meter_->wireBytesReceived());
+
+  // Like the TCP proxy, bytes received downstream count as sent upstream and the other way round.
+  stream_info.downstream_bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
+  envoy_dynamic_module_callback_transport_socket_add_wire_bytes(envoy_ptr, 5, 6);
+  EXPECT_EQ(8, stream_info.bytesReceived());
+  EXPECT_EQ(10, stream_info.bytesSent());
+  EXPECT_EQ(5, stream_info.downstream_bytes_meter_->wireBytesReceived());
+  EXPECT_EQ(6, stream_info.downstream_bytes_meter_->wireBytesSent());
+  EXPECT_EQ(5, stream_info.upstream_bytes_meter_->wireBytesSent());
+  EXPECT_EQ(6, stream_info.upstream_bytes_meter_->wireBytesReceived());
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StreamInfoIsUnavailableWithinOnSetCallbacks) {
+  const envoy_dynamic_module_type_transport_socket_io_result io_result = {};
+  auto socket = createStubSocket(io_result);
+  EXPECT_CALL(callbacks_.connection_, streamInfo()).Times(0);
+  socket->setTransportSocketCallbacks(callbacks_);
+}
+
+TEST_F(DynamicModuleTransportSocketTest, IoReadToReadBufferReadsIntoConnectionBuffer) {
+  auto socket = createSocket("splice", std::nullopt, kSpliceModule);
+  EXPECT_CALL(io_handle_, read(testing::_, testing::_))
+      .WillOnce(Invoke([](Buffer::Instance& buffer, std::optional<uint64_t> max_length) {
+        EXPECT_EQ(std::numeric_limits<size_t>::max(), max_length);
+        buffer.add("hello");
+        return Api::IoCallUint64Result(5, Api::IoError::none());
+      }))
+      .WillOnce(Invoke([](Buffer::Instance&, std::optional<uint64_t>) {
+        return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
+      }));
+
+  Buffer::OwnedImpl buffer;
+  Network::IoResult result = socket->doRead(buffer);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+  EXPECT_EQ(5, result.bytes_processed_);
+  EXPECT_FALSE(result.end_stream_read_);
+  EXPECT_EQ("hello", buffer.toString());
+}
+
+TEST_F(DynamicModuleTransportSocketTest, IoWriteFromWriteBufferWritesConnectionBuffer) {
+  auto socket = createSocket("splice", std::nullopt, kSpliceModule);
+  // The module writes until the callback reports the buffer empty, which it does without touching
+  // the socket.
+  EXPECT_CALL(io_handle_, write(testing::_)).WillOnce(Invoke([](Buffer::Instance& buffer) {
+    const uint64_t length = buffer.length();
+    buffer.drain(length);
+    return Api::IoCallUint64Result(length, Api::IoError::none());
+  }));
+
+  Buffer::OwnedImpl buffer("world");
+  Network::IoResult result = socket->doWrite(buffer, false);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+  EXPECT_EQ(5, result.bytes_processed_);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST_F(DynamicModuleTransportSocketTest, ResetActionClosesWithConnectionReset) {
+  const envoy_dynamic_module_type_transport_socket_io_result io_result = {
+      envoy_dynamic_module_type_transport_socket_post_io_action_Reset, 3, true};
+  auto socket = createStubSocket(io_result);
+  socket->setTransportSocketCallbacks(callbacks_);
+  Buffer::OwnedImpl buffer;
+
+  // Only a read reports the end of stream.
+  Network::IoResult result = socket->doRead(buffer);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ(3, result.bytes_processed_);
+  EXPECT_TRUE(result.end_stream_read_);
+  EXPECT_EQ(Api::IoError::IoErrorCode::ConnectionReset, result.err_code_);
+  result = socket->doWrite(buffer, false);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ(3, result.bytes_processed_);
+  EXPECT_FALSE(result.end_stream_read_);
+  EXPECT_EQ(Api::IoError::IoErrorCode::ConnectionReset, result.err_code_);
+}
+
+TEST_F(DynamicModuleTransportSocketTest, CloseAfterPeerResetClosesWithConnectionReset) {
+  auto socket = createSocket("splice", std::nullopt, kSpliceModule);
+  EXPECT_CALL(io_handle_, read(testing::_, testing::_))
+      .Times(2)
+      .WillRepeatedly(Invoke([](Buffer::Instance&, std::optional<uint64_t>) {
+        return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEbadfError());
+      }));
+  EXPECT_CALL(io_handle_, write(testing::_)).WillOnce(Invoke([](Buffer::Instance&) {
+    return Api::IoCallUint64Result(0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET));
+  }));
+  Buffer::OwnedImpl read_buffer;
+  Buffer::OwnedImpl write_buffer("world");
+
+  // The module only sees errors and closes. Envoy reports the close as a reset once a buffer I/O
+  // callback saw the peer reset the connection.
+  Network::IoResult result = socket->doRead(read_buffer);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_FALSE(result.err_code_.has_value());
+  result = socket->doWrite(write_buffer, false);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ(Api::IoError::IoErrorCode::ConnectionReset, result.err_code_);
+  result = socket->doRead(read_buffer);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ(Api::IoError::IoErrorCode::ConnectionReset, result.err_code_);
 }
 } // namespace
 } // namespace DynamicModules

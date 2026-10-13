@@ -71,14 +71,15 @@ struct ShadowExampleConfig {
 }
 
 impl RouteSpecifierConfig for ShadowExampleConfig {
-  fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision {
+  fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus {
     if !self.dry_run {
-      // A wet run applies the decision, so the request routes to the module's cluster. A cluster
-      // the route cannot accept is reported as an error rather than as a silent no-op.
-      if ctx.set_cluster_name(&self.cluster) {
-        return RouteDecision::Override;
+      // A wet run records only the cluster override, which the default Unspecified decision
+      // applies, so the request routes to the module's cluster. A cluster the route cannot accept is reported as an error rather
+      // than as a silent no-op.
+      if !ctx.set_cluster_name(&self.cluster) {
+        ctx.set_decision(RouteDecision::Error);
       }
-      return RouteDecision::Error;
+      return OnRouteStatus::Continue;
     }
     // A dry run reads the matched route from the context and counts whether the decision agrees
     // with it, leaving routing unchanged by passing through. A matched route without a cluster,
@@ -94,6 +95,7 @@ impl RouteSpecifierConfig for ShadowExampleConfig {
     if let Some(id) = counter {
       let _ = self.envoy_config.increment_counter(id, 1);
     }
-    RouteDecision::PassThrough
+    ctx.set_decision(RouteDecision::PassThrough);
+    OnRouteStatus::Continue
   }
 }

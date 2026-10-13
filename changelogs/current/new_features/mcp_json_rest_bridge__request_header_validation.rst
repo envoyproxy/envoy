@@ -1,1 +1,3 @@
-Added validation of ``Mcp-Method`` and ``Mcp-Name`` request headers for MCP ``2026-07-28``, including Base64-decoded ``Mcp-Name`` values. Missing, malformed, or mismatched headers are rejected with a ``HeaderMismatch`` error.
+Added validation of ``Mcp-Method`` and ``Mcp-Name`` request headers for MCP ``2026-07-28``,
+including Base64-decoded ``Mcp-Name`` values. Missing, malformed, or mismatched headers are rejected
+with a ``HeaderMismatch`` error.

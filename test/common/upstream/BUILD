@@ -364,6 +364,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
@@ -686,6 +687,7 @@ envoy_cc_test(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
+        "//source/common/upstream:host_lookup_map_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/eds:eds_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.

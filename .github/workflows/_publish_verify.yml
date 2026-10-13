@@ -69,8 +69,7 @@ jobs:
             - run: |
                 IMAGES=(
                     envoy:dev
-                    envoy-contrib:contrib-dev
-                    envoy-google-vrp:google-vrp-dev)
+                    envoy-contrib:contrib-dev)
                 RUNNER_TEMP="%{{ runner.temp }}"
                 . ./.github/workflows/docker_utils.sh
                 skopeo_copy "${IMAGES[*]}"
@@ -113,7 +112,7 @@ jobs:
             export NO_BUILD_SETUP=1
           steps-pre: |
             - id: version-support
-              uses: envoyproxy/toolshed/actions/jq@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+              uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
               with:
                 input: |
                   version_major: ${{ fromJSON(inputs.request).request.version.major }}

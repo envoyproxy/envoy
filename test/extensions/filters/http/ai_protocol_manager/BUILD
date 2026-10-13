@@ -1,13 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
-    "envoy_cc_fuzz_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -288,9 +288,10 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary(
+envoy_extension_cc_benchmark_binary(
     name = "response_handler_benchmark",
     srcs = ["response_handler_benchmark.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -300,15 +301,17 @@ envoy_cc_benchmark_binary(
     ],
 )
 
-envoy_benchmark_test(
+envoy_extension_benchmark_test(
     name = "response_handler_benchmark_test",
     benchmark_binary = "response_handler_benchmark",
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "response_handler_fuzz_test",
     srcs = ["response_handler_fuzz_test.cc"],
     corpus = "response_handler_corpus",
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",

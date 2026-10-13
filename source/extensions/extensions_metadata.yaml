@@ -1674,6 +1674,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tls.handshakers.dynamic_modules:
+  categories:
+  - envoy.tls_handshakers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.tls.handshakers.dynamic_modules.v3.DynamicModuleTlsHandshaker
 envoy.tracers.dynamic_modules:
   categories:
   - envoy.tracers

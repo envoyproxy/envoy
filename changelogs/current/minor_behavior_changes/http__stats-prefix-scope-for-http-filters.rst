@@ -6,4 +6,4 @@ only moves from the name that each filter builds to the name of the scope the fi
 stats in. The filters whose stats would not have survived that move unchanged keep creating them
 outside that scope, from the full stats prefix.
 This change can be reverted by setting the runtime guard
-``envoy.reloadable_features.use_stats_prefix_scope_for_http_filter`` to false.
+``envoy.reloadable_features.use_stats_prefix_scope_for_http_filter`` to ``false``.
