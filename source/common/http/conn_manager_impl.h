@@ -627,6 +627,9 @@ private:
   void onIdleTimeout();
   void onConnectionDurationTimeout();
   void onDrainTimeout();
+  bool drainSafeToStart() const;
+  // Returns false only when a new drain sequence must wait for codec readiness.
+  bool maybeStartDrainSequence();
   void startDrainSequence();
   // Called when the drain sequence the connection was notified of (see onDrain()) is about to end
   // and the connection has to be drained without waiting for a response to decide on.
@@ -686,8 +689,9 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
-  // Also used for QUIC connections that have a codec but have not received their first stream.
-  Event::TimerPtr drain_no_codec_close_timer_;
+  // Bounds the wait for the first request during immediate draining, including QUIC connections
+  // that already have a codec.
+  Event::TimerPtr drain_no_request_close_timer_;
   // Armed in onDrain() to fire at a random point near the end of the drain sequence, so that a
   // connection that sent no response in the meantime is still drained before it is torn down.
   Event::TimerPtr proactive_drain_timer_;

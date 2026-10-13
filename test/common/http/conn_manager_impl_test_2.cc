@@ -444,7 +444,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClosesConnectionWithoutCodec) {
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWrite,
-                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
+                    StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection));
   drain_timer->invokeCallback();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_idle_timeout_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
@@ -469,7 +469,7 @@ TEST_F(HttpConnectionManagerImplTest, ReplayedDrainClosesConnectionWithoutCodec)
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWrite,
-                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
+                    StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection));
   setup();
   drain_timer->invokeCallback();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_idle_timeout_.value());
@@ -489,7 +489,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClosesConnectionWithoutCodecOrIdleTim
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWrite,
-                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
+                    StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection));
   drain_timer->invokeCallback();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_idle_timeout_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
@@ -619,6 +619,98 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionCloseDoesNotRecreateIdleTimer) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest,
+       RemoteCloseWithActiveStreamDoesNotCloseAgainOrRearmIdleTimer) {
+  idle_timeout_ = std::chrono::milliseconds(10);
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(idle_timeout_.value(), _));
+  EXPECT_CALL(*idle_timer, disableTimer()).Times(2);
+  setup();
+  setupFilterChain(1, 0);
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  startRequest(true);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_active_.value());
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+  EXPECT_CALL(*codec_, wantsToWrite()).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createScaledTypedTimer_(_, _)).Times(0);
+  doRemoteClose();
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_active_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_destroy_remote_active_rq_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_destroy_local_.value());
+  EXPECT_EQ(nullptr, response_encoder_.stream_.codec_callbacks_);
+}
+
+TEST_F(HttpConnectionManagerImplTest, ClosingConnectionWithPendingWritesRearmsIdleTimer) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete", "true"}});
+  max_requests_per_connection_ = 1;
+  idle_timeout_ = std::chrono::milliseconds(10);
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(idle_timeout_.value(), _));
+  EXPECT_CALL(*idle_timer, disableTimer()).Times(2);
+  setup();
+  setupFilterChain(1, 0);
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  startRequest(true);
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+  EXPECT_CALL(*idle_timer, enableTimer(idle_timeout_.value(), _));
+  EXPECT_CALL(*codec_, wantsToWrite()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+  expectOnDestroy();
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_active_.value());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest,
+       ClosingConnectionWithPendingWritesRearmsIdleTimerDuringImmediateDrain) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete", "true"}});
+  max_requests_per_connection_ = 1;
+  idle_timeout_ = std::chrono::milliseconds(10);
+  Event::MockTimer* idle_timer = setUpTimer();
+  EXPECT_CALL(*idle_timer, enableTimer(idle_timeout_.value(), _));
+  EXPECT_CALL(*idle_timer, disableTimer()).Times(2);
+  setup();
+  setupFilterChain(1, 0);
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  startRequest(true);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
+  EXPECT_CALL(*codec_, shutdownNotice()).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+  EXPECT_CALL(*idle_timer, enableTimer(idle_timeout_.value(), _));
+  EXPECT_CALL(*codec_, wantsToWrite()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+  expectOnDestroy();
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_active_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_cx_drain_close_.value());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, ZeroDrainTimeoutClosesConnectionWithoutCodec) {
   delete codec_;
   idle_timeout_ = std::chrono::milliseconds(10);
@@ -636,7 +728,7 @@ TEST_F(HttpConnectionManagerImplTest, ZeroDrainTimeoutClosesConnectionWithoutCod
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
               close(Network::ConnectionCloseType::FlushWrite,
-                    StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec));
+                    StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection));
   drain_timer->invokeCallback();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }

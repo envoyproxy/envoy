@@ -484,14 +484,15 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.response_encoder_->getStream().removeCallbacks(stream);
   }
 
-  if (streams_.empty() && drain_state_ != DrainState::Closing) {
+  if (streams_.empty()) {
     const bool immediate_drain =
         connection_drain_event_.has_value() &&
         connection_drain_event_->strategy == Server::DrainStrategy::Immediate;
     if (immediate_drain && codec_ && drain_state_ == DrainState::NotDraining) {
       stats_.named_.downstream_cx_drain_close_.inc();
       startDrainSequence();
-    } else if (connection_idle_timer_ && !immediate_drain) {
+    } else if (connection_idle_timer_ &&
+               (!immediate_drain || drain_state_ == DrainState::Closing)) {
       connection_idle_timer_->enableTimer(config_->idleTimeout().value());
     }
   }
@@ -564,15 +565,9 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->filter_manager_.aboveHighWatermark());
   LinkedList::moveIntoList(std::move(new_stream), streams_);
-  if (drain_no_codec_close_timer_) {
-    // QUIC creates its codec before the handshake. Wait for the first stream before sending
-    // GOAWAY so that a connection accepted during draining can complete its handshake.
-    drain_no_codec_close_timer_->disableTimer();
-    drain_no_codec_close_timer_.reset();
-    if (drain_state_ == DrainState::NotDraining) {
-      stats_.named_.downstream_cx_drain_close_.inc();
-      startDrainSequence();
-    }
+  // The timer marks a pending immediate drain; otherwise there is no drain to resume.
+  if (drain_no_request_close_timer_) {
+    maybeStartDrainSequence();
   }
   return **streams_.begin();
 }
@@ -618,13 +613,9 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
     break;
   }
 
-  if (drain_no_codec_close_timer_ && codec_->protocol() != Protocol::Http3) {
-    drain_no_codec_close_timer_->disableTimer();
-    drain_no_codec_close_timer_.reset();
-    if (drain_state_ == DrainState::NotDraining) {
-      stats_.named_.downstream_cx_drain_close_.inc();
-      startDrainSequence();
-    }
+  // The timer marks a pending immediate drain; otherwise there is no drain to resume.
+  if (drain_no_request_close_timer_) {
+    maybeStartDrainSequence();
   }
 }
 
@@ -774,6 +765,8 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
 void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
   // The legacy path polls the DrainDecision instead and never looks at the event.
+  // A closing connection with no active streams needs no further drain decisions,
+  // so ignore the notification without caching it.
   if (!use_connection_event_drain_ || connection_drain_event_.has_value() ||
       (drain_state_ == DrainState::Closing && streams_.empty())) {
     return;
@@ -801,17 +794,15 @@ void ConnectionManagerImpl::onDrain(Network::ConnectionDrainEvent drain_event) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
-  if (codec_ && (codec_->protocol() != Protocol::Http3 || accumulated_requests_ > 0)) {
-    stats_.named_.downstream_cx_drain_close_.inc();
-    startDrainSequence();
+  if (maybeStartDrainSequence()) {
     return;
   }
-  drain_no_codec_close_timer_ = dispatcher_->createTimer([this]() {
+  drain_no_request_close_timer_ = dispatcher_->createTimer([this]() {
     stats_.named_.downstream_cx_drain_close_.inc();
     doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
-                      StreamInfo::LocalCloseReasons::get().DrainedConnectionWithoutCodec);
+                      StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection);
   });
-  drain_no_codec_close_timer_->enableTimer(config_->drainTimeout());
+  drain_no_request_close_timer_->enableTimer(config_->drainTimeout());
 }
 
 bool ConnectionManagerImpl::shouldDrainClose(Network::DrainDirection scope) {
@@ -843,9 +834,9 @@ void ConnectionManagerImpl::doConnectionClose(
     drain_timer_.reset();
   }
 
-  if (drain_no_codec_close_timer_) {
-    drain_no_codec_close_timer_->disableTimer();
-    drain_no_codec_close_timer_.reset();
+  if (drain_no_request_close_timer_) {
+    drain_no_request_close_timer_->disableTimer();
+    drain_no_request_close_timer_.reset();
   }
 
   if (proactive_drain_timer_) {
@@ -995,6 +986,30 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
   }
 }
 
+bool ConnectionManagerImpl::drainSafeToStart() const {
+  // QUIC creates its codec before encryption is established. Wait for the first stream before
+  // starting the drain sequence.
+  return codec_ && (codec_->protocol() != Protocol::Http3 || accumulated_requests_ > 0);
+}
+
+bool ConnectionManagerImpl::maybeStartDrainSequence() {
+  if (drain_state_ == DrainState::NotDraining && !drainSafeToStart()) {
+    return false;
+  }
+  // The first-request wait is no longer needed once draining is possible or the connection
+  // has already started draining or closing.
+  if (drain_no_request_close_timer_) {
+    drain_no_request_close_timer_->disableTimer();
+    drain_no_request_close_timer_.reset();
+  }
+  if (drain_state_ != DrainState::NotDraining) {
+    return true;
+  }
+  stats_.named_.downstream_cx_drain_close_.inc();
+  startDrainSequence();
+  return true;
+}
+
 void ConnectionManagerImpl::onDrainTimeout() {
   ASSERT(drain_state_ != DrainState::NotDraining);
   codec_->goAway();
@@ -1012,8 +1027,8 @@ void ConnectionManagerImpl::onProactiveDrainTimeout() {
   ENVOY_CONN_LOG(debug, "drain deadline approaching, draining connection",
                  read_callbacks_->connection());
   proactive_drain_ = true;
-  if (!codec_ || (codec_->protocol() == Protocol::Http3 && accumulated_requests_ == 0)) {
-    // Nothing was ever received on this connection, so there is no peer to drain gracefully.
+  if (!drainSafeToStart()) {
+    // No request has been received, so the connection is not ready for a graceful drain.
     stats_.named_.downstream_cx_drain_close_.inc();
     doConnectionClose(Network::ConnectionCloseType::FlushWrite, std::nullopt,
                       StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection);

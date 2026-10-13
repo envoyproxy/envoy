@@ -3762,7 +3762,9 @@ TEST_F(HttpConnectionManagerImplTest, ImmediateHttp3DrainClosesWithoutFirstStrea
       Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
 
   EXPECT_CALL(*no_stream_timer, disableTimer());
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection));
   no_stream_timer->invokeCallback();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
@@ -3784,7 +3786,9 @@ TEST_F(HttpConnectionManagerImplTest, ProactiveHttp3DrainClosesWithoutFirstStrea
       Server::DrainStrategy::Gradual});
 
   EXPECT_CALL(*proactive_drain_timer, disableTimer());
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWrite,
+                    StreamInfo::LocalCloseReasons::get().DrainDeadlineOnConnection));
   proactive_drain_timer->invokeCallback();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
 }
@@ -4100,8 +4104,25 @@ TEST_F(HttpConnectionManagerImplTest, NoProactiveDrainOnLegacyDrainPath) {
   EXPECT_EQ(0U, stats_.named_.downstream_cx_drain_close_.value());
 }
 
-// Even a connection accepted late in the drain window closes after its own no-codec wait.
-TEST_F(HttpConnectionManagerImplTest, NoCodecDrainForConnectionAcceptedLate) {
+// A connection notified of the drain once the proactive window has already opened was accepted
+// while the listener was draining. It is not drained proactively, as that could close it before its
+// first request has been read; its first response drains it instead.
+TEST_F(HttpConnectionManagerImplTest, NoProactiveDrainForConnectionAcceptedLate) {
+  // Not used in the test.
+  delete codec_;
+  ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
+      .WillByDefault(Return(std::chrono::seconds(600)));
+  setup();
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+      factory_context_.server_factory_context_.timeSource().monotonicTime() -
+          std::chrono::seconds(500),
+      Server::DrainStrategy::Gradual});
+}
+
+// Even a connection accepted late in the immediate drain window closes after its own no-codec wait.
+TEST_F(HttpConnectionManagerImplTest, NoCodecDrainForConnectionAcceptedLateImmediate) {
   // Not used in the test.
   delete codec_;
   ON_CALL(factory_context_.server_factory_context_.options_, drainTime())
