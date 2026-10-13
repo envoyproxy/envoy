@@ -60,10 +60,7 @@ typed_config:
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override {
-    cleanupLdsConnection();
-    cleanupUpstreamAndDownstream();
-  }
+  void TearDown() override { cleanupLdsConnection(); }
 
 protected:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
@@ -1533,7 +1530,6 @@ TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListe
   });
 
   cleanupLdsConnection();
-  cleanupUpstreamAndDownstream();
 }
 
 } // namespace
