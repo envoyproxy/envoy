@@ -30,7 +30,7 @@ public:
     pressure_ = usage.resource_pressure_;
   }
 
-  void onFailure(const EnvoyException& error) override { error_ = error; }
+  void onFailure(const absl::Status& error) override { error_ = error; }
 
   bool hasPressure() const { return pressure_.has_value(); }
   bool hasError() const { return error_.has_value(); }
@@ -39,7 +39,7 @@ public:
 
 private:
   std::optional<double> pressure_;
-  std::optional<EnvoyException> error_;
+  std::optional<absl::Status> error_;
 };
 
 // =============================================================================

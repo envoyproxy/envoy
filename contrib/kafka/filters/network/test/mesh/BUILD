@@ -12,7 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_unit_test",
     srcs = ["config_unit_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:config_lib",
@@ -24,7 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:filter_lib",
@@ -102,7 +102,7 @@ envoy_cc_test_library(
     hdrs = ["kafka_mocks.h"],
     tags = ["skip_on_windows"],
     deps = [
-        "//bazel/foreign_cc:librdkafka",
+        "//bazel/deps:librdkafka",
         "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_lib",
     ],
 )

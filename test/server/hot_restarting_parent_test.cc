@@ -1,6 +1,11 @@
 #include <memory>
 
+#include "envoy/config/metrics/v3/stats.pb.h"
+
 #include "source/common/network/address_impl.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/server/hot_restarting_child.h"
 #include "source/server/hot_restarting_parent.h"
 
@@ -8,6 +13,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/server/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -405,6 +411,145 @@ TEST_F(HotRestartingParentTest, RetainDynamicStats) {
   }
 }
 
+// Tag metadata is exported only for stats whose tags did not come from tag extraction (tracked
+// via Metric::noTagExtraction()): extracted tags are reproduced by the child's own tag
+// extraction during the merge, so re-transmitting them would only bloat the transfer.
+// Programmatic tags (whose values are embedded in the flat name) are the ones that need the
+// metadata.
+TEST_F(HotRestartingParentTest, ExportsTagMetadataOnlyForProgrammaticTags) {
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
+
+  Stats::SymbolTableImpl symbol_table;
+  Stats::AllocatorImpl alloc(symbol_table);
+  Stats::ThreadLocalStoreImpl store(alloc);
+  // Install a tag producer with the default extraction regexes, as the production bootstrap does.
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto producer_or = Stats::TagProducerImpl::createTagProducer(stats_config, {});
+  ASSERT_TRUE(producer_or.ok());
+  store.setTagProducer(std::move(*producer_or));
+  EXPECT_CALL(server_, stats()).WillRepeatedly(ReturnRef(store));
+
+  // Tags produced by regex extraction: the child re-derives them, so no metadata is expected.
+  Stats::Counter& extracted_counter =
+      store.rootScope()->counterFromString("cluster.foo.upstream_cx_total");
+  extracted_counter.inc();
+  ASSERT_FALSE(extracted_counter.tags().empty()); // Sanity check: extraction produced tags.
+  EXPECT_FALSE(extracted_counter.noTagExtraction());
+
+  // Programmatic tags: not re-derivable, so metadata is expected.
+  Stats::StatNamePool pool(symbol_table);
+  const Stats::StatNameTagVector tags{{pool.add("source"), pool.add("svc-a")}};
+  Stats::Counter& programmatic_counter =
+      store.rootScope()->counterFromStatNameWithTags(pool.add("custom.requests_total"), tags);
+  programmatic_counter.inc();
+  EXPECT_TRUE(programmatic_counter.noTagExtraction());
+  Stats::Gauge& programmatic_gauge = store.rootScope()->gaugeFromStatNameWithTags(
+      pool.add("custom.active_connections"), tags, Stats::Gauge::ImportMode::Accumulate);
+  programmatic_gauge.set(5);
+  EXPECT_TRUE(programmatic_gauge.noTagExtraction());
+
+  HotRestartMessage::Reply::Stats stats;
+  hot_restarting_parent_.exportStatsToChild(&stats);
+
+  EXPECT_EQ(stats.counter_tags().end(), stats.counter_tags().find(extracted_counter.name()));
+
+  auto counter_iter = stats.counter_tags().find(programmatic_counter.name());
+  ASSERT_NE(stats.counter_tags().end(), counter_iter);
+  EXPECT_EQ("custom.requests_total", counter_iter->second.base_name());
+  ASSERT_EQ(1, counter_iter->second.tags_size());
+  EXPECT_EQ("source", counter_iter->second.tags(0).name());
+  EXPECT_EQ("svc-a", counter_iter->second.tags(0).value());
+
+  auto gauge_iter = stats.gauge_tags().find(programmatic_gauge.name());
+  ASSERT_NE(stats.gauge_tags().end(), gauge_iter);
+  EXPECT_EQ("custom.active_connections", gauge_iter->second.base_name());
+  ASSERT_EQ(1, gauge_iter->second.tags_size());
+}
+
+// End-to-end through the export/merge protocol: programmatic tags recorded by the parent are
+// re-applied to the stats the child creates during the merge, and the child's own tagged
+// creation resolves to the merged stat.
+TEST_F(HotRestartingParentTest, TagMetadataAppliedToMergedStats) {
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
+
+  Stats::SymbolTableImpl parent_symbol_table;
+  Stats::AllocatorImpl parent_alloc(parent_symbol_table);
+  Stats::ThreadLocalStoreImpl parent_store(parent_alloc);
+  EXPECT_CALL(server_, stats()).WillRepeatedly(ReturnRef(parent_store));
+
+  Stats::StatNamePool parent_pool(parent_symbol_table);
+  const Stats::StatNameTagVector parent_tags{{parent_pool.add("source"), parent_pool.add("svc-a")}};
+  Stats::Counter& parent_counter = parent_store.rootScope()->counterFromStatNameWithTags(
+      parent_pool.add("custom.requests_total"), parent_tags);
+  parent_counter.add(7);
+  const std::string full_name = parent_counter.name();
+
+  HotRestartMessage::Reply::Stats stats_proto;
+  hot_restarting_parent_.exportStatsToChild(&stats_proto);
+
+  Stats::SymbolTableImpl child_symbol_table;
+  Stats::TestUtil::TestStore child_store(child_symbol_table);
+  HotRestartingChild hot_restarting_child(0, 0, testDomainSocketName(), 0, false, false);
+  hot_restarting_child.mergeParentStats(child_store, stats_proto);
+
+  Stats::StatNamePool child_pool(child_symbol_table);
+  const Stats::StatNameTagVector child_tags{{child_pool.add("source"), child_pool.add("svc-a")}};
+  Stats::Counter& child_counter = child_store.rootScope()->counterFromStatNameWithTags(
+      child_pool.add("custom.requests_total"), child_tags);
+  EXPECT_EQ(full_name, child_counter.name());
+  EXPECT_EQ(7, child_counter.value());
+  EXPECT_EQ("custom.requests_total", child_counter.tagExtractedName());
+  ASSERT_EQ(1, child_counter.tags().size());
+  EXPECT_EQ("source", child_counter.tags()[0].name_);
+  EXPECT_EQ("svc-a", child_counter.tags()[0].value_);
+  // The merged stat is marked as carrying programmatic tags, so when this child later becomes
+  // the parent of another hot restart it exports the tag metadata again.
+  EXPECT_TRUE(child_counter.noTagExtraction());
+}
+
+// With the runtime feature disabled the child ignores the transmitted tag metadata and falls
+// back to the legacy name-derived behavior: the tags collapse into the metric name.
+TEST_F(HotRestartingParentTest, TagMetadataIgnoredWhenRuntimeFlagDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.hot_restart_propagate_stat_tags", "false"}});
+
+  MockListenerManager listener_manager;
+  EXPECT_CALL(server_, listenerManager()).WillRepeatedly(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, numConnections()).WillRepeatedly(Return(0));
+
+  Stats::SymbolTableImpl parent_symbol_table;
+  Stats::AllocatorImpl parent_alloc(parent_symbol_table);
+  Stats::ThreadLocalStoreImpl parent_store(parent_alloc);
+  EXPECT_CALL(server_, stats()).WillRepeatedly(ReturnRef(parent_store));
+
+  Stats::StatNamePool parent_pool(parent_symbol_table);
+  const Stats::StatNameTagVector parent_tags{{parent_pool.add("source"), parent_pool.add("svc-a")}};
+  Stats::Counter& parent_counter = parent_store.rootScope()->counterFromStatNameWithTags(
+      parent_pool.add("custom.requests_total"), parent_tags);
+  parent_counter.add(7);
+  const std::string full_name = parent_counter.name();
+
+  HotRestartMessage::Reply::Stats stats_proto;
+  hot_restarting_parent_.exportStatsToChild(&stats_proto);
+  EXPECT_EQ(1, stats_proto.counter_tags().size());
+
+  Stats::SymbolTableImpl child_symbol_table;
+  Stats::TestUtil::TestStore child_store(child_symbol_table);
+  HotRestartingChild hot_restarting_child(0, 0, testDomainSocketName(), 0, false, false);
+  hot_restarting_child.mergeParentStats(child_store, stats_proto);
+
+  // Legacy behavior: the merged counter is keyed by the full mangled name with no tags.
+  Stats::Counter& merged = child_store.counter(full_name);
+  EXPECT_EQ(7, merged.value());
+  EXPECT_EQ(full_name, merged.tagExtractedName());
+  EXPECT_TRUE(merged.tags().empty());
+}
+
 MATCHER_P(UdpPacketHandlerPtrIs, expected_handler, "") {
   bool matched = arg->non_dispatched_udp_packet_handler_.ptr() == expected_handler;
   if (!matched) {
@@ -435,8 +580,37 @@ TEST_F(HotRestartingParentTest, UdpPacketIsForwarded) {
   expected_packet->set_payload(msg);
   expected_packet->set_receive_time_epoch_microseconds(1234567890);
   expected_packet->set_worker_index(worker_index);
+  expected_packet->set_listener_addr("udp://127.0.0.1:12345");
   EXPECT_CALL(message_sender_, sendHotRestartMessage(ProtoEq(expected_msg)));
-  hot_restarting_parent_.handle(worker_index, packet);
+  hot_restarting_parent_.handle(worker_index, *ipv4_test_addr_1_, packet);
+}
+
+// The forwarded packet carries the listener's bind address and network namespace rather than
+// only the packet's destination, so the child can resolve the right listener for transparent
+// sockets and for listeners bound to the same address in different namespaces.
+TEST_F(HotRestartingParentTest, UdpPacketIsForwardedWithListenerAddressAndNamespace) {
+  uint32_t worker_index = 3;
+  Network::UdpRecvData packet;
+  std::string msg = "hello";
+  // Transparent socket: the destination is not the bind address.
+  packet.addresses_.local_ = *Network::Utility::resolveUrl("udp://10.0.0.5:12345");
+  packet.addresses_.peer_ = ipv4_test_addr_2_;
+  packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(msg);
+  packet.receive_time_ = MonotonicTime(std::chrono::microseconds(42));
+  auto listener_address = Network::Utility::resolveUrl("udp://0.0.0.0:12345")
+                              .value()
+                              ->withNetworkNamespace("/run/netns/pod");
+  envoy::HotRestartMessage expected_msg;
+  auto* expected_packet = expected_msg.mutable_request()->mutable_forwarded_udp_packet();
+  expected_packet->set_local_addr("udp://10.0.0.5:12345");
+  expected_packet->set_peer_addr("udp://127.0.0.1:54321");
+  expected_packet->set_payload(msg);
+  expected_packet->set_receive_time_epoch_microseconds(42);
+  expected_packet->set_worker_index(worker_index);
+  expected_packet->set_listener_addr("udp://0.0.0.0:12345");
+  expected_packet->set_network_namespace("/run/netns/pod");
+  EXPECT_CALL(message_sender_, sendHotRestartMessage(ProtoEq(expected_msg)));
+  hot_restarting_parent_.handle(worker_index, *listener_address, packet);
 }
 
 } // namespace

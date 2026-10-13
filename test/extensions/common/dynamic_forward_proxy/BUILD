@@ -12,7 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "dns_cache_impl_test",
     srcs = ["dns_cache_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
         "//source/common/config:utility_lib",
@@ -35,7 +35,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dns_cache_manager_impl_test",
     srcs = ["dns_cache_manager_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:allocator_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -53,7 +53,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dns_cache_resource_manager_test",
     srcs = ["dns_cache_resource_manager_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":mocks",
         "//source/common/config:utility_lib",

@@ -17,12 +17,12 @@ namespace HttpFilters {
 namespace AwsLambdaFilter {
 
 class AwsLambdaFilterFactory
-    : public Common::DualFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::aws_lambda::v3::Config,
           envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig>,
       Logger::Loggable<Logger::Id::filter> {
 public:
-  AwsLambdaFilterFactory() : DualFactoryBase("envoy.filters.http.aws_lambda") {}
+  AwsLambdaFilterFactory() : UnifiedFactoryBase("envoy.filters.http.aws_lambda") {}
 
 protected:
   Extensions::Common::Aws::CredentialsProviderChainSharedPtr getCredentialsProvider(
@@ -35,11 +35,6 @@ protected:
       Stats::Scope& scope, bool is_upstream) const;
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
-      const std::string& stats_prefix, DualInfo dual_info,
-      Server::Configuration::ServerFactoryContext& context) override;
-
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
       Server::Configuration::ServerFactoryContext& context,

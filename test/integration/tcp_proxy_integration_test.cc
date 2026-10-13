@@ -18,6 +18,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/fake_access_log.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration.h"
@@ -28,6 +29,8 @@
 #include "test/test_common/test_random_generator.h"
 
 #include "absl/functional/any_invocable.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -1800,9 +1803,10 @@ TEST_P(TcpProxySslIntegrationTest, SslConnectionDataEarlyReadNotCached) {
   // The second access log is when the connection closes, so the handshake is complete and
   // a valid peer cert is now available.
   log_result = waitForAccessLog(access_log_path, 1, false);
-  EXPECT_EQ(log_result,
-            "san=spiffe://lyft.com/frontend-team,http://frontend.lyft.com "
-            "fingerprint=c07e14fc43b9c7b3d92f1004f91d3a9e071d9c93a58afc76b4c14303ae3a0f34");
+  EXPECT_EQ(log_result, absl::StrCat("san=spiffe://lyft.com/frontend-team,http://frontend.lyft.com "
+                                     "fingerprint=",
+                                     absl::AsciiStrToLower(
+                                         absl::StrReplaceAll(TEST_CLIENT_CERT_HASH, {{":", ""}}))));
 }
 
 // Test that Envoy does not crash when a downstream TLS connection is rejected
@@ -2296,7 +2300,7 @@ TEST_P(TcpProxyIntegrationTest, ClusterBufferHighWatermarkTimeoutClosesUpstream)
   // Disable reads from the upstream to simulate a slow upstream.
   ASSERT_TRUE(fake_upstream_connection->readDisable(true));
 
-  std::string payload(256 * 1024, 'a');
+  std::string payload(2048 * 1024, 'a');
   ASSERT_TRUE(tcp_client->write(payload, false));
 
   timeSystem().advanceTimeWait(std::chrono::milliseconds(500));

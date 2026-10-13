@@ -2142,7 +2142,8 @@ TEST_F(FilterTest, DecodeHeadersUsesPerRouteMatchTree) {
 
   // Set up per-route config that always matches.
   auto per_route_match_tree = makeAlwaysMatchTree(action);
-  auto per_route_config = std::make_shared<CompositePerRouteConfig>(per_route_match_tree);
+  auto per_route_config = std::make_shared<CompositePerRouteConfig>(
+      per_route_match_tree, decoder_callbacks_.dispatcher());
 
   ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
       .WillByDefault(testing::Return(per_route_config.get()));
@@ -2184,8 +2185,41 @@ TEST_F(FilterTest, HandleActionWithUnsupportedActionTypeLogsError) {
 // Test CompositePerRouteConfig stores and returns the match tree.
 TEST(CompositePerRouteConfigTest, StoresAndReturnsMatchTree) {
   auto match_tree = makeNeverMatchTree();
-  CompositePerRouteConfig config(match_tree);
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  CompositePerRouteConfig config(match_tree, dispatcher);
   EXPECT_EQ(match_tree, config.matchTree());
+}
+
+// A per-route configuration released off the main thread hands its match tree to the main
+// dispatcher rather than destroying it in place, because the delegated filter configurations the
+// tree's actions own are not safe to tear down on a worker thread.
+TEST(CompositePerRouteConfigTest, ReleasedOffMainThreadIsPostedToMainDispatcher) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  ON_CALL(dispatcher, isThreadSafe()).WillByDefault(testing::Return(false));
+
+  auto config = std::make_unique<CompositePerRouteConfig>(makeNeverMatchTree(), dispatcher);
+
+  Event::PostCb posted;
+  EXPECT_CALL(dispatcher, post(_)).WillOnce(testing::Invoke([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  }));
+  config.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  // Running the posted callback releases the match tree on the main thread.
+  posted();
+}
+
+// A per-route configuration released on the main thread is destroyed in place, with nothing
+// posted to the dispatcher.
+TEST(CompositePerRouteConfigTest, ReleasedOnMainThreadIsDestroyedInPlace) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  ON_CALL(dispatcher, isThreadSafe()).WillByDefault(testing::Return(true));
+
+  auto config = std::make_unique<CompositePerRouteConfig>(makeNeverMatchTree(), dispatcher);
+
+  EXPECT_CALL(dispatcher, post(_)).Times(0);
+  config.reset();
 }
 
 } // namespace

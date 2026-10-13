@@ -18,7 +18,6 @@ envoy_cc_extension(
     name = "local_error_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    repository = "@envoy",
     deps = [
         ":filter_cc_proto",
         "//library/common/http:header_utility_lib",
@@ -39,7 +38,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":local_error_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",

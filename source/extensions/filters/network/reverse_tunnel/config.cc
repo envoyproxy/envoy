@@ -11,7 +11,7 @@ absl::StatusOr<Network::FilterFactoryCb>
 ReverseTunnelFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
     Server::Configuration::FactoryContext& context) {
-  auto status = validateConnLimit(proto_config);
+  auto status = validateConfig(proto_config);
   if (!status.ok()) {
     return status;
   }
@@ -31,20 +31,21 @@ ReverseTunnelFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-absl::Status ReverseTunnelFilterConfigFactory::validateConnLimit(
+absl::Status ReverseTunnelFilterConfigFactory::validateConfig(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config)
     const {
-  if (!proto_config.enable_connection_limit()) {
-    return absl::OkStatus();
-  }
+  // The filter registers every accepted tunnel with the upstream reverse tunnel acceptor, so its
+  // bootstrap extension must be configured. Without it the handshake would answer 200 and drop the
+  // socket, leaving the initiator with a tunnel nobody can consume.
   const auto* acceptor = getAcceptor();
   if (acceptor == nullptr || acceptor->getExtension() == nullptr) {
     return absl::InvalidArgumentError(
-        "reverse_tunnel: enable_connection_limit is set but the upstream reverse_tunnel "
-        "socket interface bootstrap extension (UpstreamReverseConnectionSocketInterface) is not "
-        "configured");
+        "reverse_tunnel: the upstream reverse_tunnel socket interface bootstrap extension "
+        "(UpstreamReverseConnectionSocketInterface) is not configured");
   }
-  if (acceptor->getExtension()->maxConnectionsPerNode() == 0) {
+  // When the per-node connection cap is enforced it must be set on the extension.
+  if (proto_config.enable_connection_limit() &&
+      acceptor->getExtension()->maxConnectionsPerNode() == 0) {
     return absl::InvalidArgumentError(
         "reverse_tunnel: enable_connection_limit is set but max_connections_per_node is 0 on the "
         "UpstreamReverseConnectionSocketInterface bootstrap extension");

@@ -32,7 +32,7 @@ private:
 
   XRayConfiguration xray_config_;
   SamplingStrategyPtr sampling_strategy_;
-  ThreadLocal::SlotPtr tls_slot_ptr_;
+  ThreadLocal::SlotSharedPtr tls_slot_ptr_;
 };
 
 } // namespace XRay

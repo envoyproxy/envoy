@@ -16,17 +16,17 @@ namespace AwsEventstreamParser {
  * Config registration for the AWS EventStream Parser filter.
  */
 class AwsEventstreamParserConfig
-    : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
+    : public Extensions::HttpFilters::Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::aws_eventstream_parser::v3::AwsEventstreamParser> {
 public:
-  AwsEventstreamParserConfig()
-      : ExceptionFreeFactoryBase("envoy.filters.http.aws_eventstream_parser") {}
+  AwsEventstreamParserConfig() : UnifiedFactoryBase("envoy.filters.http.aws_eventstream_parser") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::aws_eventstream_parser::v3::AwsEventstreamParser&
           proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace AwsEventstreamParser

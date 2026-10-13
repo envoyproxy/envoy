@@ -1,5 +1,7 @@
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/produce_record_extractor.h"
 
+#include <format>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -43,7 +45,7 @@ std::vector<OutboundRecord> RecordExtractorImpl::extractPartitionRecords(const s
 
   // Let's skip these common fields, because we are not using them.
   if (data.length() < RECORD_BATCH_COMMON_FIELDS_SIZE) {
-    throw EnvoyException(fmt::format("record batch for [{}-{}] is too short (no common fields): {}",
+    throw EnvoyException(std::format("record batch for [{}-{}] is too short (no common fields): {}",
                                      topic, partition, data.length()));
   }
   data = {data.data() + RECORD_BATCH_COMMON_FIELDS_SIZE,
@@ -54,13 +56,13 @@ std::vector<OutboundRecord> RecordExtractorImpl::extractPartitionRecords(const s
   magic_deserializer.feed(data);
   if (!magic_deserializer.ready()) {
     throw EnvoyException(
-        fmt::format("magic byte is not present in record batch for [{}-{}]", topic, partition));
+        std::format("magic byte is not present in record batch for [{}-{}]", topic, partition));
   }
 
   // Old client sending old magic, or Apache Kafka introducing new magic.
   const int8_t magic = magic_deserializer.get();
   if (SUPPORTED_MAGIC != magic) {
-    throw EnvoyException(fmt::format("unknown magic value in record batch for [{}-{}]: {}", topic,
+    throw EnvoyException(std::format("unknown magic value in record batch for [{}-{}]: {}", topic,
                                      partition, magic));
   }
 
@@ -86,7 +88,7 @@ std::vector<OutboundRecord> RecordExtractorImpl::processRecordBatch(const std::s
 
   if (data.length() < IGNORED_FIELDS_SIZE) {
     throw EnvoyException(
-        fmt::format("record batch for [{}-{}] is too short (no attribute fields): {}", topic,
+        std::format("record batch for [{}-{}] is too short (no attribute fields): {}", topic,
                     partition, data.length()));
   }
   data = {data.data() + IGNORED_FIELDS_SIZE, data.length() - IGNORED_FIELDS_SIZE};
@@ -109,15 +111,15 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
   length.feed(data);
   if (!length.ready()) {
     throw EnvoyException(
-        fmt::format("record for [{}-{}] is too short (no length)", topic, partition));
+        std::format("record for [{}-{}] is too short (no length)", topic, partition));
   }
   const int32_t len = length.get();
   if (len < 0) {
     throw EnvoyException(
-        fmt::format("record for [{}-{}] has invalid length: {}", topic, partition, len));
+        std::format("record for [{}-{}] has invalid length: {}", topic, partition, len));
   }
   if (static_cast<uint32_t>(len) > data.length()) {
-    throw EnvoyException(fmt::format("record for [{}-{}] is too short (not enough bytes provided)",
+    throw EnvoyException(std::format("record for [{}-{}] is too short (not enough bytes provided)",
                                      topic, partition));
   }
 
@@ -133,7 +135,7 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
   offsetDelta.feed(data);
   if (!attributes.ready() || !tsDelta.ready() || !offsetDelta.ready()) {
     throw EnvoyException(
-        fmt::format("attributes not present in record for [{}-{}]", topic, partition));
+        std::format("attributes not present in record for [{}-{}]", topic, partition));
   }
 
   // Record key and value.
@@ -145,11 +147,11 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
   headers_count_deserializer.feed(data);
   if (!headers_count_deserializer.ready()) {
     throw EnvoyException(
-        fmt::format("header count not present in record for [{}-{}]", topic, partition));
+        std::format("header count not present in record for [{}-{}]", topic, partition));
   }
   const int32_t headers_count = headers_count_deserializer.get();
   if (headers_count < 0) {
-    throw EnvoyException(fmt::format("invalid header count in record for [{}-{}]: {}", topic,
+    throw EnvoyException(std::format("invalid header count in record for [{}-{}]: {}", topic,
                                      partition, headers_count));
   }
   std::vector<Header> headers;
@@ -165,7 +167,7 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
     return OutboundRecord{topic, partition, key, value, headers};
   } else {
     // Bad data - there are bytes left.
-    throw EnvoyException(fmt::format("data left after consuming record for [{}-{}]: {}", topic,
+    throw EnvoyException(std::format("data left after consuming record for [{}-{}]: {}", topic,
                                      partition, data.length()));
   }
 }
@@ -187,13 +189,13 @@ absl::string_view RecordExtractorImpl::extractByteArray(absl::string_view& input
 
   // Otherwise, length cannot be negative.
   if (length < 0) {
-    throw EnvoyException(fmt::format("byte array length less than -1: {}", length));
+    throw EnvoyException(std::format("byte array length less than -1: {}", length));
   }
 
   // Underflow handling.
   if (static_cast<absl::string_view::size_type>(length) > input.size()) {
     throw EnvoyException(
-        fmt::format("byte array length larger than data provided: {} vs {}", length, input.size()));
+        std::format("byte array length larger than data provided: {} vs {}", length, input.size()));
   }
 
   // We have enough data to return it.

@@ -14,21 +14,17 @@ namespace Transform {
 /**
  * Config registration for the stateful session filter. @see NamedHttpFilterConfigFactory.
  */
-class TransformFactoryConfig : public Common::ExceptionFreeFactoryBase<ProtoConfig> {
+class TransformFactoryConfig : public Common::UnifiedFactoryBase<ProtoConfig> {
 public:
-  TransformFactoryConfig() : ExceptionFreeFactoryBase("envoy.filters.http.transform") {}
+  TransformFactoryConfig() : UnifiedFactoryBase("envoy.filters.http.transform") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const ProtoConfig& proto_config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const ProtoConfig& proto_config, Server::Configuration::ServerFactoryContext& context,
       Server::Configuration::ExtraFactoryContext& extra_context) override;
 
-  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
-  // (ServerFactoryContext) paths. Stats are scoped to the given scope.
+  // Shared factory creation used by the listener/cluster and route/vhost-level paths. Stats are
+  // scoped to the given scope.
   static absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactory(const ProtoConfig& proto_config, const std::string& stats_prefix,
                       Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);

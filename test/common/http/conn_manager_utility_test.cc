@@ -1235,6 +1235,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                                    {"x-envoy-upstream-alt-stat-name", "foo"},
                                    {"x-envoy-upstream-rq-timeout-alt-response", "204"},
                                    {"x-envoy-upstream-rq-timeout-ms", "foo"},
+                                   {"x-envoy-upstream-stream-duration-ms", "1"},
                                    {"x-envoy-expected-rq-timeout-ms", "10"},
                                    {"x-envoy-ip-tags", "bar"},
                                    {"x-envoy-original-url", "my_url"},
@@ -1255,6 +1256,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-upstream-alt-stat-name"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-alt-response"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+  EXPECT_FALSE(headers.has("x-envoy-upstream-stream-duration-ms"));
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
   EXPECT_FALSE(headers.has("x-envoy-original-url"));
@@ -1280,6 +1282,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
                                    {"x-envoy-upstream-alt-stat-name", "foo"},
                                    {"x-envoy-upstream-rq-timeout-alt-response", "204"},
                                    {"x-envoy-upstream-rq-timeout-ms", "foo"},
+                                   {"x-envoy-upstream-stream-duration-ms", "1"},
                                    {"x-envoy-expected-rq-timeout-ms", "10"},
                                    {"x-envoy-ip-tags", "bar"},
                                    {"x-envoy-original-url", "my_url"},
@@ -1303,10 +1306,39 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestDontUseRemote
   EXPECT_FALSE(headers.has("x-envoy-upstream-alt-stat-name"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-alt-response"));
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+  EXPECT_FALSE(headers.has("x-envoy-upstream-stream-duration-ms"));
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
   EXPECT_FALSE(headers.has("x-envoy-original-url"));
   EXPECT_FALSE(headers.has("custom_header"));
+}
+
+// x-envoy-upstream-stream-duration-ms is preserved for external requests when the runtime guard is
+// disabled.
+TEST_F(ConnectionManagerUtilityTest, ExternalRequestUpstreamStreamDurationRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.sanitize_upstream_stream_duration_header", "false"}});
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1"));
+  EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
+  TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-duration-ms", "1"}};
+
+  EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("1", headers.get_("x-envoy-upstream-stream-duration-ms"));
+}
+
+// x-envoy-upstream-stream-duration-ms is preserved for internal requests.
+TEST_F(ConnectionManagerUtilityTest, InternalRequestPreservesUpstreamStreamDuration) {
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-duration-ms", "1"}};
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("1", headers.get_("x-envoy-upstream-stream-duration-ms"));
 }
 
 // Verify that if XFF is invalid we fall back to remote address, even if it is a pipe.
@@ -2686,6 +2718,50 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDotsDecoded) {
   TestRequestHeaderMapImpl header_map(original_headers);
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
   EXPECT_EQ(header_map.getPathValue(), "/abc");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePathWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/..;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/abc");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizeDotSegmentsWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/.;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/abc");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizeDotAndDotDotSegmentsWithParameters) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath(
+      "/.;aa=bb/..;/xyz/.;foo=bar/abc/.;fff,bbb/remove;me=yes/.;skip/..;try=again/lastone;true/.;");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/abc/lastone;true/");
+}
+
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePathWithParametersDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.strip_dotdot_segments_with_parameters", "false"}});
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setPath("/xyz/..;foo=bar/abc");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.getPathValue(), "/xyz/..;foo=bar/abc");
 }
 
 // Verify that %25 is NOT decoded as the % character per

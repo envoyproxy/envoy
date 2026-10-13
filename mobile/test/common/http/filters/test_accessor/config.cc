@@ -7,9 +7,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace TestAccessor {
 
-Http::FilterFactoryCb TestAccessorFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+TestAccessorFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::extensions::filters::http::test_accessor::TestAccessor& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
   auto config = std::make_shared<TestAccessorFilterConfig>(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

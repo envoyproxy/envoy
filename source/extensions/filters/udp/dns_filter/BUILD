@@ -41,6 +41,7 @@ envoy_cc_library(
         "//source/common/common:safe_memcpy_lib",
         "//source/common/config:config_provider_lib",
         "//source/common/config:datasource_lib",
+        "//source/common/formatter:serializer_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

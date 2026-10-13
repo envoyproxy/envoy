@@ -47,10 +47,19 @@ public:
   // directly usable by filters, while conversation content goes to the buffer.
   static constexpr std::uint32_t kDefaultInlineStringThresholdBytes = 1024;
 
+  // Bounds DOM amplification: small scalars amplify input bytes by more than
+  // an order of magnitude in per-node overhead, so a byte cap on the source
+  // alone does not bound the heap. Generous for real payloads (an ordinary
+  // provider response is a few thousand nodes).
+  static constexpr std::uint32_t kDefaultMaxNodes = 1 << 18;
+
   struct Config {
     // A string whose decoded content exceeds this is recorded as a reference
     // instead of being materialized.
     std::uint32_t inline_string_threshold_bytes{kDefaultInlineStringThresholdBytes};
+    // Parsing fails once the document exceeds this many DOM nodes (scalars,
+    // containers, and external references alike).
+    std::uint32_t max_nodes{kDefaultMaxNodes};
   };
 
   explicit JsonWithExtBufParser(Config config);
@@ -63,6 +72,13 @@ public:
   // Moves the parsed document out. Only meaningful once feed() has returned OK
   // for the final chunk; before that the document is empty.
   JsonWithExtBuf takeDocument() { return std::move(document_); }
+
+  // True once any string has been recorded as a reference rather than materialized, i.e. once the
+  // document depends on the offloaded bytes outliving it.
+  bool hasExternalRefs() const { return has_external_refs_; }
+
+  // Total raw byte length of strings that were replaced by ExternalRefs rather than kept inline.
+  std::uint64_t externalRefBytes() const { return external_ref_bytes_; }
 
   // Json::Wuffs::WuffsJsonCursor::Handler
   bool openStringCapture(absl::string_view key, int depth, size_t token_start) override;
@@ -95,9 +111,12 @@ private:
   const Config config_;
   Json::Wuffs::WuffsJsonCursor cursor_;
   JsonWithExtBuf document_;
+  bool has_external_refs_{false};
 
   nlohmann::json root_;
   bool root_set_{false};
+  // Nodes attached so far, checked against config_.max_nodes.
+  std::uint32_t node_count_{0};
   bool finished_{false};
   absl::Status status_;
 
@@ -119,6 +138,7 @@ private:
   std::string pending_string_;
   size_t string_token_start_{0};
   bool string_offloaded_{false};
+  std::uint64_t external_ref_bytes_{0};
 };
 
 } // namespace AiProtocolManager

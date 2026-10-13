@@ -12,7 +12,10 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::HasSubstr;
 
 namespace Envoy {
 namespace {
@@ -1324,10 +1327,8 @@ tap_config:
   envoy::data::tap::v3::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
-  EXPECT_NE(std::string::npos,
-            trace.http_buffered_trace().request().body().as_string().find("request"));
-  EXPECT_NE(std::string::npos,
-            trace.http_buffered_trace().response().body().as_string().find("response"));
+  EXPECT_THAT(trace.http_buffered_trace().request().body().as_string(), HasSubstr("request"));
+  EXPECT_THAT(trace.http_buffered_trace().response().body().as_string(), HasSubstr("response"));
 
   admin_client_->close();
 }

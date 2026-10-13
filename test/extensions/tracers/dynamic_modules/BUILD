@@ -35,6 +35,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:tracer_config_fail",
         "//test/extensions/dynamic_modules/test_data/c:tracer_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:tracer_no_op_no_reserve_tags",
         "//test/extensions/dynamic_modules/test_data/c:tracer_with_values",
     ],
     deps = [

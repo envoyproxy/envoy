@@ -33,15 +33,25 @@ public:
    *        send the initiation-time header).
    */
   virtual void reportConnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
-                                     absl::string_view tenant_id, int64_t initiation_time_ms) PURE;
+                                     absl::string_view tenant_id, int64_t initiation_time_ms,
+                                     int fd) PURE;
 
   /**
    * Record that a reverse tunnel has been torn down.
    * @param node_id ID of the disconnecting node.
    * @param cluster_id cluster which the node belongs to.
    */
-  virtual void reportDisconnectionEvent(absl::string_view node_id,
-                                        absl::string_view cluster_id) PURE;
+  virtual void reportDisconnectionEvent(absl::string_view node_id, absl::string_view cluster_id,
+                                        int fd) PURE;
+
+  /**
+   * Record that a go away event has been received.
+   * @param node_id ID of the node that sent the go away.
+   * @param cluster_id cluster which the node belongs to.
+   * @param fd the file descriptor of the connection that sent the go away.
+   */
+  virtual void reportGoAwayEvent(absl::string_view node_id, absl::string_view cluster_id,
+                                 int fd) PURE;
 };
 
 using ReverseTunnelReporterPtr = std::unique_ptr<ReverseTunnelReporter>;

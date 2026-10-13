@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.override_host"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":test_lb",
         ":test_lb_proto_cc_proto",
@@ -59,6 +59,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",

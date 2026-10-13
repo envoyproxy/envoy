@@ -53,10 +53,10 @@ MY_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py --g
 This section describes how to and what dependencies to install to get started building Envoy with Bazel.
 If you would rather use a pre-build Docker image with required tools installed, skip to [this section](#building-envoy-with-the-ci-docker-image).
 
-As a developer convenience, a [WORKSPACE](https://github.com/envoyproxy/envoy/blob/main/WORKSPACE) and
-[rules for building a recent
-version](https://github.com/envoyproxy/envoy/blob/main/bazel/repositories.bzl) of the various Envoy
-dependencies are provided. These are provided as is, they are only suitable for development and
+As a developer convenience, a [MODULE.bazel](https://github.com/envoyproxy/envoy/blob/main/MODULE.bazel)
+pinning a recent version of the various Envoy dependencies is provided, resolved via the
+[Envoy Bazel registry](https://github.com/envoyproxy/bazel-registry). These are provided as is, they
+are only suitable for development and
 testing purposes. The specific versions of the Envoy dependencies used in this build may not be
 up-to-date with the latest security patches. See
 [this doc](https://github.com/envoyproxy/envoy/blob/main/bazel/EXTERNAL_DEPS.md#updating-an-external-dependency-version)
@@ -95,32 +95,23 @@ for how to update or override dependencies.
     ### Linux
     Envoy uses a hermetic Clang toolchain that is automatically downloaded by Bazel, so you do not
     need to install Clang manually. Note that despite the toolchain being hermetic, `libxml2` must
-    be installed on the host (included in the package lists above). To use the hermetic toolchain,
-    add `--config=clang` to your build command:
+    be installed on the host (included in the package lists above). The hermetic toolchain is the
+    default and requires no compiler configuration flag:
     ```console
-    bazel build --config=clang envoy
+    bazel build envoy
     ```
 
-    If you want to make clang the default, add it to your `user.bazelrc`:
-    ```console
-    echo "build --config=clang" >> user.bazelrc
-    ```
-
-    Note: `libc++` is the recommended standard library for Envoy development and is automatically used with `--config=clang`.
+    Note: `libc++` is the recommended standard library for Envoy development and is automatically used with the default Clang toolchain.
 
     #### Compiler and Standard Library Configuration
     Envoy supports the following compiler toolchains:
 
-    - `--config=clang` (recommended): Uses `clang` compiler with `libc++` (LLVM standard library)
+    - No config flag (recommended): Uses the hermetic `clang` compiler with `libc++` (LLVM standard library)
     - `--config=gcc`: Uses `gcc` compiler with `libstdc++` (GNU standard library)
-    - No config flag: Uses system default compiler settings
 
-    Note: While it's possible to use `clang` with `libstdc++` by setting CC/CXX environment variables without a config flag, this combination is not tested or supported.
+    Note: The C++ standard library is derived from the compiler: clang (the default) and Apple builds use `libc++`, `--config=gcc` uses `libstdc++`. Other combinations such as clang with `libstdc++` are not supported or tested; if you need one, you will need to set up your own `cc_toolchain`.
 
-    For more granular control:
-    - `--config=clang-common`: Provides base clang configuration without standard library settings
-    - `--config=libc++`: Provides just the libc++ standard library flags
-    - `--config=libstdc++`: Provides just the libstdc++ standard library flags
+    The `--config=libc++` and `--config=libstdc++` configs are used internally (e.g. by `--config=gcc` and `bazel/setup_local_tsan.sh`) and are not intended for direct use.
 
 
     ### macOS
@@ -229,49 +220,29 @@ set different options. See below to configure test IP versions.
 
 By default, Envoy's Bazel build downloads hermetic versions of several toolchains (Go, CMake/Make/Ninja,
 and Python). Downstream projects that embed Envoy may prefer to use the versions already installed on
-the build host instead.
+the build host instead. Under bzlmod this is done from the embedding project's own `MODULE.bazel`,
+by registering host toolchains so that they take precedence over Envoy's hermetic ones.
 
-The `use_host_tools` parameter can be passed to `envoy_dependency_imports` and `envoy_dependencies_extra`
-in your WORKSPACE file to achieve this:
+The CI-tested example in [`bazel/tests/codeql`](tests/codeql) shows how a downstream root module can
+select a host-installed Clang, libc++, and lld under bzlmod. It registers a `toolchains_llvm`
+toolchain rooted at the host installation and calls `envoy_llvm.host(...)` so Envoy targets that
+directly reference LLVM tools and libraries use the same installation. No Envoy `.bazelrc`
+compiler configuration is required.
 
-```starlark
-envoy_dependency_imports(use_host_tools = True)
-envoy_dependencies_extra(use_host_tools = True)
-```
-
-When `use_host_tools = True`:
-
-- **Go**: Uses the Go SDK installed on the host (equivalent to `go_version = "host"`).
-- **CMake/Make/Ninja**: Uses the host-installed versions instead of downloading them
-  via `rules_foreign_cc`.
-- **Python**: Disables the hermetic Python toolchain and registers the host Python
-  autodetecting toolchain instead.
-
-Additionally, to use a host-installed Clang/LLVM toolchain instead of the hermetic one downloaded
-by Bazel, add the following to your `user.bazelrc`:
-
-```
-build --repo_env=BAZEL_USE_HOST_SYSROOT=True
-build --repo_env=BAZEL_LLVM_PATH=/usr
-build --config=clang-local
-```
-
-`BAZEL_LLVM_PATH` should point to the root of your LLVM installation.
+The `envoy_llvm.host(path = ...)` extension detects the installed LLVM version by running
+`bin/clang --version`. Its optional `llvm_version` attribute can be set to cross-check the detected
+major version. This mechanism supports host LLVM versions other than 22; the separate
+`toolchains_llvm` toolchain's `llvm_version` must also match the installed host version.
 
 **Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
-hermetic toolchain versions are the only configuration tested in CI. Using host tools may result
-in build failures or unexpected behavior depending on the versions installed. This option is
-provided as a convenience for downstream repositories that build inside controlled environments
-(e.g. container-based CI) where tools are pre-installed at known versions. Upstream Envoy builds
-are unaffected when the parameter is omitted.
+hermetic toolchain remains the supported default. Other host tools may fail depending on the build
+environment. Upstream Envoy builds are unaffected when no host toolchain is registered.
 
 ## Linking against libc++ on Linux
 
-When using `--config=clang`, Envoy is automatically linked against libc++. No additional configuration is needed.
+With the default Clang toolchain, Envoy is automatically linked against libc++. No additional configuration is needed.
 
 For remote execution or Docker sandbox builds, use `--config=remote-clang` or `--config=docker-clang` respectively.
-
-If you want to ensure clang with libc++ is always used by default, add `build --config=clang` to the `user.bazelrc` file in Envoy source root.
 
 ## Using a compiler toolchain in a non-standard location
 
@@ -656,14 +627,21 @@ The extensions enabled by default can be disabled by adding the following parame
 `envoy.wasm.runtime.v8` extension, add `--//source/extensions/wasm_runtime/v8:enabled=false`.
 Note not all extensions can be disabled.
 
-To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wasm=[wasm_engine]`, e.g. `--define wasm=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine. Supported engines are:
+To select a specific WebAssembly (Wasm) runtime, pass `--@proxy-wasm-cpp-host//bazel:engine=[runtime]`, e.g.
+`--@proxy-wasm-cpp-host//bazel:engine=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine.
+Accepted values are:
 
-* `v8` (the default included engine)
-* `wamr`
+* `v8` (default)
+* `wamr` (interpreter mode; alias for `wamr-interp`)
+* `wamr-interp`
+* `wamr-jit`
 * `wasmtime`
+* `null`
+* `disabled` (disable Wasm entirely)
 
-If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example
-`--@envoy//source/extensions/filters/http/kill_request:enabled`.
+Invalid values are rejected at parse time. Note: the former `--define wasm=<engine>` and
+`--define engine=<engine>` mechanisms are no longer supported; passing them is now a **build
+error**. Use `--@proxy-wasm-cpp-host//bazel:engine=<engine>` instead.
 
 You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
 
@@ -680,42 +658,48 @@ You can also use the following procedure to customize the extensions for your bu
 
 * The Envoy build assumes that a Bazel repository named `@envoy_build_config` exists which
   contains the file `@envoy_build_config//:extensions_build_config.bzl`. In the default build,
-  a synthetic repository is created containing [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
-* Start by creating a new Bazel workspace somewhere in the filesystem that your build can access.
-  This workspace should contain:
-  * Empty WORKSPACE file.
+  this repository is generated by the `envoy_build_config_ext` module extension
+  (see [`bazel/extensions.bzl`](extensions.bzl), wired up in [`MODULE.bazel`](../MODULE.bazel))
+  and contains [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
+* Start by creating a directory somewhere in the filesystem that your build can access.
+  This directory should contain:
+  * Empty `MODULE.bazel` file.
   * Empty BUILD file.
   * A copy of [extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl).
   * Comment out any extensions that you don't want to build in your file copy.
 
 To have your local build use your overridden configuration repository there are two options:
 
-1. Use the [`--override_repository`](https://docs.bazel.build/versions/master/command-line-reference.html)
-   CLI option to override the `@envoy_build_config` repo.
-2. Use the following snippet in your WORKSPACE before you load the Envoy repository. E.g.,
+1. Use the [`--override_repository`](https://bazel.build/reference/command-line-reference)
+   CLI option to override the `envoy_build_config` repo. Because it is generated by a module
+   extension it must be named by its *canonical* name, e.g.
+
+   ```
+   --override_repository=+envoy_build_config_ext+envoy_build_config=/somewhere/on/filesystem/envoy_build_config
+   ```
+
+   See [`ci/mac_ci_steps.sh`](../ci/mac_ci_steps.sh) for this usage in practice.
+2. Add the equivalent override to your `user.bazelrc` so it applies to every invocation:
 
 ```
-workspace(name = "envoy_filter_example")
-
-local_repository(
-    name = "envoy_build_config",
-    # Relative paths are also supported.
-    path = "/somewhere/on/filesystem/envoy_build_config",
-)
-
-local_repository(
-    name = "envoy",
-    # Relative paths are also supported.
-    path = "/somewhere/on/filesystem/envoy",
-)
-
-...
+build --override_repository=+envoy_build_config_ext+envoy_build_config=/somewhere/on/filesystem/envoy_build_config
 ```
 
 When performing custom builds, it is acceptable to include contrib extensions as well. This can
 be done by including the desired Bazel paths from [contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
 into the overridden `extensions_build_config.bzl`. (There is no need to specifically perform
 a contrib build to include a contrib extension.)
+
+Downstream builds can also override a small set of Envoy implementation targets via label flags
+in their own `.bazelrc` or command line. The currently supported overrides are:
+
+```console
+build --@envoy//bazel:test_main=@your_repo//:custom_test_main
+build --@envoy//bazel:test_pch=@your_repo//:custom_test_pch
+```
+
+These replace the older `repository = "@envoy"` macro workaround and should be preferred when a
+consumer needs to substitute its own implementation target.
 
 ## Extra extensions
 

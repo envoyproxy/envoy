@@ -1,6 +1,7 @@
 #include "contrib/rocketmq_proxy/filters/network/source/config.h"
 
 #include <cstdlib>
+#include <format>
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -33,7 +34,7 @@ REGISTER_FACTORY(RocketmqProxyFilterConfigFactory,
 
 ConfigImpl::ConfigImpl(const RocketmqProxyConfig& config,
                        Server::Configuration::FactoryContext& context)
-    : context_(context), stats_prefix_(fmt::format("rocketmq.{}.", config.stat_prefix())),
+    : context_(context), stats_prefix_(std::format("rocketmq.{}.", config.stat_prefix())),
       stats_(RocketmqFilterStats::generateStats(stats_prefix_, context_.scope())),
       route_matcher_(
           new Router::RouteMatcher(config.route_config(), context.serverFactoryContext())),

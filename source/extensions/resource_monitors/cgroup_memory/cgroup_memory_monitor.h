@@ -1,10 +1,9 @@
 #pragma once
 
 #include "envoy/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.pb.h"
-#include "envoy/filesystem/filesystem.h"
 #include "envoy/server/resource_monitor.h"
 
-#include "cgroup_memory_stats_reader.h"
+#include "source/extensions/resource_monitors/cgroup_memory/cgroup_memory_stats_reader.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,11 +20,11 @@ public:
   /**
    * Creates a new monitor with the given configuration.
    * @param config Configuration for the monitor.
-   * @param fs Filesystem instance to use for file operations.
+   * @param stats_reader Reader for cgroup memory statistics.
    */
   CgroupMemoryMonitor(
       const envoy::extensions::resource_monitors::cgroup_memory::v3::CgroupMemoryConfig& config,
-      Filesystem::Instance& fs);
+      StatsReaderPtr stats_reader);
 
   /**
    * Updates resource pressure based on current memory usage.
@@ -36,8 +35,6 @@ public:
 private:
   // Maximum memory limit in bytes.
   const uint64_t max_memory_bytes_;
-  // Filesystem instance.
-  Filesystem::Instance& fs_;
   // Reader for cgroup memory statistics.
   StatsReaderPtr stats_reader_;
 };

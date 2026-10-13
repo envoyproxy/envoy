@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
 )
@@ -52,7 +52,7 @@ envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_filter_test_base_lib",
         "//envoy/http:codes_interface",
@@ -86,7 +86,7 @@ envoy_extension_cc_test(
     name = "ext_authz_filter_test",
     srcs = ["ext_authz_filter_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_filter_test_base_lib",
         "//envoy/http:codes_interface",
@@ -120,7 +120,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/network:address_lib",
@@ -141,8 +141,8 @@ envoy_extension_cc_test(
     srcs = ["ext_authz_integration_test.cc"],
     data = ["ext_authz.yaml"],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "linux_x64_small",
-    shard_count = 4,
+    rbe_pool = "linux_x64_medium",
+    shard_count = 8,
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",
@@ -185,11 +185,12 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "ext_authz_grpc_fuzz_test",
     srcs = ["ext_authz_grpc_fuzz_test.cc"],
     corpus = "ext_authz_grpc_corpus",
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -203,11 +204,12 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "ext_authz_http_fuzz_test",
     srcs = ["ext_authz_http_fuzz_test.cc"],
     corpus = "ext_authz_http_corpus",
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -227,7 +229,7 @@ envoy_cc_test_library(
     name = "ext_authz_fuzz_lib",
     srcs = ["ext_authz_fuzz_lib.cc"],
     hdrs = ["ext_authz_fuzz_lib.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/http:context_lib",

@@ -91,7 +91,7 @@ class SetEventTrackerTest {
 
     client
       .newStreamPrototype()
-      .setOnResponseData { _, _, _ -> countDownLatch.countDown() }
+      .setOnError { _, _ -> countDownLatch.countDown() }
       .start()
       .close(ByteBuffer.allocate(1))
 

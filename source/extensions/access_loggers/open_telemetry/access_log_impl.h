@@ -53,7 +53,7 @@ private:
   // Common::ImplBase
   void emitLog(const Formatter::Context& context, const StreamInfo::StreamInfo& info) override;
 
-  const ThreadLocal::SlotPtr tls_slot_;
+  const ThreadLocal::SlotSharedPtr tls_slot_;
   const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::unique_ptr<OpenTelemetryFormatter> body_formatter_;
   std::unique_ptr<OpenTelemetryFormatter> attributes_formatter_;

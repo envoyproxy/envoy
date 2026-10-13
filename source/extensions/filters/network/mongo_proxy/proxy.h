@@ -18,6 +18,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/network/drain_close_util.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/const_singleton.h"
@@ -108,7 +109,8 @@ public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
               AccessLogSharedPtr access_log,
               const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
-              const Network::DrainDecision& drain_decision, TimeSource& time_system,
+              const Network::DrainDecision& drain_decision,
+              Server::Configuration::ServerFactoryContext& server_context, TimeSource& time_system,
               bool emit_dynamic_metadata, const MongoStatsSharedPtr& stats,
               uint32_t max_bson_depth);
   ~ProxyFilter() override;
@@ -120,6 +122,9 @@ public:
   Network::FilterStatus onNewConnection() override { return Network::FilterStatus::Continue; }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
+    // Captured once here rather than plumbed through the filter factory: the drain type belongs to
+    // the listener that accepted this connection, and is reachable from the connection itself.
+    drain_type_ = Network::listenerDrainType(read_callbacks_->connection());
     read_callbacks_->connection().addConnectionCallbacks(*this);
   }
 
@@ -139,6 +144,12 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+  // Only records the event; the drain-close decision is made per reply in shouldDrainClose().
+  void onDrain(Network::ConnectionDrainEvent drain_event) override {
+    if (!connection_drain_event_.has_value()) {
+      connection_drain_event_ = drain_event;
+    }
+  }
 
   void setDynamicMetadata(std::string operation, std::string resource);
 
@@ -177,6 +188,8 @@ private:
 
   void doDecode(Buffer::Instance& buffer);
   void logMessage(Message& message, bool full);
+  // Returns true if the connection should be drain-closed.
+  bool shouldDrainClose();
   void onDrainClose();
   std::optional<std::chrono::milliseconds> delayDuration();
   void delayInjectionTimerCallback();
@@ -186,6 +199,15 @@ private:
   MongoProxyStats stats_;
   Runtime::Loader& runtime_;
   const Network::DrainDecision& drain_decision_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+  // The drain type of the listener owning this connection, used to decide whether
+  // /healthcheck/fail should drain-close it.
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Set when the connection is notified of a drain sequence via onDrain().
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
+  // Latched when the filter is created so it is not re-read on every reply. See shouldDrainClose().
+  const bool use_connection_event_drain_ = false;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
   bool sniffing_{true};

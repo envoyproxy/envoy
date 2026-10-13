@@ -5,6 +5,8 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_test",
 )
 
@@ -21,8 +23,9 @@ envoy_extension_cc_test(
     name = "lua_filter_test",
     srcs = ["lua_filter_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
         "//test/mocks/api:api_mocks",
@@ -32,6 +35,7 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
@@ -45,7 +49,7 @@ envoy_extension_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:upstream_subject_alt_names_lib",
@@ -68,7 +72,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["lua_integration_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     deps = [
         ":lua_test_filter_proto_cc_proto",
         "//source/common/protobuf:utility_lib",
@@ -92,7 +96,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:factory_context_mocks",
@@ -100,4 +104,34 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/lua/v3:pkg_cc_proto",
     ],
+)
+
+envoy_extension_cc_benchmark_binary(
+    name = "lua_filter_speed_test",
+    srcs = ["lua_filter_speed_test.cc"],
+    extension_names = ["envoy.filters.http.lua"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:macros",
+        "//source/common/http:header_map_lib",
+        "//source/common/singleton:manager_impl_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/filters/common/set_filter_state:filter_config_lib",
+        "//source/extensions/filters/http/lua:lua_filter_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:test_time_lib",
+        "@benchmark",
+        "@envoy_api//envoy/extensions/filters/http/lua/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_benchmark_test(
+    name = "lua_filter_speed_test_benchmark_test",
+    benchmark_binary = "lua_filter_speed_test",
+    extension_names = ["envoy.filters.http.lua"],
+    rbe_pool = "6gig",
 )

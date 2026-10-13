@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:hashable_interface",
         "//source/common/formatter:formatter_extension_lib",

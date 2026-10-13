@@ -18,22 +18,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoMessageExtraction {
 
-FilterFactoryCreator::FilterFactoryCreator() : ExceptionFreeFactoryBase(kFilterName) {}
-
-absl::StatusOr<Envoy::Http::FilterFactoryCb>
-FilterFactoryCreator::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::proto_message_extraction::v3::
-        ProtoMessageExtractionConfig& proto_config,
-    const std::string&, Envoy::Server::Configuration::FactoryContext& context) {
-  absl::Status creation_status = absl::OkStatus();
-  auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, std::make_unique<ExtractorFactoryImpl>(),
-                                     context.serverFactoryContext().api(), creation_status);
-  RETURN_IF_NOT_OK_REF(creation_status);
-  return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(*filter_config));
-  };
-}
+FilterFactoryCreator::FilterFactoryCreator() : UnifiedFactoryBase(kFilterName) {}
 
 absl::StatusOr<Envoy::Http::FilterFactoryCb>
 FilterFactoryCreator::createHttpFilterFactoryFromProtoTyped(

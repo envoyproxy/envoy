@@ -62,9 +62,9 @@ public:
    * @param fs Filesystem instance to use for file operations.
    * @param time_source TimeSource for measuring elapsed time.
    * @return Unique pointer to concrete LinuxContainerCpuStatsReader implementation.
-   * @throw EnvoyException if no supported cgroup implementation is found.
    */
-  static ContainerStatsReaderPtr create(Filesystem::Instance& fs, TimeSource& time_source);
+  static absl::StatusOr<ContainerStatsReaderPtr> create(Filesystem::Instance& fs,
+                                                        TimeSource& time_source);
 
 protected:
   LinuxContainerCpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source)
@@ -97,6 +97,10 @@ class CgroupV2CpuStatsReader : public LinuxContainerCpuStatsReader,
                                private Logger::Loggable<Logger::Id::main> {
 public:
   explicit CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source);
+
+  // Reads the interface files of a specific cgroup directory.
+  CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,
+                         absl::string_view base_path);
 
   // Test-friendly constructor that accepts custom file paths
   CgroupV2CpuStatsReader(Filesystem::Instance& fs, TimeSource& time_source,

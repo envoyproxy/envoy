@@ -20,6 +20,15 @@ dump_permissions () {
     stat -L -c "%a %G %U" "$1"
 }
 
+check_proxy_response () {
+    # `curl -s` exits 0 even for an empty or error response body, so the
+    # content match must be part of the retried command - otherwise `retry`
+    # succeeds on the first (bad) response and the assertion fails without
+    # ever retrying.
+    RESPONSE="$(curl -s http://localhost:10000/)"
+    echo "$RESPONSE" | grep -q "Envoy is an open source edge and service proxy"
+}
+
 handle_fail () {
     run_log "${TESTNAME}" "ERROR"
     case "${TESTNAME}" in
@@ -119,9 +128,10 @@ run_log envoy-running "Check envoy is running"
 pgrep envoy
 
 run_log proxy-responds "Check proxy responds"
-# The website can be flakey, give it a minute of trying...
-RESPONSE="$(retry 60 curl -s http://localhost:10000/)"
-echo "$RESPONSE" | grep "Envoy is an open source edge and service proxy"
+# The website can be flakey, give it a minute of trying. The content match is
+# part of the retried command so an empty/error response is retried rather than
+# accepted (see check_proxy_response).
+retry 60 check_proxy_response
 
 run_log stop-envoy "Stop envoy"
 sudo -u envoy pkill envoy && echo "Envoy stopped"

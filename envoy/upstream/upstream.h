@@ -29,6 +29,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
 
@@ -38,6 +39,16 @@ class ClientCodecFactory;
 class FilterChainManager;
 class HashPolicy;
 } // namespace Http
+
+namespace ConnectionPool {
+class PendingStream;
+} // namespace ConnectionPool
+
+namespace Extensions {
+namespace QueuePolicy {
+template <class ItemType> class QueuePolicyFactory;
+} // namespace QueuePolicy
+} // namespace Extensions
 
 namespace Router {
 class ShadowPolicy;
@@ -365,6 +376,42 @@ using ExcludedHostVector = Phantom<HostVector, Excluded>;
 using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostMapSharedPtr = std::shared_ptr<HostMap>;
 using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
+
+/**
+ * Read only host map indexed by host address string. The map is created in the main thread and
+ * shared by all the worker threads.
+ */
+class HostLookupMap {
+public:
+  virtual ~HostLookupMap() = default;
+
+  /**
+   * @param address the host address string to look up.
+   * @return const HostSharedPtr& the host for the address, or a null host if absent. The reference
+   *         is only valid while the map is alive.
+   */
+  virtual const HostSharedPtr& findHost(absl::string_view address) const PURE;
+
+  /**
+   * @return size_t the number of hosts in the map.
+   */
+  virtual size_t size() const PURE;
+
+  /**
+   * @return bool true if the map holds no hosts.
+   */
+  virtual bool empty() const PURE;
+
+  /**
+   * Invokes a callback for each (address, host) entry. Iteration order is unspecified.
+   *
+   * @param cb the callback to invoke for each entry.
+   */
+  virtual void
+  forEach(absl::FunctionRef<void(absl::string_view, const HostSharedPtr&)> cb) const PURE;
+};
+using HostLookupMapConstSharedPtr = std::shared_ptr<const HostLookupMap>;
+
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -593,10 +640,10 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
-   * @return HostMapConstSharedPtr read only cross priority host map that indexed by host address
+   * @return HostLookupMapConstSharedPtr read only cross priority host map indexed by host address
    * string.
    */
-  virtual HostMapConstSharedPtr crossPriorityHostMap() const PURE;
+  virtual HostLookupMapConstSharedPtr crossPriorityHostMap() const PURE;
 
   /**
    * Parameter class for updateHosts.
@@ -630,7 +677,7 @@ public:
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            std::optional<bool> weighted_priority_health,
                            std::optional<uint32_t> overprovisioning_factor,
-                           HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
+                           HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
   /**
    * Callback provided during batch updates that can be used to update hosts.
@@ -658,7 +705,7 @@ public:
                              const HostVector& hosts_added, const HostVector& hosts_removed,
                              std::optional<bool> weighted_priority_health,
                              std::optional<uint32_t> overprovisioning_factor,
-                             HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
+                             HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
   };
 
   /**
@@ -804,6 +851,7 @@ public:
   GAUGE(upstream_cx_active, Accumulate)                                                            \
   GAUGE(upstream_cx_rx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
+  GAUGE(upstream_queue_overloaded, Accumulate)                                                     \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
@@ -917,12 +965,10 @@ struct ClusterCircuitBreakersStats {
 };
 
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
-using ClusterRequestResponseSizeStatsOptRef =
-    std::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
+using ClusterRequestResponseSizeStatsOptRef = OptRef<ClusterRequestResponseSizeStats>;
 
 using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
-using ClusterTimeoutBudgetStatsOptRef =
-    std::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>;
+using ClusterTimeoutBudgetStatsOptRef = OptRef<ClusterTimeoutBudgetStats>;
 
 /**
  * All extension protocol specific options returned by the method at
@@ -1264,14 +1310,13 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * @return std::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
-   * headers/body sizes of request/response for this cluster.
+   * @return ClusterRequestResponseSizeStatsOptRef stats to track headers/body sizes of
+   * request/response for this cluster.
    */
   virtual ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const PURE;
 
   /**
-   * @return std::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
-   * budgets for this cluster.
+   * @return ClusterTimeoutBudgetStatsOptRef stats on timeout budgets for this cluster.
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
@@ -1294,6 +1339,27 @@ public:
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * Queue policy for cluster pending requests, resolved once at cluster configuration load time
+   * so that connection pool creation does not need to perform a factory lookup or proto
+   * translation.
+   */
+  struct PendingRqQueuePolicy {
+    // Queue policy factory. Points into the static factory registry.
+    Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>* factory_{};
+    // Translated queue policy configuration.
+    std::unique_ptr<const Protobuf::Message> config_;
+    // Cluster-specific prefix supplied to the queue policy factory.
+    std::string stat_prefix_;
+  };
+
+  /**
+   * @return OptRef<const PendingRqQueuePolicy> the resolved queue policy for cluster pending
+   * requests, or nullopt when not configured (in which case the default FIFO queue policy is
+   * used).
+   */
+  virtual OptRef<const PendingRqQueuePolicy> pendingRqQueuePolicy() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections
@@ -1467,7 +1533,7 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
-using ClusterConstOptRef = std::optional<std::reference_wrapper<const Cluster>>;
+using ClusterConstOptRef = OptRef<const Cluster>;
 
 } // namespace Upstream
 } // namespace Envoy

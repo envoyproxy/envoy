@@ -134,7 +134,8 @@ envoy_cc_library(
         ":metadata_fetcher_lib",
         ":utility_lib",
         "//envoy/common:time_interface",
-        "//source/common/common:cancel_wrapper_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 

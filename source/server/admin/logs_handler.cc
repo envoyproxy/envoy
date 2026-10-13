@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/common/fine_grain_logger.h"
 #include "source/common/common/logger.h"
 #include "source/server/admin/utils.h"
@@ -117,7 +119,7 @@ absl::Status LogsHandler::changeLogLevel(Http::Utility::QueryParamsMulti& params
       return level_to_use.status();
     }
 
-    Logger::Context::changeAllLogLevels(*level_to_use);
+    Logger::Context::changeAllLogLevels(static_cast<Logger::Levels>(*level_to_use));
     return absl::OkStatus();
   }
 

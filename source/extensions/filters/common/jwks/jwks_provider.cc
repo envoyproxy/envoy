@@ -90,8 +90,9 @@ public:
             ? std::move(create_fetcher_fn)
             : JwksFetcherFactory(&Extensions::HttpFilters::Common::JwksFetcher::create);
     async_fetcher_ = std::make_unique<Extensions::HttpFilters::JwtAuthn::JwksAsyncFetcher>(
-        remote_jwks_, std::move(retry_policy), context, std::move(fetcher_cb), fetch_success,
-        fetch_failed, [this](JwtVerify::JwksPtr&& jwks) {
+        remote_jwks_, std::move(retry_policy), context.serverFactoryContext(),
+        context.initManager(), std::move(fetcher_cb), fetch_success, fetch_failed,
+        [this](JwtVerify::JwksPtr&& jwks) {
           Thread::LockGuard lock(mutex_);
           jwks_ = std::move(jwks);
         });

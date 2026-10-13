@@ -133,6 +133,7 @@ envoy_cc_library(
     srcs = ["filter_config.cc"],
     hdrs = ["filter_config.h"],
     deps = [
+        ":extractor_lib",
         ":jwks_cache_lib",
         ":matchers_lib",
         ":stats_lib",

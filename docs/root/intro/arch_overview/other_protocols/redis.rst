@@ -225,6 +225,7 @@ For details on each command's usage see the official
   CLUSTER SLOTS, Generic
   CLUSTER KEYSLOT, Generic
   CLUSTER NODES, Generic
+  CLUSTER SHARDS, Generic
   RANDOMKEY, Generic
   OBJECT, Generic
   GEOADD, Geo

@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -463,14 +464,20 @@ SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* servi
 
 void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
 
-SysCallIntResult OsSysCallsImpl::getrlimit(int resource, struct rlimit* rlim) {
-  const int rc = ::getrlimit(resource, rlim);
-  return {rc, errno};
-}
-
-SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rlim) {
-  const int rc = ::setrlimit(resource, rlim);
-  return {rc, errno};
+SysCallIntResult OsSysCallsImpl::raiseFileLimits() {
+  struct rlimit rlim;
+  if (const int result = ::getrlimit(RLIMIT_NOFILE, &rlim); result != 0) {
+    return {result, errno};
+  }
+  const auto old = rlim.rlim_cur;
+  if (old == rlim.rlim_max) {
+    return {0, 0};
+  }
+  rlim.rlim_cur = rlim.rlim_max;
+  if (const int result = ::setrlimit(RLIMIT_NOFILE, &rlim); result != 0) {
+    return {result, errno};
+  }
+  return {0, 0};
 }
 
 } // namespace Api

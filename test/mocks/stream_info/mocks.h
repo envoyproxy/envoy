@@ -154,6 +154,9 @@ public:
   MOCK_METHOD(Router::RouteConstSharedPtr, routeSharedPtr, (), (const));
   MOCK_METHOD(OptRef<const Router::VirtualHost>, virtualHost, (), (const));
   MOCK_METHOD(Router::VirtualHostConstSharedPtr, virtualHostSharedPtr, (), (const));
+  MOCK_METHOD(void, addRouteResolutionTime, (std::chrono::nanoseconds duration));
+  MOCK_METHOD(std::chrono::nanoseconds, routeResolutionTime, (), (const));
+  MOCK_METHOD(uint32_t, routeResolutionCount, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const Protobuf::Struct&));

@@ -142,7 +142,7 @@ private:
   int key_size_{};
 
   // Thread local data slot.
-  ThreadLocal::SlotPtr slot_;
+  ThreadLocal::SlotSharedPtr slot_;
 
   // Crypto operations library interface.
   IppCryptoSharedPtr ipp_;

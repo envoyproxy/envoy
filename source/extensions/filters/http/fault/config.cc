@@ -11,24 +11,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-absl::StatusOr<Http::FilterFactoryCb> FaultFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
-
-  FaultFilterConfigSharedPtr filter_config(
-      std::make_shared<FaultFilterConfig>(config, stats_prefix, context.scope(), server_context));
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
-  };
-}
-
 absl::StatusOr<Http::FilterFactoryCb> FaultFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(
-      config, extra_context.stats_prefix, server_context.scope(), server_context));
+      config, extra_context.stats_prefix, extra_context.scopeOr(server_context), server_context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };

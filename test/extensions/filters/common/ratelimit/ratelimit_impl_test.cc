@@ -65,6 +65,16 @@ public:
   StreamInfo::MockStreamInfo stream_info_;
 };
 
+TEST_F(RateLimitGrpcClientTest, DefaultUnitMultiplierIsOmitted) {
+  envoy::service::ratelimit::v3::RateLimitRequest request;
+  GrpcClientImpl::createRequest(
+      request, "foo", {{{{"foo", "bar"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}}, 0);
+
+  ASSERT_EQ(1, request.descriptors_size());
+  ASSERT_TRUE(request.descriptors(0).has_limit());
+  EXPECT_FALSE(request.descriptors(0).limit().has_unit_multiplier());
+}
+
 TEST_F(RateLimitGrpcClientTest, Basic) {
   Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse> response;
 
@@ -137,13 +147,16 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     Http::TestRequestHeaderMapImpl headers;
     GrpcClientImpl::createRequest(
         request, "foo",
-        {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}}, 0);
+        {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE, 30}}}},
+        0);
+    ASSERT_TRUE(request.descriptors(0).limit().has_unit_multiplier());
+    EXPECT_EQ(30, request.descriptors(0).limit().unit_multiplier().value());
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
 
     client_.limit(
         request_callbacks_, "foo",
-        {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}},
+        {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE, 30}}}},
         Tracing::NullSpan::instance(), stream_info_);
 
     client_.onCreateInitialMetadata(headers);

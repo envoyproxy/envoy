@@ -9,6 +9,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/mocks/server/listener_update_callbacks_handle.h"
@@ -23,6 +24,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -841,6 +843,150 @@ TEST_F(BootstrapAbiImplTest, IterateGauges) {
   EXPECT_EQ(data.count, 2);
 }
 
+// iterate_counters honors a Stop return by ending iteration immediately.
+TEST_F(BootstrapAbiImplTest, IterateCountersHonorsStop) {
+  context_.store_.counterFromString("counter.one").add(1);
+  context_.store_.counterFromString("counter.two").add(2);
+  context_.store_.counterFromString("counter.three").add(3);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  struct VisitorData {
+    int count;
+  };
+  VisitorData data{0};
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    return d->count == 2 ? envoy_dynamic_module_type_stats_iteration_action_Stop
+                         : envoy_dynamic_module_type_stats_iteration_action_Continue;
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  EXPECT_EQ(data.count, 2);
+}
+
+// iterate_gauges honors a Stop return by ending iteration immediately.
+TEST_F(BootstrapAbiImplTest, IterateGaugesHonorsStop) {
+  context_.store_.gaugeFromString("gauge.one", Stats::Gauge::ImportMode::Accumulate).set(1);
+  context_.store_.gaugeFromString("gauge.two", Stats::Gauge::ImportMode::Accumulate).set(2);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  struct VisitorData {
+    int count;
+  };
+  VisitorData data{0};
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    return envoy_dynamic_module_type_stats_iteration_action_Stop;
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  EXPECT_EQ(data.count, 1);
+}
+
+// Iteration walks a snapshot taken before any callback runs, so a reentrant stats operation from
+// the callback completes and a counter it creates is not visited. `Snapshotting` is what avoids the
+// production deadlock.
+TEST_F(BootstrapAbiImplTest, IterateCountersSnapshotAllowsReentrantStatsCall) {
+  context_.store_.counterFromString("counter.one").add(1);
+  context_.store_.counterFromString("counter.two").add(2);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  struct VisitorData {
+    Stats::Store* store;
+    int count;
+  };
+  VisitorData data{&context_.store_, 0};
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    d->store->counterFromString("counter.created_during_iteration").inc();
+    return envoy_dynamic_module_type_stats_iteration_action_Continue;
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  // Only the two counters present when iteration began are visited.
+  EXPECT_EQ(data.count, 2);
+  // The reentrant stats call took effect, so the store now holds the counter created during
+  // iteration.
+  EXPECT_EQ(context_.store_.counters().size(), 3);
+}
+
+// Iteration walks a snapshot taken before any callback runs, so a reentrant stats operation from
+// the callback completes and a gauge it creates is not visited. `Snapshotting` is what avoids the
+// production deadlock.
+TEST_F(BootstrapAbiImplTest, IterateGaugesSnapshotAllowsReentrantStatsCall) {
+  context_.store_.gaugeFromString("gauge.one", Stats::Gauge::ImportMode::Accumulate).set(1);
+  context_.store_.gaugeFromString("gauge.two", Stats::Gauge::ImportMode::Accumulate).set(2);
+
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  auto extension = std::make_unique<DynamicModuleBootstrapExtension>(config.value());
+  extension->initializeInModuleExtension();
+
+  struct VisitorData {
+    Stats::Store* store;
+    int count;
+  };
+  VisitorData data{&context_.store_, 0};
+  auto iterator = [](envoy_dynamic_module_type_envoy_buffer, uint64_t,
+                     void* user_data) -> envoy_dynamic_module_type_stats_iteration_action {
+    auto* d = static_cast<VisitorData*>(user_data);
+    d->count++;
+    d->store
+        ->gaugeFromString("gauge.created_during_iteration", Stats::Gauge::ImportMode::Accumulate)
+        .set(1);
+    return envoy_dynamic_module_type_stats_iteration_action_Continue;
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
+      static_cast<void*>(extension.get()), iterator, &data);
+
+  // Only the two gauges present when iteration began are visited.
+  EXPECT_EQ(data.count, 2);
+  // The reentrant stats call took effect, so the store now holds the gauge created during
+  // iteration.
+  EXPECT_EQ(context_.store_.gauges().size(), 3);
+}
+
 // -----------------------------------------------------------------------------
 // Stats Definition and Update Tests
 // -----------------------------------------------------------------------------
@@ -876,8 +1022,8 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounter) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the counter was defined and is accessible.
-  EXPECT_TRUE(config.value()->getCounterById(counter_id).has_value());
-  EXPECT_FALSE(config.value()->getCounterById(counter_id + 1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getCounterById(counter_id).has_value());
+  EXPECT_FALSE(config.value()->metrics().getCounterById(counter_id + 1).has_value());
 }
 
 // Test incrementing a counter with an invalid ID.
@@ -932,8 +1078,8 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGauge) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the gauge was defined and is accessible.
-  EXPECT_TRUE(config.value()->getGaugeById(gauge_id).has_value());
-  EXPECT_FALSE(config.value()->getGaugeById(gauge_id + 1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getGaugeById(gauge_id).has_value());
+  EXPECT_FALSE(config.value()->metrics().getGaugeById(gauge_id + 1).has_value());
 }
 
 // Test gauge operations with an invalid ID.
@@ -1054,10 +1200,10 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
             envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify all counters and gauges are accessible by their IDs.
-  EXPECT_TRUE(config.value()->getCounterById(counter_id_0).has_value());
-  EXPECT_TRUE(config.value()->getCounterById(counter_id_1).has_value());
-  EXPECT_TRUE(config.value()->getGaugeById(gauge_id_0).has_value());
-  EXPECT_TRUE(config.value()->getGaugeById(gauge_id_1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getCounterById(counter_id_0).has_value());
+  EXPECT_TRUE(config.value()->metrics().getCounterById(counter_id_1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getGaugeById(gauge_id_0).has_value());
+  EXPECT_TRUE(config.value()->metrics().getGaugeById(gauge_id_1).has_value());
 }
 
 // -----------------------------------------------------------------------------
@@ -1092,8 +1238,8 @@ TEST_F(BootstrapAbiImplTest, DefineAndIncrementCounterVec) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the counter vec was defined and is accessible.
-  EXPECT_TRUE(config.value()->getCounterVecById(counter_vec_id).has_value());
-  EXPECT_FALSE(config.value()->getCounterVecById(counter_vec_id + 1).has_value());
+  EXPECT_TRUE(config.value()->metrics().getCounterVecById(counter_vec_id).has_value());
+  EXPECT_FALSE(config.value()->metrics().getCounterVecById(counter_vec_id + 1).has_value());
 }
 
 // Test incrementing a counter vec with mismatched label count.
@@ -1159,7 +1305,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndManipulateGaugeVec) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the gauge vec was defined and is accessible.
-  EXPECT_TRUE(config.value()->getGaugeVecById(gauge_vec_id).has_value());
+  EXPECT_TRUE(config.value()->metrics().getGaugeVecById(gauge_vec_id).has_value());
 }
 
 // Test defining and recording a histogram vec with labels.
@@ -1190,7 +1336,7 @@ TEST_F(BootstrapAbiImplTest, DefineAndRecordHistogramVec) {
   EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Success);
 
   // Verify the histogram vec was defined and is accessible.
-  EXPECT_TRUE(config.value()->getHistogramVecById(histogram_vec_id).has_value());
+  EXPECT_TRUE(config.value()->metrics().getHistogramVecById(histogram_vec_id).has_value());
 }
 
 // Test vec metric operations with an invalid vec ID and mismatched label count.
@@ -1861,7 +2007,7 @@ TEST_F(BootstrapAbiImplTest, MetricsFrozenAfterInit) {
 }
 
 // Drives concurrent labeled increments from multiple threads to verify no data race in the
-// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+// registry's shared stat name pool. Run under `--config=tsan` to verify.
 TEST_F(BootstrapAbiImplTest, MetricsConcurrentIncrementCounterVecNoRace) {
   auto dynamic_module =
       Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
@@ -1919,6 +2065,96 @@ TEST_F(BootstrapAbiImplTest, MetricsConcurrentIncrementCounterVecNoRace) {
   for (auto& th : threads) {
     th.join();
   }
+}
+
+// A transport socket match is observed only when present in every cluster that has matches, so a
+// match is reported only once it appears in all the clusters that carry per-endpoint matches.
+TEST_F(BootstrapAbiImplTest, TransportSocketMatchIntersection) {
+  using Config = DynamicModuleBootstrapExtensionConfig;
+  EXPECT_THAT(Config::transportSocketMatchIntersection({}), testing::IsEmpty());
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b"}}),
+              testing::UnorderedElementsAre("a", "b"));
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b", "c"}, {"b", "c"}, {"b", "d"}}),
+              testing::UnorderedElementsAre("b"));
+  // Clusters with no matches are skipped and do not zero the intersection.
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{"a", "b"}, {}, {"a"}}),
+              testing::UnorderedElementsAre("a"));
+  EXPECT_THAT(Config::transportSocketMatchIntersection({{}, {}}), testing::IsEmpty());
+}
+
+// With the server initialized but no active objects, every valid resource kind emits nothing and
+// does not crash.
+TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesEmptyEmitsNothing) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+
+  // Mark the server initialized so the accessor proceeds past its guard to the kind switch.
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+
+  struct Recorder {
+    int calls = 0;
+  } recorder;
+  auto name_fn = [](envoy_dynamic_module_type_envoy_buffer, void* user_data) {
+    ++static_cast<Recorder*>(user_data)->calls;
+  };
+
+  for (auto kind : {envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch,
+                    envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret}) {
+    envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+        config.value()->thisAsVoidPtr(), kind, name_fn, &recorder);
+  }
+  EXPECT_EQ(recorder.calls, 0);
+}
+
+// A name reported more than once by the underlying manager is emitted once.
+TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesEmitsEachNameOnce) {
+  auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModule(testDataDir() + "/libbootstrap_no_op.so", false);
+  ASSERT_OK(dynamic_module);
+  auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
+                                                         std::move(dynamic_module.value()),
+                                                         dispatcher_, context_, context_.store_);
+  ASSERT_OK(config);
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config.value()->setListenerManager(listener_manager);
+
+  testing::NiceMock<Secret::MockSecretManager> secret_manager;
+  ON_CALL(context_, secretManager()).WillByDefault(testing::ReturnRef(secret_manager));
+  EXPECT_CALL(secret_manager, dynamicActiveSecretNames())
+      .WillOnce(testing::Return(std::vector<absl::string_view>{"a", "b", "a"}));
+
+  std::vector<std::string> names;
+  auto name_fn = [](envoy_dynamic_module_type_envoy_buffer name, void* user_data) {
+    static_cast<std::vector<std::string>*>(user_data)->emplace_back(name.ptr, name.length);
+  };
+  envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+      config.value()->thisAsVoidPtr(),
+      envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret, name_fn, &names);
+  EXPECT_THAT(names, testing::ElementsAre("a", "b"));
+}
+
+// Calling the accessor off the main thread is an ENVOY_BUG and emits nothing. The guard
+// short-circuits before any pointer dereference, so passing a null config is safe here.
+TEST_F(BootstrapAbiImplTest, GetActiveResourceNamesOffMainThreadFailsClosed) {
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([] {
+          envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+              nullptr, envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster,
+              [](envoy_dynamic_module_type_envoy_buffer, void*) { FAIL(); }, nullptr);
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names must be called "
+      "on the main thread");
 }
 
 } // namespace DynamicModules

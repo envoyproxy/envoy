@@ -1379,6 +1379,37 @@ TEST_F(Http1ServerConnectionImplTest, AllowCustomMethod) {
   EXPECT_OK(status);
 }
 
+// The QUERY method of RFC 10008 is accepted without `allow_custom_methods`, and its mandatory
+// request content is delivered to the decoder.
+TEST_F(Http1ServerConnectionImplTest, QueryMethodWithContentLength) {
+  initialize();
+
+  MockRequestDecoder decoder;
+  setupRequestDecoderMock(decoder);
+
+  InSequence sequence;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{{":authority", "example.com"},
+                                            {":path", "/search"},
+                                            {":method", "QUERY"},
+                                            {"content-type", "application/sql"},
+                                            {"content-length", "9"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+
+  Buffer::OwnedImpl expected_data1("SELECT 1;");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false));
+
+  Buffer::OwnedImpl expected_data2;
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), true));
+
+  Buffer::OwnedImpl buffer("QUERY /search HTTP/1.1\r\nhost: example.com\r\n"
+                           "content-type: application/sql\r\ncontent-length: 9\r\n\r\nSELECT 1;");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_OK(status);
+  EXPECT_EQ(0U, buffer.length());
+}
+
 TEST_F(Http1ServerConnectionImplTest, BadRequestStartedStream) {
   initialize();
 
@@ -5398,6 +5429,53 @@ TEST_F(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
     EXPECT_OK(status);
     EXPECT_EQ(0u, buffer.length());
   }
+}
+
+// Empty pseudo-header values are serialized as-is rather than crashing or being rejected: the
+// encoder only hardens the header accessing and keeps the previous pass-through behavior so
+// that deliberately invalid requests (e.g. from tests) can still be sent.
+TEST_F(Http1ClientConnectionImplTest, EncodeHeadersEmptyMethod) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{{":method", ""}, {":path", "/"}};
+  EXPECT_OK(request_encoder.encodeHeaders(headers, true));
+  // The empty method does not match any of the body-less methods, so an explicit
+  // content-length is added.
+  EXPECT_EQ(" / HTTP/1.1\r\ncontent-length: 0\r\n\r\n", output);
+}
+
+TEST_F(Http1ClientConnectionImplTest, EncodeHeadersEmptyPath) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", ""}};
+  EXPECT_OK(request_encoder.encodeHeaders(headers, true));
+  EXPECT_EQ("GET  HTTP/1.1\r\n\r\n", output);
+}
+
+TEST_F(Http1ClientConnectionImplTest, EncodeHeadersConnectEmptyAuthority) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", ""}};
+  EXPECT_OK(request_encoder.encodeHeaders(headers, true));
+  EXPECT_EQ("CONNECT  HTTP/1.1\r\nhost: \r\n\r\n", output);
 }
 
 } // namespace Http

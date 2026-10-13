@@ -92,9 +92,8 @@ private:
 
 struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
-         Server::Configuration::FactoryContext& context)
-      : context_(context.serverFactoryContext().grpcContext()),
-        emit_filter_state_(proto_config.emit_filter_state()),
+         Server::Configuration::ServerFactoryContext& context)
+      : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
         enable_upstream_stats_(proto_config.enable_upstream_stats()),
         replace_dots_in_grpc_service_name_(proto_config.replace_dots_in_grpc_service_name()),
         stats_for_all_methods_(
@@ -315,11 +314,12 @@ private:
 } // namespace
 
 absl::StatusOr<Http::FilterFactoryCb>
-GrpcStatsFilterConfigFactory::createFilterFactoryFromProtoTyped(
+GrpcStatsFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& factory_context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
 
-  ConfigConstSharedPtr config = std::make_shared<const Config>(proto_config, factory_context);
+  ConfigConstSharedPtr config = std::make_shared<const Config>(proto_config, context);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<GrpcStatsFilter>(config));

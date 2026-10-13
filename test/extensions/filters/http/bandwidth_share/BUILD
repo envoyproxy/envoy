@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -19,7 +18,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.bandwidth_share",
         "envoy.formatter.cel",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/bandwidth_share:config",
         "//source/extensions/formatter/cel:config",
@@ -28,10 +27,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "fair_token_bucket_impl_test",
     srcs = ["fair_token_bucket_impl_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.http.bandwidth_share"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/bandwidth_share:fair_token_bucket_impl_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -40,10 +40,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "token_bucket_singleton_test",
     srcs = ["token_bucket_singleton_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.http.bandwidth_share"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:isolated_store_lib",
@@ -60,7 +61,7 @@ envoy_extension_cc_test(
     name = "filter_integration_test",
     srcs = ["filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.bandwidth_share"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/bandwidth_share:config",
         "//test/integration:http_protocol_integration_lib",

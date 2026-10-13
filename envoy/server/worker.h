@@ -114,17 +114,24 @@ public:
    * that is posted to the worker's dispatcher.
    * @param listener_tag supplies the tag passed to addListener().
    * @param filter_chains supplies the filter chains whose connections should be notified.
+   * @param drain_event describes the drain sequence (start time and strategy), captured
+   *        once on the main thread so all connections share a consistent drain timeline.
    */
   virtual void onFilterChainDrain(uint64_t listener_tag,
-                                  const std::list<const Network::FilterChain*>& filter_chains) PURE;
+                                  const std::list<const Network::FilterChain*>& filter_chains,
+                                  Network::ConnectionDrainEvent drain_event) PURE;
 
   /**
    * Notify all connections of the given listener that they are being drained. Connections
    * are not closed. This is a fire-and-forget operation that is posted to the worker's
    * dispatcher.
-   * @param listener supplies the listener whose connections should be notified.
+   * @param listener_tag supplies the tag passed to addListener() of the listener whose connections
+   *        should be notified.
+   * @param drain_event describes the drain sequence (start time and strategy), captured
+   *        once on the main thread so all connections share a consistent drain timeline.
    */
-  virtual void onListenerDrain(Network::ListenerConfig& listener) PURE;
+  virtual void onListenerDrain(uint64_t listener_tag,
+                               Network::ConnectionDrainEvent drain_event) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;
