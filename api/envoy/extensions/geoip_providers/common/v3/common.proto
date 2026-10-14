@@ -103,6 +103,10 @@ message CommonGeoipProviderConfig {
     // If set, the key will be used to populate the country ISO code associated with the IP address.
     string country = 1;
 
+    // If set, the key will be used to populate the English name of the country associated with
+    // the IP address. Uses the country database when available, falling back to the city database.
+    string country_name = 24;
+
     // If set, the key will be used to populate the city associated with the IP address.
     string city = 2;
 
@@ -198,10 +202,6 @@ message CommonGeoipProviderConfig {
     // If set, the key will be used to populate the metro code (DMA code in the US)
     // associated with the IP address. Requires the city database.
     string metro_code = 23;
-
-    // If set, the key will be used to populate the English name of the country associated with
-    // the IP address. Uses the country database when available, falling back to the city database.
-    string country_name = 24;
   }
 
   // Configuration for geolocation headers to add to HTTP requests.
