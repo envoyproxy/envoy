@@ -21,6 +21,7 @@
 
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -59,6 +60,8 @@ typed_config:
     // Call parent initialize to complete setup.
     HttpIntegrationTest::initialize();
   }
+
+  void TearDown() override { cleanupLdsConnection(); }
 
 protected:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
@@ -126,6 +129,13 @@ protected:
   // discovery requests (e.g. a NACK) on the fake upstream thread, so destroying the FakeStream
   // without this races with that thread.
   void cleanupLdsConnection() {
+    // Return early if no LDS connection or stream was created, or if already cleaned up. This
+    // ensures idempotency when called from both test bodies and TearDown(), avoids compounding
+    // sleep overhead from advanceTimeWait() in real time across non-LDS tests, and prevents
+    // advancing simulated clocks when there are no LDS worker closures to drain.
+    if (lds_upstream_info_.stream_ == nullptr && lds_upstream_info_.connection_ == nullptr) {
+      return;
+    }
     if (lds_upstream_info_.stream_) {
       lds_upstream_info_.stream_->finishGrpcStream(Grpc::Status::Ok);
     }
@@ -1484,6 +1494,10 @@ TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListe
   on_server_init_function_ = [this]() {
     createLdsStream();
 
+    envoy::service::discovery::v3::DiscoveryRequest initial_request;
+    ASSERT_TRUE(lds_upstream_info_.stream_->waitForGrpcMessage(*dispatcher_, initial_request));
+    EXPECT_FALSE(initial_request.has_error_detail());
+
     envoy::config::listener::v3::Listener listener;
     listener.set_name("out_of_range_reverse_conn_listener");
     listener.set_stat_prefix("out_of_range_reverse_conn_listener");
@@ -1518,6 +1532,12 @@ TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListe
     HttpIntegrationTest::initialize();
     test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
   });
+
+  // Consume and assert the NACK sent by Envoy in response to the rejected listener config.
+  envoy::service::discovery::v3::DiscoveryRequest nack;
+  ASSERT_TRUE(lds_upstream_info_.stream_->waitForGrpcMessage(*dispatcher_, nack));
+  EXPECT_TRUE(nack.has_error_detail());
+  EXPECT_THAT(nack.error_detail().message(), HasSubstr("outside the supported range"));
 
   cleanupLdsConnection();
 }

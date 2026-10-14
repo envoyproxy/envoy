@@ -1767,6 +1767,25 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
       // it means that it was other worker thread that requested the discovery.
       return;
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_missing_cluster_cache") &&
+        !warming_clusters_.contains(name) && odcds->isKnownMissing(name)) {
+      ENVOY_LOG(debug,
+                "cm odcds: the requested cluster {} is already known to be missing, posting the "
+                "answer back to {}",
+                name, worker_dispatcher.name());
+      // The config source behind this handle has already answered that the cluster doesn't
+      // exist. A cluster that is warming (delivered by another config source meanwhile) is
+      // deliberately not answered from the remembered answer: the cluster lifecycle callbacks
+      // resolve the request with Available once the warm-up completes.
+      //
+      // Nothing is left pending on the main thread, so only the requesting worker is answered;
+      // any other worker that asks posts here and gets its own answer.
+      odcds->recordKnownMissingAnswer();
+      worker_dispatcher.post([invoker = std::move(invoker)] {
+        invoker.invokeAllCallbacks(ClusterDiscoveryStatus::Missing);
+      });
+      return;
+    }
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
     // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
     odcds->updateOnDemand(name);

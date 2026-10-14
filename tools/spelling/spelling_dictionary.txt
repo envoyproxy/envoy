@@ -674,6 +674,7 @@ auths
 authz
 automata
 autoscale
+autosharding
 awaitable
 awaitables
 awaiter
@@ -1068,6 +1069,8 @@ keyset
 ketama
 keyder
 kqueue
+kTLS
+ktls
 kubernetes
 kv
 kvlist

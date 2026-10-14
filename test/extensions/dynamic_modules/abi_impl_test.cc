@@ -1792,6 +1792,8 @@ WEAK_STUB(TransportSocketSetIsReadable,
           envoy_dynamic_module_callback_transport_socket_set_is_readable(nullptr))
 WEAK_STUB(TransportSocketSetIsWritable,
           envoy_dynamic_module_callback_transport_socket_set_is_writable(nullptr))
+WEAK_STUB(TransportSocketStartSplice,
+          envoy_dynamic_module_callback_transport_socket_start_splice(nullptr, nullptr))
 WEAK_STUB(TransportSocketFlushWriteBuffer,
           envoy_dynamic_module_callback_transport_socket_flush_write_buffer(nullptr))
 WEAK_STUB(TransportSocketGetRemoteAddress,

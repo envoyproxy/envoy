@@ -2814,6 +2814,10 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_set_is_readable,
 WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_set_is_writable,
                envoy_dynamic_module_type_transport_socket_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_transport_socket_start_splice, false,
+          envoy_dynamic_module_type_transport_socket_envoy_ptr,
+          envoy_dynamic_module_type_transport_socket_envoy_ptr)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_flush_write_buffer,
                envoy_dynamic_module_type_transport_socket_envoy_ptr)
 

@@ -1,2 +1,0 @@
-Added support for ``content_type_matcher`` in ``CommonDirectionConfig``, allowing
-fine-grained MIME type matching using string matchers.
