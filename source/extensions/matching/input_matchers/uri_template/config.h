@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
+#include "envoy/extensions/matching/input_matchers/uri_template/v3/uri_template.pb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 
@@ -20,7 +20,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig>();
+        envoy::extensions::matching::input_matchers::uri_template::v3::UriTemplate>();
   }
 };
 

@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//source/extensions/matching/input_matchers/uri_template:config",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/path/match/uri_template/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/input_matchers/uri_template/v3:pkg_cc_proto",
     ],
 )
 
@@ -31,8 +31,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/matching/input_matchers/uri_template:matcher_lib",
-        "//source/extensions/path/match/uri_template:config",
-        "@envoy_api//envoy/extensions/path/match/uri_template/v3:pkg_cc_proto",
+        "@re2",
     ],
 )
 

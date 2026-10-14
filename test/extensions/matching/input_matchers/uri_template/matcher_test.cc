@@ -1,11 +1,9 @@
 #include <memory>
 
-#include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
-
 #include "source/extensions/matching/input_matchers/uri_template/matcher.h"
-#include "source/extensions/path/match/uri_template/config.h"
 
 #include "gtest/gtest.h"
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,18 +16,12 @@ using ::Envoy::Matcher::MatchResult;
 
 class UriTemplateInputMatcherTest : public testing::Test {
 protected:
-  UriTemplateInputMatcherTest() {
-    envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig config;
-    config.set_path_template("/api/{version}/items/{id}");
-    Extensions::UriTemplate::Match::UriTemplateMatcherFactory factory;
-    matcher_ = std::make_unique<UriTemplateInputMatcher>(factory.createPathMatcher(config).value());
-  }
-
   MatchResult matchPath(absl::string_view path) {
-    return matcher_->match(DataInputGetResult::CreateStringView(path));
+    return matcher_.match(DataInputGetResult::CreateStringView(path));
   }
 
-  std::unique_ptr<UriTemplateInputMatcher> matcher_;
+  // The character classes exclude ? and # so the match depends on removing the query and fragment.
+  UriTemplateInputMatcher matcher_{std::make_shared<const RE2>("/api/[a-z0-9]+/items/[0-9]+")};
 };
 
 TEST_F(UriTemplateInputMatcherTest, IgnoresQueryAndFragment) {
@@ -39,10 +31,11 @@ TEST_F(UriTemplateInputMatcherTest, IgnoresQueryAndFragment) {
 
 TEST_F(UriTemplateInputMatcherTest, DoesNotMatchOtherPaths) {
   EXPECT_EQ(matchPath("/api/v1/items"), MatchResult::NoMatch);
+  EXPECT_EQ(matchPath("/api/v1/items/123/extra"), MatchResult::NoMatch);
 }
 
 TEST_F(UriTemplateInputMatcherTest, DoesNotMatchMissingInput) {
-  EXPECT_EQ(matcher_->match(DataInputGetResult::NoData()), MatchResult::NoMatch);
+  EXPECT_EQ(matcher_.match(DataInputGetResult::NoData()), MatchResult::NoMatch);
 }
 
 } // namespace UriTemplate

@@ -14,7 +14,8 @@ envoy_cc_library(
     hdrs = ["matcher.h"],
     deps = [
         "//envoy/matcher:matcher_interface",
-        "//envoy/router:path_matcher_interface",
+        "//source/common/http:path_utility_lib",
+        "@re2",
     ],
 )
 
@@ -29,7 +30,9 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//source/common/common:thread_lib",
-        "//source/extensions/path/match/uri_template:config",
-        "@envoy_api//envoy/extensions/path/match/uri_template/v3:pkg_cc_proto",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/path/uri_template_lib",
+        "@envoy_api//envoy/extensions/matching/input_matchers/uri_template/v3:pkg_cc_proto",
+        "@re2",
     ],
 )

@@ -1,7 +1,12 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/matcher/matcher.h"
-#include "envoy/router/path_matcher.h"
+
+#include "source/common/http/path_utility.h"
+
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,19 +16,18 @@ namespace UriTemplate {
 
 class UriTemplateInputMatcher : public Envoy::Matcher::InputMatcher {
 public:
-  explicit UriTemplateInputMatcher(Router::PathMatcherSharedPtr path_matcher)
-      : path_matcher_(std::move(path_matcher)) {}
+  explicit UriTemplateInputMatcher(std::shared_ptr<const RE2> regex) : regex_(std::move(regex)) {}
 
   Envoy::Matcher::MatchResult match(const Envoy::Matcher::DataInputGetResult& input) override {
     const auto path = input.stringData();
-    if (path && path_matcher_->match(*path)) {
+    if (path && RE2::FullMatch(Envoy::Http::PathUtil::removeQueryAndFragment(*path), *regex_)) {
       return Envoy::Matcher::MatchResult::Matched;
     }
     return Envoy::Matcher::MatchResult::NoMatch;
   }
 
 private:
-  const Router::PathMatcherSharedPtr path_matcher_;
+  const std::shared_ptr<const RE2> regex_;
 };
 
 } // namespace UriTemplate

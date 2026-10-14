@@ -36,7 +36,7 @@ typed_config:
             custom_match:
               name: envoy.matching.matchers.uri_template
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+                "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.uri_template.v3.UriTemplate
                 path_template: "/api/{version}/items/{id}"
         on_match:
           action:
