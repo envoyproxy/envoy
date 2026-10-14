@@ -64,6 +64,15 @@ Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocke
     Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
     Envoy::Network::Address::IpVersion version, const ReverseConnectionSocketConfig& config) const {
 
+  // The bootstrap extension sets the server context read below. Without it this is a misconfigured
+  // rc:// listener, so fail socket creation rather than dereferencing a null context and crashing.
+  if (!isInitialized()) {
+    ENVOY_LOG(error, "reverse_tunnel: cannot create reverse connection socket, the "
+                     "envoy.bootstrap.reverse_tunnel.downstream_socket_interface bootstrap "
+                     "extension is not configured");
+    return nullptr;
+  }
+
   // Return early if no remote clusters are configured.
   if (config.remote_clusters.empty()) {
     ENVOY_LOG(debug, "reverse_tunnel: No remote clusters configured, returning nullptr");

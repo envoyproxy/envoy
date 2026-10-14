@@ -19,6 +19,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
@@ -41,6 +42,19 @@ getMethod(const envoy::config::core::v3::RequestMethod config_method) {
   }
 
   return config_method;
+}
+
+// Maps the protocol negotiated by ALPN to a codec type: `h2` is HTTP/2 and `http/1.1` is HTTP/1.1.
+// Anything else, including nothing negotiated at all, is `fallback`; with the default HTTP/1.1
+// that is the same mapping as the data plane's HttpConnPoolImplMixed.
+Http::CodecType codecTypeFromAlpn(absl::string_view alpn, Http::CodecType fallback) {
+  if (alpn == Http::Utility::AlpnNames::get().Http2) {
+    return Http::CodecType::HTTP2;
+  }
+  if (alpn == Http::Utility::AlpnNames::get().Http11) {
+    return Http::CodecType::HTTP1;
+  }
+  return fallback;
 }
 
 } // namespace
@@ -73,9 +87,31 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
                            config.http_health_check().retriable_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
       codec_client_type_(codecClientType(config.http_health_check().codec_client_type())),
+      negotiate_codec_(config.http_health_check().use_alpn_protocol()),
       random_generator_(context.api().randomGenerator()) {
   // TODO(boteng): introduce additional validation for the authority and path headers
   // based on the default UHV when it is available.
+
+  if (negotiate_codec_) {
+    // The negotiating connection is TCP, so HTTP/3 is neither negotiable nor a usable fallback.
+    if (codec_client_type_ == Http::CodecType::HTTP3) {
+      throw EnvoyException(
+          fmt::format("use_alpn_protocol cannot be combined with codec_client_type HTTP3 for the "
+                      "health check of cluster {}",
+                      cluster.info()->name()));
+    }
+    // ALPN needs a transport socket that negotiates it, so reject a cluster whose transport
+    // sockets cannot, the same as the cluster's `auto_config` is rejected. Otherwise every probe
+    // would silently fall back to HTTP/1.1. The same runtime key that lets `auto_config` load on
+    // such a cluster applies here too, for a non-ALPN match that data connections never select.
+    if (!cluster.info()->transportSocketMatcher().allMatchesSupportAlpn() &&
+        !runtime_.snapshot().featureEnabled("config.do_not_validate_alpn_support", 0)) {
+      throw EnvoyException(
+          fmt::format("use_alpn_protocol configured for the health check of cluster {} "
+                      "which has a non-ALPN transport socket",
+                      cluster.info()->name()));
+    }
+  }
 
   // Process send payload.
   if (config.http_health_check().has_send()) {
@@ -201,7 +237,7 @@ Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
   PANIC_DUE_TO_CORRUPT_ENUM
 }
 
-Http::Protocol HttpHealthCheckerImpl::protocol() const {
+Http::Protocol HttpHealthCheckerImpl::configuredProtocol() const {
   return codecClientTypeToProtocol(codec_client_type_);
 }
 
@@ -218,14 +254,25 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSessio
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   ASSERT(client_ == nullptr);
+  ASSERT(negotiating_connection_ == nullptr);
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onDeferredDelete() {
+  abortNegotiatingConnection();
   if (client_) {
     // If there is an active request it will get reset, so make sure we ignore the reset.
     expect_reset_ = true;
     client_->close(Network::ConnectionCloseType::Abort);
   }
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::abortNegotiatingConnection() {
+  if (negotiating_connection_ == nullptr) {
+    return;
+  }
+  negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
+  negotiating_connection_->close(Network::ConnectionCloseType::Abort);
+  parent_.dispatcher_.deferredDelete(std::move(negotiating_connection_));
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::decodeHeaders(
@@ -270,6 +317,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
 // TODO(lilika) : Support connection pooling
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
+    ASSERT(negotiating_connection_ == nullptr);
     Upstream::Host::CreateConnectionData conn =
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                            parent_.transportSocketMatchMetadata().get());
@@ -280,13 +328,74 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       handleFailure(envoy::data::core::v3::NETWORK);
       return;
     }
-    client_.reset(parent_.createCodecClient(conn));
-    client_->addConnectionCallbacks(connection_callback_impl_);
-    client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
+
+    // With `use_alpn_protocol` the codec is unknown until the handshake completes, so only connect
+    // here; onNegotiatingConnectionEvent() chooses the codec and sends the request once Connected
+    // arrives. A pinned codec builds the codec client now and sends immediately.
+    if (parent_.negotiate_codec_) {
+      expect_reset_ = false;
+      reuse_connection_ = parent_.reuse_connection_;
+      negotiating_connection_ = std::move(conn.connection_);
+      negotiating_connection_->addConnectionCallbacks(negotiating_connection_callback_impl_);
+      // Apply the connection settings that the codec client would otherwise have applied before
+      // connecting, so that the connect and the handshake behave as they did when the codec client
+      // was created up front.
+      negotiating_connection_->detectEarlyCloseWhenReadDisabled(false);
+      negotiating_connection_->noDelay(true);
+      negotiating_connection_->connect();
+      return;
+    }
+
+    initCodecClient(conn, parent_.codec_client_type_);
     expect_reset_ = false;
     reuse_connection_ = parent_.reuse_connection_;
   }
 
+  sendRequest();
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::initCodecClient(
+    Upstream::Host::CreateConnectionData& data, Http::CodecType codec_type) {
+  client_.reset(parent_.createCodecClient(data, codec_type));
+  client_->addConnectionCallbacks(connection_callback_impl_);
+  client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
+  protocol_ = codecClientTypeToProtocol(codec_type);
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onNegotiatingConnectionEvent(
+    Network::ConnectionEvent event) {
+  ASSERT(negotiating_connection_ != nullptr);
+
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    ENVOY_CONN_LOG(debug, "connect failure reason={} health_flags={}", *negotiating_connection_,
+                   negotiating_connection_->transportFailureReason(),
+                   HostUtility::healthFlagsToString(*host_));
+    negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
+    parent_.dispatcher_.deferredDelete(std::move(negotiating_connection_));
+    handleFailure(envoy::data::core::v3::NETWORK);
+    return;
+  }
+
+  // Proceed once the handshake has completed and the negotiated protocol is known.
+  if (event != Network::ConnectionEvent::Connected) {
+    return;
+  }
+
+  const std::string alpn = negotiating_connection_->nextProtocol();
+  const Http::CodecType codec_type = codecTypeFromAlpn(alpn, parent_.codec_client_type_);
+  ENVOY_CONN_LOG(debug, "health check negotiated alpn='{}', using {}", *negotiating_connection_,
+                 alpn, Http::Utility::getProtocolString(codecClientTypeToProtocol(codec_type)));
+
+  // The handshake completed, so the negotiated protocol is finally known. Choose the codec from
+  // it, hand the live connection to a codec client, and send the request.
+  negotiating_connection_->removeConnectionCallbacks(negotiating_connection_callback_impl_);
+  Upstream::Host::CreateConnectionData data{std::move(negotiating_connection_), host_};
+  initCodecClient(data, codec_type);
+  sendRequest();
+}
+
+void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::sendRequest() {
   Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
   request_in_flight_ = true;
@@ -475,6 +584,15 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::shouldClose() const {
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   request_in_flight_ = false;
+  if (negotiating_connection_) {
+    ENVOY_CONN_LOG(debug, "connect timeout health_flags={}", *negotiating_connection_,
+                   HostUtility::healthFlagsToString(*host_));
+    // The caller records the timeout as a failure. abortNegotiatingConnection() detaches the
+    // callbacks before closing, so the close it triggers is not reported a second time.
+    abortNegotiatingConnection();
+    return;
+  }
+
   if (client_) {
     ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                    HostUtility::healthFlagsToString(*host_));
@@ -501,10 +619,10 @@ HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& t
 }
 
 Http::CodecClient*
-ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
-  return new Http::CodecClientProd(codec_client_type_, std::move(data.connection_),
-                                   data.host_description_, dispatcher_, random_generator_,
-                                   transportSocketOptions());
+ProdHttpHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data,
+                                             Http::CodecType codec_type) {
+  return new Http::CodecClientProd(codec_type, std::move(data.connection_), data.host_description_,
+                                   dispatcher_, random_generator_, transportSocketOptions());
 }
 
 } // namespace Upstream

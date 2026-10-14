@@ -5431,5 +5431,52 @@ TEST_F(Http1ClientConnectionImplTest, RequestAfterConnectionClose) {
   }
 }
 
+// Empty pseudo-header values are serialized as-is rather than crashing or being rejected: the
+// encoder only hardens the header accessing and keeps the previous pass-through behavior so
+// that deliberately invalid requests (e.g. from tests) can still be sent.
+TEST_F(Http1ClientConnectionImplTest, EncodeHeadersEmptyMethod) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{{":method", ""}, {":path", "/"}};
+  EXPECT_OK(request_encoder.encodeHeaders(headers, true));
+  // The empty method does not match any of the body-less methods, so an explicit
+  // content-length is added.
+  EXPECT_EQ(" / HTTP/1.1\r\ncontent-length: 0\r\n\r\n", output);
+}
+
+TEST_F(Http1ClientConnectionImplTest, EncodeHeadersEmptyPath) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", ""}};
+  EXPECT_OK(request_encoder.encodeHeaders(headers, true));
+  EXPECT_EQ("GET  HTTP/1.1\r\n\r\n", output);
+}
+
+TEST_F(Http1ClientConnectionImplTest, EncodeHeadersConnectEmptyAuthority) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", ""}};
+  EXPECT_OK(request_encoder.encodeHeaders(headers, true));
+  EXPECT_EQ("CONNECT  HTTP/1.1\r\nhost: \r\n\r\n", output);
+}
+
 } // namespace Http
 } // namespace Envoy
