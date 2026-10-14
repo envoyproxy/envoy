@@ -1361,23 +1361,24 @@ absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
 
 bool McpJsonRestBridgeFilter::validateClientCapabilitiesMeta(const nlohmann::json& json_rpc,
                                                              absl::string_view method) {
-
-  if (!json_rpc.contains(McpConstants::ID_FIELD)) {
-    return true;
-  }
-
   const nlohmann::json& params = json_rpc[McpConstants::PARAMS_FIELD];
-  if (params[McpConstants::META_FIELD].contains(McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD)) {
+  const nlohmann::json& meta = params[McpConstants::META_FIELD];
+  const auto client_capabilities = meta.find(McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD);
+  if (client_capabilities != meta.end() && client_capabilities->is_object()) {
     return true;
   }
 
-  ENVOY_STREAM_LOG(debug, "Stateless MCP request is missing params._meta[\"{}\"].",
-                   *decoder_callbacks_, McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD);
+  const std::string error_message =
+      client_capabilities == meta.end()
+          ? absl::StrCat("Missing required params._meta field: ",
+                         McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD)
+          : absl::StrCat("Invalid params._meta field: ",
+                         McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD, " must be an object");
+  ENVOY_STREAM_LOG(debug, "Rejecting stateless MCP request: {}", *decoder_callbacks_,
+                   error_message);
   sendErrorResponse(
-      Http::Code::BadRequest, BridgeStatus::RequestMcpClientCapabilitiesMissing,
-      generateErrorJsonResponse(McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE,
-                                absl::StrCat("Missing required params._meta field: ",
-                                             McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD))
+      Http::Code::BadRequest, BridgeStatus::RequestMcpClientCapabilitiesInvalid,
+      generateErrorJsonResponse(McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE, error_message)
           .dump(),
       nullptr, method, params);
   return false;

@@ -5485,6 +5485,8 @@ TEST_F(McpJsonRestBridgeFilterTest,
 
 constexpr absl::string_view kMissingClientCapabilitiesError =
     R"json({"code":-32602,"message":"Missing required params._meta field: io.modelcontextprotocol/clientCapabilities"})json";
+constexpr absl::string_view kInvalidClientCapabilitiesError =
+    R"json({"code":-32602,"message":"Invalid params._meta field: io.modelcontextprotocol/clientCapabilities must be an object"})json";
 
 class StatelessClientCapabilitiesTest : public McpJsonRestBridgeFilterTest {
 protected:
@@ -5527,7 +5529,7 @@ TEST_F(StatelessClientCapabilitiesTest, MissingClientCapabilitiesReturnsInvalidP
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kMissingClientCapabilitiesError), _, _,
-                     StrEq("mcp_json_rest_bridge_request_mcp_client_capabilities_missing")));
+                     StrEq("mcp_json_rest_bridge_request_mcp_client_capabilities_invalid")));
 
   Buffer::OwnedImpl body(
       R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
@@ -5560,7 +5562,7 @@ TEST_F(StatelessClientCapabilitiesTest,
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kMissingClientCapabilitiesError), _, _,
-                     StrEq("mcp_json_rest_bridge_request_mcp_client_capabilities_missing")));
+                     StrEq("mcp_json_rest_bridge_request_mcp_client_capabilities_invalid")));
 
   Buffer::OwnedImpl body(
       R"json({"jsonrpc":"2.0","id":5,"method":"resources/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
@@ -5568,27 +5570,30 @@ TEST_F(StatelessClientCapabilitiesTest,
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
-TEST_F(StatelessClientCapabilitiesTest, NotificationWithoutClientCapabilitiesIsNotChecked) {
-  request_headers_ = {{":method", "POST"},
-                      {":path", "/mcp"},
-                      {"mcp-method", "notifications/initialized"},
-                      {"mcp-protocol-version", "2026-07-28"}};
+class StatelessNonObjectClientCapabilitiesTest : public StatelessClientCapabilitiesTest,
+                                                 public testing::WithParamInterface<std::string> {};
+
+TEST_P(StatelessNonObjectClientCapabilitiesTest, NonObjectClientCapabilitiesReturnsInvalidParams) {
+  setToolsCallHeaders();
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(
       decoder_callbacks_,
-      sendLocalReply(
-          Eq(Http::Code::OK),
-          StrEq(
-              R"json({"code":-32601,"message":"MCP method notifications/initialized is not supported"})json"),
-          _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
+      sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kInvalidClientCapabilitiesError), _, _,
+                     StrEq("mcp_json_rest_bridge_request_mcp_client_capabilities_invalid")));
 
   Buffer::OwnedImpl body(
-      R"json({"jsonrpc":"2.0","method":"notifications/initialized","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","arguments":{"parent":"projects/test-codelab","key":{"displayName":"display-key"}},"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":)json" +
+      GetParam() + "}}}");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
+  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/mcp"));
 }
+
+INSTANTIATE_TEST_SUITE_P(NonObjectValues, StatelessNonObjectClientCapabilitiesTest,
+                         testing::Values("null", "true", "0", R"("elicitation")", "[]"));
 
 } // namespace
 } // namespace McpJsonRestBridge
