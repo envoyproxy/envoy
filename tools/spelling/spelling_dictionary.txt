@@ -108,6 +108,8 @@ cbor
 CDN
 CDS
 CEL
+COMDAT
+COFF
 CWND
 DLE
 DPE
@@ -1066,6 +1068,8 @@ keyset
 ketama
 keyder
 kqueue
+kTLS
+ktls
 kubernetes
 kv
 kvlist

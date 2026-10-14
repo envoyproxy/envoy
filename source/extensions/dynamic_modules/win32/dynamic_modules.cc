@@ -9,6 +9,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -45,8 +46,29 @@ newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_vi
   return absl::UnimplementedError("Dynamic modules on Windows are not supported yet.");
 }
 
+absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_name) {
+  return absl::UnimplementedError("Dynamic modules on Windows are not supported yet.");
+}
+
+absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
+                                                           const absl::string_view sha256,
+                                                           const bool do_not_close,
+                                                           const bool load_globally) {
+  return absl::UnimplementedError("Dynamic modules on Windows are not supported yet.");
+}
+
 absl::Status writeDynamicModuleBytesToDisk(absl::string_view module_bytes,
                                            absl::string_view sha256) {
+  return absl::UnimplementedError("Dynamic modules on Windows are not supported yet.");
+}
+
+std::filesystem::path moduleTempPath(const absl::string_view sha256) {
+  return std::filesystem::temp_directory_path() /
+         absl::StrCat("envoy_dynamic_module_", sha256, ".dll");
+}
+
+absl::Status verifyFileSha256(const std::filesystem::path& path,
+                              absl::string_view expected_sha256_hex) {
   return absl::UnimplementedError("Dynamic modules on Windows are not supported yet.");
 }
 

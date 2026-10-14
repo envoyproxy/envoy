@@ -91,6 +91,7 @@ constexpr absl::string_view MCP_SESSION_ID_HEADER = "mcp-session-id";
 constexpr absl::string_view MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version";
 constexpr absl::string_view MCP_METHOD_HEADER = "mcp-method";
 constexpr absl::string_view MCP_NAME_HEADER = "mcp-name";
+constexpr absl::string_view MCP_PARAM_HEADER_PREFIX = "mcp-param-";
 
 // Delimiters for encoded header values.
 constexpr absl::string_view MCP_BASE64_PREFIX = "=?base64?";

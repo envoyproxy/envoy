@@ -430,6 +430,37 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "persistent_hash_map_test",
+    srcs = ["persistent_hash_map_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:persistent_hash_map_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings:string_view",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "persistent_hash_map_speed_test",
+    srcs = ["persistent_hash_map_speed_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:persistent_hash_map_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:string_view",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "persistent_hash_map_speed_test_benchmark_test",
+    benchmark_binary = "persistent_hash_map_speed_test",
+)
+
+envoy_cc_test(
     name = "basic_resource_impl_test",
     srcs = ["basic_resource_impl_test.cc"],
     rbe_pool = "linux_x64_small",

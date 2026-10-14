@@ -21,7 +21,6 @@ This will build Docker images for multiple platforms and variants including:
 - Debug image
 - Contrib image (with additional extensions)
 - Distroless image
-- Google VRP image
 - Tools image
 
 ## Development

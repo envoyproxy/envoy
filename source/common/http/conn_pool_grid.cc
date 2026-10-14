@@ -29,13 +29,9 @@ static constexpr uint32_t kDefaultTimeoutMs = 300;
 
 std::string getTargetHostname(const Network::TransportSocketOptionsConstSharedPtr& options,
                               Upstream::HostConstSharedPtr& host) {
-  if (options && options->serverNameOverride().has_value()) {
-    return options->serverNameOverride().value();
-  }
-  std::string default_sni =
-      std::string(host->transportSocketFactory().defaultServerNameIndication());
-  if (!default_sni.empty()) {
-    return default_sni;
+  std::string sni = Http3::effectiveSni(options, *host);
+  if (!sni.empty()) {
+    return sni;
   }
   // If there's no configured SNI the hostname is probably an IP address. Return it here.
   return host->hostname();

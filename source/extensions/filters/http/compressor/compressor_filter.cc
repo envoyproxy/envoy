@@ -643,9 +643,10 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     if (allowed_compressors.count(std::string(pair.first)) ||
         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Identity ||
         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
+      const auto registered = allowed_compressors.find(std::string(pair.first));
       if ((pair.second > choice.second) ||
-          (pair.second == choice.second &&
-           allowed_compressors[std::string(pair.first)].choose_first_)) {
+          (pair.second == choice.second && registered != allowed_compressors.end() &&
+           registered->second.choose_first_)) {
         choice = pair;
       }
     }

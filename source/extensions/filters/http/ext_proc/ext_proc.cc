@@ -991,6 +991,11 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
 
 FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
                                                     bool end_stream) {
+  // For empty data chunk with end_stream false, do not send it to the ext_proc server.
+  if (emptyDataWithFalseEos(data, end_stream)) {
+    return state.getBodyCallbackResultInStreamedMode(end_stream);
+  }
+
   switch (openStream()) {
   case StreamOpenState::Error:
     return FilterDataStatus::StopIterationNoBuffer;
@@ -1091,7 +1096,10 @@ FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
-  state.setBodyReceived(true);
+  // Don't count empty body chunk with false end_stream.
+  if (!emptyDataWithFalseEos(data, end_stream)) {
+    state.setBodyReceived(true);
+  }
 
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
@@ -1503,7 +1511,7 @@ void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info)
       logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
     }
     // Only set upstream host in logging info once.
-    if (logging_info_->upstreamHost() == nullptr) {
+    if (logging_info_->upstreamHost() == nullptr && stream_info->upstreamInfo().has_value()) {
       logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
     }
 

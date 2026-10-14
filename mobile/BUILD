@@ -13,6 +13,9 @@ load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 licenses(["notice"])  # Apache 2
 
 exports_files([
+    ".bazelrc",
+    "MODULE.bazel",
+    "MODULE.bazel.lock",
     "VERSION",
     "pyproject.toml",
 ])

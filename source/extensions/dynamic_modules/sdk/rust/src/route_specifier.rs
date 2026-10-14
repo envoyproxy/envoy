@@ -10,6 +10,7 @@ use crate::{
   abi, ffi_export, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
   EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::ffi::c_void;
 use std::mem::MaybeUninit;
@@ -1156,7 +1157,7 @@ pub trait RouteSpecifierConfig: Send + Sync {
 /// Implementations must be `Send + Sync` since they may be accessed from multiple threads. The
 /// handle borrows the Envoy side configuration, so a module must drop it together with the
 /// [`RouteSpecifierConfig`] it was created for and must not keep it alive elsewhere.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyRouteSpecifierConfig: Send + Sync {
   /// The identifiers of the declared route templates, in configuration order.

@@ -1342,5 +1342,28 @@ TEST_F(MultiConnectionBaseImplTest, GetSocketPanics) {
   EXPECT_DEATH(impl_->getSocket(), "not implemented");
 }
 
+TEST_F(MultiConnectionBaseImplTest, RemoveSecondReadFilterBeforeConnectFinished) {
+  setupMultiConnectionImpl(3);
+
+  startConnect();
+
+  MockReadFilterCallbacks callbacks;
+  ReadFilterSharedPtr filter = std::make_shared<MockReadFilter>();
+  filter->initializeReadFilterCallbacks(callbacks);
+  ReadFilterSharedPtr filter2 = std::make_shared<MockReadFilter>();
+  filter2->initializeReadFilterCallbacks(callbacks);
+  impl_->addReadFilter(filter);
+  impl_->addReadFilter(filter2);
+
+  // Removing a deferred filter that is not the first.
+  impl_->removeReadFilter(filter2);
+
+  timeOutAndStartNextAttempt();
+
+  // Only the remaining filter is applied to the final connection.
+  EXPECT_CALL(*createdConnections()[1], addReadFilter(filter));
+  connectSecondAttempt();
+}
+
 } // namespace Network
 } // namespace Envoy
