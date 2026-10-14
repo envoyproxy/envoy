@@ -1,4 +1,3 @@
-Fixed UDP proxy :ref:`proxy_host
-<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.proxy_host>`
-to resolve ``%METADATA(CLUSTER:example:hostname)%`` from the cluster selected for the UDP session,
-including when a session filter selects the cluster.
+UDP proxy formatters can now resolve :ref:`cluster metadata
+<envoy_v3_api_field_config.cluster.v3.Cluster.metadata>` from the cluster selected for each UDP
+session, including when a session filter selects the cluster.
