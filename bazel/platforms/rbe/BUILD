@@ -12,6 +12,13 @@ platform(
     parents = ["//bazel/platforms:macos_arm64"],
 )
 
+# Main-repo alias for --host_platform: Bazel 9 `bazel info` can't resolve apparent repo names in
+# label flags (https://github.com/bazelbuild/bazel/issues/28954).
+alias(
+    name = "clang_platform",
+    actual = "@clang_platform",
+)
+
 platform(
     name = "linux_x64",
     exec_properties = {
