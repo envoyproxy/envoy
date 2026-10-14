@@ -441,7 +441,10 @@ envoy_cc_benchmark_binary(
     srcs = ["thread_local_store_merge_speed_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/event:libevent_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
         "@benchmark",
     ],
 )

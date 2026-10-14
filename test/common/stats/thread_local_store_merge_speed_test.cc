@@ -1,5 +1,5 @@
-// Benchmarks ParentHistogramImpl::merge(). The focused cases isolate one parent; the production
-// case models 154K parents and eight workers with lazily created TLS histograms.
+// Benchmarks histogram merging. The focused cases isolate one parent. The production cases model
+// 154K parents and eight workers, including synchronous and callback-driven store iteration.
 
 #include <algorithm>
 #include <cstddef>
@@ -12,9 +12,13 @@
 
 #include "envoy/stats/histogram.h"
 
+#include "source/common/event/libevent.h"
 #include "source/common/stats/allocator.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
+
+#include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
 
@@ -23,6 +27,12 @@ namespace {
 
 enum class ValuePattern { Overlapping, Disjoint };
 enum class AllocationPattern { Packed, Scattered };
+
+void initLibevent() {
+  if (!Event::Libevent::Global::initialized()) {
+    Event::Libevent::Global::initialize();
+  }
+}
 
 class ParentHistogramMergeBenchmark {
 public:
@@ -175,7 +185,10 @@ BENCHMARK_CAPTURE(BM_ParentHistogramMerge, ScatteredDisjoint, ValuePattern::Disj
 class ProductionHistogramMergeBenchmark {
 public:
   explicit ProductionHistogramMergeBenchmark(size_t parent_count)
-      : symbol_table_(), allocator_(symbol_table_), store_(allocator_) {
+      : symbol_table_(), allocator_(symbol_table_), api_((initLibevent(), Api::createApiForTest())),
+        dispatcher_(api_->allocateDispatcher("histogram_merge_benchmark")), store_(allocator_) {
+    tls_.setDispatcher(dispatcher_.get());
+    store_.initializeThreading(*dispatcher_, tls_);
     parents_.reserve(parent_count);
     sources_.reserve(parent_count);
 
@@ -221,6 +234,12 @@ public:
     }
   }
 
+  ~ProductionHistogramMergeBenchmark() {
+    tls_.shutdownGlobalThreading();
+    store_.shutdownThreading();
+    tls_.shutdownThread();
+  }
+
   void prepareInterval() {
     for (auto& parent_sources : sources_) {
       for (auto& source : parent_sources) {
@@ -232,8 +251,16 @@ public:
     }
   }
 
-  void merge() {
+  void mergeStoreSynchronously() {
     store_.forEachHistogram(nullptr, [](Stats::ParentHistogram& histogram) { histogram.merge(); });
+  }
+
+  void mergeInBatches() {
+    bool complete = false;
+    store_.mergeHistograms([&complete]() { complete = true; });
+    while (!complete) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
   }
 
 private:
@@ -265,23 +292,38 @@ private:
 
   Stats::SymbolTableImpl symbol_table_;
   Stats::Allocator allocator_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  testing::NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::ThreadLocalStoreImpl store_;
   std::vector<Stats::ParentHistogramImpl*> parents_;
   std::vector<std::vector<Source>> sources_;
 };
 
-void BM_ParentHistogramMergeProduction(benchmark::State& state) {
+void BM_ThreadLocalStoreSynchronousMergeProduction(benchmark::State& state) {
   ProductionHistogramMergeBenchmark benchmark(state.range(0));
 
   for (auto _ : state) {
     state.PauseTiming();
     benchmark.prepareInterval();
     state.ResumeTiming();
-    benchmark.merge();
+    benchmark.mergeStoreSynchronously();
   }
 }
 
-BENCHMARK(BM_ParentHistogramMergeProduction)->Arg(154000);
+void BM_ThreadLocalStoreMergeProduction(benchmark::State& state) {
+  ProductionHistogramMergeBenchmark benchmark(state.range(0));
+
+  for (auto _ : state) {
+    state.PauseTiming();
+    benchmark.prepareInterval();
+    state.ResumeTiming();
+    benchmark.mergeInBatches();
+  }
+}
+
+BENCHMARK(BM_ThreadLocalStoreSynchronousMergeProduction)->Arg(154000);
+BENCHMARK(BM_ThreadLocalStoreMergeProduction)->Arg(154000);
 
 } // namespace
 } // namespace Envoy

@@ -2104,6 +2104,56 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, HistogramDestructionShutdownRace) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  {
+    ScopeSharedPtr scope1 = store_->createScope("scope1.");
+    scope1->histogramFromString("h1", Histogram::Unit::Unspecified);
+  }
+
+  // Execute posted tasks to run clearScopesFromCaches on the main thread.
+  // This will destroy scope1 and in turn destroy the histogram h1 (since there are no other
+  // references). Destroying the histogram will call releaseHistogramCrossThread and post
+  // clearHistogramsFromCaches to the dispatcher.
+  main_thread_dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+
+  // Now, without executing the newly posted clearHistogramsFromCaches task, we initiate shutdown.
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+
+  // ThreadLocalStore should destruct cleanly without any histograms_to_cleanup_.empty() assert
+  // failure.
+  tls_.shutdownThread();
+}
+
+TEST(ThreadLocalStoreThreadTest, ShutdownCancelsPendingHistogramMerge) {
+  SymbolTableImpl symbol_table;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  Allocator alloc(symbol_table);
+  ThreadLocalStoreImpl store(alloc);
+  store.initializeThreading(dispatcher, tls);
+
+  for (size_t i = 0; i <= 512; ++i) {
+    store.rootScope()->histogramFromString("h" + std::to_string(i), Histogram::Unit::Unspecified);
+  }
+
+  auto* merge_callback = new Event::MockSchedulableCallback(&dispatcher);
+  EXPECT_CALL(*merge_callback, scheduleCallbackNextIteration());
+  EXPECT_CALL(*merge_callback, cancel());
+
+  bool merge_complete = false;
+  store.mergeHistograms([&merge_complete]() { merge_complete = true; });
+  EXPECT_FALSE(merge_complete);
+
+  tls.shutdownGlobalThreading();
+  store.shutdownThreading();
+  tls.shutdownThread();
+  EXPECT_FALSE(merge_complete);
+}
+
 TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
   SymbolTableImpl symbol_table;
   Api::ApiPtr api = Api::createApiForTest();
@@ -2122,6 +2172,118 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
 }
 
 // Histogram tests
+class HistogramMergeBatchTest : public HistogramTest, public testing::WithParamInterface<size_t> {};
+
+TEST_P(HistogramMergeBatchTest, MergesBoundarySizedBatch) {
+  const size_t histogram_count = GetParam();
+  ParentHistogram* first = nullptr;
+  ParentHistogram* middle = nullptr;
+  ParentHistogram* last = nullptr;
+  for (size_t i = 0; i < histogram_count; ++i) {
+    auto& histogram = static_cast<ParentHistogram&>(
+        scope_.histogramFromString("h" + std::to_string(i), Histogram::Unit::Unspecified));
+    if (first == nullptr) {
+      first = &histogram;
+    }
+    if (i == histogram_count / 2) {
+      middle = &histogram;
+    }
+    last = &histogram;
+  }
+
+  if (first != nullptr) {
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(*first), 1));
+    first->recordValue(1);
+  }
+  if (middle != nullptr && middle != first) {
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(*middle), 2));
+    middle->recordValue(2);
+  }
+  if (last != nullptr && last != first && last != middle) {
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(*last), 3));
+    last->recordValue(3);
+  }
+
+  const size_t continuation_count = histogram_count == 0 ? 0 : (histogram_count - 1) / 512;
+  Event::MockSchedulableCallback* merge_callback = nullptr;
+  if (continuation_count > 0) {
+    merge_callback = new Event::MockSchedulableCallback(&main_thread_dispatcher_);
+    EXPECT_CALL(*merge_callback, scheduleCallbackNextIteration()).Times(continuation_count);
+    EXPECT_CALL(*merge_callback, cancel());
+  }
+
+  size_t completion_count = 0;
+  store_->mergeHistograms([&completion_count]() { ++completion_count; });
+  EXPECT_EQ(completion_count, continuation_count == 0 ? 1 : 0);
+
+  for (size_t i = 0; i < continuation_count; ++i) {
+    merge_callback->invokeCallback();
+    EXPECT_EQ(completion_count, i + 1 == continuation_count ? 1 : 0);
+  }
+
+  if (first != nullptr) {
+    EXPECT_EQ(first->cumulativeStatistics().sampleCount(), 1);
+  }
+  if (middle != nullptr && middle != first) {
+    EXPECT_EQ(middle->cumulativeStatistics().sampleCount(), 1);
+  }
+  if (last != nullptr && last != first && last != middle) {
+    EXPECT_EQ(last->cumulativeStatistics().sampleCount(), 1);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(Boundaries, HistogramMergeBatchTest,
+                         testing::Values(0, 1, 511, 512, 513, 1024, 1025));
+
+TEST_F(HistogramTest, SnapshotKeepsPendingHistogramAlive) {
+  ScopeSharedPtr scope = store_->createScope("batch.");
+  for (size_t i = 0; i <= 512; ++i) {
+    scope->histogramFromString("h" + std::to_string(i), Histogram::Unit::Unspecified);
+  }
+
+  auto* merge_callback = new Event::MockSchedulableCallback(&main_thread_dispatcher_);
+  EXPECT_CALL(*merge_callback, scheduleCallbackNextIteration());
+  EXPECT_CALL(*merge_callback, cancel());
+
+  bool merge_complete = false;
+  store_->mergeHistograms([&merge_complete]() { merge_complete = true; });
+  scope.reset();
+
+  EXPECT_EQ(store_->histograms().size(), 1);
+  merge_callback->invokeCallback();
+  EXPECT_TRUE(merge_complete);
+  EXPECT_TRUE(store_->histograms().empty());
+}
+
+TEST_F(HistogramTest, ConfiguredBinsSurviveHistogramMerge) {
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto& histogram_setting = *stats_config.mutable_histogram_bucket_settings()->Add();
+  histogram_setting.mutable_match()->set_prefix("configured.");
+  histogram_setting.mutable_bins()->set_value(2);
+  store_->setHistogramSettings(std::make_unique<HistogramSettingsImpl>(stats_config, context_));
+
+  Histogram& histogram =
+      scope_.histogramFromString("configured.histogram", Histogram::Unit::Unspecified);
+  auto& parent_histogram = static_cast<ParentHistogram&>(histogram);
+  EXPECT_EQ(static_cast<ParentHistogramImpl&>(histogram).bins(), 2);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 10));
+  histogram.recordValue(10);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 1000));
+  histogram.recordValue(1000);
+
+  store_->mergeHistograms([]() {});
+
+  EXPECT_EQ(parent_histogram.cumulativeStatistics().sampleCount(), 2);
+  EXPECT_EQ(parent_histogram.intervalStatistics().sampleCount(), 2);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 100000));
+  histogram.recordValue(100000);
+  store_->mergeHistograms([]() {});
+
+  EXPECT_EQ(parent_histogram.cumulativeStatistics().sampleCount(), 3);
+  EXPECT_EQ(parent_histogram.intervalStatistics().sampleCount(), 1);
+}
+
 TEST_F(HistogramTest, BasicSingleHistogramMerge) {
   Histogram& h1 = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   EXPECT_EQ("h1", h1.name());

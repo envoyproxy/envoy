@@ -636,7 +636,9 @@ private:
   void clearScopesFromCaches();
   void clearHistogramsFromCaches();
   void releaseScopeCrossThread(ScopeImpl* scope);
-  void mergeInternal(PostMergeCb merge_cb);
+  void startChunkedMerge();
+  void mergeChunk();
+  void finishChunkedMerge();
   bool slowRejects(StatsMatcher::FastResult fast_reject_result, StatName name) const;
   bool rejects(StatName name) const { return stats_matcher_->rejects(name); }
   StatsMatcher::FastResult fastRejects(StatName name) const;
@@ -668,6 +670,12 @@ private:
   std::atomic<bool> shutting_down_{false};
   std::atomic<bool> merge_in_progress_{false};
   OptRef<ThreadLocal::Instance> tls_;
+
+  static constexpr size_t MergeBatchSize = 512;
+  Event::SchedulableCallbackPtr merge_callback_;
+  std::vector<ParentHistogramSharedPtr> merge_histograms_;
+  size_t merge_histogram_index_{0};
+  PostMergeCb merge_complete_cb_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;

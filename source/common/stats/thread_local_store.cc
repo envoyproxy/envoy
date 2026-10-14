@@ -1,5 +1,6 @@
 #include "source/common/stats/thread_local_store.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <limits>
@@ -290,6 +291,13 @@ void ThreadLocalStoreImpl::shutdownThreading() {
   shutting_down_ = true;
   ASSERT(!tls_.has_value() || tls_->isShutdown());
 
+  if (merge_callback_ != nullptr) {
+    merge_callback_->cancel();
+  }
+  merge_complete_cb_ = nullptr;
+  merge_histograms_.clear();
+  merge_histogram_index_ = 0;
+
   // We can't call runOnAllThreads here as global threading has already been shutdown. It is okay
   // to simply clear the scopes and central cache entries here as they will be cleaned up during
   // thread local data cleanup in InstanceImpl::shutdownThread().
@@ -311,6 +319,7 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
     ASSERT(!merge_in_progress_);
     merge_in_progress_ = true;
+    merge_complete_cb_ = std::move(merge_complete_cb);
     tls_cache_->runOnAllThreads(
         [](OptRef<TlsCache> tls_cache) {
           for (const auto& id_hist : tls_cache->tls_histogram_cache_) {
@@ -318,19 +327,62 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
             tls_hist->beginMerge();
           }
         },
-        [this, merge_complete_cb]() -> void { mergeInternal(merge_complete_cb); });
+        [this]() -> void { startChunkedMerge(); });
   } else {
     // If server is shutting down, just call the callback to allow flush to continue.
     merge_complete_cb();
   }
 }
 
-void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
-  if (!shutting_down_) {
-    forEachHistogram(nullptr, [](ParentHistogram& histogram) { histogram.merge(); });
-    merge_complete_cb();
-    merge_in_progress_ = false;
+void ThreadLocalStoreImpl::startChunkedMerge() {
+  if (shutting_down_) {
+    return;
   }
+
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  ASSERT(merge_in_progress_);
+  // Take a copy of histograms, and increment refcount, because the histogram_set_ might
+  // be changed between calls. We need a stable reference.
+  merge_histograms_ = histograms();
+  merge_histogram_index_ = 0;
+  // Initiate the first chunk
+  mergeChunk();
+}
+
+void ThreadLocalStoreImpl::mergeChunk() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  ASSERT(merge_in_progress_);
+
+  const size_t end = std::min(merge_histogram_index_ + MergeBatchSize, merge_histograms_.size());
+  while (merge_histogram_index_ < end) {
+    // std::move to allow this to release progressively
+    ParentHistogramSharedPtr histogram = std::move(merge_histograms_[merge_histogram_index_++]);
+    histogram->merge();
+  }
+
+  if (merge_histogram_index_ < merge_histograms_.size()) {
+    // Yield to other dispatcher work before processing the next batch.
+    if (merge_callback_ == nullptr) {
+      merge_callback_ =
+          main_thread_dispatcher_->createSchedulableCallback([this]() { mergeChunk(); });
+    }
+    merge_callback_->scheduleCallbackNextIteration();
+    return;
+  }
+
+  finishChunkedMerge();
+}
+
+void ThreadLocalStoreImpl::finishChunkedMerge() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  ASSERT(merge_in_progress_);
+
+  PostMergeCb merge_complete_cb = std::move(merge_complete_cb_);
+  // We already released merge_histograms_ elements progressively in mergeChunk
+  merge_histograms_.clear();
+  merge_histogram_index_ = 0;
+  merge_complete_cb();
+  merge_in_progress_ = false;
 }
 
 ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
