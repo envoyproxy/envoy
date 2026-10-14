@@ -1382,6 +1382,13 @@ envoy.matching.matchers.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher
+envoy.matching.matchers.uri_template:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.input_matchers.uri_template.v3.UriTemplate
 envoy.path.match.uri_template.uri_template_matcher:
   categories:
   - envoy.path.match
