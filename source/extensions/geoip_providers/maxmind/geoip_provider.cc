@@ -220,6 +220,18 @@ GeoipProviderConfig::GeoipProviderConfig(
     }
   }
 
+  // Reject at config load time when fields that require a specific database are configured
+  // without that database, rather than hitting IS_ENVOY_BUG on every lookup.
+  if (config.city_db_path().empty()) {
+    if (hasConfiguredField(*this, CITY_LOOKUP_FIELDS)) {
+      throw EnvoyException("city_db_path is required for the configured geo_field_keys");
+    }
+    if (config.country_db_path().empty() && hasConfiguredField(*this, COUNTRY_LOOKUP_FIELDS)) {
+      throw EnvoyException(
+          "country_db_path or city_db_path is required for the configured geo_field_keys");
+    }
+  }
+
   // Which databases a provider looks up in is a property of the database files it was given, not
   // of this config, so the lookup stats are remembered for every database type.
   registerGeoDbStats(CITY_DB_TYPE);

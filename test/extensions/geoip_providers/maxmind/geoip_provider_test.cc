@@ -57,6 +57,12 @@ public:
     absl::MutexLock lock(db_file_provider.mmdb_mutex_);
     db_file_provider.db_.reset();
   }
+  static void setCityDbToNull(const DriverSharedPtr& driver) {
+    auto provider = std::static_pointer_cast<GeoipProvider>(driver);
+    auto& db_file_provider = *provider->db_file_providers_.city_db_;
+    absl::MutexLock lock(db_file_provider.mmdb_mutex_);
+    db_file_provider.db_.reset();
+  }
 };
 
 namespace {
@@ -1164,6 +1170,38 @@ TEST_F(GeoipProviderTest, ExtendedCityFieldsWithoutCityDbRejected) {
   )EOF";
   EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
                           "city_db_path is required for the configured geo_field_keys");
+}
+
+TEST_F(GeoipProviderTest, CountryFieldsWithoutAnyDbRejected) {
+  // country configured with neither country_db_path nor city_db_path.
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
+                          "country_db_path or city_db_path is required for the configured geo_field_keys");
+}
+
+TEST_F(GeoipProviderTest, CityDbLookupWithNullDb) {
+  // Config passes validation (city_db_path is set), but the DB is nulled at runtime
+  // to keep IS_ENVOY_BUG coverage for lookupInCityDb.
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        city: "x-geo-city"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  GeoipProviderPeer::setCityDbToNull(provider_);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("89.160.20.112");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  auto lookup_cb_std = [&](Geolocation::LookupResult&&) {};
+  EXPECT_ENVOY_BUG(
+      { provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)); },
+      "Maxmind city database must be initialised for performing lookups");
 }
 
 struct GeoipProviderGeoDbNotSetTestCase {

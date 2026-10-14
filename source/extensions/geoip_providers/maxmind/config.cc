@@ -73,27 +73,10 @@ public:
     // Load the database files first, so that a configuration that names none of them, or names
     // one that cannot be opened, is rejected before anything is cached.
     DbFileProviders db_file_providers = getDbFileProviders(proto_config, context);
+    // GeoipProviderConfig constructor validates that configured fields have their required
+    // databases (city_db_path, country_db_path) and throws EnvoyException if not.
     const auto provider_config =
         std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
-
-    // Reject at config load time when city-dependent fields are configured without a city
-    // database, rather than hitting IS_ENVOY_BUG on every lookup. This covers both the
-    // original fields (city, region) and the extended fields (latitude, metro_code, etc.).
-    if (db_file_providers.city_db_ == nullptr) {
-      static constexpr GeoField CITY_DEPENDENT_FIELDS[] = {
-          GeoField::City,           GeoField::Region,
-          GeoField::CityGeonameId,  GeoField::Latitude,
-          GeoField::Longitude,      GeoField::TimeZone,
-          GeoField::PostalCode,     GeoField::RegionName,
-          GeoField::RegionGeonameId, GeoField::SubregionGeonameId,
-          GeoField::MetroCode,
-      };
-      for (const auto field : CITY_DEPENDENT_FIELDS) {
-        if (provider_config->fieldKey(field).has_value()) {
-          throw EnvoyException("city_db_path is required for the configured geo_field_keys");
-        }
-      }
-    }
     std::shared_ptr<GeoipProvider> driver =
         std::make_shared<GeoipProvider>(singleton, provider_config, std::move(db_file_providers));
     drivers_[key] = driver;
