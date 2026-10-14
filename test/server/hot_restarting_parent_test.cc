@@ -714,6 +714,20 @@ TEST_F(HotRestartingParentUdpForwardingTest, QueuesWhenChildSocketIsFullAndRetri
   EXPECT_EQ(dropped(), 0);
 }
 
+// After shutdown() there is no retry timer: a packet that finds the child's socket full stays
+// queued (and is dropped with the stream) without anything being scheduled.
+TEST_F(HotRestartingParentUdpForwardingTest, QueuesWithoutRetryingAfterShutdown) {
+  parent_->shutdown();
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  parent_->sendHotRestartMessage(forwardedPacket(100));
+  EXPECT_EQ(helper_->queuedDatagrams(), 1);
+  EXPECT_EQ(forwarded(), 0);
+  EXPECT_EQ(retries(), 1);
+  EXPECT_EQ(dropped(), 0);
+}
+
 TEST_F(HotRestartingParentUdpForwardingTest, QueuesAMultiDatagramMessageWhole) {
   // A payload longer than one datagram is sent as a chain of datagrams that must not be split
   // by a would-block: the child cannot recover from a partial message.

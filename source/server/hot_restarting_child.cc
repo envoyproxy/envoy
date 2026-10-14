@@ -1,11 +1,11 @@
 #include "source/server/hot_restarting_child.h"
 
+#include <chrono>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
-
-#include "absl/time/clock.h"
 
 namespace Envoy {
 namespace Server {
@@ -163,10 +163,10 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
 }
 
 std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
-  const absl::Time start = absl::Now();
-  const absl::Duration reply_timeout = absl::FromChrono(parent_reply_timeout_);
-  const absl::Duration probe_interval = absl::FromChrono(parent_probe_interval_);
-  absl::Time next_probe = start + probe_interval;
+  // A monotonic clock, so that a step of the wall clock cannot move the deadline. This runs before
+  // the server and its time system exist, hence the direct use.
+  const auto start = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+  auto next_probe = start + parent_probe_interval_;
   while (true) {
     // Returns after RECEIVE_TIMEOUT_SLICE without data, so the loop below runs regularly.
     std::unique_ptr<HotRestartMessage> reply =
@@ -182,8 +182,8 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
                          "parent: {}",
                          status.message());
     }
-    const absl::Time now = absl::Now();
-    if (now - start >= reply_timeout) {
+    const auto now = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+    if (now - start >= parent_reply_timeout_) {
       onParentUnreachable(fmt::format("no reply within {}ms", parent_reply_timeout_.count()));
       return nullptr;
     }
@@ -194,7 +194,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
       probe.mutable_request()->mutable_test_connection();
       switch (main_rpc_stream_.trySendHotRestartMessage(parent_address_, probe)) {
       case RpcStream::SendResult::Sent:
-        next_probe = now + probe_interval;
+        next_probe = now + parent_probe_interval_;
         break;
       case RpcStream::SendResult::ConnectionRefused:
         onParentGone("its socket refused a liveness probe while a reply was pending");

@@ -526,6 +526,69 @@ TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffWhenRequestSendTim
   EXPECT_FALSE(helper_->parentTerminated());
 }
 
+TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffWhenListenSocketRequestCannotBeSent) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  EXPECT_LOG_CONTAINS(
+      "error", "the listen socket request could not be sent",
+      EXPECT_EQ(hot_restarting_child_->duplicateParentListenSocket("udp://127.0.0.1:5678", 0, ""),
+                -1));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+  // Written off: later requests do not try the parent again.
+  EXPECT_EQ(hot_restarting_child_->duplicateParentListenSocket("udp://127.0.0.1:5678", 0, ""), -1);
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffWhenAdminShutdownCannotBeSent) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  EXPECT_LOG_CONTAINS("error", "the admin shutdown request could not be sent",
+                      EXPECT_FALSE(hot_restarting_child_->sendParentAdminShutdownRequest()));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, AdminShutdownWithoutReplyReturnsNothing) {
+  helper_->setParentReplyTimeout(std::chrono::milliseconds(0));
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kShutdownAdmin);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  parentNeverReplies();
+  EXPECT_LOG_CONTAINS("error", "hot restart parent is unresponsive (no reply within 0ms)",
+                      EXPECT_FALSE(hot_restarting_child_->sendParentAdminShutdownRequest()));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+}
+
+// A forwarded packet that cannot be handled while waiting is logged, and the wait goes on to the
+// parent's reply.
+TEST_F(HotRestartingChildWaitingForParentTest, LogsErrorServicingForwardedUdpWhileWaiting) {
+  envoy::HotRestartMessage bad;
+  auto* packet = bad.mutable_request()->mutable_forwarded_udp_packet();
+  packet->set_local_addr("udp://127.0.0.1:1234");
+  packet->set_peer_addr("/tmp/domainsocket");
+  packet->set_payload("hello");
+  forwarded_wire_ = FakeHotRestartingParent::serialize(bad);
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  parentRepliesOnlyAfterForwardIsRead();
+  EXPECT_CALL(mock_worker_router_, deliver(_, _)).Times(0);
+
+  std::unique_ptr<envoy::HotRestartMessage> reply;
+  EXPECT_LOG_CONTAINS("error",
+                      "error servicing forwarded udp packets while waiting for the hot restart "
+                      "parent",
+                      reply = hot_restarting_child_->getParentStats());
+  ASSERT_NE(reply, nullptr);
+  EXPECT_EQ(reply->reply().stats().gauges().at("parent.gauge"), 7);
+  EXPECT_FALSE(helper_->parentUnresponsive());
+}
+
 // A parent that does not send the listener address is matched on the packet's destination,
 // falling back to the any-address listener on the port.
 TEST_F(HotRestartingChildTest, ForwardsPacketToAnyAddressListenerByDestination) {
