@@ -141,6 +141,77 @@ This means that the CI on `main` should always be able to run the current suppor
 There are possible workaround for custom branch CI but the better path is to ensure legacy support
 in current `main` or backport any required changes.
 
+### Release tasks
+
+Always dispatch the `Envoy/release` workflow from `main`, selecting the target branch
+via the `branch` input (eg `release/v1.35`). If omitted, the target defaults to the branch
+the workflow is run from. Release tooling is not backported to release branches.
+Dispatches from a non-`main` ref cannot target a different branch.
+
+## Release automation
+
+Release tasks use the reusable `_release_task.yml` workflow to run each task against
+an explicit branch. Manual tasks are dispatched through `envoy-release.yml`; post-publish
+chaining runs through `_publish_release.yml` and `_release_chain.yml`.
+
+Untrusted runs, including non-dev release PRs, only upload docs to the preview bucket
+(`GCS_ARTIFACT_BUCKET_PRE`) via `docs-preview`. They never receive archive credentials or
+access the archive bucket; `docs-archive` only validates metadata and reports the dry-run
+destination when it runs for an untrusted request.
+
+### Manual tasks
+
+The following tasks can be dispatched against `main` or a `release/v*` branch:
+
+- `create-release`: create a release PR (`release/create/<branch>`)
+- `reopen-branch`: create a dev PR to reopen the branch (`release/dev/<branch>`)
+- `sync-version-histories`: create a PR syncing version histories (`release/sync/<branch>`)
+
+Setting `recreate` closes any existing open bot PR and deletes the bot branch before
+creating a new one.
+
+### Bot-owned branches
+
+The `release/create/*`, `release/dev/*` and `release/sync/*` branches and their PRs
+are owned by the publish bot. They are deleted and recreated as required, and no human
+interaction with them is expected. Any existing (eg "warmer") PRs on these branches
+will be closed and replaced by the automated flow.
+
+### Automated patch-release cycle
+
+Patch releases are made oldest branch first, as younger branches require the
+docs inventory and version history of the older releases.
+
+After a trusted, non-dev release is created by the `github` job and docs are successfully
+archived, `_publish_release.yml` calls `_release_chain.yml` to perform the following:
+
+| Release | Action |
+|---|---|
+| `vX.Y.0` | `main` is reopened. |
+| `vX.Y.Z` (`Z > 0`), with a younger stable branch | `release/vX.Y` is reopened, and a (non-WIP) release PR is created on the next stable branch, after syncing version histories. |
+| `vX.Y.Z` (`Z > 0`), youngest stable branch | `release/vX.Y` is reopened. |
+
+The order of stable branches is taken from the `stable_versions` of the project data
+on `main`.
+
+The publish workflow is triggered by `workflow_run` and executes from `main` regardless
+of the released branch. GitHub runs `release`-event workflows from the tagged commit,
+not from `main`, so they cannot drive this chain without backporting workflow files.
+The `.0`-only `deprecate_guards` and `create_release_branch` jobs remain on `release:`
+in `envoy-release.yml`.
+
+The chain waits for both GitHub publication and docs archival to succeed, so the inventory
+and version history of the published release are available before creating the next release PR.
+Dev pushes and untrusted runs never start the chain.
+
+To start a patch-release cycle, dispatch `create-release` from `main` with `branch` set
+to the oldest stable branch that is being released.
+
+`ENVOY_RELEASE_SKIP_VERSIONS`: a space-separated list of minor versions (eg `1.34 1.35`)
+to skip in the chain, for cycles where only some branches are being released.
+
+This only runs in `envoyproxy/envoy` or where `ENVOY_CI_RELEASE` is set.
+
 ## CI caching
 
 Currently only x86 Docker images are cached.
