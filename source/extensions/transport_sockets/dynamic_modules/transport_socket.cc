@@ -119,6 +119,7 @@ absl::StatusOr<DynamicModuleTransportSocketConfigSharedPtr> newDynamicModuleTran
   auto config = std::make_shared<DynamicModuleTransportSocketConfig>(implements_secure_transport,
                                                                      std::move(dynamic_module));
 
+  config->is_upstream_ = is_upstream;
   config->on_factory_config_destroy_ = on_config_destroy.value();
   config->on_new_ = on_new.value();
   config->on_destroy_ = on_destroy.value();
@@ -215,6 +216,11 @@ Network::IoResult DynamicModuleTransportSocket::doRead(Buffer::Instance& buffer)
   if (in_module_socket_ == nullptr) {
     return {Network::PostIoAction::Close, 0, false};
   }
+  // The engine pump owns the fd once spliced. A splice started from do_write can still be followed
+  // by a read in the same file event.
+  if (spliced_) {
+    return {Network::PostIoAction::KeepOpen, 0, false};
+  }
   current_read_buffer_ = &buffer;
   auto result = config_->on_do_read_(this, in_module_socket_);
   current_read_buffer_ = nullptr;
@@ -224,6 +230,9 @@ Network::IoResult DynamicModuleTransportSocket::doRead(Buffer::Instance& buffer)
 Network::IoResult DynamicModuleTransportSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (in_module_socket_ == nullptr) {
     return {Network::PostIoAction::Close, 0, false};
+  }
+  if (spliced_) {
+    return {Network::PostIoAction::KeepOpen, 0, false};
   }
   current_write_buffer_ = &buffer;
   auto result = config_->on_do_write_(this, in_module_socket_, end_stream);

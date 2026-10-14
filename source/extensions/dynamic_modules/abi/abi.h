@@ -15123,6 +15123,43 @@ void envoy_dynamic_module_callback_transport_socket_set_is_writable(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
 
 /**
+ * envoy_dynamic_module_callback_transport_socket_start_splice hands a downstream transport socket
+ * and its paired upstream transport socket to an engine-run splice pump that relays them without
+ * the module's read and write callbacks. The engine removes both connections' file events and
+ * moves the upload into the upstream socket with splice(2). When the upstream socket has kernel TLS
+ * in both directions, its download is read with recvmsg(2) and written to the downstream socket,
+ * because splice from a kernel TLS socket can leave the final record undelivered. A plaintext
+ * download is spliced. Each end of stream is forwarded as a half-close, both connections close once
+ * both directions end, and an error resets them.
+ *
+ * Envoy's read and write buffers of both connections must be empty and the module must hold no
+ * pending bytes, because the pump reads only the sockets. After this returns true, neither socket
+ * receives do_read or do_write, its readiness and flush callbacks do nothing, and the module must
+ * not do I/O on either socket, including in on_close. The relayed bytes are added to the
+ * connection stream info when the session ends, but they do not reset the TCP proxy idle timer, so
+ * the idle timeout still closes a session that only splices.
+ *
+ * It returns false and leaves both connections on their buffered path in these cases.
+ * - The peer is null, or both sockets are downstream or both are upstream.
+ * - Either socket has no connection yet, is already spliced, or is in a read or write whose buffer
+ *   still holds bytes.
+ * - Either connection is connecting, closed, or on a blocking socket, which io_uring creates for
+ *   upstream connections.
+ * - The two connections run on different workers.
+ * - The downstream socket has kernel TLS or implements secure transport, or the upstream socket
+ *   has kernel TLS in only one direction or implements secure transport without kernel TLS.
+ * - The pipes cannot be created, or the platform is not Linux.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param peer_transport_socket_envoy_ptr is the pointer to the Envoy transport socket object of the
+ * paired connection on the other side of the proxy, on the same worker.
+ * @return true if the pump took over both sockets, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_start_splice(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_envoy_ptr peer_transport_socket_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_transport_socket_flush_write_buffer requests that the connection
  * flush its write buffer. This is typically called after the module has queued additional bytes
  * that must reach the peer, for example handshake records produced outside of do_write.
