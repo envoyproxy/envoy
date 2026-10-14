@@ -23,6 +23,7 @@
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/event/signal_impl.h"
 #include "source/common/event/timer_impl.h"
+#include "source/common/event/worker_id.h"
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
@@ -68,8 +69,9 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
                                Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
-    : name_(name), thread_factory_(thread_factory), time_source_(time_source),
-      file_system_(file_system), buffer_factory_(watermark_factory), base_scheduler_(time_source),
+    : name_(name), worker_id_(workerIdFromThreadName(name)), thread_factory_(thread_factory),
+      time_source_(time_source), file_system_(file_system), buffer_factory_(watermark_factory),
+      base_scheduler_(time_source),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
