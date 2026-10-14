@@ -19,21 +19,11 @@ envoy_cc_library(
         "//source/common/json/wuffs_json:wuffs_json_cursor_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/mcp:constants_lib",
-        "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
-    name = "mcp_json_rewriter_lib",
-    srcs = ["mcp_json_rewriter.cc"],
-    hdrs = ["mcp_json_rewriter.h"],
-    deps = [
-        "//source/extensions/filters/common/mcp:constants_lib",
         "//source/extensions/tracers/opentelemetry:span_context_lib",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
-        "@nlohmann_json//:json",
+        "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],
 )
 
@@ -43,7 +33,6 @@ envoy_cc_library(
     hdrs = ["mcp_filter.h"],
     deps = [
         ":mcp_json_parser_lib",
-        ":mcp_json_rewriter_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -70,7 +59,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
-        "@nlohmann_json//:json",
     ],
 )
 

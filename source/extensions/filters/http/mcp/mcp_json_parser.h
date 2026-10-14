@@ -14,6 +14,10 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -282,6 +286,12 @@ public:
 
   // Helper to get nested value from metadata
   const Protobuf::Value* getNestedValue(absl::string_view dotted_path) const;
+
+  // Rewrites the MCP request body's `params._meta.traceparent` value with `new_parent_id`.
+  // No-op (returns `body` unchanged) when `new_parent_id` is empty, which occurs when the
+  // tracer decides not to sample and generates a NullSpan.
+  absl::StatusOr<std::string> rewriteTraceparent(absl::string_view body,
+                                                 absl::string_view new_parent_id) const;
 
   // Reset parser for reuse
   void reset();

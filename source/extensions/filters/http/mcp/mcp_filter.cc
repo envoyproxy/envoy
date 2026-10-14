@@ -32,15 +32,14 @@
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
-#include "source/extensions/filters/http/mcp/mcp_json_rewriter.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "nlohmann/json.hpp"
 
 namespace Envoy {
 namespace Extensions {
@@ -171,26 +170,6 @@ void injectBaggage(const Protobuf::Map<std::string, Protobuf::Value>& meta_field
   if (Envoy::Tracing::isValidBaggage(bg)) {
     headers.setCopy(baggageHeader(), bg);
   }
-}
-
-// Rewrites the MCP request body's traceparent with the new parent ID. This
-// reparses the entire body and injects `new_parent_id` into the traceparent
-// located at `params._meta.traceparent`.
-//
-// No-op when `new_parent_id` is empty. This will happen when the tracer has
-// decided not to sample. In such a case, the tracer will generate a NullSpan.
-//
-// TODO: Consider skipping the parse and doing a naive textual replacement. This
-// would only be possible for a fixed-length string like traceparent, but not
-// for tracestate.
-absl::StatusOr<std::string> rewriteBodyWithNewTraceparent(const Buffer::Instance& body,
-                                                          absl::string_view new_parent_id) {
-  if (new_parent_id.empty()) {
-    return absl::OkStatus();
-  }
-  TraceparentRewriter rewriter(new_parent_id);
-  const bool parse_ok = nlohmann::json::sax_parse(body.toString(), &rewriter);
-  return std::move(rewriter).finish(parse_ok);
 }
 
 } // namespace
@@ -1037,7 +1016,7 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
 
           const std::string new_parent_id = active_span.getSpanId();
           absl::StatusOr<std::string> rewritten_body =
-              rewriteBodyWithNewTraceparent(*decoding_buffer, new_parent_id);
+              parser_->rewriteTraceparent(decoding_buffer->toString(), new_parent_id);
           if (!rewritten_body.ok()) {
             ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
                                   rewritten_body.status().ToString());

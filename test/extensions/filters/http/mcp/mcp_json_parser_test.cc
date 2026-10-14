@@ -2166,6 +2166,74 @@ TEST(McpJsonParserMemoryTest, HeavyObjectFieldsUnorderedMethod) {
   }
 }
 
+TEST_F(McpJsonParserTest, RewriteTraceparentSuccessPreservesFormattingAndLargeNumbers) {
+  // SPELLCHECKER(off)
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      },
+      "numeric_edge_case": 18446744073709551616
+    }
+  })";
+  // SPELLCHECKER(on)
+
+  EXPECT_OK(parser_->parse(json));
+  absl::StatusOr<std::string> rewritten = parser_->rewriteTraceparent(json, "21b6bcb2a5588606");
+  ASSERT_OK(rewritten);
+  EXPECT_THAT(*rewritten, HasSubstr("00-4bf92f3577b34da6a3ce929d0e0e4736-21b6bcb2a5588606-01"));
+  EXPECT_THAT(*rewritten, HasSubstr("18446744073709551616"));
+}
+
+TEST_F(McpJsonParserTest, RewriteTraceparentAcrossChunks) {
+  // SPELLCHECKER(off)
+  const std::string chunk1 =
+      R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t","_meta":{"traceparent":"00-4bf92f3577b34da6a3ce929d0e0e4736-)";
+  const std::string chunk2 = R"(00f067aa0ba902b7-01"}}})";
+  // SPELLCHECKER(on)
+  const std::string full_body = absl::StrCat(chunk1, chunk2);
+
+  EXPECT_OK(parser_->parse(chunk1));
+  EXPECT_OK(parser_->parse(chunk2));
+  absl::StatusOr<std::string> rewritten =
+      parser_->rewriteTraceparent(full_body, "21b6bcb2a5588606");
+  ASSERT_OK(rewritten);
+  EXPECT_THAT(*rewritten, HasSubstr("00-4bf92f3577b34da6a3ce929d0e0e4736-21b6bcb2a5588606-01"));
+}
+
+TEST_F(McpJsonParserTest, RewriteTraceparentEmptyParentIdIsNoOp) {
+  const std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t"}})";
+  EXPECT_OK(parser_->parse(json));
+  absl::StatusOr<std::string> rewritten = parser_->rewriteTraceparent(json, "");
+  ASSERT_OK(rewritten);
+  EXPECT_EQ(*rewritten, json);
+}
+
+TEST_F(McpJsonParserTest, RewriteTraceparentMissingReturnsError) {
+  const std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t","_meta":{}}})";
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_THAT(parser_->rewriteTraceparent(json, "21b6bcb2a5588606"),
+              HasStatusMessage(HasSubstr("Failed to find traceparent in _meta")));
+}
+
+TEST_F(McpJsonParserTest, RewriteTraceparentInvalidValueReturnsError) {
+  const std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t","_meta":{"traceparent":"invalid"}}})";
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_THAT(parser_->rewriteTraceparent(json, "21b6bcb2a5588606"), Not(IsOk()));
+}
+
+TEST_F(McpJsonParserTest, RewriteTraceparentInvalidJsonReturnsError) {
+  EXPECT_THAT(parser_->rewriteTraceparent("{invalid", "21b6bcb2a5588606"), Not(IsOk()));
+}
+
 } // namespace
 } // namespace Mcp
 } // namespace HttpFilters

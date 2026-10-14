@@ -1,7 +1,14 @@
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
-#include "source/common/common/assert.h"
+#include <cstddef>
+#include <optional>
 
+#include "source/common/common/assert.h"
+#include "source/common/json/wuffs_json/wuffs_json_cursor.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
+
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 
@@ -11,6 +18,66 @@ namespace HttpFilters {
 namespace Mcp {
 
 using namespace Filters::Common::Mcp::McpConstants;
+using SpanContext = Envoy::Extensions::Tracers::OpenTelemetry::SpanContext;
+using SpanContextExtractor = Envoy::Extensions::Tracers::OpenTelemetry::SpanContextExtractor;
+
+namespace {
+
+// Streaming Wuffs JSON cursor handler that records the byte range of the
+// `params._meta.traceparent` string value in the raw JSON input stream.
+class TraceparentLocator : public Json::Wuffs::WuffsJsonCursor::Handler {
+public:
+  struct ByteRange {
+    size_t start;
+    size_t end;
+  };
+
+  TraceparentLocator()
+      : cursor_(*this), traceparent_path_({{std::string(PARAMS_FIELD)},
+                                           {std::string(META_FIELD)},
+                                           {std::string(TRACEPARENT_FIELD)}}) {}
+
+  absl::Status feed(absl::string_view data) { return cursor_.feed(data, /*closed=*/true); }
+
+  const std::optional<ByteRange>& traceparentRange() const { return traceparent_range_; }
+
+  // Json::Wuffs::WuffsJsonCursor::Handler
+  bool openStringCapture(absl::string_view, int, size_t token_start) override {
+    if (cursor_.matchesPatternPath(traceparent_path_)) {
+      capturing_traceparent_ = true;
+      current_start_ = token_start;
+    }
+    return false;
+  }
+  bool onStringChunk(absl::string_view, int, absl::string_view) override { return false; }
+  void closeStringCapture(absl::string_view, int, size_t token_end) override {
+    if (capturing_traceparent_) {
+      capturing_traceparent_ = false;
+      if (token_end >= current_start_ + 2) {
+        traceparent_range_ = ByteRange{current_start_ + 1, token_end - 1};
+      }
+    }
+  }
+  absl::Status onKey(absl::string_view, int, size_t) override { return absl::OkStatus(); }
+  absl::Status onNumber(absl::string_view, absl::string_view, int, size_t, size_t) override {
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view, bool, int, size_t, size_t) override {
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view, int, size_t, size_t) override {}
+  void onContainerOpen(absl::string_view, bool, int, size_t) override {}
+  void onContainerClose(int, size_t) override {}
+
+private:
+  Json::Wuffs::WuffsJsonCursor cursor_;
+  std::vector<Json::Wuffs::WuffsJsonCursor::PatternSegment> traceparent_path_;
+  bool capturing_traceparent_{false};
+  size_t current_start_{0};
+  std::optional<ByteRange> traceparent_range_;
+};
+
+} // namespace
 
 void McpParserConfig::addMethodConfig(absl::string_view method,
                                       std::vector<AttributeExtractionRule> fields) {
@@ -916,6 +983,31 @@ const Protobuf::Value* McpJsonParser::getNestedValue(absl::string_view dotted_pa
   }
 
   return nullptr;
+}
+
+absl::StatusOr<std::string>
+McpJsonParser::rewriteTraceparent(absl::string_view body, absl::string_view new_parent_id) const {
+  if (new_parent_id.empty()) {
+    return std::string(body);
+  }
+  TraceparentLocator locator;
+  if (absl::Status status = locator.feed(body); !status.ok()) {
+    return status;
+  }
+  if (!locator.traceparentRange().has_value()) {
+    return absl::InvalidArgumentError("Failed to find traceparent in _meta");
+  }
+  const auto& range = *locator.traceparentRange();
+  const absl::string_view old_traceparent = body.substr(range.start, range.end - range.start);
+  absl::StatusOr<SpanContext> parsed_traceparent =
+      SpanContextExtractor::parseTraceparent(old_traceparent, "");
+  if (!parsed_traceparent.ok()) {
+    return parsed_traceparent.status();
+  }
+  parsed_traceparent->setSpanId(std::string(new_parent_id));
+  const std::string new_traceparent =
+      SpanContextExtractor::serializeTraceparent(*parsed_traceparent);
+  return absl::StrCat(body.substr(0, range.start), new_traceparent, body.substr(range.end));
 }
 
 void McpJsonParser::reset() {
