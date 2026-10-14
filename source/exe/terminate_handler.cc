@@ -18,11 +18,11 @@ std::terminate_handler TerminateHandler::logOnTerminate() const {
   // actions during stack trace.
   BackwardsTrace::addrMapping(/*setup=*/true);
   return std::set_terminate([]() {
-    logException(std::current_exception());
-    BACKTRACE_LOG();
-    Coroutine::Backtrace co_backtrace;
-    co_backtrace.logTrace();
-    std::abort();
+    logException(std::current_exception()); // LCOV_EXCL_LINE
+    BACKTRACE_LOG();                        // LCOV_EXCL_LINE
+    Coroutine::Backtrace co_backtrace;      // LCOV_EXCL_LINE
+    co_backtrace.logTrace();                // LCOV_EXCL_LINE
+    std::abort();                           // LCOV_EXCL_LINE
   });
 }
 

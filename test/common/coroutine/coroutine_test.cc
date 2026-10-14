@@ -10,6 +10,7 @@
 #include "source/common/coroutine/task.h"
 
 #include "test/common/coroutine/manual_executor.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -876,6 +877,82 @@ TEST(BacktraceClassTest, DumpsTrace) {
   EXPECT_THAT((*result)[1], StartsWith("#1 "));
   EXPECT_THAT((*result)[2], StartsWith("#2 "));
   EXPECT_THAT((*result)[3], StartsWith("#3 "));
+}
+
+TEST(BacktraceClassTest, DumpsSingleLineTrace) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+
+  absl::StatusOr<std::vector<std::string>> result = absl::UnavailableError("unset");
+  auto dump = []() {
+    const bool save_log_to_stderr = Backtrace::logToStderr();
+    const bool save_single_line = Backtrace::singleLine();
+    Backtrace::setLogToStderr(false);
+    Backtrace::setSingleLine(true);
+    Backtrace tracer;
+    std::vector<std::string> messages;
+
+    {
+      LogLevelSetter save_levels(spdlog::level::trace);
+      StartStopRecording recording(GetLogSink());
+      tracer.logTrace();
+      messages = recording.messages();
+    }
+
+    Backtrace::setLogToStderr(save_log_to_stderr);
+    Backtrace::setSingleLine(save_single_line);
+
+    return messages;
+  };
+
+  DetachedHandle handle = launch(
+      backtraceLevel0(std::move(dump)), exec,
+      [&result](absl::StatusOr<std::vector<std::string>> status) { result = std::move(status); });
+  exec->drain();
+  EXPECT_OK(result);
+
+  EXPECT_THAT(*result, SizeIs(1));
+  EXPECT_THAT((*result)[0], HasSubstr("#0:"));
+}
+
+TEST(BacktraceClassTest, DumpsMultiLineTrace) {
+  auto exec = std::make_shared<ManualExecutor>();
+  LeafController controller;
+
+  absl::StatusOr<std::vector<std::string>> result = absl::UnavailableError("unset");
+  auto dump = []() {
+    const bool save_log_to_stderr = Backtrace::logToStderr();
+    const bool save_single_line = Backtrace::singleLine();
+    Backtrace::setLogToStderr(false);
+    Backtrace::setSingleLine(false);
+    Backtrace tracer;
+    std::vector<std::string> messages;
+
+    {
+      LogLevelSetter save_levels(spdlog::level::trace);
+      StartStopRecording recording(GetLogSink());
+      tracer.logTrace();
+      messages = recording.messages();
+    }
+
+    Backtrace::setLogToStderr(save_log_to_stderr);
+    Backtrace::setSingleLine(save_single_line);
+
+    return messages;
+  };
+
+  DetachedHandle handle = launch(
+      backtraceLevel0(std::move(dump)), exec,
+      [&result](absl::StatusOr<std::vector<std::string>> status) { result = std::move(status); });
+  exec->drain();
+  EXPECT_OK(result);
+
+  // Header and 4 coroutines in the stack
+  EXPECT_THAT(*result, SizeIs(5));
+  EXPECT_THAT((*result)[1], HasSubstr("#0:"));
+  EXPECT_THAT((*result)[2], HasSubstr("#1:"));
+  EXPECT_THAT((*result)[3], HasSubstr("#2:"));
+  EXPECT_THAT((*result)[4], HasSubstr("#3:"));
 }
 
 } // namespace
