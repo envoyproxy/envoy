@@ -1041,6 +1041,7 @@ void ConnectionImpl::sendKeepalive() {
 void ConnectionImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector,
                                     int32_t stream_id) {
   if (!allow_metadata_) {
+    stats_.metadata_dropped_.inc();
     ENVOY_CONN_LOG(debug, "metadata not allowed on this connection, dropping", connection_);
     return;
   }
