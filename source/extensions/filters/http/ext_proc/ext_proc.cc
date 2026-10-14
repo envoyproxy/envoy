@@ -1474,8 +1474,8 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
 
 void Filter::sendBody(ProcessorState& state, Buffer::Instance& data,
                       ProcessorState::CallbackState new_state, bool end_stream) {
-  const uint32_t max_chunk_size = max_streamed_body_chunk_size_.value_or(0);
-  if (max_chunk_size == 0 || data.length() <= max_chunk_size) {
+  if (!max_streamed_body_chunk_size_.has_value() ||
+      data.length() < *max_streamed_body_chunk_size_) {
     auto req = setupBodyChunk(state, data, end_stream);
     if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
       state.enqueueStreamingChunk(data, end_stream);
@@ -1488,8 +1488,10 @@ void Filter::sendBody(ProcessorState& state, Buffer::Instance& data,
   }
 
   while (data.length() > 0) {
-    const uint64_t chunk_length = std::min(static_cast<uint64_t>(max_chunk_size), data.length());
+    const uint64_t chunk_length =
+        std::min(static_cast<uint64_t>(*max_streamed_body_chunk_size_), data.length());
     Buffer::OwnedImpl chunk_buffer;
+    // Incrementally drain data buffer.
     chunk_buffer.move(data, chunk_length);
     const bool chunk_end_stream = (data.length() == 0) ? end_stream : false;
 

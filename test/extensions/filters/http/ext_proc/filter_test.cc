@@ -308,8 +308,8 @@ protected:
   };
 
   void doSend(ProcessingRequest&& request, Unused) {
-    last_request_ = request;
     sent_requests_.push_back(request);
+    last_request_ = std::move(request);
   }
 
   bool doSendClose() { return !server_closed_stream_; }
