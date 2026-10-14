@@ -200,6 +200,50 @@ TEST_F(EncoderFilterChainBridgeTest, WatermarksWithNoHandlerAreNoOps) {
   EXPECT_FALSE(bridge_->replayPaused());
 }
 
+// The filter manager fans the encoder's own high/low watermark calls out to every downstream
+// watermark subscriber, including this bridge. Wires the mock to do the same.
+class EncoderFilterChainBridgeEchoTest : public EncoderFilterChainBridgeTest {
+public:
+  EncoderFilterChainBridgeEchoTest() {
+    ON_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark())
+        .WillByDefault(Invoke([this] { subscriber_->onAboveWriteBufferHighWatermark(); }));
+    ON_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark())
+        .WillByDefault(Invoke([this] { subscriber_->onBelowWriteBufferLowWatermark(); }));
+    bridge_->setReplayHandler(handler_);
+  }
+};
+
+// Pausing the source for ingest back-pressure must not pause replay through the echo: replay is
+// what drains the charged bytes, so that would deadlock. Resuming must not produce a spurious
+// resume notification either.
+TEST_F(EncoderFilterChainBridgeEchoTest, OwnSourcePauseDoesNotPauseReplay) {
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 0);
+}
+
+// Genuine downstream back-pressure arriving while ingest is paused still pauses and resumes
+// replay; only the bridge's own echoes are filtered.
+TEST_F(EncoderFilterChainBridgeEchoTest, GenuineDownstreamWatermarkStillPausesReplay) {
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+
+  bridge_->onAboveWriteBufferHighWatermark();
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+
+  bridge_->releaseUnacked(200);
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+}
+
 // On the response path the error is surfaced through the encoder callbacks'
 // sendLocalReply (best-effort, since the response may already be in flight).
 TEST_F(EncoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {
