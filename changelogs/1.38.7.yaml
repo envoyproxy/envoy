@@ -1,0 +1,34 @@
+date: October 12, 2026
+
+bug_fixes:
+- area: aws
+  change: |
+    Fixed a race where the route level configuration of the
+    :ref:`AWS request signing <envoy_v3_api_msg_extensions.filters.http.aws_request_signing.v3.AwsRequestSigningPerRoute>`
+    and :ref:`AWS Lambda <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.PerRouteConfig>`
+    filters could be destroyed on a worker thread when an RDS update replaced the route configuration.
+- area: dynamic_modules
+  change: |
+    Fixed a bug where the ``envoy_dynamic_module_on_http_filter_per_route_config_destroy`` hook of a
+    :ref:`dynamic module <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilterPerRoute>`
+    could run on a worker thread, and the module could be unloaded there, when an RDS update replaced
+    the route configuration.
+- area: local_ratelimit
+  change: |
+    Fixed a race where the share provider manager owned by a
+    :ref:`local rate limit <envoy_v3_api_msg_extensions.filters.http.local_ratelimit.v3.LocalRateLimit>`
+    route level configuration could be destroyed on a worker thread. The manager is an unpinned
+    singleton that owns a cluster membership callback handle, so a route level configuration may own
+    the last reference to it and release it when an RDS update replaces the route configuration. It is
+    now handed to the main dispatcher alongside the rate limiter, which was already posted there.
+- area: sds
+  change: |
+    Fixed a race where a generic secret provider shared with worker threads could be destroyed on a
+    worker thread.
+- area: stats
+  change: |
+    Fixed a bug introduced in 1.38.0 that exported Prometheus native histogram bucket indices one bucket
+    too low, causing consumers to decode observations into lower value ranges and underreport quantiles.
+- area: wasm
+  change: |
+    Bumped ``wasmtime`` to ``24.0.10`` to resolve CVE-2026-54786.

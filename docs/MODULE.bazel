@@ -1,11 +1,11 @@
 module(
     name = "envoy-docs",
-    version = "1.40.0-dev",
+    version = "1.41.0-dev",
 )
 
-bazel_dep(name = "envoy", version = "1.40.0-dev.20260903.16b0d47.envoy")
-bazel_dep(name = "envoy_api", version = "1.40.0-dev.20260903.16b0d47.envoy")
-bazel_dep(name = "envoy-examples", version = "0.2.7.envoy")
+bazel_dep(name = "envoy", version = "1.41.0-dev")
+bazel_dep(name = "envoy_api", version = "1.41.0-dev")
+bazel_dep(name = "envoy-examples", version = "0.2.9.envoy")
 bazel_dep(name = "envoy_toolshed", version = "0.5.3.envoy")
 bazel_dep(name = "envoy_toolshed_jq", version = "0.5.3.envoy")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")

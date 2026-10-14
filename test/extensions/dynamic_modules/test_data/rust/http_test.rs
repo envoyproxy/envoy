@@ -811,6 +811,22 @@ fn test_filter_state_callbacks_on_request_headers() {
     .returning(|_| Some(EnvoyBuffer::new(b"req_header_value")))
     .once();
   envoy_filter
+    .expect_set_filter_state_value()
+    .withf(|key, value, life_span, stream_sharing| {
+      key == b"shared_filter_state_key"
+        && value == b"shared_filter_state_value"
+        && *life_span == abi::envoy_dynamic_module_type_filter_state_life_span::Connection
+        && *stream_sharing
+          == abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection
+    })
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_filter_state_bytes()
+    .withf(|key| key == b"shared_filter_state_key")
+    .returning(|_| Some(EnvoyBuffer::new(b"shared_filter_state_value")))
+    .once();
+  envoy_filter
     .expect_get_filter_state_bytes()
     .withf(|key| key == b"key")
     .returning(|_| None)

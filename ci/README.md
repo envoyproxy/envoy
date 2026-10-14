@@ -195,6 +195,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `format`&mdash; run validation, linting and formatting tools.
 * `lockfiles`/`lockfiles.regenerate` &mdash; repin `Cargo.Bazel.envoy.lock` from `Cargo.toml` and `Cargo.lock` with `CARGO_BAZEL_REPIN=true`, then regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
 * `lockfiles.check` &mdash; regenerate the lockfiles as `lockfiles` does and fail with a diff summary if any lockfile, including `Cargo.lock`, changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
+* `modules.version` &mdash; set the `module()` version, and the `bazel_dep` versions of in-repo modules (`envoy`, `envoy_api`, `envoy-docs`, `envoy_mobile`, `envoy_build_config`), in all `MODULE.bazel` files to match `VERSION.txt`, then regenerate the lockfiles as `lockfiles` does.
 * `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, lockfile sync, and dependabot configuration.
 * `deps.report` &mdash; run the per-workspace bzlmod dependency report targets and print the current/latest version status for each workspace.
 * `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate the lockfiles as `lockfiles` does.

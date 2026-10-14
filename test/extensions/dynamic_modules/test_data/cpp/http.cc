@@ -10,6 +10,45 @@
 namespace Envoy {
 namespace DynamicModules {
 
+class DownstreamDirectRemoteAddressFilter : public HttpFilter {
+public:
+  DownstreamDirectRemoteAddressFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
+    headers.set("x-downstream-peer",
+                handle_.getDownstreamDirectRemoteAddress().value_or("unavailable"));
+    return HeadersStatus::Continue;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+};
+
+class DownstreamDirectRemoteAddressFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<DownstreamDirectRemoteAddressFilter>(handle);
+  }
+};
+
+class DownstreamDirectRemoteAddressConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<DownstreamDirectRemoteAddressFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(DownstreamDirectRemoteAddressConfigFactory,
+                                    "downstream_direct_remote_address");
+
 // --- config_init_failure ---
 
 class ConfigInitFailureConfigFactory : public HttpFilterConfigFactory {
@@ -884,6 +923,15 @@ public:
     }
     auto typed_after = handle_.getFilterStateTyped("envoy.test.http_typed_object_for_rust");
     if (!typed_after.has_value() || *typed_after != "typed_value") {
+      std::abort();
+    }
+    if (!handle_.setFilterStateValue("shared_filter_state_key", "shared_filter_state_value",
+                                     FilterStateLifeSpan::Connection,
+                                     FilterStateStreamSharing::SharedWithUpstreamConnection)) {
+      std::abort();
+    }
+    if (auto val = handle_.getFilterState("shared_filter_state_key");
+        !val || *val != "shared_filter_state_value") {
       std::abort();
     }
     testFilterState("req_header_key", "req_header_value");

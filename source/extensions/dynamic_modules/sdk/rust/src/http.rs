@@ -1399,6 +1399,18 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_filter_state_bytes(&mut self, key: &[u8], value: &[u8]) -> bool;
 
+  /// Set the bytes-typed filter state value with the given key, lifespan, and upstream sharing
+  /// options. If the filter state is not found, this will create a new filter state.
+  ///
+  /// Returns true if the operation is successful.
+  fn set_filter_state_value(
+    &mut self,
+    key: &[u8],
+    value: &[u8],
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+    stream_sharing: abi::envoy_dynamic_module_type_filter_state_stream_sharing,
+  ) -> bool;
+
   /// Set a typed filter state value with the given key. The value is deserialized by a
   /// registered `StreamInfo::FilterState::ObjectFactory` on the Envoy side. This is useful for
   /// setting filter state objects that other Envoy filters expect to read as specific C++ types
@@ -2130,6 +2142,12 @@ pub trait EnvoyHttpFilter {
   /// Returns `None` if the address is unavailable. The buffer is valid until the current event
   /// hook returns.
   fn get_upstream_remote_address<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
+
+  /// Get the downstream socket peer address, including the port, before XFF processing.
+  ///
+  /// Returns `None` if the address is unavailable. The buffer is valid until the current event
+  /// hook returns.
+  fn get_downstream_direct_remote_address<'a>(&'a self) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the upstream host addresses in attempt order.
   ///
@@ -3292,6 +3310,24 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn set_filter_state_value(
+    &mut self,
+    key: &[u8],
+    value: &[u8],
+    life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+    stream_sharing: abi::envoy_dynamic_module_type_filter_state_stream_sharing,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_filter_state_value(
+        self.raw_ptr,
+        bytes_to_module_buffer(key),
+        bytes_to_module_buffer(value),
+        life_span,
+        stream_sharing,
+      )
+    }
+  }
+
   fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_filter_state_typed(
@@ -4316,6 +4352,24 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     };
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_upstream_remote_address(
+        self.raw_ptr,
+        &mut result as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
+  fn get_downstream_direct_remote_address(&self) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
         self.raw_ptr,
         &mut result as *mut _,
       )
