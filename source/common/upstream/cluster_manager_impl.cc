@@ -1251,7 +1251,13 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   for (auto& per_priority : params.per_priority_update_params_) {
     const auto& host_set =
         cm_cluster.cluster().prioritySet().hostSetsPerPriority()[per_priority.priority_];
-    per_priority.update_hosts_params_ = HostSetImpl::updateHostsParams(*host_set);
+    // A persistent host set hands workers its partitions instead of building flat vectors.
+    if (auto snapshot = host_set->persistentPartitions(); snapshot != nullptr) {
+      per_priority.update_hosts_params_ =
+          HostSetImpl::snapshotUpdateHostsParams(std::move(snapshot));
+    } else {
+      per_priority.update_hosts_params_ = HostSetImpl::updateHostsParams(*host_set);
+    }
     per_priority.locality_weights_ = host_set->localityWeights();
     per_priority.weighted_priority_health_ = host_set->weightedPriorityHealth();
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();

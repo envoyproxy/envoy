@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_dyn_module_test",
+    "envoy_cc_test",
     "envoy_package",
 )
 
@@ -28,6 +29,7 @@ envoy_cc_dyn_module_test(
         "//source/common/stream_info:filter_state_lib",
         "//source/common/upstream:host_lookup_map_lib",
         "//source/extensions/clusters/dynamic_modules:cluster_lib",
+        "//source/extensions/clusters/dynamic_modules:persistent_host_set_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
@@ -48,10 +50,23 @@ envoy_cc_dyn_module_test(
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "persistent_host_set_test",
+    srcs = ["persistent_host_set_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/clusters/dynamic_modules:persistent_host_set_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
     ],
 )
 
