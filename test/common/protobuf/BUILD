@@ -123,9 +123,12 @@ envoy_cc_benchmark_binary(
     rbe_pool = "linux_x64_small",
     deps = [
         ":deterministic_hash_test_proto_cc_proto",
+        "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:test_runtime_lib",
         "@benchmark",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@yaml-cpp",
     ],
 )
 

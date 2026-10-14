@@ -15,6 +15,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "udpa/annotations/sensitive.pb.h"
 #include "udpa/annotations/status.pb.h"
 #include "utf8_validity.h"
@@ -42,60 +43,177 @@ void blockFormat(YAML::Node node) {
   }
 }
 
-Protobuf::Value parseYamlNode(const YAML::Node& node) {
-  Protobuf::Value value;
+// One shared YAML::Node traversal (template below) used by both a Protobuf::Value
+// builder (ValueSink, for ValueUtil::loadFromYaml()) and a direct JSON-text builder
+// (JsonSink, for MessageUtil::loadFromYaml()) -- avoids two copies of the same
+// null/bool/int-range/tag/!ignore decision tree. Not Json::Streamer: that lives in
+// source/common/json, which already depends on source/common/protobuf, so using it
+// here would create a build cycle.
+template <typename Sink> void visitYaml(const YAML::Node& node, Sink& sink);
+
+// Builds a Protobuf::Value tree (today's representation, kept for callers that need
+// one, e.g. ValueUtil::loadFromYaml()).
+struct ValueSink {
+  Protobuf::Value& value;
+  void null() { value.set_null_value(Protobuf::NULL_VALUE); }
+  void boolean(bool b) { value.set_bool_value(b); }
+  // Small enough for Value's double number_value; see visitYaml() for why.
+  void integer(int64_t i) { value.set_number_value(i); }
+  void str(absl::string_view s) { value.set_string_value(std::string(s)); }
+  void array(const YAML::Node& node) {
+    auto& values = *value.mutable_list_value()->mutable_values();
+    for (const auto& it : node) {
+      ValueSink child{*values.Add()};
+      visitYaml(it, child);
+    }
+  }
+  void object(const YAML::Node& node) {
+    auto& fields = *value.mutable_struct_value()->mutable_fields();
+    for (const auto& it : node) {
+      if (it.first.Tag() == "!ignore") {
+        continue;
+      }
+      // yaml-cpp doesn't dedupe repeated map keys; build each entry standalone and
+      // assign (last wins), matching a real map's semantics -- not in-place, which
+      // would merge into whatever a prior duplicate key already wrote here.
+      Protobuf::Value entry;
+      ValueSink child{entry};
+      visitYaml(it.second, child);
+      fields[it.first.as<std::string>()] = std::move(entry);
+    }
+  }
+};
+
+// Appends JSON text directly, skipping the Value tree entirely.
+struct JsonSink {
+  std::string& out;
+  void null() { out += "null"; }
+  void boolean(bool b) { out += (b ? "true" : "false"); }
+  void integer(int64_t i) { absl::StrAppend(&out, i); }
+  // Double-quoted and JSON-escaped (RFC 8259 ยง7); matches JsonEscaper
+  // (source/common/common/json_escape_string.h), not reused to avoid a new dep for
+  // a handful of lines.
+  void str(absl::string_view s) {
+    out.push_back('"');
+    for (const char c : s) {
+      switch (c) {
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\b':
+        out += "\\b";
+        break;
+      case '\f':
+        out += "\\f";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
+      default:
+        if (static_cast<unsigned char>(c) <= 0x1f) {
+          // Control chars always fit in 2 hex digits; avoid pulling in str_format.h
+          // for this one rare case (it clashes with fmt.h's absl::Status formatter
+          // in some translation units).
+          static constexpr char kHex[] = "0123456789abcdef";
+          const auto u = static_cast<unsigned char>(c);
+          out += "\\u00";
+          out.push_back(kHex[u >> 4]);
+          out.push_back(kHex[u & 0xf]);
+        } else {
+          out.push_back(c); // UTF-8 passed through as-is.
+        }
+      }
+    }
+    out.push_back('"');
+  }
+  void array(const YAML::Node& node) {
+    out.push_back('[');
+    bool first = true;
+    for (const auto& it : node) {
+      if (!first) {
+        out.push_back(',');
+      }
+      first = false;
+      JsonSink child{out};
+      visitYaml(it, child);
+    }
+    out.push_back(']');
+  }
+  void object(const YAML::Node& node) {
+    out.push_back('{');
+    bool first = true;
+    for (const auto& it : node) {
+      if (it.first.Tag() == "!ignore") {
+        continue;
+      }
+      if (!first) {
+        out.push_back(',');
+      }
+      first = false;
+      str(it.first.as<std::string>());
+      out.push_back(':');
+      JsonSink child{out};
+      visitYaml(it.second, child);
+    }
+    out.push_back('}');
+  }
+};
+
+template <typename Sink> void visitYaml(const YAML::Node& node, Sink& sink) {
   switch (node.Type()) {
   case YAML::NodeType::Null:
-    value.set_null_value(Protobuf::NULL_VALUE);
-    break;
+    sink.null();
+    return;
   case YAML::NodeType::Scalar: {
     if (node.Tag() == "!") {
-      value.set_string_value(node.as<std::string>());
-      break;
+      sink.str(node.as<std::string>());
+      return;
     }
     bool bool_value;
     if (YAML::convert<bool>::decode(node, bool_value)) {
-      value.set_bool_value(bool_value);
-      break;
+      sink.boolean(bool_value);
+      return;
     }
     int64_t int_value;
     if (YAML::convert<int64_t>::decode(node, int_value)) {
       if (std::numeric_limits<int32_t>::min() <= int_value &&
           std::numeric_limits<int32_t>::max() >= int_value) {
-        // We could convert all integer values to string but it will break some stuff relying on
-        // Protobuf::Struct itself, only convert small numbers into number_value here.
-        value.set_number_value(int_value);
+        sink.integer(int_value);
       } else {
-        // Proto3 JSON mapping allows use string for integer, this still has to be converted from
-        // int_value to support hexadecimal and octal literals.
-        value.set_string_value(std::to_string(int_value));
+        // Proto3 JSON allows a string for out-of-int32-range integers.
+        sink.str(std::to_string(int_value));
       }
-      break;
+      return;
     }
-    // Fall back on string, including float/double case. When protobuf parse the JSON into a message
-    // it will convert based on the type in the message definition.
-    value.set_string_value(node.as<std::string>());
-    break;
+    // String fallback covers floats too; the destination field's type drives the
+    // final conversion once this reaches loadFromJson().
+    sink.str(node.as<std::string>());
+    return;
   }
-  case YAML::NodeType::Sequence: {
-    auto& list_values = *value.mutable_list_value()->mutable_values();
-    for (const auto& it : node) {
-      *list_values.Add() = parseYamlNode(it);
-    }
-    break;
-  }
-  case YAML::NodeType::Map: {
-    auto& struct_fields = *value.mutable_struct_value()->mutable_fields();
-    for (const auto& it : node) {
-      if (it.first.Tag() != "!ignore") {
-        struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
-      }
-    }
-    break;
-  }
+  case YAML::NodeType::Sequence:
+    sink.array(node);
+    return;
+  case YAML::NodeType::Map:
+    sink.object(node);
+    return;
   case YAML::NodeType::Undefined:
     throw EnvoyException("Undefined YAML value");
   }
+}
+
+Protobuf::Value parseYamlNode(const YAML::Node& node) {
+  Protobuf::Value value;
+  ValueSink sink{value};
+  visitYaml(node, sink);
   return value;
 }
 
@@ -113,18 +231,14 @@ void jsonConvertInternal(const Protobuf::Message& source,
   MessageUtil::loadFromJson(json, dest, validation_visitor);
 }
 
-absl::Status jsonConvertInternalNoThrow(const Protobuf::Message& source,
-                                        ProtobufMessage::ValidationVisitor& validation_visitor,
-                                        Protobuf::Message& dest) {
-  absl::Status conversion_status = absl::OkStatus();
-  Protobuf::util::JsonPrintOptions json_options;
-  json_options.preserve_proto_field_names = true;
+// `node` must be a Map or Sequence; callers apply the same top-level-shape check
+// MessageUtil::loadFromYaml[NoThrow]() always have.
+std::string yamlNodeToJsonString(const YAML::Node& node) {
+  ASSERT(node.Type() == YAML::NodeType::Map || node.Type() == YAML::NodeType::Sequence);
   std::string json;
-  conversion_status = Protobuf::util::MessageToJsonString(source, &json, json_options);
-  if (conversion_status.ok()) {
-    MessageUtil::loadFromJson(json, dest, validation_visitor);
-  }
-  return conversion_status;
+  JsonSink sink{json};
+  visitYaml(node, sink);
+  return json;
 }
 
 } // namespace
@@ -191,21 +305,45 @@ void MessageUtil::loadFromJson(absl::string_view json, Protobuf::Struct& message
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
-  Protobuf::Value value = ValueUtil::loadFromYaml(yaml);
-  if (value.kind_case() == Protobuf::Value::kStructValue ||
-      value.kind_case() == Protobuf::Value::kListValue) {
-    jsonConvertInternal(value, validation_visitor, message);
-    return;
+  YAML::Node root;
+  std::string json;
+  bool is_container = false;
+  TRY_ASSERT_MAIN_THREAD {
+    root = YAML::Load(yaml);
+    if (root.Type() == YAML::NodeType::Map || root.Type() == YAML::NodeType::Sequence) {
+      json = yamlNodeToJsonString(root);
+      is_container = true;
+    }
   }
-  throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
+  END_TRY
+  catch (YAML::ParserException& e) {
+    throw EnvoyException(e.what());
+  }
+  catch (YAML::BadConversion& e) {
+    throw EnvoyException(e.what());
+  }
+  catch (std::exception& e) {
+    throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
+  }
+  if (!is_container) {
+    throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
+  }
+  loadFromJson(json, message, validation_visitor);
 }
 
 absl::Status
 MessageUtil::loadFromYamlNoThrow(const std::string& yaml, Protobuf::Message& message,
                                  ProtobufMessage::ValidationVisitor& validation_visitor) {
   absl::Status load_status = absl::OkStatus();
-  Protobuf::Value value;
-  TRY_NEEDS_AUDIT { value = parseYamlNode(YAML::Load(yaml)); }
+  std::string json;
+  bool is_container = false;
+  TRY_NEEDS_AUDIT {
+    YAML::Node root = YAML::Load(yaml);
+    if (root.Type() == YAML::NodeType::Map || root.Type() == YAML::NodeType::Sequence) {
+      json = yamlNodeToJsonString(root);
+      is_container = true;
+    }
+  }
   END_TRY
   catch (YAML::ParserException& e) {
     load_status = absl::InvalidArgumentError(fmt::format("Failed to parse yaml: {}", e.what()));
@@ -215,16 +353,14 @@ MessageUtil::loadFromYamlNoThrow(const std::string& yaml, Protobuf::Message& mes
         absl::InvalidArgumentError(fmt::format("Failed to convert to yaml: {}", e.what()));
   }
   catch (std::exception& e) {
-    // There is a potentially wide space of exceptions thrown by the YAML parser,
-    // and enumerating them all may be difficult. Envoy doesn't work well with
-    // unhandled exceptions, so we capture them and record the exception name in
-    // the status.
     load_status =
         absl::InvalidArgumentError(fmt::format("Unexpected YAML exception: {}", e.what()));
   }
-  if (value.kind_case() == Protobuf::Value::kStructValue ||
-      value.kind_case() == Protobuf::Value::kListValue) {
-    load_status = jsonConvertInternalNoThrow(value, validation_visitor, message);
+  // Pre-existing quirk, preserved: is_container is false on any exception above, so
+  // this always overwrites load_status with the generic message below.
+  if (is_container) {
+    MessageUtil::loadFromJson(json, message, validation_visitor);
+    load_status = absl::OkStatus();
   } else {
     load_status =
         absl::InvalidArgumentError(fmt::format("Unable to convert YAML as JSON: {}", yaml));
