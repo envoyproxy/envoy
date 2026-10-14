@@ -87,13 +87,15 @@ RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_
 bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
   const double max_tokens = token_bucket_.maxTokens();
-  const double scaled_tokens = to_consume / factor;
-  // When sharing makes a request that would otherwise fit larger than the bucket, charge one full
-  // bucket so it can be admitted when full.
-  const bool preserve_one_request = preserve_one_request_ && max_tokens > 0 &&
-                                    to_consume <= max_tokens && scaled_tokens > max_tokens;
-  const double tokens = preserve_one_request ? max_tokens : scaled_tokens;
-  auto cb = [tokens](double total) { return total < tokens ? 0.0 : tokens; };
+  const double tokens = to_consume / factor;
+  // Sharing can make the cost of a request larger than the bucket. If the request fits in the
+  // bucket without sharing, admit it when the bucket holds max_tokens, but still consume the full
+  // shared cost. The bucket goes below zero and the next request waits for the refill, so the
+  // aggregate rate across the local cluster stays at the configured rate.
+  const double threshold = preserve_one_request_ && max_tokens > 0 && to_consume <= max_tokens
+                               ? std::min(tokens, max_tokens)
+                               : tokens;
+  auto cb = [tokens, threshold](double total) { return total < threshold ? 0.0 : tokens; };
   return token_bucket_.consume(cb) != 0.0;
 }
 
