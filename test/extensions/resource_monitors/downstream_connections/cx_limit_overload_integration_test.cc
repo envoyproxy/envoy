@@ -246,7 +246,8 @@ TEST_F(GlobalDownstreamCxLimitIntegrationTest, PerListenerLimitAndGlobalLimitInO
 // would fail immediately (by aborting the test server) if the rebind in
 // ActiveTcpListener::onAcceptWorker() ever regressed and let a stale, cross-worker handle reach
 // this code path again.
-TEST_F(GlobalDownstreamCxLimitIntegrationTest, RebalancedConnectionUsesRealThreadLocalOverloadState) {
+TEST_F(GlobalDownstreamCxLimitIntegrationTest,
+       RebalancedConnectionUsesRealThreadLocalOverloadState) {
   concurrency_ = 2;
 
   AlwaysRebalanceConnectionBalanceFactory factory;
