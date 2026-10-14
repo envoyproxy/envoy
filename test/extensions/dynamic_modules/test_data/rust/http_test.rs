@@ -345,6 +345,21 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     })
     .return_const(())
     .once();
+  envoy_filter
+    .expect_get_typed_metadata()
+    .withf(|source, ns| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Dynamic
+        && ns == "ns_req_header_typed"
+    })
+    .returning(|_, _| Some((EnvoyBuffer::new(b"t/x"), EnvoyBuffer::new(&[0x01, 0x02]))))
+    .once();
+  envoy_filter
+    .expect_get_typed_metadata()
+    .withf(|source, ns| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Dynamic && ns == "missing"
+    })
+    .returning(|_, _| None)
+    .once();
   // Route/Cluster/Host metadata.
   envoy_filter
     .expect_get_metadata_string()
@@ -743,4 +758,83 @@ fn test_span_callbacks_filter_calls_set_tags() {
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   );
   assert!(FAKE_SPAN_SET_TAGS_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_filter_state_callbacks_on_request_headers() {
+  let f = FilterStateCallbacksFilter {};
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  envoy_filter
+    .expect_get_filter_state_typed()
+    .withf(|key| key == b"envoy.test.http_typed_object_for_rust")
+    .returning(|_| None)
+    .once();
+  envoy_filter
+    .expect_set_filter_state_typed()
+    .withf(|key, _| key == b"envoy.test.http_typed_object_for_rust")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_filter_state_typed()
+    .withf(|key| key == b"envoy.test.http_typed_object_for_rust")
+    .returning(|_| Some(EnvoyBuffer::new(b"typed_value")))
+    .once();
+  envoy_filter
+    .expect_set_filter_state_typed()
+    .withf(|key, _| key == b"no.such.factory")
+    .return_const(false)
+    .once();
+  envoy_filter
+    .expect_has_filter_state()
+    .withf(|key| key == b"envoy.test.http_typed_object_for_rust")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_has_filter_state()
+    .withf(|key| key == b"nonexistent_key")
+    .return_const(false)
+    .once();
+  envoy_filter
+    .expect_set_filter_state_bytes()
+    .withf(|key, value| key == b"req_header_key" && value == b"req_header_value")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_has_filter_state()
+    .withf(|key| key == b"req_header_key")
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_filter_state_bytes()
+    .withf(|key| key == b"req_header_key")
+    .returning(|_| Some(EnvoyBuffer::new(b"req_header_value")))
+    .once();
+  envoy_filter
+    .expect_set_filter_state_value()
+    .withf(|key, value, life_span, stream_sharing| {
+      key == b"shared_filter_state_key"
+        && value == b"shared_filter_state_value"
+        && *life_span == abi::envoy_dynamic_module_type_filter_state_life_span::Connection
+        && *stream_sharing
+          == abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection
+    })
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_filter_state_bytes()
+    .withf(|key| key == b"shared_filter_state_key")
+    .returning(|_| Some(EnvoyBuffer::new(b"shared_filter_state_value")))
+    .once();
+  envoy_filter
+    .expect_get_filter_state_bytes()
+    .withf(|key| key == b"key")
+    .returning(|_| None)
+    .once();
+
+  let status = f.on_request_headers(&mut envoy_filter, false);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  );
 }

@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.input_matchers.uri_template.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.uri_template.v3";
+option java_outer_classname = "UriTemplateProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/input_matchers/uri_template/v3;uri_templatev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: URI template matcher]
+// [#extension: envoy.matching.matchers.uri_template]
+
+// Matches a string input, such as the ``:path`` header, against a URI template with the same
+// semantics as route :ref:`path_match_policy
+// <envoy_v3_api_field_config.route.v3.RouteMatch.path_match_policy>`. The query string and
+// fragment of the input are ignored, and the input is not otherwise normalized.
+message UriTemplate {
+  // The URI template to match against, for example ``/api/{version}/items/{id}``. See
+  // :ref:`UriTemplateMatchConfig
+  // <envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>` for the
+  // template syntax.
+  string path_template = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
+}

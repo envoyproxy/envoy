@@ -215,6 +215,12 @@ private:
   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry_;
 };
 
+// Returns the SNI for HTTP/3 connections to the host. It prefers the server name override, then
+// the host's hostname if `auto_host_sni` is set and the hostname is a valid SNI, then the
+// configured SNI.
+std::string effectiveSni(const Network::TransportSocketOptionsConstSharedPtr& options,
+                         const Upstream::HostDescription& host);
+
 std::unique_ptr<Http3ConnPoolImpl>
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,

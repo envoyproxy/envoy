@@ -1,0 +1,20 @@
+date: October 1, 2026
+
+bug_fixes:
+- area: tls
+  change: |
+    Fix: `CVE-2026-35189 <https://github.com/google/boringssl/blob/main/docs/advisories/2026-09-29.md>`_
+
+    Patched BoringSSL to fix excessive memory allocation when parsing X.509 certificates containing
+    CRL Distribution Points with ``nameRelativeToCRLIssuer`` entries. A single specially crafted
+    certificate under the normal per-certificate size limit could trigger hundreds of MiB of heap
+    allocation, allowing a remote denial of service via TLS handshakes. The unused
+    ``nameRelativeToCRLIssuer`` processing has been removed. The BoringSSL FIPS build
+    (``--config=boringssl-fips``) does not receive this patch.
+
+removed_config_or_runtime:
+- area: build
+  change: |
+    Removed Debian bullseye (11) packaging. Debian bullseye is end-of-life (LTS ended 31 August 2026)
+    and its package repositories are no longer available on the main Debian mirrors. Bullseye ``.deb``
+    packages are no longer built or published.

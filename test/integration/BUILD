@@ -422,6 +422,13 @@ envoy_cc_test(
     ],
     deps = [
         ":vhds_lib",
+        # Required so the on_demand HTTP filter is linked into this test
+        # binary and can be referenced by name from the filter-chain YAML in
+        # OnDemandVhdsRecreateStreamRegressionTest.
+        "//source/extensions/filters/http/on_demand:config",
+        # Required so the trivial ``add-header-filter`` used by the
+        # regression tests (to count decode-chain invocations) is available.
+        "//test/integration/filters:add_header_filter_config_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -2896,6 +2903,7 @@ envoy_cc_test(
         "//test/common/http/http2:http2_frame",
         "//test/config:v2_link_hacks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
@@ -3017,6 +3025,29 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
         "//test/test_common:logging_lib",
+    ]),
+)
+
+envoy_cc_test(
+    name = "quic_hot_restart_integration_test",
+    size = "large",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["quic_hot_restart_integration_test.cc"],
+    }),
+    data = ["//test/config/integration/certs"],
+    rbe_pool = "linux_x64_small",
+    tags = [
+        "fails_on_clang_cl",
+        "fails_on_windows",
+    ],
+    deps = envoy_select_enable_http3([
+        ":quic_http_integration_test_lib",
+        "//envoy/network:parent_drained_callback_registrar_interface",
+        "//source/server:hot_restart_nop_lib",
+        "//test/common/quic:test_utils_lib",
+        "//test/test_common:network_utility_lib",
+        "@quiche//:quic_test_tools_test_utils_lib",
     ]),
 )
 

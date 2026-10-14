@@ -13,6 +13,7 @@ Extensions
   certificate_mappers/certificate_mappers
   certificate_selectors/certificate_selectors
   certificate_validators/certificate_validators
+  tls_handshakers/tls_handshakers
   cluster/cluster
   common/common
   compression/compression

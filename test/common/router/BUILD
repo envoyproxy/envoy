@@ -241,6 +241,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -707,4 +708,24 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "scoped_config_benchmark_test",
     benchmark_binary = "scoped_config_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "scoped_rds_speed_test",
+    srcs = ["scoped_rds_speed_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/router:scoped_config_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "scoped_rds_benchmark_test",
+    benchmark_binary = "scoped_rds_speed_test",
 )

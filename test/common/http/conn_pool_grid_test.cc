@@ -263,6 +263,8 @@ TEST_F(ConnectivityGridTest, HostnameFromTransportSocketFactory) {
   EXPECT_CALL(*transport_socket_matcher, resolve(_, _, _))
       .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(
           factory, transport_socket_matcher->stats_, "test")));
+  EXPECT_CALL(factory, clientContextConfig())
+      .WillOnce(Return(OptRef<const Ssl::ClientContextConfig>()));
   EXPECT_CALL(factory, defaultServerNameIndication)
       .WillRepeatedly(Return("transport_socket_hostname"));
   host_impl_hostname_ = "custom_hostname";
@@ -271,6 +273,26 @@ TEST_F(ConnectivityGridTest, HostnameFromTransportSocketFactory) {
   // Without "hostname" in the TransportSocketOptionsImpl, this fails over to
   // the host name in HostNameImpl
   EXPECT_EQ("transport_socket_hostname", grid_->getOriginHostname());
+}
+
+TEST_F(ConnectivityGridTest, HostnameFromAutoHostSni) {
+  Network::MockTransportSocketFactory factory;
+  StrictMock<Ssl::MockClientContextConfig> client_context_config;
+  EXPECT_CALL(client_context_config, autoHostServerNameIndication()).WillOnce(Return(true));
+  Upstream::MockTransportSocketMatcher* transport_socket_matcher =
+      dynamic_cast<Upstream::MockTransportSocketMatcher*>(
+          cluster_->transport_socket_matcher_.get());
+  EXPECT_CALL(*transport_socket_matcher, resolve(_, _, _))
+      .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(
+          factory, transport_socket_matcher->stats_, "test")));
+  EXPECT_CALL(factory, clientContextConfig())
+      .WillOnce(Return(makeOptRef<const Ssl::ClientContextConfig>(client_context_config)));
+  EXPECT_CALL(factory, defaultServerNameIndication)
+      .WillRepeatedly(Return("transport_socket_hostname"));
+  host_impl_hostname_ = "upstream.example.com";
+  transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>();
+  initialize();
+  EXPECT_EQ("upstream.example.com", grid_->getOriginHostname());
 }
 
 TEST_F(ConnectivityGridTest, NoServerNameOverride) {

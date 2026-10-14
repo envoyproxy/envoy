@@ -212,6 +212,8 @@
 /*/extensions/matching/input_matchers/cel_matcher @tyxia @yanavlasov
 # dynamic metadata input matcher
 /*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
+# URI template input matcher
+/*/extensions/matching/input_matchers/uri_template @agrawroh @wbpcode
 # environment generic input
 /*/extensions/matching/common_inputs/environment_variable @donyu @mattklein123
 # format string matching
@@ -440,6 +442,7 @@
 /*/extensions/matching/input_matchers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/matching/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/transport_sockets/tls/cert_validator/dynamic_modules @agrawroh @mathetake @wbpcode
+/*/extensions/transport_sockets/tls/handshakers/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/transport_sockets/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/upstreams/http/dynamic_modules @agrawroh @mathetake @wbpcode
 /*/extensions/tracers/dynamic_modules @agrawroh @mathetake @wbpcode

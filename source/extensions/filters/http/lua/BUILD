@@ -55,6 +55,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/lua:protobuf_converter_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 

@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
 
@@ -28,15 +29,23 @@ public:
   /**
    * Constructor that takes ownership of the socket and stores parent pointer, connection key, and
    * the initiator's per-connection identifier (retained so it can be reported at close time, when
-   * the originating connection object is already gone).
+   * the originating connection object is already gone). ``residual_bytes`` holds any bytes the
+   * responder coalesced with the handshake response, to serve before the socket, and is null when
+   * nothing was coalesced.
    */
   DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
                                       ReverseConnectionIOHandle* parent,
-                                      const std::string& connection_key, uint64_t connection_id);
+                                      const std::string& connection_key, uint64_t connection_id,
+                                      Buffer::InstancePtr residual_bytes = nullptr);
 
   ~DownstreamReverseConnectionIOHandle() override;
 
   // Network::IoHandle overrides.
+  // Serve handshake residual bytes before the socket, then defer to the RPING interceptor.
+  Api::IoCallUint64Result read(Buffer::Instance& buffer,
+                               std::optional<uint64_t> max_length) override;
+  Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
+                                uint64_t num_slice) override;
   Api::IoCallUint64Result close() override;
   Api::SysCallIntResult shutdown(int how) override;
 
@@ -79,6 +88,9 @@ private:
   std::string connection_key_;
   // The initiator's per-connection identifier, reported to the parent on close.
   uint64_t connection_id_;
+  // Bytes the responder coalesced with the handshake response, served before the socket. Null once
+  // nothing is left to replay.
+  Buffer::InstancePtr residual_bytes_;
 };
 
 } // namespace ReverseConnection

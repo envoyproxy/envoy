@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "source/common/http/http3/conn_pool.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/quic/quic_client_transport_socket_factory.h"
 
 #include "test/common/http/common.h"
@@ -16,6 +17,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -45,11 +47,12 @@ public:
     ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
     EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
-    factory_ = *Quic::QuicClientTransportSocketFactory::create(
-        std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
-            new NiceMock<Ssl::MockClientContextConfig>),
-        context_);
+    auto client_context_config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
+    client_context_config_ = client_context_config.get();
+    factory_ =
+        *Quic::QuicClientTransportSocketFactory::create(std::move(client_context_config), context_);
     factory_->initialize();
+    ON_CALL(mockHost(), hostname()).WillByDefault(testing::ReturnRef(hostname_));
     quic_info_ = Quic::createPersistentQuicInfoForCluster(dispatcher_, mockHost().cluster_,
                                                           context_.server_context_);
 
@@ -85,12 +88,11 @@ public:
                OptRef<const Network::TransportSocketOptions>) -> Upstream::UpstreamLocalAddress {
               return Upstream::UpstreamLocalAddress({nullptr, nullptr});
             }));
-    Network::TransportSocketOptionsConstSharedPtr transport_options;
-    pool_ =
-        allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                         transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
-                         makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                         quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
+    pool_ = allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default,
+                             options, transport_socket_options_, state_, quic_stat_names_, {},
+                             *store_.rootScope(),
+                             makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
+                             quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
     EXPECT_EQ(test_address_->ip()->port(), Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -108,8 +110,11 @@ public:
   NiceMock<Server::MockOverloadManager> overload_manager_;
   Network::Address::InstanceConstSharedPtr test_address_;
   std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_;
+  std::string hostname_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Ssl::MockClientContextConfig>* client_context_config_{nullptr};
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Ssl::ClientContextSharedPtr ssl_context_{new NiceMock<Ssl::MockClientContext>()};
   Stats::IsolatedStoreImpl store_{context_.server_context_.serverScope().symbolTable()};
   Quic::QuicStatNames quic_stat_names_{store_.symbolTable()};
@@ -336,6 +341,50 @@ TEST_F(Http3ConnPoolImplTest, GetNetworkChangeEvents) {
   observers_.onNetworkConnected(-1);
   observers_.onNetworkMadeDefault(-1);
   observers_.onNetworkDisconnected(-1);
+}
+
+TEST_F(Http3ConnPoolImplTest, ServerIdUsesConfiguredSniWithoutAutoHostSni) {
+  hostname_ = "upstream.example.com";
+  initialize();
+  EXPECT_EQ("default_sni.example.com", Http3ConnPoolImplPeer::getServerId(*pool_).host());
+}
+
+TEST_F(Http3ConnPoolImplTest, ServerIdUsesHostnameWithAutoHostSni) {
+  ON_CALL(*client_context_config_, autoHostServerNameIndication()).WillByDefault(Return(true));
+  hostname_ = "upstream.example.com";
+  initialize();
+  EXPECT_EQ("upstream.example.com", Http3ConnPoolImplPeer::getServerId(*pool_).host());
+}
+
+TEST_F(Http3ConnPoolImplTest, ServerIdUsesConfiguredSniWithAutoHostSniAndNoHostname) {
+  ON_CALL(*client_context_config_, autoHostServerNameIndication()).WillByDefault(Return(true));
+  initialize();
+  EXPECT_EQ("default_sni.example.com", Http3ConnPoolImplPeer::getServerId(*pool_).host());
+}
+
+TEST_F(Http3ConnPoolImplTest, ServerIdUsesConfiguredSniWithAutoHostSniAndIpHostname) {
+  ON_CALL(*client_context_config_, autoHostServerNameIndication()).WillByDefault(Return(true));
+  hostname_ = "127.0.0.1";
+  initialize();
+  EXPECT_EQ("default_sni.example.com", Http3ConnPoolImplPeer::getServerId(*pool_).host());
+}
+
+TEST_F(Http3ConnPoolImplTest, ServerIdUsesServerNameOverrideWithAutoHostSni) {
+  ON_CALL(*client_context_config_, autoHostServerNameIndication()).WillByDefault(Return(true));
+  hostname_ = "upstream.example.com";
+  transport_socket_options_ =
+      std::make_shared<Network::TransportSocketOptionsImpl>("override.example.com");
+  initialize();
+  EXPECT_EQ("override.example.com", Http3ConnPoolImplPeer::getServerId(*pool_).host());
+}
+
+TEST_F(Http3ConnPoolImplTest, ServerIdUsesConfiguredSniWithAutoHostSniAndRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_upstream_auto_host_sni", "false"}});
+  ON_CALL(*client_context_config_, autoHostServerNameIndication()).WillByDefault(Return(true));
+  hostname_ = "upstream.example.com";
+  initialize();
+  EXPECT_EQ("default_sni.example.com", Http3ConnPoolImplPeer::getServerId(*pool_).host());
 }
 
 } // namespace Http3

@@ -2,6 +2,7 @@ use crate::{
   abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
   wrap_into_c_void_ptr, EnvoyBuffer, NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 
 thread_local! {
@@ -68,7 +69,7 @@ pub trait UpstreamHttpTcpBridge: Send {
 }
 
 /// Envoy-side bridge operations available to the module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyUpstreamHttpTcpBridge: Send {
   /// Get a request header value by key at the given index.

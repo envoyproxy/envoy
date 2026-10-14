@@ -43,6 +43,33 @@ By default, the :ref:`HTTP connection manager <config_http_conn_man>` filter wil
 add "Connection: close" to HTTP1 requests, send HTTP2 GOAWAY, and terminate connections
 on request completion (after the delayed close period).
 
+The HTTP connection manager decides whether to drain a connection in two ways:
+
+* When a response is sent. With the gradual drain strategy (see :option:`--drain-strategy`) the
+  probability that a response drains its connection increases linearly from zero at the start of
+  the drain sequence to one at half of the :option:`--drain-time-s`. From then on every response
+  drains its connection.
+* Proactively, for the connections that are still not draining after two thirds of the drain time,
+  for example because they are idle or have a low request rate. Each of these connections is
+  drained at a random point in the remainder of the drain time, early enough for the :ref:`drain
+  timeout
+  <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`
+  to elapse before the drain sequence ends. Idle connections are closed once the drain timeout
+  elapses.
+
+Upgraded (e.g. WebSocket) and ``CONNECT`` streams send no further response and cannot be told to
+go away, so they are reset when the connection is drained proactively: on HTTP/1 connections as
+soon as that happens, as the connection cannot be reused anyway, and on HTTP/2 and HTTP/3
+connections once the drain timeout elapses. Other requests are left to complete. A connection
+drained by a response keeps its tunneling streams until it is drained proactively as well.
+
+Spreading the proactive draining over the last third of the drain time avoids closing all the
+remaining connections at the same moment at the end of the drain sequence, which would make their
+clients reconnect at the same time. For the same reason connections are not drained proactively
+when the drain time is too short to leave room for it after the drain timeout, nor are connections
+accepted after the last third of the drain time has begun. Connections are also not drained
+proactively when the server has been health check failed, as that has no drain time.
+
 Each :ref:`configured listener <arch_overview_listeners>` has a :ref:`drain_type
 <envoy_v3_api_enum_config.listener.v3.Listener.DrainType>` setting which controls when draining takes place. The currently
 supported values are:

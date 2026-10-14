@@ -854,6 +854,21 @@ func (mr *MockHttpFilterHandleMockRecorder) GetData(key any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetData", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetData), key)
 }
 
+// GetDownstreamDirectRemoteAddress mocks base method.
+func (m *MockHttpFilterHandle) GetDownstreamDirectRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDownstreamDirectRemoteAddress")
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetDownstreamDirectRemoteAddress indicates an expected call of GetDownstreamDirectRemoteAddress.
+func (mr *MockHttpFilterHandleMockRecorder) GetDownstreamDirectRemoteAddress() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDownstreamDirectRemoteAddress", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetDownstreamDirectRemoteAddress))
+}
+
 // GetFilterState mocks base method.
 func (m *MockHttpFilterHandle) GetFilterState(key string) (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
@@ -1118,6 +1133,22 @@ func (mr *MockHttpFilterHandleMockRecorder) GetTimingInfo() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTimingInfo", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetTimingInfo))
 }
 
+// GetTypedMetadata mocks base method.
+func (m *MockHttpFilterHandle) GetTypedMetadata(source shared.MetadataSourceType, metadataNamespace string) (shared.UnsafeEnvoyBuffer, shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTypedMetadata", source, metadataNamespace)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(shared.UnsafeEnvoyBuffer)
+	ret2, _ := ret[2].(bool)
+	return ret0, ret1, ret2
+}
+
+// GetTypedMetadata indicates an expected call of GetTypedMetadata.
+func (mr *MockHttpFilterHandleMockRecorder) GetTypedMetadata(source, metadataNamespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTypedMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetTypedMetadata), source, metadataNamespace)
+}
+
 // GetUpstreamConnectionIDsAttempted mocks base method.
 func (m *MockHttpFilterHandle) GetUpstreamConnectionIDsAttempted() []uint64 {
 	m.ctrl.T.Helper()
@@ -1173,6 +1204,20 @@ func (m *MockHttpFilterHandle) GetWorkerIndex() uint32 {
 func (mr *MockHttpFilterHandleMockRecorder) GetWorkerIndex() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkerIndex", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetWorkerIndex))
+}
+
+// HasFilterState mocks base method.
+func (m *MockHttpFilterHandle) HasFilterState(key string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HasFilterState", key)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// HasFilterState indicates an expected call of HasFilterState.
+func (mr *MockHttpFilterHandleMockRecorder) HasFilterState(key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasFilterState", reflect.TypeOf((*MockHttpFilterHandle)(nil).HasFilterState), key)
 }
 
 // HttpCallout mocks base method.
@@ -1588,6 +1633,20 @@ func (m *MockHttpFilterHandle) SetFilterStateTyped(key string, value []byte) boo
 func (mr *MockHttpFilterHandleMockRecorder) SetFilterStateTyped(key, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterStateTyped", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterStateTyped), key, value)
+}
+
+// SetFilterStateValue mocks base method.
+func (m *MockHttpFilterHandle) SetFilterStateValue(key string, value []byte, lifeSpan shared.FilterStateLifeSpan, streamSharing shared.FilterStateStreamSharing) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetFilterStateValue", key, value, lifeSpan, streamSharing)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetFilterStateValue indicates an expected call of SetFilterStateValue.
+func (mr *MockHttpFilterHandleMockRecorder) SetFilterStateValue(key, value, lifeSpan, streamSharing any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterStateValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterStateValue), key, value, lifeSpan, streamSharing)
 }
 
 // SetGaugeValue mocks base method.

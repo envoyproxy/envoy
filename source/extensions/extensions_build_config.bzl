@@ -102,6 +102,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
     "envoy.matching.matchers.dynamic_modules":           "//source/extensions/matching/input_matchers/dynamic_modules:config",
     "envoy.matching.matchers.metadata_matcher":         "//source/extensions/matching/input_matchers/metadata:config",
+    "envoy.matching.matchers.uri_template":             "//source/extensions/matching/input_matchers/uri_template:config",
 
     #
     # Network Matchers
@@ -454,6 +455,12 @@ EXTENSIONS = {
 
     "envoy.tls.cert_validator.dynamic_modules":          "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
+
+    #
+    # TLS handshakers
+    #
+
+    "envoy.tls.handshakers.dynamic_modules":             "//source/extensions/transport_sockets/tls/handshakers/dynamic_modules:config",
 
     #
     # HTTP header formatters

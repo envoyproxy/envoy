@@ -82,7 +82,7 @@ class Mutations {
 public:
   using HeaderMutations = Http::HeaderMutations;
 
-  Mutations(const MutationsProto& config, Server::Configuration::ServerFactoryContext& context,
+  Mutations(const MutationsProto& config, Server::Configuration::GenericFactoryContext& context,
             absl::Status& creation_status);
 
   void mutateRequestHeaders(Http::RequestHeaderMap& headers, const Formatter::Context& context,
@@ -106,7 +106,7 @@ private:
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
 public:
   PerRouteHeaderMutation(const PerRouteProtoConfig& config,
-                         Server::Configuration::ServerFactoryContext& context,
+                         Server::Configuration::GenericFactoryContext& context,
                          absl::Status& creation_status);
 
   const Mutations& mutations() const { return mutations_; }
@@ -119,7 +119,7 @@ using PerRouteHeaderMutationSharedPtr = std::shared_ptr<PerRouteHeaderMutation>;
 class HeaderMutationConfig {
 public:
   HeaderMutationConfig(const ProtoConfig& config,
-                       Server::Configuration::ServerFactoryContext& context,
+                       Server::Configuration::GenericFactoryContext& context,
                        absl::Status& creation_status);
 
   const Mutations& mutations() const { return mutations_; }
