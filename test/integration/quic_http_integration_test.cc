@@ -2460,5 +2460,91 @@ TEST_P(QuicHttpIntegrationTest, FirstRequestSucceedsWithoutEnvoyBugOnNewConnecti
   codec_client_->close();
 }
 
+class QuicUpstreamAutoHostSniIntegrationTest : public QuicHttpIntegrationTest {
+public:
+  void initialize() override {
+    setUpstreamProtocol(Http::CodecType::HTTP3);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_load_assignment()
+          ->mutable_endpoints(0)
+          ->mutable_lb_endpoints(0)
+          ->mutable_endpoint()
+          ->set_hostname(upstream_hostname_);
+      // Turn off `auto_sni` so that the request host does not override the SNI.
+      auto& protocol_options = (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+      auto http_protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(protocol_options);
+      http_protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(false);
+      std::ignore = protocol_options.PackFrom(http_protocol_options);
+      auto* transport_socket = cluster->mutable_transport_socket();
+      auto quic_transport = MessageUtil::anyConvert<
+          envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport>(
+          transport_socket->typed_config());
+      quic_transport.mutable_upstream_tls_context()->set_auto_host_sni(true);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(quic_transport);
+    });
+    QuicHttpIntegrationTest::initialize();
+  }
+
+  // Sends a request through the HTTP/3 cluster and checks the SNI that the upstream received.
+  void expectUpstreamSni(absl::string_view expected_sni) {
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    std::string sni;
+    ASSERT_TRUE(fake_upstream_connection_->sharedConnection().executeOnDispatcher(
+        [&sni](Network::Connection& connection) { sni = connection.ssl()->sni(); }));
+    EXPECT_EQ(expected_sni, sni);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client_->close();
+  }
+
+  std::string upstream_hostname_{"upstream.lyft.com"};
+};
+
+INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicUpstreamAutoHostSniIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// The upstream host's hostname takes precedence over the configured SNI.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesHostname) {
+  initialize();
+  expectUpstreamSni("upstream.lyft.com");
+}
+
+// The server certificate is validated against the upstream host's hostname.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, FailsWhenCertificateDoesNotMatchHostname) {
+  upstream_hostname_ = "upstream.example.com";
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  test_server_->waitForCounter(
+      "http3.upstream.tx.quic_connection_close_error_code_QUIC_TLS_CERTIFICATE_UNKNOWN", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_fail", Eq(1));
+  codec_client_->close();
+}
+
+// Hostnames that are not valid SNI fall back to the configured SNI.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesConfiguredSniWithIpHostname) {
+  upstream_hostname_ = Network::Test::getLoopbackAddressString(version_);
+  initialize();
+  expectUpstreamSni("foo.lyft.com");
+}
+
+// Disabling the runtime guard restores the previous behavior.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesConfiguredSniWithRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_upstream_auto_host_sni",
+                                    "false");
+  upstream_hostname_ = "upstream.example.com";
+  initialize();
+  expectUpstreamSni("foo.lyft.com");
+}
+
 } // namespace Quic
 } // namespace Envoy

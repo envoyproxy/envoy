@@ -31,6 +31,7 @@ envoy_cc_extension(
         ":reverse_connection_address_lib",
         "//envoy/network:resolver_interface",
         "//envoy/registry",
+        "//source/common/http:header_utility_lib",
     ],
 )
 

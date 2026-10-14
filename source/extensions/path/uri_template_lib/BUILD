@@ -17,6 +17,7 @@ envoy_cc_library(
     visibility = [
         "//source/common/router:__subpackages__",
         "//source/extensions/filters/http/ai_protocol_manager:__subpackages__",
+        "//source/extensions/matching/input_matchers/uri_template:__subpackages__",
         "//source/extensions/path:__subpackages__",
         "//test/extensions/path:__subpackages__",
     ],

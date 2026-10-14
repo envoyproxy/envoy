@@ -58,8 +58,8 @@ LLVM_LIB_DIR = %r
 LLVM_IS_HOST = %s
 """ % (llvm_version, major, major_minor, llvm_lib_dir, is_host))
 
-def _detect_llvm_version(repository_ctx, llvm_root, declared_version):
-    clang = llvm_root.get_child("bin/clang")
+def _detect_llvm_version(repository_ctx, llvm_root, declared_version, clang_name = "bin/clang"):
+    clang = llvm_root.get_child(clang_name)
     result = repository_ctx.execute([str(clang), "--version"])
     if result.return_code != 0:
         fail("Could not run %s --version (exit code %s): %s" % (clang, result.return_code, result.stderr))
@@ -129,6 +129,33 @@ def _symlink_directory_contents(repository_ctx, source, destination):
     for child in source.readdir():
         repository_ctx.symlink(child, destination + "/" + child.basename)
 
+def _windows_llvm_repo(repository_ctx):
+    # Windows builds use the host clang-cl toolchain, so there is no hermetic LLVM to alias.
+    # Expose the tools Envoy needs from the host LLVM that clang-cl comes from, located the same
+    # way as the rules_cc Windows toolchain does it.
+    llvm_root = repository_ctx.path(
+        (repository_ctx.getenv("BAZEL_LLVM") or "C:/Program Files/LLVM").replace("\\", "/").rstrip("/"),
+    )
+    objcopy = llvm_root.get_child("bin/llvm-objcopy.exe")
+    if not objcopy.exists:
+        fail("Could not find %s. Set BAZEL_LLVM to the host LLVM installation." % objcopy)
+    repository_ctx.symlink(objcopy, "bin/llvm-objcopy.exe")
+    repository_ctx.file(
+        "BUILD.bazel",
+        """
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["llvm.bzl"])
+
+alias(
+    name = "objcopy",
+    actual = "bin/llvm-objcopy.exe",
+)
+""",
+    )
+    version = _detect_llvm_version(repository_ctx, llvm_root, "", "bin/clang.exe")
+    _write_llvm_bzl(repository_ctx, version, "lib", True)
+
 def _llvm_alias_repo_impl(repository_ctx):
     os_name = repository_ctx.os.name.lower()
     arch = repository_ctx.os.arch.lower()
@@ -140,6 +167,9 @@ def _llvm_alias_repo_impl(repository_ctx):
         arch.startswith("aarch64") or arch.startswith("arm64")
     ):
         llvm_root = repository_ctx.path(repository_ctx.attr.minimal_macos_arm64).dirname
+    elif os_name.startswith("windows"):
+        _windows_llvm_repo(repository_ctx)
+        return
     else:
         fail(
             "Unsupported host platform for llvm_toolchain_llvm: %s %s" %

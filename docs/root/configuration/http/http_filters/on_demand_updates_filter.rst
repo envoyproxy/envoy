@@ -34,6 +34,12 @@ the on demand CDS for requests using this virtual host or route. Conversely,
 if :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` is specified,
 on demand CDS is enabled for requests using this virtual host or route.
 
+Statistics
+----------
+
+The on-demand CDS config sources emit statistics rooted at *cluster_manager.odcds.*, documented in
+the :ref:`cluster manager statistics <config_cluster_manager_odcds_stats>`.
+
 Configuration
 -------------
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand``.

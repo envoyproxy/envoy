@@ -26,6 +26,7 @@ envoy_cc_dyn_module_test(
         "//source/common/http:message_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/common/upstream:host_lookup_map_lib",
         "//source/extensions/clusters/dynamic_modules:cluster_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/load_balancing_policies/cluster_provided:config",

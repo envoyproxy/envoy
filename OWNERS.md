@@ -26,7 +26,7 @@ routing PRs, questions, etc. to the right place.
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
   * Overload manager, security, logging, wasm, data plane.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
-  * Dynamic Modules, Reverse Tunnels, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
+  * Dynamic Modules, Reverse Tunnels, Performance, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
   * Load balancing, data plane, overload manager.
 

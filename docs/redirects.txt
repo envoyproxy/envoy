@@ -1,4 +1,5 @@
 version_history/current.rst  version_history/version_history.rst
+intro/arch_overview/security/google_vrp.rst  intro/arch_overview/security/google_prp.rst
 version_history/v1.0.0.rst  version_history/v1.0/v1.0.0.rst
 version_history/v1.1.0.rst  version_history/v1.1/v1.1.0.rst
 version_history/v1.2.0.rst  version_history/v1.2/v1.2.0.rst

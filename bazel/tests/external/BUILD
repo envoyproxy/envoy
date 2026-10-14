@@ -12,10 +12,35 @@ load(
     "envoy_select_enable_exceptions",
     "envoy_select_hot_restart",
 )
+load("@envoy_toolshed//dependency:macros.bzl", "module_deps_json", "module_updater", "registry_updater")
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    ".bazelrc",
+    "MODULE.bazel",
+    "MODULE.bazel.lock",
+])
+
 envoy_extension_package()
+
+module_deps_json(
+    name = "module_deps",
+    lockfile = "//:MODULE.bazel.lock",
+    module_file = "//:MODULE.bazel",
+)
+
+module_updater(
+    name = "update_module",
+    bazelrc = "//:.bazelrc",
+    dependencies = ":module_deps",
+    module_file = "//:MODULE.bazel",
+)
+
+registry_updater(
+    name = "update_registry",
+    bazelrc = "//:.bazelrc",
+)
 
 envoy_cc_library(
     name = "select_enable_exceptions_dep",

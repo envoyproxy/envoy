@@ -1382,6 +1382,13 @@ envoy.matching.matchers.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher
+envoy.matching.matchers.uri_template:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.input_matchers.uri_template.v3.UriTemplate
 envoy.path.match.uri_template.uri_template_matcher:
   categories:
   - envoy.path.match
@@ -1674,6 +1681,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tls.handshakers.dynamic_modules:
+  categories:
+  - envoy.tls_handshakers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.tls.handshakers.dynamic_modules.v3.DynamicModuleTlsHandshaker
 envoy.tracers.dynamic_modules:
   categories:
   - envoy.tracers

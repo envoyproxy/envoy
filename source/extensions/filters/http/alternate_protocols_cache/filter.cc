@@ -67,17 +67,30 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // Envoy routes request to upstream hosts not to origin servers directly. This choice would
   // allow HTTP/3 to be used on a per-upstream host basis, even for origins which are load
   // balanced across them.
+  const auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
   Upstream::HostDescriptionConstSharedPtr host =
-      encoder_callbacks_->streamInfo().upstreamInfo()->upstreamHost();
+      upstream_info != nullptr ? upstream_info->upstreamHost() : nullptr;
+  if (host == nullptr) {
+    // There is no upstream host, for example when a local reply carrying an alt-svc header is sent
+    // before an upstream request was created. Without a host there is no origin to associate the
+    // advertised alternate protocols with.
+    return Http::FilterHeadersStatus::Continue;
+  }
   absl::string_view hostname = host->hostname();
-  if (encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection() &&
-      !encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->sni().empty()) {
+  if (upstream_info->upstreamSslConnection() &&
+      !upstream_info->upstreamSslConnection()->sni().empty()) {
     // In the case the configured hostname and SNI differ, prefer SNI where
     // available.
-    hostname = encoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->sni();
+    hostname = upstream_info->upstreamSslConnection()->sni();
   }
   auto host_addr = host->address();
-  const uint32_t port = (host_addr ? host_addr->ip()->port() : 443);
+  const auto* host_ip = host_addr ? host_addr->ip() : nullptr;
+  if (host_ip == nullptr) {
+    // Alternate protocols (HTTP/3 over QUIC) are only meaningful for IP endpoints; a pipe or
+    // internal upstream address has no origin to advertise them for.
+    return Http::FilterHeadersStatus::Continue;
+  }
+  const uint32_t port = host_ip->port();
   Http::HttpServerPropertiesCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,
                                                  port);
   cache->setAlternatives(origin, protocols);

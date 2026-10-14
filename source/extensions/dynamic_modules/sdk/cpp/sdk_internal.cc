@@ -371,6 +371,21 @@ public:
     return value.toStringView();
   }
 
+  std::optional<std::pair<std::string_view, std::string_view>>
+  getTypedMetadata(std::string_view ns) override {
+    BufferView type_url{nullptr, 0};
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_typed_metadata(
+        host_plugin_ptr_, envoy_dynamic_module_type_metadata_source_Dynamic,
+        envoy_dynamic_module_type_module_buffer{ns.data(), ns.size()},
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&type_url),
+        reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    if (!found) {
+      return {};
+    }
+    return std::make_pair(type_url.toStringView(), value.toStringView());
+  }
+
   std::optional<double> getMetadataNumber(std::string_view ns, std::string_view key) override {
     double value = 0.0;
     const bool ret = envoy_dynamic_module_callback_http_get_metadata_number(
@@ -561,6 +576,16 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
+  bool setFilterStateValue(std::string_view key, std::string_view value,
+                           FilterStateLifeSpan life_span,
+                           FilterStateStreamSharing stream_sharing) override {
+    return envoy_dynamic_module_callback_http_set_filter_state_value(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()},
+        static_cast<envoy_dynamic_module_type_filter_state_life_span>(life_span),
+        static_cast<envoy_dynamic_module_type_filter_state_stream_sharing>(stream_sharing));
+  }
+
   std::optional<std::string_view> getFilterStateTyped(std::string_view key) override {
     BufferView value{nullptr, 0};
     const bool ret = envoy_dynamic_module_callback_http_get_filter_state_typed(
@@ -573,6 +598,11 @@ public:
     return envoy_dynamic_module_callback_http_set_filter_state_typed(
         host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+  }
+
+  bool hasFilterState(std::string_view key) override {
+    return envoy_dynamic_module_callback_http_has_filter_state(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()});
   }
 
   std::optional<std::string_view> getAttributeString(AttributeID id) override {
@@ -782,6 +812,13 @@ public:
   std::optional<std::string_view> getUpstreamRemoteAddress() override {
     BufferView value{nullptr, 0};
     const bool found = envoy_dynamic_module_callback_http_get_upstream_remote_address(
+        host_plugin_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
+  std::optional<std::string_view> getDownstreamDirectRemoteAddress() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
         host_plugin_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
     return bufferViewToOptionalStringView(value, found);
   }
