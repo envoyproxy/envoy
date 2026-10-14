@@ -2807,7 +2807,13 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
     }
   }
   // Finish modifying `json` (moving `model` and `stream` out to the URL path for APIs like
-  // Gemini) before validating the final request body.
+  // Gemini) before validating the final request body. Which fields leave the body follows the
+  // dialect's own envelope only: an instruction's pattern adds the path and leaves the body as
+  // the dialect has it.
+  //
+  // TODO(ginama): a provider can serve a dialect with a different envelope. Claude on Vertex AI
+  // takes `model` in the path alone and `anthropic_version` in the body. Express that adaptation
+  // explicitly, naming the fields that move, rather than inferring it from the pattern.
   std::optional<std::string> path;
   if (const UriPattern* pattern = patternFor(ctx.response_uri_pattern, envelope)) {
     absl::StatusOr<std::string> rendered =

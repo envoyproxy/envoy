@@ -515,9 +515,11 @@ TEST_F(TranscoderFilterTest, UnsetRequestHandlingPassesRequestThroughUntouched) 
 // ---------------------------------------------------------------------------
 // Transcoding instructions in filter state.
 
-// An OpenAI client, a route that declares Gemini, and a model router that chose Claude on Vertex
-// AI instead: it leaves the backend's dialect, the path Vertex expects, and the resolved model in
-// filter state, and the request goes out as Anthropic Messages to that path, naming that model.
+// An OpenAI client, a route that declares Gemini, and a model router that chose Claude behind a
+// gateway instead: it leaves the backend's dialect, the path the gateway expects, and the resolved
+// model in filter state, and the request goes out as Anthropic Messages to that path, naming that
+// model in the body as the dialect does. (Claude on Vertex AI additionally drops `model` from the
+// body and adds `anthropic_version`; that provider adaptation is not expressed yet.)
 // The response then comes back through the same instance as Anthropic, not Gemini, and names the
 // model the client asked for, not the one the router chose.
 TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChose) {
@@ -526,8 +528,7 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
       Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
   setResponseProtocolInstruction(LLMProtocol::AnthropicMessages);
   setInstruction(FilterStateKeys::UriPatternResponse,
-                 "/v1/projects/p/locations/l/publishers/anthropic/models/"
-                 "{model}:{rawPredict|streamRawPredict}");
+                 "/gateway/anthropic/{model}/{messages|messages-stream}");
   setInstruction(FilterStateKeys::ModelResolved, "claude-sonnet-4-5@20250929");
 
   FilterManager manager({std::make_shared<TranscoderFilter>(
@@ -540,8 +541,8 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
 
   ASSERT_TRUE(status_.ok()) << status_;
   EXPECT_EQ(local_reply_code_, Http::Code::OK);
-  EXPECT_EQ(request_headers_.getPathValue(), "/v1/projects/p/locations/l/publishers/anthropic/"
-                                             "models/claude-sonnet-4-5@20250929:rawPredict");
+  EXPECT_EQ(request_headers_.getPathValue(),
+            "/gateway/anthropic/claude-sonnet-4-5@20250929/messages");
   const nlohmann::json out = forwarded();
   EXPECT_EQ(out["model"], "claude-sonnet-4-5@20250929");
   EXPECT_EQ(out["max_tokens"], 16);

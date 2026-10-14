@@ -1452,20 +1452,18 @@ TEST(TranscodingEngineTest, ResponseUriPatternRendersTheUpstreamPath) {
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
 
-  const absl::StatusOr<UriPattern> vertex_claude =
-      UriPattern::parse("/v1/projects/p/locations/l/publishers/anthropic/models/"
-                        "{model}:{rawPredict|streamRawPredict}");
-  ASSERT_THAT(vertex_claude.status(), IsOk());
+  const absl::StatusOr<UriPattern> gateway_claude =
+      UriPattern::parse("/gateway/anthropic/{model}/{messages|messages-stream}");
+  ASSERT_THAT(gateway_claude.status(), IsOk());
   nlohmann::json anthropic = nlohmann::json::parse(R"({
     "model": "claude-sonnet-4-5", "stream": true, "max_completion_tokens": 16,
     "messages": [{"role": "user", "content": "Hi"}]
   })");
   TranscodeContext ctx;
-  ctx.response_uri_pattern = &*vertex_claude;
+  ctx.response_uri_pattern = &*gateway_claude;
   ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, anthropic), IsOk());
-  EXPECT_THAT(ctx.rewritten_path,
-              testing::Optional(std::string("/v1/projects/p/locations/l/publishers/anthropic/"
-                                            "models/claude-sonnet-4-5:streamRawPredict")));
+  EXPECT_THAT(ctx.rewritten_path, testing::Optional(std::string(
+                                      "/gateway/anthropic/claude-sonnet-4-5/messages-stream")));
   EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
   EXPECT_EQ(anthropic["stream"], true);
 
@@ -1514,23 +1512,21 @@ TEST(TranscodingEngineTest, ResolvedModelReplacesTheRequestedOne) {
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
 
-  const absl::StatusOr<UriPattern> vertex_claude =
-      UriPattern::parse("/v1/projects/p/locations/l/publishers/anthropic/models/"
-                        "{model}:{rawPredict|streamRawPredict}");
-  ASSERT_THAT(vertex_claude.status(), IsOk());
+  const absl::StatusOr<UriPattern> gateway_claude =
+      UriPattern::parse("/gateway/anthropic/{model}/{messages|messages-stream}");
+  ASSERT_THAT(gateway_claude.status(), IsOk());
   nlohmann::json anthropic = nlohmann::json::parse(R"({
     "model": "claude-sonnet", "max_completion_tokens": 16,
     "messages": [{"role": "user", "content": "Hi"}]
   })");
   TranscodeContext ctx;
   ctx.resolved_model = "claude-sonnet-4-5@20250929";
-  ctx.response_uri_pattern = &*vertex_claude;
+  ctx.response_uri_pattern = &*gateway_claude;
   ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, anthropic), IsOk());
   EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5@20250929");
   EXPECT_EQ(ctx.ir_model, "claude-sonnet");
-  EXPECT_THAT(ctx.rewritten_path,
-              testing::Optional(std::string("/v1/projects/p/locations/l/publishers/anthropic/"
-                                            "models/claude-sonnet-4-5@20250929:rawPredict")));
+  EXPECT_THAT(ctx.rewritten_path, testing::Optional(std::string(
+                                      "/gateway/anthropic/claude-sonnet-4-5@20250929/messages")));
 
   // It fills in a model the request never named, too.
   nlohmann::json gemini =
