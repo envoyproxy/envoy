@@ -116,6 +116,21 @@ TEST(ResponseLlmProtocolTest, ReadsItsOwnKeyOnly) {
   EXPECT_EQ(RequestLlmProtocol::fromFilterState(filter_state), LLMProtocol::Unspecified);
 }
 
+// The backend API in effect: filter state when set, else whatever the route declared.
+TEST(ResponseLlmProtocolTest, ResolvesFilterStateOverTheRoute) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(ResponseLlmProtocol::resolve(filter_state, LLMProtocol::GeminiGenerateContent),
+            LLMProtocol::GeminiGenerateContent);
+  EXPECT_EQ(ResponseLlmProtocol::resolve(filter_state, LLMProtocol::Unspecified),
+            LLMProtocol::Unspecified);
+
+  filter_state.setData(FilterStateKeys::LlmProtocolResponse,
+                       std::make_shared<ResponseLlmProtocol>(LLMProtocol::AnthropicMessages),
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(ResponseLlmProtocol::resolve(filter_state, LLMProtocol::GeminiGenerateContent),
+            LLMProtocol::AnthropicMessages);
+}
+
 class StringKeyFactoryTest : public testing::TestWithParam<absl::string_view> {};
 
 INSTANTIATE_TEST_SUITE_P(StringKeys, StringKeyFactoryTest,

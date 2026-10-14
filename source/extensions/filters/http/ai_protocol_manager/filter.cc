@@ -561,14 +561,17 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   }
 
   if (want_token_usage) {
-    // The wire API to extract against, in precedence order: the route's declared
-    // response API, the route's declared request API, the configured fallback;
-    // Unspecified auto-detects from the response shape.
+    // The wire API to extract against, in precedence order: the backend API a filter left in
+    // filter state, the route's declared response API, the route's declared request API, the
+    // configured fallback; Unspecified auto-detects from the response shape. Resolved through
+    // the same rule the transcoder follows, so the two cannot disagree about the backend.
     LLMProtocol protocol = config_->defaultLLMProtocol();
     if (route_config != nullptr &&
         route_config->effectiveResponseProtocol() != LLMProtocol::Unspecified) {
       protocol = route_config->effectiveResponseProtocol();
     }
+    protocol =
+        ResponseLlmProtocol::resolve(*encoder_callbacks_->streamInfo().filterState(), protocol);
 
     // Observation buffers charge the stream's memory account when tracking is
     // enabled; in an upstream installation the decoder callbacks resolve to the

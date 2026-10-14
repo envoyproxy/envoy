@@ -1080,12 +1080,32 @@ TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRout
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
 
-// The per-route response API outranks the per-route request API, which
-// outranks the configured fallback.
+// The backend API left in filter state outranks the per-route response API,
+// which outranks the per-route request API, which outranks the configured
+// fallback.
 TEST_F(AiProtocolManagerFilterResponseTest, PerRouteProtocolPrecedence) {
   // The ambiguous body below carries Anthropic-style usage keys with no
   // detectable shape marker, so whichever protocol seeds extraction wins.
   const std::string ambiguous = "{\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}";
+
+  // filter state (ANTHROPIC_MESSAGES) > route response (GEMINI_GENERATE_CONTENT): a model
+  // router that sent the request elsewhere also decides what the response is read as.
+  setup("{default_llm_protocol: OPENAI_CHAT_COMPLETIONS}");
+  PerRouteProto rerouted;
+  rerouted.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  rerouted.mutable_response()->set_llm_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  setEncodeRouteConfig(rerouted);
+  encoder_callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::LlmProtocolResponse,
+      std::make_shared<ResponseLlmProtocol>(LLMProtocol::AnthropicMessages),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  sendHeaders("application/json");
+  sendData(ambiguous, true);
+  {
+    const auto typed = singleTypedWrite("envoy.ai.token_usage");
+    ASSERT_TRUE(typed.has_value());
+    EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  }
 
   // route response (ANTHROPIC_MESSAGES) > route request (OPENAI_CHAT_COMPLETIONS).
   setup("{default_llm_protocol: GEMINI_GENERATE_CONTENT}");

@@ -260,10 +260,7 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
 
 absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstructions() {
   const StreamInfo::FilterState& filter_state = *filter_state_;
-  if (const LLMProtocol declared = ResponseLlmProtocol::fromFilterState(filter_state);
-      declared != LLMProtocol::Unspecified) {
-    target_protocol_ = declared;
-  }
+  target_protocol_ = ResponseLlmProtocol::resolve(filter_state, target_protocol_);
 
   Instructions instructions;
   // The two patterns, each read from its key into its slot.

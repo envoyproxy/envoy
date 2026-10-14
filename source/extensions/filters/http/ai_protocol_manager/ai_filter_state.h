@@ -74,6 +74,15 @@ public:
   static LLMProtocol fromFilterState(const StreamInfo::FilterState& filter_state) {
     return read(filter_state, FilterStateKeys::LlmProtocolResponse);
   }
+
+  // The backend's wire API in effect for this stream: the filter state object when one is set,
+  // else `route_declared`. Every reader of the backend's API (the transcoder's legs, token usage
+  // extraction) resolves it through here, so they cannot disagree.
+  static LLMProtocol resolve(const StreamInfo::FilterState& filter_state,
+                             LLMProtocol route_declared) {
+    const LLMProtocol declared = fromFilterState(filter_state);
+    return declared != LLMProtocol::Unspecified ? declared : route_declared;
+  }
 };
 
 // The string a Router::StringAccessor at `key` holds; nullopt when no object is set.
