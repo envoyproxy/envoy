@@ -108,6 +108,13 @@ PendingStreamPtr ConnPoolImplBase::removePendingStream(PendingStream& stream) {
   return pending_stream;
 }
 
+void ConnPoolImplBase::dropPendingStream(PendingStreamPtr pending_stream) {
+  ENVOY_LOG(debug, "dropping pending stream due to CoDel overload");
+  host_->cluster().trafficStats()->upstream_rq_pending_dropped_codel_.inc();
+  onPoolFailure(nullptr, "pending request dropped by CoDel",
+                ConnectionPool::PoolFailureReason::Overflow, pending_stream->context());
+}
+
 void ConnPoolImplBase::updateQueueOverloadedGauge() {
   const bool queue_overloaded = pending_stream_queue_->isOverloaded();
   if (queue_overloaded == queue_overloaded_) {
@@ -475,6 +482,16 @@ void ConnPoolImplBase::scheduleOnUpstreamReady() {
 void ConnPoolImplBase::onUpstreamReady() {
   while (hasPendingStreams() && !ready_clients_.empty()) {
     ActiveClientPtr& client = ready_clients_.front();
+    PendingStream& stream = pending_stream_queue_->peek();
+    if (pending_stream_queue_->onDequeue(stream, dispatcher_.timeSource().monotonicTime()) ==
+        Extensions::QueuePolicy::DequeueAction::Drop) {
+      PendingStreamPtr pending_stream = removePendingStream(stream);
+      cluster_connectivity_state_.decrPendingStreams(1);
+      updateQueueOverloadedGauge();
+      dropPendingStream(std::move(pending_stream));
+      continue;
+    }
+
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
       PendingStreamPtr pending_stream = popPendingStream();
@@ -482,7 +499,6 @@ void ConnPoolImplBase::onUpstreamReady() {
       updateQueueOverloadedGauge();
       attachStreamToClient(*client, pending_stream->context());
     } else {
-      PendingStream& stream = pending_stream_queue_->peek();
       attachStreamToClient(*client, stream.context());
       cluster_connectivity_state_.decrPendingStreams(1);
       removePendingStream(stream);
@@ -884,6 +900,15 @@ void ConnPoolImplBase::onUpstreamReadyForEarlyData(ActiveClient& client) {
       return false;
     }
     if (stream.can_send_early_data_) {
+      if (pending_stream_queue_->onDequeue(stream, dispatcher_.timeSource().monotonicTime()) ==
+          Extensions::QueuePolicy::DequeueAction::Drop) {
+        PendingStreamPtr pending_stream = removePendingStream(stream);
+        cluster_connectivity_state_.decrPendingStreams(1);
+        updateQueueOverloadedGauge();
+        dropPendingStream(std::move(pending_stream));
+        return true;
+      }
+
       ENVOY_CONN_LOG(debug, "creating stream for early data.", client);
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
         PendingStreamPtr pending_stream = removePendingStream(stream);

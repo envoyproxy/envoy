@@ -479,8 +479,9 @@
 
 # Queue policy
 /*/extensions/queue_policy/adaptive_lifo @nezdolik @tonya11en @yanavlasov
-/*/extensions/queue_policy/common @nezdolik @yanavlasov @tonya11en @balrawi-figma
-/*/extensions/queue_policy/fifo @nezdolik @yanavlasov @tonya11en @balrawi-figma
+/*/extensions/queue_policy/codel @nezdolik @yanavlasov @tonya11en
+/*/extensions/queue_policy/common @nezdolik @yanavlasov @tonya11en
+/*/extensions/queue_policy/fifo @nezdolik @yanavlasov @tonya11en
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
