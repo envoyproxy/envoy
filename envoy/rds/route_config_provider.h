@@ -17,9 +17,12 @@ namespace Rds {
 class RouteConfigProvider {
 public:
   struct ConfigInfo {
-    // A reference to the currently loaded route configuration. Do not hold this reference beyond
-    // the caller of configInfo()'s scope.
-    const Protobuf::Message& config_;
+    // The serialized wire-format bytes of the currently loaded route configuration. Do not hold
+    // this reference beyond the caller of configInfo()'s scope.
+    const std::string& config_;
+
+    // The name of the route configuration.
+    const std::string name_;
 
     // The discovery version that supplied this route. This will be set to "" in the case of
     // static clusters.

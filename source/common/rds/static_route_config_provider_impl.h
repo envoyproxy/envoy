@@ -29,7 +29,8 @@ public:
   absl::Status onConfigUpdate() override { return absl::OkStatus(); }
 
 private:
-  ProtobufTypes::MessagePtr route_config_proto_;
+  std::string serialized_route_config_proto_;
+  std::string route_config_name_;
   ConfigConstSharedPtr config_;
   SystemTime last_updated_;
   std::optional<ConfigInfo> config_info_;

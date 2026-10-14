@@ -107,9 +107,10 @@ public:
   }
 
 private:
-  const Protobuf::Message& latestProtobufConfiguration() const {
-    return base_.warming_state_.route_config_proto_ ? *base_.warming_state_.route_config_proto_
-                                                    : *base_.route_config_proto_;
+  const std::string& latestSerializedRouteConfiguration() const {
+    return base_.warming_state_.serialized_route_config_proto_.has_value()
+               ? *base_.warming_state_.serialized_route_config_proto_
+               : base_.serialized_route_config_proto_;
   }
 
   absl::StatusOr<VhdsSubscriptionPtr>

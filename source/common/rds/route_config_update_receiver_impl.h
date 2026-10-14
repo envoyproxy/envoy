@@ -110,10 +110,11 @@ private:
   std::string update_id_;
 };
 
-// The state of one route configuration: the proto it was built from, the parsed configuration and
-// the bookkeeping that goes with them.
+// The state of one route configuration: the serialized wire-format bytes, route config name,
+// the parsed configuration and the bookkeeping that goes with them.
 struct WarmingConfigState {
-  ProtobufTypes::MessagePtr route_config_proto_;
+  std::optional<std::string> serialized_route_config_proto_;
+  std::string route_config_name_;
   ConfigConstSharedPtr config_;
   std::string version_info_;
   // This will be nullopt if the state is generated from VHDS updates.
@@ -121,7 +122,8 @@ struct WarmingConfigState {
   SystemTime last_updated_;
 
   void clear() {
-    route_config_proto_.reset();
+    serialized_route_config_proto_.reset();
+    route_config_name_.clear();
     config_.reset();
     version_info_.clear();
     last_config_hash_.reset();
@@ -147,8 +149,8 @@ public:
   // Builds a new route configuration and installs the init manager that its resources warm up
   // with, but doesn't warm anything up or publish anything yet. The caller finishes applying the
   // update and then calls startWarming(), which eventually publishes it.
-  void updateConfig(std::unique_ptr<Protobuf::Message> route_config_proto,
-                    std::optional<uint64_t> hash, absl::string_view version_info);
+  void updateConfig(const Protobuf::Message& route_config_proto, std::optional<uint64_t> hash,
+                    absl::string_view version_info);
   // Warms up the route configuration built by the last updateConfig() call and publishes it once
   // it's ready. Note that this may happen before this method returns, i.e. synchronously, if there
   // is nothing to warm up.
@@ -167,14 +169,14 @@ public:
 
   uint64_t configHash() const override { return last_config_hash_; }
   const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const override;
-  const Protobuf::Message& protobufConfiguration() const override { return *route_config_proto_; }
+  const Protobuf::Message& protobufConfiguration() const override;
   ConfigConstSharedPtr parsedConfiguration() const override { return config_; }
   SystemTime lastUpdated() const override { return last_updated_; }
 
 private:
   friend class Envoy::Router::RouteConfigUpdateReceiverImpl;
 
-  void updateState(std::unique_ptr<Protobuf::Message> route_config_proto,
+  void updateState(std::string serialized_route_config_proto, std::string route_config_name,
                    std::optional<uint64_t> hash, absl::string_view version_info,
                    ConfigConstSharedPtr config,
                    std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id);
@@ -185,7 +187,9 @@ private:
   ProtoTraits& proto_traits_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   TimeSource& time_source_;
-  ProtobufTypes::MessagePtr route_config_proto_;
+  std::string serialized_route_config_proto_;
+  std::string route_config_name_;
+  mutable ProtobufTypes::MessagePtr route_config_proto_cache_;
   uint64_t last_config_hash_{0ull};
   SystemTime last_updated_;
   std::optional<RouteConfigProvider::ConfigInfo> config_info_;

@@ -3,12 +3,6 @@
 namespace Envoy {
 namespace Rds {
 
-ProtobufTypes::MessagePtr cloneProto(ProtoTraits& proto_traits, const Protobuf::Message& rc) {
-  auto clone = proto_traits.createEmptyProto();
-  clone->CheckTypeAndMergeFrom(rc);
-  return clone;
-}
-
 std::string resourceName(ProtoTraits& proto_traits, const Protobuf::Message& rc) {
   Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(rc);
   const Protobuf::FieldDescriptor* field = reflectable_message->GetDescriptor()->FindFieldByNumber(

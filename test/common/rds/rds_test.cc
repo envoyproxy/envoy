@@ -153,6 +153,24 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   EXPECT_EQ(1, config.use_count());
 }
 
+TEST_F(RdsConfigUpdateReceiverTest, EmptyRouteConfig) {
+  setup();
+
+  envoy::config::route::v3::RouteConfiguration empty_config;
+  SystemTime time1(std::chrono::milliseconds(1234567891234));
+  timeSystem().setSystemTime(time1);
+
+  EXPECT_OK(config_update_->onRdsUpdate(empty_config, "empty_version"));
+  EXPECT_TRUE(config_update_->configInfo().has_value());
+  EXPECT_EQ("", config_update_->configInfo().value().name_);
+  EXPECT_EQ("empty_version", config_update_->configInfo().value().version_);
+  EXPECT_EQ("", config_update_->configInfo().value().config_);
+  EXPECT_EQ(time1, config_update_->lastUpdated());
+
+  const auto& proto = config_update_->protobufConfiguration();
+  EXPECT_EQ("", dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(proto).name());
+}
+
 class RdsConfigProviderManagerTest : public RdsTestBase {
 public:
   RdsConfigProviderManagerTest() : manager_(server_factory_context_.admin_) {}

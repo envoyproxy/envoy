@@ -56,30 +56,29 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
     ConfigTraits& config_traits, ProtoTraits& proto_traits,
     Server::Configuration::ServerFactoryContext& factory_context)
     : config_traits_(config_traits), proto_traits_(proto_traits), factory_context_(factory_context),
-      time_source_(factory_context.timeSource()),
-      route_config_proto_(proto_traits_.createEmptyProto()),
-      config_(config_traits_.createNullConfig()),
+      time_source_(factory_context.timeSource()), config_(config_traits_.createNullConfig()),
       warmer_(factory_context_.mainThreadDispatcher(), [this]() { onConfigWarmed(); }) {}
 
-void RouteConfigUpdateReceiverImpl::updateConfig(
-    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
-    absl::string_view version_info) {
-  std::string update_id =
-      fmt::format("rds {}:{}", resourceName(proto_traits_, *route_config_proto), version_info);
+void RouteConfigUpdateReceiverImpl::updateConfig(const Protobuf::Message& route_config_proto,
+                                                 std::optional<uint64_t> hash,
+                                                 absl::string_view version_info) {
+  std::string route_config_name = resourceName(proto_traits_, route_config_proto);
+  std::string update_id = fmt::format("rds {}:{}", route_config_name, version_info);
   // The init manager is kept local until the new route configuration is known to be built without
   // throwing, so that a rejected update leaves a previous update that is still warming up alone.
   auto update_init_manager = warmer_.createInitManager(update_id);
   auto config =
-      config_traits_.createConfig(*route_config_proto, factory_context_, *update_init_manager,
+      config_traits_.createConfig(route_config_proto, factory_context_, *update_init_manager,
                                   false /* not validate unknown cluster */);
 
-  updateState(std::move(route_config_proto), hash, version_info, std::move(config),
-              std::move(update_init_manager), std::move(update_id));
+  std::string serialized_proto = route_config_proto.SerializeAsString();
+  updateState(std::move(serialized_proto), std::move(route_config_name), hash, version_info,
+              std::move(config), std::move(update_init_manager), std::move(update_id));
 }
 
 void RouteConfigUpdateReceiverImpl::updateState(
-    std::unique_ptr<Protobuf::Message> route_config_proto, std::optional<uint64_t> hash,
-    absl::string_view version_info, ConfigConstSharedPtr config,
+    std::string serialized_route_config_proto, std::string route_config_name,
+    std::optional<uint64_t> hash, absl::string_view version_info, ConfigConstSharedPtr config,
     std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id) {
   // Abort a previous warming update first to ensure the init watcher will never be notified when
   // destroying the previous configuration.
@@ -89,7 +88,8 @@ void RouteConfigUpdateReceiverImpl::updateState(
     warmer_.abortWarming();
   }
 
-  warming_state_.route_config_proto_ = std::move(route_config_proto);
+  warming_state_.serialized_route_config_proto_ = std::move(serialized_route_config_proto);
+  warming_state_.route_config_name_ = std::move(route_config_name);
   warming_state_.config_ = std::move(config);
   // If previously, there was a pending RDS update that contains a hash. And then a new VHDS
   // update arrives, the new VHDS update will not contain a hash. In this case, we should keep the
@@ -116,7 +116,7 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
     return absl::OkStatus();
   }
 
-  updateConfig(cloneProto(proto_traits_, rc), new_hash, version_info);
+  updateConfig(rc, new_hash, version_info);
   startWarming();
   return absl::OkStatus();
 }
@@ -125,15 +125,19 @@ void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
   // Mark that we have received at least one valid route configuration update.
   initialized_ = true;
 
-  if (warming_state_.route_config_proto_ != nullptr) {
-    route_config_proto_ = std::move(warming_state_.route_config_proto_);
+  if (warming_state_.serialized_route_config_proto_.has_value()) {
+    serialized_route_config_proto_ = std::move(*warming_state_.serialized_route_config_proto_);
+    route_config_name_ = std::move(warming_state_.route_config_name_);
     config_ = std::move(warming_state_.config_);
     // Only update the last config hash if it was set in the warming state.
     if (warming_state_.last_config_hash_.has_value()) {
       last_config_hash_ = warming_state_.last_config_hash_.value();
     }
     last_updated_ = warming_state_.last_updated_;
-    config_info_.emplace(*route_config_proto_, std::move(warming_state_.version_info_));
+    config_info_.emplace(RouteConfigProvider::ConfigInfo{serialized_route_config_proto_,
+                                                         route_config_name_,
+                                                         std::move(warming_state_.version_info_)});
+    route_config_proto_cache_.reset();
   }
   // Defensively clear the warming state.
   warming_state_.clear();
@@ -142,6 +146,15 @@ void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
 const std::optional<RouteConfigProvider::ConfigInfo>&
 RouteConfigUpdateReceiverImpl::configInfo() const {
   return config_info_;
+}
+
+const Protobuf::Message& RouteConfigUpdateReceiverImpl::protobufConfiguration() const {
+  if (route_config_proto_cache_ == nullptr) {
+    route_config_proto_cache_ = proto_traits_.createEmptyProto();
+    RELEASE_ASSERT(route_config_proto_cache_->ParseFromString(serialized_route_config_proto_),
+                   "Failed to deserialize RouteConfiguration from wire bytes");
+  }
+  return *route_config_proto_cache_;
 }
 
 } // namespace Rds
