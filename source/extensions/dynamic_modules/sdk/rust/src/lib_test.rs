@@ -2279,6 +2279,54 @@ const HTTP_UPSTREAM_REMOTE_ADDRESS: &[u8] = b"10.0.0.3:9443";
 const HTTP_UPSTREAM_HOSTS_ATTEMPTED: [&[u8]; 2] = [b"10.0.0.1:443", b"10.0.0.2:8443"];
 const HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED: [u64; 3] = [10, 20, 30];
 
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE: usize = 4;
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL: usize = 5;
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS: &[u8] = b"[2001:db8::40]:54321";
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  match filter_envoy_ptr as usize {
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE => {
+      unsafe {
+        *result = abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS.as_ptr() as *mut _,
+          length: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS.len(),
+        };
+      }
+      true
+    },
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL => true,
+    _ => false,
+  }
+}
+
+#[test]
+fn test_http_get_downstream_direct_remote_address() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE as *mut _,
+  };
+  assert_eq!(
+    filter
+      .get_downstream_direct_remote_address()
+      .unwrap()
+      .as_slice(),
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS
+  );
+}
+
+#[test]
+fn test_http_get_downstream_direct_remote_address_unavailable() {
+  for raw_ptr in [0, HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL] {
+    let filter = http::EnvoyHttpFilterImpl {
+      raw_ptr: raw_ptr as *mut _,
+    };
+    assert!(filter.get_downstream_direct_remote_address().is_none());
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_remote_address(
   filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -4785,6 +4833,30 @@ fn test_http_filter_state_object_round_trip() {
   assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_set_filter_state_value(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+  _life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  _stream_sharing: abi::envoy_dynamic_module_type_filter_state_stream_sharing,
+) -> bool {
+  true
+}
+
+#[test]
+fn test_http_set_filter_state_value() {
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  assert!(envoy_filter.set_filter_state_value(
+    b"key",
+    b"value",
+    abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection,
+  ));
+}
+
 // Single-slot store backing the has_filter_state FFI stub below.
 static HAS_FILTER_STATE_RESULT: std::sync::atomic::AtomicBool =
   std::sync::atomic::AtomicBool::new(false);
@@ -5348,6 +5420,12 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_remove_hosts(
 
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_use_persistent_host_map(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
 ) {
 }
@@ -9546,6 +9624,11 @@ fn test_transport_socket_io_result_conversions() {
   assert_eq!(close.bytes_processed, 3);
   assert!(!close.end_stream_read);
 
+  let reset = IoResult::reset(5);
+  assert_eq!(reset.action, PostIoAction::Reset);
+  assert_eq!(reset.bytes_processed, 5);
+  assert!(!reset.end_stream_read);
+
   // Round-trip through the ABI representation in both directions.
   let abi_result: abi::envoy_dynamic_module_type_transport_socket_io_result = keep.into();
   assert_eq!(abi_result.bytes_processed, 7);
@@ -9555,7 +9638,11 @@ fn test_transport_socket_io_result_conversions() {
 
 #[test]
 fn test_transport_socket_post_io_action_conversions() {
-  for action in [PostIoAction::KeepOpen, PostIoAction::Close] {
+  for action in [
+    PostIoAction::KeepOpen,
+    PostIoAction::Close,
+    PostIoAction::Reset,
+  ] {
     let abi_action: abi::envoy_dynamic_module_type_transport_socket_post_io_action = action.into();
     assert_eq!(PostIoAction::from(abi_action), action);
   }
@@ -10117,6 +10204,126 @@ fn test_mock_envoy_transport_socket_fd_and_write_rearm() {
     socket.on_do_write(&mut mock, false),
     IoResult::keep_open(0, false)
   );
+}
+
+// =============================================================================
+// Transport Socket Relay FFI stubs and tests.
+// =============================================================================
+
+const STUB_TRANSPORT_SOCKET_CONNECTION_ID: u64 = 41;
+const STUB_TRANSPORT_SOCKET_UPSTREAM_CONNECTION_ID: u64 = 42;
+const STUB_TRANSPORT_SOCKET_BYTES_WRITTEN: usize = 4;
+
+// Single-slot store backing the add_wire_bytes FFI stub below.
+static STUB_TRANSPORT_SOCKET_WIRE_BYTES: std::sync::Mutex<(u64, u64)> =
+  std::sync::Mutex::new((0, 0));
+
+// A null pointer stands in for a transport socket whose callbacks are unavailable.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(
+  envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  max_length: usize,
+  bytes_read: *mut usize,
+) -> abi::envoy_dynamic_module_type_transport_socket_io_status {
+  if envoy_ptr.is_null() {
+    return abi::envoy_dynamic_module_type_transport_socket_io_status::Error;
+  }
+  unsafe { *bytes_read = max_length };
+  abi::envoy_dynamic_module_type_transport_socket_io_status::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(
+  envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  bytes_written: *mut usize,
+) -> abi::envoy_dynamic_module_type_transport_socket_io_status {
+  if envoy_ptr.is_null() {
+    return abi::envoy_dynamic_module_type_transport_socket_io_status::Error;
+  }
+  unsafe { *bytes_written = STUB_TRANSPORT_SOCKET_BYTES_WRITTEN };
+  abi::envoy_dynamic_module_type_transport_socket_io_status::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_get_connection_id(
+  envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  connection_id_out: *mut u64,
+) -> bool {
+  if envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe { *connection_id_out = STUB_TRANSPORT_SOCKET_CONNECTION_ID };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+  envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  connection_id_out: *mut u64,
+) -> bool {
+  if envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe { *connection_id_out = STUB_TRANSPORT_SOCKET_UPSTREAM_CONNECTION_ID };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_add_wire_bytes(
+  _envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  bytes_received: u64,
+  bytes_sent: u64,
+) {
+  *STUB_TRANSPORT_SOCKET_WIRE_BYTES.lock().unwrap() = (bytes_received, bytes_sent);
+}
+
+// Any non-null pointer works because the stubs never dereference it.
+fn stub_transport_socket_envoy_ptr() -> abi::envoy_dynamic_module_type_transport_socket_envoy_ptr {
+  1 as abi::envoy_dynamic_module_type_transport_socket_envoy_ptr
+}
+
+#[test]
+fn test_envoy_transport_socket_impl_envoy_ptr_round_trips() {
+  let raw = stub_transport_socket_envoy_ptr();
+  assert_eq!(EnvoyTransportSocketImpl::new(raw).envoy_ptr(), raw);
+}
+
+#[test]
+fn test_envoy_transport_socket_impl_buffer_io() {
+  let envoy = EnvoyTransportSocketImpl::new(stub_transport_socket_envoy_ptr());
+  assert_eq!(envoy.io_read_to_read_buffer(3), (IoStatus::Success, 3));
+  assert_eq!(
+    envoy.io_write_from_write_buffer(),
+    (IoStatus::Success, STUB_TRANSPORT_SOCKET_BYTES_WRITTEN)
+  );
+
+  let unset = EnvoyTransportSocketImpl::new(std::ptr::null_mut());
+  assert_eq!(unset.io_read_to_read_buffer(3), (IoStatus::Error, 0));
+  assert_eq!(unset.io_write_from_write_buffer(), (IoStatus::Error, 0));
+}
+
+#[test]
+fn test_envoy_transport_socket_impl_connection_ids() {
+  let envoy = EnvoyTransportSocketImpl::new(stub_transport_socket_envoy_ptr());
+  assert_eq!(
+    envoy.get_connection_id(),
+    Some(STUB_TRANSPORT_SOCKET_CONNECTION_ID)
+  );
+  assert_eq!(
+    envoy.get_upstream_connection_id(),
+    Some(STUB_TRANSPORT_SOCKET_UPSTREAM_CONNECTION_ID)
+  );
+
+  let unset = EnvoyTransportSocketImpl::new(std::ptr::null_mut());
+  assert_eq!(unset.get_connection_id(), None);
+  assert_eq!(unset.get_upstream_connection_id(), None);
+}
+
+#[test]
+fn test_envoy_transport_socket_impl_add_wire_bytes() {
+  let envoy = EnvoyTransportSocketImpl::new(stub_transport_socket_envoy_ptr());
+  envoy.add_wire_bytes(5, 7);
+  assert_eq!(*STUB_TRANSPORT_SOCKET_WIRE_BYTES.lock().unwrap(), (5, 7));
 }
 
 // =============================================================================

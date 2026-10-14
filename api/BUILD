@@ -5,6 +5,12 @@ load("@rules_proto//proto:defs.bzl", "proto_descriptor_set")
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    ".bazelrc",
+    "MODULE.bazel",
+    "MODULE.bazel.lock",
+])
+
 proto_library(
     name = "v2_protos",
     visibility = ["//visibility:public"],
@@ -153,6 +159,7 @@ proto_library(
         "//envoy/extensions/access_loggers/stats/v3:pkg",
         "//envoy/extensions/access_loggers/stream/v3:pkg",
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
+        "//envoy/extensions/ai_protocol_manager/external_buffer/in_memory/v3:pkg",
         "//envoy/extensions/bootstrap/dynamic_modules/v3:pkg",
         "//envoy/extensions/bootstrap/internal_listener/v3:pkg",
         "//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg",
@@ -363,6 +370,7 @@ proto_library(
         "//envoy/extensions/internal_redirect/previous_routes/v3:pkg",
         "//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg",
         "//envoy/extensions/key_value/file_based/v3:pkg",
+        "//envoy/extensions/load_balancing_policies/autosharding/v3:pkg",
         "//envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3:pkg",
         "//envoy/extensions/load_balancing_policies/cluster_provided/v3:pkg",
         "//envoy/extensions/load_balancing_policies/common/v3:pkg",
@@ -390,6 +398,7 @@ proto_library(
         "//envoy/extensions/matching/input_matchers/ip/v3:pkg",
         "//envoy/extensions/matching/input_matchers/metadata/v3:pkg",
         "//envoy/extensions/matching/input_matchers/runtime_fraction/v3:pkg",
+        "//envoy/extensions/matching/input_matchers/uri_template/v3:pkg",
         "//envoy/extensions/network/dns_resolver/apple/v3:pkg",
         "//envoy/extensions/network/dns_resolver/cares/v3:pkg",
         "//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg",

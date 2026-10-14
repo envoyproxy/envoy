@@ -345,6 +345,21 @@ fn test_dynamic_metadata_callbacks_on_response_body() {
     })
     .return_const(())
     .once();
+  envoy_filter
+    .expect_get_typed_metadata()
+    .withf(|source, ns| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Dynamic
+        && ns == "ns_req_header_typed"
+    })
+    .returning(|_, _| Some((EnvoyBuffer::new(b"t/x"), EnvoyBuffer::new(&[0x01, 0x02]))))
+    .once();
+  envoy_filter
+    .expect_get_typed_metadata()
+    .withf(|source, ns| {
+      *source == abi::envoy_dynamic_module_type_metadata_source::Dynamic && ns == "missing"
+    })
+    .returning(|_, _| None)
+    .once();
   // Route/Cluster/Host metadata.
   envoy_filter
     .expect_get_metadata_string()
@@ -794,6 +809,22 @@ fn test_filter_state_callbacks_on_request_headers() {
     .expect_get_filter_state_bytes()
     .withf(|key| key == b"req_header_key")
     .returning(|_| Some(EnvoyBuffer::new(b"req_header_value")))
+    .once();
+  envoy_filter
+    .expect_set_filter_state_value()
+    .withf(|key, value, life_span, stream_sharing| {
+      key == b"shared_filter_state_key"
+        && value == b"shared_filter_state_value"
+        && *life_span == abi::envoy_dynamic_module_type_filter_state_life_span::Connection
+        && *stream_sharing
+          == abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection
+    })
+    .return_const(true)
+    .once();
+  envoy_filter
+    .expect_get_filter_state_bytes()
+    .withf(|key| key == b"shared_filter_state_key")
+    .returning(|_| Some(EnvoyBuffer::new(b"shared_filter_state_value")))
     .once();
   envoy_filter
     .expect_get_filter_state_bytes()

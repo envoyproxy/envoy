@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
@@ -42,6 +43,12 @@ struct EndpointKey {
   template <typename H> friend H AbslHashValue(H h, const EndpointKey& k) {
     return H::combine(std::move(h), k.host, k.path);
   }
+};
+
+struct McpParamHeaderMapping {
+  Http::LowerCaseString header_name;
+  std::vector<std::string> property_path;
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpParamHeader::Type type;
 };
 
 // Cache hints returned in locally served tools/list responses.
@@ -97,6 +104,10 @@ public:
   bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
                                    absl::string_view path) const;
 
+  const std::vector<McpParamHeaderMapping>& mcpParamHeaders(absl::string_view tool_name,
+                                                            absl::string_view host,
+                                                            absl::string_view path) const;
+
   bool shouldStoreToDynamicMetadata() const {
     return proto_config_.request_storage_mode() ==
            envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::
@@ -124,6 +135,7 @@ private:
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig* tool_proto;
+    std::vector<McpParamHeaderMapping> mcp_param_headers;
   };
   struct EndpointConfig {
     absl::flat_hash_map<std::string, ToolEntry> tool_entries;
@@ -176,6 +188,10 @@ public:
   bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
                                    absl::string_view path) const;
 
+  const std::vector<McpParamHeaderMapping>& mcpParamHeaders(absl::string_view tool_name,
+                                                            absl::string_view host,
+                                                            absl::string_view path) const;
+
 private:
   explicit McpJsonRestBridgePerRouteConfig(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
@@ -187,6 +203,7 @@ private:
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig* tool_proto;
+    std::vector<McpParamHeaderMapping> mcp_param_headers;
   };
   struct EndpointConfig {
     absl::flat_hash_map<std::string, ToolEntry> tool_entries;
@@ -244,6 +261,14 @@ private:
   // "params.name" field for a tools/call request.
   bool validateMcpNameHeader(const nlohmann::json& json_rpc, absl::string_view method,
                              Http::RequestHeaderMapOptRef request_headers);
+
+  // Validates the configured "Mcp-Param-{name}" request headers of a resolved tool against the
+  // tools/call "arguments". Request headers without a configured mapping are not inspected.
+  // Returns true when every mapping is valid. Otherwise sends a local HeaderMismatch error response
+  // and returns false.
+  bool validateMcpParamHeaders(const std::vector<McpParamHeaderMapping>& mappings,
+                               const nlohmann::json& arguments, const nlohmann::json& params,
+                               Http::RequestHeaderMapOptRef request_headers);
 
   // Serves a local tools/list response using tools' ToolsListSpecificConfig.
   void serveToolsListLocal(

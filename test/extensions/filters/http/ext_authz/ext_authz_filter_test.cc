@@ -4487,6 +4487,60 @@ TEST_F(HttpFilterTest, RequestHeaderLimitsReachedDuringRemoval) {
   EXPECT_EQ(1U, config_->stats().request_header_limits_reached_.value());
 }
 
+// Verifies that a check request can be built without crashing when the stream has no downstream
+// connection (for example when the filter runs in an upstream filter chain driven by the async
+// client), and that the check request then carries only request-level metadata and no peer
+// attributes.
+TEST_F(HttpFilterTest, MetadataContextWithoutConnection) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  metadata_context_namespaces:
+  - request.has.data
+  - connection.has.data
+  )EOF");
+
+  const std::string request_yaml = R"EOF(
+  filter_metadata:
+    request.has.data:
+      data: request
+  )EOF";
+
+  envoy::config::core::v3::Metadata request_metadata;
+  TestUtility::loadFromYaml(request_yaml, request_metadata);
+  ON_CALL(decoder_filter_callbacks_.stream_info_, dynamicMetadata())
+      .WillByDefault(ReturnRef(request_metadata));
+
+  // The stream has no downstream connection.
+  ON_CALL(decoder_filter_callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{}));
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks&,
+                     const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { check_request = check_param; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_EQ("request", check_request.attributes()
+                           .metadata_context()
+                           .filter_metadata()
+                           .at("request.has.data")
+                           .fields()
+                           .at("data")
+                           .string_value());
+  EXPECT_EQ(0, check_request.attributes().metadata_context().filter_metadata().count(
+                   "connection.has.data"));
+
+  // Without a connection there are no peer attributes.
+  EXPECT_FALSE(check_request.attributes().source().has_address());
+  EXPECT_FALSE(check_request.attributes().destination().has_address());
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters

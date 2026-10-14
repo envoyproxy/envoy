@@ -400,16 +400,100 @@ end, still receives ``data: [DONE]``. A response or event that cannot be convert
 untranslated, since part of the response may already be on its way to the client, and is
 counted by ``transcoder.failed``.
 
+.. _config_http_filters_ai_protocol_manager_transcoder_instructions:
+
+Per-request transcoding instructions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The route decides the backend for every request it matches. A filter ahead of the transcoder --
+a model router, ext_proc, or :ref:`set_filter_state <config_http_filters_set_filter_state>` --
+can override that decision for one request by leaving instructions in filter state. Each key is
+independent, and a key that is not set leaves today's behavior in place.
+
+``envoy.ai.llm_protocol.response``
+  The backend's wire API, replacing the route's ``response`` declaration. An :ref:`LLMProtocol
+  <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name, e.g. ``GEMINI_GENERATE_CONTENT``.
+  Response token-usage extraction follows it too, so the two never disagree about the backend.
+
+``envoy.ai.uri_pattern.request``
+  The URI pattern the client's request path follows. The ``TO_IR`` leg reads the model and the
+  streaming mode from the path under it; the path itself is not rewritten. It replaces the
+  client API's own layout: without it, only that layout is recognized -- Gemini's
+  ``/v1beta/models/{model}:generateContent`` and its Vertex AI form, or none for an API that
+  names the model in the body -- so a gateway that serves Gemini under its own prefix names the
+  prefix here.
+
+``envoy.ai.uri_pattern.response``
+  The URI pattern of the path the backend expects. The ``FROM_IR`` leg renders it from the
+  request's model and streaming mode and sets ``:path`` to the result, replacing the backend
+  API's own layout; a Gemini backend on Vertex AI, for example, names Vertex's path here.
+
+``envoy.ai.model.resolved``
+  The model to send upstream in place of the one the client asked for. It reaches the body and
+  the rendered path alike. The response still reports the model the client asked for; which
+  backend served it stays with the gateway.
+
+A URI pattern is a path in the :ref:`URI template syntax
+<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>` of
+``path_match_policy``, with two additions. ``{model}`` is the variable that names the model, and
+must hold only letters, digits and ``-``, ``.``, ``_``, ``@``. ``{unary|stream}`` spells out, once,
+the part of the path that differs between a unary and a streaming request; either side may be
+empty, and a side may end in a query string, which rendering appends and matching ignores.
+Several layouts may be listed separated by spaces: a path matches the first that fits it
+entirely, and rendering writes the first. Other variables and wildcards match on the way in but
+cannot be rendered.
+
+.. code-block:: text
+
+  /v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}
+  /v1/projects/{project}/locations/{location}/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}
+  /gateway/{model}/{chat|chat-stream}
+  /v1/messages
+
+On the way in, a ``model`` or ``stream`` the body already names is never overwritten by the
+path. On the way out, an API that names the model in its path alone (Gemini) loses it from the
+body, and one that names it in the body (OpenAI, Anthropic) keeps it there and only gains the
+path. A pattern that does not parse is a misconfiguration of the proxy, not of the client: the
+request fails with a 500, counted by ``transcoder.unresolved``. A request pattern that does not
+match the path lifts nothing and is logged at debug.
+
+The instructions are read once, when the transcoder's request leg runs, so the filter that
+writes them must run before that instance of the transcoder; a model router placed between the
+two instances in the example above writes them in time for the backend-boundary one. Writes
+during the response have no effect.
+
+The example pins a route to Claude on an illustrative gateway, statically, with
+``set_filter_state``; a model router would write the same keys per request.
+
+.. code-block:: yaml
+
+  routes:
+  - match: { prefix: /anthropic/ }
+    route: { cluster: claude_gateway }
+    typed_per_filter_config:
+      envoy.filters.http.set_filter_state:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+        on_request_headers:
+        - object_key: envoy.ai.llm_protocol.response
+          format_string:
+            text_format_source:
+              inline_string: "ANTHROPIC_MESSAGES"
+        - object_key: envoy.ai.uri_pattern.response
+          format_string:
+            text_format_source:
+              inline_string: "/gateway/anthropic/{model}/{messages|messages-stream}"
+        - object_key: envoy.ai.model.resolved
+          format_string:
+            text_format_source:
+              inline_string: "claude-sonnet-4-5"
+
 .. note::
 
-  Gemini carries the model and the streaming mode in the request path rather than the
-  body. The ``TO_IR`` leg lifts both out of the path into the canonical ``model`` and
-  ``stream`` fields, and a ``FROM_IR`` leg targeting Gemini moves them back, setting the
-  path to ``/v1beta/models/{model}:generateContent`` or
-  ``/v1beta/models/{model}:streamGenerateContent?alt=sse``. A route in front of another
-  endpoint layout rewrites that prefix, for example Vertex AI's with ``regex_rewrite``.
-  Other vendor paths and authentication headers are left to the route, for example through
-  ``prefix_rewrite`` and ``request_headers_to_add``.
+  The pattern only decides the path. Where a provider serves an API with a body that differs
+  from the API's own -- Claude on Vertex AI takes the model in the path alone and an
+  ``anthropic_version`` field in the body -- that adaptation is not expressed by these
+  instructions yet. Authentication headers are likewise left to the route, for example through
+  ``request_headers_to_add``.
 
 Response token-usage extraction
 -------------------------------
