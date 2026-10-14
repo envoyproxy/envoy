@@ -265,6 +265,14 @@ pub trait EnvoyTransportSocket {
   /// buffered bytes for its own reasons rather than because the socket reported it would block. It
   /// is a no-op while the connection is connecting or once it is closed.
   fn set_is_writable(&self);
+  /// Hands this socket and `peer`, the Envoy pointer of its paired transport socket on the other
+  /// side of the proxy, to an engine-run splice pump. The engine splices the upload and reads the
+  /// download of a kernel TLS upstream with recvmsg. Both connections need empty Envoy buffers, and
+  /// the module must hold no pending bytes. After this returns `true` neither socket receives
+  /// `on_do_read` or `on_do_write`, and the module must not do I/O on either socket, including in
+  /// `on_close`. It returns `false` and leaves both connections on their buffered path when the
+  /// splice cannot start.
+  fn start_splice(&self, peer: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr) -> bool;
   /// Requests that the connection flush its write buffer, for example after queuing handshake
   /// bytes outside of a write step.
   fn flush_write_buffer(&self);
@@ -465,6 +473,12 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_transport_socket_set_is_writable(self.raw);
     }
+  }
+
+  // `peer` is an opaque Envoy handle passed back to Envoy, never dereferenced in Rust.
+  #[allow(clippy::not_unsafe_ptr_arg_deref)]
+  fn start_splice(&self, peer: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_transport_socket_start_splice(self.raw, peer) }
   }
 
   fn flush_write_buffer(&self) {
