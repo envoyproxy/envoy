@@ -40,7 +40,8 @@ message Autosharding {
 
   // Name of the request header containing the application-defined key. This key
   // is used to look up the matching key-range assigned by the sharding service.
-  string key_header_name = 3 [(validate.rules).string = {min_len: 1}];
+  string key_header_name = 3
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // When true, enables a fallback mechanism. The LB policy chooses a random
   // endpoint from the name resolver's list when:
