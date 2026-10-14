@@ -2837,6 +2837,42 @@ TEST_F(Http1ClientConnectionImplTest, Reset) {
   request_encoder.getStream().resetStream(StreamResetReason::LocalReset);
 }
 
+// With allow_multiplexed_upstream_half_close a response that completes before its request must
+// reset the stream, also when an earlier request on the same connection was complete.
+TEST_F(Http1ClientConnectionImplTest, PrematureResponseResetsStreamOnReusedConnection) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
+  initialize();
+
+  // A complete request and its response: no reset.
+  {
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    Http::MockStreamCallbacks callbacks;
+    request_encoder.getStream().addCallbacks(callbacks);
+    EXPECT_CALL(callbacks, onResetStream(_, _)).Times(0);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+    Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+    EXPECT_TRUE(codec_->dispatch(response).ok());
+  }
+
+  // A request whose body has not been sent yet gets a complete response: the stream is reset.
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  Http::MockStreamCallbacks callbacks;
+  request_encoder.getStream().addCallbacks(callbacks);
+  TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", "/"}, {":authority", "host"}, {"content-length", "5"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, false).ok());
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::Http1PrematureUpstreamHalfClose, _));
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+  EXPECT_TRUE(codec_->dispatch(response).ok());
+}
+
 // Verify that we correctly enable reads on the connection when the final response is
 // received.
 TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
