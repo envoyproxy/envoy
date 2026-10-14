@@ -65,7 +65,10 @@ public:
     TimedOut,
   };
   // sendHotRestartMessage(address, proto, /*allow_failure=*/true), reporting why a send failed.
-  SendResult trySendHotRestartMessage(sockaddr_un& address, const envoy::HotRestartMessage& proto);
+  // With Blocking::No a full peer socket fails the send at once (TimedOut) instead of after
+  // SEND_TIMEOUT, for callers that retry from a timer.
+  SendResult trySendHotRestartMessage(sockaddr_un& address, const envoy::HotRestartMessage& proto,
+                                      Blocking block = Blocking::Yes);
 
   // Receive data, possibly enough to build one of our protocol messages.
   // If block is true, blocks until a full protocol message is available or the socket's receive
@@ -105,7 +108,7 @@ public:
 
 private:
   SendResult sendHotRestartMessageImpl(sockaddr_un& address, const envoy::HotRestartMessage& proto,
-                                       bool allow_failure);
+                                       bool allow_failure, Blocking block = Blocking::Yes);
   // Fills `datagrams` with the wire form of `proto`: a uint64 'length' followed by the serialized
   // message, split at MaxSendmsgSize as the protocol requires.
   static void serializeToDatagrams(const envoy::HotRestartMessage& proto,

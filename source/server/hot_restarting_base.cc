@@ -113,20 +113,27 @@ bool RpcStream::sendHotRestartMessage(sockaddr_un& address, const HotRestartMess
 }
 
 RpcStream::SendResult RpcStream::trySendHotRestartMessage(sockaddr_un& address,
-                                                          const HotRestartMessage& proto) {
-  return sendHotRestartMessageImpl(address, proto, /*allow_failure=*/true);
+                                                          const HotRestartMessage& proto,
+                                                          Blocking block) {
+  return sendHotRestartMessageImpl(address, proto, /*allow_failure=*/true, block);
 }
 
 RpcStream::SendResult RpcStream::sendHotRestartMessageImpl(sockaddr_un& address,
                                                            const HotRestartMessage& proto,
-                                                           bool allow_failure) {
+                                                           bool allow_failure, Blocking block) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   std::vector<std::vector<uint8_t>> datagrams;
   serializeToDatagrams(proto, datagrams);
 
-  RELEASE_ASSERT(fcntl(domain_socket_, F_SETFL, 0) != -1,
-                 fmt::format("Set domain socket blocking failed, errno = {}", errno));
-  const auto restore_nonblocking = [this]() {
+  const bool blocking = block == Blocking::Yes;
+  if (blocking) {
+    RELEASE_ASSERT(fcntl(domain_socket_, F_SETFL, 0) != -1,
+                   fmt::format("Set domain socket blocking failed, errno = {}", errno));
+  }
+  const auto restore_nonblocking = [this, blocking]() {
+    if (!blocking) {
+      return;
+    }
     RELEASE_ASSERT(fcntl(domain_socket_, F_SETFL, O_NONBLOCK) != -1,
                    fmt::format("Set domain socket nonblocking failed, errno = {}", errno));
   };
@@ -164,7 +171,7 @@ RpcStream::SendResult RpcStream::sendHotRestartMessageImpl(sockaddr_un& address,
     int rc = 0;
     bool sent = false;
     for (int attempt = 0; attempt < SENDMSG_MAX_RETRIES; attempt++) {
-      auto result = os_sys_calls.sendmsg(domain_socket_, &message, 0);
+      auto result = os_sys_calls.sendmsg(domain_socket_, &message, blocking ? 0 : MSG_DONTWAIT);
       rc = result.return_value_;
       saved_errno = result.errno_;
 
@@ -184,6 +191,10 @@ RpcStream::SendResult RpcStream::sendHotRestartMessageImpl(sockaddr_un& address,
       }
 
       if (saved_errno == SOCKET_ERROR_AGAIN) {
+        if (!blocking) {
+          // The caller retries later.
+          return SendResult::TimedOut;
+        }
         // The peer is not draining its socket (SEND_TIMEOUT elapsed). Blocking on it any longer
         // would stall this thread on the other process: give up on the message instead.
         ENVOY_LOG(error,

@@ -201,8 +201,10 @@ envoy_cc_test(
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_child",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )

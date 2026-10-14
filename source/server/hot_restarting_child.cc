@@ -107,9 +107,13 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
         return onSocketEventUdpForwarding();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  parent_exit_timer_ = dispatcher.createTimer([this]() { onParentExitTimer(); });
 }
 
-void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
+void HotRestartingChild::shutdown() {
+  socket_event_udp_forwarding_.reset();
+  parent_exit_timer_.reset();
+}
 
 void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index,
                                               const Network::Address::Instance& listener_address,
@@ -217,6 +221,47 @@ void HotRestartingChild::onParentUnreachable(absl::string_view reason) {
             "be merged and new listeners will bind their own sockets. The parent will still be "
             "asked to terminate at the end of the drain period.",
             reason);
+}
+
+void HotRestartingChild::onParentExitTimer() {
+  HotRestartMessage message;
+  if (terminate_delivered_) {
+    // The parent ignores this request; sending it only tells us whether its socket still exists.
+    message.mutable_request()->mutable_test_connection();
+  } else {
+    message.mutable_request()->mutable_terminate();
+  }
+  // Never blocks: a full socket is simply tried again on the next tick.
+  const RpcStream::SendResult result =
+      main_rpc_stream_.trySendHotRestartMessage(parent_address_, message, RpcStream::Blocking::No);
+  if (result == RpcStream::SendResult::ConnectionRefused) {
+    ENVOY_LOG(info, "hot restart parent has exited; completing the drain from it");
+    allDrainsImplicitlyComplete();
+    return;
+  }
+  if (result == RpcStream::SendResult::Sent && !terminate_delivered_) {
+    ENVOY_LOG(info, "hot restart parent received the terminate request on a retry");
+    terminate_delivered_ = true;
+  }
+  const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - parent_exit_wait_start_); // NO_CHECK_FORMAT(real_time)
+  if (waited >= parent_exit_wait_cap_) {
+    if (terminate_delivered_) {
+      ENVOY_LOG(warn,
+                "hot restart parent has not exited {}ms after being asked to terminate; "
+                "completing the drain from it anyway",
+                waited.count());
+    } else {
+      ENVOY_LOG(error,
+                "hot restart parent did not accept the terminate request within {}ms (its socket "
+                "stayed full) and keeps running alongside this process; completing the drain "
+                "from it anyway. The parent has to be stopped by other means.",
+                waited.count());
+    }
+    allDrainsImplicitlyComplete();
+    return;
+  }
+  parent_exit_timer_->enableTimer(parent_exit_probe_interval_);
 }
 
 void HotRestartingChild::onParentGone(absl::string_view reason) {
@@ -327,14 +372,33 @@ void HotRestartingChild::sendParentTerminateRequest() {
   if (parent_terminated_) {
     return;
   }
-  allDrainsImplicitlyComplete();
+  // The drained callbacks unpause the inherited UDP listeners, whose sockets the parent's workers
+  // keep reading until the parent stops: a packet of one of the parent's QUIC connections that we
+  // dequeue first is unknown to us and gets a stateless reset. So, unless disabled, they run once
+  // the parent has exited, which its domain socket refusing our datagrams tells us, rather than
+  // now. Packets simply queue in the kernel meanwhile, for at most PARENT_EXIT_WAIT_CAP.
+  const bool wait_for_exit =
+      parent_exit_timer_ != nullptr &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hot_restart_wait_for_parent_exit");
+  if (!wait_for_exit) {
+    allDrainsImplicitlyComplete();
+  }
 
   HotRestartMessage wrapped_request;
   wrapped_request.mutable_request()->mutable_terminate();
-  // A parent that is already gone cannot be told, and one that is wedged will not listen.
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request,
-                                         /*allow_failure=*/true);
+  // A parent that is already gone cannot be told; one whose socket is full is told again below.
+  const RpcStream::SendResult sent =
+      main_rpc_stream_.trySendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
+  if (wait_for_exit) {
+    if (sent == RpcStream::SendResult::ConnectionRefused) {
+      allDrainsImplicitlyComplete();
+    } else {
+      terminate_delivered_ = sent == RpcStream::SendResult::Sent;
+      parent_exit_wait_start_ = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+      parent_exit_timer_->enableTimer(parent_exit_probe_interval_);
+    }
+  }
 
   // Note that the 'generation' counter needs to retain the contribution from
   // the parent.

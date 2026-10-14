@@ -78,6 +78,12 @@ public:
   // How often, while waiting for a reply, the parent's socket is probed to detect that the parent
   // is gone (which a datagram socket does not otherwise report to the receiver).
   static constexpr std::chrono::milliseconds PARENT_PROBE_INTERVAL{1000};
+  // After the terminate request: how often the child retries delivering it while the parent's
+  // socket is full, and then checks whether the parent has exited.
+  static constexpr std::chrono::milliseconds PARENT_EXIT_PROBE_INTERVAL{50};
+  // How long the child keeps the inherited UDP listeners paused waiting for the parent to receive
+  // the terminate request and exit, before taking them over regardless.
+  static constexpr std::chrono::milliseconds PARENT_EXIT_WAIT_CAP{2000};
 
 protected:
   absl::Status onSocketEventUdpForwarding();
@@ -106,6 +112,10 @@ private:
   // The parent is definitely gone (its socket refuses our datagrams): there is nothing left to
   // drain from, so complete the drains as sendParentTerminateRequest() would.
   void onParentGone(absl::string_view reason);
+  // Runs every PARENT_EXIT_PROBE_INTERVAL after the terminate request until the parent has exited
+  // or PARENT_EXIT_WAIT_CAP has passed: resends the request while it has not been delivered, then
+  // probes for the parent's exit. Completes the drains at the end.
+  void onParentExitTimer();
   friend class HotRestartUdpForwardingTestHelper;
   absl::Mutex registry_mu_;
   const int restart_epoch_;
@@ -114,6 +124,12 @@ private:
   bool parent_unresponsive_{false};
   std::chrono::milliseconds parent_reply_timeout_{PARENT_REPLY_TIMEOUT};
   std::chrono::milliseconds parent_probe_interval_{PARENT_PROBE_INTERVAL};
+  std::chrono::milliseconds parent_exit_probe_interval_{PARENT_EXIT_PROBE_INTERVAL};
+  std::chrono::milliseconds parent_exit_wait_cap_{PARENT_EXIT_WAIT_CAP};
+  Event::TimerPtr parent_exit_timer_;
+  // Whether the parent's socket has accepted the terminate request.
+  bool terminate_delivered_{false};
+  std::chrono::steady_clock::time_point parent_exit_wait_start_; // NO_CHECK_FORMAT(real_time)
   bool parent_drained_ ABSL_GUARDED_BY(registry_mu_);
   const bool skip_hot_restart_on_no_parent_;
   const bool skip_parent_stats_;
