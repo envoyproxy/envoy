@@ -1188,8 +1188,8 @@ TEST_F(BootstrapAbiImplTest, DefineMultipleMetrics) {
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_define_gauge(
                 config.value()->thisAsVoidPtr(), gauge_name_1, nullptr, 0, &gauge_id_1),
             envoy_dynamic_module_type_metrics_result_Success);
-  EXPECT_EQ(gauge_id_0, 1u);
-  EXPECT_EQ(gauge_id_1, 2u);
+  EXPECT_EQ(gauge_id_0, 3u);
+  EXPECT_EQ(gauge_id_1, 4u);
 
   // Increment each counter independently.
   EXPECT_EQ(envoy_dynamic_module_callback_bootstrap_extension_config_increment_counter(
