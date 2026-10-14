@@ -136,6 +136,7 @@ public:
                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
+  absl::Status initializeCidGeneratorAndWorkerRouting();
   absl::Status initializeWorkerRouting(
       absl::Span<const Network::ListenSocketFactoryPtr> socket_factories) override;
 
@@ -157,8 +158,6 @@ protected:
 
 private:
   friend class ActiveQuicListenerFactoryPeer;
-
-  absl::Status initializeCidGeneratorAndWorkerRouting();
 
   OptRef<EnvoyQuicCryptoServerStreamFactoryInterface> crypto_server_stream_factory_;
   OptRef<EnvoyQuicProofSourceFactoryInterface> proof_source_factory_;
