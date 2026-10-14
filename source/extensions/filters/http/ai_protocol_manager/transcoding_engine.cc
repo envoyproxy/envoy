@@ -1499,11 +1499,14 @@ DialectTranscodePack createGeminiTranscodePack() {
       .request = {.to_ir = geminiRequestToIr(), .from_ir = geminiRequestFromIr()},
       .response = {.to_ir = geminiResponseToIr(), .from_ir = geminiResponseFromIr()},
       .stream = {.to_ir = geminiStreamToIr(), .from_ir = geminiStreamFromIr()},
-      // The Gemini API's layout. A route in front of another, such as Vertex AI's, rewrites the
+      // The Gemini API's layout, then Vertex AI's, which nests the same methods under a project and
+      // a location. A request renders the first: a route in front of another rewrites the
       // `/v1beta/models/` prefix, or an instruction ahead of the transcoder names the path outright
       // (see `TranscodeContext::response_uri_pattern`).
       .envelope = *UriPattern::parse(
-          "/v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}"),
+          "/v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse} "
+          "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
+          "{model}:{generateContent|streamGenerateContent?alt=sse}"),
   };
 }
 
@@ -2725,7 +2728,7 @@ bool liftFromRequestPath(const UriPattern& pattern, absl::string_view request_pa
   if (!json.is_object()) {
     return true;
   }
-  if (pattern.hasModel() && !json.contains(kModelField)) {
+  if (!target->model.empty() && !json.contains(kModelField)) {
     json[kModelField] = target->model;
   }
   if (target->stream && !json.contains(kStreamField)) {

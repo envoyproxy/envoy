@@ -18,6 +18,9 @@ using ::testing::HasSubstr;
 
 constexpr absl::string_view kGemini =
     "/v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}";
+constexpr absl::string_view kVertexGemini =
+    "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
+    "{model}:{generateContent|streamGenerateContent?alt=sse}";
 constexpr absl::string_view kVertexClaude =
     "/v1/projects/p/locations/l/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}";
 constexpr absl::string_view kBedrock = "/model/{model}/{converse|converse-stream}";
@@ -28,31 +31,33 @@ UriPattern parseOk(absl::string_view pattern) {
   return *parsed;
 }
 
-TEST(UriPatternParseTest, RejectsMalformedPatterns) {
-  EXPECT_THAT(UriPattern::parse(""), HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(UriPattern::parse("/v1/{model"), HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(UriPattern::parse("/v1/{mo{del}}"),
-              HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(UriPattern::parse("/v1/{project}/x"),
-              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("unknown placeholder")));
-  EXPECT_THAT(UriPattern::parse("/{model}/{model}"),
-              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("more than one")));
-  EXPECT_THAT(UriPattern::parse("/{a|b}/{c|d}"),
-              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("more than one")));
-  EXPECT_THAT(UriPattern::parse("/{a|b|c}"),
-              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("exactly two")));
-  // The model must end at a literal.
-  EXPECT_THAT(UriPattern::parse("/models/{model}{a|b}"),
-              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("followed by a literal")));
+TEST(UriPatternParseTest, RejectsMalformedTemplates) {
+  for (absl::string_view pattern : {"", "v1/{model}", "/v1/{model", "/v1/{mo{del}}",
+                                    "/{model}/{model}", "/v1//x", " /v1", "/v1 ", "/v1  /v2"}) {
+    EXPECT_THAT(UriPattern::parse(pattern), HasStatusCode(absl::StatusCode::kInvalidArgument))
+        << pattern;
+  }
+}
+
+TEST(UriPatternParseTest, RejectsAnythingButOneChoiceOfTwo) {
+  for (absl::string_view pattern : {"/{a|b}/{c|d}", "/{a|b|c}", "/{a|b", "/a|b", "/{x{model}|y}"}) {
+    EXPECT_THAT(UriPattern::parse(pattern),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("expected at most one `{unary|stream}`")))
+        << pattern;
+  }
 }
 
 TEST(UriPatternParseTest, AcceptsTheShapesInUse) {
   EXPECT_TRUE(parseOk(kGemini).hasModel());
+  EXPECT_TRUE(parseOk(kVertexGemini).hasModel());
   EXPECT_TRUE(parseOk(kVertexClaude).hasModel());
   EXPECT_TRUE(parseOk(kBedrock).hasModel());
   EXPECT_FALSE(parseOk("/v1/messages").hasModel());
-  // A model at the end, and empty alternatives, are allowed.
+  EXPECT_FALSE(parseOk("/v1/{project}/messages").hasModel());
+  // A model at the end, a model followed by a choice, and an empty choice are allowed.
   EXPECT_TRUE(parseOk("/models/{model}").hasModel());
+  EXPECT_TRUE(parseOk("/models/{model}{:unary|:stream}").hasModel());
   EXPECT_FALSE(parseOk("/v1/chat/completions{|?stream=true}").hasModel());
   EXPECT_EQ(parseOk(kGemini).source(), kGemini);
 }
@@ -74,15 +79,44 @@ TEST(UriPatternMatchTest, LiftsModelAndStreamMode) {
   EXPECT_FALSE(gemini.match("/v1beta/models/gemini-2.0-flash:generateContent?key=x")->stream);
 }
 
-// A prefix in front of the API's own path, such as Vertex AI's, does not hide it.
-TEST(UriPatternMatchTest, LeadingLiteralAnchorsOnItsLastSegment) {
-  const UriPattern gemini = parseOk(kGemini);
-  std::optional<UriPattern::Match> m = gemini.match(
-      "/v1/projects/p/locations/l/publishers/google/models/gemini-2.0-flash:generateContent");
+// A prefix in front of the API's own path is part of the path: a pattern that accepts one says
+// so, with a variable or a wildcard.
+TEST(UriPatternMatchTest, MatchesTheWholePath) {
+  const absl::string_view vertex =
+      "/v1/projects/p/locations/l/publishers/google/models/gemini-2.0-flash:generateContent";
+  EXPECT_FALSE(parseOk(kGemini).match(vertex).has_value());
+  EXPECT_FALSE(
+      parseOk(kGemini).match("/gw/v1beta/models/gemini-2.0-flash:generateContent").has_value());
+
+  std::optional<UriPattern::Match> m = parseOk(kVertexGemini).match(vertex);
   ASSERT_TRUE(m.has_value());
   EXPECT_EQ(m->model, "gemini-2.0-flash");
-  // But the last segment itself must be there.
-  EXPECT_FALSE(gemini.match("/v1beta/gemini-2.0-flash:generateContent").has_value());
+  EXPECT_FALSE(m->stream);
+}
+
+// A path matches the first layout that fits it, and the first layout is the one rendered.
+TEST(UriPatternMatchTest, MatchesAnyLayout) {
+  const UriPattern gemini = parseOk(std::string(kGemini) + " " + std::string(kVertexGemini));
+  for (absl::string_view path : {"/v1beta/models/gemini-2.0-flash:streamGenerateContent",
+                                 "/v1/projects/p/locations/l/publishers/google/models/"
+                                 "gemini-2.0-flash:streamGenerateContent"}) {
+    std::optional<UriPattern::Match> m = gemini.match(path);
+    ASSERT_TRUE(m.has_value()) << path;
+    EXPECT_EQ(m->model, "gemini-2.0-flash");
+    EXPECT_TRUE(m->stream);
+  }
+  EXPECT_THAT(gemini.render("gemini-2.0-flash", true),
+              IsOkAndHolds("/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"));
+}
+
+// Layouts need not agree: a path names the model only when its own layout does.
+TEST(UriPatternMatchTest, LayoutsNameTheModelOnTheirOwn) {
+  const UriPattern chat =
+      parseOk("/v1/chat/completions /openai/deployments/{model}/chat/completions");
+  EXPECT_FALSE(chat.hasModel());
+  EXPECT_EQ(chat.match("/v1/chat/completions")->model, "");
+  EXPECT_EQ(chat.match("/openai/deployments/gpt-4o/chat/completions?api-version=1")->model,
+            "gpt-4o");
 }
 
 TEST(UriPatternMatchTest, RejectsWhatThePatternDoesNotName) {
@@ -92,10 +126,12 @@ TEST(UriPatternMatchTest, RejectsWhatThePatternDoesNotName) {
   EXPECT_FALSE(gemini.match("/v1beta/models/gemini-2.0-flash:countTokens").has_value());
   EXPECT_FALSE(gemini.match("/v1beta/models/gemini-2.0-flash:generateContentX").has_value());
   EXPECT_FALSE(gemini.match("/v1beta/models/a/b:generateContent").has_value()); // slash in model
+  EXPECT_FALSE(gemini.match("/v1beta/models/a:b:generateContent").has_value()); // not a model id
+  EXPECT_FALSE(gemini.match("/v1beta/models/a%2Fb:generateContent").has_value());
   EXPECT_FALSE(gemini.match("/v1/chat/completions").has_value());
 }
 
-TEST(UriPatternMatchTest, AlternativeThatExtendsTheOtherIsMatchedWhole) {
+TEST(UriPatternMatchTest, ChoiceThatExtendsTheOtherIsMatchedWhole) {
   const UriPattern bedrock = parseOk(kBedrock);
   std::optional<UriPattern::Match> m = bedrock.match("/model/anthropic.claude-3/converse-stream");
   ASSERT_TRUE(m.has_value());
@@ -106,17 +142,27 @@ TEST(UriPatternMatchTest, AlternativeThatExtendsTheOtherIsMatchedWhole) {
   EXPECT_FALSE(m->stream);
 }
 
+// Spellings that differ only in their query match alike, and the body says whether to stream.
+TEST(UriPatternMatchTest, ChoiceOfQueriesMatchesAsUnary) {
+  const UriPattern chat = parseOk("/v1/chat/completions{|?stream=true}");
+  for (absl::string_view path : {"/v1/chat/completions", "/v1/chat/completions?stream=true"}) {
+    std::optional<UriPattern::Match> m = chat.match(path);
+    ASSERT_TRUE(m.has_value()) << path;
+    EXPECT_FALSE(m->stream) << path;
+  }
+}
+
 TEST(UriPatternMatchTest, FixedPatternMatchesOnlyItself) {
   const UriPattern messages = parseOk("/v1/messages");
   std::optional<UriPattern::Match> m = messages.match("/v1/messages?beta=true");
   ASSERT_TRUE(m.has_value());
   EXPECT_TRUE(m->model.empty());
   EXPECT_FALSE(m->stream);
-  EXPECT_TRUE(messages.match("/anthropic/v1/messages").has_value()); // gateway prefix
+  EXPECT_FALSE(messages.match("/anthropic/v1/messages").has_value());
   EXPECT_FALSE(messages.match("/v1/messages/count_tokens").has_value());
 }
 
-TEST(UriPatternRenderTest, RendersModelAndAlternative) {
+TEST(UriPatternRenderTest, RendersModelAndChoice) {
   const UriPattern gemini = parseOk(kGemini);
   EXPECT_THAT(gemini.render("gemini-2.0-flash", false),
               IsOkAndHolds("/v1beta/models/gemini-2.0-flash:generateContent"));
@@ -127,11 +173,24 @@ TEST(UriPatternRenderTest, RendersModelAndAlternative) {
                            "claude-sonnet-4@20250514:streamRawPredict"));
   EXPECT_THAT(parseOk(kBedrock).render("anthropic.claude-3", false),
               IsOkAndHolds("/model/anthropic.claude-3/converse"));
+  EXPECT_THAT(parseOk("/v1/chat/completions{|?stream=true}").render("", true),
+              IsOkAndHolds("/v1/chat/completions?stream=true"));
 }
 
 TEST(UriPatternRenderTest, FixedPatternIgnoresTheModel) {
   EXPECT_THAT(parseOk("/v1/messages").render("", false), IsOkAndHolds("/v1/messages"));
   EXPECT_THAT(parseOk("/v1/messages").render("../x", true), IsOkAndHolds("/v1/messages"));
+}
+
+// Variables other than `{model}`, and wildcards, stand for segments only a matched path knows.
+TEST(UriPatternRenderTest, RefusesSegmentsTheModelDoesNotFill) {
+  for (absl::string_view pattern : std::initializer_list<absl::string_view>{
+           kVertexGemini, "/v1/{model=*}:predict", "/v1/{model}/{rest=**}"}) {
+    EXPECT_THAT(parseOk(pattern).render("gemini-2.0-flash", false),
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("has segments other than `{model}` to fill")))
+        << pattern;
+  }
 }
 
 // The model becomes a path segment, so anything that could escape one is refused.

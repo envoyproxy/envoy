@@ -1338,16 +1338,19 @@ TEST(TranscodingEngineTest, RequestEnvelopeIsDataInThePack) {
   const TranscodeLeg from_ir{PayloadKind::Request, TranscodeDirection::FromIr,
                              LLMProtocol::OpenAiResponses};
 
-  // Only the prefix's last segment has to match, and the query is ignored.
+  // The whole path has to match, and the query is ignored.
   nlohmann::json doc = nlohmann::json::parse(R"({"input": "Hi"})");
   TranscodeContext ctx;
-  ctx.request_path = "/tenants/t/v2/engines/engine-7:streamPredict?alt=json";
+  ctx.request_path = "/v2/engines/engine-7:streamPredict?alt=json";
   ASSERT_THAT(engine.transcode(to_ir, ctx, doc), IsOk());
   EXPECT_EQ(doc, nlohmann::json::parse(R"({"input": "Hi", "model": "engine-7", "stream": true})"));
   EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::OpenAiResponses, ctx.request_path),
             "engine-7");
   EXPECT_EQ(
       engine.modelFromRequestPath(LLMProtocol::OpenAiResponses, "/v2/models/engine-7:predict"), "");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::OpenAiResponses,
+                                        "/tenants/t/v2/engines/engine-7:predict"),
+            "");
 
   // A rendered path keeps the method's query.
   ASSERT_THAT(engine.transcode(from_ir, ctx, doc), IsOk());

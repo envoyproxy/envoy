@@ -1,11 +1,13 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,55 +18,54 @@ namespace AiProtocolManager {
 // escape one.
 bool isModelId(absl::string_view model);
 
-// A request path template used to extract (`match()`) or rewrite (`render()`) the model and
-// streaming mode in URL paths. Supports `{model}` and `{unary|stream}` placeholders, e.g.:
+// Where an API names the model and the streaming mode in its request path: one or more layouts,
+// separated by spaces, each a URI template in the route's `path_match_policy` syntax with at most
+// one `{unary|stream}` choice between its two spellings, e.g.:
 //   /v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}
 //
-// The streaming mode is spelled out as two literal alternatives (either may be empty) rather than
-// a `{method}` placeholder so the pattern stays dialect-agnostic without per-dialect method tables.
+// A path matches the first layout that fits all of it but the query; `render()` writes the first
+// layout. A spelling may end in a query, which `render()` appends and `match()` ignores. Variables
+// other than `{model}`, and wildcards, match segments that `render()` cannot fill.
 class UriPattern {
 public:
-  // What a matched path names. `model` is empty when the pattern has no `{model}`.
+  // What a matched path names. `model` is empty when the matched layout has no `{model}`.
   struct Match {
     std::string model;
     bool stream{false};
   };
 
-  // Parses `pattern`, or returns an error if it is empty or has invalid placeholders.
   static absl::StatusOr<UriPattern> parse(absl::string_view pattern);
 
-  // Matches `path` (ignoring query parameters; a leading literal only has to match by its last
-  // segment, so a gateway or Vertex AI prefix ahead of the API's own path does not hide it) and
-  // extracts the model and streaming mode, or returns `std::nullopt` if it does not match.
   std::optional<Match> match(absl::string_view path) const;
 
-  // Renders the pattern for `model` and `stream`. Fails when the pattern has `{model}` and `model`
-  // is not a model id.
+  // The path for `model` and `stream`. Fails when the layout has `{model}` and `model` is not a
+  // model id, or has segments that `{model}` does not fill.
   absl::StatusOr<std::string> render(absl::string_view model, bool stream) const;
 
-  bool hasModel() const { return has_model_; }
+  // Whether the layout `render()` writes names the model.
+  bool hasModel() const { return layouts_.front().front().model_group > 0; }
   // The pattern as parsed.
   const std::string& source() const { return source_; }
 
 private:
-  struct Piece {
-    enum class Kind { Literal, Model, Alternative };
-    Kind kind{Kind::Literal};
-    // Literal: the text. Alternative: the unary text.
-    std::string text{};
-    // Alternative: the stream text.
-    std::string stream_text{};
+  // One side of a layout's choice: a URI template, and the query rendered after it.
+  struct Spelling {
+    std::string path;
+    std::string query;
+    std::shared_ptr<const RE2> regex;
+    // The regex group that captures `{model}`; 0, the whole match, when there is none.
+    int model_group{0};
   };
+  // The unary spelling, then the streaming one when the layout spells it differently.
+  using Layout = std::vector<Spelling>;
 
-  UriPattern(std::string source, std::vector<Piece> pieces, bool has_model)
-      : source_(std::move(source)), pieces_(std::move(pieces)), has_model_(has_model) {}
+  static absl::StatusOr<Layout> parseLayout(absl::string_view layout);
 
-  // Matches the pieces from `first` on against `path` from `pos` on, to its end.
-  std::optional<Match> matchFrom(size_t first, absl::string_view path, size_t pos) const;
+  UriPattern(std::string source, std::vector<Layout> layouts)
+      : source_(std::move(source)), layouts_(std::move(layouts)) {}
 
   std::string source_;
-  std::vector<Piece> pieces_;
-  bool has_model_{false};
+  std::vector<Layout> layouts_;
 };
 
 } // namespace AiProtocolManager
