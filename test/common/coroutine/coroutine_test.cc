@@ -821,7 +821,7 @@ TEST(BacktraceTest, BacktraceWorks) {
 
     PromiseBase* frame = current_coroutine.load(std::memory_order_relaxed);
     while (frame) {
-      char buf[1024];
+      char buf[1024] = "";
       absl::Symbolize(frame->caller_, buf, sizeof(buf));
       backtrace.push_back({buf});
 
