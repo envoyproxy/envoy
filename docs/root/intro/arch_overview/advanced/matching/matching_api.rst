@@ -122,6 +122,28 @@ are available in some contexts:
 
 * Regex matching using :ref:`Hyperscan matcher <envoy_v3_api_msg_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan>`.
 
+.. _extension_envoy.matching.matchers.uri_template:
+
+* :ref:`URI template matcher <envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>`
+  matches the input against a URI template with the same semantics as route
+  :ref:`path_match_policy <envoy_v3_api_field_config.route.v3.RouteMatch.path_match_policy>`. The
+  query string and fragment are ignored, and the input is not otherwise normalized. The following
+  predicate matches the request path against a template.
+
+.. validated-code-block:: yaml
+  :type-name: envoy.config.common.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate
+
+  input:
+    name: envoy.matching.inputs.request_headers
+    typed_config:
+      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+      header_name: ":path"
+  custom_match:
+    name: envoy.matching.matchers.uri_template
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+      path_template: "/api/{version}/items/{id}"
+
 Matching actions
 ################
 
