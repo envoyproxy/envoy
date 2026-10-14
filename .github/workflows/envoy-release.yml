@@ -110,6 +110,13 @@ jobs:
           "${BAZEL_RUN_ARGS[@]}"
           @envoy_repo//:release
           "${BAZEL_ARGS[@]}"
+    - name: Update bazel module versions and lockfiles
+      run: |
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh modules.version'
+        git add -- ':(glob)**/MODULE.bazel' ':(glob)**/MODULE.bazel.lock' Cargo.lock Cargo.Bazel.envoy.lock
+        git commit --amend --no-edit
+      env:
+        ENVOY_DOCKER_CI: 1
     - run: |
         VERSION=$(cat VERSION.txt)
         echo "version=v${VERSION}" >> $GITHUB_OUTPUT
@@ -163,6 +170,13 @@ jobs:
           --config=ci
           @envoy_repo//:dev
           -- ${{ steps.checkout.outputs.branch-name != 'main' && '--patch' || '' }}
+    - name: Update bazel module versions and lockfiles
+      run: |
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh modules.version'
+        git add -- ':(glob)**/MODULE.bazel' ':(glob)**/MODULE.bazel.lock' Cargo.lock Cargo.Bazel.envoy.lock
+        git commit --amend --no-edit
+      env:
+        ENVOY_DOCKER_CI: 1
     - run: |
         VERSION=$(cat VERSION.txt | cut -d- -f1)
         echo "version=v${VERSION}" >> $GITHUB_OUTPUT
