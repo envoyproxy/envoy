@@ -395,9 +395,10 @@ message ExternalProcessor {
   google.protobuf.BoolValue emit_client_span = 27;
 
   // Maximum size of a body chunk sent to the external processor in ``STREAMED`` or
-  // ``FULL_DUPLEX_STREAMED`` mode.
+  // ``FULL_DUPLEX_STREAMED`` mode. Must be at least 1024 bytes.
   // If not specified, all body data passed in a given encodeData() or decodeData() call will be sent in a single chunk.
-  google.protobuf.UInt32Value max_streamed_body_chunk_size = 28;
+  google.protobuf.UInt32Value max_streamed_body_chunk_size = 28
+      [(validate.rules).uint32 = {gte: 1024}];
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
@@ -531,9 +532,10 @@ message ExtProcOverrides {
   google.protobuf.BoolValue emit_client_span = 10;
 
   // Maximum size of a body chunk sent to the external processor in ``STREAMED`` or
-  // ``FULL_DUPLEX_STREAMED`` mode.
+  // ``FULL_DUPLEX_STREAMED`` mode. Must be at least 1024 bytes.
   // If not specified, all body data passed in a given encodeData() or decodeData() call will be sent in a single chunk.
   // This is a per-route override of
   // :ref:`max_streamed_body_chunk_size <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.max_streamed_body_chunk_size>`.
-  google.protobuf.UInt32Value max_streamed_body_chunk_size = 11;
+  google.protobuf.UInt32Value max_streamed_body_chunk_size = 11
+      [(validate.rules).uint32 = {gte: 1024}];
 }
