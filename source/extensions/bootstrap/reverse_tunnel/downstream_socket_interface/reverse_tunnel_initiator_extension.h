@@ -124,6 +124,11 @@ public:
   uint64_t maintainIntervalMs() const { return maintain_interval_ms_; }
 
   /**
+   * @return the handshake response deadline in milliseconds.
+   */
+  uint64_t handshakeTimeoutMs() const { return handshake_timeout_ms_; }
+
+  /**
    * @return reference to the configured HTTP handshake request path.
    */
   const std::string& handshakeRequestPath() const { return handshake_request_path_; }
@@ -210,6 +215,7 @@ private:
   bool enable_detailed_stats_{false};
   uint64_t max_reconnect_backoff_ms_{};
   uint64_t maintain_interval_ms_{};
+  uint64_t handshake_timeout_ms_{};
   std::string handshake_request_path_;
   std::vector<envoy::config::core::v3::HeaderValueOption> additional_headers_;
   bool use_http_upgrade_{false};

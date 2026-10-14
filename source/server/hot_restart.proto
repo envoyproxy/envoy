@@ -26,6 +26,11 @@ message HotRestartMessage {
       uint64 receive_time_epoch_microseconds = 3;
       bytes payload = 4;
       uint32 worker_index = 5;
+      // The address the forwarding listener is bound to, which may differ from local_addr for
+      // transparent sockets, and its network namespace if it has one. The child resolves the
+      // target listener from these when present, and from local_addr otherwise.
+      string listener_addr = 6;
+      string network_namespace = 7;
     }
     message TestConnection {
     }

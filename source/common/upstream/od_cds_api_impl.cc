@@ -32,6 +32,7 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
                            absl::Status& creation_status)
     : helper_(cm, xds_manager, "odcds"), notifier_(notifier),
       scope_(scope.createScope("cluster_manager.odcds.")),
+      stats_({ALL_ODCDS_STATS(POOL_COUNTER(*scope_))}),
       resource_type_helper_(validation_visitor, "name") {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
@@ -66,11 +67,23 @@ OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   sendAwaiting();
   status_ = StartStatus::InitialFetchDone;
+  for (const auto& resource : added_resources) {
+    // The cluster exists now, so an earlier "doesn't exist" answer no longer holds. A rejected
+    // (NACKed) add erases the remembered answer too, which errs in the safe direction: the next
+    // request falls back to a full rediscovery instead of being answered locally.
+    missing_names_.erase(resource.get().name());
+  }
   // According to the XDS specification, the server can send a reply with names in the
   // removed_resources field for requested resources that do not exist. That way we can notify the
   // interested parties about the missing resource immediately without waiting for some timeout to
   // be triggered.
   for (const auto& resource_name : removed_resources) {
+    if (requested_names_.contains(resource_name)) {
+      // Remember the answer for a name requested through this instance, so that a repeated
+      // request for it can be answered immediately. The subscription interest in the name
+      // persists, so the server pushes the cluster on its own if it comes into existence later.
+      missing_names_.insert(resource_name);
+    }
     ENVOY_LOG(debug, "odcds: notifying about potential missing cluster {}", resource_name);
     notifier_.notifyMissingCluster(resource_name);
   }
@@ -102,6 +115,7 @@ void OdCdsApiImpl::sendAwaiting() {
 }
 
 void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
+  requested_names_.insert(cluster_name);
   switch (status_) {
   case StartStatus::NotStarted:
     ENVOY_LOG(trace, "odcds: starting a subscription with cluster name {}", cluster_name);
@@ -135,7 +149,7 @@ public:
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
       : xds_manager_(xds_manager), helper_(cm, xds_manager, "odcds-xdstp"), notifier_(notifier),
         scope_(scope.createScope("cluster_manager.odcds.")),
-        validation_visitor_(validation_visitor) {}
+        stats_({ALL_ODCDS_STATS(POOL_COUNTER(*scope_))}), validation_visitor_(validation_visitor) {}
 
   absl::Status onResourceUpdate(absl::string_view resource_name,
                                 const Config::DecodedResourceRef& resource,
@@ -169,6 +183,16 @@ public:
     // their initialization can proceed.
     notifier_.notifyMissingCluster(resource_name);
   }
+
+  bool isKnownMissing(absl::string_view resource_name) const {
+    const auto it = subscriptions_.find(resource_name);
+    if (it == subscriptions_.end()) {
+      return false;
+    }
+    return it->second->isKnownMissing();
+  }
+
+  void recordKnownMissingAnswer() { stats_.known_missing_answers_.inc(); }
 
   void addSubscription(absl::string_view resource_name, bool old_ads) {
     if (subscriptions_.contains(resource_name)) {
@@ -223,6 +247,10 @@ private:
       return absl::OkStatus();
     }
 
+    // Whether the server answered the resource with "doesn't exist" and no later update has
+    // delivered it.
+    bool isKnownMissing() const { return known_missing_; }
+
   private:
     const envoy::config::core::v3::ConfigSource& staticAdsConfigSource() {
       CONSTRUCT_ON_FIRST_USE(envoy::config::core::v3::ConfigSource,
@@ -243,10 +271,12 @@ private:
       resource_was_updated_ = true;
       if (resources.empty()) {
         ENVOY_LOG(trace, "ODCDS-manager: removing a single resource: {}", resource_name_);
+        known_missing_ = true;
         return parent_.onResourceRemoved(resource_name_, version_info);
       }
       // A single cluster update.
       ENVOY_LOG(trace, "ODCDS-manager: updating a single resource: {}", resource_name_);
+      known_missing_ = false;
       return parent_.onResourceUpdate(resource_name_, resources[0], version_info);
     }
     absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
@@ -258,10 +288,12 @@ private:
       resource_was_updated_ = true;
       if (!removed_resources.empty()) {
         ENVOY_LOG(trace, "ODCDS-manager: removing a single resource: {}", resource_name_);
+        known_missing_ = true;
         return parent_.onResourceRemoved(resource_name_, system_version_info);
       }
       // A single cluster update.
       ENVOY_LOG(trace, "ODCDS-manager: updating a single resource: {}", resource_name_);
+      known_missing_ = false;
       return parent_.onResourceUpdate(resource_name_, added_resources[0], system_version_info);
     }
     void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -287,6 +319,7 @@ private:
     const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
     Config::SubscriptionPtr subscription_;
     bool resource_was_updated_{false};
+    bool known_missing_{false};
   };
   using PerSubscriptionDataPtr = std::unique_ptr<PerSubscriptionData>;
 
@@ -294,6 +327,7 @@ private:
   CdsApiHelper helper_;
   MissingClusterNotifier& notifier_;
   Stats::ScopeSharedPtr scope_;
+  OdCdsStats stats_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   // Maps a resource name to its subscription data.
   absl::flat_hash_map<std::string, PerSubscriptionDataPtr> subscriptions_;
@@ -353,6 +387,14 @@ XdstpOdCdsApiImpl::subscriptionsManager(Server::Configuration::ServerFactoryCont
 
 void XdstpOdCdsApiImpl::updateOnDemand(std::string cluster_name) {
   subscriptions_manager_->addSubscription(cluster_name, old_ads_);
+}
+
+bool XdstpOdCdsApiImpl::isKnownMissing(absl::string_view cluster_name) const {
+  return subscriptions_manager_->isKnownMissing(cluster_name);
+}
+
+void XdstpOdCdsApiImpl::recordKnownMissingAnswer() {
+  subscriptions_manager_->recordKnownMissingAnswer();
 }
 } // namespace Upstream
 } // namespace Envoy

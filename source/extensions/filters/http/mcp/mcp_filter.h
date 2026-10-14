@@ -192,12 +192,14 @@ private:
   void recordErrorState(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   void sendErrorReply(absl::string_view error_msg, Filters::Common::Mcp::Status status);
   void sendUnsupportedProtocolVersionReply(absl::string_view requested_version);
+  void sendJsonRpcErrorReply(int error_code, absl::string_view error_msg);
   void sendHeaderMismatchReply(absl::string_view error_msg);
   void sendMethodNotAllowedReply(absl::string_view error_msg);
-  bool needsBody() const;
+  bool needsBody();
   bool hasCompleteHeaderAttributes() const;
   bool headerAttributesMatch() const;
   bool verifyHeaderAttributes() const;
+  bool hasRequiredClientCapabilities() const;
   enum class ProtocolVersionValidationResult {
     Ok,
     Missing,

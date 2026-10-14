@@ -66,6 +66,8 @@ test_program(name = "bootstrap_admin_handler_test")
 
 test_program(name = "bootstrap_cluster_lifecycle_test")
 
+test_program(name = "bootstrap_config_names_test")
+
 test_program(name = "bootstrap_listener_lifecycle_test")
 
 test_program(name = "network_integration_test")
@@ -97,6 +99,8 @@ test_program(name = "cluster_dynamic_metadata_test")
 test_program(name = "stat_sink_integration_test")
 
 test_program(name = "transport_socket_integration_test")
+
+test_program(name = "transport_socket_splice")
 
 test_program(name = "early_header_mutation_integration_test")
 

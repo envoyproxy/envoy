@@ -93,7 +93,7 @@ void OAuth2ClientImpl::onSuccess(const Envoy::Http::AsyncClient::Request&,
                                  Envoy::Http::ResponseMessagePtr&& message) {
   in_flight_request_ = nullptr;
   // Check that the auth cluster returned a happy response.
-  const auto response_code = message->headers().Status()->value().getStringView();
+  const absl::string_view response_code = message->headers().getStatusValue();
   if (response_code != "200") {
     ENVOY_LOG(error, "Oauth response code: {}", response_code);
     ENVOY_LOG(error, "Oauth response body: {}", message->bodyAsString());

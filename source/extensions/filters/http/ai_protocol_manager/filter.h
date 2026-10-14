@@ -40,11 +40,13 @@ class FilterConfig {
 public:
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-      Stats::Scope& scope, AiFilterFactories ai_filter_factories);
+      Stats::Scope& scope, AiFilterFactories ai_filter_factories,
+      ExternalBufferFactorySharedPtr buffer_factory);
 
   static absl::StatusOr<FilterConfigSharedPtr>
   create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-         Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
+         Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+         ExternalBufferFactorySharedPtr buffer_factory);
 
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
@@ -60,6 +62,7 @@ public:
   uint32_t maxJsonBodySize() const { return max_json_body_size_; }
   uint32_t maxParsedSseEvents() const { return max_parsed_sse_events_; }
   AiProtocolManagerStats& stats() const { return stats_; }
+  ExternalBufferFactory& bufferFactory() const { return *buffer_factory_; }
 
 private:
   // Counters are thread-safe to increment; mutable so a shared const config
@@ -78,13 +81,13 @@ private:
   const uint32_t max_json_body_size_ = 0;
   const uint32_t max_parsed_sse_events_ = 0;
   const AiFilterFactories ai_filter_factories_;
+  const ExternalBufferFactorySharedPtr buffer_factory_;
 };
 
 // Per-route configuration. Its presence declares the route an AI endpoint.
 // The request and response wire APIs are declared separately (protocol
 // translation can make them differ); either may be Unspecified when the
-// route left it undeclared. A declared request API with a registered payload
-// schema (schema/schema_registry.h) is validated strictly.
+// route left it undeclared.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   explicit RouteConfig(const PerRouteProto& proto)
@@ -156,9 +159,9 @@ private:
 // rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
 // endpoint carries no such gate.
 //
-// A declared wire API with a registered payload schema is validated at end of
-// payload (schema/schema_registry.h), then the configured AI filters run over the
-// parsed document (filter_manager.h); normalization comes later.
+// At end of payload the configured AI filters run over the parsed document
+// (filter_manager.h); payload schema validation is one of them. Normalization
+// comes later.
 //
 // Encode (response) path: observe-only token-usage extraction. When
 // response_handling.token_usage is configured, 2xx SSE/JSON responses on
@@ -171,8 +174,7 @@ private:
 class AiProtocolManagerFilter : public Http::PassThroughFilter,
                                 public Logger::Loggable<Logger::Id::filter> {
 public:
-  AiProtocolManagerFilter(ExternalBufferFactory& buffer_factory, FilterConfigSharedPtr config)
-      : buffer_factory_(buffer_factory), config_(std::move(config)) {}
+  explicit AiProtocolManagerFilter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -218,7 +220,6 @@ private:
   // Invoked when the SSE response filter pipeline completes or fails.
   void onEncodeComplete(absl::Status status);
 
-  ExternalBufferFactory& buffer_factory_;
   FilterConfigSharedPtr config_;
 
   // Declared before decode_manager_, encode_manager_, and filter_manager_ so they outlive the
@@ -235,9 +236,10 @@ private:
 
   // Copied out of the route configuration rather than held by pointer: the route
   // can be re-resolved mid-stream, which would leave a cached pointer dangling,
-  // and these are two scalars.
+  // and these are scalars.
   bool route_has_request_{false};
-  LLMProtocol route_request_protocol_{LLMProtocol::Unspecified};
+  LLMProtocol request_protocol_{LLMProtocol::Unspecified};
+  LLMProtocol route_response_protocol_{LLMProtocol::Unspecified};
 
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or

@@ -1646,13 +1646,6 @@ TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
   EXPECT_NO_THROW(scoped = null_mux_.pause(params));
 }
 
-TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
-  EXPECT_ENVOY_BUG(null_mux_.requestOnDemandUpdate("type_url", {"for_update"}),
-                   "unexpected request for on demand update");
-  EXPECT_ENVOY_BUG(null_mux_.requestOnDemandUpdate("type_url", {"for_update"}, {"for_removal"}),
-                   "unexpected request for on demand update");
-}
-
 TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
   NiceMock<MockSubscriptionCallbacks> callbacks;
   OpaqueResourceDecoderSharedPtr resource_decoder(
@@ -1912,11 +1905,12 @@ TEST_P(GrpcMuxImplTest, ShutdownPreventsSending) {
   auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
 }
 
-TEST_P(GrpcMuxImplTest, RequestOnDemandUpdateDoesNothing) {
+TEST_P(GrpcMuxImplTest, WatchAppendDoesNothing) {
   setup();
-  // Should not throw or crash.
-  grpc_mux_->requestOnDemandUpdate("foo", {"z"});
-  grpc_mux_->requestOnDemandUpdate("foo", {"z"}, {"y"});
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x"}, callbacks_, resource_decoder_, {});
+  // Should not throw or crash on the legacy SOTW mux.
+  foo_sub->append({"z"});
+  foo_sub->append({"z"}, {"y"});
 }
 
 } // namespace

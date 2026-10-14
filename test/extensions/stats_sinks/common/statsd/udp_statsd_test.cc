@@ -423,6 +423,18 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
               write("envoy.duration:1234567.891|ms"));
   sink.onHistogramComplete(duration_micro, 1234567891);
 
+  NiceMock<Stats::MockHistogram> duration_nano;
+  duration_nano.name_ = "duration";
+  duration_nano.unit_ = Stats::Histogram::Unit::Nanoseconds;
+
+  // Nanoseconds are scaled to milliseconds without losing the sub-microsecond part.
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:0.0407|ms"));
+  sink.onHistogramComplete(duration_nano, 40700);
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:3.943277|ms"));
+  sink.onHistogramComplete(duration_nano, 3943277);
+
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";
   duration_milli.unit_ = Stats::Histogram::Unit::Milliseconds;
@@ -447,6 +459,14 @@ TEST(UdpStatsdSinkTest, HistogramUnitScalingOffByDefault) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.duration:1500|ms"));
   sink.onHistogramComplete(duration_micro, 1500);
+
+  NiceMock<Stats::MockHistogram> duration_nano;
+  duration_nano.name_ = "duration";
+  duration_nano.unit_ = Stats::Histogram::Unit::Nanoseconds;
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:40700|ms"));
+  sink.onHistogramComplete(duration_nano, 40700);
 
   tls_.shutdownThread();
 }
@@ -546,6 +566,15 @@ TEST(UdpStatsdSinkWithTagsTest, SiSuffix) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.duration:0.003|ms|#key1:value1,key2:value2"));
   sink.onHistogramComplete(duration_micro, 3);
+
+  NiceMock<Stats::MockHistogram> duration_nano;
+  duration_nano.name_ = "duration";
+  duration_nano.unit_ = Stats::Histogram::Unit::Nanoseconds;
+  duration_nano.setTags(tags);
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.duration:0.0407|ms|#key1:value1,key2:value2"));
+  sink.onHistogramComplete(duration_nano, 40700);
 
   NiceMock<Stats::MockHistogram> duration_milli;
   duration_milli.name_ = "duration";

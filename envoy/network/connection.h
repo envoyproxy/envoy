@@ -17,6 +17,8 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Event {
 class Dispatcher;
@@ -418,11 +420,11 @@ public:
   virtual absl::string_view localCloseReason() const PURE;
 
   /**
-   * @return absl::string_view the initial local close reason of the underlying socket.
-   * This logs the first local close reason set on the connection which is not overwritten by
-   * subsequent local close reasons.
+   * @return absl::Span<const std::string> every local close reason set on the
+   * connection, in the order in which they were set; empty if no local close
+   * occurred.
    */
-  virtual absl::string_view initialLocalCloseReason() const { return ""; }
+  virtual absl::Span<const std::string> localCloseReasons() const { return {}; }
 
   /**
    * Instructs the connection to start using secure transport.

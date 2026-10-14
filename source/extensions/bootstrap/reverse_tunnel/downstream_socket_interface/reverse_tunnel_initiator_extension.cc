@@ -42,6 +42,9 @@ ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
       PROTOBUF_GET_MS_OR_DEFAULT(config, max_reconnect_backoff, kDefaultMaxReconnectBackoffMs);
   maintain_interval_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(
       config, maintain_interval, ReverseConnectionUtility::kDefaultMaintainIntervalMs);
+  // Deadline for receiving the handshake response. Defaults to 15s.
+  handshake_timeout_ms_ =
+      PROTOBUF_GET_MS_OR_DEFAULT(config.http_handshake(), handshake_timeout, 15000);
   if (config.has_http_handshake() && !config.http_handshake().request_path().empty()) {
     handshake_request_path_ = config.http_handshake().request_path();
   } else {

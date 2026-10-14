@@ -203,6 +203,82 @@ TEST_F(TokenCacheTest, BoundJwtFingerprintAwareCache) {
   EXPECT_EQ(foundA.value(), "token_for_A");
 }
 
+TEST_F(TokenCacheTest, AccessTokenScopesAwareCache) {
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience1;
+  audience1.mutable_access_token()->add_scopes("https://www.googleapis.com/auth/cloud-platform");
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience2;
+  audience2.mutable_access_token()->add_scopes("https://www.googleapis.com/auth/cloud-platform");
+  audience2.mutable_access_token()->add_scopes("openid");
+
+  // Insert token for audience1.
+  auto token1 = std::make_unique<GcpToken>("token_scope_1", ExpTime, audience1);
+  token_cache_->insert(std::move(token1));
+
+  // Lookup with audience1 should succeed.
+  auto found1 = token_cache_->lookUp(audience1, std::nullopt);
+  EXPECT_TRUE(found1.has_value());
+  EXPECT_EQ(found1.value(), "token_scope_1");
+
+  // Lookup with audience2 should result in a cache miss.
+  auto found2 = token_cache_->lookUp(audience2, std::nullopt);
+  EXPECT_FALSE(found2.has_value());
+
+  // Insert token for audience2.
+  auto token2 = std::make_unique<GcpToken>("token_scope_2", ExpTime, audience2);
+  token_cache_->insert(std::move(token2));
+
+  // Lookup with audience2 should now succeed.
+  found2 = token_cache_->lookUp(audience2, std::nullopt);
+  EXPECT_TRUE(found2.has_value());
+  EXPECT_EQ(found2.value(), "token_scope_2");
+
+  // Lookup with audience1 should still succeed without collision.
+  found1 = token_cache_->lookUp(audience1, std::nullopt);
+  EXPECT_TRUE(found1.has_value());
+  EXPECT_EQ(found1.value(), "token_scope_1");
+}
+
+TEST_F(TokenCacheTest, BoundAccessTokenScopesAwareCache) {
+  const std::string fingerprint = "fingerprint_123";
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience1;
+  audience1.mutable_bound_access_token()->add_scopes(
+      "https://www.googleapis.com/auth/cloud-platform");
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience2;
+  audience2.mutable_bound_access_token()->add_scopes(
+      "https://www.googleapis.com/auth/cloud-platform");
+  audience2.mutable_bound_access_token()->add_scopes("openid");
+
+  // Insert token for audience1.
+  auto token1 = std::make_unique<GcpToken>("token_bound_1", ExpTime, audience1, fingerprint);
+  token_cache_->insert(std::move(token1));
+
+  // Lookup with audience1 should succeed.
+  auto found1 = token_cache_->lookUp(audience1, fingerprint);
+  EXPECT_TRUE(found1.has_value());
+  EXPECT_EQ(found1.value(), "token_bound_1");
+
+  // Lookup with audience2 should result in a cache miss.
+  auto found2 = token_cache_->lookUp(audience2, fingerprint);
+  EXPECT_FALSE(found2.has_value());
+
+  // Insert token for audience2.
+  auto token2 = std::make_unique<GcpToken>("token_bound_2", ExpTime, audience2, fingerprint);
+  token_cache_->insert(std::move(token2));
+
+  // Lookup with audience2 should now succeed.
+  found2 = token_cache_->lookUp(audience2, fingerprint);
+  EXPECT_TRUE(found2.has_value());
+  EXPECT_EQ(found2.value(), "token_bound_2");
+
+  // Lookup with audience1 should still succeed.
+  found1 = token_cache_->lookUp(audience1, fingerprint);
+  EXPECT_TRUE(found1.has_value());
+  EXPECT_EQ(found1.value(), "token_bound_1");
+}
+
 } // namespace
 } // namespace GcpAuthn
 } // namespace HttpFilters

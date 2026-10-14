@@ -532,8 +532,10 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
 
   const std::string& type_url = Config::TestTypeUrl::get().VirtualHost;
   SubscriptionOptions options;
-  options.use_namespace_matching_ = true;
-  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, options);
+  // Register a suffix-glob watch so resources named "prefix/<id>" are routed here, without
+  // subscribing to the glob on the wire (mirrors VHDS).
+  watch->accept({"prefix/*"});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -569,8 +571,8 @@ TEST_P(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
 
   const std::string& type_url = Config::TestTypeUrl::get().VirtualHost;
   SubscriptionOptions options;
-  options.use_namespace_matching_ = true;
-  auto watch = grpc_mux_->addWatch(type_url, {"prefix"}, callbacks_, resource_decoder_, options);
+  auto watch = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, options);
+  watch->accept({"prefix/*"});
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -690,18 +692,19 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
   expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
   grpc_mux_->start();
 
+  // Additionally add "z" to the watch: it is both subscribed on the wire and routed to this watch.
   expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"z"}});
-  grpc_mux_->requestOnDemandUpdate("foo", {"z"});
+  foo_sub->append({"z"});
 
   expectSendMessage(
       {.type_url = "foo", .resource_names_subscribe = {"w"}, .resource_names_unsubscribe = {"z"}});
-  grpc_mux_->requestOnDemandUpdate("foo", {"w"}, {"z"});
+  foo_sub->append({"w"}, {"z"});
 
   expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"w"}});
-  grpc_mux_->requestOnDemandUpdate("foo", {}, {"w"});
+  foo_sub->append({}, {"w"});
 
   // Unsubscribing from a resource that is not subscribed should not trigger a discovery request.
-  grpc_mux_->requestOnDemandUpdate("foo", {}, {"non_existent"});
+  foo_sub->append({}, {"non_existent"});
 
   expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}});
 }
@@ -1220,20 +1223,23 @@ TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnDemandUnsubscribed) {
   grpc_mux_->start();
 
   expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
-  grpc_mux_->requestOnDemandUpdate(type_url, {"x"});
+  foo_sub->append({"x"});
 
   EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "x"));
   EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "non_existent")).Times(0);
   expectSendMessage({.type_url = type_url,
                      .resource_names_subscribe = {"y"},
                      .resource_names_unsubscribe = {"x"}});
-  grpc_mux_->requestOnDemandUpdate(type_url, {"y"}, {"x", "non_existent"});
+  foo_sub->append({"y"}, {"x", "non_existent"});
 
   // Unsubscribing on-demand from a watched resource ("w") should notify the tracker once,
-  // and destroying the watch afterwards should not notify a second time.
+  // and destroying the watch afterwards should not notify a second time for "w".
   EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "w"));
   expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"w"}});
-  grpc_mux_->requestOnDemandUpdate(type_url, {}, {"w"});
+  foo_sub->append({}, {"w"});
+
+  EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "y"));
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"y"}});
   foo_sub.reset();
 
   shutdownMux();

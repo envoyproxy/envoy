@@ -441,19 +441,19 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   worker_id.value_ = "123";
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
-                         "listener_manager.worker_dispatcher.loop_duration_us", {worker_id});
+                         "listener_manager.worker.dispatcher.loop_duration_us", {worker_id});
 
   // Listener worker id
   listener_address.value_ = "127.0.0.1_3012";
   regex_tester.testRegex("listener.127.0.0.1_3012.worker_123.downstream_cx_active",
-                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker.downstream_cx_active", {listener_address, worker_id});
 
   listener_address.value_ = "myprefix";
   regex_tester.testRegex("listener.myprefix.worker_123.downstream_cx_active",
-                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker.downstream_cx_active", {listener_address, worker_id});
 
   // Server worker id
-  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.worker_watchdog_miss",
+  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.worker.watchdog_miss",
                          {worker_id});
 
   // Thrift Proxy Prefix
@@ -558,6 +558,23 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   sds_resource.name_ = tag_names.XDS_RESOURCE_NAME;
   sds_resource.value_ = "xds_trusted_ca";
   regex_tester.testRegex("sds.xds_trusted_ca.update_attempt", "sds.update_attempt", {sds_resource});
+
+  // Upstream per-zone stats
+  Tag from_zone;
+  from_zone.name_ = tag_names.UPSTREAM_FROM_ZONE;
+  from_zone.value_ = "zone_a";
+  Tag to_zone;
+  to_zone.name_ = tag_names.UPSTREAM_TO_ZONE;
+  to_zone.value_ = "zone_b";
+  regex_tester.testRegex("cluster.test_cluster.zone.zone_a.zone_b.upstream_rq_200",
+                         "cluster.zone.upstream_rq",
+                         {test_cluster, from_zone, to_zone, response_code});
+  regex_tester.testRegex("cluster.test_cluster.alt_prefix.zone.zone_a.zone_b.upstream_rq_time",
+                         "cluster.alt_prefix.zone.upstream_rq_time",
+                         {test_cluster, from_zone, to_zone});
+  regex_tester.testRegex("cluster.test_cluster.zone.zone_a.zone_b.thrift.upstream_resp_success",
+                         "cluster.zone.thrift.upstream_resp_success",
+                         {test_cluster, from_zone, to_zone});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

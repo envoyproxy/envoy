@@ -97,7 +97,13 @@ TEST_F(HttpSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
 }
 
-TEST_F(HttpSubscriptionImplTest, RequestOnDemandNotImplemented) {
+// REST subscription does not support on-demand updates; accept() is a no-op and
+// requestOnDemandUpdate() is unexpected.
+TEST_F(HttpSubscriptionImplTest, OnDemandUpdateNotSupported) {
+  startSubscription({"cluster0", "cluster1"});
+  // accept() is a no-op for the REST subscription.
+  subscription_->accept({"cluster0"});
+  // requestOnDemandUpdate() is not expected to be called for the REST subscription.
   EXPECT_ENVOY_BUG(subscription_->requestOnDemandUpdate({"cluster0"}),
                    "unexpected request for on demand update");
   EXPECT_ENVOY_BUG(subscription_->requestOnDemandUpdate({"cluster0"}, {"cluster1"}),

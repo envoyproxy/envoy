@@ -46,6 +46,7 @@ public:
                              const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
+  void accept(const absl::flat_hash_set<std::string>&) override {}
 
 protected:
   virtual std::string refreshInternal(ProtobufTypes::MessagePtr* config_update);

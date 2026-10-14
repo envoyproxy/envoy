@@ -47,58 +47,53 @@ namespace {
 OnRouteResult runSpecifiers(RouteSpecifierSpan specifiers, RouteConstSharedPtr route,
                             const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info, uint64_t random,
-                            OnRouteMatchStatus& match_status) {
+                            OnRouteInputStatus input_status) {
   for (const auto& specifier : specifiers) {
-    auto result = specifier->onRoute(std::move(route), headers, stream_info, random);
-    // The last specifier that has an opinion on the match status decides it.
-    if (result.match_status != OnRouteMatchStatus::Unspecified) {
-      match_status = result.match_status;
-    }
-    if (result.chain_status == OnRouteChainStatus::StopIteration) {
+    auto result = specifier->onRoute(std::move(route), headers, stream_info, random, input_status);
+    if (result.status != OnRouteStatus::Continue) {
       return result;
     }
     route = std::move(result.route);
   }
-  return {std::move(route), OnRouteChainStatus::Continue};
+  return {std::move(route), OnRouteStatus::Continue};
 }
 
 } // namespace
 
-RouteConstSharedPtr applyRouteSpecifiers(RouteConstSharedPtr route,
-                                         RouteSpecifierSpan config_specifiers,
-                                         RouteSpecifierSpan vhost_specifiers,
-                                         RouteSpecifierSpan route_specifiers,
-                                         const Http::RequestHeaderMap& headers,
-                                         const StreamInfo::StreamInfo& stream_info, uint64_t random,
-                                         OnRouteMatchStatus& match_status) {
+OnRouteResult applyRouteSpecifiers(RouteConstSharedPtr route, RouteSpecifierSpan config_specifiers,
+                                   RouteSpecifierSpan vhost_specifiers,
+                                   RouteSpecifierSpan route_specifiers,
+                                   const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info, uint64_t random,
+                                   OnRouteInputStatus input_status) {
   if (!route_specifiers.empty()) {
     auto result = runSpecifiers(route_specifiers, std::move(route), headers, stream_info, random,
-                                match_status);
-    route = std::move(result.route);
-    if (result.chain_status == OnRouteChainStatus::StopIteration) {
-      return route;
+                                input_status);
+    if (result.status != OnRouteStatus::Continue) {
+      return result;
     }
+    route = std::move(result.route);
   }
 
   if (!vhost_specifiers.empty()) {
     auto result = runSpecifiers(vhost_specifiers, std::move(route), headers, stream_info, random,
-                                match_status);
-    route = std::move(result.route);
-    if (result.chain_status == OnRouteChainStatus::StopIteration) {
-      return route;
+                                input_status);
+    if (result.status != OnRouteStatus::Continue) {
+      return result;
     }
+    route = std::move(result.route);
   }
 
   if (!config_specifiers.empty()) {
     auto result = runSpecifiers(config_specifiers, std::move(route), headers, stream_info, random,
-                                match_status);
-    route = std::move(result.route);
-    if (result.chain_status == OnRouteChainStatus::StopIteration) {
-      return route;
+                                input_status);
+    if (result.status != OnRouteStatus::Continue) {
+      return result;
     }
+    route = std::move(result.route);
   }
 
-  return route;
+  return {std::move(route), OnRouteStatus::Continue};
 }
 
 } // namespace Router
