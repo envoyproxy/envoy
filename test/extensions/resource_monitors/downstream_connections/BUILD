@@ -57,6 +57,7 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",

@@ -7,6 +7,7 @@
 
 #include "test/integration/integration.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
 using testing::Eq;
