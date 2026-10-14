@@ -3,6 +3,10 @@
 #include <dlfcn.h>
 #include <unistd.h>
 
+#if defined(__linux__)
+#include <link.h>
+#endif
+
 #include <cerrno>
 #include <fstream>
 #include <string>
@@ -12,14 +16,17 @@
 
 #include "source/common/common/hex.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "openssl/evp.h"
 #include "openssl/sha.h"
@@ -41,11 +48,95 @@ void logModuleLoadFailure(absl::string_view module, absl::string_view reason) {
                       "Unable to load dynamic module {}: {}", module, reason);
 }
 
+// Every DynamicModule that finished loading, until it is destroyed. A module is removed before it
+// closes its handle, so holding the mutex keeps every module in the set loaded.
+struct LoadedModules {
+  absl::Mutex mutex;
+  absl::flat_hash_set<const DynamicModule*> modules ABSL_GUARDED_BY(mutex);
+};
+
+LoadedModules& loadedModules() { MUTABLE_CONSTRUCT_ON_FIRST_USE(LoadedModules); }
+
+void registerLoadedModule(const DynamicModule* module) {
+  LoadedModules& loaded = loadedModules();
+  absl::MutexLock lock(loaded.mutex);
+  loaded.modules.insert(module);
+}
+
+void unregisterLoadedModule(const DynamicModule* module) {
+  LoadedModules& loaded = loadedModules();
+  absl::MutexLock lock(loaded.mutex);
+  loaded.modules.erase(module);
+}
+
+// Serializes the loads of shared objects, so that a load never finds a shared object that another
+// load is still initializing.
+absl::Mutex& sharedObjectLoadMutex() { MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::Mutex); }
+
+// Returns the address ranges of the executable segments of the loaded object that contains the
+// given address.
+std::vector<AddressRange> executableRangesOfObject(const void* address) {
+  std::vector<AddressRange> ranges;
+#if defined(__linux__)
+  struct Search {
+    uintptr_t address;
+    std::vector<AddressRange>& ranges;
+  } search{reinterpret_cast<uintptr_t>(address), ranges};
+  dl_iterate_phdr(
+      [](dl_phdr_info* info, size_t, void* data) -> int {
+        Search& search = *static_cast<Search*>(data);
+        std::vector<AddressRange> executable;
+        bool contains_address = false;
+        for (ElfW(Half) i = 0; i < info->dlpi_phnum; ++i) {
+          const ElfW(Phdr) & header = info->dlpi_phdr[i];
+          if (header.p_type != PT_LOAD || (header.p_flags & PF_X) == 0) {
+            continue;
+          }
+          const uintptr_t begin = info->dlpi_addr + header.p_vaddr;
+          const uintptr_t end = begin + header.p_memsz;
+          executable.push_back({begin, end});
+          contains_address |= search.address >= begin && search.address < end;
+        }
+        if (!contains_address) {
+          return 0;
+        }
+        search.ranges = std::move(executable);
+        return 1;
+      },
+      &search);
+#else
+  UNREFERENCED_PARAMETER(address);
+#endif
+  return ranges;
+}
+
 } // namespace
+
+// The init function is defined by every module, so it identifies the shared object of the module
+// among the loaded ones.
+DynamicModule::DynamicModule(void* handle, absl::string_view name)
+    : handle_(handle), name_(name), code_ranges_(executableRangesOfObject(
+                                        dlsym(handle, "envoy_dynamic_module_on_program_init"))) {}
+
+DynamicModule::DynamicModule(absl::string_view static_module_name)
+    : handle_(nullptr), name_(static_module_name) {}
+
+void forEachLoadedModule(absl::FunctionRef<void(const DynamicModule&)> fn) {
+  LoadedModules& loaded = loadedModules();
+  absl::MutexLock lock(loaded.mutex);
+  // Statically linked modules have no handle, and a name identifies exactly one of them.
+  absl::flat_hash_set<std::pair<const void*, absl::string_view>> visited;
+  for (const DynamicModule* module : loaded.modules) {
+    if (visited.emplace(module->handle_, module->name()).second) {
+      fn(*module);
+    }
+  }
+}
 
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
-                 const bool load_globally) {
+                 const bool load_globally, absl::string_view name) {
+  absl::MutexLock load_lock(sharedObjectLoadMutex());
   // Exactly one of RTLD_LAZY or RTLD_NOW must be present. By default the loader binds now
   // (RTLD_NOW), resolving every referenced symbol at load so a missing symbol fails the load
   // instead of crashing later on first use. The runtime guard reverts to RTLD_LAZY, which resolves
@@ -66,7 +157,9 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
   if (handle != nullptr) {
     // This means the module is already loaded, and the return value is the handle of the already
     // loaded module. We don't need to call the init function again.
-    return std::make_unique<DynamicModule>(handle);
+    DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle, name);
+    registerLoadedModule(dynamic_module.get());
+    return dynamic_module;
   }
   int mode = binding_mode;
   if (load_globally) {
@@ -89,7 +182,7 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
         "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", reason));
   }
 
-  DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);
+  DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle, name);
 
   const auto init_function =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
@@ -121,6 +214,7 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
                         "Dynamic module ABI version {} matched.", module_abi_version);
   }
+  registerLoadedModule(dynamic_module.get());
   return dynamic_module;
 }
 
@@ -144,7 +238,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByNameImpl(const absl::string_v
   const std::filesystem::path file_path_absolute = std::filesystem::absolute(file_path);
   if (std::filesystem::exists(file_path_absolute)) {
     absl::StatusOr<DynamicModulePtr> dynamic_module =
-        newDynamicModule(file_path_absolute, do_not_close, load_globally);
+        newDynamicModule(file_path_absolute, do_not_close, load_globally, module_name);
     // If the file exists but failed to load, return the error without trying other paths.
     // This allows the user to get the detailed error message such as missing dependencies, ABI
     // mismatch, etc.
@@ -159,8 +253,8 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByNameImpl(const absl::string_v
   // > searches for the object ...
   //
   // which basically says dlopen searches for LD_LIBRARY_PATH and /usr/lib, etc.
-  absl::StatusOr<DynamicModulePtr> dynamic_module =
-      newDynamicModule(fmt::format("lib{}.so", module_name), do_not_close, load_globally);
+  absl::StatusOr<DynamicModulePtr> dynamic_module = newDynamicModule(
+      fmt::format("lib{}.so", module_name), do_not_close, load_globally, module_name);
   if (dynamic_module.ok()) {
     return dynamic_module;
   }
@@ -185,7 +279,8 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(
 }
 
 DynamicModule::~DynamicModule() {
-  if (!static_module_name_.empty()) {
+  unregisterLoadedModule(this);
+  if (handle_ == nullptr) {
     // Static modules have no dlopen handle to close.
     return;
   }
@@ -193,9 +288,9 @@ DynamicModule::~DynamicModule() {
 }
 
 void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
-  if (!static_module_name_.empty()) {
+  if (handle_ == nullptr) {
     // For statically linked modules, look up the prefixed symbol in the process binary.
-    const std::string prefixed = absl::StrCat(static_module_name_, "_", symbol_ref);
+    const std::string prefixed = absl::StrCat(name_, "_", symbol_ref);
     return dlsym(RTLD_DEFAULT, prefixed.c_str());
   }
   // TODO(mathetake): maybe we should accept null-terminated const char* instead of string_view to
@@ -307,7 +402,8 @@ absl::Status writeDynamicModuleBytesToDisk(const absl::string_view module_bytes,
 absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_view module_bytes,
                                                            const absl::string_view sha256,
                                                            const bool do_not_close,
-                                                           const bool load_globally) {
+                                                           const bool load_globally,
+                                                           absl::string_view name) {
   auto status = writeDynamicModuleBytesToDisk(module_bytes, sha256);
   if (!status.ok()) {
     return status;
@@ -315,7 +411,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleFromBytes(const absl::string_vi
   auto temp_file_path = moduleTempPath(sha256);
   // If the module was already loaded at this path, newDynamicModule's RTLD_NOLOAD check
   // returns the existing handle without re-init.
-  auto result = newDynamicModule(temp_file_path, do_not_close, load_globally);
+  auto result = newDynamicModule(temp_file_path, do_not_close, load_globally, name);
   if (!result.ok()) {
     // Clean up the invalid file.
     std::filesystem::remove(temp_file_path);
@@ -350,6 +446,7 @@ absl::StatusOr<DynamicModulePtr> newStaticModule(const absl::string_view module_
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
                         "Static module ABI version {} matched.", abi_version);
   }
+  registerLoadedModule(dynamic_module.get());
   return dynamic_module;
 }
 
@@ -382,8 +479,9 @@ newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_vi
 
   if (!config.module().local().filename().empty()) {
     // Module specified by local file path.
-    auto dynamic_module = newDynamicModule(config.module().local().filename(),
-                                           config.do_not_close(), config.load_globally());
+    auto dynamic_module =
+        newDynamicModule(config.module().local().filename(), config.do_not_close(),
+                         config.load_globally(), config.name());
     if (!dynamic_module.ok()) {
       incrementLoadFailure(context, stat_name, ModuleLoadErrorStat);
 
@@ -429,8 +527,8 @@ newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_vi
                      verify_status.message());
       // Fall through to the fetch logic below.
     } else {
-      auto dynamic_module =
-          newDynamicModule(cached_path, config.do_not_close(), config.load_globally());
+      auto dynamic_module = newDynamicModule(cached_path, config.do_not_close(),
+                                             config.load_globally(), config.name());
       if (dynamic_module.ok()) {
         BackgroundFetchManager::singleton(context->singletonManager())->erase(sha256);
         return DynamicModuleLoadResult{std::move(dynamic_module.value()), nullptr};
@@ -481,8 +579,8 @@ newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_vi
       context->mainThreadDispatcher(), context->api().randomGenerator(),
       /*allow_empty=*/true,
       [stat_name = std::string(stat_name), sha256 = std::string(sha256), weak_state, context,
-       do_not_close = config.do_not_close(),
-       load_globally = config.load_globally()](const std::string& data) {
+       do_not_close = config.do_not_close(), load_globally = config.load_globally(),
+       name = config.name()](const std::string& data) {
         auto state = weak_state.lock();
         if (!state) {
           return;
@@ -494,7 +592,8 @@ newDynamicModuleByConfig(const ProtoDynamicModuleConfig& config, absl::string_vi
               "Remote dynamic module fetch returned empty data; module will not be loaded");
           return;
         }
-        auto module_or_error = newDynamicModuleFromBytes(data, sha256, do_not_close, load_globally);
+        auto module_or_error =
+            newDynamicModuleFromBytes(data, sha256, do_not_close, load_globally, name);
         if (!module_or_error.ok()) {
           incrementLoadFailure(context, stat_name, RemoteFetchErrorStat);
           ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules),

@@ -105,6 +105,16 @@ absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
   return result;
 }
 
+absl::Status
+TcmallocProfiler::forEachHeapSample(absl::FunctionRef<void(absl::Span<void* const>, uint64_t)> fn) {
+  tcmalloc::MallocExtension::SnapshotCurrent(tcmalloc::ProfileType::kHeap)
+      .Iterate([fn](const tcmalloc::Profile::Sample& sample) {
+        fn(absl::MakeConstSpan(sample.stack, sample.depth),
+           static_cast<uint64_t>(sample.count) * sample.requested_size);
+      });
+  return absl::OkStatus();
+}
+
 } // namespace Profiler
 } // namespace Envoy
 
@@ -131,6 +141,12 @@ absl::Status TcmallocProfiler::startAllocationProfile() {
 absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
   return absl::Status(absl::StatusCode::kUnimplemented,
                       "Allocation profile is not implemented in current build");
+}
+
+absl::Status
+TcmallocProfiler::forEachHeapSample(absl::FunctionRef<void(absl::Span<void* const>, uint64_t)>) {
+  return absl::Status(absl::StatusCode::kUnimplemented,
+                      "Heap profile is not implemented in current build");
 }
 
 } // namespace Profiler

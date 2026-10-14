@@ -132,6 +132,12 @@ const char* __attribute__((weak)) envoy_dynamic_modules_abi_version =
 #include <stdint.h>
 #endif
 
+// When built with clang, functions declared here never end in a tail call, so that the memory that
+// Envoy allocates in a callback is not attributed to the module that called it.
+#if defined(__clang__)
+#pragma clang attribute push(__attribute__((disable_tail_calls)), apply_to = function)
+#endif
+
 // =============================================================================
 // ==================================== Common =================================
 // =============================================================================
@@ -18497,6 +18503,10 @@ bool envoy_dynamic_module_on_header_formatter_format(
     envoy_dynamic_module_type_header_formatter_envoy_ptr formatter_envoy_ptr,
     envoy_dynamic_module_type_header_formatter_module_ptr formatter_module_ptr,
     envoy_dynamic_module_type_envoy_buffer key, envoy_dynamic_module_type_module_buffer* result);
+
+#if defined(__clang__)
+#pragma clang attribute pop
+#endif
 
 #ifdef __cplusplus
 }
