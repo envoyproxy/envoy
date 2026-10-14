@@ -137,7 +137,6 @@ void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
     config_info_.emplace(RouteConfigProvider::ConfigInfo{serialized_route_config_proto_,
                                                          route_config_name_,
                                                          std::move(warming_state_.version_info_)});
-    route_config_proto_cache_.reset();
   }
   // Defensively clear the warming state.
   warming_state_.clear();
@@ -146,15 +145,6 @@ void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
 const std::optional<RouteConfigProvider::ConfigInfo>&
 RouteConfigUpdateReceiverImpl::configInfo() const {
   return config_info_;
-}
-
-const Protobuf::Message& RouteConfigUpdateReceiverImpl::protobufConfiguration() const {
-  if (route_config_proto_cache_ == nullptr) {
-    route_config_proto_cache_ = proto_traits_.createEmptyProto();
-    RELEASE_ASSERT(route_config_proto_cache_->ParseFromString(serialized_route_config_proto_),
-                   "Failed to deserialize RouteConfiguration from wire bytes");
-  }
-  return *route_config_proto_cache_;
 }
 
 } // namespace Rds

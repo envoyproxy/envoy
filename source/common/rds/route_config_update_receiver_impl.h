@@ -169,7 +169,6 @@ public:
 
   uint64_t configHash() const override { return last_config_hash_; }
   const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const override;
-  const Protobuf::Message& protobufConfiguration() const override;
   ConfigConstSharedPtr parsedConfiguration() const override { return config_; }
   SystemTime lastUpdated() const override { return last_updated_; }
 
@@ -189,7 +188,6 @@ private:
   TimeSource& time_source_;
   std::string serialized_route_config_proto_;
   std::string route_config_name_;
-  mutable ProtobufTypes::MessagePtr route_config_proto_cache_;
   uint64_t last_config_hash_{0ull};
   SystemTime last_updated_;
   std::optional<RouteConfigProvider::ConfigInfo> config_info_;

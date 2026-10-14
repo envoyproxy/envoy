@@ -166,9 +166,6 @@ TEST_F(RdsConfigUpdateReceiverTest, EmptyRouteConfig) {
   EXPECT_EQ("empty_version", config_update_->configInfo().value().version_);
   EXPECT_EQ("", config_update_->configInfo().value().config_);
   EXPECT_EQ(time1, config_update_->lastUpdated());
-
-  const auto& proto = config_update_->protobufConfiguration();
-  EXPECT_EQ("", dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(proto).name());
 }
 
 class RdsConfigProviderManagerTest : public RdsTestBase {

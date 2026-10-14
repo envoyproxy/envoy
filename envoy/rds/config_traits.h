@@ -31,11 +31,6 @@ public:
    * Gives back the name field tag number of the route configuration proto.
    */
   virtual int resourceNameFieldNumber() const PURE;
-
-  /**
-   * Create an empty route configuration proto object.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyProto() const PURE;
 };
 
 class ConfigTraits {
