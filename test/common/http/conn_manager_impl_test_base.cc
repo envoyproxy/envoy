@@ -447,6 +447,34 @@ void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+void HttpConnectionManagerImplMixin::sendGetWithGrpcContentTypeAndExpectLocalReply(
+    const std::string& expected_status, bool expect_grpc_status) {
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        decoder_filters_[0]->callbacks_->sendLocalReply(
+            Code::ServiceUnavailable, "no healthy upstream", nullptr, std::nullopt, "details");
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
+                                                             {":path", "/"},
+                                                             {":method", "GET"},
+                                                             {"content-type", "application/grpc"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, _))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(expected_status, headers.getStatusValue());
+        EXPECT_EQ(expect_grpc_status, headers.GrpcStatus() != nullptr);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 void HttpConnectionManagerImplMixin::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
   setup();

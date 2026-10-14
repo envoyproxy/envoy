@@ -235,7 +235,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
       close_connection_on_zombie_stream_complete_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
+          "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")),
+      grpc_local_reply_requires_post_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.grpc_local_reply_requires_post")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -1088,7 +1090,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       connection_manager_.config_->localReply(),
                       connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
                       connection_manager_.read_callbacks_->connection().streamInfo().filterState(),
-                      connection_manager_.overload_manager_),
+                      connection_manager_.overload_manager_,
+                      connection_manager_.grpc_local_reply_requires_post_),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       has_explicit_global_flush_timeout_(

@@ -707,10 +707,12 @@ public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
                 OptRef<const Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
-                uint64_t buffer_limit)
+                uint64_t buffer_limit, bool grpc_local_reply_requires_post = true)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
-        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
+        proxy_100_continue_(proxy_100_continue),
+        grpc_local_reply_requires_post_(grpc_local_reply_requires_post),
+        buffer_limit_(buffer_limit) {}
 
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
@@ -853,12 +855,16 @@ public:
   void callUpstreamLowWatermarkCallbacks();
 
   void requestHeadersInitialized() {
-    if (Http::Headers::get().MethodValues.Head ==
-        filter_manager_callbacks_.requestHeaders()->getMethodValue()) {
+    const RequestHeaderMap& headers = filter_manager_callbacks_.requestHeaders().ref();
+    if (Http::Headers::get().MethodValues.Head == headers.getMethodValue()) {
       state_.is_head_request_ = true;
     }
-    state_.is_grpc_request_ =
-        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders().ref());
+    // Only a POST request can be a gRPC request. A GET or HEAD request that carries a gRPC
+    // content type gets an ordinary HTTP local reply instead of a trailers-only 200 that an HTTP
+    // cache could store (https://github.com/envoyproxy/envoy/issues/48070).
+    state_.is_grpc_request_ = grpc_local_reply_requires_post_
+                                  ? Grpc::Common::isGrpcPostRequestHeaders(headers)
+                                  : Grpc::Common::isGrpcRequestHeaders(headers);
   }
 
   /**
@@ -1164,6 +1170,11 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
+  // Whether a request must use the POST method to be treated as gRPC when formatting local
+  // replies. Latched once per HTTP connection manager and passed in by the
+  // DownstreamFilterManager; the upstream filter manager forwards local replies downstream and
+  // never consults it.
+  const bool grpc_local_reply_requires_post_;
 
   StreamDecoderFilters decoder_filters_;
   StreamEncoderFilters encoder_filters_;
@@ -1238,9 +1249,10 @@ public:
                           const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
                           TimeSource& time_source,
                           StreamInfo::FilterStateSharedPtr parent_filter_state,
-                          Server::OverloadManager& overload_manager)
+                          Server::OverloadManager& overload_manager,
+                          bool grpc_local_reply_requires_post = true)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
-                      proxy_100_continue, buffer_limit),
+                      proxy_100_continue, buffer_limit, grpc_local_reply_requires_post),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      StreamInfo::FilterState::LifeSpan::FilterChain,
                      std::move(parent_filter_state)),
