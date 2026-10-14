@@ -4360,6 +4360,952 @@ fn test_cert_validator_update_digest() {
 }
 
 // =============================================================================
+// TLS Certificate Selector callback stubs.
+// =============================================================================
+
+// A null selection context stands for a handshake without any of the requested state.
+fn tls_certificate_selector_stub_result(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+  value: &'static [u8],
+  result_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  if context_envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe {
+    *result_out = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: value.as_ptr() as *const _,
+      length: value.len(),
+    };
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_get_requested_server_name(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+  result_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  tls_certificate_selector_stub_result(context_envoy_ptr, b"www.lyft.com", result_out)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_get_client_hello_extension(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+  extension_type: u16,
+  result_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  extension_type == 16
+    && tls_certificate_selector_stub_result(context_envoy_ptr, b"\x00\x03\x02h2", result_out)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_get_filter_state(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  value_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  let key = unsafe { std::slice::from_raw_parts(key.ptr as *const u8, key.length) };
+  key == b"tenant" && tls_certificate_selector_stub_result(context_envoy_ptr, b"lyft", value_out)
+}
+
+thread_local! {
+  // The configuration callbacks received on this thread, so each test checks only its own calls.
+  static TLS_CERTIFICATE_SELECTOR_CONFIG_CALLS: std::cell::RefCell<Vec<String>> =
+    const { std::cell::RefCell::new(Vec::new()) };
+}
+
+// Stands for the Envoy side configuration, so the stubs can check that the SDK passes it on.
+fn tls_certificate_selector_envoy_config(
+) -> abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr {
+  static ENVOY_CONFIG: u8 = 0;
+  &ENVOY_CONFIG as *const u8 as *mut _
+}
+
+fn assert_tls_certificate_selector_envoy_config(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+) {
+  assert_eq!(config_envoy_ptr, tls_certificate_selector_envoy_config());
+}
+
+fn record_tls_certificate_selector_config_call(call: String) {
+  TLS_CERTIFICATE_SELECTOR_CONFIG_CALLS.with(|calls| calls.borrow_mut().push(call));
+}
+
+fn take_tls_certificate_selector_config_calls() -> Vec<String> {
+  TLS_CERTIFICATE_SELECTOR_CONFIG_CALLS.with(|calls| calls.take())
+}
+
+fn tls_certificate_selector_buffer_string(
+  buffer: abi::envoy_dynamic_module_type_module_buffer,
+) -> String {
+  String::from_utf8_lossy(unsafe {
+    crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr as *const u8, buffer.length)
+  })
+  .into_owned()
+}
+
+fn tls_certificate_selector_buffers_string(
+  buffers: *mut abi::envoy_dynamic_module_type_module_buffer,
+  length: usize,
+) -> String {
+  unsafe { crate::ffi_helpers::slice_from_raw_or_empty(buffers as *const _, length) }
+    .iter()
+    .map(|buffer| tls_certificate_selector_buffer_string(*buffer))
+    .collect::<Vec<_>>()
+    .join(",")
+}
+
+// Every metric gets the id 7, and a metric named "frozen" cannot be defined.
+fn define_tls_certificate_selector_metric(
+  kind: &str,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_names_length: usize,
+  id_out: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name = tls_certificate_selector_buffer_string(name);
+  let labels = tls_certificate_selector_buffers_string(label_names, label_names_length);
+  record_tls_certificate_selector_config_call(format!("define_{kind} {name} [{labels}]"));
+  if name == "frozen" {
+    return abi::envoy_dynamic_module_type_metrics_result::Frozen;
+  }
+  unsafe { *id_out = 7 };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+fn record_tls_certificate_selector_metric(
+  callback: &str,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let labels = tls_certificate_selector_buffers_string(label_values, label_values_length);
+  record_tls_certificate_selector_config_call(format!("{callback} {id} [{labels}] {value}"));
+  if id == 7 {
+    abi::envoy_dynamic_module_type_metrics_result::Success
+  } else {
+    abi::envoy_dynamic_module_type_metrics_result::MetricNotFound
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_names_length: usize,
+  counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  define_tls_certificate_selector_metric(
+    "counter",
+    name,
+    label_names,
+    label_names_length,
+    counter_id_ptr,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_increment_counter(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric(
+    "increment_counter",
+    id,
+    label_values,
+    label_values_length,
+    value,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_define_gauge(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_names_length: usize,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  define_tls_certificate_selector_metric(
+    "gauge",
+    name,
+    label_names,
+    label_names_length,
+    gauge_id_ptr,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_set_gauge(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric("set_gauge", id, label_values, label_values_length, value)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_increment_gauge(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric(
+    "increment_gauge",
+    id,
+    label_values,
+    label_values_length,
+    value,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_decrement_gauge(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric(
+    "decrement_gauge",
+    id,
+    label_values,
+    label_values_length,
+    value,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_define_histogram(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_names_length: usize,
+  histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  define_tls_certificate_selector_metric(
+    "histogram",
+    name,
+    label_names,
+    label_names_length,
+    histogram_id_ptr,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_record_histogram_value(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric(
+    "record_histogram_value",
+    id,
+    label_values,
+    label_values_length,
+    value,
+  )
+}
+
+// A certificate named "invalid" is rejected.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  certificate_chain: abi::envoy_dynamic_module_type_module_buffer,
+  private_key: abi::envoy_dynamic_module_type_module_buffer,
+  ocsp_staple: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  let name = tls_certificate_selector_buffer_string(name);
+  record_tls_certificate_selector_config_call(format!(
+    "set_certificate {name} {} {} {}",
+    tls_certificate_selector_buffer_string(certificate_chain),
+    tls_certificate_selector_buffer_string(private_key),
+    tls_certificate_selector_buffer_string(ocsp_staple)
+  ));
+  name != "invalid"
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_config_call(format!(
+    "remove_certificate {}",
+    tls_certificate_selector_buffer_string(name)
+  ));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_config_call("scheduler_new".to_string());
+  std::ptr::dangling_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_commit(
+  scheduler: abi::envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr,
+  event_id: u64,
+) {
+  assert_eq!(scheduler, std::ptr::dangling_mut());
+  record_tls_certificate_selector_config_call(format!("scheduler_commit {event_id}"));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_delete(
+  scheduler: abi::envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr,
+) {
+  assert_eq!(scheduler, std::ptr::dangling_mut());
+  record_tls_certificate_selector_config_call("scheduler_delete".to_string());
+}
+
+// =============================================================================
+// TLS Certificate Selector tests.
+// =============================================================================
+
+fn select_with_tls_certificate_selector(
+  selection: tls_certificate_selector::TlsCertificateSelection,
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+) -> (
+  abi::envoy_dynamic_module_type_tls_certificate_selector_status,
+  usize,
+  Vec<u8>,
+) {
+  struct TestSelector {
+    selection: tls_certificate_selector::TlsCertificateSelection,
+  }
+  impl tls_certificate_selector::TlsCertificateSelector for TestSelector {
+    fn select(
+      &self,
+      _context: &tls_certificate_selector::TlsCertificateSelectionContext,
+    ) -> tls_certificate_selector::TlsCertificateSelection {
+      self.selection.clone()
+    }
+  }
+
+  let selector: Box<dyn tls_certificate_selector::TlsCertificateSelector> =
+    Box::new(TestSelector { selection });
+  let selector_ptr = wrap_into_c_void_ptr!(selector);
+  let mut certificate_index = 0;
+  let mut certificate_name = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let status = unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_select(
+      selector_ptr,
+      context_envoy_ptr,
+      &mut certificate_index,
+      &mut certificate_name,
+    )
+  };
+  let name = unsafe {
+    crate::ffi_helpers::slice_from_raw_or_empty(
+      certificate_name.ptr as *const u8,
+      certificate_name.length,
+    )
+  }
+  .to_vec();
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_destroy(
+      selector_ptr,
+    );
+  }
+  (status, certificate_index, name)
+}
+
+fn request_tls_certificate(
+  config_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_module_ptr,
+  name: &[u8],
+) {
+  use tls_certificate_selector::*;
+  unsafe {
+    envoy_dynamic_module_on_tls_certificate_selector_config_certificate_requested(
+      tls_certificate_selector_envoy_config(),
+      config_ptr,
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: name.as_ptr() as *const _,
+        length: name.len(),
+      },
+    );
+  }
+}
+
+#[test]
+fn test_tls_certificate_selector_config_new_and_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestConfig {
+    _envoy_config: std::sync::Arc<dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig>,
+  }
+  impl Drop for TestConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      _certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      None
+    }
+  }
+
+  let new_config_fn: NewTlsCertificateSelectorConfigFunction =
+    |name, config, is_upstream, envoy_config| {
+      assert_eq!(name, "selector");
+      assert_eq!(config, b"config");
+      assert_eq!(
+        envoy_config.define_counter_vec("selected", &["outcome"]),
+        Ok(EnvoyCounterVecId(1))
+      );
+      if is_upstream {
+        Some(Box::new(TestConfig {
+          _envoy_config: envoy_config,
+        }))
+      } else {
+        None
+      }
+    };
+  let envoy_config =
+    || -> std::sync::Arc<dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig> {
+      let mut mock_config = tls_certificate_selector::MockEnvoyTlsCertificateSelectorConfig::new();
+      mock_config
+        .expect_define_counter_vec()
+        .withf(|name, label_names| name == "selected" && label_names == ["outcome"])
+        .times(1)
+        .returning(|_, _| Ok(EnvoyCounterVecId(1)));
+      std::sync::Arc::new(mock_config)
+    };
+
+  let config_ptr = tls_certificate_selector::init_tls_certificate_selector_config(
+    "selector",
+    b"config",
+    false,
+    envoy_config(),
+    &new_config_fn,
+  );
+  assert!(config_ptr.is_null());
+
+  let config_ptr = tls_certificate_selector::init_tls_certificate_selector_config(
+    "selector",
+    b"config",
+    true,
+    envoy_config(),
+    &new_config_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_tls_certificate_selector_new_and_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestConfig;
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      assert_eq!(certificates, [b"certificate".as_slice(), b"".as_slice()]);
+      Some(Box::new(TestSelector))
+    }
+  }
+
+  struct TestSelector;
+  impl Drop for TestSelector {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl tls_certificate_selector::TlsCertificateSelector for TestSelector {
+    fn select(
+      &self,
+      _context: &tls_certificate_selector::TlsCertificateSelectionContext,
+    ) -> tls_certificate_selector::TlsCertificateSelection {
+      tls_certificate_selector::TlsCertificateSelection::Default
+    }
+  }
+
+  let config: Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  let certificate = b"certificate";
+  let certificates = [
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: certificate.as_ptr() as *const _,
+      length: certificate.len(),
+    },
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  ];
+  let selector_ptr = unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_new(
+      config_ptr,
+      certificates.as_ptr(),
+      certificates.len(),
+    )
+  };
+  assert!(!selector_ptr.is_null());
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_destroy(
+      selector_ptr,
+    );
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+}
+
+#[test]
+fn test_tls_certificate_selector_selections() {
+  use tls_certificate_selector::TlsCertificateSelection;
+  let context_envoy_ptr = std::ptr::null_mut();
+
+  let (status, certificate_index, _) =
+    select_with_tls_certificate_selector(TlsCertificateSelection::Configured(1), context_envoy_ptr);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Configured
+  );
+  assert_eq!(certificate_index, 1);
+
+  // The name stays valid after the hook returns, since Envoy reads it then.
+  let (status, _, certificate_name) = select_with_tls_certificate_selector(
+    TlsCertificateSelection::Dynamic("dynamic.lyft.com".to_string()),
+    context_envoy_ptr,
+  );
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Dynamic
+  );
+  assert_eq!(certificate_name, b"dynamic.lyft.com");
+
+  let (status, ..) =
+    select_with_tls_certificate_selector(TlsCertificateSelection::Default, context_envoy_ptr);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Default
+  );
+
+  let (status, ..) =
+    select_with_tls_certificate_selector(TlsCertificateSelection::Failed, context_envoy_ptr);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Failed
+  );
+}
+
+#[test]
+fn test_tls_certificate_selector_context_reads_the_handshake() {
+  // Checks the state of the handshake, which is only available with a selection context.
+  struct TestSelector;
+  impl tls_certificate_selector::TlsCertificateSelector for TestSelector {
+    fn select(
+      &self,
+      context: &tls_certificate_selector::TlsCertificateSelectionContext,
+    ) -> tls_certificate_selector::TlsCertificateSelection {
+      let Some(server_name) = context.get_requested_server_name() else {
+        assert!(context.get_client_hello_extension(16).is_none());
+        assert!(context.get_filter_state("tenant").is_none());
+        return tls_certificate_selector::TlsCertificateSelection::Default;
+      };
+      assert_eq!(server_name.as_slice(), b"www.lyft.com");
+      assert_eq!(
+        context.get_client_hello_extension(16).unwrap().as_slice(),
+        b"\x00\x03\x02h2"
+      );
+      assert!(context.get_client_hello_extension(5).is_none());
+      assert_eq!(
+        context.get_filter_state("tenant").unwrap().as_slice(),
+        b"lyft"
+      );
+      assert!(context.get_filter_state("other").is_none());
+      tls_certificate_selector::TlsCertificateSelection::Configured(0)
+    }
+  }
+
+  let selector: Box<dyn tls_certificate_selector::TlsCertificateSelector> = Box::new(TestSelector);
+  let selector_ptr = wrap_into_c_void_ptr!(selector);
+  let mut context = 0u8;
+  for (context_envoy_ptr, expected_status) in [
+    (
+      &mut context as *mut u8 as *mut _,
+      abi::envoy_dynamic_module_type_tls_certificate_selector_status::Configured,
+    ),
+    (
+      std::ptr::null_mut(),
+      abi::envoy_dynamic_module_type_tls_certificate_selector_status::Default,
+    ),
+  ] {
+    let mut certificate_index = 0;
+    let mut certificate_name = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let status = unsafe {
+      tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_select(
+        selector_ptr,
+        context_envoy_ptr,
+        &mut certificate_index,
+        &mut certificate_name,
+      )
+    };
+    assert_eq!(status, expected_status);
+  }
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_destroy(
+      selector_ptr,
+    );
+  }
+}
+
+#[test]
+fn test_tls_certificate_selector_new_failure() {
+  struct TestConfig;
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      assert!(certificates.is_empty());
+      None
+    }
+  }
+
+  let config: Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  let selector_ptr = unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_new(
+      config_ptr,
+      std::ptr::null(),
+      0,
+    )
+  };
+  assert!(selector_ptr.is_null());
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+}
+
+#[test]
+fn test_tls_certificate_selector_default_hooks() {
+  use tls_certificate_selector::TlsCertificateSelectorConfig;
+  struct TestConfig;
+  impl TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      _certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      None
+    }
+  }
+
+  // By default a requested certificate is declined and a scheduled event does nothing.
+  let mut envoy_config = tls_certificate_selector::MockEnvoyTlsCertificateSelectorConfig::new();
+  envoy_config
+    .expect_remove_certificate()
+    .withf(|name| name == "dynamic.lyft.com")
+    .times(1)
+    .return_const(());
+  TestConfig.on_certificate_requested(&envoy_config, "dynamic.lyft.com");
+  TestConfig.on_scheduled(&envoy_config, 1);
+}
+
+#[test]
+fn test_tls_certificate_selector_hooks() {
+  static REQUESTED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+  static SCHEDULED: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
+
+  struct TestConfig;
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      _certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      None
+    }
+    fn on_certificate_requested(
+      &self,
+      envoy_config: &dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig,
+      name: &str,
+    ) {
+      REQUESTED.lock().unwrap().push(name.to_string());
+      assert!(envoy_config.set_certificate(name, b"chain", b"key", b""));
+    }
+    fn on_scheduled(
+      &self,
+      envoy_config: &dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig,
+      event_id: u64,
+    ) {
+      SCHEDULED.lock().unwrap().push(event_id);
+      envoy_config.remove_certificate("dynamic.lyft.com");
+    }
+  }
+
+  let config: Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  request_tls_certificate(config_ptr, b"dynamic.lyft.com");
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_scheduled(
+      tls_certificate_selector_envoy_config(),
+      config_ptr,
+      7,
+    );
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+  assert_eq!(*REQUESTED.lock().unwrap(), vec!["dynamic.lyft.com"]);
+  assert_eq!(*SCHEDULED.lock().unwrap(), vec![7]);
+  assert_eq!(
+    take_tls_certificate_selector_config_calls(),
+    vec![
+      "set_certificate dynamic.lyft.com chain key ",
+      "remove_certificate dynamic.lyft.com",
+    ]
+  );
+}
+
+#[test]
+fn test_tls_certificate_selector_certificate_requested_panic_declines_the_certificate() {
+  struct TestConfig;
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      _certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      None
+    }
+    fn on_certificate_requested(
+      &self,
+      _envoy_config: &dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig,
+      _name: &str,
+    ) {
+      panic!("requested panic");
+    }
+  }
+
+  let config: Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  request_tls_certificate(config_ptr, b"dynamic.lyft.com");
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+  assert_eq!(
+    take_tls_certificate_selector_config_calls(),
+    vec!["remove_certificate dynamic.lyft.com"]
+  );
+}
+
+#[test]
+fn test_tls_certificate_selector_envoy_config_calls_envoy() {
+  use tls_certificate_selector::{
+    EnvoyTlsCertificateSelectorConfig, EnvoyTlsCertificateSelectorConfigScheduler,
+  };
+  let envoy_config = tls_certificate_selector::EnvoyTlsCertificateSelectorConfigImpl {
+    raw: tls_certificate_selector_envoy_config(),
+  };
+
+  assert_eq!(
+    envoy_config.define_counter("counter"),
+    Ok(EnvoyCounterId(7))
+  );
+  assert_eq!(
+    envoy_config.define_counter_vec("counter_vec", &["a", "b"]),
+    Ok(EnvoyCounterVecId(7))
+  );
+  assert_eq!(envoy_config.define_gauge("gauge"), Ok(EnvoyGaugeId(7)));
+  assert_eq!(
+    envoy_config.define_gauge_vec("gauge_vec", &["a"]),
+    Ok(EnvoyGaugeVecId(7))
+  );
+  assert_eq!(
+    envoy_config.define_histogram("histogram"),
+    Ok(EnvoyHistogramId(7))
+  );
+  assert_eq!(
+    envoy_config.define_histogram_vec("histogram_vec", &["a"]),
+    Ok(EnvoyHistogramVecId(7))
+  );
+  assert_eq!(
+    envoy_config.define_counter("frozen"),
+    Err(abi::envoy_dynamic_module_type_metrics_result::Frozen)
+  );
+  assert_eq!(envoy_config.increment_counter(EnvoyCounterId(7), 1), Ok(()));
+  assert_eq!(
+    envoy_config.increment_counter_vec(EnvoyCounterVecId(7), &["x", "y"], 2),
+    Ok(())
+  );
+  assert_eq!(envoy_config.set_gauge(EnvoyGaugeId(7), 3), Ok(()));
+  assert_eq!(
+    envoy_config.set_gauge_vec(EnvoyGaugeVecId(7), &["x"], 4),
+    Ok(())
+  );
+  assert_eq!(envoy_config.increase_gauge(EnvoyGaugeId(7), 5), Ok(()));
+  assert_eq!(
+    envoy_config.increase_gauge_vec(EnvoyGaugeVecId(7), &["x"], 6),
+    Ok(())
+  );
+  assert_eq!(envoy_config.decrease_gauge(EnvoyGaugeId(7), 7), Ok(()));
+  assert_eq!(
+    envoy_config.decrease_gauge_vec(EnvoyGaugeVecId(7), &["x"], 8),
+    Ok(())
+  );
+  assert_eq!(
+    envoy_config.record_histogram_value(EnvoyHistogramId(7), 9),
+    Ok(())
+  );
+  assert_eq!(
+    envoy_config.record_histogram_value_vec(EnvoyHistogramVecId(7), &["x"], 10),
+    Ok(())
+  );
+  assert_eq!(
+    envoy_config.increment_counter(EnvoyCounterId(8), 1),
+    Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound)
+  );
+  assert!(envoy_config.set_certificate("dynamic.lyft.com", b"chain", b"key", b""));
+  assert!(!envoy_config.set_certificate("invalid", b"chain", b"key", b"ocsp"));
+  envoy_config.remove_certificate("dynamic.lyft.com");
+  // A boxed scheduler is itself a scheduler, so generic module code can take it.
+  fn commit_event(scheduler: &impl EnvoyTlsCertificateSelectorConfigScheduler, event_id: u64) {
+    scheduler.commit(event_id);
+  }
+  let scheduler = envoy_config.new_scheduler();
+  commit_event(&scheduler, 42);
+  drop(scheduler);
+
+  assert_eq!(
+    take_tls_certificate_selector_config_calls(),
+    vec![
+      "define_counter counter []",
+      "define_counter counter_vec [a,b]",
+      "define_gauge gauge []",
+      "define_gauge gauge_vec [a]",
+      "define_histogram histogram []",
+      "define_histogram histogram_vec [a]",
+      "define_counter frozen []",
+      "increment_counter 7 [] 1",
+      "increment_counter 7 [x,y] 2",
+      "set_gauge 7 [] 3",
+      "set_gauge 7 [x] 4",
+      "increment_gauge 7 [] 5",
+      "increment_gauge 7 [x] 6",
+      "decrement_gauge 7 [] 7",
+      "decrement_gauge 7 [x] 8",
+      "record_histogram_value 7 [] 9",
+      "record_histogram_value 7 [x] 10",
+      "increment_counter 8 [] 1",
+      "set_certificate dynamic.lyft.com chain key ",
+      "set_certificate invalid chain key ocsp",
+      "remove_certificate dynamic.lyft.com",
+      "scheduler_new",
+      "scheduler_commit 42",
+      "scheduler_delete",
+    ]
+  );
+}
+
+#[test]
+fn test_tls_certificate_selector_scheduler_mock() {
+  // The scheduler is a trait so module authors can unit test their off-thread logic with a mock.
+  use crate::tls_certificate_selector::EnvoyTlsCertificateSelectorConfigScheduler;
+  let mut mock_scheduler =
+    tls_certificate_selector::MockEnvoyTlsCertificateSelectorConfigScheduler::new();
+  mock_scheduler
+    .expect_commit()
+    .with(mockall::predicate::eq(42u64))
+    .times(1)
+    .return_const(());
+  mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_tls_certificate_selector_select_panic_fails_closed() {
+  struct TestSelector;
+  impl tls_certificate_selector::TlsCertificateSelector for TestSelector {
+    fn select(
+      &self,
+      _context: &tls_certificate_selector::TlsCertificateSelectionContext,
+    ) -> tls_certificate_selector::TlsCertificateSelection {
+      panic!("select panic");
+    }
+  }
+
+  let selector: Box<dyn tls_certificate_selector::TlsCertificateSelector> = Box::new(TestSelector);
+  let selector_ptr = wrap_into_c_void_ptr!(selector);
+  let mut certificate_index = 7;
+  let mut certificate_name = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let status = unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_select(
+      selector_ptr,
+      std::ptr::null_mut(),
+      &mut certificate_index,
+      &mut certificate_name,
+    )
+  };
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Failed
+  );
+  assert_eq!(certificate_index, 7);
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_destroy(
+      selector_ptr,
+    );
+  }
+}
+
+// =============================================================================
 // Load Balancer Metrics Tests
 // =============================================================================
 
