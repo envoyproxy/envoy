@@ -978,6 +978,45 @@ TEST_F(ExecInNetnsTest, Basic) {
   EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 }
 
+TEST_F(ExecInNetnsTest, CallbackThrowRestoresNetns) {
+  // Make the tests use mock syscalls.
+  testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_syscalls;
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
+
+  EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly(Invoke([this](int fd) -> Api::SysCallIntResult {
+    EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
+    fake_fd_map_.erase(fd);
+    return {0, 0};
+  }));
+
+  EXPECT_CALL(linux_os_syscalls, setns(_, Eq(CLONE_NEWNET)))
+      .WillRepeatedly(([this](int fd, int) -> Api::SysCallIntResult {
+        EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
+        current_netns_ = fake_fd_map_[fd];
+        return {0, 0};
+      }));
+
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillRepeatedly(Invoke([this](const char* pathname, int) -> Api::SysCallIntResult {
+        int fd = this->next_fd_++;
+        fake_fd_map_[fd] = pathname;
+        return {fd, 0};
+      }));
+
+  // Record the calling thread's original namespace with a successful call, then verify that a
+  // throwing callback restores it. A caller can catch the exception (e.g. a listener bind failure)
+  // and keep running, so skipping the restore would strand this thread in the target namespace.
+  auto original = Utility::execInNetworkNamespace([]() -> int { return 0; }, "ns1");
+  ASSERT_TRUE(original.ok());
+  const std::string original_netns = getCurrentNetns();
+
+  std::function<int()> thrower = []() -> int { throw EnvoyException("callback failed"); };
+  EXPECT_THROW(static_cast<void>(Utility::execInNetworkNamespace(thrower, "ns2")), EnvoyException);
+  EXPECT_EQ(getCurrentNetns(), original_netns);
+}
+
 TEST_F(ExecInNetnsTest, OpenFail) {
   // Make the tests use mock syscalls.
   testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_syscalls;
