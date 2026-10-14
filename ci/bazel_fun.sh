@@ -200,7 +200,10 @@ _registry_check_mod() {
     workspace_bazel_run "$module_dir" update_registry.check "$@" -- \
         "--json-out=${status_path}" \
         "--markdown-out=${markdown_path}" \
-        "--sha-out=${sha_path}" || return
+        "--sha-out=${sha_path}" || {
+        echo "FAIL: ${workspace}: bazel registry check failed" >&2
+        return 1
+    }
 
     sha="$(cat "${sha_path}")"
     tags="$(jq -r '.tags | join(" ")' "${status_path}")"
