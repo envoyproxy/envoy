@@ -91,15 +91,17 @@ public:
    * Subscription to a singleton resource using SingletonSubscriptionCallbacks.
    *
    * @param resource_name absl::string_view the resource to subscribe to.
-   * @param config OptRef<const envoy::config::core::v3::ConfigSource> an optional config source to use.
+   * @param config OptRef<const envoy::config::core::v3::ConfigSource> an optional config source to
+   * use.
    * @param type_url type URL for the resource being subscribed to.
    * @param scope stats scope for any stats tracked by the subscription.
-   * @param callbacks the callbacks needed by all SingletonSubscription objects, to deliver config updates.
-   *                  The callbacks must not result in the deletion of the SingletonSubscription object.
+   * @param callbacks the callbacks needed by all SingletonSubscription objects, to deliver config
+   * updates. The callbacks must not result in the deletion of the SingletonSubscription object.
    * @param resource_decoder how incoming opaque resource objects are to be decoded.
    * @param options subscription options.
    *
-   * @return std::unique_ptr<SingletonSubscription> subscription object corresponding for config and type_url or error status.
+   * @return std::unique_ptr<SingletonSubscription> subscription object corresponding for config and
+   * type_url or error status.
    */
   virtual absl::StatusOr<std::unique_ptr<SingletonSubscription>> subscribeToSingletonResource(
       absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,

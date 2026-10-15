@@ -140,6 +140,14 @@ public:
   MOCK_METHOD(void, start, ());
 };
 
+class MockSingletonSubscriptionCallbacks : public SingletonSubscriptionCallbacks {
+public:
+  MOCK_METHOD(absl::Status, onResourceUpdate,
+              (const DecodedResource& resource, const std::string& version_info));
+  MOCK_METHOD(void, onResourceRemoved, ());
+  MOCK_METHOD(void, onFailure, (ConfigUpdateFailureReason reason, const EnvoyException* e));
+};
+
 class MockSubscriptionFactory : public SubscriptionFactory {
 public:
   MockSubscriptionFactory();
@@ -152,7 +160,8 @@ public:
                const SubscriptionOptions& options));
   MOCK_METHOD(absl::StatusOr<std::unique_ptr<SingletonSubscription>>, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
-               Stats::Scope& scope, absl::string_view resource_name, SingletonSubscriptionCallbacks& callbacks,
+               Stats::Scope& scope, absl::string_view resource_name,
+               SingletonSubscriptionCallbacks& callbacks,
                OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
   MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscriptionOverAdsGrpcMux,
@@ -161,8 +170,9 @@ public:
                OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
   MOCK_METHOD(absl::StatusOr<std::unique_ptr<SingletonSubscription>>, subscriptionOverAdsGrpcMux,
-              (GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
-               absl::string_view type_url, Stats::Scope& scope, absl::string_view resource_name, SingletonSubscriptionCallbacks& callbacks,
+              (GrpcMuxSharedPtr & ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
+               absl::string_view type_url, Stats::Scope& scope, absl::string_view resource_name,
+               SingletonSubscriptionCallbacks& callbacks,
                OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
   MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, collectionSubscriptionFromUrl,

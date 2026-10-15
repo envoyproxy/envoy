@@ -376,8 +376,8 @@ absl::StatusOr<std::unique_ptr<SingletonSubscription>> XdsManagerImpl::subscribe
                       "resource or a config must be provided.",
                       resource_name));
     }
-    return subscription_factory_->subscriptionFromConfigSource(*config, type_url, scope, resource_name, callbacks,
-                                                               resource_decoder, options);
+    return subscription_factory_->subscriptionFromConfigSource(
+        *config, type_url, scope, resource_name, callbacks, resource_decoder, options);
   }
   absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
       XdsResourceIdentifier::decodeUrn(resource_name);
@@ -421,14 +421,14 @@ absl::StatusOr<std::unique_ptr<SingletonSubscription>> XdsManagerImpl::subscribe
   if (matched_authority != nullptr) {
     // Use the config-source from the authorities that were added in the bootstrap.
     return subscription_factory_->subscriptionOverAdsGrpcMux(
-        matched_authority->grpc_mux_, matched_authority->config_, type_url, scope, resource_name, callbacks,
-        resource_decoder, options);
+        matched_authority->grpc_mux_, matched_authority->config_, type_url, scope, resource_name,
+        callbacks, resource_decoder, options);
   }
   // Nothing was matched, revert to the old-way (given the config-source) if possible.
   // This will be used for backwards compatibility.
   if (config.has_value()) {
-    return subscription_factory_->subscriptionFromConfigSource(*config, type_url, scope, resource_name, callbacks,
-                                                               resource_decoder, options);
+    return subscription_factory_->subscriptionFromConfigSource(
+        *config, type_url, scope, resource_name, callbacks, resource_decoder, options);
   }
   // No actual config source was found, return an error.
   return absl::NotFoundError(

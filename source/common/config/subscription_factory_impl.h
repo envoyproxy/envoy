@@ -34,8 +34,9 @@ public:
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
   absl::StatusOr<std::unique_ptr<SingletonSubscription>> subscriptionFromConfigSource(
       const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
-      Stats::Scope& scope, absl::string_view resource_name, SingletonSubscriptionCallbacks& callbacks,
-      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
+      Stats::Scope& scope, absl::string_view resource_name,
+      SingletonSubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
+      const SubscriptionOptions& options) override;
   absl::StatusOr<SubscriptionPtr> subscriptionOverAdsGrpcMux(
       GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
       absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
@@ -43,8 +44,8 @@ public:
   absl::StatusOr<std::unique_ptr<SingletonSubscription>> subscriptionOverAdsGrpcMux(
       GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
       absl::string_view type_url, Stats::Scope& scope, absl::string_view resource_name,
-      SingletonSubscriptionCallbacks& callbacks,
-      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
+      SingletonSubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
+      const SubscriptionOptions& options) override;
   absl::StatusOr<SubscriptionPtr>
   collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,
                                 const envoy::config::core::v3::ConfigSource& config,

@@ -133,8 +133,8 @@ SubscriptionFactoryImpl::subscriptionFromConfigSource(
     Stats::Scope& scope, absl::string_view resource_name, SingletonSubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
   auto adapter = std::make_unique<SingletonSubscriptionCallbacksAdapter>(callbacks);
-  absl::StatusOr<SubscriptionPtr> sub_or_error = subscriptionFromConfigSource(
-      config, type_url, scope, *adapter, resource_decoder, options);
+  absl::StatusOr<SubscriptionPtr> sub_or_error =
+      subscriptionFromConfigSource(config, type_url, scope, *adapter, resource_decoder, options);
   if (!sub_or_error.ok()) {
     return sub_or_error.status();
   }
