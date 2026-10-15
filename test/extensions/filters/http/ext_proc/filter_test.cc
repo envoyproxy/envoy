@@ -770,7 +770,7 @@ protected:
 };
 
 TEST_F(HttpFilterTest, StreamedChunkBodyTest) {
-  // Configured to chunk at 5 bytes for both request and response in STREAMED
+  // Configured to chunk at 1024 bytes for both request and response in STREAMED
   // mode.
   initialize(R"EOF(
   grpc_service:
@@ -781,7 +781,7 @@ TEST_F(HttpFilterTest, StreamedChunkBodyTest) {
     response_header_mode: "SKIP"
     request_body_mode: "STREAMED"
     response_body_mode: "STREAMED"
-  max_streamed_body_chunk_size: 5
+  max_streamed_body_chunk_size: 1024
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -794,28 +794,32 @@ TEST_F(HttpFilterTest, StreamedChunkBodyTest) {
         got_req_end_streams.push_back(eos);
       });
 
-  Buffer::OwnedImpl first_chunk("123456789012");
+  const std::string req_chunk1(1024, '1');
+  const std::string req_chunk2(1024, '2');
+  const std::string req_chunk3(200, '3');
+  const std::string req_chunk2_mutated(1024, 'M');
+  Buffer::OwnedImpl first_chunk(req_chunk1 + req_chunk2 + req_chunk3);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(first_chunk, false));
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
 
-  // Should have sent 3 request body chunks (5 bytes, 5 bytes, 2 bytes).
+  // Should have sent 3 request body chunks (1024 bytes, 1024 bytes, 200 bytes).
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), req_chunk1);
   EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), req_chunk2);
   EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_EQ(sent_requests_[2].request_body().body(), req_chunk3);
   EXPECT_FALSE(sent_requests_[2].request_body().end_of_stream());
 
   // Process all 3 request BodyResponses, mutating the 2nd chunk.
   processRequestBody(std::nullopt, false);
   processRequestBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& body_resp) {
-        body_resp.mutable_response()->mutable_body_mutation()->set_body("ABCDE");
+      [&](const HttpBody&, ProcessingResponse&, BodyResponse& body_resp) {
+        body_resp.mutable_response()->mutable_body_mutation()->set_body(req_chunk2_mutated);
       },
       false);
   processRequestBody(std::nullopt, true);
-  EXPECT_EQ(got_request_body.toString(), "12345ABCDE12");
+  EXPECT_EQ(got_request_body.toString(), req_chunk1 + req_chunk2_mutated + req_chunk3);
   EXPECT_THAT(got_req_end_streams, ElementsAre(false, false, false));
 
   // Now test response body in STREAMED mode with end_stream = true.
@@ -831,26 +835,30 @@ TEST_F(HttpFilterTest, StreamedChunkBodyTest) {
             got_resp_end_streams.push_back(eos);
           });
 
-  Buffer::OwnedImpl resp_chunk("abcdefghijkl");
+  const std::string resp_chunk1(1024, 'a');
+  const std::string resp_chunk2(1024, 'b');
+  const std::string resp_chunk3(200, 'c');
+  const std::string resp_chunk3_mutated(200, 'Z');
+  Buffer::OwnedImpl resp_chunk(resp_chunk1 + resp_chunk2 + resp_chunk3);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, true));
 
   ASSERT_EQ(sent_requests_.size(), 6);
-  EXPECT_EQ(sent_requests_[3].response_body().body(), "abcde");
+  EXPECT_EQ(sent_requests_[3].response_body().body(), resp_chunk1);
   EXPECT_FALSE(sent_requests_[3].response_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[4].response_body().body(), "fghij");
+  EXPECT_EQ(sent_requests_[4].response_body().body(), resp_chunk2);
   EXPECT_FALSE(sent_requests_[4].response_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[5].response_body().body(), "kl");
+  EXPECT_EQ(sent_requests_[5].response_body().body(), resp_chunk3);
   EXPECT_TRUE(sent_requests_[5].response_body().end_of_stream());
 
   // Process all 3 response BodyResponses, mutating the 3rd chunk.
   processResponseBody(std::nullopt, false);
   processResponseBody(std::nullopt, false);
   processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& body_resp) {
-        body_resp.mutable_response()->mutable_body_mutation()->set_body("KL!");
+      [&](const HttpBody&, ProcessingResponse&, BodyResponse& body_resp) {
+        body_resp.mutable_response()->mutable_body_mutation()->set_body(resp_chunk3_mutated);
       },
       true);
-  EXPECT_EQ(got_response_body.toString(), "abcdefghijKL!");
+  EXPECT_EQ(got_response_body.toString(), resp_chunk1 + resp_chunk2 + resp_chunk3_mutated);
   EXPECT_THAT(got_resp_end_streams, ElementsAre(false, false, true));
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
 
@@ -869,7 +877,7 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyTest) {
     response_body_mode: "FULL_DUPLEX_STREAMED"
     request_trailer_mode: "SEND"
     response_trailer_mode: "SEND"
-  max_streamed_body_chunk_size: 5
+  max_streamed_body_chunk_size: 1024
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -881,16 +889,19 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyTest) {
       .WillRepeatedly(
           [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); });
 
-  Buffer::OwnedImpl req_chunk("123456789012");
+  const std::string req_chunk1(1024, '1');
+  const std::string req_chunk2(1024, '2');
+  const std::string req_chunk3(200, '3');
+  Buffer::OwnedImpl req_chunk(req_chunk1 + req_chunk2 + req_chunk3);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk, true));
   EXPECT_EQ(req_chunk.length(), 0);
 
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), req_chunk1);
   EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), req_chunk2);
   EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_EQ(sent_requests_[2].request_body().body(), req_chunk3);
   EXPECT_TRUE(sent_requests_[2].request_body().end_of_stream());
 
   processRequestBody(
@@ -915,16 +926,19 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyTest) {
       .WillRepeatedly(
           [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); });
 
-  Buffer::OwnedImpl resp_chunk("abcdefghijk");
+  const std::string resp_chunk1(1024, 'a');
+  const std::string resp_chunk2(1024, 'b');
+  const std::string resp_chunk3(100, 'c');
+  Buffer::OwnedImpl resp_chunk(resp_chunk1 + resp_chunk2 + resp_chunk3);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   EXPECT_EQ(resp_chunk.length(), 0);
 
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].response_body().body(), "abcde");
+  EXPECT_EQ(sent_requests_[0].response_body().body(), resp_chunk1);
   EXPECT_FALSE(sent_requests_[0].response_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].response_body().body(), "fghij");
+  EXPECT_EQ(sent_requests_[1].response_body().body(), resp_chunk2);
   EXPECT_FALSE(sent_requests_[1].response_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[2].response_body().body(), "k");
+  EXPECT_EQ(sent_requests_[2].response_body().body(), resp_chunk3);
   EXPECT_FALSE(sent_requests_[2].response_body().end_of_stream());
 
   processResponseBodyHelper("mutated_response", want_response_body,
@@ -948,30 +962,33 @@ TEST_F(HttpFilterTest, StreamedChunkBodyPerRouteOverrideTest) {
     response_header_mode: "SEND"
     request_body_mode: "STREAMED"
     response_body_mode: "FULL_DUPLEX_STREAMED"
-  max_streamed_body_chunk_size: 10
+  max_streamed_body_chunk_size: 2048
   )EOF");
 
   ExtProcPerRoute route_proto;
-  route_proto.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(4);
+  route_proto.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(1024);
   FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(filter_->maxStreamedBodyChunkSize(), 4);
+  EXPECT_EQ(filter_->maxStreamedBodyChunkSize(), 1024);
   processRequestHeaders(false, std::nullopt);
   sent_requests_.clear();
 
-  Buffer::OwnedImpl req_chunk("0123456789");
+  const std::string req_chunk1(1024, '0');
+  const std::string req_chunk2(1024, '1');
+  const std::string req_chunk3(512, '2');
+  Buffer::OwnedImpl req_chunk(req_chunk1 + req_chunk2 + req_chunk3);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk, true));
 
-  // Per-route limit (4) overrides filter-level limit (10): 10 bytes -> 4, 4, 2.
+  // Per-route limit (1024) overrides filter-level limit (2048): 2560 bytes -> 1024, 1024, 512.
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "0123");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), req_chunk1);
   EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "4567");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), req_chunk2);
   EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[2].request_body().body(), "89");
+  EXPECT_EQ(sent_requests_[2].request_body().body(), req_chunk3);
   EXPECT_TRUE(sent_requests_[2].request_body().end_of_stream());
 
   processRequestBody(std::nullopt, false);
@@ -983,17 +1000,20 @@ TEST_F(HttpFilterTest, StreamedChunkBodyPerRouteOverrideTest) {
   processResponseHeaders(true, std::nullopt);
   sent_requests_.clear();
 
-  Buffer::OwnedImpl resp_chunk("abcdefghi");
+  const std::string resp_chunk1(1024, 'a');
+  const std::string resp_chunk2(1024, 'b');
+  const std::string resp_chunk3(252, 'c');
+  Buffer::OwnedImpl resp_chunk(resp_chunk1 + resp_chunk2 + resp_chunk3);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, true));
 
-  // Per-route limit (4) also applies to FULL_DUPLEX_STREAMED response: 9 bytes
-  // -> 4, 4, 1.
+  // Per-route limit (1024) also applies to FULL_DUPLEX_STREAMED response: 2300 bytes
+  // -> 1024, 1024, 252.
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].response_body().body(), "abcd");
+  EXPECT_EQ(sent_requests_[0].response_body().body(), resp_chunk1);
   EXPECT_FALSE(sent_requests_[0].response_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].response_body().body(), "efgh");
+  EXPECT_EQ(sent_requests_[1].response_body().body(), resp_chunk2);
   EXPECT_FALSE(sent_requests_[1].response_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[2].response_body().body(), "i");
+  EXPECT_EQ(sent_requests_[2].response_body().body(), resp_chunk3);
   EXPECT_TRUE(sent_requests_[2].response_body().end_of_stream());
 
   Buffer::OwnedImpl want_response_body;
@@ -1013,7 +1033,7 @@ TEST_F(HttpFilterTest, StreamedChunkBodyEdgeCasesTest) {
     response_header_mode: "SKIP"
     request_body_mode: "STREAMED"
     response_body_mode: "NONE"
-  max_streamed_body_chunk_size: 5
+  max_streamed_body_chunk_size: 1024
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -1021,36 +1041,41 @@ TEST_F(HttpFilterTest, StreamedChunkBodyEdgeCasesTest) {
 
   // Body data arriving while waiting for HeadersResponse should still be
   // chunked.
+  const std::string early_chunk1(1024, '1');
+  const std::string early_chunk2(1024, '2');
+  const std::string early_chunk3(200, '3');
   Buffer::OwnedImpl buffered_request_data;
   setUpDecodingBuffering(buffered_request_data, true);
-  Buffer::OwnedImpl early_chunk("123456789012");
+  Buffer::OwnedImpl early_chunk(early_chunk1 + early_chunk2 + early_chunk3);
   buffered_request_data.add(early_chunk);
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(early_chunk, false));
   EXPECT_TRUE(sent_requests_.empty());
 
   processRequestHeaders(false, std::nullopt);
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
-  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), early_chunk1);
+  EXPECT_EQ(sent_requests_[1].request_body().body(), early_chunk2);
+  EXPECT_EQ(sent_requests_[2].request_body().body(), early_chunk3);
   processRequestBody(std::nullopt, false);
   processRequestBody(std::nullopt, false);
   processRequestBody(std::nullopt, false);
   sent_requests_.clear();
 
-  // Body data is exact multiple of max_streamed_body_chunk_size (10 == 2 * 5).
-  Buffer::OwnedImpl exact_multiple("abcdefghij");
+  // Body data is exact multiple of max_streamed_body_chunk_size (2048 == 2 * 1024).
+  const std::string exact_chunk1(1024, 'a');
+  const std::string exact_chunk2(1024, 'b');
+  Buffer::OwnedImpl exact_multiple(exact_chunk1 + exact_chunk2);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(exact_multiple, false));
   ASSERT_EQ(sent_requests_.size(), 2);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "abcde");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), exact_chunk1);
   EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "fghij");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), exact_chunk2);
   EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
   processRequestBody(std::nullopt, false);
   processRequestBody(std::nullopt, false);
   sent_requests_.clear();
 
-  // Body data is smaller than max_streamed_body_chunk_size (3 < 5).
+  // Body data is smaller than max_streamed_body_chunk_size (3 < 1024).
   Buffer::OwnedImpl smaller_chunk("xyz");
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(smaller_chunk, false));
   ASSERT_EQ(sent_requests_.size(), 1);
@@ -1082,7 +1107,7 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyEdgeCasesTest) {
     response_body_mode: "FULL_DUPLEX_STREAMED"
     request_trailer_mode: "SEND"
     response_trailer_mode: "SEND"
-  max_streamed_body_chunk_size: 5
+  max_streamed_body_chunk_size: 1024
   )EOF");
 
   Buffer::OwnedImpl got_request_body;
@@ -1095,15 +1120,18 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyEdgeCasesTest) {
 
   // Body data arriving while HeadersCallback is still pending is sent
   // immediately in chunks with CallbackState::HeadersCallback.
-  Buffer::OwnedImpl early_req_chunk("123456789012");
+  const std::string early_chunk1(1024, '1');
+  const std::string early_chunk2(1024, '2');
+  const std::string early_chunk3(200, '3');
+  Buffer::OwnedImpl early_req_chunk(early_chunk1 + early_chunk2 + early_chunk3);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(early_req_chunk, false));
   EXPECT_EQ(early_req_chunk.length(), 0);
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), early_chunk1);
   EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), early_chunk2);
   EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_EQ(sent_requests_[2].request_body().body(), early_chunk3);
   EXPECT_FALSE(sent_requests_[2].request_body().end_of_stream());
   sent_requests_.clear();
 
@@ -1113,17 +1141,19 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyEdgeCasesTest) {
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   stream_callbacks_->onReceiveMessage(std::move(req_headers_resp));
 
-  // Exact multiple of max_streamed_body_chunk_size (10 == 2 * 5).
-  Buffer::OwnedImpl exact_multiple("abcdefghij");
+  // Exact multiple of max_streamed_body_chunk_size (2048 == 2 * 1024).
+  const std::string exact_chunk1(1024, 'a');
+  const std::string exact_chunk2(1024, 'b');
+  Buffer::OwnedImpl exact_multiple(exact_chunk1 + exact_chunk2);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(exact_multiple, false));
   ASSERT_EQ(sent_requests_.size(), 2);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "abcde");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), exact_chunk1);
   EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "fghij");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), exact_chunk2);
   EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
   sent_requests_.clear();
 
-  // Smaller than max_streamed_body_chunk_size (3 < 5).
+  // Smaller than max_streamed_body_chunk_size (3 < 1024).
   Buffer::OwnedImpl smaller_chunk("xyz");
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(smaller_chunk, false));
   ASSERT_EQ(sent_requests_.size(), 1);
@@ -1165,12 +1195,14 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyEdgeCasesTest) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   sent_requests_.clear();
 
-  Buffer::OwnedImpl resp_exact("ABCDEFGHIJ");
+  const std::string resp_exact1(1024, 'A');
+  const std::string resp_exact2(1024, 'B');
+  Buffer::OwnedImpl resp_exact(resp_exact1 + resp_exact2);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_exact, true));
   ASSERT_EQ(sent_requests_.size(), 2);
-  EXPECT_EQ(sent_requests_[0].response_body().body(), "ABCDE");
+  EXPECT_EQ(sent_requests_[0].response_body().body(), resp_exact1);
   EXPECT_FALSE(sent_requests_[0].response_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].response_body().body(), "FGHIJ");
+  EXPECT_EQ(sent_requests_[1].response_body().body(), resp_exact2);
   EXPECT_TRUE(sent_requests_[1].response_body().end_of_stream());
 
   // Receiving HeadersResponse when complete_body_available_ is true and
@@ -1198,7 +1230,7 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyStandaloneModeOverrideTest) {
     request_body_mode: "STREAMED"
     response_body_mode: "NONE"
   allow_mode_override: true
-  max_streamed_body_chunk_size: 5
+  max_streamed_body_chunk_size: 1024
   )EOF");
 
   Buffer::OwnedImpl got_request_body;
@@ -1210,9 +1242,12 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyStandaloneModeOverrideTest) {
   sent_requests_.clear();
 
   // Buffer complete body while waiting for HeadersResponse in STREAMED mode.
+  const std::string early_chunk1(1024, '1');
+  const std::string early_chunk2(1024, '2');
+  const std::string early_chunk3(200, '3');
   Buffer::OwnedImpl buffered_request_data;
   setUpDecodingBuffering(buffered_request_data, true);
-  Buffer::OwnedImpl early_chunk("123456789012");
+  Buffer::OwnedImpl early_chunk(early_chunk1 + early_chunk2 + early_chunk3);
   buffered_request_data.add(early_chunk);
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(early_chunk, true));
   EXPECT_TRUE(sent_requests_.empty());
@@ -1227,11 +1262,11 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyStandaloneModeOverrideTest) {
 
   // handleStandaloneModeOverride() should flush and chunk the buffered body.
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), early_chunk1);
   EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), early_chunk2);
   EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_EQ(sent_requests_[2].request_body().body(), early_chunk3);
   EXPECT_TRUE(sent_requests_[2].request_body().end_of_stream());
   EXPECT_EQ(buffered_request_data.length(), 0);
 
@@ -1266,7 +1301,7 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyHeadersModeOverrideTest) {
     request_body_mode: "BUFFERED"
     response_body_mode: "NONE"
   allow_mode_override: true
-  max_streamed_body_chunk_size: 5
+  max_streamed_body_chunk_size: 1024
   )EOF");
 
   Buffer::OwnedImpl got_request_body;
@@ -1278,9 +1313,12 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyHeadersModeOverrideTest) {
   sent_requests_.clear();
 
   // Buffer complete body while waiting for HeadersResponse in BUFFERED mode.
+  const std::string early_chunk1(1024, '1');
+  const std::string early_chunk2(1024, '2');
+  const std::string early_chunk3(200, '3');
   Buffer::OwnedImpl buffered_request_data;
   setUpDecodingBuffering(buffered_request_data, true);
-  Buffer::OwnedImpl early_chunk("123456789012");
+  Buffer::OwnedImpl early_chunk(early_chunk1 + early_chunk2 + early_chunk3);
   buffered_request_data.add(early_chunk);
   EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(early_chunk, true));
   EXPECT_TRUE(sent_requests_.empty());
@@ -1294,11 +1332,11 @@ TEST_F(HttpFilterTest, FullDuplexStreamedChunkBodyHeadersModeOverrideTest) {
   // handleCompleteBodyAvailable() -> sendBufferedDataInStreamedMode() should
   // chunk the buffered body and drain it without enqueueing in chunk_queue_.
   ASSERT_EQ(sent_requests_.size(), 3);
-  EXPECT_EQ(sent_requests_[0].request_body().body(), "12345");
+  EXPECT_EQ(sent_requests_[0].request_body().body(), early_chunk1);
   EXPECT_FALSE(sent_requests_[0].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[1].request_body().body(), "67890");
+  EXPECT_EQ(sent_requests_[1].request_body().body(), early_chunk2);
   EXPECT_FALSE(sent_requests_[1].request_body().end_of_stream());
-  EXPECT_EQ(sent_requests_[2].request_body().body(), "12");
+  EXPECT_EQ(sent_requests_[2].request_body().body(), early_chunk3);
   EXPECT_TRUE(sent_requests_[2].request_body().end_of_stream());
   EXPECT_EQ(buffered_request_data.length(), 0);
   EXPECT_TRUE(FilterAccessor::decodingState(*filter_).chunkQueue().empty());
@@ -4526,24 +4564,24 @@ TEST_F(OverrideTest, EmitClientSpanMerge) {
 
 TEST_F(OverrideTest, MaxStreamedBodyChunkSizeMerge) {
   ExtProcPerRoute cfg1;
-  cfg1.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(10);
+  cfg1.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(2048);
 
   ExtProcPerRoute cfg2;
-  cfg2.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(5);
+  cfg2.mutable_overrides()->mutable_max_streamed_body_chunk_size()->set_value(1024);
 
   FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
   FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
 
   ASSERT_TRUE(merged_route.maxStreamedBodyChunkSize().has_value());
-  EXPECT_EQ(*merged_route.maxStreamedBodyChunkSize(), 5);
+  EXPECT_EQ(*merged_route.maxStreamedBodyChunkSize(), 1024);
 
   // Empty more specific inherits from less specific.
   ExtProcPerRoute empty_cfg;
   FilterConfigPerRoute empty_route(empty_cfg, builder_, factory_context_);
   FilterConfigPerRoute merged_inherited(route1, empty_route);
   ASSERT_TRUE(merged_inherited.maxStreamedBodyChunkSize().has_value());
-  EXPECT_EQ(*merged_inherited.maxStreamedBodyChunkSize(), 10);
+  EXPECT_EQ(*merged_inherited.maxStreamedBodyChunkSize(), 2048);
 }
 
 // Verify that attempts to change headers that are not allowed to be changed
