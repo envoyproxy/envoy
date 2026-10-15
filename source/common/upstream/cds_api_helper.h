@@ -19,8 +19,7 @@ namespace Upstream {
  */
 class CdsApiHelper : Logger::Loggable<Logger::Id::upstream> {
 public:
-  CdsApiHelper(ClusterManager& cm, Config::XdsManager& xds_manager, std::string name)
-      : cm_(cm), xds_manager_(xds_manager), name_(std::move(name)) {}
+  CdsApiHelper(ClusterManager& cm, std::string name) : cm_(cm), name_(std::move(name)) {}
   /**
    * onConfigUpdate handles the addition and removal of clusters by notifying the ClusterManager
    * about the cluster changes. It closely follows the onConfigUpdate API from
@@ -40,7 +39,6 @@ public:
 
 private:
   ClusterManager& cm_;
-  Config::XdsManager& xds_manager_;
   const std::string name_;
   std::string system_version_info_;
 };
