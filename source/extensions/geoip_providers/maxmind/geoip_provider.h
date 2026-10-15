@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <vector>
 
 #include "envoy/common/platform.h"
 #include "envoy/extensions/geoip_providers/maxmind/v3/maxmind.pb.h"
@@ -58,6 +59,9 @@ public:
     return field_keys_[enumToInt(field)];
   }
 
+  // Every configured output key, in the order the fields were configured.
+  absl::Span<const std::string> fieldKeyNames() const { return field_key_names_; }
+
   void incLookupError(absl::string_view maxmind_db_type) {
     incCounter(
         stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".lookup_error"), unknown_hit_));
@@ -78,6 +82,8 @@ public:
 private:
   // Configured output key for each GeoField.
   std::array<std::optional<std::string>, enumToInt(GeoField::Count)> field_keys_;
+  // The configured output keys as a list, for callers that need all of them at once.
+  std::vector<std::string> field_key_names_;
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
@@ -172,6 +178,7 @@ public:
 
   // Envoy::Geolocation::Driver
   void lookup(Geolocation::LookupRequest&&, Geolocation::LookupGeoHeadersCallback&&) const override;
+  absl::Span<const std::string> geoHeaderNames() const override { return config_->fieldKeyNames(); }
 
 private:
   // Allow the unit test to have access to private members.
