@@ -600,14 +600,13 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}, end_stream={}", data.length(),
             bytes_parsed_, end_stream);
 
+  if (config_->propagateTraceContext()->reparent_active_span() && !end_stream) {
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+
   const uint32_t max_size = getMaxRequestBodySize();
   uint32_t bytes_parsed_in_this_call = 0;
   const bool early_terminate = canEarlyTerminate();
-  const bool reparent_active_span = config_->propagateTraceContext()->reparent_active_span();
-
-  if (reparent_active_span && !end_stream) {
-    return Http::FilterDataStatus::StopIterationAndBuffer;
-  }
 
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     const char* start = static_cast<const char*>(slice.mem_);
@@ -991,6 +990,8 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
       if (config_->propagateTraceContext().has_value()) {
         injectTraceContextIntoHeaders(meta_fields, *headers);
 
+        // Reparent the active span.
+        //
         // MCP version 2026-07-28 puts the traceparent in the body instead of a
         // header. If the traceparent was not duplicated in a header, the active
         // span was created without the necessary context, meaning its trace ID
