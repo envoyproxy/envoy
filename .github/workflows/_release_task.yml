@@ -26,10 +26,6 @@ on:
           before creating a new one
         type: boolean
         default: false
-      sync:
-        description: Sync version histories before creating the release (`create-release` only)
-        type: boolean
-        default: false
       pr:
         description: Create a PR
         type: boolean
@@ -142,9 +138,7 @@ jobs:
         email: ${{ inputs.author }}
 
     - name: Sync version histories
-      if: >-
-        inputs.task == 'sync-version-histories'
-        || (inputs.task == 'create-release' && inputs.sync)
+      if: inputs.task == 'sync-version-histories'
       uses: envoyproxy/toolshed/actions/github/run@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         report-name: ci-report-sync.json
@@ -163,12 +157,12 @@ jobs:
         source: |
           BAZEL_ARGS=(--)
           BAZEL_RUN_ARGS=(--config=ci)
-          if [[ -n "${{ inputs.author }}" ]]; then
+          if [[ -n "$AUTHOR" ]]; then
               BAZEL_ARGS+=(
-                  "--release-author=${{ inputs.author }}"
-                  "--signoff=${{ steps.changelog.outputs.committer }}")
+                  "--release-author=${AUTHOR}"
+                  "--signoff=${COMMITTER}")
           else
-              BAZEL_ARGS+=("--release-author=${{ steps.changelog.outputs.committer }}")
+              BAZEL_ARGS+=("--release-author=${COMMITTER}")
           fi
         command: >-
           bazel
@@ -176,6 +170,9 @@ jobs:
           "${BAZEL_RUN_ARGS[@]}"
           @envoy_repo//:release
           "${BAZEL_ARGS[@]}"
+      env:
+        AUTHOR: ${{ inputs.author }}
+        COMMITTER: ${{ steps.changelog.outputs.committer }}
 
     - name: Re-open branch
       if: inputs.task == 'reopen-branch'
@@ -192,11 +189,13 @@ jobs:
     - id: bzlmod
       name: Check for bzlmod
       if: inputs.task == 'create-release' || inputs.task == 'reopen-branch'
+      env:
+        BRANCH: ${{ inputs.branch }}
       run: |
         if [[ ! -e bazel/repository_locations.bzl ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
         else
-            echo "::notice::Pre-bzlmod branch (${{ inputs.branch }}), skipping module version update"
+            echo "::notice::Pre-bzlmod branch (${BRANCH}), skipping module version update"
         fi
 
     - name: Update bazel module versions and lockfiles

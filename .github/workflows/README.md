@@ -143,10 +143,11 @@ in current `main` or backport any required changes.
 
 ### Release tasks
 
-Always dispatch the `Envoy/release` workflow from `main`, selecting the target branch
+Dispatch release tasks from `main` or a `release/vX.Y` branch, selecting the target branch
 via the `branch` input (eg `release/v1.35`). If omitted, the target defaults to the branch
-the workflow is run from. Release tooling is not backported to release branches.
-Dispatches from a non-`main` ref cannot target a different branch.
+the workflow is run from. Release tooling is not backported to release branches, so prefer `main`.
+Invalid dispatch refs and dispatches from a release branch targeting a different branch fail the run.
+The `branch` input and dispatch validation do not apply to `deprecate-guards`.
 
 ## Release automation
 
@@ -188,7 +189,7 @@ archived, `_publish_release.yml` calls `_release_chain.yml` to perform the follo
 | Release | Action |
 |---|---|
 | `vX.Y.0` | `main` is reopened. |
-| `vX.Y.Z` (`Z > 0`), with a younger stable branch | `release/vX.Y` is reopened, and a (non-WIP) release PR is created on the next stable branch, after syncing version histories. |
+| `vX.Y.Z` (`Z > 0`), with a younger stable branch | `release/vX.Y` is reopened, and a (non-WIP) release PR, which includes synced version histories, is created on the next stable branch. |
 | `vX.Y.Z` (`Z > 0`), youngest stable branch | `release/vX.Y` is reopened. |
 
 The order of stable branches is taken from the `stable_versions` of the project data

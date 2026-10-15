@@ -23,7 +23,7 @@ on:
       branch:
         description: >-
           Target branch, eg `release/v1.35`
-          (default: the branch the workflow is run from)
+          (default: the branch the workflow is run from; not used by `deprecate-guards`)
         type: string
       dry-run:
         type: boolean
@@ -59,13 +59,34 @@ env:
 
 
 jobs:
+  validate:
+    if: github.event_name == 'workflow_dispatch' && inputs.task != 'deprecate-guards'
+    runs-on: ubuntu-24.04
+    name: Validate dispatch
+    outputs:
+      branch: ${{ steps.validate.outputs.branch }}
+    steps:
+    - id: validate
+      env:
+        REF: ${{ github.ref_name }}
+        BRANCH: ${{ inputs.branch }}
+      run: |
+        if [[ "$REF" != "main" && ! "$REF" =~ ^release/v[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tasks must be dispatched from main or a release/vX.Y branch (got ${REF})"
+            exit 1
+        fi
+        if [[ -n "$BRANCH" && "$REF" != "main" && "$BRANCH" != "$REF" ]]; then
+            echo "::error::Dispatches from ${REF} cannot target a different branch (${BRANCH}); dispatch from main instead"
+            exit 1
+        fi
+        echo "branch=${BRANCH:-$REF}" >> "$GITHUB_OUTPUT"
+
   ## Triggerable actions
 
   # Create a release commit, when landed this will publish.
   create_release:
-    if: >-
-      github.event_name == 'workflow_dispatch' && inputs.task == 'create-release'
-      && (!inputs.branch || github.ref_name == 'main' || inputs.branch == github.ref_name)
+    needs: validate
+    if: inputs.task == 'create-release'
     name: Create release
     uses: ./.github/workflows/_release_task.yml
     secrets:
@@ -73,7 +94,7 @@ jobs:
       ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     with:
       task: create-release
-      branch: ${{ inputs.branch || github.ref_name }}
+      branch: ${{ needs.validate.outputs.branch }}
       recreate: ${{ inputs.recreate }}
       pr: ${{ inputs.pr }}
       pr-message: ${{ inputs.pr-message }}
@@ -83,9 +104,8 @@ jobs:
 
   # Re-open a branch.
   reopen-branch:
-    if: >-
-      github.event_name == 'workflow_dispatch' && inputs.task == 'reopen-branch'
-      && (!inputs.branch || github.ref_name == 'main' || inputs.branch == github.ref_name)
+    needs: validate
+    if: inputs.task == 'reopen-branch'
     name: Re-open branch
     uses: ./.github/workflows/_release_task.yml
     secrets:
@@ -93,7 +113,7 @@ jobs:
       ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     with:
       task: reopen-branch
-      branch: ${{ inputs.branch || github.ref_name }}
+      branch: ${{ needs.validate.outputs.branch }}
       recreate: ${{ inputs.recreate }}
       pr: ${{ inputs.pr }}
       pr-message: ${{ inputs.pr-message }}
@@ -101,9 +121,8 @@ jobs:
       summary: ${{ inputs.summary }}
 
   sync_version_histories:
-    if: >-
-      github.event_name == 'workflow_dispatch' && inputs.task == 'sync-version-histories'
-      && (!inputs.branch || github.ref_name == 'main' || inputs.branch == github.ref_name)
+    needs: validate
+    if: inputs.task == 'sync-version-histories'
     name: Sync version histories
     uses: ./.github/workflows/_release_task.yml
     secrets:
@@ -111,7 +130,7 @@ jobs:
       ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     with:
       task: sync-version-histories
-      branch: ${{ inputs.branch || github.ref_name }}
+      branch: ${{ needs.validate.outputs.branch }}
       recreate: ${{ inputs.recreate }}
       pr: ${{ inputs.pr }}
       pr-message: ${{ inputs.pr-message }}

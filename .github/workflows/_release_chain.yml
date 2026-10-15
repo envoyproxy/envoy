@@ -104,4 +104,3 @@ jobs:
       task: create-release
       branch: ${{ needs.plan.outputs.next-branch }}
       recreate: true
-      sync: true
