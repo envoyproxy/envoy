@@ -84,6 +84,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_adapters_lib",
         "//source/extensions/filters/http/ai_protocol_manager:transcoding_engine_lib",
         "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_lib",
@@ -211,6 +212,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "llm_binding_test",
+    srcs = ["llm_binding_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
+        "//test/test_common:status_utility_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "uri_pattern_test",
     srcs = ["uri_pattern_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
@@ -230,6 +243,7 @@ envoy_extension_cc_test(
         "//envoy/registry",
         "//envoy/router:string_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
     ],

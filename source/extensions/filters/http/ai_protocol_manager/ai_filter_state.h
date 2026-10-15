@@ -1,12 +1,18 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
+#include "envoy/router/string_accessor.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -22,10 +28,10 @@ namespace FilterStateKeys {
 constexpr absl::string_view LlmProtocolRequest = "envoy.ai.llm_protocol.request";
 // A ResponseLlmProtocol: the wire API of the target backend model.
 constexpr absl::string_view LlmProtocolResponse = "envoy.ai.llm_protocol.response";
-// The URI pattern the request path follows. See UriPattern.
-constexpr absl::string_view UriPatternRequest = "envoy.ai.uri_pattern.request";
-// The URI pattern the upstream expects. See UriPattern.
-constexpr absl::string_view UriPatternResponse = "envoy.ai.uri_pattern.response";
+// An LlmBindingObject: how the request as received carries its API on HTTP.
+constexpr absl::string_view BindingRequest = "envoy.ai.binding.request";
+// An LlmBindingObject: how the upstream expects the backend's API on HTTP.
+constexpr absl::string_view BindingResponse = "envoy.ai.binding.response";
 // The model the request names, as the request_info AI filter records it.
 constexpr absl::string_view ModelRequest = "envoy.ai.model.request";
 // The model to send upstream, when it differs from the one the request names. It replaces the model
@@ -83,6 +89,44 @@ public:
     const LLMProtocol declared = fromFilterState(filter_state);
     return declared != LLMProtocol::Unspecified ? declared : route_declared;
   }
+};
+
+// A binding in filter state, created from a URI pattern (`/...`) or an LLMBinding in JSON
+// (`{...}`). A value that does not parse keeps its error for the reader. On the request side it
+// also holds what was read from the client's path, which field access exposes by variable name.
+class LlmBindingObject : public Router::StringAccessor {
+public:
+  explicit LlmBindingObject(LlmBindingConstSharedPtr binding);
+
+  // Never null.
+  static std::unique_ptr<LlmBindingObject> fromString(absl::string_view value);
+  // The object at `key`; a plain string another writer left there is parsed as `fromString()`
+  // does. Null when no object is set.
+  static std::shared_ptr<const LlmBindingObject>
+  fromFilterState(StreamInfo::FilterState& filter_state, absl::string_view key);
+
+  // Null when `status()` is not ok.
+  const LlmBindingConstSharedPtr& binding() const { return binding_; }
+  const absl::Status& status() const { return status_; }
+  const std::optional<LlmBindingRead>& read() const { return read_; }
+  void setRead(LlmBindingRead read) { read_ = std::move(read); }
+
+  // Router::StringAccessor
+  absl::string_view asString() const override { return source_; }
+
+  // StreamInfo::FilterState::Object
+  std::optional<std::string> serializeAsString() const override { return source_; }
+  bool hasFieldSupport() const override { return true; }
+  // `model` and the path variables of the read, by name.
+  FieldType getField(absl::string_view field_name) const override;
+
+private:
+  LlmBindingObject(std::string source, absl::StatusOr<LlmBindingConstSharedPtr> binding);
+
+  const std::string source_;
+  LlmBindingConstSharedPtr binding_;
+  absl::Status status_;
+  std::optional<LlmBindingRead> read_;
 };
 
 // The string a Router::StringAccessor at `key` holds; nullopt when no object is set.

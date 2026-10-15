@@ -8,10 +8,10 @@
 #include <vector>
 
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 #include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
-#include "source/extensions/filters/http/ai_protocol_manager/uri_pattern.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -542,11 +542,15 @@ struct TranscodeContext {
   // request `ToIr` legs read `request_path` to copy them into the IR body.
   absl::string_view request_path{};
 
-  // Custom incoming URL pattern so request `ToIr` legs can extract `model` and `stream` from it
-  const UriPattern* request_uri_pattern{nullptr};
-  // Custom upstream URL pattern so request `FromIr` legs can format `rewritten_path` for the
-  // target backend.
-  const UriPattern* response_uri_pattern{nullptr};
+  // The binding the client's request arrived in, when a filter named it. Request `ToIr` legs read
+  // `request_path` under it, or else under the dialect's own and client bindings.
+  LlmBindingConstSharedPtr request_binding{};
+  // The binding request `FromIr` legs send the request in; null for the dialect's own, which also
+  // fills the parts this one leaves empty.
+  const LlmBinding* response_binding{nullptr};
+  // What a request `ToIr` leg read (see `read`), for request `FromIr` legs: its path variables fill
+  // the rendered path, and its body fields come back when `response_binding` is the one it read.
+  const LlmBindingRead* arrived{nullptr};
   // Model override for the outbound request (e.g. from a model router) so request `FromIr` legs
   // send the model name the upstream backend expects to run.
   absl::string_view resolved_model{};
@@ -564,15 +568,15 @@ struct TranscodeContext {
   // `ToIr` leg and before a `FromIr` one replaces it with `resolved_model`. The caller hands it
   // back as `request_model` on the response legs.
   std::string ir_model{};
-  // Set by a successful request `FromIr` leg that has a path to render, from `response_uri_pattern`
-  // or the dialect's own layout (see `DialectTranscodePack::envelope`): the `:path` the request
-  // must be sent to, which the caller applies along with the body. Every other request leg clears
-  // it.
+  // Set by a successful request `FromIr` leg whose binding has a path to render: the `:path` the
+  // request must be sent to, which the caller applies along with the body. Every other request leg
+  // clears it.
   std::optional<std::string> rewritten_path{};
-  // Set by a request `ToIr` leg: whether `request_path` matched the pattern the leg followed
-  // (`request_uri_pattern` or the dialect's own layout), and so had its model and streaming mode
-  // lifted. False when there was no pattern, or on any other leg.
-  bool request_path_matched{false};
+  // Set by a successful request `FromIr` leg: its binding's header edits, which the caller applies
+  // along with the path.
+  std::vector<HeaderMutation> header_mutations{};
+  // Set by a request `ToIr` leg whose `request_path` matched a binding: what it read there.
+  std::optional<LlmBindingRead> read{};
 };
 
 // The rule sets for one payload kind of a dialect: `to_ir` converts the dialect into the IR
@@ -708,12 +712,13 @@ struct DialectTranscodePack {
   LegRules response{};
   // Streamed response events.
   StreamGrammars stream{};
-  // Not all APIs put `model` and `stream` in the URL (e.g. OpenAI and Anthropic keep them in the
-  // JSON body, so this is `std::nullopt`). For APIs whose URL does carry `model` and `stream`
-  // (e.g. Gemini's `/v1beta/models/{model}:{generateContent|streamGenerateContent}`), `ToIr`
-  // extracts them from the URL into the IR body, and `FromIr` moves them from the IR body back
-  // into the outgoing URL.
-  std::optional<UriPattern> envelope{};
+  // The API's own binding, when its path carries request values (e.g. Gemini's
+  // `/v1beta/models/{model}:{generateContent|streamGenerateContent}`, which takes `model` and
+  // `stream` out of the body). Request `FromIr` legs send requests in it unless given another.
+  LlmBindingConstSharedPtr binding{};
+  // Other bindings a client may arrive in, tried after `binding` when a request `ToIr` leg is
+  // given none, e.g. Claude on Vertex AI.
+  std::vector<LlmBindingConstSharedPtr> client_bindings{};
   const PayloadSchema* dialect_schema{nullptr};
   const PayloadSchema* ir_schema{nullptr};
 };
@@ -771,10 +776,9 @@ public:
   // caller still holds the original and can forward it untranslated. `StreamEvent` legs go
   // through `transcodeStreamEvent()` instead.
   //
-  // A `Request` leg also moves what its dialect names in the request path rather than the body
-  // (`DialectTranscodePack::envelope`): `ToIr` lifts it from `ctx.request_path` into the IR body,
-  // and `FromIr` moves it out of the body into `ctx.rewritten_path`, which the caller must send the
-  // request to.
+  // A `Request` leg also applies its bindings (see `TranscodeContext`): `ToIr` reads
+  // `ctx.request_path` into the body, and `FromIr` renders `ctx.rewritten_path`, which the caller
+  // must send the request to.
   //
   // A leg whose dialect is the IR is the identity, except that a request `FromIr` leg still
   // validates the payload against the IR's schema.
@@ -802,11 +806,11 @@ public:
   absl::StatusOr<std::vector<SseEventPtr>> finishStream(const TranscodeLeg& leg,
                                                         TranscodeContext& ctx) const;
 
-  // The model that `path`, a request path of `dialect`'s API, names: empty unless `path` matches
-  // `pattern`, or the dialect's own layout (`DialectTranscodePack::envelope`) when `pattern` is
-  // null, and that names a model. For a caller that needs the model without running a request leg.
+  // The model that `path`, a request path of `dialect`'s API, names under `binding`, or else under
+  // the dialect's own and client bindings; empty when none matches and names one. For a caller
+  // that needs the model without running a request leg.
   std::string modelFromRequestPath(LLMProtocol dialect, absl::string_view path,
-                                   const UriPattern* pattern = nullptr) const;
+                                   const LlmBinding* binding = nullptr) const;
 
 private:
   absl::StatusOr<const DialectTranscodePack*> findPack(LLMProtocol dialect) const;

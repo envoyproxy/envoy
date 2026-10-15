@@ -23,20 +23,27 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Provider identity, when needed, must come from configuration or routing
 // metadata.
 //
+// Nor does it name how a provider carries the API on HTTP: Claude on the
+// Anthropic API and on Vertex AI both speak ``ANTHROPIC_MESSAGES``, although
+// Vertex AI names the model in the path. An :ref:`LLMBinding
+// <envoy_v3_api_msg_type.ai.v3.LLMBinding>` describes such a difference, so a
+// value is added here only for an API with schemas of its own.
+//
 // Response framing is separate: JSON, SSE, and streamed JSON-array variants
 // of the same API share one ``LLMProtocol`` value.
 enum LLMProtocol {
   LLM_PROTOCOL_UNSPECIFIED = 0;
 
-  // OpenAI-compatible ``/v1/chat/completions`` API.
+  // OpenAI Chat Completions API, served as ``/v1/chat/completions``.
   OPENAI_CHAT_COMPLETIONS = 1;
 
-  // OpenAI-compatible ``/v1/responses`` API.
+  // OpenAI Responses API, served as ``/v1/responses``.
   OPENAI_RESPONSES = 2;
 
-  // Anthropic-compatible ``/v1/messages`` API.
+  // Anthropic Messages API, served as ``/v1/messages``.
   ANTHROPIC_MESSAGES = 3;
 
-  // Gemini ``generateContent`` / ``streamGenerateContent`` APIs.
+  // Gemini ``generateContent`` / ``streamGenerateContent`` APIs, served as
+  // ``/v1beta/models/{model}:generateContent``.
   GEMINI_GENERATE_CONTENT = 4;
 }

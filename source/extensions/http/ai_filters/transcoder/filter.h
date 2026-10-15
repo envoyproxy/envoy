@@ -13,9 +13,10 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/flattening_json_codec.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/transcoding_engine.h"
-#include "source/extensions/filters/http/ai_protocol_manager/uri_pattern.h"
 
 #include "absl/status/statusor.h"
 #include "absl/types/span.h"
@@ -90,12 +91,12 @@ using TranscoderFilterConfigSharedPtr = std::shared_ptr<const TranscoderFilterCo
 // response transcoding for that instance so responses splice out immediately and pass through
 // untouched.
 //
-// The route declares the client's and the backend's dialects, and each dialect's pack says where
-// its API names the model and streaming mode. A filter ahead of this one, such as a model router
-// or an ext_proc callout, can override any of that for one request through the transcoding
-// instructions in filter state (`HttpFilters::AiProtocolManager::FilterStateKeys`): the backend's
-// dialect, the pattern the client's path follows, the pattern the backend's path must follow, and
-// the model to send upstream. Whatever is not set keeps its route and built-in default.
+// The route declares the client's and the backend's dialects, and each dialect's pack says how
+// its API is carried on HTTP. A filter ahead of this one, such as a model router or an ext_proc
+// callout, can override any of that for one request through the transcoding instructions in
+// filter state (`HttpFilters::AiProtocolManager::FilterStateKeys`): the backend's dialect, the
+// binding the client's request arrived in, the binding the backend expects, and the model to send
+// upstream. Whatever is not set keeps its route and built-in default.
 class TranscoderFilter : public HttpFilters::AiProtocolManager::AiFilter,
                          public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
@@ -120,16 +121,19 @@ private:
   // The transcoding instructions in filter state that the request legs follow; each is unset when
   // no filter ahead of this one left it.
   struct Instructions {
-    std::optional<HttpFilters::AiProtocolManager::UriPattern> request_uri_pattern;
-    std::optional<HttpFilters::AiProtocolManager::UriPattern> response_uri_pattern;
+    std::shared_ptr<const HttpFilters::AiProtocolManager::LlmBindingObject> request_binding;
+    std::shared_ptr<const HttpFilters::AiProtocolManager::LlmBindingObject> response_binding;
     std::string resolved_model;
   };
 
   // Reads the instructions once the request has arrived, so a filter ahead of this one in the
   // same chain has had its turn to set them, and applies the backend's dialect to
-  // `target_protocol_`. Fails (counted as `unresolved`) on a pattern that does not parse.
+  // `target_protocol_`. Fails (counted as `unresolved`) on a binding that does not parse.
   absl::StatusOr<Instructions> readInstructions();
   absl::Status transcodeRequest(nlohmann::json& json, const Instructions& instructions);
+  // Leaves what a request `ToIr` leg read on the `envoy.ai.binding.request` object, creating it
+  // when no filter ahead set one, for the backend-side leg and for field access.
+  void recordRead(HttpFilters::AiProtocolManager::LlmBindingRead read);
 
   // The engine leg that transcodes this stream's response as `kind`, or `std::nullopt` when the
   // response passes through: response transcoding is off, or the dialect it needs is unknown.

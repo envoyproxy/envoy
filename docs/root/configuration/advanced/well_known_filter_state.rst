@@ -123,15 +123,19 @@ The following lists the filter state object keys used by the Envoy extensions to
   <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name as a constructor, e.g.
   "GEMINI_GENERATE_CONTENT". Supports field access with ``llm_protocol``.
 
-``envoy.ai.uri_pattern.request``
-  The :ref:`URI pattern <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
-  client's request path follows, from which the transcoder's ``TO_IR`` leg reads the model and
-  the streaming mode. Accepts a non-empty pattern as a constructor.
+``envoy.ai.binding.request``
+  The :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
+  client's request arrived in, under which the transcoder's ``TO_IR`` leg reads its path and
+  body. Accepts a URI pattern (``/...``) or an :ref:`LLMBinding
+  <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON (``{...}``) as a constructor. Once the leg
+  has read the path, supports field access with ``model`` and the names of the path's other
+  variables, e.g. ``location``.
 
-``envoy.ai.uri_pattern.response``
-  The :ref:`URI pattern <config_http_filters_ai_protocol_manager_transcoder_instructions>` of the
-  path the backend expects, which the transcoder's ``FROM_IR`` leg renders into the request's
-  ``:path``. Accepts a non-empty pattern as a constructor.
+``envoy.ai.binding.response``
+  The :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
+  backend expects, which the transcoder's ``FROM_IR`` leg renders into the request's ``:path``
+  and applies to its body and headers. Accepts a URI pattern or an :ref:`LLMBinding
+  <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON as a constructor.
 
 ``envoy.ai.model.resolved``
   The model the transcoder sends upstream in place of the one the request names, in the body and

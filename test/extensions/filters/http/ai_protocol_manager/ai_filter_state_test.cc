@@ -2,6 +2,7 @@
 #include "envoy/router/string_accessor.h"
 #include "envoy/stream_info/filter_state.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 
@@ -134,9 +135,7 @@ TEST(ResponseLlmProtocolTest, ResolvesFilterStateOverTheRoute) {
 class StringKeyFactoryTest : public testing::TestWithParam<absl::string_view> {};
 
 INSTANTIATE_TEST_SUITE_P(StringKeys, StringKeyFactoryTest,
-                         testing::Values(FilterStateKeys::UriPatternRequest,
-                                         FilterStateKeys::UriPatternResponse,
-                                         FilterStateKeys::ModelResolved));
+                         testing::Values(FilterStateKeys::ModelResolved));
 
 TEST_P(StringKeyFactoryTest, BuildsStringAccessorAndRejectsEmpty) {
   const auto* factory =
@@ -147,6 +146,107 @@ TEST_P(StringKeyFactoryTest, BuildsStringAccessorAndRejectsEmpty) {
   ASSERT_NE(value, nullptr);
   EXPECT_EQ(value->asString(), "/v1beta/models/{model}:{method}");
   EXPECT_EQ(factory->createFromBytes(""), nullptr);
+}
+
+class BindingFactoryTest : public testing::TestWithParam<absl::string_view> {
+protected:
+  std::unique_ptr<StreamInfo::FilterState::Object> build(absl::string_view value) {
+    const auto* factory =
+        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(GetParam());
+    EXPECT_NE(factory, nullptr) << GetParam();
+    return factory != nullptr ? factory->createFromBytes(value) : nullptr;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(BindingKeys, BindingFactoryTest,
+                         testing::Values(FilterStateKeys::BindingRequest,
+                                         FilterStateKeys::BindingResponse));
+
+TEST_P(BindingFactoryTest, BuildsFromAPatternOrJson) {
+  constexpr absl::string_view pattern = "/gateway/{model}/{chat|chat-stream}";
+  std::unique_ptr<StreamInfo::FilterState::Object> object = build(pattern);
+  const auto* binding = dynamic_cast<const LlmBindingObject*>(object.get());
+  ASSERT_NE(binding, nullptr);
+  EXPECT_TRUE(binding->status().ok());
+  ASSERT_NE(binding->binding(), nullptr);
+  EXPECT_EQ(binding->binding()->pattern->source(), pattern);
+  EXPECT_TRUE(binding->binding()->mutations.empty());
+  EXPECT_EQ(binding->asString(), pattern);
+  EXPECT_EQ(object->serializeAsString(), pattern);
+
+  constexpr absl::string_view json =
+      R"({"uri_pattern": "/v1/models/{model}:rawPredict", "mutations": [{"body_field": "model"},)"
+      R"( {"header": "X-Tenant", "value": "t-1", "keep_existing": true}]})";
+  object = build(json);
+  binding = dynamic_cast<const LlmBindingObject*>(object.get());
+  ASSERT_NE(binding, nullptr);
+  ASSERT_TRUE(binding->status().ok()) << binding->status();
+  ASSERT_EQ(binding->binding()->mutations.size(), 2);
+  EXPECT_EQ(binding->binding()->mutations[1].name, "x-tenant");
+  EXPECT_EQ(binding->asString(), json);
+}
+
+// Only an empty value leaves the key unset. Any other value sets it, so one that does not parse
+// fails the request where it is read instead of being dropped silently.
+TEST_P(BindingFactoryTest, KeepsTheErrorOfAValueThatDoesNotParse) {
+  EXPECT_EQ(build(""), nullptr);
+  for (absl::string_view value :
+       {"gateway/{model}", "/v1/{model", R"({"uri_pattern": 1})", R"({"unknown": true})",
+        R"({"mutations": [{}]})", R"({"mutations": [{"header": ":path", "value": "/x"}]})",
+        R"({"mutations": [{"header": "x-a", "value": 1}]})"}) {
+    std::unique_ptr<StreamInfo::FilterState::Object> object = build(value);
+    const auto* binding = dynamic_cast<const LlmBindingObject*>(object.get());
+    ASSERT_NE(binding, nullptr) << value;
+    EXPECT_EQ(binding->status().code(), absl::StatusCode::kInvalidArgument) << value;
+    EXPECT_EQ(binding->binding(), nullptr) << value;
+    EXPECT_EQ(binding->asString(), value);
+  }
+}
+
+// Field access reads what was read from the client's path, once a request leg recorded it.
+TEST(LlmBindingObjectTest, ExposesTheReadByVariableName) {
+  std::unique_ptr<LlmBindingObject> object =
+      LlmBindingObject::fromString("/{version}/projects/{project}/models/{model}:rawPredict");
+  ASSERT_TRUE(object->status().ok());
+  EXPECT_TRUE(object->hasFieldSupport());
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(object->getField("project")));
+
+  object->setRead(
+      {object->binding(), "claude-sonnet-4-5", {{"version", "v1"}, {"project", "acme"}}, {}});
+  EXPECT_EQ(absl::get<absl::string_view>(object->getField("model")), "claude-sonnet-4-5");
+  EXPECT_EQ(absl::get<absl::string_view>(object->getField("project")), "acme");
+  EXPECT_EQ(absl::get<absl::string_view>(object->getField("version")), "v1");
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(object->getField("location")));
+}
+
+TEST(LlmBindingObjectTest, ReadsWhatAnyWriterLeftAtTheKey) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingResponse),
+            nullptr);
+
+  // A plain string, as Golang's SetFilterState leaves one, reads as the factory builds it.
+  filter_state.setData(FilterStateKeys::BindingResponse,
+                       std::make_shared<Router::StringAccessorImpl>("/v1beta/models/{model}"),
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  std::shared_ptr<const LlmBindingObject> binding =
+      LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingResponse);
+  ASSERT_NE(binding, nullptr);
+  ASSERT_TRUE(binding->status().ok());
+  EXPECT_EQ(binding->binding()->pattern->source(), "/v1beta/models/{model}");
+
+  // The object itself is returned as set.
+  std::shared_ptr<LlmBindingObject> set = LlmBindingObject::fromString("/v1/messages");
+  filter_state.setData(FilterStateKeys::BindingRequest, set,
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingRequest), set);
+
+  // Any other object is not a binding.
+  filter_state.setData(FilterStateKeys::LlmProtocolRequest,
+                       std::make_shared<RequestLlmProtocol>(LLMProtocol::AnthropicMessages),
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  binding = LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::LlmProtocolRequest);
+  ASSERT_NE(binding, nullptr);
+  EXPECT_FALSE(binding->status().ok());
 }
 
 TEST(StringFromFilterStateTest, ReadsStringAccessorAtKey) {

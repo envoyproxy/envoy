@@ -1,7 +1,12 @@
+#include <optional>
+#include <string>
+
 #include "source/extensions/filters/http/ai_protocol_manager/uri_pattern.h"
 
 #include "test/test_common/status_utility.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -29,6 +34,32 @@ UriPattern parseOk(absl::string_view pattern) {
   absl::StatusOr<UriPattern> parsed = UriPattern::parse(pattern);
   EXPECT_THAT(parsed, IsOk()) << pattern;
   return *parsed;
+}
+
+using Values = absl::flat_hash_map<std::string, std::string>;
+
+// An unnamed wildcard segment, kept out of literals the spelling check reads as comments.
+constexpr absl::string_view kWildcard = "*";
+
+absl::StatusOr<std::string> render(const UriPattern& pattern, bool stream, const Values& values) {
+  return pattern.render(stream, [&values](absl::string_view name) -> std::optional<std::string> {
+    const auto value = values.find(name);
+    if (value == values.end()) {
+      return std::nullopt;
+    }
+    return value->second;
+  });
+}
+
+TEST(IsPathTokenTest, AcceptsOnlyWhatStaysInOneSegment) {
+  for (absl::string_view token :
+       {"gemini-2.5-flash", "claude-sonnet-4-5@20250929", "v1", "us-east5", "my_project.1", "0"}) {
+    EXPECT_TRUE(isPathToken(token)) << token;
+  }
+  for (absl::string_view token :
+       {"", ".", "..", ".hidden", "-x", "@x", "a/b", "a?b", "a#b", "a%2Fb", "a b", "a:b"}) {
+    EXPECT_FALSE(isPathToken(token)) << token;
+  }
 }
 
 TEST(UriPatternParseTest, RejectsMalformedTemplates) {
@@ -94,6 +125,25 @@ TEST(UriPatternMatchTest, MatchesTheWholePath) {
   EXPECT_FALSE(m->stream);
 }
 
+// Every named variable reads a value; `{model}` has a field of its own.
+TEST(UriPatternMatchTest, ReadsEveryNamedVariable) {
+  std::optional<UriPattern::Match> m =
+      parseOk(kVertexGemini)
+          .match("/v1/projects/acme/locations/us-east5/publishers/google/models/gemini-2.5-flash:"
+                 "streamGenerateContent?alt=sse");
+  ASSERT_TRUE(m.has_value());
+  EXPECT_EQ(m->model, "gemini-2.5-flash");
+  EXPECT_TRUE(m->stream);
+  EXPECT_EQ(m->variables,
+            (Values{{"version", "v1"}, {"project", "acme"}, {"location", "us-east5"}}));
+
+  // Unnamed wildcards and the query read nothing.
+  m = parseOk(absl::StrCat("/gw/", kWildcard, "/{tenant}/v1/chat/completions"))
+          .match("/gw/x/t-1/v1/chat/completions?key=k");
+  ASSERT_TRUE(m.has_value());
+  EXPECT_EQ(m->variables, (Values{{"tenant", "t-1"}}));
+}
+
 // A path matches the first layout that fits it, and the first layout is the one rendered.
 TEST(UriPatternMatchTest, MatchesAnyLayout) {
   const UriPattern gemini = parseOk(std::string(kGemini) + " " + std::string(kVertexGemini));
@@ -105,7 +155,7 @@ TEST(UriPatternMatchTest, MatchesAnyLayout) {
     EXPECT_EQ(m->model, "gemini-2.0-flash");
     EXPECT_TRUE(m->stream);
   }
-  EXPECT_THAT(gemini.render("gemini-2.0-flash", true),
+  EXPECT_THAT(render(gemini, true, {{"model", "gemini-2.0-flash"}}),
               IsOkAndHolds("/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"));
 }
 
@@ -128,7 +178,12 @@ TEST(UriPatternMatchTest, RejectsWhatThePatternDoesNotName) {
   EXPECT_FALSE(gemini.match("/v1beta/models/a/b:generateContent").has_value()); // slash in model
   EXPECT_FALSE(gemini.match("/v1beta/models/a:b:generateContent").has_value()); // not a model id
   EXPECT_FALSE(gemini.match("/v1beta/models/a%2Fb:generateContent").has_value());
+  EXPECT_FALSE(gemini.match("/v1beta/models/..:generateContent").has_value());
   EXPECT_FALSE(gemini.match("/v1/chat/completions").has_value());
+  // Every variable's value must be a path token, not just the model's.
+  EXPECT_FALSE(parseOk(kVertexGemini)
+                   .match("/v1/projects/../locations/l/publishers/google/models/m:generateContent")
+                   .has_value());
 }
 
 TEST(UriPatternMatchTest, ChoiceThatExtendsTheOtherIsMatchedWhole) {
@@ -164,49 +219,69 @@ TEST(UriPatternMatchTest, FixedPatternMatchesOnlyItself) {
 
 TEST(UriPatternRenderTest, RendersModelAndChoice) {
   const UriPattern gemini = parseOk(kGemini);
-  EXPECT_THAT(gemini.render("gemini-2.0-flash", false),
+  const Values model{{"model", "gemini-2.0-flash"}};
+  EXPECT_THAT(render(gemini, false, model),
               IsOkAndHolds("/v1beta/models/gemini-2.0-flash:generateContent"));
-  EXPECT_THAT(gemini.render("gemini-2.0-flash", true),
+  EXPECT_THAT(render(gemini, true, model),
               IsOkAndHolds("/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"));
-  EXPECT_THAT(parseOk(kVertexClaude).render("claude-sonnet-4@20250514", true),
+  EXPECT_THAT(render(parseOk(kVertexClaude), true, {{"model", "claude-sonnet-4@20250514"}}),
               IsOkAndHolds("/v1/projects/p/locations/l/publishers/anthropic/models/"
                            "claude-sonnet-4@20250514:streamRawPredict"));
-  EXPECT_THAT(parseOk(kBedrock).render("anthropic.claude-3", false),
+  EXPECT_THAT(render(parseOk(kBedrock), false, {{"model", "anthropic.claude-3"}}),
               IsOkAndHolds("/model/anthropic.claude-3/converse"));
-  EXPECT_THAT(parseOk("/v1/chat/completions{|?stream=true}").render("", true),
+  EXPECT_THAT(render(parseOk("/v1/chat/completions{|?stream=true}"), true, {}),
               IsOkAndHolds("/v1/chat/completions?stream=true"));
 }
 
-TEST(UriPatternRenderTest, FixedPatternIgnoresTheModel) {
-  EXPECT_THAT(parseOk("/v1/messages").render("", false), IsOkAndHolds("/v1/messages"));
-  EXPECT_THAT(parseOk("/v1/messages").render("../x", true), IsOkAndHolds("/v1/messages"));
+TEST(UriPatternRenderTest, FixedPatternReadsNoValues) {
+  EXPECT_THAT(render(parseOk("/v1/messages"), false, {}), IsOkAndHolds("/v1/messages"));
+  EXPECT_THAT(render(parseOk("/v1/messages"), true, {{"model", "../x"}}),
+              IsOkAndHolds("/v1/messages"));
 }
 
-// Variables other than `{model}`, and wildcards, stand for segments only a matched path knows.
-TEST(UriPatternRenderTest, RefusesSegmentsTheModelDoesNotFill) {
-  for (absl::string_view pattern : std::initializer_list<absl::string_view>{
-           kVertexGemini, "/v1/{model=*}:predict", "/v1/{model}/{rest=**}"}) {
-    EXPECT_THAT(parseOk(pattern).render("gemini-2.0-flash", false),
-                HasStatus(absl::StatusCode::kInvalidArgument,
-                          HasSubstr("has segments other than `{model}` to fill")))
-        << pattern;
-  }
+TEST(UriPatternRenderTest, RendersEveryNamedVariable) {
+  EXPECT_THAT(render(parseOk(kVertexGemini), true,
+                     {{"version", "v1"},
+                      {"project", "acme"},
+                      {"location", "us-east5"},
+                      {"model", "gemini-2.5-flash"}}),
+              IsOkAndHolds("/v1/projects/acme/locations/us-east5/publishers/google/models/"
+                           "gemini-2.5-flash:streamGenerateContent?alt=sse"));
+  EXPECT_THAT(render(parseOk("/v1/{model=*}:predict"), false, {{"model", "m"}}),
+              IsOkAndHolds("/v1/m:predict"));
 }
 
-// The model becomes a path segment, so anything that could escape one is refused.
-TEST(UriPatternRenderTest, RefusesAModelThatIsNotAnId) {
+// A variable without a value, or an unnamed wildcard, stands for a segment only a matched path
+// knows.
+TEST(UriPatternRenderTest, RefusesSegmentsWithoutAValue) {
+  EXPECT_THAT(
+      render(parseOk(kVertexGemini), false, {{"model", "gemini-2.0-flash"}}),
+      HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("has no value for `{version}`")));
+  EXPECT_THAT(render(parseOk("/v1/{model}/{rest=**}"), false, {{"model", "m"}}),
+              HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("`{rest}`")));
+  EXPECT_THAT(
+      render(parseOk(absl::StrCat("/v1/", kWildcard, "/models/{model}")), false, {{"model", "m"}}),
+      HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("wildcard")));
+}
+
+// Every value becomes a path segment, so anything that could escape one is refused.
+TEST(UriPatternRenderTest, RefusesAValueThatIsNotAPathToken) {
   const UriPattern gemini = parseOk(kGemini);
   for (absl::string_view bad : {"", "../admin", "a/b", "a?b", "a#b", "a%2Fb", "a b", "a:b"}) {
-    EXPECT_THAT(gemini.render(bad, false), HasStatusCode(absl::StatusCode::kInvalidArgument))
+    EXPECT_THAT(render(gemini, false, {{"model", std::string(bad)}}),
+                HasStatusCode(absl::StatusCode::kInvalidArgument))
         << bad;
   }
+  EXPECT_THAT(render(parseOk(kVertexGemini), false,
+                     {{"version", "v1"}, {"project", ".."}, {"location", "l"}, {"model", "m"}}),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(UriPatternRenderTest, RoundTrips) {
   for (absl::string_view pattern : {kGemini, kVertexClaude, kBedrock}) {
     const UriPattern parsed = parseOk(pattern);
     for (const bool stream : {false, true}) {
-      const absl::StatusOr<std::string> rendered = parsed.render("m-1.5", stream);
+      const absl::StatusOr<std::string> rendered = render(parsed, stream, {{"model", "m-1.5"}});
       ASSERT_THAT(rendered, IsOk());
       const std::optional<UriPattern::Match> m = parsed.match(*rendered);
       ASSERT_TRUE(m.has_value()) << *rendered;
