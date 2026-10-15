@@ -1002,8 +1002,11 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
         // active span below the body's traceparent. We must rewrite the body so
         // any upstream spans are descendants of the active span.
         Tracing::Span& active_span = decoder_callbacks_->activeSpan();
+        const std::string new_parent_id = active_span.getSpanId();
+
         if (config_->propagateTraceContext()->reparent_active_span() &&
-            meta_fields.contains(Filters::Common::Mcp::McpConstants::TRACEPARENT_FIELD)) {
+            meta_fields.contains(Filters::Common::Mcp::McpConstants::TRACEPARENT_FIELD) &&
+            !new_parent_id.empty()) {
           Tracing::HttpTraceContext trace_context(*headers);
           active_span.updateParent(trace_context);
 
@@ -1014,15 +1017,15 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
               [&decoding_buffer](Buffer::Instance& b) { decoding_buffer = &b; });
           ASSERT(decoding_buffer != nullptr);
 
-          const std::string new_parent_id = active_span.getSpanId();
-          absl::StatusOr<std::string> rewritten_body =
-              parser_->rewriteTraceparent(decoding_buffer->toString(), new_parent_id);
-          if (!rewritten_body.ok()) {
+          std::string buffer_string = decoding_buffer->toString();
+          if (absl::Status status =
+                  JsonPathParser::rewriteTraceparent(buffer_string, new_parent_id);
+              !status.ok()) {
             ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
-                                  rewritten_body.status().ToString());
+                                  status.ToString());
           } else {
             decoding_buffer->drain(decoding_buffer->length());
-            decoding_buffer->add(*rewritten_body);
+            decoding_buffer->add(buffer_string);
             headers->setContentLength(decoding_buffer->length());
           }
         }

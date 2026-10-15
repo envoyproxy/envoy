@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 
@@ -985,10 +986,16 @@ const Protobuf::Value* McpJsonParser::getNestedValue(absl::string_view dotted_pa
   return nullptr;
 }
 
-absl::StatusOr<std::string>
-McpJsonParser::rewriteTraceparent(absl::string_view body, absl::string_view new_parent_id) const {
+void McpJsonParser::reset() {
+  metadata_.Clear();
+  stream_parser_.reset();
+  extractor_.reset();
+  parsing_started_ = false;
+}
+
+absl::Status McpJsonParser::rewriteTraceparent(std::string& body, absl::string_view new_parent_id) {
   if (new_parent_id.empty()) {
-    return std::string(body);
+    return absl::OkStatus();
   }
   TraceparentLocator locator;
   if (absl::Status status = locator.feed(body); !status.ok()) {
@@ -998,23 +1005,26 @@ McpJsonParser::rewriteTraceparent(absl::string_view body, absl::string_view new_
     return absl::InvalidArgumentError("Failed to find traceparent in _meta");
   }
   const auto& range = *locator.traceparentRange();
-  const absl::string_view old_traceparent = body.substr(range.start, range.end - range.start);
-  absl::StatusOr<SpanContext> parsed_traceparent =
-      SpanContextExtractor::parseTraceparent(old_traceparent, "");
+
+  absl::Span<char> traceparent (body.data() + range.start, range.end - range.start);
+
+  absl::StatusOr<SpanContext> parsed_traceparent = SpanContextExtractor::parseTraceparent(
+      absl::string_view(traceparent.data(), traceparent.size()), "");
   if (!parsed_traceparent.ok()) {
     return parsed_traceparent.status();
   }
   parsed_traceparent->setSpanId(std::string(new_parent_id));
   const std::string new_traceparent =
       SpanContextExtractor::serializeTraceparent(*parsed_traceparent);
-  return absl::StrCat(body.substr(0, range.start), new_traceparent, body.substr(range.end));
-}
 
-void McpJsonParser::reset() {
-  metadata_.Clear();
-  stream_parser_.reset();
-  extractor_.reset();
-  parsing_started_ = false;
+  if (new_traceparent.size() != traceparent.size()) {
+    return absl::InternalError(
+        absl::StrCat("Unexpectedly computed new traceparent string with wrong length: ",
+                     new_traceparent.size()));
+  }
+
+  std::copy(new_traceparent.begin(), new_traceparent.end(), traceparent.begin());
+  return absl::OkStatus();
 }
 
 } // namespace Mcp

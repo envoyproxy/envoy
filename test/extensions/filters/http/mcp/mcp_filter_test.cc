@@ -3525,6 +3525,9 @@ TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
       .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   filter_->decodeHeaders(headers, false);
 
+  // Note that this example contains the key "numeric_edge_case" with a value of
+  // 2^64.  That integer literal should be preserved exactly, even though it
+  // can't be represented by IEEE 754 binary64.
   // SPELLCHECKER(off)
   std::string json = R"({
     "jsonrpc": "2.0",
