@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message GrpcService {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcService";
 
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message EnvoyGrpc {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.GrpcService.EnvoyGrpc";
@@ -72,6 +72,20 @@ message GrpcService {
     // If true, the header will be removed and can not be overridden by per stream option.
     // Default to false.
     bool skip_envoy_headers = 5;
+
+    // Maximum number of request bytes buffered per stream so that the request can be replayed on
+    // a retry, when :ref:`retry_policy <envoy_v3_api_field_config.core.v3.GrpcService.retry_policy>`
+    // or a caller-provided retry policy is set. For a streaming call this counts every message
+    // sent on the stream so far. Once a request exceeds this limit it is no longer retried, and the
+    // upstream cluster's ``retry_or_shadow_abandoned`` counter is incremented.
+    //
+    // Set this above the largest request, or the largest amount of data sent on a stream before
+    // it is established, that should still be retried. Up to this many bytes per stream can be
+    // held in memory until the stream completes.
+    //
+    // A per-stream buffer limit set by the caller takes precedence over this value. If not set,
+    // the default buffer limit of the Envoy HTTP async client, 64 KiB, is used.
+    google.protobuf.UInt32Value retry_buffer_limit_bytes = 6 [(validate.rules).uint32 = {gt: 0}];
   }
 
   // [#next-free-field: 11]
