@@ -202,6 +202,7 @@
     "https://bcr.bazel.build/modules/dd-trace-cpp/2.1.1.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/dragonbox/0.0.0-241028-6c7c925.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/elfutils/0.196.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/emsdk/4.0.23.envoy.1/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/emsdk/4.0.23.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/envoy_toolshed/0.5.20.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/envoy_toolshed_jq/0.5.20.envoy/MODULE.bazel": "not found",
@@ -448,7 +449,7 @@
     "https://bcr.bazel.build/modules/protoc-gen-validate/1.2.1/MODULE.bazel": "52b51f50533ec4fbd5d613cd093773f979ac2e035d954e02ca11de383f502505",
     "https://bcr.bazel.build/modules/protoc-gen-validate/1.3.3.envoy.1/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/proxy-wasm-cpp-host/0.0.0-260704-f2db56a.envoy.1/MODULE.bazel": "not found",
-    "https://bcr.bazel.build/modules/proxy-wasm-cpp-host/0.0.0-260704-f2db56a.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy.1/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/proxy-wasm-rust-sdk/0.2.5/MODULE.bazel": "c44116b797e7f37fa3dcd379befe5b29753add6d16d7c6a02af84522960072e7",
     "https://bcr.bazel.build/modules/proxy-wasm-rust-sdk/0.2.5/source.json": "a3efa79635a285eb2c9d36e3c69e138881932e03de3e240662eb7bbbd330b675",
@@ -618,7 +619,8 @@
     "https://bcr.bazel.build/modules/rules_nodejs/6.3.0/MODULE.bazel": "45345e4aba35dd6e4701c1eebf5a4e67af4ed708def9ebcdc6027585b34ee52d",
     "https://bcr.bazel.build/modules/rules_nodejs/6.3.2/MODULE.bazel": "42e8d5254b6135f890fecca7c8d7f95a7d27a45f8275b276f66ec337767530ef",
     "https://bcr.bazel.build/modules/rules_nodejs/6.3.3/MODULE.bazel": "b66eadebd10f1f1b25f52f95ab5213a57e82c37c3f656fcd9a57ad04d2264ce7",
-    "https://bcr.bazel.build/modules/rules_nodejs/6.3.3/source.json": "45bd343155bdfed2543f0e39b80ff3f6840efc31975da4b5795797f4c94147ad",
+    "https://bcr.bazel.build/modules/rules_nodejs/6.7.6/MODULE.bazel": "45f203b9c0d721bcb1a5932815f218091fa2169cede2af3d88a8a17a4fb7676a",
+    "https://bcr.bazel.build/modules/rules_nodejs/6.7.6/source.json": "ad9987b7979be1ce93d10ffee9b6af4f84f8835cbc7def27937d632da2e4750e",
     "https://bcr.bazel.build/modules/rules_pkg/0.7.0/MODULE.bazel": "df99f03fc7934a4737122518bb87e667e62d780b610910f0447665a7e2be62dc",
     "https://bcr.bazel.build/modules/rules_pkg/1.0.1/MODULE.bazel": "5b1df97dbc29623bccdf2b0dcd0f5cb08e2f2c9050aab1092fd39a41e82686ff",
     "https://bcr.bazel.build/modules/rules_pkg/1.3.0/MODULE.bazel": "ae0bdefbacc990c91f843206c90cf0f4be620639a5bf22119043599ba86d51a3",
@@ -741,7 +743,6 @@
     "https://bcr.bazel.build/modules/vectorscan/5.4.11.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/vpp-vcl/26.02-260111-85abefb.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/wamr/2.4.5.envoy/MODULE.bazel": "not found",
-    "https://bcr.bazel.build/modules/wasmtime/45.0.2.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/wasmtime/49.0.5.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/wuffs/0.4.0-alpha.9.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/xctestrunner/0.2.16-20260212-4c6f493/MODULE.bazel": "df9d74c77698e7dbc52a65ebdd6de5727044e98121ac309b5d046f2d04121d56",
@@ -807,8 +808,9 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/dragonbox/0.0.0-241028-6c7c925.envoy/source.json": "642addb5bea17b6570a138ccfb4f50f34c810c9e3416748a09e1ac723b01021f",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/elfutils/0.196.envoy/MODULE.bazel": "9625ac2b3d7f9bb696000b284bc7714b5067fa107d74c86d0e6b1414494c6779",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/elfutils/0.196.envoy/source.json": "726cd0015c75134acf6bd28e5360b636aeb7e455ae66c4adebf79e4f55ba5fc8",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/emsdk/4.0.23.envoy.1/MODULE.bazel": "293566de2519f183284579b634683f114c1f6d296dbf3ba8ec68fe2bfe7e5076",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/emsdk/4.0.23.envoy.1/source.json": "f351528327bab793f60b7f99bae8c613d95d814e24f688dbc613aa7d1cd5c933",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/emsdk/4.0.23.envoy/MODULE.bazel": "f764bb57c935c9fb4dc72263dd92c48c50e21367983fb1edf402fb43717752b5",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/emsdk/4.0.23.envoy/source.json": "a87b602d182b5ceb203c858f9ecd88f4702de7b549e3074e22a02f6ac7d68dc0",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/envoy_toolshed/0.5.20.envoy/MODULE.bazel": "5be0b018f959fa4b314ce712f99808d07044272d590316d890c1af8ccc6ad03f",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/envoy_toolshed/0.5.20.envoy/source.json": "e6fbcc7d663b82707fdf8268f9104790c9dc0e776841c515c6a6d231977219a8",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/envoy_toolshed_jq/0.5.20.envoy/MODULE.bazel": "ef2fd540600d4110f14a07d4a0f2487619233cc0f5e0408ddd249da6d5bf537b",
@@ -871,9 +873,9 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/protoc-gen-validate/1.3.3.envoy.1/source.json": "53ddbc94e66efe3b64ffbfd53c493cc757d1c03a3077bd1239e454657cfd1416",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/proxy-wasm-cpp-host/0.0.0-260704-f2db56a.envoy.1/MODULE.bazel": "7f40f6ab2c95695066133805af2f59bb27584c0e53555c82a8136a7515691abc",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/proxy-wasm-cpp-host/0.0.0-260704-f2db56a.envoy.1/source.json": "a0d07803509fccd67885d289b2451daff24af807f5d9756bf4e98acc0948512b",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/proxy-wasm-cpp-host/0.0.0-260704-f2db56a.envoy/MODULE.bazel": "5ec13aeb03c5c148f1d340127d5f225c5094bc80a152b4c7c90708c529d57722",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy.1/MODULE.bazel": "ec5062be3c8620753cccd09c95bbd245b5e6040e644fbd73019fcff710a6f8cc",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy.1/source.json": "addd26dd3ab7698df403c2049045fba697fdcbe4fa50e20a3a6b762de7e73792",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy/MODULE.bazel": "dfc7349d5177a6d63cceac9710e2b00b4ea069973235031c45eb0e8c6a466fd7",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/proxy-wasm-cpp-sdk/0.0.0-250925-e5256b0.envoy/source.json": "59ba8d0658f8da92d73259baf75e419dc23c25fa4909357a3ba784806ebfcf8a",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/qat-zstd/1.0.0.envoy/MODULE.bazel": "9c46bd2cd0752e70de76ce0c1c36811b14448a4dbbc3ff8b0f4f95c343bbb6c4",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/qat-zstd/1.0.0.envoy/source.json": "7aaf3a82884e4e603f76568ca98009fb4769fdd5f66c430054f47b4d82820c16",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/qatlib/26.02.0.envoy/MODULE.bazel": "45e6093e2bd42ef8128bd93a168028a9d2926ce223a43694650359997a046f5f",
@@ -910,7 +912,6 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/vpp-vcl/26.02-260111-85abefb.envoy/source.json": "a4d00de623af10ab9af46799667aadd8fd07d2a4028a3123ebeb959519e820cf",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/wamr/2.4.5.envoy/MODULE.bazel": "1d46e497d61465f6045ce9fa03c67a4e7a53ba9e451bbea4d3d0822f18a17d33",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/wamr/2.4.5.envoy/source.json": "dedc6d874500bff067e8a574e806b2a2da575b5d7f03103b3d215854e62057f8",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/wasmtime/45.0.2.envoy/MODULE.bazel": "049737b70b559b996eb68f95e38ff92ef50d629545ddafa1aa4d62b3c1a73225",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/wasmtime/49.0.5.envoy/MODULE.bazel": "4b2651d0d3572a030ba49d40b8b6a5dca84326b3edf3e5942b0efa0dae06fc19",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/wasmtime/49.0.5.envoy/source.json": "34f59a98f6b565dc39c444dbca425199c8f926d68b13c1774670b4fb78c6039a",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/417c07db4ecb93a16c52ef73a350482dec76c00c/modules/wuffs/0.4.0-alpha.9.envoy/MODULE.bazel": "e46699ee4851ddd18a50012b34c662f2390f014394cb17b8e07337cbc4033eb2",
@@ -1158,7 +1159,7 @@
     "@@emsdk+//:emscripten_cache.bzl%emscripten_cache": {
       "general": {
         "bzlTransitiveDigest": "uqDvXmpTNqW4+ie/Fk+xC3TrFrKvL+9hNtoP51Kt2oo=",
-        "usagesDigest": "DiK4MwwPwWtYLSt+yREBFYKvCLbm0Cqdn0INE2VZjKM=",
+        "usagesDigest": "tqMlVIpAFY/3agmeB8sd3h+NnW8g5Bb4Pei8lBIeN3Q=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "emscripten_cache": {
@@ -1173,17 +1174,22 @@
     },
     "@@emsdk+//:emscripten_deps.bzl%emscripten_deps": {
       "general": {
-        "bzlTransitiveDigest": "Q84yui7XG9DiK2HKzzr0oMDg3dpKQ5qZGvK9htQjy9Y=",
-        "usagesDigest": "yRGSmWwksrOI68EzUU8kC0L5tJnr2E2AVst3Nt5BY1s=",
+        "bzlTransitiveDigest": "KtDaeDO6H5dVzSjAwuMAizkZRjXvamr7MEk2PVUKyuA=",
+        "usagesDigest": "UkYjyEB96a8Qjbl+R4LBgwf+MLOeeletlxBF22hcn1c=",
         "recordedInputs": [
           "REPO_MAPPING:bazel_tools,rules_cc rules_cc+",
-          "REPO_MAPPING:emsdk+,bazel_tools bazel_tools"
+          "REPO_MAPPING:emsdk+,bazel_tools bazel_tools",
+          "REPO_MAPPING:emsdk+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_cc+,bazel_tools bazel_tools",
+          "REPO_MAPPING:rules_cc+,cc_compatibility_proxy rules_cc++compatibility_proxy+cc_compatibility_proxy",
+          "REPO_MAPPING:rules_cc+,rules_cc rules_cc+",
+          "REPO_MAPPING:rules_cc++compatibility_proxy+cc_compatibility_proxy,rules_cc rules_cc+"
         ],
         "generatedRepoSpecs": {
           "emscripten_bin_linux": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "repoRuleId": "@@emsdk+//:remote_emscripten_repository.bzl%_emscripten_archive",
             "attributes": {
-              "build_file_content": "\npackage(default_visibility = ['//visibility:public'])\n\nfilegroup(\n    name = \"all\",\n    srcs = glob([\"**\"]),\n)\n\nfilegroup(\n    name = \"includes\",\n    srcs = glob([\n        \"emscripten/cache/sysroot/include/c++/v1/**\",\n        \"emscripten/cache/sysroot/include/compat/**\",\n        \"emscripten/cache/sysroot/include/**\",\n        \"lib/clang/**/include/**\",\n    ]),\n)\n\nfilegroup(\n    name = \"emcc_common\",\n    srcs = [\n        \"emscripten/emcc.py\",\n        \"emscripten/embuilder.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/cache/sysroot_install.stamp\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/third_party/**\",\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"compiler_files\",\n    srcs = [\n        \"bin/clang\",\n        \"bin/clang++\",\n        \":emcc_common\",\n        \":includes\",\n    ],\n)\n\nfilegroup(\n    name = \"linker_files\",\n    srcs = [\n        \"bin/clang\",\n        \"bin/llvm-ar\",\n        \"bin/llvm-dwarfdump\",\n        \"bin/llvm-nm\",\n        \"bin/llvm-objcopy\",\n        \"bin/wasm-ctor-eval\",\n        \"bin/wasm-emscripten-finalize\",\n        \"bin/wasm-ld\",\n        \"bin/wasm-metadce\",\n        \"bin/wasm-opt\",\n        \"bin/wasm-split\",\n        \"bin/wasm2js\",\n        \":emcc_common\",\n    ] + glob(\n        include = [\n            \"emscripten/cache/sysroot/lib/**\",\n            \"emscripten/node_modules/**\",\n            \"emscripten/src/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"ar_files\",\n    srcs = [\n        \"bin/llvm-ar\",\n        \"emscripten/emar.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"dwp_files\",\n    srcs = [\n        \"bin/llvm-dwp\",\n    ],\n)\n\n",
+              "bin_extension": "",
               "sha256": "5f1565fe45a1223cedf3b0300f5089c2c64954d2895b2aaedc85043c719be965",
               "strip_prefix": "install",
               "type": "tar.xz",
@@ -1191,9 +1197,9 @@
             }
           },
           "emscripten_bin_linux_arm64": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "repoRuleId": "@@emsdk+//:remote_emscripten_repository.bzl%_emscripten_archive",
             "attributes": {
-              "build_file_content": "\npackage(default_visibility = ['//visibility:public'])\n\nfilegroup(\n    name = \"all\",\n    srcs = glob([\"**\"]),\n)\n\nfilegroup(\n    name = \"includes\",\n    srcs = glob([\n        \"emscripten/cache/sysroot/include/c++/v1/**\",\n        \"emscripten/cache/sysroot/include/compat/**\",\n        \"emscripten/cache/sysroot/include/**\",\n        \"lib/clang/**/include/**\",\n    ]),\n)\n\nfilegroup(\n    name = \"emcc_common\",\n    srcs = [\n        \"emscripten/emcc.py\",\n        \"emscripten/embuilder.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/cache/sysroot_install.stamp\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/third_party/**\",\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"compiler_files\",\n    srcs = [\n        \"bin/clang\",\n        \"bin/clang++\",\n        \":emcc_common\",\n        \":includes\",\n    ],\n)\n\nfilegroup(\n    name = \"linker_files\",\n    srcs = [\n        \"bin/clang\",\n        \"bin/llvm-ar\",\n        \"bin/llvm-dwarfdump\",\n        \"bin/llvm-nm\",\n        \"bin/llvm-objcopy\",\n        \"bin/wasm-ctor-eval\",\n        \"bin/wasm-emscripten-finalize\",\n        \"bin/wasm-ld\",\n        \"bin/wasm-metadce\",\n        \"bin/wasm-opt\",\n        \"bin/wasm-split\",\n        \"bin/wasm2js\",\n        \":emcc_common\",\n    ] + glob(\n        include = [\n            \"emscripten/cache/sysroot/lib/**\",\n            \"emscripten/node_modules/**\",\n            \"emscripten/src/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"ar_files\",\n    srcs = [\n        \"bin/llvm-ar\",\n        \"emscripten/emar.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"dwp_files\",\n    srcs = [\n        \"bin/llvm-dwp\",\n    ],\n)\n\n",
+              "bin_extension": "",
               "sha256": "d8ed075930b397d3aed8a1c7558db1918ade786349b07d5c042dfa7f65f78563",
               "strip_prefix": "install",
               "type": "tar.xz",
@@ -1201,9 +1207,9 @@
             }
           },
           "emscripten_bin_mac": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "repoRuleId": "@@emsdk+//:remote_emscripten_repository.bzl%_emscripten_archive",
             "attributes": {
-              "build_file_content": "\npackage(default_visibility = ['//visibility:public'])\n\nfilegroup(\n    name = \"all\",\n    srcs = glob([\"**\"]),\n)\n\nfilegroup(\n    name = \"includes\",\n    srcs = glob([\n        \"emscripten/cache/sysroot/include/c++/v1/**\",\n        \"emscripten/cache/sysroot/include/compat/**\",\n        \"emscripten/cache/sysroot/include/**\",\n        \"lib/clang/**/include/**\",\n    ]),\n)\n\nfilegroup(\n    name = \"emcc_common\",\n    srcs = [\n        \"emscripten/emcc.py\",\n        \"emscripten/embuilder.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/cache/sysroot_install.stamp\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/third_party/**\",\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"compiler_files\",\n    srcs = [\n        \"bin/clang\",\n        \"bin/clang++\",\n        \":emcc_common\",\n        \":includes\",\n    ],\n)\n\nfilegroup(\n    name = \"linker_files\",\n    srcs = [\n        \"bin/clang\",\n        \"bin/llvm-ar\",\n        \"bin/llvm-dwarfdump\",\n        \"bin/llvm-nm\",\n        \"bin/llvm-objcopy\",\n        \"bin/wasm-ctor-eval\",\n        \"bin/wasm-emscripten-finalize\",\n        \"bin/wasm-ld\",\n        \"bin/wasm-metadce\",\n        \"bin/wasm-opt\",\n        \"bin/wasm-split\",\n        \"bin/wasm2js\",\n        \":emcc_common\",\n    ] + glob(\n        include = [\n            \"emscripten/cache/sysroot/lib/**\",\n            \"emscripten/node_modules/**\",\n            \"emscripten/src/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"ar_files\",\n    srcs = [\n        \"bin/llvm-ar\",\n        \"emscripten/emar.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"dwp_files\",\n    srcs = [\n        \"bin/llvm-dwp\",\n    ],\n)\n\n",
+              "bin_extension": "",
               "sha256": "5823ef26fd45b5a960960fb53026513d43922eac7a1e3ba12d1344d7a94699f9",
               "strip_prefix": "install",
               "type": "tar.xz",
@@ -1211,9 +1217,9 @@
             }
           },
           "emscripten_bin_mac_arm64": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "repoRuleId": "@@emsdk+//:remote_emscripten_repository.bzl%_emscripten_archive",
             "attributes": {
-              "build_file_content": "\npackage(default_visibility = ['//visibility:public'])\n\nfilegroup(\n    name = \"all\",\n    srcs = glob([\"**\"]),\n)\n\nfilegroup(\n    name = \"includes\",\n    srcs = glob([\n        \"emscripten/cache/sysroot/include/c++/v1/**\",\n        \"emscripten/cache/sysroot/include/compat/**\",\n        \"emscripten/cache/sysroot/include/**\",\n        \"lib/clang/**/include/**\",\n    ]),\n)\n\nfilegroup(\n    name = \"emcc_common\",\n    srcs = [\n        \"emscripten/emcc.py\",\n        \"emscripten/embuilder.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/cache/sysroot_install.stamp\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/third_party/**\",\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"compiler_files\",\n    srcs = [\n        \"bin/clang\",\n        \"bin/clang++\",\n        \":emcc_common\",\n        \":includes\",\n    ],\n)\n\nfilegroup(\n    name = \"linker_files\",\n    srcs = [\n        \"bin/clang\",\n        \"bin/llvm-ar\",\n        \"bin/llvm-dwarfdump\",\n        \"bin/llvm-nm\",\n        \"bin/llvm-objcopy\",\n        \"bin/wasm-ctor-eval\",\n        \"bin/wasm-emscripten-finalize\",\n        \"bin/wasm-ld\",\n        \"bin/wasm-metadce\",\n        \"bin/wasm-opt\",\n        \"bin/wasm-split\",\n        \"bin/wasm2js\",\n        \":emcc_common\",\n    ] + glob(\n        include = [\n            \"emscripten/cache/sysroot/lib/**\",\n            \"emscripten/node_modules/**\",\n            \"emscripten/src/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"ar_files\",\n    srcs = [\n        \"bin/llvm-ar\",\n        \"emscripten/emar.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"dwp_files\",\n    srcs = [\n        \"bin/llvm-dwp\",\n    ],\n)\n\n",
+              "bin_extension": "",
               "sha256": "54234e108d6612eca5dc9280d1779ccec3d49ad4d8c8562a6b2046b0a5a8d5d4",
               "strip_prefix": "install",
               "type": "tar.xz",
@@ -1221,9 +1227,9 @@
             }
           },
           "emscripten_bin_win": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "repoRuleId": "@@emsdk+//:remote_emscripten_repository.bzl%_emscripten_archive",
             "attributes": {
-              "build_file_content": "\npackage(default_visibility = ['//visibility:public'])\n\nfilegroup(\n    name = \"all\",\n    srcs = glob([\"**\"]),\n)\n\nfilegroup(\n    name = \"includes\",\n    srcs = glob([\n        \"emscripten/cache/sysroot/include/c++/v1/**\",\n        \"emscripten/cache/sysroot/include/compat/**\",\n        \"emscripten/cache/sysroot/include/**\",\n        \"lib/clang/**/include/**\",\n    ]),\n)\n\nfilegroup(\n    name = \"emcc_common\",\n    srcs = [\n        \"emscripten/emcc.py\",\n        \"emscripten/embuilder.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/cache/sysroot_install.stamp\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/third_party/**\",\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"compiler_files\",\n    srcs = [\n        \"bin/clang.exe\",\n        \"bin/clang++.exe\",\n        \":emcc_common\",\n        \":includes\",\n    ],\n)\n\nfilegroup(\n    name = \"linker_files\",\n    srcs = [\n        \"bin/clang.exe\",\n        \"bin/llvm-ar.exe\",\n        \"bin/llvm-dwarfdump.exe\",\n        \"bin/llvm-nm.exe\",\n        \"bin/llvm-objcopy.exe\",\n        \"bin/wasm-ctor-eval.exe\",\n        \"bin/wasm-emscripten-finalize.exe\",\n        \"bin/wasm-ld.exe\",\n        \"bin/wasm-metadce.exe\",\n        \"bin/wasm-opt.exe\",\n        \"bin/wasm-split.exe\",\n        \"bin/wasm2js.exe\",\n        \":emcc_common\",\n    ] + glob(\n        include = [\n            \"emscripten/cache/sysroot/lib/**\",\n            \"emscripten/node_modules/**\",\n            \"emscripten/src/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"ar_files\",\n    srcs = [\n        \"bin/llvm-ar.exe\",\n        \"emscripten/emar.py\",\n        \"emscripten/emscripten-version.txt\",\n        \"emscripten/src/settings.js\",\n        \"emscripten/src/settings_internal.js\",\n    ] + glob(\n        include = [\n            \"emscripten/tools/**\",\n        ],\n        exclude = [\n            \"**/__pycache__/**\",\n        ],\n    ),\n)\n\nfilegroup(\n    name = \"dwp_files\",\n    srcs = [\n        \"bin/llvm-dwp.exe\",\n    ],\n)\n\n",
+              "bin_extension": ".exe",
               "sha256": "c2e1b9a2eed20f9d5903780b559ce2b384132713f07936512e6d962dd5a5dae6",
               "strip_prefix": "install",
               "type": "zip",
@@ -2148,124 +2154,6 @@
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
           "reproducible": false
-        }
-      }
-    },
-    "@@rules_nodejs+//nodejs:extensions.bzl%node": {
-      "general": {
-        "bzlTransitiveDigest": "q44Ox2Nwogn6OsO0Xw5lhjkd/xmxkvvpwVOn5P4pmHQ=",
-        "usagesDigest": "APcBjUh7j4UUNtZ16FonkFYE68qQt5/vMEYCyHxAeaQ=",
-        "recordedInputs": [],
-        "generatedRepoSpecs": {
-          "nodejs_linux_amd64": {
-            "repoRuleId": "@@rules_nodejs+//nodejs:repositories.bzl%_nodejs_repositories",
-            "attributes": {
-              "node_download_auth": {},
-              "node_repositories": {},
-              "node_urls": [
-                "https://nodejs.org/dist/v{version}/{filename}"
-              ],
-              "node_version": "20.18.0",
-              "include_headers": false,
-              "platform": "linux_amd64"
-            }
-          },
-          "nodejs_linux_arm64": {
-            "repoRuleId": "@@rules_nodejs+//nodejs:repositories.bzl%_nodejs_repositories",
-            "attributes": {
-              "node_download_auth": {},
-              "node_repositories": {},
-              "node_urls": [
-                "https://nodejs.org/dist/v{version}/{filename}"
-              ],
-              "node_version": "20.18.0",
-              "include_headers": false,
-              "platform": "linux_arm64"
-            }
-          },
-          "nodejs_linux_s390x": {
-            "repoRuleId": "@@rules_nodejs+//nodejs:repositories.bzl%_nodejs_repositories",
-            "attributes": {
-              "node_download_auth": {},
-              "node_repositories": {},
-              "node_urls": [
-                "https://nodejs.org/dist/v{version}/{filename}"
-              ],
-              "node_version": "20.18.0",
-              "include_headers": false,
-              "platform": "linux_s390x"
-            }
-          },
-          "nodejs_linux_ppc64le": {
-            "repoRuleId": "@@rules_nodejs+//nodejs:repositories.bzl%_nodejs_repositories",
-            "attributes": {
-              "node_download_auth": {},
-              "node_repositories": {},
-              "node_urls": [
-                "https://nodejs.org/dist/v{version}/{filename}"
-              ],
-              "node_version": "20.18.0",
-              "include_headers": false,
-              "platform": "linux_ppc64le"
-            }
-          },
-          "nodejs_darwin_amd64": {
-            "repoRuleId": "@@rules_nodejs+//nodejs:repositories.bzl%_nodejs_repositories",
-            "attributes": {
-              "node_download_auth": {},
-              "node_repositories": {},
-              "node_urls": [
-                "https://nodejs.org/dist/v{version}/{filename}"
-              ],
-              "node_version": "20.18.0",
-              "include_headers": false,
-              "platform": "darwin_amd64"
-            }
-          },
-          "nodejs_darwin_arm64": {
-            "repoRuleId": "@@rules_nodejs+//nodejs:repositories.bzl%_nodejs_repositories",
-            "attributes": {
-              "node_download_auth": {},
-              "node_repositories": {},
-              "node_urls": [
-                "https://nodejs.org/dist/v{version}/{filename}"
-              ],
-              "node_version": "20.18.0",
-              "include_headers": false,
-              "platform": "darwin_arm64"
-            }
-          },
-          "nodejs_windows_amd64": {
-            "repoRuleId": "@@rules_nodejs+//nodejs:repositories.bzl%_nodejs_repositories",
-            "attributes": {
-              "node_download_auth": {},
-              "node_repositories": {},
-              "node_urls": [
-                "https://nodejs.org/dist/v{version}/{filename}"
-              ],
-              "node_version": "20.18.0",
-              "include_headers": false,
-              "platform": "windows_amd64"
-            }
-          },
-          "nodejs": {
-            "repoRuleId": "@@rules_nodejs+//nodejs/private:nodejs_repo_host_os_alias.bzl%nodejs_repo_host_os_alias",
-            "attributes": {
-              "user_node_repository_name": "nodejs"
-            }
-          },
-          "nodejs_host": {
-            "repoRuleId": "@@rules_nodejs+//nodejs/private:nodejs_repo_host_os_alias.bzl%nodejs_repo_host_os_alias",
-            "attributes": {
-              "user_node_repository_name": "nodejs"
-            }
-          },
-          "nodejs_toolchains": {
-            "repoRuleId": "@@rules_nodejs+//nodejs/private:nodejs_toolchains_repo.bzl%nodejs_toolchains_repo",
-            "attributes": {
-              "user_node_repository_name": "nodejs"
-            }
-          }
         }
       }
     },
