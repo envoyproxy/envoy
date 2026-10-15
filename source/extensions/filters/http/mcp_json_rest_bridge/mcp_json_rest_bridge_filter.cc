@@ -1575,8 +1575,12 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         },
         Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover");
   } else {
+    // MCP 2026-07-28 Streamable HTTP requires 404 Not Found together with -32601 (Method not found)
+    // for methods the server does not implement. Legacy (2025-11-25 and earlier) requests keep
+    // 200 OK; see sendErrorResponse().
+    const Http::Code response_code = is_stateless_request_ ? Http::Code::NotFound : Http::Code::OK;
     sendErrorResponse(
-        Http::Code::OK, BridgeStatus::RequestMcpMethodNotSupported,
+        response_code, BridgeStatus::RequestMcpMethodNotSupported,
         generateErrorJsonResponse(-32601, absl::StrCat("MCP method ", method, " is not supported"))
             .dump(),
         nullptr, method,

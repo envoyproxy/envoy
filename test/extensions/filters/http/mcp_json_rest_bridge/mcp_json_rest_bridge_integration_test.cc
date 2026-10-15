@@ -450,6 +450,37 @@ TEST_P(McpJsonRestBridgeIntegrationTest, UnsupportedMethod) {
           R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"MCP method tools/update is not supported"}})json"));
 }
 
+TEST_P(McpJsonRestBridgeIntegrationTest, StatelessUnsupportedMethodReturnsNotFound) {
+  const std::string config = R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      server_info:
+        max_supported_protocol_version: "2026-07-28"
+  )EOF";
+
+  initializeFilter(config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-method", "tools/invalid"},
+                                     {"mcp-protocol-version", "2026-07-28"}},
+      R"json({"jsonrpc":"2.0","id":1,"method":"tools/invalid","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers().getStatusValue(), StrEq("404"));
+  EXPECT_EQ(
+      nlohmann::json::parse(response->body()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"MCP method tools/invalid is not supported"}})json"));
+}
+
 TEST_P(McpJsonRestBridgeIntegrationTest, InitializeMissingProtocolVersion) {
   const std::string config = R"EOF(
     name: envoy.filters.http.mcp_json_rest_bridge
