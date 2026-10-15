@@ -25,13 +25,14 @@ public:
              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
              StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
              Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn,
-             bool always_serialize, LLMProtocol request_protocol)
+             bool always_serialize, LLMProtocol request_protocol, OnFiltersDoneFn on_filters_done)
       : TaskGroup(dispatcher), filters_(std::move(filters)),
         payload_index_(std::move(payload_index)), pipeline_(filters_.size()),
         buffer_manager_(buffer_manager), stream_info_(stream_info),
         on_complete_(std::move(on_complete)), request_headers_(request_headers),
         local_reply_fn_(std::move(local_reply_fn)), always_serialize_(always_serialize),
-        request_protocol_(request_protocol), filter_handoff_status_(filters_.size()) {}
+        request_protocol_(request_protocol), on_filters_done_(std::move(on_filters_done)),
+        filter_handoff_status_(filters_.size()) {}
 
   ~AsyncState() override { cancel(); }
 
@@ -57,6 +58,7 @@ public:
     auto self = shared_from_this();
     on_complete_ = nullptr;
     local_reply_fn_ = nullptr;
+    on_filters_done_ = nullptr;
     cancelHandles();
     final_req_.reset();
     pipeline_.closeAndDrain();
@@ -146,6 +148,10 @@ private:
       co_return absl::InvalidArgumentError("cannot propagate null AiRequestPtr");
     }
     filter_handoff_status_[index].propagated = true;
+    // Recorded here so a filter that propagates a new AiRequest cannot withdraw an earlier refresh.
+    if (req->routeActionRequested(AiRouteAction::RefreshCluster)) {
+      refresh_route_cluster_ = true;
+    }
     co_return co_await pipeline_.propagate(index, std::move(req));
   }
 
@@ -157,6 +163,10 @@ private:
 
     final_req_ = std::move(*res);
     ASSERT(final_req_ != nullptr);
+
+    if (OnFiltersDoneFn on_filters_done = std::move(on_filters_done_)) {
+      on_filters_done(refresh_route_cluster_);
+    }
 
     if (always_serialize_) {
       CO_RETURN_IF_ERROR(co_await serializeFinalRequest());
@@ -290,6 +300,9 @@ private:
   LocalReplyFn local_reply_fn_;
   const bool always_serialize_{true};
   const LLMProtocol request_protocol_;
+  OnFiltersDoneFn on_filters_done_;
+  // Whether any filter that propagated the request asked for a route cluster refresh.
+  bool refresh_route_cluster_{false};
   AiRequestPtr final_req_;
   std::vector<FilterHandoffStatus> filter_handoff_status_;
 };
@@ -299,11 +312,11 @@ RequestFilterManager::RequestFilterManager(
     BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
     StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
     Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn, bool always_serialize,
-    LLMProtocol request_protocol)
+    LLMProtocol request_protocol, OnFiltersDoneFn on_filters_done)
     : async_state_(std::make_shared<AsyncState>(
           std::move(filters), std::move(payload_index), buffer_manager, dispatcher, stream_info,
           std::move(on_complete), request_headers, std::move(local_reply_fn), always_serialize,
-          request_protocol)) {}
+          request_protocol, std::move(on_filters_done))) {}
 
 RequestFilterManager::~RequestFilterManager() { cancel(); }
 

@@ -33,6 +33,7 @@ namespace AiProtocolManager {
 class FilterManager : public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
   using LocalReplyFn = RequestFilterManager::LocalReplyFn;
+  using OnFiltersDoneFn = RequestFilterManager::OnFiltersDoneFn;
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
 
   explicit FilterManager(std::vector<AiFilterSharedPtr> filters);
@@ -45,7 +46,8 @@ public:
                     Event::Dispatcher& dispatcher, StreamInfo::StreamInfo& stream_info,
                     OnCompleteFn on_complete, Http::RequestHeaderMap* request_headers = nullptr,
                     LocalReplyFn local_reply_fn = nullptr, bool always_serialize = true,
-                    LLMProtocol request_protocol = LLMProtocol::Unspecified);
+                    LLMProtocol request_protocol = LLMProtocol::Unspecified,
+                    OnFiltersDoneFn on_filters_done = nullptr);
 
   // Starts the SSE response filter chain in reverse filter order (N-1..0).
   void startSseResponse(ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,

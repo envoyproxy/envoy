@@ -33,13 +33,17 @@ class RequestFilterManager : public Logger::Loggable<Logger::Id::ai_protocol_man
 public:
   using LocalReplyFn = absl::AnyInvocable<void(Http::Code code, std::string details)>;
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
+  // Runs once every filter has propagated the request and before the sink writes it out, while the
+  // request headers are still held. Told whether any filter requested a route cluster refresh.
+  using OnFiltersDoneFn = absl::AnyInvocable<void(bool refresh_route_cluster)>;
 
   RequestFilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
                        BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
                        StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
                        Http::RequestHeaderMap* request_headers = nullptr,
                        LocalReplyFn local_reply_fn = nullptr, bool always_serialize = true,
-                       LLMProtocol request_protocol = LLMProtocol::Unspecified);
+                       LLMProtocol request_protocol = LLMProtocol::Unspecified,
+                       OnFiltersDoneFn on_filters_done = nullptr);
   ~RequestFilterManager();
 
   // Starts the request filter pipeline and sink coroutines.

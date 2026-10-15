@@ -140,6 +140,9 @@ struct AiFilterContext {
   uint64_t request_payload_bytes{0};
   // Route-declared response/backend wire API; Unspecified when the route named none.
   LLMProtocol response_protocol = LLMProtocol::Unspecified;
+  // Whether the AI Protocol Manager applies an AiRouteAction requested on this stream; false in an
+  // upstream filter chain, which has no route to act on.
+  bool route_actions_supported{false};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.
