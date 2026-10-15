@@ -27,8 +27,8 @@ bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.3.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.3.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.4.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.4.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -245,12 +245,12 @@ llvm.toolchain_root(
 )
 llvm.sysroot(
     name = "llvm_toolchain",
-    label = "@sysroot_linux_amd64//:sysroot",
+    label = "@sysroot_linux_amd64//sysroot",
     targets = ["linux-x86_64"],
 )
 llvm.sysroot(
     name = "llvm_toolchain",
-    label = "@sysroot_linux_arm64//:sysroot",
+    label = "@sysroot_linux_arm64//sysroot",
     targets = ["linux-aarch64"],
 )
 use_repo(llvm, "llvm_toolchain")
