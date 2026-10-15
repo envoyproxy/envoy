@@ -263,6 +263,42 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndAsnDbsSuccessfulLookup) {
   expectStats("asn_db");
 }
 
+// The provider reports every configured output key, so the HTTP filter can remove them from a
+// request before the lookup; a key that was not configured is not reported.
+TEST_F(GeoipProviderTest, GeoHeaderNamesListEveryConfiguredKey) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+        region: "x-geo-region"
+        city: "x-geo-city"
+        asn: "x-geo-asn"
+        anon_vpn: "x-geo-anon-vpn"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  EXPECT_THAT(provider_->geoHeaderNames(),
+              testing::UnorderedElementsAre("x-geo-country", "x-geo-region", "x-geo-city",
+                                            "x-geo-asn", "x-geo-anon-vpn"));
+}
+
+// The deprecated geo_headers_to_add form, including the is_anon fallback, reports its keys too.
+TEST_F(GeoipProviderTest, GeoHeaderNamesListDeprecatedGeoHeadersToAdd) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        is_anon: "x-geo-anon"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  EXPECT_THAT(provider_->geoHeaderNames(),
+              testing::UnorderedElementsAre("x-geo-country", "x-geo-anon"));
+}
+
 TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
