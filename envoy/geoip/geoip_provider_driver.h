@@ -6,6 +6,7 @@
 #include "envoy/server/factory_context.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Geolocation {
@@ -40,6 +41,15 @@ public:
    *  @param cb supplies the filter callbacks to notify when lookup is complete.
    */
   virtual void lookup(LookupRequest&& request, LookupGeoHeadersCallback&& cb) const PURE;
+
+  /**
+   * @return every key this driver is configured to populate in a ``LookupResult``, that is, every
+   * request header the HTTP geoip filter may write. The filter removes these headers from the
+   * request before the lookup, so a value a client sent cannot stand in for one the lookup did
+   * not produce. The default is empty, which keeps a provider that does not override this method
+   * on the previous behavior of only writing the headers a lookup returns.
+   */
+  virtual absl::Span<const std::string> geoHeaderNames() const { return {}; }
 };
 
 using DriverSharedPtr = std::shared_ptr<Driver>;
