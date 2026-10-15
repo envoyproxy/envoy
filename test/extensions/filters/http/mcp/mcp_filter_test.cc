@@ -3525,9 +3525,6 @@ TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
       .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   filter_->decodeHeaders(headers, false);
 
-  // Note that this example contains the key "numeric_edge_case" with a value of
-  // 2^64.  That integer literal should be preserved exactly, even though it
-  // can't be represented by IEEE 754 binary64.
   // SPELLCHECKER(off)
   std::string json = R"({
     "jsonrpc": "2.0",
@@ -3538,8 +3535,7 @@ TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
       "_meta": {
         "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
         "tracestate": "rojo=00f067aa0ba902b7"
-      },
-      "numeric_edge_case": 18446744073709551616 
+      }
     }
   })";
   // SPELLCHECKER(on)
@@ -3568,8 +3564,6 @@ TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
   EXPECT_THAT(buffer.toString(),
               HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kSpanIdHex, "-01")))
       << "The request body's traceparent should have been rewritten with a new parent ID";
-
-  EXPECT_THAT(buffer.toString(), HasSubstr("18446744073709551616"));
 }
 
 TEST_F(McpFilterTest, TraceContextEnabledValidParentAndState) {

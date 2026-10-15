@@ -1017,15 +1017,12 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
               [&decoding_buffer](Buffer::Instance& b) { decoding_buffer = &b; });
           ASSERT(decoding_buffer != nullptr);
 
-          std::string buffer_string = decoding_buffer->toString();
           if (absl::Status status =
-                  JsonPathParser::rewriteTraceparent(buffer_string, new_parent_id);
+                  JsonPathParser::rewriteTraceparent(*decoding_buffer, new_parent_id);
               !status.ok()) {
             ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
                                   status.ToString());
           } else {
-            decoding_buffer->drain(decoding_buffer->length());
-            decoding_buffer->add(buffer_string);
             headers->setContentLength(decoding_buffer->length());
           }
         }

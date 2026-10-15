@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
+#include "envoy/buffer/buffer.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
@@ -292,7 +293,7 @@ public:
 
   // Rewrites the MCP request body's `params._meta.traceparent` value with
   // `new_parent_id`.  No-op when `new_parent_id` is empty.
-  static absl::Status rewriteTraceparent(std::string& body, absl::string_view new_parent_id);
+  static absl::Status rewriteTraceparent(Buffer::Instance& body, absl::string_view new_parent_id);
 
 private:
   McpParserConfig config_;

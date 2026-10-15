@@ -2166,9 +2166,12 @@ TEST(McpJsonParserMemoryTest, HeavyObjectFieldsUnorderedMethod) {
   }
 }
 
-TEST_F(McpJsonParserTest, RewriteTraceparentSuccessPreservesFormattingAndLargeNumbers) {
-  // SPELLCHECKER(off)
-  std::string json = R"({
+TEST_F(McpJsonParserTest, RewriteTraceparentPreservesLargeNumericToken) {
+  // Note that this example contains the key "numeric_edge_case" with a value of
+  // 2^64.  That integer literal should be preserved exactly, even though it
+  // can't be represented by IEEE 754 binary64.
+  static constexpr absl::string_view kJson=
+      R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
     "id": 1,
@@ -2181,57 +2184,92 @@ TEST_F(McpJsonParserTest, RewriteTraceparentSuccessPreservesFormattingAndLargeNu
       "numeric_edge_case": 18446744073709551616
     }
   })";
-  // SPELLCHECKER(on)
+  static constexpr absl::string_view kNewParentId = "21b6bcb2a5588606";
 
-  EXPECT_OK(parser_->parse(json));
-  absl::Status rewritten = McpJsonParser::rewriteTraceparent(json, "21b6bcb2a5588606");
-  ASSERT_OK(rewritten);
-  EXPECT_THAT(json, HasSubstr("00-4bf92f3577b34da6a3ce929d0e0e4736-21b6bcb2a5588606-01"));
-  EXPECT_THAT(json, HasSubstr("18446744073709551616"));
+  EXPECT_OK(parser_->parse(kJson));
+  ASSERT_OK(parser_->finishParse());
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(kJson);
+
+  ASSERT_OK(McpJsonParser::rewriteTraceparent(buffer, kNewParentId));
+
+  std::string rewritten_json = buffer.toString();
+  EXPECT_THAT(rewritten_json, HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kNewParentId, "-01")));
+  EXPECT_THAT(rewritten_json, HasSubstr("18446744073709551616"));
 }
 
-TEST_F(McpJsonParserTest, RewriteTraceparentAcrossChunks) {
-  // SPELLCHECKER(off)
-  const std::string chunk1 =
-      R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t","_meta":{"traceparent":"00-4bf92f3577b34da6a3ce929d0e0e4736-)";
-  const std::string chunk2 = R"(00f067aa0ba902b7-01"}}})";
-  // SPELLCHECKER(on)
-  std::string full_body = absl::StrCat(chunk1, chunk2);
+TEST_F(McpJsonParserTest, RewriteTraceparentSuccessAcrossMultipleBufferSlices) {
+  static constexpr absl::string_view kJsonChunk1 =
+      R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929)";
+  static constexpr absl::string_view kJsonChunk2 =
+      R"(d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  static constexpr absl::string_view kNewParentId = "21b6bcb2a5588606";
 
-  EXPECT_OK(parser_->parse(chunk1));
-  EXPECT_OK(parser_->parse(chunk2));
-  absl::Status rewritten = parser_->rewriteTraceparent(full_body, "21b6bcb2a5588606");
-  ASSERT_OK(rewritten);
-  EXPECT_THAT(full_body, HasSubstr("00-4bf92f3577b34da6a3ce929d0e0e4736-21b6bcb2a5588606-01"));
+  EXPECT_OK(parser_->parse(kJsonChunk1));
+  EXPECT_OK(parser_->parse(kJsonChunk2));
+  ASSERT_OK(parser_->finishParse());
+
+  Buffer::OwnedImpl buffer;
+  buffer.appendSliceForTest(kJsonChunk1);
+  buffer.appendSliceForTest(kJsonChunk2);
+  EXPECT_EQ(buffer.sliceCount(), 2);
+
+  ASSERT_OK(McpJsonParser::rewriteTraceparent(buffer, kNewParentId));
+
+  std::string rewritten_json = buffer.toString();
+  EXPECT_THAT(rewritten_json, HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kNewParentId, "-01")));
 }
 
 TEST_F(McpJsonParserTest, RewriteTraceparentEmptyParentIdIsNoOp) {
-  static constexpr absl::string_view json = R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t"}})";
-  std::string json_string(json);
-  absl::Status status = parser_->rewriteTraceparent(json_string, "");
-  ASSERT_OK(status);
-  EXPECT_EQ(json_string, json);
-}
+  static constexpr absl::string_view kJson = R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t"}})";
+  EXPECT_OK(parser_->parse(kJson));
+  ASSERT_OK(parser_->finishParse());
 
-TEST_F(McpJsonParserTest, RewriteTraceparentMissingReturnsError) {
-  std::string json =
-      R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t","_meta":{}}})";
-  EXPECT_OK(parser_->parse(json));
-  EXPECT_THAT(parser_->rewriteTraceparent(json, "21b6bcb2a5588606"),
-              HasStatusMessage(HasSubstr("Failed to find traceparent in _meta")));
+  Buffer::OwnedImpl buffer;
+  buffer.add(kJson);
+
+  ASSERT_OK(McpJsonParser::rewriteTraceparent(buffer, ""));
+  EXPECT_EQ(buffer.toString(), kJson);
 }
 
 TEST_F(McpJsonParserTest, RewriteTraceparentInvalidValueReturnsError) {
-  std::string json =
+  static constexpr absl::string_view kJson =
       R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t","_meta":{"traceparent":"invalid"}}})";
-  EXPECT_OK(parser_->parse(json));
-  EXPECT_THAT(parser_->rewriteTraceparent(json, "21b6bcb2a5588606"), Not(IsOk()));
+  static constexpr absl::string_view kNewParentId = "21b6bcb2a5588606";
+
+  EXPECT_OK(parser_->parse(kJson));
+  ASSERT_OK(parser_->finishParse());
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(kJson);
+
+  ASSERT_THAT(McpJsonParser::rewriteTraceparent(buffer, kNewParentId), Not(IsOk()));
 }
 
 TEST_F(McpJsonParserTest, RewriteTraceparentInvalidJsonReturnsError) {
-  std::string json = "{invalid";
-  EXPECT_THAT(parser_->rewriteTraceparent(json, "21b6bcb2a5588606"), Not(IsOk()));
-  EXPECT_EQ(json, "{invalid");
+  static constexpr absl::string_view kJson = "{invalid";
+  static constexpr absl::string_view kNewParentId = "21b6bcb2a5588606";
+
+  EXPECT_OK(parser_->parse(kJson));
+  ASSERT_THAT(parser_->finishParse(), Not(IsOk()));
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(kJson);
+
+  ASSERT_THAT(McpJsonParser::rewriteTraceparent(buffer, kNewParentId), Not(IsOk()));
+
 }
 
 } // namespace

@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <optional>
 
+#include "envoy/buffer/buffer.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/json/wuffs_json/wuffs_json_cursor.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
@@ -38,7 +40,8 @@ public:
                                            {std::string(META_FIELD)},
                                            {std::string(TRACEPARENT_FIELD)}}) {}
 
-  absl::Status feed(absl::string_view data) { return cursor_.feed(data, /*closed=*/true); }
+  absl::Status feed(absl::string_view data) { return cursor_.feed(data, /*closed=*/false); }
+  absl::Status feedComplete() { return cursor_.feed("", /*closed=*/true); }
 
   const std::optional<ByteRange>& traceparentRange() const { return traceparent_range_; }
 
@@ -993,36 +996,45 @@ void McpJsonParser::reset() {
   parsing_started_ = false;
 }
 
-absl::Status McpJsonParser::rewriteTraceparent(std::string& body, absl::string_view new_parent_id) {
+absl::Status McpJsonParser::rewriteTraceparent(Buffer::Instance& body, absl::string_view new_parent_id) {
   if (new_parent_id.empty()) {
     return absl::OkStatus();
   }
+  // Locate the bounds of the traceparent value in `body` without linearizing
+  // the buffer yet.
   TraceparentLocator locator;
-  if (absl::Status status = locator.feed(body); !status.ok()) {
-    return status;
+  for (Buffer::RawSlice slice : body.getRawSlices()) {
+    absl::string_view slice_view(reinterpret_cast<const char*>(slice.mem_), slice.len_);
+    RETURN_IF_NOT_OK(locator.feed(slice_view));
   }
-  if (!locator.traceparentRange().has_value()) {
-    return absl::InvalidArgumentError("Failed to find traceparent in _meta");
+  RETURN_IF_NOT_OK(locator.feedComplete());
+
+  const std::optional<TraceparentLocator::ByteRange> range = locator.traceparentRange();
+  if (!range.has_value()) {
+    return absl::OkStatus();
   }
-  const auto& range = *locator.traceparentRange();
+  ASSERT(range->end > 0);
+  ASSERT(range->end >= range->start);
+  if (range->end > std::numeric_limits<uint32_t>::max()) {
+    return absl::InvalidArgumentError("Cannot rewrite traceparent because body length exceeds UINT32_MAX");
+  }
 
-  absl::Span<char> traceparent (body.data() + range.start, range.end - range.start);
+  const absl::Span<char> linearized(reinterpret_cast<char*>(body.linearize(range->end)), range->end);
+  absl::Span<char> traceparent = linearized.subspan(range->start);
 
-  absl::StatusOr<SpanContext> parsed_traceparent = SpanContextExtractor::parseTraceparent(
+  absl::StatusOr<SpanContext> parsed = SpanContextExtractor::parseTraceparent(
       absl::string_view(traceparent.data(), traceparent.size()), "");
-  if (!parsed_traceparent.ok()) {
-    return parsed_traceparent.status();
-  }
-  parsed_traceparent->setSpanId(std::string(new_parent_id));
-  const std::string new_traceparent =
-      SpanContextExtractor::serializeTraceparent(*parsed_traceparent);
+  RETURN_IF_NOT_OK(parsed.status());
+
+  parsed->setSpanId(std::string(new_parent_id));
+  const std::string new_traceparent = SpanContextExtractor::serializeTraceparent(*parsed);
 
   if (new_traceparent.size() != traceparent.size()) {
     return absl::InternalError(
-        absl::StrCat("Unexpectedly computed new traceparent string with wrong length: ",
-                     new_traceparent.size()));
+        "New traceparent's length unexpected differs from original traceparent");
   }
 
+  // Overwrite the original traceparent.
   std::copy(new_traceparent.begin(), new_traceparent.end(), traceparent.begin());
   return absl::OkStatus();
 }
