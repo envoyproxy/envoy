@@ -726,7 +726,8 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
     source_address_policy_ = Upstream::UdpSourceAddressPolicy::fromUpstreamLocalAddress(
         source_address_selector->getUpstreamLocalAddress(
             host_->address(), /*socket_options=*/nullptr, /*transport_socket_options=*/{}));
-  } else if (filter_.config_->upstreamPacketWriterFactory() != nullptr) {
+  } else if (filter_.config_->upstreamPacketWriterFactory() != nullptr &&
+             host_->address()->ip() != nullptr) {
     // Allocate a source port before buffering; writable events do not signal port availability.
     const auto bind_address = host_->address()->ip()->version() == Network::Address::IpVersion::v4
                                   ? Network::Utility::getIpv4AnyAddress()

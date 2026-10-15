@@ -58,8 +58,8 @@ Upstream batching
 
 Use :ref:`upstream_packet_writer_config
 <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_packet_writer_config>`
-to select a writer per upstream UDP socket. For GSO, use a Linux build with the GSO writer extension
-and configure:
+to select a writer per upstream UDP socket. Configuring a writer extension absent from the build is
+rejected. For GSO, use a Linux build with the GSO writer extension and configure:
 
 .. code-block:: yaml
 
@@ -72,7 +72,9 @@ Batches flush at event-loop iteration end. Oversized, multi-slice and empty data
 separately after flushing older packets. Blocked writers drop new datagrams as send errors and retry
 buffered packets when writable. Other GSO send errors discard the failed batch. Unsupported batching
 or MTU errors (``EINVAL``, ``EMSGSIZE``, ``EOPNOTSUPP`` or ``EIO``) switch the session to individual
-sends; other errors retain the writer. Teardown attempts a final flush, then discards any remaining data.
+sends for subsequent datagrams; other errors retain the writer. Kernel GSO support is not probed in
+advance, so unsupported kernels use this fallback. Teardown attempts a final flush, then discards any
+remaining data.
 
 Each upstream GSO session allocates a 64 KiB batch buffer, released when the session closes or falls
 back to individual sends.
@@ -82,8 +84,9 @@ use ``cluster.<name>.udp.upstream.``; ``internal_buffer_size`` sums buffered pay
 sessions, excluding unused buffer capacity. ``sess_tx_errors`` counts failed send or flush operations,
 not discarded datagrams.
 
-This setting is independent of the downstream writer and upstream GRO, and cannot be combined with
-UDP-over-HTTP tunneling. If unset, upstream datagrams are sent individually.
+This setting is independent of the :ref:`downstream writer
+<envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config>` and upstream
+GRO, and cannot be combined with UDP-over-HTTP tunneling. If unset, upstream datagrams are sent individually.
 
 Load balancing and unhealthy host handling
 ------------------------------------------

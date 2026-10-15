@@ -138,7 +138,9 @@ public:
         : parent_(parent), upstream_address_(upstream_address) {
       if (is_cluster_available) {
         socket_ = new NiceMock<Network::MockSocket>();
-        ON_CALL(*socket_, ipVersion()).WillByDefault(Return(upstream_address_->ip()->version()));
+        if (upstream_address_->ip() != nullptr) {
+          ON_CALL(*socket_, ipVersion()).WillByDefault(Return(upstream_address_->ip()->version()));
+        }
       }
     }
 
@@ -495,6 +497,7 @@ public:
   struct WriterState {
     StrictMock<Network::MockUdpPacketWriter>* writer_{};
     Event::MockSchedulableCallback* flush_{};
+    absl::AnyInvocable<void() &&> on_can_write_cb_;
     bool blocked_{false};
   };
 
@@ -557,7 +560,11 @@ upstream_packet_writer_config:
     EXPECT_CALL(*factory_.factory_,
                 createUdpPacketWriter(testing::Ref(*session.socket_->io_handle_), _, _, _))
         .After(socket_setup)
-        .WillOnce(Return(ByMove(Network::UdpPacketWriterPtr(state.writer_))));
+        .WillOnce(Invoke([&state](Network::IoHandle&, Stats::Scope&, Event::Dispatcher&,
+                                  absl::AnyInvocable<void() &&> on_can_write_cb) {
+          state.on_can_write_cb_ = std::move(on_can_write_cb);
+          return Network::UdpPacketWriterPtr(state.writer_);
+        }));
     return state;
   }
 
@@ -647,6 +654,10 @@ TEST_F(UdpProxyUpstreamWriterTest, ScheduledFlushRetriesAfterWritableNotificatio
   EXPECT_FALSE(state.flush_->enabled_);
   EXPECT_CALL(*test_sessions_[0].socket_->io_handle_, enableFileEvents(Event::FileReadyType::Read));
   EXPECT_CALL(*state.writer_, flush()).WillOnce(Return(makeNoError(0))).RetiresOnSaturation();
+  EXPECT_CALL(*test_sessions_[0].socket_->io_handle_,
+              activateFileEvents(Event::FileReadyType::Write));
+  ASSERT_TRUE(state.on_can_write_cb_);
+  std::move(state.on_can_write_cb_)();
   EXPECT_OK(test_sessions_[0].file_event_cb_(Event::FileReadyType::Write));
   EXPECT_FALSE(state.blocked_);
   EXPECT_FALSE(state.flush_->enabled_);
@@ -775,6 +786,24 @@ TEST_F(UdpProxyUpstreamWriterTest, TransparentIpv6SourceAddressIsPreserved) {
         return makeNoError(buffer.length());
       }));
   recvDataFromDownstream(peer->asString(), "[2001:db8::3]:80", "hello");
+}
+
+TEST_F(UdpProxyUpstreamWriterTest, TransparentPipeHostFailsWithoutCreatingWriter) {
+  auto config = writerConfig();
+  config.set_use_original_src_ip(true);
+  EXPECT_CALL(os_sys_calls_, supportsIpTransparent(_));
+  setup(config);
+  const auto upstream = *Network::Utility::resolveUrl("unix:///upstream");
+  auto host = createHost(upstream);
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
+              chooseHost(_))
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{host})));
+  expectSessionCreate(upstream);
+  EXPECT_CALL(*factory_.factory_, createUdpPacketWriter(_, _, _, _)).Times(0);
+  send("hello");
+  EXPECT_TRUE(filter_->activeSessions().empty());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(1, upstreamCounter("udp.sess_tx_errors"));
 }
 
 TEST_F(UdpProxyUpstreamWriterTest, TransparentBindFailureDoesNotCreateWriterOrRetry) {
