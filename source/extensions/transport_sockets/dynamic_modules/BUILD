@@ -9,6 +9,24 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
+# Engine-run kernel splice pump for the dynamic-module transport socket fast path. Relays a paired
+# downstream and upstream socket, splicing the upload and reading a kTLS download with recvmsg.
+envoy_cc_library(
+    name = "splice_pump_lib",
+    srcs = ["splice_pump.cc"],
+    hdrs = ["splice_pump.h"],
+    deps = [
+        "//envoy/common:base_includes",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:file_event_interface",
+        "//envoy/event:schedulable_cb_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
+        "@abseil-cpp//absl/status",
+    ],
+)
+
 envoy_cc_library(
     name = "transport_socket_lib",
     srcs = ["transport_socket.cc"],
@@ -35,14 +53,19 @@ envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
     deps = [
+        ":splice_pump_lib",
         ":transport_socket_lib",
         "//envoy/api:io_error_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
+        "//envoy/event:schedulable_cb_interface",
         "//envoy/network:address_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/common:linked_object",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules/abi",
     ],

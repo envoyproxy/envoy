@@ -1,7 +1,5 @@
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 
-#include "source/extensions/dynamic_modules/worker_index.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -71,7 +69,7 @@ void DynamicModuleNetworkFilter::initializeReadFilterCallbacks(
   // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
   cached_dispatcher_.store(&callbacks.connection().dispatcher(), std::memory_order_release);
 
-  worker_index_ = parseWorkerIndexFromDispatcherName(callbacks.connection().dispatcher().name());
+  worker_index_ = callbacks.connection().dispatcher().workerId().value_or(0);
 
   // Delay the in-module filter initialization until read callbacks are set
   // to allow accessing worker index during filter creation.

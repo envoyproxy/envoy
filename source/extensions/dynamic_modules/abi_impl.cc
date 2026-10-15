@@ -2814,6 +2814,10 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_set_is_readable,
 WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_set_is_writable,
                envoy_dynamic_module_type_transport_socket_envoy_ptr)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_transport_socket_start_splice, false,
+          envoy_dynamic_module_type_transport_socket_envoy_ptr,
+          envoy_dynamic_module_type_transport_socket_envoy_ptr)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_flush_write_buffer,
                envoy_dynamic_module_type_transport_socket_envoy_ptr)
 
@@ -3159,6 +3163,11 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_set_filter_state_bytes, false
           envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_set_filter_state_value, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_filter_state_life_span,
+          envoy_dynamic_module_type_filter_state_stream_sharing)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_filter_state_bytes, false,
           envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_envoy_buffer*)
@@ -3401,6 +3410,9 @@ WEAK_STUB(uint64_t, envoy_dynamic_module_callback_http_get_upstream_connection_i
           envoy_dynamic_module_type_http_filter_envoy_ptr)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_upstream_remote_address, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_downstream_direct_remote_address, false,
           envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_envoy_buffer*)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size, 0,

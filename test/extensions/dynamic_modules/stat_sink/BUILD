@@ -1,9 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
-    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -16,7 +19,7 @@ envoy_cc_test_library(
     deps = ["//test/mocks/stats:stats_mocks"],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
@@ -27,6 +30,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_missing_histogram_complete",
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_no_op",
     ],
+    extension_names = ["envoy.stat_sinks.dynamic_modules"],
     deps = [
         "//envoy/registry",
         "//source/extensions/stat_sinks/dynamic_modules:config",
@@ -38,7 +42,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "sink_test",
     srcs = ["sink_test.cc"],
     data = [
@@ -46,6 +50,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_missing_config_new",
         "//test/extensions/dynamic_modules/test_data/c:stat_sink_no_op",
     ],
+    extension_names = ["envoy.stat_sinks.dynamic_modules"],
     deps = [
         ":test_util_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -59,9 +64,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
+    extension_names = ["envoy.stat_sinks.dynamic_modules"],
     deps = [
         ":test_util_lib",
         "//source/common/stats:histogram_lib",
@@ -75,7 +81,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -86,6 +92,7 @@ envoy_cc_dyn_module_test(
     env = {
         "GODEBUG": "cgocheck=0",
     },
+    extension_names = ["envoy.stat_sinks.dynamic_modules"],
     deps = [
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/stat_sinks/dynamic_modules:config",

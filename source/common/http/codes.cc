@@ -270,6 +270,8 @@ TaggedCodeStatsImpl::TaggedCodeStatsImpl(Stats::SymbolTable& symbol_table)
       virtual_host_tag_(stat_name_pool_.add(Config::TagNames::get().VIRTUAL_HOST)),
       virtual_cluster_tag_(stat_name_pool_.add(Config::TagNames::get().VIRTUAL_CLUSTER)),
       route_tag_(stat_name_pool_.add(Config::TagNames::get().ROUTE)),
+      from_zone_tag_(stat_name_pool_.add(Config::TagNames::get().UPSTREAM_FROM_ZONE)),
+      to_zone_tag_(stat_name_pool_.add(Config::TagNames::get().UPSTREAM_TO_ZONE)),
       basic_rq_names_(symbol_table, response_code_tag_, response_code_class_tag_, ""),
       canary_rq_names_(symbol_table, response_code_tag_, response_code_class_tag_, "canary"),
       external_rq_names_(symbol_table, response_code_tag_, response_code_class_tag_, "external"),
@@ -346,6 +348,20 @@ void TaggedCodeStatsImpl::recordHistogram(Stats::Scope& scope, Stats::StatName b
   scope.histogramFromTaggedName(base_name, tags, joined.statName(), unit).recordValue(count);
 }
 
+void TaggedCodeStatsImpl::recordHistogram(Stats::Scope& scope,
+                                          absl::Span<const Stats::StatName> base_names,
+                                          Stats::StatNameTagSpan tags,
+                                          absl::Span<const Stats::StatName> names,
+                                          Stats::Histogram::Unit unit, uint64_t count) const {
+  if (tags.empty()) {
+    recordHistogram(scope, names, unit, count);
+    return;
+  }
+  const Stats::StatNameJoiner base(base_names, symbol_table_);
+  const Stats::StatNameJoiner joined(names, symbol_table_);
+  scope.histogramFromTaggedName(base.statName(), tags, joined.statName(), unit).recordValue(count);
+}
+
 void TaggedCodeStatsImpl::writeVhostVcluster(const ResponseStatInfo& info, Stats::StatName base,
                                              CodeStatName leaf) const {
   incCounter(
@@ -368,9 +384,10 @@ void TaggedCodeStatsImpl::writeVhostRoute(const ResponseStatInfo& info, Stats::S
 }
 
 void TaggedCodeStatsImpl::writeUpstreamZone(const ResponseStatInfo& info, CodeStatName leaf) const {
-  incCounter(info.cluster_scope_,
-             {info.prefix_, zone_, info.from_zone_, info.to_zone_, leaf.base_name_},
-             Stats::StatNameTagSpan{leaf.tag_}.subspan(0, leaf.tag_.first.empty() ? 0 : 1),
+  incCounter(info.cluster_scope_, {info.prefix_, zone_, leaf.base_name_},
+             Stats::StatNameTagSpan{
+                 {from_zone_tag_, info.from_zone_}, {to_zone_tag_, info.to_zone_}, leaf.tag_}
+                 .subspan(0, leaf.tag_.first.empty() ? 2 : 3),
              {info.prefix_, zone_, info.from_zone_, info.to_zone_, leaf.name_});
 }
 
@@ -436,7 +453,7 @@ void TaggedCodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info,
     }
   }
 
-  // Handle per zone stats. The zones are part of the stat name; they carry no tags of their own.
+  // Handle per zone stats. The zones stay in the flat stat name and are also carried as tags.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
     writeUpstreamZone(info, basic_rq_names_.completed());
     if (has_group) {
@@ -495,9 +512,10 @@ void TaggedCodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) c
         Stats::Histogram::Unit::Milliseconds, count);
   }
 
-  // Handle per zone stats. The zones are part of the stat name; they carry no tags of their own.
+  // Handle per zone stats. The zones stay in the flat stat name and are also carried as tags.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    recordHistogram(info.cluster_scope_,
+    recordHistogram(info.cluster_scope_, {info.prefix_, zone_, basic_rq_names_.time()},
+                    {{from_zone_tag_, info.from_zone_}, {to_zone_tag_, info.to_zone_}},
                     {info.prefix_, zone_, info.from_zone_, info.to_zone_, basic_rq_names_.time()},
                     Stats::Histogram::Unit::Milliseconds, count);
   }

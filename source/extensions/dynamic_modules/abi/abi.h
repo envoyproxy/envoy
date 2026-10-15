@@ -2836,6 +2836,35 @@ typedef enum envoy_dynamic_module_type_filter_state_life_span {
   envoy_dynamic_module_type_filter_state_life_span_Connection = 2,
 } envoy_dynamic_module_type_filter_state_life_span;
 
+// Upstream connection sharing options for a filter state entry. Mirrors
+// StreamInfo::StreamSharingMayImpactPooling.
+typedef enum envoy_dynamic_module_type_filter_state_stream_sharing {
+  envoy_dynamic_module_type_filter_state_stream_sharing_None = 0,
+  envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnection = 1,
+  envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnectionOnce = 2,
+} envoy_dynamic_module_type_filter_state_stream_sharing;
+
+/**
+ * envoy_dynamic_module_callback_http_set_filter_state_value is called by the module to set the
+ * bytes value of the filter state with the given key, lifespan, and upstream sharing options. If
+ * the filter state is not accessible, this returns false. If the key does not exist, it will be
+ * created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param key is the key of the filter state.
+ * @param value is the bytes value of the filter state to be set.
+ * @param life_span is the lifespan of the filter state entry.
+ * @param stream_sharing is the upstream connection sharing option of the filter state entry.
+ * @return true if the operation is successful, false otherwise. Different from setting metadata,
+ * this could fail if the same key already exists at a conflicting life_span.
+ */
+bool envoy_dynamic_module_callback_http_set_filter_state_value(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_filter_state_life_span life_span,
+    envoy_dynamic_module_type_filter_state_stream_sharing stream_sharing);
+
 // OWNERSHIP: module-owned opaque object stored in filter state. Envoy never dereferences it; it
 // calls the supplied destructor exactly once when the entry is destroyed. THREADING: created and
 // accessed on the worker thread owning the stream.
@@ -3720,6 +3749,18 @@ uint64_t envoy_dynamic_module_callback_http_get_upstream_connection_id(
  * @return true if the upstream remote address is available, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_get_upstream_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * Get the downstream socket peer address, including the port, before XFF processing.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param result is the pointer to store the address. The buffer is owned by Envoy and is valid
+ * until the end of the current event hook.
+ * @return true if the downstream direct remote address is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
 
@@ -15080,6 +15121,43 @@ void envoy_dynamic_module_callback_transport_socket_set_is_readable(
  */
 void envoy_dynamic_module_callback_transport_socket_set_is_writable(
     envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_transport_socket_start_splice hands a downstream transport socket
+ * and its paired upstream transport socket to an engine-run splice pump that relays them without
+ * the module's read and write callbacks. The engine removes both connections' file events and
+ * moves the upload into the upstream socket with splice(2). When the upstream socket has kernel TLS
+ * in both directions, its download is read with recvmsg(2) and written to the downstream socket,
+ * because splice from a kernel TLS socket can leave the final record undelivered. A plaintext
+ * download is spliced. Each end of stream is forwarded as a half-close, both connections close once
+ * both directions end, and an error resets them.
+ *
+ * Envoy's read and write buffers of both connections must be empty and the module must hold no
+ * pending bytes, because the pump reads only the sockets. After this returns true, neither socket
+ * receives do_read or do_write, its readiness and flush callbacks do nothing, and the module must
+ * not do I/O on either socket, including in on_close. The relayed bytes are added to the
+ * connection stream info when the session ends, but they do not reset the TCP proxy idle timer, so
+ * the idle timeout still closes a session that only splices.
+ *
+ * It returns false and leaves both connections on their buffered path in these cases.
+ * - The peer is null, or both sockets are downstream or both are upstream.
+ * - Either socket has no connection yet, is already spliced, or is in a read or write whose buffer
+ *   still holds bytes.
+ * - Either connection is connecting, closed, or on a blocking socket, which io_uring creates for
+ *   upstream connections.
+ * - The two connections run on different workers.
+ * - The downstream socket has kernel TLS or implements secure transport, or the upstream socket
+ *   has kernel TLS in only one direction or implements secure transport without kernel TLS.
+ * - The pipes cannot be created, or the platform is not Linux.
+ *
+ * @param transport_socket_envoy_ptr is the pointer to the Envoy transport socket object.
+ * @param peer_transport_socket_envoy_ptr is the pointer to the Envoy transport socket object of the
+ * paired connection on the other side of the proxy, on the same worker.
+ * @return true if the pump took over both sockets, false otherwise.
+ */
+bool envoy_dynamic_module_callback_transport_socket_start_splice(
+    envoy_dynamic_module_type_transport_socket_envoy_ptr transport_socket_envoy_ptr,
+    envoy_dynamic_module_type_transport_socket_envoy_ptr peer_transport_socket_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_transport_socket_flush_write_buffer requests that the connection

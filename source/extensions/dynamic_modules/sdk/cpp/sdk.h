@@ -348,6 +348,18 @@ enum class SocketOptionState : uint32_t {
 
 enum class SocketDirection : uint32_t { Upstream, Downstream };
 
+enum class FilterStateLifeSpan : uint32_t {
+  FilterChain = 0,
+  Request = 1,
+  Connection = 2,
+};
+
+enum class FilterStateStreamSharing : uint32_t {
+  None = 0,
+  SharedWithUpstreamConnection = 1,
+  SharedWithUpstreamConnectionOnce = 2,
+};
+
 struct ClusterHostCounts {
   uint64_t total;
   uint64_t healthy;
@@ -651,6 +663,19 @@ public:
   virtual void setFilterState(std::string_view key, std::string_view value) = 0;
 
   /**
+   * Sets the serialized filter state value of the stream with the given lifespan and upstream
+   * sharing options.
+   * @param key The filter state key.
+   * @param value The filter state value.
+   * @param life_span The lifespan of the filter state entry.
+   * @param stream_sharing The upstream sharing option of the filter state entry.
+   * @return true if the value was stored successfully.
+   */
+  virtual bool setFilterStateValue(std::string_view key, std::string_view value,
+                                   FilterStateLifeSpan life_span,
+                                   FilterStateStreamSharing stream_sharing) = 0;
+
+  /**
    * Retrieves a string attribute value.
    * @param id The attribute ID.
    * @return Pair of string view and bool indicating if attribute was found.
@@ -822,6 +847,12 @@ public:
    * differ from AttributeId::UpstreamAddress, which exposes the selected upstream host address.
    */
   virtual std::optional<std::string_view> getUpstreamRemoteAddress() = 0;
+
+  /**
+   * Retrieves the downstream socket peer address, including the port, before XFF processing.
+   * Returns std::nullopt if unavailable. The buffer is valid until the current event hook returns.
+   */
+  virtual std::optional<std::string_view> getDownstreamDirectRemoteAddress() = 0;
 
   /**
    * Retrieves the upstream host addresses attempted for the current request in attempt order.

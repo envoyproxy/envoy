@@ -630,6 +630,11 @@ protected:
   // The ProcessObject to use when constructing the envoy server.
   ProcessObjectOptRef process_object_{std::nullopt};
 
+  // If set, the server runs with this hot restart implementation instead of one without a parent,
+  // e.g. to give it listen sockets "inherited" from a parent the test plays. Must outlive the
+  // server.
+  Server::HotRestart* hot_restart_{};
+
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;
 

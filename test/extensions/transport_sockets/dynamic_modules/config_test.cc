@@ -99,6 +99,27 @@ stubTransportSocketDoWrite(envoy_dynamic_module_type_transport_socket_envoy_ptr,
   return *static_cast<const envoy_dynamic_module_type_transport_socket_io_result*>(socket);
 }
 
+// State of a stand-in module that tries to splice from inside its own read or write.
+struct SplicingSocket {
+  envoy_dynamic_module_type_transport_socket_envoy_ptr peer = nullptr;
+  mutable bool started = true;
+};
+
+extern "C" envoy_dynamic_module_type_transport_socket_io_result
+spliceFromDoRead(envoy_dynamic_module_type_transport_socket_envoy_ptr envoy_ptr,
+                 envoy_dynamic_module_type_transport_socket_module_ptr socket) {
+  const auto* splicing = static_cast<const SplicingSocket*>(socket);
+  splicing->started =
+      envoy_dynamic_module_callback_transport_socket_start_splice(envoy_ptr, splicing->peer);
+  return {envoy_dynamic_module_type_transport_socket_post_io_action_KeepOpen, 0, false};
+}
+
+extern "C" envoy_dynamic_module_type_transport_socket_io_result
+spliceFromDoWrite(envoy_dynamic_module_type_transport_socket_envoy_ptr envoy_ptr,
+                  envoy_dynamic_module_type_transport_socket_module_ptr socket, bool) {
+  return spliceFromDoRead(envoy_ptr, socket);
+}
+
 // Tests for the upstream and downstream config factories.
 class DynamicModuleTransportSocketConfigTest : public testing::Test {
 public:
@@ -266,6 +287,16 @@ public:
     return socket;
   }
 
+  // Creates an upstream passthrough socket without callbacks, a peer that a downstream socket can
+  // splice with.
+  Network::TransportSocketPtr createUpstreamSocket() {
+    auto factory_or_error = upstream_factory_.createTransportSocketFactory(
+        buildProtoConfig(kReferenceModule, "passthrough"), context_);
+    EXPECT_OK(factory_or_error);
+    upstream_factory_ptr_ = std::move(factory_or_error.value());
+    return upstream_factory_ptr_->createTransportSocket(nullptr, nullptr);
+  }
+
   std::unique_ptr<DynamicModuleTransportSocket>
   createStubSocket(const envoy_dynamic_module_type_transport_socket_io_result& io_result) {
     auto config = std::make_shared<DynamicModuleTransportSocketConfig>(false, nullptr);
@@ -281,6 +312,8 @@ public:
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   DownstreamDynamicModuleTransportSocketConfigFactory factory_;
   Network::DownstreamTransportSocketFactoryPtr factory_ptr_;
+  UpstreamDynamicModuleTransportSocketConfigFactory upstream_factory_;
+  Network::UpstreamTransportSocketFactoryPtr upstream_factory_ptr_;
   NiceMock<Network::MockTransportSocketCallbacks> callbacks_;
   NiceMock<Network::MockIoHandle> io_handle_;
 };
@@ -873,6 +906,169 @@ TEST_F(DynamicModuleTransportSocketTest, CloseAfterPeerResetClosesWithConnection
   result = socket->doRead(read_buffer);
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
   EXPECT_EQ(Api::IoError::IoErrorCode::ConnectionReset, result.err_code_);
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsNullPeer) {
+  auto socket = createSocket("passthrough");
+  auto* self = static_cast<DynamicModuleTransportSocket*>(socket.get());
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, nullptr));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsPeerWithoutCallbacks) {
+  auto self_socket = createSocket("passthrough");
+  // A peer whose callbacks were never set has a null callbacks pointer.
+  auto peer_socket = createUpstreamSocket();
+  auto* self = static_cast<DynamicModuleTransportSocket*>(self_socket.get());
+  auto* peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, peer));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsClosedHandle) {
+  auto self_socket = createSocket("passthrough");
+  auto peer_socket = createUpstreamSocket();
+  peer_socket->setTransportSocketCallbacks(callbacks_);
+  auto* self = static_cast<DynamicModuleTransportSocket*>(self_socket.get());
+  auto* peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(testing::Return(false));
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, peer));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsConnectingConnection) {
+  auto self_socket = createSocket("passthrough");
+  auto peer_socket = createUpstreamSocket();
+  peer_socket->setTransportSocketCallbacks(callbacks_);
+  auto* self = static_cast<DynamicModuleTransportSocket*>(self_socket.get());
+  auto* peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  ON_CALL(callbacks_.connection_, connecting()).WillByDefault(testing::Return(true));
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, peer));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsItselfAsPeer) {
+  auto socket = createSocket("passthrough");
+  auto* self = static_cast<DynamicModuleTransportSocket*>(socket.get());
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, self));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsPeerOnTheSameSide) {
+  auto self_socket = createSocket("passthrough");
+  auto peer_socket = factory_ptr_->createDownstreamTransportSocket();
+  peer_socket->setTransportSocketCallbacks(callbacks_);
+  auto* self = static_cast<DynamicModuleTransportSocket*>(self_socket.get());
+  auto* peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, peer));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsSplicedSocket) {
+  auto self_socket = createSocket("passthrough");
+  auto peer_socket = createUpstreamSocket();
+  peer_socket->setTransportSocketCallbacks(callbacks_);
+  auto* self = static_cast<DynamicModuleTransportSocket*>(self_socket.get());
+  auto* peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  peer->markSpliced();
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, peer));
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(peer, self));
+}
+
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsPeerOnAnotherDispatcher) {
+  auto self_socket = createSocket("passthrough");
+  // A separate mock connection has a dispatcher of its own.
+  NiceMock<Network::MockTransportSocketCallbacks> peer_callbacks;
+  ON_CALL(peer_callbacks, ioHandle()).WillByDefault(ReturnRef(io_handle_));
+  auto peer_socket = createUpstreamSocket();
+  peer_socket->setTransportSocketCallbacks(peer_callbacks);
+  auto* self = static_cast<DynamicModuleTransportSocket*>(self_socket.get());
+  auto* peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, peer));
+}
+
+// A secure downstream decrypts in the module, which the splice would bypass.
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsSecureDownstream) {
+  auto config = buildProtoConfig(kReferenceModule, "passthrough");
+  config.set_implements_secure_transport(true);
+  auto factory_or_error = factory_.createTransportSocketFactory(config, context_, {});
+  ASSERT_OK(factory_or_error);
+  factory_ptr_ = std::move(factory_or_error.value());
+  auto self_socket = factory_ptr_->createDownstreamTransportSocket();
+  self_socket->setTransportSocketCallbacks(callbacks_);
+  auto peer_socket = createUpstreamSocket();
+  peer_socket->setTransportSocketCallbacks(callbacks_);
+  auto* self = static_cast<DynamicModuleTransportSocket*>(self_socket.get());
+  auto* peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, peer));
+}
+
+// Bytes still in the buffer of the read or write that splices would stay in Envoy.
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceRejectsPendingBytes) {
+  SplicingSocket splicing;
+  auto config = std::make_shared<DynamicModuleTransportSocketConfig>(false, nullptr);
+  config->in_module_config_ = &splicing;
+  config->on_new_ = newStubTransportSocket;
+  config->on_destroy_ = destroyStubTransportSocket;
+  config->on_set_callbacks_ = setStubTransportSocketCallbacks;
+  config->on_do_read_ = spliceFromDoRead;
+  config->on_do_write_ = spliceFromDoWrite;
+  DynamicModuleTransportSocket self(config);
+  self.setTransportSocketCallbacks(callbacks_);
+  auto peer_socket = createUpstreamSocket();
+  peer_socket->setTransportSocketCallbacks(callbacks_);
+  splicing.peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(0);
+  Buffer::OwnedImpl read_buffer("x");
+  self.doRead(read_buffer);
+  EXPECT_FALSE(splicing.started);
+  splicing.started = true;
+  Buffer::OwnedImpl write_buffer("x");
+  self.doWrite(write_buffer, false);
+  EXPECT_FALSE(splicing.started);
+}
+
+// A pair that passes every check but cannot be prepared stays on the buffered path untouched.
+TEST_F(DynamicModuleTransportSocketTest, StartSpliceFallsBackWhenPrepareFails) {
+  auto self_socket = createSocket("passthrough");
+  auto peer_socket = createUpstreamSocket();
+  peer_socket->setTransportSocketCallbacks(callbacks_);
+  auto* self = static_cast<DynamicModuleTransportSocket*>(self_socket.get());
+  auto* peer = static_cast<DynamicModuleTransportSocket*>(peer_socket.get());
+  // Both fds are read, so every guard passed, and an invalid fd then fails the non-blocking check.
+  // The session asks for its teardown callback first.
+  EXPECT_CALL(io_handle_, fdDoNotUse()).Times(2).WillRepeatedly(testing::Return(-1));
+  callbacks_.connection_.dispatcher_.allow_null_callback_ = true;
+  EXPECT_CALL(io_handle_, resetFileEvents()).Times(0);
+  EXPECT_CALL(callbacks_.connection_, addConnectionCallbacks(testing::_)).Times(0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_transport_socket_start_splice(self, peer));
+  EXPECT_FALSE(self->spliced());
+  EXPECT_FALSE(peer->spliced());
+}
+
+// Once the pump owns the fd, a late read, write, wakeup, or flush must not touch it.
+TEST_F(DynamicModuleTransportSocketTest, IsInertOnceSpliced) {
+  auto socket = createSocket("passthrough");
+  auto* envoy_ptr = static_cast<DynamicModuleTransportSocket*>(socket.get());
+  envoy_ptr->markSpliced();
+  EXPECT_CALL(io_handle_, recv(testing::_, testing::_, testing::_)).Times(0);
+  EXPECT_CALL(io_handle_, writev(testing::_, testing::_)).Times(0);
+  EXPECT_CALL(io_handle_, shutdown(testing::_)).Times(0);
+  EXPECT_CALL(callbacks_, setTransportSocketIsReadable()).Times(0);
+  EXPECT_CALL(io_handle_, activateFileEvents(testing::_)).Times(0);
+  EXPECT_CALL(callbacks_, flushWriteBuffer()).Times(0);
+  Buffer::OwnedImpl read_buffer;
+  Buffer::OwnedImpl write_buffer("data");
+  Network::IoResult result = socket->doRead(read_buffer);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+  EXPECT_EQ(0, result.bytes_processed_);
+  result = socket->doWrite(write_buffer, true);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+  EXPECT_EQ(0, result.bytes_processed_);
+  envoy_dynamic_module_callback_transport_socket_set_is_readable(envoy_ptr);
+  envoy_dynamic_module_callback_transport_socket_set_is_writable(envoy_ptr);
+  envoy_dynamic_module_callback_transport_socket_flush_write_buffer(envoy_ptr);
 }
 } // namespace
 } // namespace DynamicModules

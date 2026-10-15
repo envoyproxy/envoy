@@ -20,6 +20,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
+    "downstream_direct_remote_address" => {
+      Some(Box::new(DownstreamDirectRemoteAddressFilterConfig {}))
+    },
     "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
       streams_total: envoy_filter_config
         .define_counter("streams_total")
@@ -96,6 +99,33 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "response_flags_callbacks" => Some(Box::new(ResponseFlagsCallbacksFilterConfig {})),
     "config_init_failure" => None,
     _ => panic!("Unknown filter name: {name}"),
+  }
+}
+
+struct DownstreamDirectRemoteAddressFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for DownstreamDirectRemoteAddressFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(DownstreamDirectRemoteAddressFilter {})
+  }
+}
+
+struct DownstreamDirectRemoteAddressFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DownstreamDirectRemoteAddressFilter {
+  fn on_request_headers(
+    &self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let address = envoy_filter
+      .get_downstream_direct_remote_address()
+      .map(|address| address.as_slice().to_vec());
+    envoy_filter.set_request_header(
+      "x-downstream-peer",
+      address.as_deref().unwrap_or(b"unavailable"),
+    );
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 }
 
@@ -1244,6 +1274,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
     let filter_state = envoy_filter.get_filter_state_bytes(b"req_header_key");
     assert!(filter_state.is_some());
     assert_eq!(filter_state.unwrap().as_slice(), b"req_header_value");
+    let ok = envoy_filter.set_filter_state_value(
+      b"shared_filter_state_key",
+      b"shared_filter_state_value",
+      abi::envoy_dynamic_module_type_filter_state_life_span::Connection,
+      abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection,
+    );
+    assert!(ok);
+    let shared_state = envoy_filter.get_filter_state_bytes(b"shared_filter_state_key");
+    assert!(shared_state.is_some());
+    assert_eq!(
+      shared_state.unwrap().as_slice(),
+      b"shared_filter_state_value"
+    );
     let filter_state = envoy_filter.get_filter_state_bytes(b"key");
     assert!(filter_state.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
