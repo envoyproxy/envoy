@@ -155,7 +155,7 @@ jobs:
         && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/v'))
         && github.repository == 'envoyproxy/envoy'
         && fromJSON(steps.needs.outputs.value)['notify-required'] != null
-      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d  # v4.0.0
       with:
         method: chat.postMessage
         token: ${{ secrets.slack-bot-token }}
@@ -173,7 +173,7 @@ jobs:
         && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/v'))
         && github.repository == 'envoyproxy/envoy'
         && fromJSON(steps.needs.outputs.value)['notify-openssl'] != null
-      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d  # v4.0.0
       with:
         method: chat.postMessage
         token: ${{ secrets.slack-bot-token }}
