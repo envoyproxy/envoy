@@ -70,10 +70,6 @@ Config::Config(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
                                                    max_client_hello_size_),
                    max_client_hello_size_)) {
-  // Already enforced by the proto's validate.rules; see TLS_MAX_CLIENT_HELLO in tls_inspector.h.
-  ASSERT(max_client_hello_size_ <= TLS_MAX_CLIENT_HELLO,
-         fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
-                     max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
 
   SSL_CTX_set_min_proto_version(ssl_ctx_.get(), TLS_MIN_SUPPORTED_VERSION);
   SSL_CTX_set_max_proto_version(ssl_ctx_.get(), TLS_MAX_SUPPORTED_VERSION);
