@@ -33,56 +33,52 @@ LlmProtocolFilterState::getField(absl::string_view field_name) const {
   return absl::monostate{};
 }
 
-LlmBindingObject::LlmBindingObject(LlmBindingConstSharedPtr binding)
-    : source_(binding != nullptr && binding->pattern.has_value() ? binding->pattern->source() : ""),
-      binding_(std::move(binding)) {}
-
-LlmBindingObject::LlmBindingObject(std::string source,
-                                   absl::StatusOr<LlmBindingConstSharedPtr> binding)
-    : source_(std::move(source)), status_(binding.status()) {
+LlmBindingObject::LlmBindingObject(absl::string_view value) : source_(value) {
+  absl::StatusOr<LlmBindingConstSharedPtr> binding = LlmBinding::parse(value);
   if (binding.ok()) {
     binding_ = *std::move(binding);
+  } else {
+    status_ = binding.status();
   }
 }
 
-std::unique_ptr<LlmBindingObject> LlmBindingObject::fromString(absl::string_view value) {
-  return std::unique_ptr<LlmBindingObject>(
-      new LlmBindingObject(std::string(value), LlmBinding::parse(value)));
-}
-
-std::shared_ptr<const LlmBindingObject>
-LlmBindingObject::fromFilterState(StreamInfo::FilterState& filter_state, absl::string_view key) {
-  std::shared_ptr<StreamInfo::FilterState::Object> object =
-      filter_state.getDataSharedMutableGeneric(key);
+absl::StatusOr<LlmBindingConstSharedPtr>
+LlmBindingObject::fromFilterState(const StreamInfo::FilterState& filter_state,
+                                  absl::string_view key) {
+  const StreamInfo::FilterState::Object* object = filter_state.getDataReadOnlyGeneric(key);
   if (object == nullptr) {
     return nullptr;
   }
-  if (auto binding = std::dynamic_pointer_cast<const LlmBindingObject>(object);
-      binding != nullptr) {
-    return binding;
+  if (const auto* binding = dynamic_cast<const LlmBindingObject*>(object); binding != nullptr) {
+    if (!binding->status().ok()) {
+      return binding->status();
+    }
+    return binding->binding();
   }
   // Golang's SetFilterState and the dynamic modules' bytes setter store plain strings.
-  if (const auto* text = dynamic_cast<const Router::StringAccessor*>(object.get());
-      text != nullptr) {
-    return fromString(text->asString());
+  if (const auto* text = dynamic_cast<const Router::StringAccessor*>(object); text != nullptr) {
+    return LlmBinding::parse(text->asString());
   }
-  return std::shared_ptr<const LlmBindingObject>(
-      new LlmBindingObject("", absl::InvalidArgumentError("the object is not a binding")));
+  return absl::InvalidArgumentError("the object is not a binding");
+}
+
+const LlmBindingRead*
+LlmBindingReadObject::fromFilterState(const StreamInfo::FilterState& filter_state) {
+  const auto* object =
+      filter_state.getDataReadOnly<LlmBindingReadObject>(FilterStateKeys::BindingRead);
+  return object != nullptr ? &object->read() : nullptr;
 }
 
 StreamInfo::FilterState::Object::FieldType
-LlmBindingObject::getField(absl::string_view field_name) const {
-  if (!read_.has_value()) {
-    return absl::monostate{};
-  }
+LlmBindingReadObject::getField(absl::string_view field_name) const {
   if (field_name == "model") {
-    if (read_->model.empty()) {
+    if (read_.model.empty()) {
       return absl::monostate{};
     }
-    return absl::string_view(read_->model);
+    return absl::string_view(read_.model);
   }
-  const auto variable = read_->path_variables.find(field_name);
-  if (variable == read_->path_variables.end()) {
+  const auto variable = read_.path_variables.find(field_name);
+  if (variable == read_.path_variables.end()) {
     return absl::monostate{};
   }
   return absl::string_view(variable->second);
@@ -146,7 +142,7 @@ std::unique_ptr<StreamInfo::FilterState::Object> bindingFromBytes(absl::string_v
   if (data.empty()) {
     return nullptr;
   }
-  return LlmBindingObject::fromString(data);
+  return std::make_unique<LlmBindingObject>(data);
 }
 
 class RequestBindingObjectFactory : public StreamInfo::FilterState::ObjectFactory {

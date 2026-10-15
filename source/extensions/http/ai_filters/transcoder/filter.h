@@ -121,8 +121,8 @@ private:
   // The transcoding instructions in filter state that the request legs follow; each is unset when
   // no filter ahead of this one left it.
   struct Instructions {
-    std::shared_ptr<const HttpFilters::AiProtocolManager::LlmBindingObject> request_binding;
-    std::shared_ptr<const HttpFilters::AiProtocolManager::LlmBindingObject> response_binding;
+    HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr request_binding;
+    HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr response_binding;
     std::string resolved_model;
   };
 
@@ -130,9 +130,12 @@ private:
   // same chain has had its turn to set them, and applies the backend's dialect to
   // `target_protocol_`. Fails (counted as `unresolved`) on a binding that does not parse.
   absl::StatusOr<Instructions> readInstructions();
-  absl::Status transcodeRequest(nlohmann::json& json, const Instructions& instructions);
-  // Leaves what a request `ToIr` leg read on the `envoy.ai.binding.request` object, creating it
-  // when no filter ahead set one, for the backend-side leg and for field access.
+  // On failure, `unresolved` says whether the binding needs a value the client's path did not
+  // supply, which is the proxy's configuration at fault rather than the request.
+  absl::Status transcodeRequest(nlohmann::json& json, const Instructions& instructions,
+                                bool& unresolved);
+  // Leaves what a request `ToIr` leg read in this stream's `envoy.ai.binding.read`, for the
+  // backend-side leg and for field access.
   void recordRead(HttpFilters::AiProtocolManager::LlmBindingRead read);
 
   // The engine leg that transcodes this stream's response as `kind`, or `std::nullopt` when the

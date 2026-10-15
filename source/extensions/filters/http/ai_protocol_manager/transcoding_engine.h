@@ -572,9 +572,9 @@ struct TranscodeContext {
   // request must be sent to, which the caller applies along with the body. Every other request leg
   // clears it.
   std::optional<std::string> rewritten_path{};
-  // Set by a successful request `FromIr` leg: its binding's header edits, which the caller applies
-  // along with the path.
-  std::vector<HeaderMutation> header_mutations{};
+  // Set by a request `FromIr` leg that fails because its binding needs a value the client's path
+  // did not supply: the proxy's configuration, not the request, is at fault.
+  bool unresolved{false};
   // Set by a request `ToIr` leg whose `request_path` matched a binding: what it read there.
   std::optional<LlmBindingRead> read{};
 };
@@ -810,7 +810,7 @@ public:
   // the dialect's own and client bindings; empty when none matches and names one. For a caller
   // that needs the model without running a request leg.
   std::string modelFromRequestPath(LLMProtocol dialect, absl::string_view path,
-                                   const LlmBinding* binding = nullptr) const;
+                                   const LlmBindingConstSharedPtr& binding = nullptr) const;
 
 private:
   absl::StatusOr<const DialectTranscodePack*> findPack(LLMProtocol dialect) const;

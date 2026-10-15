@@ -372,7 +372,7 @@ private:
       // would read the region for the upstream host.
       auto* location = route->mutable_request_headers_to_add()->Add()->mutable_header();
       location->set_key("x-vertex-location");
-      location->set_value("%FILTER_STATE(envoy.ai.binding.request:FIELD:location)%");
+      location->set_value("%FILTER_STATE(envoy.ai.binding.read:FIELD:location)%");
     });
 
     config_helper_.prependFilter(R"EOF(

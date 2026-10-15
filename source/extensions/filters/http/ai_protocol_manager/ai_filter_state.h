@@ -32,6 +32,8 @@ constexpr absl::string_view LlmProtocolResponse = "envoy.ai.llm_protocol.respons
 constexpr absl::string_view BindingRequest = "envoy.ai.binding.request";
 // An LlmBindingObject: how the upstream expects the backend's API on HTTP.
 constexpr absl::string_view BindingResponse = "envoy.ai.binding.response";
+// An LlmBindingReadObject: what the transcoder read from the client's path.
+constexpr absl::string_view BindingRead = "envoy.ai.binding.read";
 // The model the request names, as the request_info AI filter records it.
 constexpr absl::string_view ModelRequest = "envoy.ai.model.request";
 // The model to send upstream, when it differs from the one the request names. It replaces the model
@@ -92,41 +94,50 @@ public:
 };
 
 // A binding in filter state, created from a URI pattern (`/...`) or an LLMBinding in JSON
-// (`{...}`). A value that does not parse keeps its error for the reader. On the request side it
-// also holds what was read from the client's path, which field access exposes by variable name.
+// (`{...}`). A value that does not parse keeps its error for the reader. It never changes once
+// set, so it may be shared, e.g. set once per connection.
 class LlmBindingObject : public Router::StringAccessor {
 public:
-  explicit LlmBindingObject(LlmBindingConstSharedPtr binding);
+  explicit LlmBindingObject(absl::string_view value);
 
-  // Never null.
-  static std::unique_ptr<LlmBindingObject> fromString(absl::string_view value);
-  // The object at `key`; a plain string another writer left there is parsed as `fromString()`
-  // does. Null when no object is set.
-  static std::shared_ptr<const LlmBindingObject>
-  fromFilterState(StreamInfo::FilterState& filter_state, absl::string_view key);
+  // The binding at `key`: null when no object is set, or the error of one that does not parse. A
+  // plain string another writer left there is parsed as the factory does.
+  static absl::StatusOr<LlmBindingConstSharedPtr>
+  fromFilterState(const StreamInfo::FilterState& filter_state, absl::string_view key);
 
   // Null when `status()` is not ok.
   const LlmBindingConstSharedPtr& binding() const { return binding_; }
   const absl::Status& status() const { return status_; }
-  const std::optional<LlmBindingRead>& read() const { return read_; }
-  void setRead(LlmBindingRead read) { read_ = std::move(read); }
 
   // Router::StringAccessor
   absl::string_view asString() const override { return source_; }
 
   // StreamInfo::FilterState::Object
   std::optional<std::string> serializeAsString() const override { return source_; }
-  bool hasFieldSupport() const override { return true; }
-  // `model` and the path variables of the read, by name.
-  FieldType getField(absl::string_view field_name) const override;
 
 private:
-  LlmBindingObject(std::string source, absl::StatusOr<LlmBindingConstSharedPtr> binding);
-
   const std::string source_;
   LlmBindingConstSharedPtr binding_;
   absl::Status status_;
-  std::optional<LlmBindingRead> read_;
+};
+
+// What a request leg read from the client's path under the binding the request arrived in. The
+// transcoder sets it once per stream; field access reads `model` and the path variables by name.
+class LlmBindingReadObject : public StreamInfo::FilterState::Object {
+public:
+  explicit LlmBindingReadObject(LlmBindingRead read) : read_(std::move(read)) {}
+
+  // The read the transcoder left in `filter_state`; null when there is none.
+  static const LlmBindingRead* fromFilterState(const StreamInfo::FilterState& filter_state);
+
+  const LlmBindingRead& read() const { return read_; }
+
+  // StreamInfo::FilterState::Object
+  bool hasFieldSupport() const override { return true; }
+  FieldType getField(absl::string_view field_name) const override;
+
+private:
+  const LlmBindingRead read_;
 };
 
 // The string a Router::StringAccessor at `key` holds; nullopt when no object is set.

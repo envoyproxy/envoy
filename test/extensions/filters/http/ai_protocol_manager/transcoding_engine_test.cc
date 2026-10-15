@@ -1506,9 +1506,8 @@ TEST(TranscodingEngineTest, RequestBindingReadsTheClientsPath) {
   ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, ctx, named), IsOk());
   EXPECT_EQ(named["model"], "claude-opus-4-1");
 
-  EXPECT_EQ(
-      engine.modelFromRequestPath(LLMProtocol::AnthropicMessages, ctx.request_path, vertex.get()),
-      "claude-sonnet-4-5");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::AnthropicMessages, ctx.request_path, vertex),
+            "claude-sonnet-4-5");
 }
 
 // A response binding says what path the upstream expects. With a pattern alone, a dialect that
@@ -1661,13 +1660,14 @@ TEST(TranscodingEngineTest, ResponseBindingVariableWithoutAValueIsUnresolved) {
       R"({"model": "gemini-2.5-flash", "messages": [{"role": "user", "content": "Hi"}]})");
   TranscodeContext ctx;
   ctx.response_binding = vertex_gemini.get();
-  EXPECT_THAT(engine.transcode(kIrRequestToGemini, ctx, doc),
-              HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_FALSE(engine.transcode(kIrRequestToGemini, ctx, doc).ok());
+  EXPECT_TRUE(ctx.unresolved);
   EXPECT_FALSE(ctx.rewritten_path.has_value());
+  EXPECT_EQ(doc["model"], "gemini-2.5-flash");
 }
 
 // Claude on Vertex AI as a backend: the body is validated with `model` still in it, as Anthropic's
-// schema requires, and only then edited. Header edits go back to the caller.
+// schema requires, and only then edited.
 TEST(TranscodingEngineTest, ResponseBindingEditsTheBodyAfterValidation) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -1677,9 +1677,7 @@ TEST(TranscodingEngineTest, ResponseBindingEditsTheBodyAfterValidation) {
     "uri_pattern": "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
     "mutations": [
       {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true},
-      {"header": "X-Model", "value": "{model}"},
-      {"header": "x-api-key"}
+      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
     ]
   })");
   nlohmann::json doc = nlohmann::json::parse(R"({
@@ -1697,17 +1695,13 @@ TEST(TranscodingEngineTest, ResponseBindingEditsTheBodyAfterValidation) {
   EXPECT_EQ(doc["anthropic_version"], "vertex-2023-10-16");
   EXPECT_EQ(doc["stream"], true);
   EXPECT_EQ(doc["max_tokens"], 16);
-  ASSERT_EQ(ctx.header_mutations.size(), 2);
-  EXPECT_EQ(ctx.header_mutations[0].name, "x-model");
-  EXPECT_EQ(ctx.header_mutations[0].value, "claude-sonnet-4-5@20250929");
-  EXPECT_EQ(ctx.header_mutations[1].name, "x-api-key");
-  EXPECT_FALSE(ctx.header_mutations[1].value.has_value());
 
   // Without `model` the body fails the schema before the binding would have dropped it.
   nlohmann::json no_model = nlohmann::json::parse(
       R"({"max_completion_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})");
   EXPECT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, no_model),
               HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_FALSE(ctx.unresolved);
   EXPECT_FALSE(ctx.rewritten_path.has_value());
 }
 

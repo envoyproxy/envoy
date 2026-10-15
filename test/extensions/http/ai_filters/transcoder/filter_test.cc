@@ -60,6 +60,8 @@ using HttpFilters::AiProtocolManager::FlattenJsonField;
 using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LlmBindingObject;
+using HttpFilters::AiProtocolManager::LlmBindingRead;
+using HttpFilters::AiProtocolManager::LlmBindingReadObject;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::ResponseLlmProtocol;
@@ -143,7 +145,10 @@ public:
   TranscoderFilterTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
         bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
-        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
+        connection_filter_state_(std::make_shared<StreamInfo::FilterStateImpl>(
+            StreamInfo::FilterState::LifeSpan::Connection)),
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain,
+                     connection_filter_state_) {}
 
   ~TranscoderFilterTest() override { buffer_manager_.onDestroy(); }
 
@@ -273,6 +278,8 @@ public:
   InMemoryExternalBufferFactory factory_;
   FakeBridge bridge_;
   BufferManager buffer_manager_;
+  // The downstream connection's filter state, which every stream on the connection shares.
+  StreamInfo::FilterStateSharedPtr connection_filter_state_;
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Http::TestRequestHeaderMapImpl request_headers_;
@@ -576,7 +583,7 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
 
 // A request binding tells the `TO_IR` leg where the client's path names the model and streaming
 // mode, for a dialect whose own bindings say nothing about the path. A plain string, as Golang's
-// SetFilterState leaves one, reads as the factory would build it, and keeps its key.
+// SetFilterState leaves one, reads as the factory would build it.
 TEST_F(TranscoderFilterTest, RequestBindingLiftsTheModelFromTheClientsPath) {
   setInstruction(FilterStateKeys::BindingRequest, "/anthropic/{model}/{messages|stream}");
 
@@ -590,9 +597,27 @@ TEST_F(TranscoderFilterTest, RequestBindingLiftsTheModelFromTheClientsPath) {
   EXPECT_EQ(out["model"], "claude-sonnet-4-5");
   EXPECT_EQ(out["stream"], true);
   EXPECT_EQ(counterValue("transcoded"), 1);
-  EXPECT_EQ(stream_info_.filterState()->getDataReadOnly<LlmBindingObject>(
-                FilterStateKeys::BindingRequest),
-            nullptr);
+  const LlmBindingRead* read = LlmBindingReadObject::fromFilterState(*stream_info_.filterState());
+  ASSERT_NE(read, nullptr);
+  EXPECT_EQ(read->model, "claude-sonnet-4-5");
+}
+
+// A binding set once per connection is shared by every stream on it, so what one stream's path
+// held is kept on that stream alone.
+TEST_F(TranscoderFilterTest, ReadOfABindingSharedByStreamsStaysWithTheStream) {
+  connection_filter_state_->setData(FilterStateKeys::BindingRequest,
+                                    std::make_shared<LlmBindingObject>("/tenants/{tenant}/{model}"),
+                                    StreamInfo::FilterState::LifeSpan::Connection);
+
+  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::OpenAiChatCompletions,
+                  R"({"messages": [{"role": "user", "content": "Hi"}]})", "/tenants/t-1/gpt-4o");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(forwarded()["model"], "gpt-4o");
+  const LlmBindingRead* read = LlmBindingReadObject::fromFilterState(*stream_info_.filterState());
+  ASSERT_NE(read, nullptr);
+  EXPECT_EQ(read->path_variables.at("tenant"), "t-1");
+  EXPECT_FALSE(connection_filter_state_->hasDataWithName(FilterStateKeys::BindingRead));
 }
 
 // A request binding that does not match the path reads nothing from it; the request still goes
@@ -606,10 +631,7 @@ TEST_F(TranscoderFilterTest, RequestBindingThatMissesThePathReadsNothing) {
 
   ASSERT_TRUE(status_.ok()) << status_;
   EXPECT_FALSE(forwarded().contains("model"));
-  const auto* binding = stream_info_.filterState()->getDataReadOnly<LlmBindingObject>(
-      FilterStateKeys::BindingRequest);
-  ASSERT_NE(binding, nullptr);
-  EXPECT_FALSE(binding->read().has_value());
+  EXPECT_EQ(LlmBindingReadObject::fromFilterState(*stream_info_.filterState()), nullptr);
   EXPECT_EQ(counterValue("transcoded"), 1);
 }
 
@@ -697,12 +719,12 @@ TEST_F(TranscoderFilterTest, VertexClaudeClientReachesGeminiOnVertexAi) {
   })"));
   EXPECT_EQ(counterValue("transcoded"), 2);
 
-  // What the client's path held stays on the request binding, for filters and access logs.
-  const auto* binding = stream_info_.filterState()->getDataReadOnly<LlmBindingObject>(
-      FilterStateKeys::BindingRequest);
-  ASSERT_NE(binding, nullptr);
-  EXPECT_EQ(absl::get<absl::string_view>(binding->getField("location")), "us-east5");
-  EXPECT_EQ(absl::get<absl::string_view>(binding->getField("model")), "claude-sonnet-4-5@20250929");
+  // What the client's path held is kept for the stream, for filters and access logs.
+  const auto* read = stream_info_.filterState()->getDataReadOnly<LlmBindingReadObject>(
+      FilterStateKeys::BindingRead);
+  ASSERT_NE(read, nullptr);
+  EXPECT_EQ(absl::get<absl::string_view>(read->getField("location")), "us-east5");
+  EXPECT_EQ(absl::get<absl::string_view>(read->getField("model")), "claude-sonnet-4-5@20250929");
 
   // Gemini's stream comes back as Anthropic's, naming the model the client asked for.
   const std::string wire = runResponse(
@@ -752,20 +774,16 @@ TEST_F(TranscoderFilterTest, RequestWithItsApiUnchangedLeavesInTheBindingItArriv
 }
 
 // A binding spelled out in JSON carries what a URI pattern cannot: Claude on Vertex AI takes the
-// model in the path alone and `anthropic_version` in the body, and the binding edits headers too.
+// model in the path alone and `anthropic_version` in the body.
 TEST_F(TranscoderFilterTest, JsonBindingSendsTheRequestToClaudeOnVertexAi) {
   target_protocol_ = LLMProtocol::AnthropicMessages;
-  request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                    {":path", "/v1/chat/completions"},
-                                                    {"authorization", "Bearer client-key"}};
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
   setBinding(FilterStateKeys::BindingResponse, R"({
     "uri_pattern": "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
     "mutations": [
       {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true},
-      {"header": "x-goog-user-project", "value": "acme"},
-      {"header": "x-llm-model", "value": "{model}", "keep_existing": true},
-      {"header": "authorization"}
+      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
     ]
   })");
   setInstruction(FilterStateKeys::ModelResolved, "claude-sonnet-4-5@20250929");
@@ -785,9 +803,6 @@ TEST_F(TranscoderFilterTest, JsonBindingSendsTheRequestToClaudeOnVertexAi) {
     "anthropic_version": "vertex-2023-10-16", "max_tokens": 16,
     "messages": [{"role": "user", "content": "Hi"}]
   })"));
-  EXPECT_EQ(request_headers_.get_("x-goog-user-project"), "acme");
-  EXPECT_EQ(request_headers_.get_("x-llm-model"), "claude-sonnet-4-5@20250929");
-  EXPECT_FALSE(request_headers_.has("authorization"));
 
   const std::string wire = runResponse(
       manager,

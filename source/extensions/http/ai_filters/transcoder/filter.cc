@@ -27,9 +27,10 @@ using HttpFilters::AiProtocolManager::AiResponseStreamPropagator;
 using HttpFilters::AiProtocolManager::AiResponseStreamReceiver;
 using HttpFilters::AiProtocolManager::FieldPathSegment;
 using HttpFilters::AiProtocolManager::FlattenJsonField;
-using HttpFilters::AiProtocolManager::HeaderMutation;
+using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
 using HttpFilters::AiProtocolManager::LlmBindingObject;
 using HttpFilters::AiProtocolManager::LlmBindingRead;
+using HttpFilters::AiProtocolManager::LlmBindingReadObject;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::PayloadKind;
@@ -67,15 +68,6 @@ void flattenInto(const nlohmann::json& node, std::vector<FieldPathSegment>& path
     return;
   }
   out.emplace_back(path, node);
-}
-
-void applyHeaderMutation(const HeaderMutation& mutation, Http::RequestHeaderMap& headers) {
-  const Http::LowerCaseString name(mutation.name);
-  if (!mutation.value.has_value()) {
-    headers.remove(name);
-  } else if (!mutation.keep_existing || headers.get(name).empty()) {
-    headers.setCopy(name, *mutation.value);
-  }
 }
 
 } // namespace
@@ -157,17 +149,15 @@ Coroutine::Task<absl::Status> TranscoderFilter::decode(AiRequestReceiver receive
     co_return co_await std::move(propagate_request)(std::move(request));
   }
 
-  const absl::Status status = transcodeRequest(request->json(), *instructions);
+  bool unresolved = false;
+  const absl::Status status = transcodeRequest(request->json(), *instructions, unresolved);
   if (!status.ok()) {
     // A partially transcoded payload must never reach the next filter or the upstream: the rules
     // mutate the document in place, so a mid-rule failure leaves a document that is neither the
     // source shape nor the target shape. Failing the request is the only safe outcome. Unlike the
     // response path there is nothing on the wire yet, so a local reply is a clean failure.
-    // A binding without a value for its path is the proxy's configuration at fault.
     ENVOY_LOG(debug, "transcoder: rejecting request: {}", status.message());
-    std::move(reply_locally)(status.code() == absl::StatusCode::kFailedPrecondition
-                                 ? Http::Code::InternalServerError
-                                 : Http::Code::BadRequest,
+    std::move(reply_locally)(unresolved ? Http::Code::InternalServerError : Http::Code::BadRequest,
                              std::string(status.message()));
     co_return absl::OkStatus();
   }
@@ -272,7 +262,7 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
 }
 
 absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstructions() {
-  StreamInfo::FilterState& filter_state = *filter_state_;
+  const StreamInfo::FilterState& filter_state = *filter_state_;
   target_protocol_ = ResponseLlmProtocol::resolve(filter_state, target_protocol_);
 
   Instructions instructions;
@@ -280,14 +270,14 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
   for (const auto& [key, into] :
        {std::pair{&FilterStateKeys::BindingRequest, &instructions.request_binding},
         std::pair{&FilterStateKeys::BindingResponse, &instructions.response_binding}}) {
-    std::shared_ptr<const LlmBindingObject> object =
+    absl::StatusOr<LlmBindingConstSharedPtr> binding =
         LlmBindingObject::fromFilterState(filter_state, *key);
-    if (object != nullptr && !object->status().ok()) {
+    if (!binding.ok()) {
       config_->stats().unresolved_.inc();
       return absl::FailedPreconditionError(
-          absl::StrCat("transcoder: filter state `", *key, "`: ", object->status().message()));
+          absl::StrCat("transcoder: filter state `", *key, "`: ", binding.status().message()));
     }
-    *into = std::move(object);
+    *into = *std::move(binding);
   }
   if (const std::optional<absl::string_view> model =
           stringFromFilterState(filter_state, FilterStateKeys::ModelResolved);
@@ -298,19 +288,19 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
   // The model the client's path names, for a response that needs it when no request leg of this
   // instance reports the IR's: what a request leg recorded, or else the path read again under the
   // binding the request names.
-  const LlmBindingObject* request = instructions.request_binding.get();
-  if (request != nullptr && request->read().has_value()) {
-    request_model_ = request->read()->model;
+  if (const LlmBindingRead* read = LlmBindingReadObject::fromFilterState(filter_state);
+      read != nullptr) {
+    request_model_ = read->model;
   } else {
     request_model_ = config_->engine().modelFromRequestPath(
-        source_protocol_, request_headers_.getPathValue(),
-        request != nullptr ? request->binding().get() : nullptr);
+        source_protocol_, request_headers_.getPathValue(), instructions.request_binding);
   }
   return instructions;
 }
 
 absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
-                                                const Instructions& instructions) {
+                                                const Instructions& instructions,
+                                                bool& unresolved) {
   absl::StatusOr<TranscodeLeg> leg = resolveLeg(config_->requestHandling(), PayloadKind::Request);
   if (!leg.ok()) {
     return leg.status();
@@ -320,14 +310,10 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
   // upstream would reject fails here rather than over the network.
   TranscodeContext ctx;
   ctx.request_path = request_headers_.getPathValue();
-  if (const LlmBindingObject* request = instructions.request_binding.get(); request != nullptr) {
-    ctx.request_binding = request->binding();
-    if (request->read().has_value()) {
-      ctx.arrived = &*request->read();
-    }
-  }
+  ctx.request_binding = instructions.request_binding;
+  ctx.arrived = LlmBindingReadObject::fromFilterState(*filter_state_);
   if (instructions.response_binding != nullptr) {
-    ctx.response_binding = instructions.response_binding->binding().get();
+    ctx.response_binding = instructions.response_binding.get();
   } else if (ctx.arrived != nullptr && source_protocol_ == target_protocol_) {
     // A request whose API does not change leaves in the binding it arrived in.
     ctx.response_binding = ctx.arrived->binding.get();
@@ -335,7 +321,8 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
   ctx.resolved_model = instructions.resolved_model;
   const absl::Status status = config_->engine().transcode(*leg, ctx, json);
   if (!status.ok()) {
-    if (status.code() == absl::StatusCode::kFailedPrecondition) {
+    unresolved = ctx.unresolved;
+    if (unresolved) {
       config_->stats().unresolved_.inc();
     } else {
       config_->stats().failed_.inc();
@@ -348,9 +335,8 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
              leg->direction == TranscodeDirection::ToIr) {
     // The instruction was set on purpose, so a path it does not match is more likely a
     // misconfiguration than intent. The request still goes through on what the body says.
-    ENVOY_LOG(debug, "transcoder: {} `{}` does not match the request path `{}`",
-              FilterStateKeys::BindingRequest, instructions.request_binding->asString(),
-              ctx.request_path);
+    ENVOY_LOG(debug, "transcoder: {} does not match the request path `{}`",
+              FilterStateKeys::BindingRequest, ctx.request_path);
   }
   if (!ctx.ir_model.empty()) {
     request_model_ = std::move(ctx.ir_model);
@@ -358,29 +344,18 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
   if (ctx.rewritten_path.has_value()) {
     request_headers_.setPath(*ctx.rewritten_path);
   }
-  for (const HeaderMutation& mutation : ctx.header_mutations) {
-    applyHeaderMutation(mutation, request_headers_);
-  }
   return absl::OkStatus();
 }
 
 void TranscoderFilter::recordRead(LlmBindingRead read) {
-  StreamInfo::FilterState& filter_state = *filter_state_;
-  if (auto* object = filter_state.getDataMutable<LlmBindingObject>(FilterStateKeys::BindingRequest);
-      object != nullptr) {
-    object->setRead(std::move(read));
+  // Set once per stream, so no other stream sees it; a read already there is left alone.
+  if (filter_state_->hasDataWithName(FilterStateKeys::BindingRead)) {
+    ENVOY_LOG(debug, "transcoder: {} is already set", FilterStateKeys::BindingRead);
     return;
   }
-  // A plain string keeps its key: setData() rejects another life span than the writer's.
-  if (filter_state.hasDataWithName(FilterStateKeys::BindingRequest)) {
-    ENVOY_LOG(debug, "transcoder: {} is a plain string, so what the path held is not recorded",
-              FilterStateKeys::BindingRequest);
-    return;
-  }
-  auto object = std::make_shared<LlmBindingObject>(read.binding);
-  object->setRead(std::move(read));
-  filter_state.setData(FilterStateKeys::BindingRequest, std::move(object),
-                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_->setData(FilterStateKeys::BindingRead,
+                         std::make_shared<LlmBindingReadObject>(std::move(read)),
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
 }
 
 std::optional<TranscodeLeg> TranscoderFilter::responseLeg(PayloadKind kind) {

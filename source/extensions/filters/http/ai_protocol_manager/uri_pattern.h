@@ -26,10 +26,10 @@ bool isPathToken(absl::string_view value);
 // choice between its two spellings, e.g.:
 //   /v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}
 //
-// A path matches the first layout that fits all of it but the query, and each named variable reads
-// a value from it. `render()` writes the first layout. A spelling may end in a query, which
-// `render()` appends and `match()` ignores. Unnamed wildcards match segments `render()` cannot
-// fill.
+// A path matches the first layout that fits all of it but the query, and each named variable,
+// which matches one segment, reads a value from it. `render()` writes the first layout. A spelling
+// may end in a query, which `render()` appends and `match()` ignores. Unnamed wildcards match
+// segments `render()` cannot fill.
 class UriPattern {
 public:
   // What a matched path names.
@@ -55,6 +55,10 @@ public:
 
   // Whether the layout `render()` writes names the model.
   bool hasModel() const { return layouts_.front().front().has_model; }
+  // The named variables of the layout `render()` writes.
+  const std::vector<std::string>& renderVariables() const { return render_variables_; }
+  // Whether that layout has no unnamed wildcard, which `render()` cannot fill.
+  bool renderable() const { return renderable_; }
   // The pattern as parsed.
   const std::string& source() const { return source_; }
 
@@ -67,6 +71,7 @@ private:
     // The named capture groups, by index.
     std::vector<std::pair<int, std::string>> groups;
     bool has_model{false};
+    bool has_wildcard{false};
   };
   // The unary spelling, then the streaming one when the layout spells it differently.
   using Layout = std::vector<Spelling>;
@@ -74,11 +79,12 @@ private:
   static absl::StatusOr<Layout> parseLayout(absl::string_view layout);
   static std::optional<Match> matchSpelling(const Spelling& spelling, absl::string_view path);
 
-  UriPattern(std::string source, std::vector<Layout> layouts)
-      : source_(std::move(source)), layouts_(std::move(layouts)) {}
+  UriPattern(std::string source, std::vector<Layout> layouts);
 
   std::string source_;
   std::vector<Layout> layouts_;
+  std::vector<std::string> render_variables_;
+  bool renderable_{true};
 };
 
 } // namespace AiProtocolManager

@@ -19,8 +19,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: LLM binding]
 
 // How a provider carries an :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` on
-// HTTP, where that differs from the API's own: the request path, and edits to the request body and
-// headers. The API itself -- its schemas, stream events and usage -- does not change.
+// HTTP, where that differs from the API's own: the request path, and edits to the request body.
+// The API itself -- its schemas, stream events and usage -- does not change.
 //
 // Claude on Vertex AI:
 //
@@ -33,41 +33,36 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // On the way out, the path is rendered from the request and the mutations are applied in order.
 // On the way in, the model and streaming mode the path names are written into the body and the
-// body fields the mutations write are removed, so every AI filter sees the API's own document.
+// body fields the mutations write are removed, so the API's own document is transcoded.
 message LLMBinding {
-  // One edit to the request: a body field or a header is written, or removed when ``value`` is
-  // unset.
+  // One edit to the request body: a field is written, or removed when ``value`` is unset or null.
   message Mutation {
     oneof target {
       option (validate.required) = true;
 
       // A top-level member of the request body.
       string body_field = 1 [(validate.rules).string = {min_len: 1}];
-
-      // A request header. Its value must be a string.
-      string header = 2
-          [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
     }
 
-    // The value to write. In a string, ``{name}`` is replaced by the request's value of that name,
-    // as ``uri_pattern`` defines them: a body field such as ``{model}``, or a path variable such as
-    // ``{project}``. When unset, the target is removed.
-    google.protobuf.Value value = 3;
+    // The value to write. In a string, ``{name}`` is replaced by a value of the request:
+    // ``{model}`` by the body's model, any other name by a path variable the client's path holds,
+    // such as ``{project}``. When unset or null, the field is removed.
+    google.protobuf.Value value = 2;
 
-    // Write ``value`` only where the target is absent, rather than replace it.
-    bool keep_existing = 4;
+    // Write ``value`` only where the field is absent, rather than replace it.
+    bool keep_existing = 3;
   }
 
   // The request path, as a :ref:`URI pattern
   // <config_http_filters_ai_protocol_manager_transcoder_instructions>`: a two-way map between the
-  // path and the request's named values. A variable named after a top-level field of the API's
-  // request is that field (``{model}``; the ``{unary|stream}`` choice is ``stream``); any other,
-  // such as ``{project}``, is a path variable, kept beside the body and never in it. Coming in,
-  // the pattern reads the client's path into those values; going out, it is rendered from them.
+  // path and the request's named values, each matching one path segment. ``{model}`` is the
+  // request's model and the ``{unary|stream}`` choice its ``stream``; any other variable, such as
+  // ``{project}``, is a path variable, kept beside the body and never in it. Coming in, the
+  // pattern reads the client's path into those values; going out, it is rendered from them.
   // Unnamed wildcards and the query are never read. When empty, the API's own path is used.
   string uri_pattern = 1;
 
-  // Edits to the request, applied in order. When empty, the API's own edits apply, such as
+  // Edits to the request body, applied in order. When empty, the API's own edits apply, such as
   // removing ``model`` and ``stream`` for Gemini.
   repeated Mutation mutations = 2;
 }

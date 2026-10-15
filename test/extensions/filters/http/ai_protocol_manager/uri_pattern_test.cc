@@ -70,6 +70,28 @@ TEST(UriPatternParseTest, RejectsMalformedTemplates) {
   }
 }
 
+// A named variable's value must be one path token, so a variable spanning segments could only
+// ever match one.
+TEST(UriPatternParseTest, RejectsNamedVariablesOverSeveralSegments) {
+  for (const std::string& pattern : {std::string("/v1/{model}/{rest=**}"),
+                                     absl::StrCat("/v1/{name=models/", kWildcard, "}:predict")}) {
+    EXPECT_THAT(UriPattern::parse(pattern),
+                HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("must match one path")))
+        << pattern;
+  }
+  EXPECT_TRUE(parseOk("/v1/{model=*}:predict").hasModel());
+}
+
+// What rendering needs: the variables of the first layout, and no unnamed wildcard in it.
+TEST(UriPatternParseTest, DescribesTheLayoutItRenders) {
+  const UriPattern vertex = parseOk(kVertexGemini);
+  EXPECT_EQ(vertex.renderVariables(),
+            (std::vector<std::string>{"version", "project", "location", "model"}));
+  EXPECT_TRUE(vertex.renderable());
+  EXPECT_FALSE(parseOk(absl::StrCat("/v1/", kWildcard, "/models/{model}")).renderable());
+  EXPECT_TRUE(parseOk(absl::StrCat("/v1/models/{model} /gw/", kWildcard, "/{model}")).renderable());
+}
+
 TEST(UriPatternParseTest, RejectsAnythingButOneChoiceOfTwo) {
   for (absl::string_view pattern : {"/{a|b}/{c|d}", "/{a|b|c}", "/{a|b", "/a|b", "/{x{model}|y}"}) {
     EXPECT_THAT(UriPattern::parse(pattern),
@@ -257,8 +279,6 @@ TEST(UriPatternRenderTest, RefusesSegmentsWithoutAValue) {
   EXPECT_THAT(
       render(parseOk(kVertexGemini), false, {{"model", "gemini-2.0-flash"}}),
       HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("has no value for `{version}`")));
-  EXPECT_THAT(render(parseOk("/v1/{model}/{rest=**}"), false, {{"model", "m"}}),
-              HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("`{rest}`")));
   EXPECT_THAT(
       render(parseOk(absl::StrCat("/v1/", kWildcard, "/models/{model}")), false, {{"model", "m"}}),
       HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("wildcard")));

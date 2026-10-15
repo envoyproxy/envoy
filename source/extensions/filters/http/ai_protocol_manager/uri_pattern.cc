@@ -47,6 +47,31 @@ absl::StatusOr<std::vector<std::string>> spellOut(absl::string_view layout) {
       absl::StrCat(before, layout.substr(bar + 1, close - bar - 1), after)};
 }
 
+// Whether `path_template`, which parsed, has an unnamed wildcard. Fails on a named variable that
+// spans more than one segment, whose value could never be a path token.
+absl::StatusOr<bool> hasUnnamedWildcard(absl::string_view path_template) {
+  bool wildcard = false;
+  while (true) {
+    const size_t special = path_template.find_first_of("{*");
+    if (special == absl::string_view::npos) {
+      return wildcard;
+    }
+    if (path_template[special] == '*') {
+      wildcard = true;
+      path_template.remove_prefix(special + 1);
+      continue;
+    }
+    const size_t close = path_template.find('}', special);
+    const absl::string_view variable = path_template.substr(special + 1, close - special - 1);
+    const size_t equals = variable.find('=');
+    if (equals != absl::string_view::npos && variable.substr(equals + 1) != "*") {
+      return absl::InvalidArgumentError(absl::StrCat("variable `{", variable.substr(0, equals),
+                                                     "}` must match one path segment"));
+    }
+    path_template.remove_prefix(close + 1);
+  }
+}
+
 } // namespace
 
 absl::StatusOr<UriPattern::Layout> UriPattern::parseLayout(absl::string_view layout) {
@@ -63,9 +88,14 @@ absl::StatusOr<UriPattern::Layout> UriPattern::parseLayout(absl::string_view lay
     if (!regex.ok()) {
       return regex.status();
     }
+    absl::StatusOr<bool> wildcard = hasUnnamedWildcard(path_and_query.first);
+    if (!wildcard.ok()) {
+      return wildcard.status();
+    }
     auto compiled = std::make_shared<const RE2>(*regex);
     Spelling spelling{std::string(path_and_query.first), std::string(path_and_query.second),
                       compiled};
+    spelling.has_wildcard = *wildcard;
     for (const auto& [index, name] : compiled->CapturingGroupNames()) {
       spelling.has_model |= name == kModelVariable;
       spelling.groups.emplace_back(index, name);
@@ -86,6 +116,16 @@ absl::StatusOr<UriPattern> UriPattern::parse(absl::string_view pattern) {
     layouts.push_back(*std::move(layout));
   }
   return UriPattern(std::string(pattern), std::move(layouts));
+}
+
+UriPattern::UriPattern(std::string source, std::vector<Layout> layouts)
+    : source_(std::move(source)), layouts_(std::move(layouts)) {
+  for (const Spelling& spelling : layouts_.front()) {
+    renderable_ &= !spelling.has_wildcard;
+  }
+  for (const auto& [index, name] : layouts_.front().front().groups) {
+    render_variables_.push_back(name);
+  }
 }
 
 std::optional<UriPattern::Match> UriPattern::matchSpelling(const Spelling& spelling,

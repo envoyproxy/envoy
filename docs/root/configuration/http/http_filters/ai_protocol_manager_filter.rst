@@ -446,13 +446,14 @@ may end in a query string, which rendering appends and matching ignores. Several
 listed separated by spaces: a path matches the first that fits it entirely, and rendering writes
 the first.
 
-Every named variable reads a value from a matched path, which must hold only letters, digits and
-``-``, ``.``, ``_``, ``@``, and start with a letter or a digit. ``{model}`` and the choice are the
-request's ``model`` and ``stream``. Any other variable, such as ``{project}``, is a path
-variable: it never enters the body, and the ``envoy.ai.binding.request`` object keeps it for
-field access, e.g. ``%FILTER_STATE(envoy.ai.binding.request:FIELD:location)%``. Rendering fills
-each variable from the body field of its name, else from the client's path variables; unnamed
-wildcards match on the way in but cannot be rendered.
+Every named variable matches one path segment and reads its value, which must hold only letters,
+digits and ``-``, ``.``, ``_``, ``@``, and start with a letter or a digit. ``{model}`` and the
+choice are the request's ``model`` and ``stream``. Any other variable, such as ``{project}``, is a
+path variable: it never enters the body, and the ``envoy.ai.binding.read`` object the transcoder
+sets for the stream keeps it for field access, e.g.
+``%FILTER_STATE(envoy.ai.binding.read:FIELD:location)%``. Rendering takes ``{model}`` from the
+body and every other variable from the client's path; unnamed wildcards match on the way in but
+cannot be rendered.
 
 .. code-block:: text
 
@@ -467,9 +468,10 @@ body's wins otherwise; the body fields the binding writes are taken out, so Vert
 the backend API's schema first, then the binding's edits apply in order. A request that leaves
 in the binding it arrived in gets those fields back as the client sent them.
 
-A binding that does not parse, or a variable without a value, is a misconfiguration of the
-proxy, not of the client: the request fails with a 500, counted by ``transcoder.unresolved``. A
-request binding that does not match the path reads nothing and is logged at debug.
+A binding that does not parse, or one that needs a path variable the client's path did not hold,
+is a misconfiguration of the proxy, not of the client: the request fails with a 500, counted by
+``transcoder.unresolved``. A request binding that does not match the path reads nothing and is
+logged at debug.
 
 The instructions are read once, when the transcoder's request leg runs, so the filter that
 writes them must run before that instance of the transcoder; a model router placed between the
@@ -501,8 +503,8 @@ The example pins a route to Claude on an illustrative gateway, statically, with
             text_format_source:
               inline_string: "claude-sonnet-4-5"
 
-A binding in JSON also edits the body and the headers. Claude on Vertex AI takes the model in the
-path alone and the Vertex AI API version in the body:
+A binding in JSON also edits the body. Claude on Vertex AI takes the model in the path alone and
+the Vertex AI API version in the body:
 
 .. code-block:: json
 

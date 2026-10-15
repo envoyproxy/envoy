@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.filters.http.ai_protocol_manager.v3;
 
 import "envoy/config/core/v3/extension.proto";
-import "envoy/type/ai/v3/llm_binding.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -38,7 +37,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // endpoints — and which :ref:`wire API <envoy_v3_api_enum_type.ai.v3.LLMProtocol>`
 // each speaks — is declared with the :ref:`per-route configuration
 // <envoy_v3_api_msg_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute>`.
-// [#next-free-field: 6]
 message AiProtocolManager {
   // Request-side AI protocol processing. When unset, the decode path is a
   // pure passthrough — including on routes carrying per-route configuration.
@@ -58,13 +56,6 @@ message AiProtocolManager {
   // is used, which does not bound the size of the payload it holds.
   // [#extension-category: envoy.ai_protocol_manager.external_buffer]
   config.core.v3.TypedExtensionConfig external_buffer_config = 4;
-
-  // Bindings that the ``envoy.ai.binding.request`` and ``envoy.ai.binding.response`` filter state
-  // objects can name. Naming one is an optimization: it is built and checked once, when the
-  // configuration loads, while a filter state object can also spell a binding out for one
-  // request.
-  // [#not-implemented-hide:]
-  map<string, type.ai.v3.LLMBinding> bindings = 5;
 }
 
 // Request-side processing configuration. A route that carries a
@@ -267,14 +258,6 @@ message RequestPerRoute {
   // will be added here once the transformation and its output contract
   // exist.]
   type.ai.v3.LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
-
-  // How clients on this route carry ``llm_protocol`` on HTTP. When unset, the
-  // client's path is matched against the API's own binding and the bindings
-  // Envoy defines for it, so one route takes clients of the Anthropic API and
-  // of Claude on Vertex AI alike. For one request, the
-  // ``envoy.ai.binding.request`` filter state object replaces it.
-  // [#not-implemented-hide:]
-  type.ai.v3.LLMBinding binding = 2;
 }
 
 // Per-route response-side behavior.
@@ -283,11 +266,4 @@ message ResponsePerRoute {
   // ``request.llm_protocol`` when the gateway performs protocol translation.
   // ``LLM_PROTOCOL_UNSPECIFIED`` falls through the precedence chain above.
   type.ai.v3.LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
-
-  // How the backend carries its API on HTTP. When unset, a request whose
-  // backend speaks the client's API leaves in the binding it arrived in, and
-  // any other request in the backend API's own. For one request, the
-  // ``envoy.ai.binding.response`` filter state object replaces it.
-  // [#not-implemented-hide:]
-  type.ai.v3.LLMBinding binding = 2;
 }
