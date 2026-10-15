@@ -1,0 +1,296 @@
+name: Release task
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      ENVOY_CI_PUBLISH_APP_ID:
+        required: true
+      ENVOY_CI_PUBLISH_APP_KEY:
+        required: true
+    inputs:
+      task:
+        description: >-
+          Task to run (`create-release`, `reopen-branch` or `sync-version-histories`)
+        type: string
+        required: true
+      branch:
+        description: Branch to run the task against (eg `main` or `release/v1.34`)
+        type: string
+        required: true
+      recreate:
+        description: >-
+          Close any existing bot PR and delete the bot branch for this task/branch
+          before creating a new one
+        type: boolean
+        default: false
+      pr:
+        description: Create a PR
+        type: boolean
+        default: true
+      pr-message:
+        description: Additional message for PR
+        type: string
+        default: ''
+      wip:
+        type: boolean
+        default: false
+      author:
+        description: >-
+          Author: User/email, eg 'Myname <me@mymail.com>'
+          (used by create-release, default: `changelogs/summary.md` last committer)
+        type: string
+        default: ''
+      summary:
+        description: Use changelog summary (required to publish release)
+        type: boolean
+        default: true
+
+env:
+  COMMITTER_NAME: publish-envoy[bot]
+  COMMITTER_EMAIL: 140627008+publish-envoy[bot]@users.noreply.github.com
+
+
+jobs:
+  task:
+    runs-on: ubuntu-24.04
+    name: ${{ inputs.task }} (${{ inputs.branch }})
+    steps:
+    - id: target
+      name: Target
+      env:
+        TASK: ${{ inputs.task }}
+        BRANCH: ${{ inputs.branch }}
+      run: |
+        case "$TASK" in
+            create-release)
+                PR_PREFIX=release/create
+                DIFF_PREFIX=release
+                ;;
+            reopen-branch)
+                PR_PREFIX=release/dev
+                DIFF_PREFIX=release-dev
+                ;;
+            sync-version-histories)
+                PR_PREFIX=release/sync
+                DIFF_PREFIX=version-histories
+                ;;
+            *)
+                echo "::error::Unknown release task: ${TASK}"
+                exit 1
+                ;;
+        esac
+        if [[ -z "$BRANCH" ]]; then
+            echo "::error::No branch specified"
+            exit 1
+        fi
+        if [[ "$BRANCH" != "main" && ! "$BRANCH" =~ ^release/v[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid target branch: expected main or release/vX.Y"
+            exit 1
+        fi
+        NAME="${BRANCH#release/}"
+        {
+            echo "name=${NAME}"
+            echo "pr-branch=${PR_PREFIX}/${NAME}"
+            echo "diff-upload=${DIFF_PREFIX}-${NAME}"
+        } >> "$GITHUB_OUTPUT"
+
+    - id: appauth
+      name: App auth
+      uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        branch: ${{ inputs.branch }}
+        committer-name: ${{ env.COMMITTER_NAME }}
+        committer-email: ${{ env.COMMITTER_EMAIL }}
+        token: ${{ steps.appauth.outputs.token }}
+        config: |
+          fetch-depth: 0
+
+    - id: changelog
+      name: Check changelog summary
+      if: inputs.task == 'create-release'
+      env:
+        SUMMARY: ${{ inputs.summary }}
+      run: |
+        if [[ ! -s "changelogs/summary.md" ]]; then
+            if [[ "$SUMMARY" == "false" ]]; then
+                echo "::warning::Changelog summary (changelogs/summary.md) is empty!"
+                exit 0
+            fi
+            echo "::error::Changelog summary (changelogs/summary.md) is empty!"
+            exit 1
+        fi
+        COMMITTER=$(git log -n 1 --format='%an <%ae>' -- changelogs/summary.md)
+        echo "committer=${COMMITTER}" >> "$GITHUB_OUTPUT"
+    - name: Validate signoff email
+      if: inputs.task == 'create-release' && inputs.author
+      uses: envoyproxy/toolshed/actions/email/validate@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        email: ${{ inputs.author }}
+
+    - name: Sync version histories
+      if: inputs.task == 'sync-version-histories'
+      uses: envoyproxy/toolshed/actions/github/run@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        report-name: ci-report-sync.json
+        command: >-
+          bazel
+          run
+          --config=ci @envoy_repo//:sync
+          --
+          --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
+
+    - name: Create release
+      if: inputs.task == 'create-release'
+      uses: envoyproxy/toolshed/actions/github/run@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        report-name: ci-report-release.json
+        source: |
+          BAZEL_ARGS=(--)
+          BAZEL_RUN_ARGS=(--config=ci)
+          if [[ -n "$AUTHOR" ]]; then
+              BAZEL_ARGS+=(
+                  "--release-author=${AUTHOR}"
+                  "--signoff=${COMMITTER}")
+          else
+              BAZEL_ARGS+=("--release-author=${COMMITTER}")
+          fi
+        command: >-
+          bazel
+          run
+          "${BAZEL_RUN_ARGS[@]}"
+          @envoy_repo//:release
+          "${BAZEL_ARGS[@]}"
+      env:
+        AUTHOR: ${{ inputs.author }}
+        COMMITTER: ${{ steps.changelog.outputs.committer }}
+
+    - name: Re-open branch
+      if: inputs.task == 'reopen-branch'
+      uses: envoyproxy/toolshed/actions/github/run@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        report-name: ci-report-dev.json
+        command: >-
+          bazel
+          run
+          --config=ci
+          @envoy_repo//:dev
+          -- ${{ steps.target.outputs.name != 'main' && '--patch' || '' }}
+
+    - id: bzlmod
+      name: Check for bzlmod
+      if: inputs.task == 'create-release' || inputs.task == 'reopen-branch'
+      env:
+        BRANCH: ${{ inputs.branch }}
+      run: |
+        if [[ ! -e bazel/repository_locations.bzl ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+        else
+            echo "::notice::Pre-bzlmod branch (${BRANCH}), skipping module version update"
+        fi
+
+    - name: Update bazel module versions and lockfiles
+      if: steps.bzlmod.outputs.enabled
+      env:
+        ENVOY_DOCKER_CI: 1
+      run: |
+        ./ci/run_envoy_docker.sh './ci/do_ci.sh modules.version'
+        git add -- ':(glob)**/MODULE.bazel' ':(glob)**/MODULE.bazel.lock' Cargo.lock Cargo.Bazel.envoy.lock
+        git commit --amend --no-edit
+
+    - id: pr-meta
+      name: PR metadata
+      env:
+        TASK: ${{ inputs.task }}
+        NAME: ${{ steps.target.outputs.name }}
+        ACTOR: ${{ github.actor }}
+        PR_MESSAGE: ${{ inputs.pr-message }}
+        SUMMARY: ${{ inputs.summary }}
+        WIP: ${{ (! inputs.summary || inputs.wip) && 'true' || 'false' }}
+      run: |
+        VERSION="$(cut -d- -f1 < VERSION.txt)"
+        BODY="Created by Envoy publish bot for @${ACTOR}"
+        case "$TASK" in
+            create-release)
+                PREFIX="release/${NAME}"
+                if [[ "$WIP" == "true" ]]; then
+                    PREFIX="WIP/${PREFIX}"
+                fi
+                TITLE="[${PREFIX}] repo: Release v${VERSION}"
+                if [[ "$SUMMARY" != "true" ]]; then
+                    BODY+=$'\n'":warning: Created without changelog summary, this will need to be updated before publishing"
+                fi
+                ;;
+            reopen-branch)
+                TITLE="[dev/${NAME}] repo: Dev v${VERSION}"
+                ;;
+            sync-version-histories)
+                WIP=false
+                TITLE="repo: Sync version histories"
+                if [[ "$NAME" != "main" ]]; then
+                    TITLE="[${NAME}] ${TITLE}"
+                fi
+                ;;
+        esac
+        if [[ -n "$PR_MESSAGE" ]]; then
+            BODY+=$'\n\n'"${PR_MESSAGE}"
+        fi
+        DELIM="EOF_$(openssl rand -hex 8)"
+        {
+            echo "title=${TITLE}"
+            echo "wip=${WIP}"
+            echo "body<<${DELIM}"
+            echo "$BODY"
+            echo "${DELIM}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Remove existing PR/branch
+      if: inputs.recreate && inputs.pr
+      env:
+        GH_TOKEN: ${{ steps.appauth.outputs.token }}
+        BASE_BRANCH: ${{ inputs.branch }}
+        PR_BRANCH: ${{ steps.target.outputs.pr-branch }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        PRS=$(gh pr list \
+                  -R "$GITHUB_REPOSITORY" \
+                  -H "$PR_BRANCH" \
+                  -B "$BASE_BRANCH" \
+                  --state open \
+                  --json number \
+                  -q '.[].number')
+        for pr in $PRS; do
+            echo "Closing PR #${pr} (${PR_BRANCH})"
+            gh pr close "$pr" \
+                -R "$GITHUB_REPOSITORY" \
+                --delete-branch \
+                --comment "Superseded by automated release flow (${RUN_URL})"
+        done
+        if git ls-remote --exit-code --heads origin "$PR_BRANCH" > /dev/null; then
+            echo "Deleting branch ${PR_BRANCH}"
+            git push origin --delete "$PR_BRANCH"
+        fi
+
+    - name: Create a PR
+      uses: envoyproxy/toolshed/actions/github/pr@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        base: ${{ inputs.branch }}
+        commit: false
+        append-commit-message: true
+        body: ${{ steps.pr-meta.outputs.body }}
+        branch: ${{ steps.target.outputs.pr-branch }}
+        diff-upload: ${{ steps.target.outputs.diff-upload }}
+        diff-show: true
+        dry-run: ${{ ! inputs.pr }}
+        wip: ${{ steps.pr-meta.outputs.wip == 'true' }}
+        title: ${{ steps.pr-meta.outputs.title }}
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
