@@ -89,20 +89,6 @@ public:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  char* mutableData() {
-    const StorageLocation location = storageLocation();
-    switch (location) {
-    case StorageLocation::Reference:
-      ASSERT(location != StorageLocation::Reference);
-      return nullptr;
-    case StorageLocation::Heap:
-      return heap_;
-    case StorageLocation::Inline:
-      return inline_;
-    }
-    PANIC_DUE_TO_CORRUPT_ENUM;
-  }
-
   /**
    * Point at data owned elsewhere, releasing any owned data.
    */
@@ -118,9 +104,32 @@ public:
    * Take ownership of a copy of data, discarding any data held previously.
    */
   void assign(const char* data, uint32_t size) {
-    reserveDiscard(size);
+    char* mutable_data = nullptr;
+    switch (const auto storage = storageLocation(); storage) {
+    case StorageLocation::Reference:
+    case StorageLocation::Inline:
+      if (size <= kInlineStringCapacity) {
+        capacity_ = kInlineStringCapacity;
+        mutable_data = inline_;
+        break;
+      }
+    case StorageLocation::Heap:
+      if (capacity_ < size) {
+        const uint32_t new_capacity = computeCapacity(size, capacity_);
+        char* new_heap = new char[new_capacity];
+        if (storage == StorageLocation::Heap) {
+          delete[] heap_;
+        }
+        heap_ = new_heap;
+        capacity_ = new_capacity;
+      }
+      mutable_data = heap_;
+      break;
+      PANIC_DUE_TO_CORRUPT_ENUM;
+    }
+    ASSERT(mutable_data != nullptr);
     if (size != 0) {
-      memmove(mutableData(), data, size); // NOLINT(safe-memcpy)
+      memmove(mutable_data, data, size); // NOLINT(safe-memcpy)
     }
     size_ = size;
   }
@@ -132,10 +141,40 @@ public:
     if (size == 0) {
       return;
     }
+    char* mutable_data = nullptr;
     const uint64_t new_size = static_cast<uint64_t>(size_) + size;
     ASSERT(new_size <= std::numeric_limits<uint32_t>::max());
-    reservePreserve(static_cast<uint32_t>(new_size));
-    memmove(mutableData() + size_, data, size); // NOLINT(safe-memcpy)
+    switch (const auto storage = storageLocation(); storage) {
+    case StorageLocation::Reference:
+      if (new_size <= kInlineStringCapacity) {
+        memcpy(inline_, ref_, size_); // NOLINT(safe-memcpy)
+        capacity_ = kInlineStringCapacity;
+        mutable_data = inline_;
+        break;
+      }
+      ABSL_FALLTHROUGH_INTENDED;
+    case StorageLocation::Inline:
+      if (new_size <= kInlineStringCapacity) {
+        mutable_data = inline_;
+        break;
+      }
+      ABSL_FALLTHROUGH_INTENDED;
+    case StorageLocation::Heap:
+      if (capacity_ < new_size) {
+        const uint32_t new_capacity = computeCapacity(new_size, capacity_);
+        char* new_heap = new char[new_capacity];
+        memcpy(new_heap, this->data(), size_); // NOLINT(safe-memcpy)
+        if (storage == StorageLocation::Heap) {
+          delete[] heap_;
+        }
+        heap_ = new_heap;
+        capacity_ = new_capacity;
+      }
+      mutable_data = heap_;
+      break;
+    }
+    ASSERT(mutable_data != nullptr);
+    memmove(mutable_data + size_, data, size); // NOLINT(safe-memcpy)
     size_ = static_cast<uint32_t>(new_size);
   }
 
@@ -156,6 +195,25 @@ public:
   void shrink(uint32_t new_size) {
     ASSERT(storageLocation() != StorageLocation::Reference && new_size <= size_);
     size_ = new_size;
+  }
+
+  /**
+   * Transforms the owned data using the given UnaryOperation (conforms to std::transform).
+   * @param unary_op the operations to be performed on each of the elements.
+   */
+  template <typename UnaryOperation> void inlineTransform(UnaryOperation&& unary_op) {
+    char* data = nullptr;
+    switch (storageLocation()) {
+    case StorageLocation::Heap:
+      data = heap_;
+      break;
+    case StorageLocation::Inline:
+      data = inline_;
+      break;
+    case StorageLocation::Reference:
+      return;
+    }
+    std::transform(data, data + size_, data, unary_op);
   }
 
 private:
@@ -196,44 +254,6 @@ private:
     const uint64_t capacity = std::max<uint64_t>(required, doubled);
     return static_cast<uint32_t>(
         std::min<uint64_t>(capacity, std::numeric_limits<uint32_t>::max()));
-  }
-
-  // Own at least required bytes of capacity. The data held currently is discarded.
-  void reserveDiscard(uint32_t required) {
-    if (storageLocation() != StorageLocation::Reference && capacity_ >= required) {
-      return;
-    }
-    if (required <= kInlineStringCapacity) {
-      freeIfHeap();
-      capacity_ = kInlineStringCapacity;
-      return;
-    }
-    const uint32_t new_capacity = computeCapacity(required, capacity_);
-    char* new_heap = new char[new_capacity];
-    freeIfHeap();
-    heap_ = new_heap;
-    capacity_ = new_capacity;
-  }
-
-  // Own at least required bytes of capacity, preserving the size_ bytes held currently.
-  void reservePreserve(uint32_t required) {
-    const StorageLocation location = storageLocation();
-    if (location != StorageLocation::Reference && capacity_ >= required) {
-      return;
-    }
-    if (required <= kInlineStringCapacity) {
-      // Only reachable from the Reference state, which holds no inline data yet.
-      ASSERT(location == StorageLocation::Reference);
-      memcpy(inline_, ref_, size_); // NOLINT(safe-memcpy)
-      capacity_ = kInlineStringCapacity;
-      return;
-    }
-    const uint32_t new_capacity = computeCapacity(required, capacity_);
-    char* new_heap = new char[new_capacity];
-    memcpy(new_heap, data(), size_); // NOLINT(safe-memcpy)
-    freeIfHeap();
-    heap_ = new_heap;
-    capacity_ = new_capacity;
   }
 
   uint32_t size_{0};
@@ -303,8 +323,7 @@ public:
    */
   template <typename UnaryOperation> void inlineTransform(UnaryOperation&& unary_op) {
     ASSERT(type() == Type::Inline);
-    char* data = buffer_.mutableData();
-    std::transform(data, data + buffer_.size(), data, unary_op);
+    buffer_.inlineTransform(unary_op);
   }
 
   /**
