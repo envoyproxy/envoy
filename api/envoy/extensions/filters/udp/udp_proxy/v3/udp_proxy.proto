@@ -277,7 +277,9 @@ message UdpProxyConfig {
   UdpAccessLogOptions access_log_options = 13;
 
   // Configuration for the upstream UDP packet writer. If unset, datagrams are sent individually.
-  // Independent of the downstream writer and incompatible with
+  // Independent of the downstream :ref:`udp_packet_packet_writer_config
+  // <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config>`
+  // and incompatible with
   // :ref:`tunneling_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.tunneling_config>`.
   // [#extension-category: envoy.udp_packet_writer]
   config.core.v3.TypedExtensionConfig upstream_packet_writer_config = 14;
