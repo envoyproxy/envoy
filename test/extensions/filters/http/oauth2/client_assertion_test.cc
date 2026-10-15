@@ -339,6 +339,9 @@ public:
   std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer) override {
     return real_.getSha256Digest(buffer);
   }
+  std::vector<uint8_t> getSha256Digest(absl::string_view text) override {
+    return real_.getSha256Digest(text);
+  }
   std::vector<uint8_t> getSha256Hmac(absl::Span<const uint8_t> key,
                                      absl::string_view message) override {
     return real_.getSha256Hmac(key, message);

@@ -104,6 +104,40 @@ The following lists the filter state object keys used by the Envoy extensions to
   request attributes when ``request_storage_mode`` is set to ``FILTER_STATE`` or
   ``DYNAMIC_METADATA_AND_FILTER_STATE``. The object stores extracted fields from the parsed request.
 
+``envoy.ai.llm_protocol.request``
+  Names the request's wire API to the :ref:`AI Protocol Manager <config_http_filters_ai_protocol_manager>`,
+  ahead of the route's declaration. Accepts an :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>`
+  enum-value name as a constructor, e.g. "ANTHROPIC_MESSAGES". Supports field access with
+  ``llm_protocol``.
+
+``envoy.ai.model.request``
+  The model the request names, as the :ref:`request info AI filter
+  <envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>` read it from the
+  payload or, for Gemini, the request path. Accepts a non-empty model name as a constructor, e.g.
+  "gpt-4o".
+
+``envoy.ai.llm_protocol.response``
+  Names the backend's wire API to the :ref:`transcoder AI filter
+  <config_http_filters_ai_protocol_manager_transcoder_instructions>` and to response token-usage
+  extraction, ahead of the route's ``response`` declaration. Accepts an :ref:`LLMProtocol
+  <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name as a constructor, e.g.
+  "GEMINI_GENERATE_CONTENT". Supports field access with ``llm_protocol``.
+
+``envoy.ai.uri_pattern.request``
+  The :ref:`URI pattern <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
+  client's request path follows, from which the transcoder's ``TO_IR`` leg reads the model and
+  the streaming mode. Accepts a non-empty pattern as a constructor.
+
+``envoy.ai.uri_pattern.response``
+  The :ref:`URI pattern <config_http_filters_ai_protocol_manager_transcoder_instructions>` of the
+  path the backend expects, which the transcoder's ``FROM_IR`` leg renders into the request's
+  ``:path``. Accepts a non-empty pattern as a constructor.
+
+``envoy.ai.model.resolved``
+  The model the transcoder sends upstream in place of the one the request names, in the body and
+  in the rendered path alike. Accepts a non-empty model name as a constructor, e.g.
+  "gemini-2.5-flash".
+
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 

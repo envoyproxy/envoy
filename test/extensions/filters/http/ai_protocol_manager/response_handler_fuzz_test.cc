@@ -2,7 +2,7 @@
 #include <string>
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
 #include "source/extensions/filters/http/ai_protocol_manager/stats.h"
 
@@ -38,9 +38,9 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 
   FuzzedDataProvider provider(buf, len);
-  const ApiProtocol format = provider.PickValueInArray(
-      {ApiProtocol::Unspecified, ApiProtocol::OpenAiChatCompletions, ApiProtocol::OpenAiResponses,
-       ApiProtocol::AnthropicMessages, ApiProtocol::GeminiGenerateContent});
+  const LLMProtocol format = provider.PickValueInArray(
+      {LLMProtocol::Unspecified, LLMProtocol::OpenAiChatCompletions, LLMProtocol::OpenAiResponses,
+       LLMProtocol::AnthropicMessages, LLMProtocol::GeminiGenerateContent});
   // Small caps exercise discard mode and the complete-event skip; 1 is the
   // proto validation floor.
   const uint32_t max_event_size = provider.ConsumeIntegralInRange<uint32_t>(1, 4 * 1024);
@@ -83,7 +83,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   FUZZ_ASSERT(a.tool_use_input_tokens == b.tool_use_input_tokens);
   FUZZ_ASSERT(a.reasoning_tokens == b.reasoning_tokens);
   FUZZ_ASSERT(a.model == b.model);
-  FUZZ_ASSERT(a.api_protocol == b.api_protocol);
+  FUZZ_ASSERT(a.llm_protocol == b.llm_protocol);
   FUZZ_ASSERT(fragmented.parsingComplete() == whole.parsingComplete());
   FUZZ_ASSERT(fragmented.degraded() == whole.degraded());
 

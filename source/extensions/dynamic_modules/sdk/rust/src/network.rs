@@ -1,16 +1,18 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
-use crate::buffer::EnvoyBuffer;
+use crate::buffer::{read_buffer_chunks, EnvoyBuffer};
 use crate::{
   abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
   wrap_into_c_void_ptr, ClusterHostCount, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId,
   NewNetworkFilterConfigFunction, NEW_NETWORK_FILTER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
+use std::num::NonZero;
 
 /// The trait that represents the Envoy network filter configuration.
 /// This is used in [`NewNetworkFilterConfigFunction`] to pass the Envoy filter configuration
 /// to the dynamic module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
   fn define_counter(
@@ -201,7 +203,7 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
 
 /// The trait that represents the Envoy network filter.
 /// This is used in [`NetworkFilter`] to interact with the underlying Envoy network filter object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyNetworkFilter {
   /// Get the read buffer chunks. This is valid after the first on_read callback for the lifetime
@@ -502,8 +504,8 @@ pub trait EnvoyNetworkFilter {
   /// Check if an upstream host has been selected for this connection.
   fn has_upstream_host(&self) -> bool;
 
-  /// Get the upstream connection ID, or 0 if not available.
-  fn get_upstream_connection_id(&self) -> u64;
+  /// Get the upstream connection ID, or `None` if not available.
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>>;
 
   /// Signal the downstream connection to enable secure transport mode.
   /// This is done when the downstream connection's transport socket is of startTLS type.
@@ -611,7 +613,7 @@ pub trait EnvoyNetworkFilter {
 /// the [`Box<dyn EnvoyNetworkFilterScheduler>`] can be sent across threads.
 ///
 /// It is also safe to be called concurrently, so it is marked as `Sync` as well.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`NetworkFilter`] is running.
   ///
@@ -663,7 +665,7 @@ impl EnvoyNetworkFilterScheduler for Box<dyn EnvoyNetworkFilterScheduler> {
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
 /// Envoy network filter config on the main thread.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyNetworkFilterConfigScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);
@@ -881,63 +883,22 @@ impl EnvoyNetworkFilterImpl {
 
 impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   fn get_read_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer<'_>>, usize) {
-    let size = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(self.raw)
-    };
-    if size == 0 {
-      return (Vec::new(), 0);
-    }
-
-    let total_length =
-      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_size(self.raw) };
-    if total_length == 0 {
-      return (Vec::new(), 0);
-    }
-
-    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(
-        self.raw,
-        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
-      )
-    };
-    if !ok {
-      return (Vec::new(), 0);
-    }
-    unsafe {
-      buffers.set_len(size);
-    }
-    (buffers, total_length)
+    let raw = self.raw;
+    let count =
+      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks_size(raw) };
+    read_buffer_chunks(count, |chunks| unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_read_buffer_chunks(raw, chunks)
+    })
   }
 
   fn get_write_buffer_chunks(&mut self) -> (Vec<EnvoyBuffer<'_>>, usize) {
-    let size = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(self.raw)
+    let raw = self.raw;
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks_size(raw)
     };
-    if size == 0 {
-      return (Vec::new(), 0);
-    }
-
-    let total_length =
-      unsafe { abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_size(self.raw) };
-    if total_length == 0 {
-      return (Vec::new(), 0);
-    }
-
-    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(
-        self.raw,
-        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
-      )
-    };
-    if !ok {
-      return (Vec::new(), 0);
-    }
-    unsafe {
-      buffers.set_len(size);
-    }
-    (buffers, total_length)
+    read_buffer_chunks(count, |chunks| unsafe {
+      abi::envoy_dynamic_module_callback_network_filter_get_write_buffer_chunks(raw, chunks)
+    })
   }
 
   fn drain_read_buffer(&mut self, length: usize) {
@@ -1356,25 +1317,28 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
   }
 
   fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
-    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
-    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
-    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
-    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
-      Vec::with_capacity(entries.len());
-    for (key, value) in entries {
-      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
-        key_ptr: key.as_ptr() as *const _,
-        key_length: key.len(),
-        value_ptr: value.as_ptr() as *const _,
-        value_length: value.len(),
-      });
-    }
+    type KvPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: KvPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<KvPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
     unsafe {
       abi::envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
         self.raw,
         str_to_module_buffer(namespace),
-        pairs.as_ptr(),
-        pairs.len(),
+        entries.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        entries.len(),
       )
     }
   }
@@ -1804,10 +1768,10 @@ impl EnvoyNetworkFilter for EnvoyNetworkFilterImpl {
     unsafe { abi::envoy_dynamic_module_callback_network_filter_has_upstream_host(self.raw) }
   }
 
-  fn get_upstream_connection_id(&self) -> u64 {
-    unsafe {
+  fn get_upstream_connection_id(&self) -> Option<NonZero<u64>> {
+    NonZero::new(unsafe {
       abi::envoy_dynamic_module_callback_network_filter_get_upstream_connection_id(self.raw)
-    }
+    })
   }
 
   fn start_downstream_secure_transport(&mut self) -> bool {

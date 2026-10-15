@@ -580,8 +580,37 @@ TEST_F(HotRestartingParentTest, UdpPacketIsForwarded) {
   expected_packet->set_payload(msg);
   expected_packet->set_receive_time_epoch_microseconds(1234567890);
   expected_packet->set_worker_index(worker_index);
+  expected_packet->set_listener_addr("udp://127.0.0.1:12345");
   EXPECT_CALL(message_sender_, sendHotRestartMessage(ProtoEq(expected_msg)));
-  hot_restarting_parent_.handle(worker_index, packet);
+  hot_restarting_parent_.handle(worker_index, *ipv4_test_addr_1_, packet);
+}
+
+// The forwarded packet carries the listener's bind address and network namespace rather than
+// only the packet's destination, so the child can resolve the right listener for transparent
+// sockets and for listeners bound to the same address in different namespaces.
+TEST_F(HotRestartingParentTest, UdpPacketIsForwardedWithListenerAddressAndNamespace) {
+  uint32_t worker_index = 3;
+  Network::UdpRecvData packet;
+  std::string msg = "hello";
+  // Transparent socket: the destination is not the bind address.
+  packet.addresses_.local_ = *Network::Utility::resolveUrl("udp://10.0.0.5:12345");
+  packet.addresses_.peer_ = ipv4_test_addr_2_;
+  packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(msg);
+  packet.receive_time_ = MonotonicTime(std::chrono::microseconds(42));
+  auto listener_address = Network::Utility::resolveUrl("udp://0.0.0.0:12345")
+                              .value()
+                              ->withNetworkNamespace("/run/netns/pod");
+  envoy::HotRestartMessage expected_msg;
+  auto* expected_packet = expected_msg.mutable_request()->mutable_forwarded_udp_packet();
+  expected_packet->set_local_addr("udp://10.0.0.5:12345");
+  expected_packet->set_peer_addr("udp://127.0.0.1:54321");
+  expected_packet->set_payload(msg);
+  expected_packet->set_receive_time_epoch_microseconds(42);
+  expected_packet->set_worker_index(worker_index);
+  expected_packet->set_listener_addr("udp://0.0.0.0:12345");
+  expected_packet->set_network_namespace("/run/netns/pod");
+  EXPECT_CALL(message_sender_, sendHotRestartMessage(ProtoEq(expected_msg)));
+  hot_restarting_parent_.handle(worker_index, *listener_address, packet);
 }
 
 } // namespace

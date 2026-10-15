@@ -52,6 +52,7 @@ BOM
 CCL
 CGROUP
 CROSSSLOT
+DLL
 ECN
 ECS
 EdDSA
@@ -108,6 +109,8 @@ cbor
 CDN
 CDS
 CEL
+COMDAT
+COFF
 CWND
 DLE
 DPE
@@ -129,6 +132,7 @@ FIXME
 decrypted
 decrypts
 gperf
+gperftools
 HEXDIG
 HEXDIGIT
 HPE
@@ -457,6 +461,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+PSK
 Postgre
 Postgres
 Prereq
@@ -470,6 +475,7 @@ qatzip
 qatzstd
 RAII
 RANLUX
+RBE
 RBAC
 RDN
 RDS
@@ -603,6 +609,7 @@ WRR
 WS
 WSA
 WSABUF
+WSAEMSGSIZE
 WSS
 WUFFS
 Welford's
@@ -668,6 +675,7 @@ auths
 authz
 automata
 autoscale
+autosharding
 awaitable
 awaitables
 awaiter
@@ -973,6 +981,7 @@ hackery
 hacky
 handoff
 handshaker
+handshakers
 hardcode
 hardcoded
 hardcodes
@@ -1034,6 +1043,7 @@ ints
 invariance
 invariants
 invoker
+Invocable
 iov
 iovcnt
 iovec
@@ -1060,6 +1070,8 @@ keyset
 ketama
 keyder
 kqueue
+kTLS
+ktls
 kubernetes
 kv
 kvlist
@@ -1827,3 +1839,6 @@ MLKEM
 PQC
 quantum
 X25519MLKEM768
+cpaths
+SynchronousFeedbackResourceMonitor
+bernoulli

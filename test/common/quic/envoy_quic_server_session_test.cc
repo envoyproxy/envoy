@@ -42,6 +42,7 @@
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #include "quiche/quic/test_tools/quic_stream_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
@@ -988,6 +989,56 @@ TEST_F(EnvoyQuicServerSessionTest, GoAway) {
   EXPECT_EQ(1U, stats_.goaway_sent_.value());
 }
 
+TEST_F(EnvoyQuicServerSessionTest, CreateIncomingStreamGoAwayOnDispatch) {
+  Server::MockLoadShedPoint go_away_lsp;
+  ON_CALL(overload_manager_,
+          getLoadShedPoint(Server::LoadShedPointName::get().H3ServerGoAwayOnDispatch))
+      .WillByDefault(Return(&go_away_lsp));
+  installReadFilter();
+
+  testing::NiceMock<quic::test::MockHttp3DebugVisitor> debug_visitor;
+  envoy_quic_session_.set_debug_visitor(&debug_visitor);
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks1, stream_callbacks2;
+  setupRequestDecoderMock(request_decoder);
+  EXPECT_CALL(request_decoder, accessLogHandlers()).Times(2);
+
+  EXPECT_CALL(go_away_lsp, shouldShedLoad()).WillRepeatedly(Return(true));
+  EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+
+  auto* stream1 = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(4u, request_decoder, stream_callbacks1));
+  ASSERT_NE(nullptr, stream1);
+
+  // Subsequent stream creation should not send a duplicate GOAWAY frame.
+  auto* stream2 = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(8u, request_decoder, stream_callbacks2));
+  ASSERT_NE(nullptr, stream2);
+
+  EXPECT_CALL(stream_callbacks1, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream1->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_CALL(stream_callbacks2, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream2->resetStream(Http::StreamResetReason::LocalReset);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, CreateIncomingStreamGoAwayAndCloseOnDispatch) {
+  Server::MockLoadShedPoint go_away_and_close_lsp;
+  ON_CALL(overload_manager_,
+          getLoadShedPoint(Server::LoadShedPointName::get().H3ServerGoAwayAndCloseOnDispatch))
+      .WillByDefault(Return(&go_away_and_close_lsp));
+  installReadFilter();
+
+  EXPECT_CALL(go_away_and_close_lsp, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_PEER_GOING_AWAY, _, "Server overloaded"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+
+  EXPECT_EQ(nullptr, envoy_quic_session_.GetOrCreateStream(4u));
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  EXPECT_FALSE(quic_connection_->connected());
+}
+
 TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
   installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
@@ -1419,14 +1470,16 @@ TEST_F(EnvoyQuicServerSessionTest, TerminateIdleSession) {
 TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigDefault) {
   installReadFilter();
   quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  EXPECT_EQ(config.client_cert_mode, quic::ClientCertMode::kNone);
   ASSERT_TRUE(config.early_data_enabled.has_value());
   EXPECT_TRUE(*config.early_data_enabled);
   EXPECT_FALSE(config.disable_ticket_support);
 }
 
-// `GetSSLConfig` requests a client certificate and disables 0-RTT when the matched filter chain
-// requires client authentication, because replayable early data would bypass validation.
-TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertRequiredDisablesEarlyData) {
+// `GetSSLConfig` requires a client certificate when the matched filter chain requires one. Early
+// data follows the transport socket configuration, which defaults off when a validation context is
+// configured.
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertRequired) {
   installReadFilter();
   setupMtlsFilterChainPosition(R"EOF(
 downstream_tls_context:
@@ -1448,8 +1501,8 @@ downstream_tls_context:
   EXPECT_FALSE(*config.early_data_enabled);
 }
 
-// `GetSSLConfig` leaves client authentication and 0-RTT untouched when the matched chain does not
-// require a client certificate.
+// `GetSSLConfig` leaves client authentication and 0-RTT untouched when the matched chain configures
+// no validation context.
 TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertNotRequired) {
   installReadFilter();
   setupMtlsFilterChainPosition(R"EOF(
@@ -1466,6 +1519,62 @@ downstream_tls_context:
   EXPECT_EQ(config.client_cert_mode, quic::ClientCertMode::kNone);
   ASSERT_TRUE(config.early_data_enabled.has_value());
   EXPECT_TRUE(*config.early_data_enabled);
+}
+
+// `setClientCertificateValidated()` marks the peer certificate validated on the connection.
+TEST_F(EnvoyQuicServerSessionTest, SetClientCertificateValidated) {
+  installReadFilter();
+  EXPECT_FALSE(envoy_quic_session_.ssl()->peerCertificateValidated());
+  envoy_quic_session_.setClientCertificateValidated({});
+  EXPECT_TRUE(envoy_quic_session_.ssl()->peerCertificateValidated());
+}
+
+// `GetSSLConfig` requests but does not require a client certificate when a validation context is
+// configured without `require_client_certificate`. Early data defaults off for such a chain.
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertOptional) {
+  installReadFilter();
+  setupMtlsFilterChainPosition(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+
+  quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  EXPECT_EQ(config.client_cert_mode, quic::ClientCertMode::kRequest);
+  ASSERT_TRUE(config.early_data_enabled.has_value());
+  EXPECT_FALSE(*config.early_data_enabled);
+}
+
+// With the `quic_mtls_server_enabled` runtime guard disabled, an optional validation context does
+// not request a client certificate.
+TEST_F(EnvoyQuicServerSessionTest, GetSSLConfigClientCertOptionalRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_mtls_server_enabled", "false"}});
+  installReadFilter();
+  setupMtlsFilterChainPosition(R"EOF(
+downstream_tls_context:
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+
+  quic::QuicSSLConfig config = envoy_quic_session_.GetSSLConfig();
+  EXPECT_EQ(config.client_cert_mode, quic::ClientCertMode::kNone);
+  ASSERT_TRUE(config.early_data_enabled.has_value());
+  EXPECT_FALSE(*config.early_data_enabled);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, SessionIdleCallbacksIdempotency) {
@@ -1538,6 +1647,37 @@ class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessio
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
   EXPECT_EQ(envoy_quic_session_.lastRoundTripTime(), std::nullopt);
   EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), std::nullopt);
+}
+
+class EnvoyQuicServerSessionSslResetTest : public EnvoyQuicServerSessionTest {
+public:
+  EnvoyQuicServerSessionSslResetTest() {
+    // Merged before SetUp() initializes the session, so it picks up the flag.
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.quic_enable_reset_ssl_after_handshake", "true"}});
+  }
+
+protected:
+  TestScopedRuntime scoped_runtime_;
+};
+
+// With reset-after-handshake enabled, the peer certificate chain is cached at handshake
+// completion so peer certificate queries keep working after QUICHE releases the SSL object.
+TEST_F(EnvoyQuicServerSessionSslResetTest, PeerCertQueriesAfterSslReset) {
+  installReadFilter();
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  envoy_quic_session_.OnTlsHandshakeComplete();
+
+  // Release the SSL object the way QUICHE does once the handshake completion is acknowledged.
+  static_cast<quic::QuicCryptoServerStreamBase*>(
+      quic::test::QuicSessionPeer::GetMutableCryptoStream(&envoy_quic_session_))
+      ->ResetSsl();
+
+  // No client certificate was presented; the queries are served from the cache instead of the
+  // released SSL object.
+  EXPECT_FALSE(envoy_quic_session_.ssl()->peerCertificatePresented());
+  EXPECT_TRUE(envoy_quic_session_.ssl()->subjectPeerCertificate().empty());
 }
 
 TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, ResetSslAfterHandshakeEnabledViaRuntime) {

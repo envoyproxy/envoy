@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -62,7 +63,36 @@ private:
   uint32_t vm_count_delta_{};
 };
 
-using PerLuaCodeSetupPtr = std::unique_ptr<PerLuaCodeSetup>;
+// Shared, because the same VM setup may be handed to several filter or route configurations
+// when they opt into sharing via `shared_vm_id`.
+using PerLuaCodeSetupSharedPtr = std::shared_ptr<PerLuaCodeSetup>;
+
+/**
+ * A process-wide registry of the Lua VM setups that configurations have opted into sharing via
+ * `shared_vm_id`. Configurations that agree on the id and on the script get one PerLuaCodeSetup,
+ * and therefore one set of VMs, between them instead of one each.
+ */
+class SharedLuaCodeSetupRegistry : public Singleton::Instance, Logger::Loggable<Logger::Id::lua> {
+public:
+  /**
+   * @return the setup already registered for this id and script, or a newly built one which is
+   *         registered for later callers. Returns nullptr, with creation_status set, if the
+   *         script cannot be parsed; a script that fails to parse is not registered.
+   */
+  PerLuaCodeSetupSharedPtr getOrCreate(absl::string_view shared_vm_id, const std::string& lua_code,
+                                       const Filters::Common::Lua::PackagePaths& package_paths,
+                                       ThreadLocal::SlotAllocator& tls,
+                                       Stats::Gauge& vm_count_gauge, uint32_t concurrency,
+                                       absl::Status& creation_status);
+
+private:
+  // Weak, so that a shared VM is torn down once the last configuration using it is drained, the
+  // same way an unshared one is. Every configuration that reaches this registry holds a
+  // shared_ptr to it, so the registry outlives the setups it hands out.
+  absl::flat_hash_map<std::string, std::weak_ptr<PerLuaCodeSetup>> setups_;
+};
+
+using SharedLuaCodeSetupRegistrySharedPtr = std::shared_ptr<SharedLuaCodeSetupRegistry>;
 
 /**
  * Callbacks used by a stream handler to access the filter.
@@ -103,10 +133,12 @@ public:
                        lua_State* state) PURE;
 
   /**
-   * @return const Protobuf::Struct& the value of metadata inside the lua filter scope of current
-   * route entry.
+   * @param ns supplies the namespace of the metadata. If it is empty, the filter config name is
+   * used and the filter canonical name is used as a fallback.
+   * @return const Protobuf::Struct& the value of metadata under the namespace of current route
+   * entry.
    */
-  virtual const Protobuf::Struct& metadata() const PURE;
+  virtual const Protobuf::Struct& metadata(absl::string_view ns) const PURE;
 
   /**
    * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
@@ -153,6 +185,11 @@ public:
    * is pre-configured with the appropriate lua stat prefix.
    */
   virtual Stats::Scope& statsScope() PURE;
+
+  /**
+   * @return Http::RequestHeaderMapOptRef the request headers for this stream, if present.
+   */
+  virtual Http::RequestHeaderMapOptRef requestHeaders() PURE;
 };
 
 class Filter;
@@ -214,6 +251,7 @@ public:
 
   static ExportedFunctions exportedFunctions() {
     return {{"headers", static_luaHeaders},
+            {"requestHeaders", static_luaRequestHeaders},
             {"body", static_luaBody},
             {"bodyChunks", static_luaBodyChunks},
             {"trailers", static_luaTrailers},
@@ -264,6 +302,13 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaHeaders);
 
   /**
+   * @return a handle to the request headers, or nil if the stream has none. On the request path
+   *         this is the same header map that headers() returns; on the response path it is the
+   *         request's headers, which are otherwise unreachable from envoy_on_response.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRequestHeaders);
+
+  /**
    * @return a handle to the full body or nil if there is no body. This call will cause the script
    *         to yield until the entire body is received (or if there is no body will return nil
    *         right away).
@@ -286,6 +331,8 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTrailers);
 
   /**
+   * @param 1 (string): optional namespace of the metadata. The filter config name is used if it
+   *        is not set.
    * @return a handle to the metadata.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
@@ -412,9 +459,10 @@ private:
     // Headers/body/trailers wrappers do not survive any yields. The user can request them
     // again across yields if needed.
     headers_wrapper_.reset();
+    request_headers_wrapper_.reset();
     body_wrapper_.reset();
     trailers_wrapper_.reset();
-    metadata_wrapper_.reset();
+    metadata_wrappers_.clear();
     filter_context_wrapper_.reset();
     stream_info_wrapper_.reset();
     connection_wrapper_.reset();
@@ -443,9 +491,13 @@ private:
   FilterCallbacks& callbacks_;
   Http::HeaderMap* trailers_{};
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> request_headers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
-  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+  // The metadata wrappers keyed by the namespace. The empty key is used for the default namespace.
+  absl::flat_hash_map<std::string,
+                      Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>>
+      metadata_wrappers_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>
       filter_context_wrapper_;
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
@@ -486,7 +538,8 @@ public:
   FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                Api::Api& api, Stats::Scope& scope, const std::string& stat_prefix,
-               uint32_t concurrency, absl::Status& creation_status);
+               uint32_t concurrency, Singleton::Manager& singleton_manager,
+               absl::Status& creation_status);
 
   PerLuaCodeSetup* perLuaCodeSetup(std::optional<absl::string_view> name = std::nullopt) const {
     if (!name.has_value()) {
@@ -516,8 +569,11 @@ private:
 
   const bool clear_route_cache_{};
   const Protobuf::Struct filter_context_;
-  PerLuaCodeSetupPtr default_lua_code_setup_;
-  absl::flat_hash_map<std::string, PerLuaCodeSetupPtr> per_lua_code_setups_map_;
+  // Non-null only when `shared_vm_id` is set. Holding it keeps the registry alive for at least
+  // as long as the setups it handed to this configuration.
+  SharedLuaCodeSetupRegistrySharedPtr shared_code_setup_registry_;
+  PerLuaCodeSetupSharedPtr default_lua_code_setup_;
+  absl::flat_hash_map<std::string, PerLuaCodeSetupSharedPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
   // Sub-scope pre-configured with the lua stat prefix.
   Stats::ScopeSharedPtr lua_stats_scope_;
@@ -543,7 +599,9 @@ public:
 private:
   const bool disabled_;
   const std::string name_;
-  PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
+  // See FilterConfig::shared_code_setup_registry_.
+  SharedLuaCodeSetupRegistrySharedPtr shared_code_setup_registry_;
+  PerLuaCodeSetupSharedPtr per_lua_code_setup_ptr_;
   const bool has_filter_context_ = false;
   const Protobuf::Struct filter_context_;
 };
@@ -625,7 +683,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const Protobuf::Struct& metadata() const override;
+    const Protobuf::Struct& metadata(absl::string_view ns) const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
@@ -645,6 +703,7 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
+    Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -663,7 +722,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const Protobuf::Struct& metadata() const override;
+    const Protobuf::Struct& metadata(absl::string_view ns) const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
@@ -679,6 +738,7 @@ private:
       return callbacks_->filterConfigName();
     }
     Stats::Scope& statsScope() override { return parent_.config_->luaStatsScope(); }
+    Http::RequestHeaderMapOptRef requestHeaders() override { return callbacks_->requestHeaders(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};

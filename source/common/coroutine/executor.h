@@ -6,6 +6,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/timer.h"
 
+#include "absl/functional/any_invocable.h"
+
 namespace Envoy {
 namespace Coroutine {
 
@@ -32,6 +34,12 @@ public:
    * root and (b) future thread hops.
    */
   virtual void schedule(std::coroutine_handle<> handle) PURE;
+
+  /**
+   * Post `cb` to run on this executor's run loop. Used by `YieldAwaitable` /
+   * `yield`.
+   */
+  virtual void post(absl::AnyInvocable<void()> cb) PURE;
 
   /**
    * Create a timer that invokes `cb` when it fires. Used by `TimerAwaitable` /

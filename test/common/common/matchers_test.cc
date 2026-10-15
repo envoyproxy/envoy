@@ -546,6 +546,14 @@ TEST_F(PathMatcher, MatchExactPath) {
   EXPECT_FALSE(matcher->match("/exacz#/exact"));
 }
 
+TEST_F(PathMatcher, MatchPathWithoutQuery) {
+  const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", false, context_);
+
+  EXPECT_TRUE(matcher->matchPathWithoutQuery("/exact"));
+  EXPECT_FALSE(matcher->matchPathWithoutQuery("/other"));
+  EXPECT_FALSE(matcher->matchPathWithoutQuery("/exact?param=val"));
+}
+
 TEST_F(PathMatcher, MatchExactPathIgnoreCase) {
   const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", true, context_);
 

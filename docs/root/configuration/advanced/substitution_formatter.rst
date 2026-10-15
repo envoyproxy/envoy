@@ -491,6 +491,20 @@ Current supported substitution commands include:
 
   Renders a numeric value in typed JSON logs.
 
+``%ROUTE_RESOLUTION_TIME_US%``
+  HTTP
+    Total wall time in microseconds spent resolving the route for the request. A request that never
+    resolved a route will appear as ``"-"`` in the access logs.
+
+  Renders a numeric value in typed JSON logs.
+
+``%ROUTE_RESOLUTION_COUNT%``
+  HTTP
+    Number of times the route was resolved for the request. A request that never resolved a route
+    will appear as ``0``.
+
+  Renders a numeric value in typed JSON logs.
+
 ``%DOWNSTREAM_HANDSHAKE_DURATION%``
   HTTP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -1434,6 +1448,13 @@ Current supported substitution commands include:
 ``%DOWNSTREAM_PEER_CERT%``
   HTTP/TCP/THRIFT
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%DOWNSTREAM_PEER_CERT_CHAIN%``
+  HTTP/TCP/THRIFT
+    The client certificate chain used to establish the downstream TLS connection in URL-encoded PEM format.
+    The certificate chain includes the leaf certificate.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 

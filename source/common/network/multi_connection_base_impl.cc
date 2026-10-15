@@ -66,6 +66,7 @@ void MultiConnectionBaseImpl::removeReadFilter(ReadFilterSharedPtr filter) {
       post_connect_state_.read_filters_.erase(i);
       return;
     }
+    ++i;
   }
   IS_ENVOY_BUG("Failed to remove read filter");
 }

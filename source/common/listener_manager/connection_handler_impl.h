@@ -32,9 +32,8 @@ class ConnectionHandlerImpl : public ConnectionHandler,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  using UdpListenerCallbacksOptRef =
-      std::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
-  using ActiveTcpListenerOptRef = std::optional<std::reference_wrapper<ActiveTcpListener>>;
+  using UdpListenerCallbacksOptRef = OptRef<Network::UdpListenerCallbacks>;
+  using ActiveTcpListenerOptRef = OptRef<ActiveTcpListener>;
 
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index);
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index,
@@ -61,6 +60,7 @@ public:
   void enableListeners() override;
   void setListenerRejectFraction(UnitFloat reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
+  std::optional<uint32_t> workerId() const override { return worker_index_; }
   void closeIdleHttpConnections(bool is_saturated) override;
 
   // Network::TcpConnectionHandler
@@ -146,11 +146,10 @@ private:
     }
   };
 
-  using ActiveListenerDetailsOptRef = std::optional<std::reference_wrapper<ActiveListenerDetails>>;
+  using ActiveListenerDetailsOptRef = OptRef<ActiveListenerDetails>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
-  using PerAddressActiveListenerDetailsOptRef =
-      std::optional<std::reference_wrapper<PerAddressActiveListenerDetails>>;
+  using PerAddressActiveListenerDetailsOptRef = OptRef<PerAddressActiveListenerDetails>;
   PerAddressActiveListenerDetailsOptRef
   findPerAddressActiveListenerDetails(const ActiveListenerDetailsOptRef active_listener_details,
                                       const Network::Address::Instance& address);

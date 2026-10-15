@@ -92,11 +92,11 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
       init_target_(
           fmt::format("VhdsConfigSubscription {}", route_config_name_),
           [this, use_collection = !route_config.vhds().default_resource_locator().empty()]() {
-            if (use_collection) {
-              subscription_->start({});
-            } else {
-              subscription_->start({route_config_name_});
+            if (!use_collection) {
+              // Accept on-demand virtual hosts without subscribing to them on the wire.
+              subscription_->accept({route_config_name_ + "/*"});
             }
+            subscription_->start({});
           }),
       resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
                             "name") {
@@ -104,10 +104,9 @@ VhdsSubscription::VhdsSubscription(const envoy::config::route::v3::RouteConfigur
   const auto& default_resource_name = vhds.default_resource_locator();
 
   if (default_resource_name.empty()) {
-    // Legacy mode: use namespace-matching subscription.
+    // On-demand mode: accept virtual hosts under the route configuration namespace.
     const auto resource_name = resource_type_helper_.getResourceName();
     Envoy::Config::SubscriptionOptions options;
-    options.use_namespace_matching_ = true;
     absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
         factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
             route_config.vhds().config_source(), Grpc::Common::typeUrl(resource_name), *scope_,

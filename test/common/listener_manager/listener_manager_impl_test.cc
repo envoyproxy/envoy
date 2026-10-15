@@ -59,6 +59,7 @@ namespace {
 using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using testing::ByMove;
+using testing::HasSubstr;
 using testing::InSequence;
 using ::testing::Not;
 using testing::Return;
@@ -983,6 +984,100 @@ filter_chains:
   EXPECT_THAT(status, Not(IsOk()));
 #endif
 }
+
+#if defined(__linux__)
+// A listener in a network namespace whose path can no longer be opened still inherits its socket
+// from the hot restart parent: the parent's socket is already bound inside that namespace, so the
+// namespace is not entered when the parent has a socket to hand over.
+TEST_P(ListenerManagerImplTest, InheritParentListenSocketWithoutEnteringNetworkNamespace) {
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+    network_namespace_filepath: /var/run/netns/removed
+filter_chains:
+- filters: []
+  )EOF";
+
+  const int parent_fd = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0).return_value_;
+  ASSERT_GE(parent_fd, 0);
+  EXPECT_CALL(server_.hot_restart_,
+              duplicateParentListenSocket("tcp://127.0.0.1:1234", 0, "/var/run/netns/removed"))
+      .WillOnce(Return(parent_fd));
+  // The namespace file is never opened.
+  EXPECT_CALL(os_sys_calls_, open(_, _)).Times(0);
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [&real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
+  EXPECT_CALL(listener_foo->target_, initialize());
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+}
+
+// Without a parent socket to inherit, a network namespace path that cannot be opened still fails
+// the listener.
+TEST_P(ListenerManagerImplTest, MissingNetworkNamespaceWithoutParentListenSocketFails) {
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+    network_namespace_filepath: /var/run/netns/removed
+filter_chains:
+- filters: []
+  )EOF";
+
+  EXPECT_CALL(server_.hot_restart_,
+              duplicateParentListenSocket("tcp://127.0.0.1:1234", 0, "/var/run/netns/removed"))
+      .WillOnce(Return(-1));
+  // Opening the current namespace succeeds; opening the target namespace fails.
+  EXPECT_CALL(os_sys_calls_, open(_, _))
+      .WillRepeatedly(Invoke([](const char* pathname, int) -> Api::SysCallIntResult {
+        if (absl::EndsWith(pathname, "/ns/net")) {
+          return {3, 0};
+        }
+        return {-1, ENOENT};
+      }));
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [&real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_THAT(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true)
+                  .status()
+                  .message(),
+              HasSubstr("failed to open netns file /var/run/netns/removed"));
+  EXPECT_EQ(
+      1UL,
+      server_.stats_store_.counterFromString("listener_manager.listener_create_failure").value());
+}
+#endif
 
 TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
   const std::string yaml = R"EOF(
@@ -7734,14 +7829,14 @@ api_listener:
   ASSERT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   ASSERT_TRUE(manager_->apiListener().has_value());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
 
   // Only one ApiListener is added.
   ASSERT_FALSE(addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   // The original ApiListener is there.
   ASSERT_TRUE(manager_->apiListener().has_value());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
@@ -8988,6 +9083,64 @@ TEST_P(ListenerManagerImplTest, TcpBacklogCustomConfig) {
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   EXPECT_EQ(1U, manager_->listeners().size());
   EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());
+}
+
+// Regression test: tcp_backlog_size updated via xDS must be applied to the kernel socket.
+// When a listener update shares the same address, cloneSocketFactoryFrom() is called instead of
+// creating a new socket. Before the fix the copy constructor carried the old factory's
+// tcp_backlog_size_, so doFinalPreWorkerInit() would call listen() with the stale value.
+TEST_P(ListenerManagerImplTest, TcpBacklogSizeAppliedOnListenerUpdate) {
+  // Add a listener with tcp_backlog_size: 100. Workers have not started yet.
+  const std::string listener_v1_yaml = TestEnvironment::substitute(R"EOF(
+    name: foo
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    tcp_backlog_size: 100
+    filter_chains:
+    - filters: []
+  )EOF",
+                                                                   Network::Address::IpVersion::v4);
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_v1_yaml)));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());
+
+  // Update with tcp_backlog_size: 200 (same address). Workers are still not started so
+  // supportUpdateFilterChain() returns false and the standard path is taken:
+  // setupSocketFactoryForListener -> cloneSocketFactoryFrom. The fix ensures the cloned
+  // factory is created with the new backlog value (200) rather than the old one (100).
+  const std::string listener_v2_yaml = TestEnvironment::substitute(R"EOF(
+    name: foo
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    tcp_backlog_size: 200
+    filter_chains:
+    - filters: []
+  )EOF",
+                                                                   Network::Address::IpVersion::v4);
+
+  auto* duplicated_socket = new NiceMock<Network::MockListenSocket>();
+  EXPECT_CALL(*listener_factory_.socket_, duplicate())
+      .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
+  ListenerHandle* listener_foo_update = expectListenerCreate(false, true);
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_v2_yaml)));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  EXPECT_EQ(200U, manager_->listeners().back().get().tcpBacklogSize());
+
+  // Starting workers triggers doFinalPreWorkerInit() on the updated listener, which calls
+  // listen() on the duplicated socket. Verify the new backlog (200) reaches the kernel —
+  // this is the observable behavior the fix enables.
+  EXPECT_CALL(*duplicated_socket->io_handle_, listen(200))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+  worker_->callAddCompletion();
+
+  EXPECT_CALL(*listener_foo_update, onDestroy());
 }
 
 TEST_P(ListenerManagerImplTest, WorkersStartedCallbackCalled) {

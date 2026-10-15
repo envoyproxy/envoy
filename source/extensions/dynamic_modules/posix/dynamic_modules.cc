@@ -13,6 +13,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/background_fetch_manager.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
@@ -45,22 +46,29 @@ void logModuleLoadFailure(absl::string_view module, absl::string_view reason) {
 absl::StatusOr<DynamicModulePtr>
 newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close,
                  const bool load_globally) {
+  // Exactly one of RTLD_LAZY or RTLD_NOW must be present. By default the loader binds now
+  // (RTLD_NOW), resolving every referenced symbol at load so a missing symbol fails the load
+  // instead of crashing later on first use. The runtime guard reverts to RTLD_LAZY, which resolves
+  // symbols lazily on first use, for operators that rely on the previous behavior.
+  const int binding_mode =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dynamic_modules_rtld_now")
+          ? RTLD_NOW
+          : RTLD_LAZY;
   // From the man page of dlopen(3):
   //
   // > This can be used to test if the object is already resident (dlopen() returns NULL if it
   // > is not, or the object's handle if it is resident).
   //
   // So we can use RTLD_NOLOAD to check if the module is already loaded to avoid the duplicate call
-  // to the init function.
-  void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | RTLD_LAZY);
+  // to the init function. The binding mode is carried on this probe so an already resident object
+  // is resolved with the same binding as a fresh load.
+  void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | binding_mode);
   if (handle != nullptr) {
     // This means the module is already loaded, and the return value is the handle of the already
     // loaded module. We don't need to call the init function again.
     return std::make_unique<DynamicModule>(handle);
   }
-  // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
-  // dlopen results in Invalid argument.
-  int mode = RTLD_LAZY;
+  int mode = binding_mode;
   if (load_globally) {
     mode |= RTLD_GLOBAL;
   } else {
@@ -99,16 +107,19 @@ newDynamicModule(const std::filesystem::path& object_file_absolute_path, const b
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
   }
+  // Copy the version out of module memory right away, since the returned pointer is only
+  // guaranteed valid immediately after on_program_init returns.
+  const std::string module_abi_version(abi_version);
   // We log a warning if the ABI version does not match exactly.
-  if (absl::string_view(abi_version) != absl::string_view(ENVOY_DYNAMIC_MODULES_ABI_VERSION)) {
+  if (module_abi_version != ENVOY_DYNAMIC_MODULES_ABI_VERSION) {
     ENVOY_LOG_TO_LOGGER(
         Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
         "Dynamic module ABI version {} is deprecated. Please recompile the module against the "
         "SDK with the exact Envoy version used by the main program.",
-        abi_version);
+        module_abi_version);
   } else {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), info,
-                        "Dynamic module ABI version {} matched.", abi_version);
+                        "Dynamic module ABI version {} matched.", module_abi_version);
   }
   return dynamic_module;
 }

@@ -22,6 +22,7 @@ HTTP filters
   cache_v2_filter
   cdn_loop_filter
   checksum_filter
+  client_cert_filter
   compressor_filter
   composite_filter
   connect_grpc_bridge_filter

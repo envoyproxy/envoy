@@ -3,10 +3,12 @@ abseil-cpp:
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
   apparent_name: abseil_cpp
-  release_date: "2026-02-11"
+  release_date: "2026-08-18"
   use_category:
   - dataplane_core
   - controlplane
+  implied_untracked_deps:
+  - gloop
   license: "Apache-2.0"
   license_url: "https://github.com/abseil/abseil-cpp/blob/{version}/LICENSE"
 
@@ -27,7 +29,6 @@ antlr4-cpp-runtime:
   - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
   - envoy.rate_limit_descriptors.expr
   - envoy.stat_sinks.wasm
-
   use_category:
   - api
   - controlplane
@@ -112,7 +113,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2026-04-14"
+  release_date: "2026-09-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -124,7 +125,7 @@ brotli:
   project_name: "brotli"
   project_desc: "brotli compression library"
   project_url: "https://brotli.org"
-  release_date: "2025-10-27"
+  release_date: "2026-09-30"
   use_category:
   - dataplane_core
   - dataplane_ext
@@ -186,39 +187,9 @@ cel-cpp:
   - envoy.tracers.opentelemetry.samplers.cel
   implied_untracked_deps:
   - antlr4_runtimes
+  - cel-spec
   license: "Apache-2.0"
   license_url: "https://github.com/google/cel-cpp/blob/v{version}/LICENSE"
-
-cel-spec:
-  project_name: "Common Expression Language (CEL) spec"
-  project_desc: "Common Expression Language (CEL) spec and conformance tests"
-  project_url: "https://opensource.google/projects/cel"
-  apparent_name: cel_spec
-  release_date: "2026-05-08"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.access_loggers.extension_filters.cel
-  - envoy.access_loggers.wasm
-  - envoy.bootstrap.wasm
-  - envoy.rate_limit_descriptors.expr
-  - envoy.filters.http.ext_proc
-  - envoy.filters.http.rate_limit_quota
-  - envoy.filters.http.rbac
-  - envoy.filters.http.upstream_rbac
-  - envoy.filters.http.wasm
-  - envoy.filters.network.ext_proc
-  - envoy.filters.network.rbac
-  - envoy.filters.network.wasm
-  - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
-  - envoy.stat_sinks.wasm
-  - envoy.formatter.cel
-  - envoy.matching.inputs.cel_data_input
-  - envoy.matching.matchers.cel_matcher
-  - envoy.tracers.opentelemetry
-  - envoy.tracers.opentelemetry.samplers.cel
-  license: "Apache-2.0"
-  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
 
 colm:
   project_name: "Colm"
@@ -296,7 +267,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-09-03"
+  release_date: "2026-10-08"
   use_category:
   - build
   - controlplane
@@ -319,7 +290,7 @@ fast_float:
     Fast and exact implementation of the C++ from_chars functions for number types: 4x to 10x faster than strtod,
     part of GCC 12, Chromium, Redis and WebKit/Safari
   project_url: "https://github.com/fastfloat/fast_float"
-  release_date: "2024-11-21"
+  release_date: "2026-03-10"
   use_category:
   - dataplane_ext
   extensions:
@@ -329,7 +300,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -342,7 +313,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -355,7 +326,7 @@ fips_go_linux_amd64:
   project_name: "Go (Linux amd64)"
   project_desc: "Go programming language (Linux amd64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -368,7 +339,7 @@ fips_go_linux_arm64:
   project_name: "Go (Linux arm64)"
   project_desc: "Go programming language (Linux arm64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -661,7 +632,7 @@ libpfm:
   project_name: "libpfm"
   project_desc: "A helper library to develop monitoring tools"
   project_url: "https://sourceforge.net/projects/perfmon2"
-  release_date: "2020-09-02"
+  release_date: "2020-09-03"
   use_category:
   - test_only
 
@@ -738,7 +709,7 @@ msgpack-cxx:
   project_name: "msgpack for C/C++"
   project_desc: "MessagePack is an efficient binary serialization format"
   project_url: "https://github.com/msgpack/msgpack-c"
-  apparent_name: msgpack-cxx
+  apparent_name: msgpack-c
   release_date: "2024-11-02"
   use_category:
   - observability_ext
@@ -806,7 +777,7 @@ openssl:
   project_name: "OpenSSL"
   project_desc: "TLS/SSL and crypto library"
   project_url: "https://github.com/openssl/openssl"
-  release_date: "2026-06-09"
+  release_date: "2026-09-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -859,7 +830,7 @@ proto-converter:
   project_desc: "Library that supports the conversion between protobuf binary and json"
   project_url: "https://github.com/grpc-ecosystem/proto-converter"
   apparent_name: proto-converter
-  release_date: "2024-06-25"
+  release_date: "2026-09-12"
   use_category:
   - dataplane_core
   - controlplane
@@ -964,7 +935,7 @@ proxy-wasm-rust-sdk:
   project_desc: "WebAssembly for Proxies (Rust SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk"
   apparent_name: proxy-wasm-rust-sdk
-  release_date: "2025-10-01"
+  release_date: "2026-05-20"
   use_category:
   - test_only
   license: "Apache-2.0"
@@ -1010,7 +981,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-08-31"
+  release_date: "2026-10-06"
   use_category:
   - controlplane
   - dataplane_core
@@ -1453,7 +1424,7 @@ zlib-ng:
   project_desc: "zlib fork (higher performance)"
   project_url: "https://github.com/zlib-ng/zlib-ng"
   apparent_name: zlib-ng
-  release_date: "2025-12-02"
+  release_date: "2026-02-03"
   use_category:
   - controlplane
   - dataplane_core
@@ -1464,7 +1435,7 @@ zstd:
   project_name: "zstd"
   project_desc: "zstd compression library"
   project_url: "https://facebook.github.io/zstd"
-  release_date: "2025-02-19"
+  release_date: "2026-10-13"
   use_category:
   - dataplane_ext
   extensions:

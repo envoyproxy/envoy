@@ -1,15 +1,16 @@
-use crate::buffer::EnvoyBuffer;
+use crate::buffer::{read_buffer_chunks, EnvoyBuffer};
 use crate::{
   abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
   wrap_into_c_void_ptr, EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId,
   NewUdpListenerFilterConfigFunction, NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 
 /// The trait that represents the Envoy UDP listener filter configuration.
 /// This is used in [`NewUdpListenerFilterConfigFunction`] to pass the Envoy filter configuration
 /// to the dynamic module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyUdpListenerFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
   fn define_counter(
@@ -100,7 +101,7 @@ pub trait UdpListenerFilter<ELF: EnvoyUdpListenerFilter> {
 /// The trait that represents the Envoy UDP listener filter.
 /// This is used in [`UdpListenerFilter`] to interact with the underlying Envoy UDP listener filter
 /// object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyUdpListenerFilter {
   /// Get the current datagram data as chunks.
@@ -322,35 +323,13 @@ impl EnvoyUdpListenerFilterImpl {
 
 impl EnvoyUdpListenerFilter for EnvoyUdpListenerFilterImpl {
   fn get_datagram_data(&self) -> (Vec<EnvoyBuffer<'_>>, usize) {
-    let size = unsafe {
-      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(self.raw)
+    let raw = self.raw;
+    let count = unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks_size(raw)
     };
-    if size == 0 {
-      return (Vec::new(), 0);
-    }
-    let mut buffers: Vec<EnvoyBuffer> = Vec::with_capacity(size);
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(
-        self.raw,
-        buffers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
-      )
-    };
-    if !ok {
-      return (Vec::new(), 0);
-    }
-
-    let total_length = unsafe {
-      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_size(self.raw)
-    };
-    if total_length == 0 {
-      // This shouldn't happen if chunks were retrieved, but we guard for safety.
-      return (Vec::new(), 0);
-    }
-
-    unsafe {
-      buffers.set_len(size);
-    }
-    (buffers, total_length)
+    read_buffer_chunks(count, |chunks| unsafe {
+      abi::envoy_dynamic_module_callback_udp_listener_filter_get_datagram_data_chunks(raw, chunks)
+    })
   }
 
   fn set_datagram_data(&mut self, data: &[u8]) -> bool {

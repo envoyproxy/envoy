@@ -14,7 +14,6 @@ envoy_cc_library(
     srcs = [
         "background_fetch_manager.cc",
         "dynamic_module_stats.cc",
-        "worker_index.cc",
     ] + select({
         "//bazel:windows_x86_64": ["win32/dynamic_modules.cc"],
         "//conditions:default": ["posix/dynamic_modules.cc"],
@@ -23,7 +22,6 @@ envoy_cc_library(
         "background_fetch_manager.h",
         "dynamic_module_stats.h",
         "dynamic_modules.h",
-        "worker_index.h",
     ],
     external_deps = ["ssl"],
     deps = [
@@ -38,6 +36,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:remote_data_fetcher_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules/abi",
@@ -60,13 +59,17 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 
 envoy_cc_library(
     name = "abi_context_accessors_lib",
     srcs = ["abi_context_accessors.cc"],
-    hdrs = ["abi_context_accessors.h"],
+    hdrs = [
+        "abi_context_accessors.h",
+        "abi_conversions.h",
+    ],
     deps = [
         "//envoy/common:optref_lib",
         "//envoy/formatter:http_formatter_context_interface",
@@ -75,6 +78,8 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/router:string_accessor_lib",
@@ -104,6 +109,8 @@ go_library(
         "sdk/go/shared/common.go",
         "sdk/go/shared/early_header_mutation.go",
         "sdk/go/shared/early_header_mutation_api.go",
+        "sdk/go/shared/header_formatter.go",
+        "sdk/go/shared/header_formatter_api.go",
         "sdk/go/shared/http.go",
         "sdk/go/shared/http_api.go",
         "sdk/go/shared/listener_api.go",
@@ -113,6 +120,8 @@ go_library(
         "sdk/go/shared/stats_sink.go",
         "sdk/go/shared/stats_sink_api.go",
         "sdk/go/shared/types.go",
+        "sdk/go/shared/udp_listener_api.go",
+        "sdk/go/shared/udp_listener_base.go",
     ],
     cgo = True,
     importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/shared",
@@ -144,13 +153,29 @@ go_library(
 )
 
 go_library(
+    name = "go_sdk_internal_recovery",
+    srcs = ["sdk/go/internal/recovery/recovery.go"],
+    importpath = "github.com/envoyproxy/envoy/source/extensions/dynamic_modules/sdk/go/internal/recovery",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_sdk_internal_recovery_test",
+    srcs = ["sdk/go/internal/recovery/recovery_test.go"],
+    embed = [":go_sdk_internal_recovery"],
+)
+
+go_library(
     name = "go_sdk_abi",
     srcs = [
         "sdk/go/abi/common.go",
         "sdk/go/abi/early_header_mutation.go",
+        "sdk/go/abi/header_formatter.go",
         "sdk/go/abi/internal.go",
         "sdk/go/abi/listener.go",
         "sdk/go/abi/network.go",
+        "sdk/go/abi/panic_barrier.go",
+        "sdk/go/abi/udp_listener.go",
         "//source/extensions/dynamic_modules/abi:abi.h",
     ],
     cgo = True,
@@ -165,6 +190,7 @@ go_library(
     deps = [
         "//source/extensions/dynamic_modules:go_sdk",
         "//source/extensions/dynamic_modules:go_sdk_internal_buffer",
+        "//source/extensions/dynamic_modules:go_sdk_internal_recovery",
         "//source/extensions/dynamic_modules:go_sdk_shared",
     ],
 )

@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
 // [#extension: envoy.filters.http.lua]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Lua {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.lua.v2.Lua";
@@ -127,9 +127,39 @@ message Lua {
   // ``package.cpath``, i.e. modules which are loadable C libraries rather than Lua source, for
   // example ``/etc/envoy/lua/?.so``.
   repeated string package_cpaths = 8 [(validate.rules).repeated = {items {string {min_len: 1}}}];
+
+  // If set, the Lua VMs this filter builds are shared with every other Lua filter configuration
+  // that sets the same ``shared_vm_id`` and configures the same script, rather than each
+  // configuration building its own. This applies to every script this message configures:
+  // :ref:`default_source_code
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`,
+  // :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>` and
+  // every entry of :ref:`source_codes
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
+  //
+  // Sharing is decided per script, not per configuration: two configurations that agree on this
+  // id share a VM only for the scripts whose contents match, and whose :ref:`package_paths
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>` and
+  // :ref:`package_cpaths
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_cpaths>` match, since a
+  // script that resolves its ``require`` calls differently does not produce an equivalent VM.
+  // A :ref:`LuaPerRoute.shared_vm_id
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.shared_vm_id>` participates in
+  // the same sharing, so a route's inline script can reuse a VM built here and the other way
+  // around.
+  //
+  // A VM is not only an amount of memory, it is also a set of Lua globals that outlive a request.
+  // Scripts sharing a VM therefore see each other's globals, exactly as separate requests through
+  // one configuration already do. Leave this field unset, which is the default, to keep every
+  // configuration's scripts in VMs of their own.
+  //
+  // A shared VM lives for as long as at least one configuration using it is alive. Once the last
+  // one is drained the VM is torn down, and the next configuration asking for that id and script
+  // builds a fresh one.
+  string shared_vm_id = 9;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message LuaPerRoute {
   oneof override {
     // Disable the Lua filter for this particular vhost or route. If disabled is specified in
@@ -178,4 +208,16 @@ message LuaPerRoute {
   // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_paths>`, but for
   // ``package.cpath``.
   repeated string package_cpaths = 6 [(validate.rules).repeated = {items {string {min_len: 1}}}];
+
+  // As :ref:`Lua.shared_vm_id
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.shared_vm_id>`, but for the VM built
+  // from this route's :ref:`source_code
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>`. Routes and
+  // filter configurations share one pool of VMs, so a route setting the same id as a filter
+  // configuration reuses that configuration's VM when the script matches.
+  //
+  // Setting this has no effect when this route selects a script by :ref:`name
+  // <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, or configures no
+  // script at all, since that VM belongs to the filter and follows the filter's setting.
+  string shared_vm_id = 7;
 }

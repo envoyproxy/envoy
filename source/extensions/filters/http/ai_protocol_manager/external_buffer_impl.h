@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer.h"
@@ -44,8 +45,27 @@ private:
 // streams and workers.
 class InMemoryExternalBufferFactory : public ExternalBufferFactory {
 public:
+  using ExternalBufferFactory::createBuffer;
   ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
     return std::make_unique<InMemoryExternalBuffer>(dispatcher);
+  }
+  ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher,
+                                 std::optional<uint64_t> /*content_length*/) override {
+    return createBuffer(dispatcher);
+  }
+};
+
+// Factory for creating InMemoryExternalBufferFactory from typed configuration.
+class InMemoryExternalBufferConfigFactory : public ExternalBufferConfigFactory {
+public:
+  ExternalBufferFactorySharedPtr
+  createExternalBufferFactory(const Protobuf::Message& config,
+                              Server::Configuration::ServerFactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
+  std::string name() const override {
+    return "envoy.ai_protocol_manager.external_buffer.in_memory";
   }
 };
 

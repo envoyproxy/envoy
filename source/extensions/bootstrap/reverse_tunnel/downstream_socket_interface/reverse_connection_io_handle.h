@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
@@ -94,6 +96,8 @@ struct ReverseConnectionSocketConfig {
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
   // How often to re-check each host and dial missing tunnels.
   uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
+  // Deadline for receiving the handshake response after a dial opens the connection.
+  uint64_t handshake_timeout_ms{15000};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -188,6 +192,15 @@ public:
   Api::IoCallUint64Result close() override;
 
   /**
+   * Return a fresh, unstarted reverse connection handle rather than a raw fd dup. The listener
+   * manager duplicates the listen socket per worker under ``reuse_port`` and on every LDS update,
+   * and a raw dup of this handle's fd never dials and can auto-bind an unadvertised port. The copy
+   * shares the configuration and backs its own dial loop once the worker initializes it.
+   * @return a new ReverseConnectionIOHandle over a fresh unbound TCP socket.
+   */
+  Network::IoHandlePtr duplicate() override;
+
+  /**
    * Stop reverse-connection maintenance on listener teardown. On the owning worker this also
    * shuts down in-flight handshake wrappers and deferred-deletes them.
    */
@@ -233,7 +246,7 @@ public:
    * Get the file descriptor for the pipe monitor used to wake up accept().
    * @return the file descriptor for the pipe monitor
    */
-  int getPipeMonitorFd() const;
+  os_fd_t getPipeMonitorFd() const;
 
   // Callbacks from RCConnectionWrapper.
   /**
@@ -304,8 +317,9 @@ public:
                              const std::string& connection_key);
 
   /**
-   * Handle downstream connection closure and update internal maps so that the next
-   * maintenance cycle re-initiates the connection.
+   * Handle downstream connection closure: drop the key from tracking (if still present) and always
+   * emit a connection_closed access log. When the key was already removed at drain time, host and
+   * cluster in the log may be empty; correlate via connection_key / connection_id.
    * @param connection_key the unique key identifying the closed connection.
    * @param connection_id the initiator's per-connection identifier for the closed connection.
    */
@@ -314,13 +328,17 @@ public:
   /**
    * Drop a tunnel from tracking because it has begun draining (the downstream HCM sent a
    * shutdownNotice/GOAWAY due to max_connection_duration or graceful shutdown, or the peer sent a
-   * GOAWAY) and kick maintenance to dial a replacement immediately. The underlying TCP socket is
-   * left alone so in-flight HTTP/2 streams can finish; onDownstreamConnectionClosed() no-ops when
-   * the socket eventually closes.
+   * GOAWAY) and kick maintenance to dial a replacement immediately. Emits a connection_draining
+   * access log. The underlying TCP socket is left alone so in-flight HTTP/2 streams can finish;
+   * onDownstreamConnectionClosed() later still emits connection_closed (host/cluster may be empty
+   * because the key was already dropped) so the close can be correlated via connection_key /
+   * connection_id.
    *
    * @param connection_key the local-address string of the outbound tunnel socket.
+   * @param connection_id the initiator's per-connection identifier for access-log correlation.
    */
-  void markTunnelDrainingAndDialReplacement(const std::string& connection_key);
+  void markTunnelDrainingAndDialReplacement(const std::string& connection_key,
+                                            uint64_t connection_id);
 
   /**
    * Remove a connection key from per-host tracking (the key set and its state gauge). Shared by the
@@ -334,7 +352,7 @@ public:
   /**
    * Child DownstreamReverseConnectionIOHandles register/unregister here at construction/destruction
    * so that, if this parent is destroyed while a tunnel connection is still draining, it can null
-   * each child's back-pointer (see cleanup()) and the child's parent() safely returns nullptr.
+   * each child's back-pointer (see cleanup()) and child drain/close notifications become no-ops.
    */
   void registerChildIoHandle(DownstreamReverseConnectionIOHandle& child) {
     child_io_handles_.insert(&child);
@@ -377,6 +395,13 @@ public:
    */
   const std::shared_ptr<const std::vector<HandshakeHeader>>& handshakeHeaders() const {
     return config_.handshake_headers;
+  }
+
+  /**
+   * @return the handshake response deadline applied to each dial attempt.
+   */
+  std::chrono::milliseconds handshakeTimeout() const {
+    return std::chrono::milliseconds(config_.handshake_timeout_ms);
   }
 
 private:
@@ -464,6 +489,12 @@ private:
    */
   bool isTriggerPipeReady() const;
 
+  /**
+   * Write a trigger byte so accept() consumes a queued tunnel. On a failed write the maintenance
+   * timer is rearmed to retry the wake while a tunnel remains queued.
+   */
+  void signalAcceptReady();
+
   // Host/cluster mapping management
   /**
    * Update cluster -> host mappings from the cluster manager. Called before connection initiation
@@ -520,6 +551,7 @@ private:
   const ReverseConnectionSocketConfig config_; // Configuration for reverse connections
   Upstream::ClusterManager& cluster_manager_;
   ReverseTunnelInitiatorExtension* extension_;
+  Stats::Scope& scope_; // Stats scope, forwarded to handles created by duplicate().
 
   // Connection wrapper management
   std::vector<std::unique_ptr<RCConnectionWrapper>>
@@ -529,13 +561,20 @@ private:
 
   // Simple pipe-based trigger mechanism to wake up accept() when a connection is established.
   // Inlined directly for simplicity and reduced test coverage requirements.
-  int trigger_pipe_read_fd_{-1};
-  int trigger_pipe_write_fd_{-1};
+  os_fd_t trigger_pipe_read_fd_{INVALID_SOCKET};
+  os_fd_t trigger_pipe_write_fd_{INVALID_SOCKET};
+
+  // An established tunnel awaiting accept(), with any bytes the responder coalesced with the
+  // handshake response so accept() can replay them before reading the socket.
+  struct EstablishedConnection {
+    Envoy::Network::ClientConnectionPtr connection;
+    Buffer::InstancePtr residual_bytes;
+  };
 
   // Connection management : We store the established connections in a queue.
   // and pop the last established connection when data is read on trigger_pipe_read_fd_
   // to determine the connection that got established last.
-  std::queue<Envoy::Network::ClientConnectionPtr> established_connections_;
+  std::queue<EstablishedConnection> established_connections_;
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
@@ -549,7 +588,7 @@ private:
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
 
   // Store original socket FD for cleanup.
-  os_fd_t original_socket_fd_{-1};
+  os_fd_t original_socket_fd_{INVALID_SOCKET};
 };
 
 } // namespace ReverseConnection

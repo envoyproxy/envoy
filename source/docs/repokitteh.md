@@ -40,7 +40,7 @@ extra args. Do not prefix team names with `@`, as doing so subscribes the entire
 Team names prefixed with `@` are still accepted for compatibility, but the bot will remind the user to omit it in
 future commands. Example teams include:
 - `envoyproxy/senior-maintainers` (Senior maintainers)
-- `envoyproxy/maintainers` (All maintainers)
+- `envoyproxy/envoy-maintainers` (All maintainers)
 - `envoyproxy/api-shepherds` (API shepherds)
 - `envoyproxy/dependency-shepherds` (Dependency shepherds)
 - `envoyproxy/first-pass-reviewers` (Contributors that provide first-pass

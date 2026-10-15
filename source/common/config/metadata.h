@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
@@ -10,10 +11,12 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/shared_pool/shared_pool.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Config {
@@ -175,7 +178,22 @@ protected:
 template <class FactoryClass> struct MetadataPack {
   MetadataPack(const envoy::config::core::v3::Metadata& metadata)
       : proto_metadata_(metadata), typed_metadata_(proto_metadata_) {}
+  MetadataPack(envoy::config::core::v3::Metadata&& metadata)
+      : proto_metadata_(std::move(metadata)), typed_metadata_(proto_metadata_) {}
   MetadataPack() : proto_metadata_(), typed_metadata_(proto_metadata_) {}
+
+  // Builds a pack, running the registered typed metadata factories, and returns an error instead of
+  // throwing when a factory rejects the metadata. This lets a caller on the request path turn a
+  // rejected namespace into a failure and build a pack once, before it is handed to a consumer that
+  // must not throw. The metadata is moved in, so no copy is made.
+  static absl::StatusOr<std::unique_ptr<MetadataPack<FactoryClass>>>
+  create(envoy::config::core::v3::Metadata&& metadata) {
+    TRY_NEEDS_AUDIT { return std::make_unique<MetadataPack<FactoryClass>>(std::move(metadata)); }
+    END_TRY
+    MULTI_CATCH(
+        const EnvoyException& e, { return absl::InvalidArgumentError(e.what()); },
+        { return absl::InvalidArgumentError("rejected by a typed metadata factory"); });
+  }
 
   const envoy::config::core::v3::Metadata proto_metadata_;
   const TypedMetadataImpl<FactoryClass> typed_metadata_;

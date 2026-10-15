@@ -378,6 +378,18 @@ TEST(NetworkUtility, GetAddressWithPort) {
   EXPECT_FALSE(addr_v6only_false->ip()->ipv6()->v6only());
   auto addr_v6only_false_new_port = Utility::getAddressWithPort(*addr_v6only_false, 8080);
   EXPECT_FALSE(addr_v6only_false_new_port->ip()->ipv6()->v6only());
+
+  // Verify custom SocketInterface is preserved for IPv4 and IPv6.
+  MockSocketInterface custom_socket_interface({Address::IpVersion::v4, Address::IpVersion::v6});
+  auto addr_v4_custom_sock =
+      std::make_shared<Address::Ipv4Instance>("1.2.3.4", 80, &custom_socket_interface);
+  auto addr_v4_custom_sock_new_port = Utility::getAddressWithPort(*addr_v4_custom_sock, 8080);
+  EXPECT_EQ(&custom_socket_interface, &addr_v4_custom_sock_new_port->socketInterface());
+
+  auto addr_v6_custom_sock =
+      std::make_shared<Address::Ipv6Instance>("::1", 80, &custom_socket_interface);
+  auto addr_v6_custom_sock_new_port = Utility::getAddressWithPort(*addr_v6_custom_sock, 8080);
+  EXPECT_EQ(&custom_socket_interface, &addr_v6_custom_sock_new_port->socketInterface());
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
@@ -965,16 +977,17 @@ TEST_F(ExecInNetnsTest, Basic) {
   EXPECT_THAT(result, IsOkAndHolds("ns1"));
 
   // Make sure the netns reverted back to the netns the execInNetworkNamespace function was called
-  // from. When the netns was noted before making the jump, it used the fd of "/proc/self/ns/net"
-  // and that is what would show up for the test.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  // from. When the netns was noted before making the jump, it used the fd of the calling thread's
+  // own namespace, "/proc/thread-self/ns/net" (not "/proc/self/ns/net", which is the main
+  // thread's), and that is what would show up for the test.
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 
   // Try another netns.
   result = Utility::execInNetworkNamespace(func, "ns2");
   EXPECT_THAT(result, IsOkAndHolds("ns2"));
 
   // Make sure the netns reverted back.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 }
 
 TEST_F(ExecInNetnsTest, OpenFail) {

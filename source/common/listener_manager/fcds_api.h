@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -70,7 +72,7 @@ public:
   /**
    * Current filter chain.
    */
-  virtual Network::DrainableFilterChainSharedPtr filterChain() const PURE;
+  virtual const Network::DrainableFilterChainSharedPtr& filterChain() const PURE;
 
   /**
    * @return the last received version info from FCDS.
@@ -88,7 +90,7 @@ public:
   FcdsApiImpl(const envoy::config::core::v3::ConfigSource& fcds_config,
               const std::string& filter_chain_name, FilterChainUpdateCallbacks& callbacks,
               Upstream::ClusterManager& cm, Stats::Scope& scope,
-              ProtobufMessage::ValidationVisitor& validation_visitor,
+              const Config::ResourceTypeHelper<FilterChainProto>& resource_type_helper,
               absl::Status& creation_status);
   ~FcdsApiImpl() override;
 
@@ -97,7 +99,9 @@ public:
   Init::Target& initTarget() override { return init_target_; }
   std::string versionInfo() const override { return system_version_info_; }
   void setFilterChain(Network::DrainableFilterChainSharedPtr&& filter_chain) override;
-  Network::DrainableFilterChainSharedPtr filterChain() const override { return filter_chain_; }
+  const Network::DrainableFilterChainSharedPtr& filterChain() const override {
+    return filter_chain_;
+  }
 
 private:
   // Config::SubscriptionCallbacks
@@ -109,19 +113,16 @@ private:
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
-  const envoy::config::core::v3::ConfigSource fcds_config_;
   const std::string filter_chain_name_;
   FilterChainUpdateCallbacks& callbacks_;
   Stats::ScopeSharedPtr scope_;
-  const Config::ResourceTypeHelper<FilterChainProto> resource_type_helper_;
   Init::SharedTargetImpl init_target_;
   Config::SubscriptionPtr subscription_;
 
-  std::optional<FilterChainProto> config_;
+  std::optional<uint64_t> config_hash_;
   std::string system_version_info_;
   Network::DrainableFilterChainSharedPtr filter_chain_;
   bool started_ : 1 {false};
-  bool warming_ : 1 {false};
 };
 
 class FcdsFilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,

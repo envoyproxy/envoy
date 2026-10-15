@@ -35,9 +35,12 @@ envoy_extension_cc_dyn_module_test(
         # Failure-path stubs loaded via ENVOY_DYNAMIC_MODULES_SEARCH_PATH:
         #   - ``dns_resolver_config_new_fail``: exports all 7 DNS resolver ABI symbols, returns null
         #     from ``on_dns_resolver_config_new`` to exercise the Rust-rejection path.
+        #   - ``dns_resolver_new_fail``: loads its configuration but returns null from
+        #     ``on_dns_resolver_new`` to exercise the resolver-creation failure path.
         #   - ``matcher_no_op``: exports ``program_init`` but no DNS resolver symbols, exercising the
         #     ABI-symbol-resolution failure path.
         "//test/extensions/dynamic_modules/test_data/c:dns_resolver_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:dns_resolver_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
     extension_names = ["envoy.network.dns_resolver.hickory"],

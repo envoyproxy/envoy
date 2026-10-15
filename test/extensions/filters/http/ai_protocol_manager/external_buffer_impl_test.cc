@@ -2,9 +2,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/registry/registry.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -255,6 +258,58 @@ TEST_F(InMemoryExternalBufferTest, WriteWithEndStreamAcknowledged) {
   drain();
   EXPECT_TRUE(acked);
   EXPECT_EQ(buffer_.length(), 5);
+}
+
+// The factory produces a usable buffer when created with an optional content length hint.
+TEST_F(InMemoryExternalBufferTest, FactoryCreatesUsableBufferWithContentLengthHint) {
+  InMemoryExternalBufferFactory factory;
+  ExternalBufferPtr buffer = factory.createBuffer(*dispatcher_, 1024);
+  ASSERT_NE(buffer, nullptr);
+
+  buffer->write(std::make_unique<Buffer::OwnedImpl>("via-hinted-factory"), false,
+                [](ExternalBufferStatus) {});
+  drain();
+  EXPECT_EQ(buffer->length(), 18);
+}
+
+class TestExternalBufferConfigFactory : public ExternalBufferConfigFactory {
+public:
+  ExternalBufferFactorySharedPtr
+  createExternalBufferFactory(const Protobuf::Message&,
+                              Server::Configuration::ServerFactoryContext&) override {
+    return std::make_shared<InMemoryExternalBufferFactory>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+
+  std::string name() const override { return "envoy.ai_protocol_manager.external_buffer.test"; }
+};
+
+// ExternalBufferConfigFactory exposes the expected extension category.
+TEST_F(InMemoryExternalBufferTest, ExternalBufferConfigFactoryCategoryMatches) {
+  TestExternalBufferConfigFactory config_factory;
+  EXPECT_EQ(config_factory.category(), "envoy.ai_protocol_manager.external_buffer");
+}
+
+// The in-memory external buffer config factory is registered under its
+// well-known name, produces an empty in-memory config proto, and creates an
+// in-memory buffer factory.
+TEST(InMemoryExternalBufferConfigFactoryTest, ResolvesFromRegistryAndCreatesFactory) {
+  auto* config_factory = Registry::FactoryRegistry<ExternalBufferConfigFactory>::getFactory(
+      "envoy.ai_protocol_manager.external_buffer.in_memory");
+  ASSERT_NE(config_factory, nullptr);
+  EXPECT_EQ(config_factory->name(), "envoy.ai_protocol_manager.external_buffer.in_memory");
+  EXPECT_EQ(config_factory->category(), "envoy.ai_protocol_manager.external_buffer");
+
+  ProtobufTypes::MessagePtr empty_proto = config_factory->createEmptyConfigProto();
+  ASSERT_NE(empty_proto, nullptr);
+  EXPECT_EQ(empty_proto->GetDescriptor()->full_name(),
+            "envoy.extensions.ai_protocol_manager.external_buffer.in_memory.v3.InMemory");
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ExternalBufferFactorySharedPtr buffer_factory =
+      config_factory->createExternalBufferFactory(*empty_proto, context);
+  EXPECT_NE(buffer_factory, nullptr);
 }
 
 } // namespace

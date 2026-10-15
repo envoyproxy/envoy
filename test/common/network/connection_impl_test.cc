@@ -49,6 +49,7 @@ using Envoy::StreamInfo::DetectedCloseType;
 using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
+using testing::ElementsAre;
 using testing::EndsWith;
 using testing::Eq;
 using testing::HasSubstr;
@@ -4845,6 +4846,29 @@ TEST_P(ConnectionImplTest, TestConstSocketAccess) {
   EXPECT_EQ(&socket_ref, &client_connection_->getSocket());
 
   disconnect(true);
+}
+
+TEST_P(ConnectionImplTest, LocalCloseReasonsRecordedInOrder) {
+  ConnectionMocks mocks = createConnectionMocks(false);
+  IoHandlePtr io_handle = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(0);
+  Network::ConnectionPtr connection = std::make_unique<Network::ServerConnectionImpl>(
+      *mocks.dispatcher_,
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
+      std::move(mocks.transport_socket_), stream_info_);
+
+  EXPECT_TRUE(connection->localCloseReasons().empty());
+  EXPECT_TRUE(connection->localCloseReason().empty());
+
+  // Close with an initial reason (e.g. FlushWriteAndDelay with codec error).
+  connection->close(ConnectionCloseType::FlushWriteAndDelay, "first_reason");
+  EXPECT_THAT(connection->localCloseReasons(), ElementsAre("first_reason"));
+  EXPECT_EQ(connection->localCloseReason(), "first_reason");
+
+  // A subsequent close updates localCloseReason() and is appended to
+  // localCloseReasons().
+  connection->close(ConnectionCloseType::NoFlush, "second_reason");
+  EXPECT_THAT(connection->localCloseReasons(), ElementsAre("first_reason", "second_reason"));
+  EXPECT_EQ(connection->localCloseReason(), "second_reason");
 }
 
 } // namespace

@@ -70,13 +70,6 @@ public:
     // test should no longer be parameterized.
     scoped_runtime_.mergeValues(
         {{"envoy.restart_features.xds_failover_support", GetParam() ? "true" : "false"}});
-    // Allow additional timers to be created (e.g., TtlManager timers for dependent type URLs
-    // created lazily in GrpcMuxImpl::apiStateFor() when pause(dependentTypeUrls(...)) is called
-    // during onDiscoveryResponse).
-    EXPECT_CALL(dispatcher_, createTimer_(_))
-        .Times(testing::AnyNumber())
-        .WillRepeatedly(
-            testing::Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
   }
 
   void setup() { setup(rate_limit_settings_); }
@@ -320,15 +313,13 @@ TEST_P(GrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   // Create the retry timer that will invoke the callback that will trigger
   // reconnection when the gRPC connection is closed.
   Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
+  Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
   Event::TimerCb grpc_stream_retry_timer_cb;
   EXPECT_CALL(dispatcher_, createTimer_(_))
       .WillOnce(
           testing::DoAll(SaveArg<0>(&grpc_stream_retry_timer_cb), Return(grpc_stream_retry_timer)))
-      // Happens when adding a type url watch and for dependent type URL TTL timers
-      // created lazily in apiStateFor(). Each call must return a fresh timer because
-      // the caller takes ownership via unique_ptr.
-      .WillRepeatedly(
-          testing::Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
+      // Happens when adding a type url watch.
+      .WillRepeatedly(Return(ttl_mgr_timer));
   setup();
   InSequence s;
   const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
@@ -1655,11 +1646,6 @@ TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
   EXPECT_NO_THROW(scoped = null_mux_.pause(params));
 }
 
-TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
-  EXPECT_ENVOY_BUG(null_mux_.requestOnDemandUpdate("type_url", {"for_update"}),
-                   "unexpected request for on demand update");
-}
-
 TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
   NiceMock<MockSubscriptionCallbacks> callbacks;
   OpaqueResourceDecoderSharedPtr resource_decoder(
@@ -1917,12 +1903,6 @@ TEST_P(GrpcMuxImplTest, ShutdownPreventsSending) {
   // We do not expect any messages to be sent here as the mux has been shutdown.
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _)).Times(0);
   auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
-}
-
-TEST_P(GrpcMuxImplTest, RequestOnDemandUpdateDoesNothing) {
-  setup();
-  // Should not throw or crash.
-  grpc_mux_->requestOnDemandUpdate("foo", {"z"});
 }
 
 } // namespace

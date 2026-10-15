@@ -70,50 +70,60 @@ bool getTagExtractedName(const MetricRefs& metrics, size_t index, char* name_buf
   return true;
 }
 
-// Reports the number of tags on the metric at index. Counts via iterateTagStatNames so the tag
-// StatNames are not materialized into a std::string vector. Returns false when index is out of
-// range.
+// Fills the flush context tag cache for the metric if it is not already cached and returns the
+// cached tags. A module reads a metric's tags in order, so caching the last metric collapses the
+// repeated per-index tag walks from O(T^2) to O(T) for a full read.
+const std::vector<Envoy::Stats::StatNameTag>&
+cachedTags(DynamicModuleStatsSinkFlushContext& context, const Envoy::Stats::Metric& metric) {
+  if (context.cached_metric_ != &metric) {
+    // Invalidate before refilling so a failure partway through cannot leave a stale metric matched
+    // to a partial tag list.
+    context.cached_metric_ = nullptr;
+    context.cached_tags_.clear();
+    metric.iterateTagStatNames(
+        [&context](Envoy::Stats::StatName name, Envoy::Stats::StatName value) {
+          context.cached_tags_.emplace_back(name, value);
+          return true;
+        });
+    context.cached_metric_ = &metric;
+  }
+  return context.cached_tags_;
+}
+
+// Reports the number of tags on the metric at index. Uses the flush context tag cache so a full
+// per-metric read walks the tags once. Returns false when index is out of range.
 template <typename MetricRefs>
-bool getTagCount(const MetricRefs& metrics, size_t index, size_t* tag_count) {
+bool getTagCount(DynamicModuleStatsSinkFlushContext& context, const MetricRefs& metrics,
+                 size_t index, size_t* tag_count) {
   const Envoy::Stats::Metric* metric = metricAt(metrics, index);
   if (metric == nullptr) {
     return false;
   }
-  size_t count = 0;
-  metric->iterateTagStatNames([&count](Envoy::Stats::StatName, Envoy::Stats::StatName) {
-    ++count;
-    return true;
-  });
-  *tag_count = count;
+  *tag_count = cachedTags(context, *metric).size();
   return true;
 }
 
-// Serializes the name and value of one tag directly into the module buffers. Iterates the borrowed
-// tag StatNames and serializeToBuffers the requested pair, so no std::string is composed. Returns
-// false when either index is out of range.
+// Serializes the name and value of one tag directly into the module buffers. Reads the tag pair
+// from the flush context tag cache so a full per-metric read walks the tags once. Returns false
+// when either index is out of range.
 template <typename MetricRefs>
-bool getTag(const MetricRefs& metrics, size_t index, size_t tag_index, char* name_buffer,
-            size_t name_buffer_capacity, size_t* name_size, char* value_buffer,
-            size_t value_buffer_capacity, size_t* value_size) {
+bool getTag(DynamicModuleStatsSinkFlushContext& context, const MetricRefs& metrics, size_t index,
+            size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+            char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
   const Envoy::Stats::Metric* metric = metricAt(metrics, index);
   if (metric == nullptr) {
     return false;
   }
+  const std::vector<Envoy::Stats::StatNameTag>& tags = cachedTags(context, *metric);
+  if (tag_index >= tags.size()) {
+    return false;
+  }
   const Envoy::Stats::SymbolTable& symbol_table = metric->constSymbolTable();
-  size_t current = 0;
-  bool found = false;
-  metric->iterateTagStatNames([&](Envoy::Stats::StatName tag_name,
-                                  Envoy::Stats::StatName tag_value) {
-    if (current == tag_index) {
-      *name_size = symbol_table.serializeToBuffer(tag_name, name_buffer, name_buffer_capacity);
-      *value_size = symbol_table.serializeToBuffer(tag_value, value_buffer, value_buffer_capacity);
-      found = true;
-      return false;
-    }
-    ++current;
-    return true;
-  });
-  return found;
+  *name_size =
+      symbol_table.serializeToBuffer(tags[tag_index].first, name_buffer, name_buffer_capacity);
+  *value_size =
+      symbol_table.serializeToBuffer(tags[tag_index].second, value_buffer, value_buffer_capacity);
+  return true;
 }
 
 } // namespace
@@ -242,6 +252,29 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
   return true;
 }
 
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    char* name_buffer, size_t name_buffer_capacity, size_t* name_size) {
+  return getTagExtractedName(toFlushContext(snapshot_envoy_ptr)->snapshot_.histograms(), index,
+                             name_buffer, name_buffer_capacity, name_size);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t* tag_count) {
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTagCount(*context, context->snapshot_.histograms(), index, tag_count);
+}
+
+bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
+    size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
+    char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTag(*context, context->snapshot_.histograms(), index, tag_index, name_buffer,
+                name_buffer_capacity, name_size, value_buffer, value_buffer_capacity, value_size);
+}
+
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     char* name_buffer, size_t name_buffer_capacity, size_t* name_size) {
@@ -252,16 +285,17 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     size_t* tag_count) {
-  return getTagCount(toFlushContext(snapshot_envoy_ptr)->snapshot_.counters(), index, tag_count);
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTagCount(*context, context->snapshot_.counters(), index, tag_count);
 }
 
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
     char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
-  return getTag(toFlushContext(snapshot_envoy_ptr)->snapshot_.counters(), index, tag_index,
-                name_buffer, name_buffer_capacity, name_size, value_buffer, value_buffer_capacity,
-                value_size);
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTag(*context, context->snapshot_.counters(), index, tag_index, name_buffer,
+                name_buffer_capacity, name_size, value_buffer, value_buffer_capacity, value_size);
 }
 
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_name(
@@ -274,16 +308,17 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_extracted_na
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     size_t* tag_count) {
-  return getTagCount(toFlushContext(snapshot_envoy_ptr)->snapshot_.gauges(), index, tag_count);
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTagCount(*context, context->snapshot_.gauges(), index, tag_count);
 }
 
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_tag(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
     char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
-  return getTag(toFlushContext(snapshot_envoy_ptr)->snapshot_.gauges(), index, tag_index,
-                name_buffer, name_buffer_capacity, name_size, value_buffer, value_buffer_capacity,
-                value_size);
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTag(*context, context->snapshot_.gauges(), index, tag_index, name_buffer,
+                name_buffer_capacity, name_size, value_buffer, value_buffer_capacity, value_size);
 }
 
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extracted_name(
@@ -296,17 +331,17 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_extra
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag_count(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     size_t* tag_count) {
-  return getTagCount(toFlushContext(snapshot_envoy_ptr)->snapshot_.textReadouts(), index,
-                     tag_count);
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTagCount(*context, context->snapshot_.textReadouts(), index, tag_count);
 }
 
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_tag(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,
     size_t tag_index, char* name_buffer, size_t name_buffer_capacity, size_t* name_size,
     char* value_buffer, size_t value_buffer_capacity, size_t* value_size) {
-  return getTag(toFlushContext(snapshot_envoy_ptr)->snapshot_.textReadouts(), index, tag_index,
-                name_buffer, name_buffer_capacity, name_size, value_buffer, value_buffer_capacity,
-                value_size);
+  auto* context = toFlushContext(snapshot_envoy_ptr);
+  return getTag(*context, context->snapshot_.textReadouts(), index, tag_index, name_buffer,
+                name_buffer_capacity, name_size, value_buffer, value_buffer_capacity, value_size);
 }
 
 envoy_dynamic_module_type_metrics_result

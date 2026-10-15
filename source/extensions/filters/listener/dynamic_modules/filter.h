@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <deque>
 
 #include "envoy/http/async_client.h"
 #include "envoy/network/filter.h"
@@ -41,9 +42,33 @@ public:
   Network::ListenerFilterBuffer* currentBuffer() { return current_buffer_; }
   Network::Address::InstanceConstSharedPtr& cachedOriginalDst() { return cached_original_dst_; }
 
-  // Temporary storage for the serialized typed filter state value returned by
-  // get_filter_state_typed. Valid until the next call into the module on the same filter.
-  std::optional<std::string> last_serialized_filter_state_;
+  // RAII guard placed at each event hook that can invoke a module filter-state getter. Nested hooks
+  // share the outermost scope, so the returned views stay valid until the outermost hook returns
+  // and are then cleared.
+  class HookScope {
+  public:
+    explicit HookScope(DynamicModuleListenerFilter& filter) : filter_(filter) {
+      ++filter_.hook_depth_;
+    }
+    ~HookScope() {
+      if (--filter_.hook_depth_ == 0) {
+        filter_.filter_state_scratch_.clear();
+      }
+    }
+
+  private:
+    DynamicModuleListenerFilter& filter_;
+  };
+
+  // Test-only accessor for the number of buffered filter-state getter results.
+  size_t filterStateScratchSizeForTest() const { return filter_state_scratch_.size(); }
+
+  // Scratch buffer for serialized typed filter-state getter results. A deque keeps stable element
+  // addresses, so consecutive getter calls in the same hook stay valid until the hook returns.
+  std::deque<std::string> filter_state_scratch_;
+
+  // Depth of nested event hooks. The scratch is cleared when the outermost hook returns.
+  uint32_t hook_depth_ = 0;
 
   // Test-only setters.
   void setCallbacksForTest(Network::ListenerFilterCallbacks* callbacks) { callbacks_ = callbacks; }
