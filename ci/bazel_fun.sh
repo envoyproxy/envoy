@@ -8,7 +8,7 @@
 ENVOY_DOCS_PATH="${ENVOY_DOCS_PATH:-./docs}"
 ENVOY_DOCS_PATH="$(_realpath "$ENVOY_DOCS_PATH")"
 LOCKFILES_DIFF_OUTPUT="${LOCKFILES_DIFF_OUTPUT:-/build/fix_lockfiles.diff}"
-readonly LOCKFILE_PATHSPEC=':(glob)**/MODULE.bazel.lock'
+readonly -a LOCKFILE_PATHSPECS=(':(glob)**/MODULE.bazel.lock' Cargo.lock Cargo.Bazel.envoy.lock)
 readonly -a REGISTRY_BAZELRC_FILES=(
     ".bazelrc"
     "api/.bazelrc"
@@ -19,6 +19,8 @@ readonly -a REGISTRY_BAZELRC_FILES=(
 readonly -a MODULE_DIRS=(. "$ENVOY_DOCS_PATH" api mobile bazel/tests/codeql bazel/tests/external)
 # shellcheck disable=SC2034
 readonly -a REGISTRY_MODULE_DIRS=(. api bazel/tests/codeql bazel/tests/external)
+# In-repo modules whose versions track VERSION.txt.
+readonly -a VERSIONED_MODULES=(envoy envoy_api envoy-docs envoy_mobile envoy_build_config)
 
 run_in_mods() {
     local -n _mod_dirs="$1"
@@ -91,13 +93,13 @@ workspace_bazel_run() {
 
 lockfiles_check() {
     lockfiles_generate
-    if [[ -z "$(git status --porcelain -- "$LOCKFILE_PATHSPEC")" ]]; then
+    if [[ -z "$(git status --porcelain -- "${LOCKFILE_PATHSPECS[@]}")" ]]; then
         return 0
     fi
-    git --no-pager diff --stat -- "$LOCKFILE_PATHSPEC"
+    git --no-pager diff --stat -- "${LOCKFILE_PATHSPECS[@]}"
     echo >&2
     echo "FAIL: Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
-    if { git --no-pager diff -- "$LOCKFILE_PATHSPEC" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
+    if { git --no-pager diff -- "${LOCKFILE_PATHSPECS[@]}" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
         echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT}" >&2
     fi
     echo >&2
@@ -105,11 +107,41 @@ lockfiles_check() {
 }
 
 lockfiles_generate() {
+    cargo_lockfile_generate
     run_in_nested_mods _lockfiles_generate_mod
+}
+
+# Bazel never compares the crate_universe lockfile with Cargo.toml and Cargo.lock, so it is always
+# repinned. The crate extension does not track CARGO_BAZEL_REPIN, so a new server must evaluate it.
+cargo_lockfile_generate() {
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
+    CARGO_BAZEL_REPIN=true bazel fetch "${BAZEL_GLOBAL_OPTIONS[@]}" --config=ci --repo=@envoy_rust_crate_index
 }
 
 _lockfiles_generate_mod() {
     bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --config=ci --lockfile_mode=update
+}
+
+# Set the `module()` version, and the `bazel_dep` versions of in-repo modules, in every
+# MODULE.bazel file to match VERSION.txt.
+module_versions_update() {
+    local module_file modules version
+
+    version="$(cat VERSION.txt)"
+    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-dev)?$ ]]; then
+        echo "FAIL: Unexpected version in VERSION.txt: ${version}" >&2
+        return 1
+    fi
+    modules="$(IFS='|'; echo "${VERSIONED_MODULES[*]}")"
+    while read -r module_file; do
+        sed -i -E \
+            -e "/^module\($/,/^\)$/ s/^(    version = )\"[^\"]*\"/\1\"${version}\"/" \
+            -e "s/^(bazel_dep\(name = \"(${modules})\", version = )\"[^\"]*\"/\1\"${version}\"/" \
+            "$module_file"
+        if ! git diff --quiet -- "$module_file"; then
+            echo "${module_file}: ${version}"
+        fi
+    done < <(git ls-files ':(glob)**/MODULE.bazel')
 }
 
 registry_current_hash() {
@@ -168,7 +200,10 @@ _registry_check_mod() {
     workspace_bazel_run "$module_dir" update_registry.check "$@" -- \
         "--json-out=${status_path}" \
         "--markdown-out=${markdown_path}" \
-        "--sha-out=${sha_path}" || return
+        "--sha-out=${sha_path}" || {
+        echo "FAIL: ${workspace}: bazel registry check failed" >&2
+        return 1
+    }
 
     sha="$(cat "${sha_path}")"
     tags="$(jq -r '.tags | join(" ")' "${status_path}")"

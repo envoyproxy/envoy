@@ -4,7 +4,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
-#include "source/extensions/dynamic_modules/worker_index.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
@@ -62,8 +61,7 @@ buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_
   }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    const uint32_t worker_index = Extensions::DynamicModules::parseWorkerIndexFromDispatcherName(
-        callbacks.dispatcher().name());
+    const uint32_t worker_index = callbacks.dispatcher().workerId().value_or(0);
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
             config, config->stats_scope_->symbolTable(), worker_index);

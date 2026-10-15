@@ -32,12 +32,14 @@ class TestHttpHealthCheckerImpl : public HttpHealthCheckerImpl {
 public:
   using HttpHealthCheckerImpl::HttpHealthCheckerImpl;
 
-  Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& conn_data) override {
-    return createCodecClient_(conn_data);
+  Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& conn_data,
+                                       Http::CodecType codec_type) override {
+    return createCodecClient_(conn_data, codec_type);
   };
 
   // HttpHealthCheckerImpl
-  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_,
+              (Upstream::Host::CreateConnectionData&, Http::CodecType));
 
   Http::CodecType codecClientType() { return codec_client_type_; }
 };

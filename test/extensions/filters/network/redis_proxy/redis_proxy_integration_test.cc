@@ -11,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
@@ -1994,6 +1995,54 @@ TEST_P(RedisProxyIntegrationTest, RedirectWhenNotEnabled) {
     simpleRequestAndResponse(request, "-MOVED 1111 ::1:34123\r\n");
     simpleRequestAndResponse(request, "-ASK 1111 ::1:34123\r\n");
   }
+}
+
+// The upstream answers one command with two replies in the same write. The first reply is
+// forwarded downstream and the surplus reply is dropped. The upstream connection stays open and
+// the next command on it gets its own reply.
+
+TEST_P(RedisProxyIntegrationTest, SurplusUpstreamReplyIsDropped) {
+  const std::string request = makeBulkStringArray({"lpush", "foo", "bar"});
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  ASSERT_TRUE(redis_client->write(request));
+  WAIT_FOR_LOG_CONTAINS("debug", "redis: dropping upstream frame with no outstanding request",
+                        expectUpstreamRequestResponse(fake_upstreams_[0], request, ":1\r\n:1\r\n",
+                                                      fake_upstream_connection, "", ""));
+  redis_client->waitForData(":1\r\n");
+  EXPECT_EQ(":1\r\n", redis_client->data());
+
+  roundtripToUpstreamStep(fake_upstreams_[0], request, ":2\r\n", redis_client,
+                          fake_upstream_connection, "", "");
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// The upstream sends a reply after the reply to the only pending command. The unsolicited reply
+// is dropped. The upstream connection stays open and the next command on it gets its own reply.
+
+TEST_P(RedisProxyIntegrationTest, UnsolicitedUpstreamReplyIsDropped) {
+  const std::string request = makeBulkStringArray({"lpush", "foo", "bar"});
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  roundtripToUpstreamStep(fake_upstreams_[0], request, ":1\r\n", redis_client,
+                          fake_upstream_connection, "", "");
+  WAIT_FOR_LOG_CONTAINS("debug", "redis: dropping upstream frame with no outstanding request",
+                        ASSERT_TRUE(fake_upstream_connection->write(":1\r\n")));
+  EXPECT_EQ(":1\r\n", redis_client->data());
+
+  roundtripToUpstreamStep(fake_upstreams_[0], request, ":2\r\n", redis_client,
+                          fake_upstream_connection, "", "");
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
 }
 
 // This test sends an AUTH command from the fake downstream client to

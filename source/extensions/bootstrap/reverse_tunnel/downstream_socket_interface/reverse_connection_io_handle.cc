@@ -638,6 +638,12 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
             "connections per host",
             cluster_name, cluster_config.reverse_connection_count);
 
+  // A count of 0 keeps the listener idle. Return before the cluster lookup so idle ticks are not
+  // reported as failed connection attempts.
+  if (cluster_config.reverse_connection_count == 0) {
+    return;
+  }
+
   // Connection key for early cluster-level failure tracking. The state gauge is keyed by host and
   // cluster and the terminal state is not persisted, so a stable key is sufficient.
   const std::string temp_connection_key = cluster_name + "_cannot_connect";

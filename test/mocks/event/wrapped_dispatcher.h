@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <optional>
 
 #include "envoy/event/dispatcher.h"
 
@@ -19,6 +20,7 @@ public:
 
   // Event::Dispatcher
   const std::string& name() override { return impl_.name(); }
+  std::optional<uint32_t> workerId() const override { return impl_.workerId(); }
 
   void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                         std::chrono::milliseconds min_touch_interval) override {

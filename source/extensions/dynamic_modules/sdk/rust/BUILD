@@ -1,4 +1,4 @@
-load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
+load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps", "crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load(
@@ -61,20 +61,37 @@ cargo_build_script(
     ),
 )
 
+# Production target for dynamic modules. Production code must depend on this target.
+# It excludes test-only dependencies such as mockall to avoid bloating production binaries.
 rust_library(
     name = "envoy_proxy_dynamic_modules_rust_sdk",
     srcs = glob(["src/**/*.rs"]),
     edition = "2021",
+    deps = crate_deps(["smallvec"]) + [":build_script"],
+)
+
+# Test-only target with mock support enabled via the `mock` feature.
+# Unit tests and test dynamic modules that require mocked Envoy traits (e.g. `MockEnvoyHttpFilter`)
+# must depend on this target instead of the production SDK target.
+rust_library(
+    name = "envoy_proxy_dynamic_modules_rust_sdk_mock",
+    testonly = True,
+    srcs = glob(["src/**/*.rs"]),
+    crate_features = ["mock"],
+    crate_name = "envoy_proxy_dynamic_modules_rust_sdk",
+    edition = "2021",
     deps = all_crate_deps(
         normal = True,
+        normal_dev = True,
     ) + [":build_script"],
 )
 
 rust_test(
     name = "envoy_proxy_dynamic_modules_rust_sdk_test",
-    crate = ":envoy_proxy_dynamic_modules_rust_sdk",
+    crate = ":envoy_proxy_dynamic_modules_rust_sdk_mock",
     edition = "2021",
     deps = all_crate_deps(
         normal = True,
+        normal_dev = True,
     ) + [":build_script"],
 )

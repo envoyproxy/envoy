@@ -539,6 +539,8 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
 //  - A VHDS DiscoveryResponse received but contains no update for the domain (the management server
 //  couldn't resolve it)
 //  - Upstream receives a 404 response
+//  - A repeated request for the same domain on a new stream receives a 404 answered locally,
+//  without a new DeltaDiscoveryRequest
 TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
   // RDS exchange with a non-empty virtual_hosts field
   useRdsWithVhosts();
@@ -568,6 +570,38 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
 
   response->waitForHeaders();
   EXPECT_EQ("404", response->headers().getStatusValue());
+
+  // Consume the ack of the resolution failure, so that the wire is known to be empty afterwards.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // A repeated request for the answered domain on a new stream is answered locally from the
+  // published route configuration: a 404 without a new DeltaDiscoveryRequest.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr repeated_response =
+      codec_client_->makeHeaderOnlyRequest(request_headers);
+  repeated_response->waitForHeaders();
+  EXPECT_EQ("404", repeated_response->headers().getStatusValue());
+
+  // Prove that the repeated request put nothing on the wire: the next DeltaDiscoveryRequest is
+  // the one of a request for a different unknown domain, alone.
+  Http::TestRequestHeaderMapImpl other_request_headers{{":method", "GET"},
+                                                       {":path", "/"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "vhost.fourth"},
+                                                       {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr other_response =
+      codec_client_->makeHeaderOnlyRequest(other_request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.fourth")}, {},
+                                           vhds_stream_.get()));
+  notifyAboutAliasResolutionFailure("5", vhds_stream_, {"my_route/vhost.fourth"});
+
+  other_response->waitForHeaders();
+  EXPECT_EQ("404", other_response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }

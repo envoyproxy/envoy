@@ -51,30 +51,38 @@ jobs:
   build:
     secrets:
       dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      gcp-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED
+            || secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.release || fromJSON(needs.load.outputs.request).run.verify }}
+    if: >-
+      fromJSON(needs.load.outputs.request).run.release
+      || fromJSON(needs.load.outputs.request).run.verify
+      || fromJSON(needs.load.outputs.request).run.docs
     needs:
     - load
-    uses: ./.github/workflows/_publish_build.yml
     name: Build
-    strategy:
-      fail-fast: false
-      matrix:
-        arch:
-        - x64
-        - arm64
+    uses: ./.github/workflows/_publish_build.yml
     with:
-      arch: ${{ matrix.arch }}
+      docs: ${{ fromJSON(needs.load.outputs.request).run.docs == true }}
+      server: ${{ fromJSON(needs.load.outputs.request).run.release == true || fromJSON(needs.load.outputs.request).run.verify == true }}
       request: ${{ needs.load.outputs.request }}
-      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) == true || false }}
 
   release:
     secrets:
       dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-      dockerhub-write-token: ${{ secrets.DOCKERHUB_WRITE_TOKEN }}
+      dockerhub-write-token: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.DOCKERHUB_WRITE_TOKEN
+            || '' }}
+      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
       gcp-docs-archive-key: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -114,7 +122,11 @@ jobs:
       actions: read
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.release }}
+    if: >-
+      !cancelled()
+      && (fromJSON(needs.load.outputs.request).run.release
+          || fromJSON(needs.load.outputs.request).run.docs)
+      && needs.build.result == 'success'
     needs:
     - load
     - build
@@ -132,10 +144,9 @@ jobs:
       actions: read
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.verify }}
+    if: fromJSON(needs.load.outputs.request).run.verify
     needs:
     - load
-    - build
     - release
     uses: ./.github/workflows/_publish_verify.yml
     name: Verify
@@ -152,11 +163,12 @@ jobs:
       contents: read
       pull-requests: read
     if: |
-      always()
+      !cancelled()
       && github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
       && (fromJSON(needs.load.outputs.request).run.release
+          || fromJSON(needs.load.outputs.request).run.docs
           || fromJSON(needs.load.outputs.request).run.verify)
     needs:
     - load

@@ -1022,6 +1022,26 @@ TEST_F(OverrideHostLoadBalancerTest, FallbackRecreatedOnHostChange) {
   thread_local_priority_set_.runUpdateCallbacks(0, {}, {});
   EXPECT_EQ(worker_lb_create_count, 3);
 }
+
+TEST_F(OverrideHostLoadBalancerTest, SelectedHostKeyWithNullRequestStreamInfo) {
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithSelectedHostKey("x-gateway-destination-endpoint-served"));
+
+  // A context without request stream info delegates to the fallback LB, which still picks
+  // a host; recording the selected host must be skipped instead of dereferencing null.
+  EXPECT_CALL(load_balancer_context_, requestStreamInfo()).WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_)).Times(0);
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ(host->address()->asString(), "127.0.0.1:80");
+}
 } // namespace
 } // namespace OverrideHost
 } // namespace LoadBalancingPolicies

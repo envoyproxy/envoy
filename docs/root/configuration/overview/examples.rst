@@ -299,6 +299,8 @@ The management server could respond to EDS requests with:
               address: 127.0.0.1
               port_value: 1234
 
+.. _config_overview_special_yaml:
+
 Special YAML usage
 ~~~~~~~~~~~~~~~~~~
 
@@ -331,3 +333,22 @@ node as a simple scalar when loading:
 
 Alternatively, :repo:`this is how <tools/config_validation/validate_fragment.py>`
 Envoy registers the !ignore tag in config validation.
+
+Float literals are loaded as strings by default, and protobuf converts them according to the
+type of the target field. This does not help when the target is a
+``google.protobuf.Struct`` (for example a ``typed_config`` packed as a ``Struct``), since the value
+would remain a string. Tag the scalar with the standard YAML ``!!float`` tag to load it as a
+number instead:
+
+.. code-block:: yaml
+
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        max_size: !!float 5000.0
+
+Non-finite values (``!!float .inf``, ``!!float -.inf`` and ``!!float .nan``) cannot be represented
+as JSON numbers, so they end up as the strings ``Infinity``, ``-Infinity`` and ``NaN`` in a
+``Struct``. Typed ``double`` and ``float`` fields parse these strings back into the corresponding
+values. A ``!!float`` scalar that cannot be decoded as a number is rejected and fails
+configuration loading.

@@ -378,6 +378,18 @@ TEST(NetworkUtility, GetAddressWithPort) {
   EXPECT_FALSE(addr_v6only_false->ip()->ipv6()->v6only());
   auto addr_v6only_false_new_port = Utility::getAddressWithPort(*addr_v6only_false, 8080);
   EXPECT_FALSE(addr_v6only_false_new_port->ip()->ipv6()->v6only());
+
+  // Verify custom SocketInterface is preserved for IPv4 and IPv6.
+  MockSocketInterface custom_socket_interface({Address::IpVersion::v4, Address::IpVersion::v6});
+  auto addr_v4_custom_sock =
+      std::make_shared<Address::Ipv4Instance>("1.2.3.4", 80, &custom_socket_interface);
+  auto addr_v4_custom_sock_new_port = Utility::getAddressWithPort(*addr_v4_custom_sock, 8080);
+  EXPECT_EQ(&custom_socket_interface, &addr_v4_custom_sock_new_port->socketInterface());
+
+  auto addr_v6_custom_sock =
+      std::make_shared<Address::Ipv6Instance>("::1", 80, &custom_socket_interface);
+  auto addr_v6_custom_sock_new_port = Utility::getAddressWithPort(*addr_v6_custom_sock, 8080);
+  EXPECT_EQ(&custom_socket_interface, &addr_v6_custom_sock_new_port->socketInterface());
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
