@@ -18,3 +18,13 @@ envoy_cc_test(
         "//test/common/buffer:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "handshake_test",
+    srcs = ["handshake_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:base64_lib",
+        "//source/common/websocket:handshake_lib",
+    ],
+)

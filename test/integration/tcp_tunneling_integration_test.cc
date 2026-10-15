@@ -13,6 +13,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/tcp_tunneling_integration.h"
+#include "test/integration/websocket_handshake_test_utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -844,10 +845,11 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
   // Send response headers
   // The HTTP/1 upstream will observe the upgrade headers and needs to respond with 101
   // HTTP/2 and HTTP/3 upstreams need to respond to extended CONNECT with 200
-  upstream_request_->encodeHeaders(upstreamProtocol() == Http::CodecType::HTTP1
-                                       ? h1_upgrade_response
-                                       : default_response_headers_,
-                                   false);
+  upstream_request_->encodeHeaders(
+      withWebSocketAccept(upstream_request_->headers(), upstreamProtocol() == Http::CodecType::HTTP1
+                                                            ? h1_upgrade_response
+                                                            : default_response_headers_),
+      false);
 
   // Wait for them to arrive downstream.
   response_->waitForHeaders();

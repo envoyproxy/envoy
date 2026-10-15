@@ -11,6 +11,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/integration/utility.h"
+#include "test/integration/websocket_handshake_test_utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
@@ -21,6 +22,7 @@
 
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
 namespace Envoy {
 namespace {
 
@@ -97,6 +99,9 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     proxied_request_headers.setContentLength(size_t(0));
   }
 
+  removeGeneratedWebSocketKey(proxied_request_headers, original_request_headers,
+                              upstreamProtocol() == Http::CodecType::HTTP1 ||
+                                  downstreamProtocol() == Http::CodecType::HTTP1);
   commonValidate(proxied_request_headers, original_request_headers);
   proxied_request_headers.removeRequestId();
 
@@ -200,7 +205,8 @@ void WebsocketIntegrationTest::performUpgrade(
   validateUpgradeRequestHeaders(upstream_request_->headers(), upgrade_request_headers);
 
   // Send the upgrade response
-  upstream_request_->encodeHeaders(upgrade_response_headers, false);
+  upstream_request_->encodeHeaders(
+      withWebSocketAccept(upstream_request_->headers(), upgrade_response_headers), false);
 
   // Verify the upgrade response was received downstream.
   response_->waitForHeaders();
@@ -238,6 +244,43 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
   test_server_->waitForGauge("http.config_test.downstream_cx_upgrades_active", Eq(0));
+}
+
+TEST_P(WebsocketIntegrationTest, ExtendedConnectToHttp1RejectsUpstreamWithoutMatchingAccept) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  config_helper_.addConfigModifier(setRouteRetryOn5xxPolicy());
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(upgradeRequestHeaders());
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  // Both the original attempt and the retry get a 101 without an accept for their key.
+  std::vector<std::string> keys;
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    const auto key = upstream_request_->headers().get(Http::Headers::get().SecWebSocketKey);
+    ASSERT_EQ(key.size(), 1);
+    keys.emplace_back(key[0]->value().getStringView());
+    upstream_request_->encodeHeaders(upgradeResponseHeaders(), false);
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+  EXPECT_NE(keys[0], keys[1]);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_EQ("502", response_->headers().getStatusValue());
+  EXPECT_EQ(response_->headers().Upgrade(), nullptr);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_retry", Eq(1));
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("UPE upstream_reset_before_response_started{protocol_error}"));
 }
 
 TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
@@ -580,8 +623,9 @@ TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding)
 
   // Send upgrade request without CL and TE headers
   ASSERT_TRUE(tcp_client->write(
-      "GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n", false,
-      false));
+      "GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: websocket\r\n"
+      "sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n",
+      false, false));
 
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
@@ -627,7 +671,8 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithTransferEncoding) {
 
   // Send upgrade request with TE: chunked header
   ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: "
-                                "websocket\r\ntransfer-encoding: chunked\r\n\r\n",
+                                "websocket\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+                                "transfer-encoding: chunked\r\n\r\n",
                                 false, false));
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -675,7 +720,8 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithContentLength) {
 
   // Send upgrade request with TE: chunked header
   ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: "
-                                "websocket\r\ncontent-length: 7\r\n\r\n",
+                                "websocket\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+                                "content-length: 7\r\n\r\n",
                                 false, false));
 
   FakeRawConnectionPtr fake_upstream_connection;
@@ -993,7 +1039,8 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeRetryWithFilterChain) {
 
   // Send the successful 101 upgrade response on the second try
   auto success_response_headers = upgradeResponseHeaders();
-  upstream_request_->encodeHeaders(success_response_headers, false);
+  upstream_request_->encodeHeaders(
+      withWebSocketAccept(upstream_request_->headers(), success_response_headers), false);
 
   // Verify the successful upgrade response was received downstream.
   response_->waitForHeaders();

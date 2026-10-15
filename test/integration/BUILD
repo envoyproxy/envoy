@@ -1829,6 +1829,18 @@ envoy_cc_test_library(
     hdrs = ["websocket_integration_test.h"],
 )
 
+envoy_cc_test_library(
+    name = "websocket_handshake_test_utility_lib",
+    hdrs = ["websocket_handshake_test_utility.h"],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/websocket:handshake_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "websocket_integration_test",
     srcs = ["websocket_integration_test.cc"],
@@ -1836,6 +1848,7 @@ envoy_cc_test(
     shard_count = 8,
     deps = [
         ":http_protocol_integration_lib",
+        ":websocket_handshake_test_utility_lib",
         ":websocket_integration_test_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/file:config",
@@ -2329,6 +2342,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         ":tcp_tunneling_integration_lib",
+        ":websocket_handshake_test_utility_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/upstreams/http/tcp:config",
         "//test/integration/filters:add_header_filter_config_lib",

@@ -16,6 +16,7 @@
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/websocket/handshake.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/common/memory/memory_test_utility.h"
@@ -32,6 +33,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -2687,6 +2689,9 @@ public:
   void testRequestWithValueExpectSuccess(absl::string_view value, absl::string_view expected_value);
   void testRequestWithValueExpectFailure(absl::string_view value,
                                          absl::string_view expected_error_message);
+  std::string encodeWebsocketUpgrade(RequestEncoder& request_encoder,
+                                     absl::string_view upgrade = "websocket",
+                                     absl::string_view websocket_key = "");
 
 protected:
   Stats::TestUtil::TestStore store_;
@@ -3257,6 +3262,128 @@ TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
                              "upgrade\r\nUpgrade: websocket\r\n\r\n12345abcd");
   auto status = codec_->dispatch(response);
   EXPECT_OK(status);
+}
+
+TEST_F(Http1ClientConnectionImplTest, GeneratedWebsocketKeyIsValidatedAndAcceptStripped) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  const std::string key = encodeWebsocketUpgrade(codec_->newStream(response_decoder));
+  EXPECT_EQ(key.size(), 24);
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false))
+      .WillOnce(Invoke([](ResponseHeaderMapPtr& headers, bool) {
+        EXPECT_TRUE(headers->get(Http::Headers::get().SecWebSocketAccept).empty());
+      }));
+  Buffer::OwnedImpl response(absl::StrCat("HTTP/1.1 101 Switching Protocols\r\n"
+                                          "Connection: Upgrade\r\nUpgrade: WebSocket\r\n"
+                                          "Sec-WebSocket-Accept: ",
+                                          WebSocket::computeAccept(key), "\r\n\r\n"));
+  EXPECT_OK(codec_->dispatch(response));
+}
+
+TEST_F(Http1ClientConnectionImplTest, InvalidGeneratedWebsocketHandshake) {
+  for (const absl::string_view response_headers : {
+           "Connection: upgrade\r\nUpgrade: websocket\r\n"
+           "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n",
+           "Connection: upgrade\r\nUpgrade: websocket\r\n",
+           "Connection: upgrade\r\nUpgrade: websocket\r\n{accept}{accept}",
+           "Connection: upgrade\r\n{accept}",
+           "Upgrade: websocket\r\n{accept}",
+           "Connection: upgrade\r\nUpgrade: foo\r\n{accept}",
+       }) {
+    initialize();
+
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    const std::string key = encodeWebsocketUpgrade(request_encoder);
+
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, _)).Times(0);
+    Buffer::OwnedImpl response(absl::StrCat(
+        "HTTP/1.1 101 Switching Protocols\r\n",
+        absl::StrReplaceAll(response_headers,
+                            {{"{accept}", absl::StrCat("Sec-WebSocket-Accept: ",
+                                                       WebSocket::computeAccept(key), "\r\n")}}),
+        "\r\n"));
+    auto status = codec_->dispatch(response);
+    EXPECT_TRUE(isCodecProtocolError(status)) << response_headers;
+    EXPECT_EQ(request_encoder.getStream().responseDetails(), "http1.invalid_websocket_handshake");
+  }
+}
+
+TEST_F(Http1ClientConnectionImplTest, RejectedGeneratedWebsocketUpgradeIsNotValidated) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  encodeWebsocketUpgrade(codec_->newStream(response_decoder));
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl response("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n");
+  EXPECT_OK(codec_->dispatch(response));
+}
+
+TEST_F(Http1ClientConnectionImplTest, ClientWebsocketKeyIsNotReplacedOrValidated) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  EXPECT_EQ(encodeWebsocketUpgrade(codec_->newStream(response_decoder), "websocket",
+                                   "dGhlIHNhbXBsZSBub25jZQ=="),
+            "dGhlIHNhbXBsZSBub25jZQ==");
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false))
+      .WillOnce(Invoke([](ResponseHeaderMapPtr& headers, bool) {
+        EXPECT_EQ(headers->get(Http::Headers::get().SecWebSocketAccept).size(), 1);
+      }));
+  Buffer::OwnedImpl response("HTTP/1.1 101 Switching Protocols\r\nConnection: upgrade\r\n"
+                             "Upgrade: websocket\r\nSec-WebSocket-Accept: not-the-accept\r\n\r\n");
+  EXPECT_OK(codec_->dispatch(response));
+}
+
+TEST_F(Http1ClientConnectionImplTest, WebsocketKeyNotGeneratedForOtherUpgrades) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  EXPECT_EQ(encodeWebsocketUpgrade(codec_->newStream(response_decoder), "foo"), "");
+}
+
+TEST_F(Http1ClientConnectionImplTest, WebsocketKeyNotGeneratedWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_synthesize_websocket_key", "false"}});
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  EXPECT_EQ(encodeWebsocketUpgrade(codec_->newStream(response_decoder)), "");
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl response("HTTP/1.1 101 Switching Protocols\r\nConnection: upgrade\r\n"
+                             "Upgrade: websocket\r\n\r\n");
+  EXPECT_OK(codec_->dispatch(response));
+}
+
+// Encodes a websocket upgrade request and returns the sec-websocket-key written for it, if any.
+std::string Http1ClientConnectionImplTest::encodeWebsocketUpgrade(RequestEncoder& request_encoder,
+                                                                  absl::string_view upgrade,
+                                                                  absl::string_view websocket_key) {
+  std::string output;
+  EXPECT_CALL(connection_, write(_, _)).WillOnce(AddBufferToString(&output));
+  TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                   {":path", "/"},
+                                   {":authority", "host"},
+                                   {"connection", "upgrade"},
+                                   {"upgrade", std::string(upgrade)}};
+  if (!websocket_key.empty()) {
+    headers.addCopy(Http::Headers::get().SecWebSocketKey, websocket_key);
+  }
+  EXPECT_OK(request_encoder.encodeHeaders(headers, false));
+
+  constexpr absl::string_view key_prefix = "sec-websocket-key: ";
+  const size_t key_start = output.find(key_prefix);
+  if (key_start == std::string::npos) {
+    return "";
+  }
+  const size_t value_start = key_start + key_prefix.size();
+  return output.substr(value_start, output.find("\r\n", value_start) - value_start);
 }
 
 TEST_F(Http1ClientConnectionImplTest, ConnectResponse) {
