@@ -571,6 +571,14 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.counter")->value());
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.gauge")->value());
   EXPECT_EQ(0, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+  EXPECT_EQ(
+      0,
+      TestUtility::findGauge(*store_, "server.stats_cardinality.max_counter_utilization")->value());
+  EXPECT_EQ(
+      0,
+      TestUtility::findGauge(*store_, "server.stats_cardinality.max_gauge_utilization")->value());
+  EXPECT_EQ(0, TestUtility::findGauge(*store_, "server.stats_cardinality.max_histogram_utilization")
+                   ->value());
 
   {
     Counter& c1 = scope->counterFromString("c1");
@@ -590,6 +598,15 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
     Histogram& h2 = scope->histogramFromString("h2", Histogram::Unit::Unspecified);
     EXPECT_EQ("", h2.name());
     EXPECT_EQ(1, TestUtility::findCounter(*store_, "server.stats_overflow.histogram")->value());
+    EXPECT_EQ(100,
+              TestUtility::findGauge(*store_, "server.stats_cardinality.max_counter_utilization")
+                  ->value());
+    EXPECT_EQ(
+        100,
+        TestUtility::findGauge(*store_, "server.stats_cardinality.max_gauge_utilization")->value());
+    EXPECT_EQ(100,
+              TestUtility::findGauge(*store_, "server.stats_cardinality.max_histogram_utilization")
+                  ->value());
 
     // c1, g1, h1 are used.
     c1.inc();
@@ -609,6 +626,14 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
   // Second eviction removes stats.
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   store_->evictUnused();
+  EXPECT_EQ(
+      0,
+      TestUtility::findGauge(*store_, "server.stats_cardinality.max_counter_utilization")->value());
+  EXPECT_EQ(
+      0,
+      TestUtility::findGauge(*store_, "server.stats_cardinality.max_gauge_utilization")->value());
+  EXPECT_EQ(0, TestUtility::findGauge(*store_, "server.stats_cardinality.max_histogram_utilization")
+                   ->value());
 
   // After eviction, we should be able to create new stats.
   Counter& c3 = scope->counterFromString("c3");
@@ -635,6 +660,71 @@ TEST_F(StatsThreadLocalStoreTest, StatsNumLimitsWithEviction) {
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
+}
+
+TEST_F(StatsThreadLocalStoreTest, StatsCardinalityUtilizationIsMaximumAcrossLimitedScopes) {
+  ScopeSharedPtr scope1 = store_->createScope("scope1.", false, {4, 4, 4});
+  GaugeSharedPtr counter_utilization =
+      TestUtility::findGauge(*store_, "server.stats_cardinality.max_counter_utilization");
+  GaugeSharedPtr gauge_utilization =
+      TestUtility::findGauge(*store_, "server.stats_cardinality.max_gauge_utilization");
+  GaugeSharedPtr histogram_utilization =
+      TestUtility::findGauge(*store_, "server.stats_cardinality.max_histogram_utilization");
+  ASSERT_NE(nullptr, counter_utilization);
+  ASSERT_NE(nullptr, gauge_utilization);
+  ASSERT_NE(nullptr, histogram_utilization);
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, counter_utilization->importMode());
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, gauge_utilization->importMode());
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, histogram_utilization->importMode());
+
+  scope1->counterFromString("counter");
+  scope1->gaugeFromString("gauge", Gauge::ImportMode::Accumulate);
+  scope1->histogramFromString("histogram", Histogram::Unit::Unspecified);
+  EXPECT_EQ(25, counter_utilization->value());
+  EXPECT_EQ(25, gauge_utilization->value());
+  EXPECT_EQ(25, histogram_utilization->value());
+
+  ScopeSharedPtr scope2 = store_->createScope("scope2.", false, {2, 2, 2});
+  scope2->counterFromString("counter");
+  scope2->gaugeFromString("gauge", Gauge::ImportMode::Accumulate);
+  scope2->histogramFromString("histogram", Histogram::Unit::Unspecified);
+  EXPECT_EQ(50, counter_utilization->value());
+  EXPECT_EQ(50, gauge_utilization->value());
+  EXPECT_EQ(50, histogram_utilization->value());
+
+  // Releasing a scope that is not at the maximum leaves the gauges unchanged.
+  ScopeSharedPtr scope3 = store_->createScope("scope3.", false, {8, 8, 8});
+  scope3->counterFromString("counter");
+  scope3->gaugeFromString("gauge", Gauge::ImportMode::Accumulate);
+  scope3->histogramFromString("histogram", Histogram::Unit::Unspecified);
+  EXPECT_EQ(50, counter_utilization->value());
+  EXPECT_EQ(50, gauge_utilization->value());
+  EXPECT_EQ(50, histogram_utilization->value());
+  scope3.reset();
+  EXPECT_EQ(50, counter_utilization->value());
+  EXPECT_EQ(50, gauge_utilization->value());
+  EXPECT_EQ(50, histogram_utilization->value());
+
+  // Releasing the scope at the maximum lowers the gauges to the next-highest scope.
+  scope2.reset();
+  EXPECT_EQ(25, counter_utilization->value());
+  EXPECT_EQ(25, gauge_utilization->value());
+  EXPECT_EQ(25, histogram_utilization->value());
+}
+
+TEST_F(StatsThreadLocalStoreTest, StatsCardinalityUtilizationHandlesZeroAndSelectiveLimits) {
+  ScopeSharedPtr scope = store_->createScope("scope.", false, {std::nullopt, 0, std::nullopt});
+  EXPECT_EQ(nullptr,
+            TestUtility::findGauge(*store_, "server.stats_cardinality.max_counter_utilization"));
+  EXPECT_EQ(nullptr,
+            TestUtility::findGauge(*store_, "server.stats_cardinality.max_histogram_utilization"));
+  GaugeSharedPtr gauge_utilization =
+      TestUtility::findGauge(*store_, "server.stats_cardinality.max_gauge_utilization");
+  ASSERT_NE(nullptr, gauge_utilization);
+  EXPECT_EQ(100, gauge_utilization->value());
+  EXPECT_EQ(&store_->nullGauge(),
+            &scope->gaugeFromString("rejected", Gauge::ImportMode::Accumulate));
+  EXPECT_EQ(100, gauge_utilization->value());
 }
 
 TEST_F(StatsThreadLocalStoreTest, ForEach) {

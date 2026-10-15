@@ -38,6 +38,9 @@ Server related statistics are rooted at *server.* with following statistics:
   stats_overflow.counter, Counter, Total number of counter lookup or creation attempts dropped due to reaching the configured limit on label cardinality.
   stats_overflow.gauge, Counter, Total number of gauge lookup or creation attempts dropped due to reaching the configured limit on label cardinality.
   stats_overflow.histogram, Counter, Total number of histogram lookup or creation attempts dropped due to reaching the configured limit on label cardinality.
+  stats_cardinality.max_counter_utilization, Gauge, Highest percentage (0-100) of the configured counter cardinality limit in use across all scopes with a counter limit. Only present if at least one scope has a counter limit.
+  stats_cardinality.max_gauge_utilization, Gauge, Highest percentage (0-100) of the configured gauge cardinality limit in use across all scopes with a gauge limit. Only present if at least one scope has a gauge limit.
+  stats_cardinality.max_histogram_utilization, Gauge, Highest percentage (0-100) of the configured histogram cardinality limit in use across all scopes with a histogram limit. Only present if at least one scope has a histogram limit.
 
 .. _server_compilation_settings_statistics:
 

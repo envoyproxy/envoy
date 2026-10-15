@@ -583,6 +583,20 @@ private:
   bool iterateScopesLockHeld(const std::function<bool(const ScopeImplSharedPtr&)> fn) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
+  // Updates the process-wide maximum utilization gauges from one scope. This is used on stat
+  // insertion, when utilization can only increase.
+  void updateCardinalityUtilizationLockHeld(const ScopeImpl& scope)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+
+  // Recomputes the gauges across all live limited scopes after cardinality can decrease.
+  void recomputeCardinalityUtilizationLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+
+  // Returns true if the scope currently holds the maximum utilization for any stat type, in
+  // which case its removal can lower the corresponding gauge. Used to skip the full
+  // recomputation when a scope that is not at the maximum is released.
+  bool scopeAtMaxUtilizationLockHeld(const ScopeImpl& scope) const
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+
   // The Store versions of iterate cover all the scopes in the store.
   template <class StatFn> bool iterHelper(StatFn fn) const {
     return iterateScopes([this, fn](const ScopeImplSharedPtr& scope)
@@ -676,6 +690,9 @@ private:
   CounterSharedPtr counters_overflow_;
   CounterSharedPtr gauges_overflow_;
   CounterSharedPtr histograms_overflow_;
+  GaugeSharedPtr max_counter_cardinality_utilization_;
+  GaugeSharedPtr max_gauge_cardinality_utilization_;
+  GaugeSharedPtr max_histogram_cardinality_utilization_;
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;

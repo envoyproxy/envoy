@@ -116,6 +116,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
       sinked_histograms_.erase(deleted_histograms_[i].get());
     }
   }
+  recomputeCardinalityUtilizationLockHeld();
 }
 
 template <class StatMapClass, class StatListClass>
@@ -244,6 +245,7 @@ ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromTaggedName(
 void ThreadLocalStoreImpl::addScope(std::shared_ptr<ScopeImpl>& new_scope) {
   Thread::LockGuard lock(lock_);
   scopes_[new_scope.get()] = std::weak_ptr<ScopeImpl>(new_scope);
+  updateCardinalityUtilizationLockHeld(*new_scope);
 }
 
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
@@ -343,7 +345,13 @@ ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
+  // Releasing a scope can only lower a max utilization gauge if the scope currently holds the
+  // maximum for some stat type, so skip the recomputation across all scopes otherwise.
+  const bool was_at_max = scopeAtMaxUtilizationLockHeld(*scope);
   scopes_.erase(scope);
+  if (was_at_max) {
+    recomputeCardinalityUtilizationLockHeld();
+  }
 
   // This method is called directly from the ScopeImpl destructor, but we can't
   // destroy scope->central_cache_ until all the TLS caches are be destroyed, as
@@ -673,6 +681,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     }
     central_ref = &central_cache_map[stat->statName()];
     *central_ref = stat;
+    parent_.updateCardinalityUtilizationLockHeld(*this);
   }
 
   // If we have a TLS cache, insert the stat.
@@ -962,6 +971,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::getOrCreateHistogramBase(
 
     central_ref = &central_cache->histograms_[stat->statName()];
     *central_ref = stat;
+    parent_.updateCardinalityUtilizationLockHeld(*this);
   }
 
   if (tls_cache != nullptr) {
@@ -1405,6 +1415,7 @@ void ThreadLocalStoreImpl::evictUnused() {
       }
       return true;
     });
+    recomputeCardinalityUtilizationLockHeld();
   }
 
   // At this point, central caches no longer return the evicted stats, but we
@@ -1548,16 +1559,110 @@ void ThreadLocalStoreImpl::ensureOverflowStats(const ScopeStatsLimitSettings& li
     StatName name = pool.add("server.stats_overflow.counter");
     counters_overflow_ = alloc_.makeCounter(name, name, {});
   }
+  if (need_counter_overflow_stat && max_counter_cardinality_utilization_ == nullptr) {
+    StatNamePool pool(symbolTable());
+    StatName name = pool.add("server.stats_cardinality.max_counter_utilization");
+    max_counter_cardinality_utilization_ =
+        alloc_.makeGauge(name, name, {}, Gauge::ImportMode::NeverImport);
+  }
   if (need_gauge_overflow_stat && gauges_overflow_ == nullptr) {
     StatNamePool pool(symbolTable());
     StatName name = pool.add("server.stats_overflow.gauge");
     gauges_overflow_ = alloc_.makeCounter(name, name, {});
+  }
+  if (need_gauge_overflow_stat && max_gauge_cardinality_utilization_ == nullptr) {
+    StatNamePool pool(symbolTable());
+    StatName name = pool.add("server.stats_cardinality.max_gauge_utilization");
+    max_gauge_cardinality_utilization_ =
+        alloc_.makeGauge(name, name, {}, Gauge::ImportMode::NeverImport);
   }
   if (need_histogram_overflow_stat && histograms_overflow_ == nullptr) {
     StatNamePool pool(symbolTable());
     StatName name = pool.add("server.stats_overflow.histogram");
     histograms_overflow_ = alloc_.makeCounter(name, name, {});
   }
+  if (need_histogram_overflow_stat && max_histogram_cardinality_utilization_ == nullptr) {
+    StatNamePool pool(symbolTable());
+    StatName name = pool.add("server.stats_cardinality.max_histogram_utilization");
+    max_histogram_cardinality_utilization_ =
+        alloc_.makeGauge(name, name, {}, Gauge::ImportMode::NeverImport);
+  }
+}
+
+namespace {
+
+uint64_t cardinalityUtilization(size_t cardinality, uint32_t limit) {
+  if (limit == 0 || cardinality >= limit) {
+    return 100;
+  }
+  return cardinality * 100 / limit;
+}
+
+void updateMaxUtilization(const GaugeSharedPtr& gauge, size_t cardinality, uint32_t limit) {
+  const uint64_t utilization = cardinalityUtilization(cardinality, limit);
+  if (utilization > gauge->value()) {
+    gauge->set(utilization);
+  }
+}
+
+} // namespace
+
+bool ThreadLocalStoreImpl::scopeAtMaxUtilizationLockHeld(const ScopeImpl& scope) const {
+  assertLocked(scope);
+  const CentralCacheEntrySharedPtr& central_cache = scope.centralCacheLockHeld();
+  if (scope.limits_.max_counters.has_value() && max_counter_cardinality_utilization_ != nullptr &&
+      cardinalityUtilization(central_cache->counters_.size(), scope.limits_.max_counters.value()) ==
+          max_counter_cardinality_utilization_->value()) {
+    return true;
+  }
+  if (scope.limits_.max_gauges.has_value() && max_gauge_cardinality_utilization_ != nullptr &&
+      cardinalityUtilization(central_cache->gauges_.size(), scope.limits_.max_gauges.value()) ==
+          max_gauge_cardinality_utilization_->value()) {
+    return true;
+  }
+  if (scope.limits_.max_histograms.has_value() &&
+      max_histogram_cardinality_utilization_ != nullptr &&
+      cardinalityUtilization(central_cache->histograms_.size(),
+                             scope.limits_.max_histograms.value()) ==
+          max_histogram_cardinality_utilization_->value()) {
+    return true;
+  }
+  return false;
+}
+
+void ThreadLocalStoreImpl::updateCardinalityUtilizationLockHeld(const ScopeImpl& scope) {
+  assertLocked(scope);
+  const CentralCacheEntrySharedPtr& central_cache = scope.centralCacheLockHeld();
+  if (scope.limits_.max_counters.has_value()) {
+    updateMaxUtilization(max_counter_cardinality_utilization_, central_cache->counters_.size(),
+                         scope.limits_.max_counters.value());
+  }
+  if (scope.limits_.max_gauges.has_value()) {
+    updateMaxUtilization(max_gauge_cardinality_utilization_, central_cache->gauges_.size(),
+                         scope.limits_.max_gauges.value());
+  }
+  if (scope.limits_.max_histograms.has_value()) {
+    updateMaxUtilization(max_histogram_cardinality_utilization_, central_cache->histograms_.size(),
+                         scope.limits_.max_histograms.value());
+  }
+}
+
+void ThreadLocalStoreImpl::recomputeCardinalityUtilizationLockHeld() {
+  if (max_counter_cardinality_utilization_ != nullptr) {
+    max_counter_cardinality_utilization_->set(0);
+  }
+  if (max_gauge_cardinality_utilization_ != nullptr) {
+    max_gauge_cardinality_utilization_->set(0);
+  }
+  if (max_histogram_cardinality_utilization_ != nullptr) {
+    max_histogram_cardinality_utilization_->set(0);
+  }
+  iterateScopesLockHeld([this](const ScopeImplSharedPtr& scope)
+                            ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
+                              assertLocked(*scope);
+                              updateCardinalityUtilizationLockHeld(*scope);
+                              return true;
+                            });
 }
 
 } // namespace Stats
