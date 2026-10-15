@@ -3,5 +3,8 @@ try-import ../.bazelrc
 try-import ../ci.bazelrc
 try-import ../user.bazelrc
 
+# ci.bazelrc uses a main-repo label that only exists in the root workspace.
+common:remote-exec --host_platform=@clang_platform
+
 common --@proxy-wasm-cpp-host//bazel:engine=disabled
 build --@rules_rust//rust/settings:extra_exec_rustc_flags=-Clink-self-contained=no

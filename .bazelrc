@@ -23,10 +23,29 @@ try-import %workspace%/ci.bazelrc
 
 common --noincompatible_disallow_empty_glob
 common --noincompatible_disallow_ctx_resolve_tools
-common --legacy_external_runfiles
+
+# Bazel 9 no longer autoloads formerly-native rules (cc_*, py_*, sh_*, proto_*, java_*).
+# The main repo uses explicit load()s, but many external modules still rely on autoloads.
+# This restores the Bazel 8 defaults plus @rules_cc (C++ rules were still built in to Bazel 8).
+# TODO(jwendell): remove once all external modules have explicit loads.
+common --incompatible_autoload_externally=+@rules_cc,+@rules_python,+java_common,+JavaInfo,+JavaPluginInfo,ProguardSpecProvider,java_binary,java_import,java_library,java_plugin,java_test,java_runtime,java_toolchain,java_package_configuration,@com_google_protobuf,@rules_shell,+@rules_android
+
+# Bazel 9 stops propagating --action_env to repository rules/module extensions. Envoy passes
+# toolchain configuration (CC, CXX, BAZEL_LINKLIBS, ...) via --action_env, so keep the
+# Bazel 8 behavior for now.
+# TODO(jwendell): migrate the relevant variables to --repo_env and remove this.
+common --noincompatible_repo_env_ignores_action_env
+
+# Bazel 9 uses -I instead of -isystem for the `includes` attribute. Restore the Bazel 8 behavior
+# (`includes` as -isystem, everything else unchanged) so that third-party header warnings are not
+# reported against Envoy's -Werror build. Note: `external_include_paths` is not equivalent, it
+# makes *all* external headers (e.g. abseil) system headers, which changes coverage attribution
+# of macros such as ABSL_FLAG. This works on any toolchain, as rules_cc only checks whether the
+# feature was requested.
+build --features=system_include_paths --host_features=system_include_paths
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/e66afe84303d8bfe3df43fdefb17cda8701f3196
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/429f95e660024dce57dfc764c3eb4a01a5e4e27e
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -40,7 +59,6 @@ build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --experimental_repository_downloader_retries=2
 build --experimental_cc_static_library
 build --enable_platform_specific_config
-build --incompatible_merge_fixed_and_default_shell_env
 # A workaround for slow ICU download.
 build --http_timeout_scaling=6.0
 

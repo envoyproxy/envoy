@@ -56,7 +56,9 @@ common:remote-cache --remote_timeout=3600s
 common:remote-exec --remote_executor=grpcs://mordenite.cluster.engflow.com
 common:remote-exec --jobs=200
 common:remote-exec --define=engflow_rbe=true
-common:remote-exec --host_platform=@clang_platform
+# Main-repo label (not @clang_platform) to work around https://github.com/bazelbuild/bazel/issues/28954.
+# Workspaces importing this file without that package override it in their own .bazelrc.
+common:remote-exec --host_platform=//bazel/platforms/rbe:clang_platform
 
 
 #############################################################################
