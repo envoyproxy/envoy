@@ -152,12 +152,13 @@ jobs:
             exit 1
         fi
     - name: Set up GCP credentials for dry run
-      if: ${{ inputs.dry-run && env.HAS_GCP_KEY == 'true' }}
+      if: inputs.dry-run && inputs.trusted && env.HAS_GCP_KEY == 'true'
       uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         key: ${{ secrets.gcp-key }}
     - name: Dry-run versioned artifact sync
-      if: ${{ inputs.dry-run && inputs.layout == 'version' && env.HAS_GCP_KEY == 'true' }}
+      if: >-
+        inputs.dry-run && inputs.trusted && inputs.layout == 'version' && env.HAS_GCP_KEY == 'true'
       env:
         ARTIFACT: ${{ matrix.artifact }}
         BUCKET: ${{ vars.GCS_DOCS_ARCHIVE_BUCKET }}
@@ -167,7 +168,8 @@ jobs:
         gcloud storage rsync --dry-run --delete-unmatched-destination-objects -r \
           "$ARTIFACT" "gs://${BUCKET}/${PREFIX}/${VERSION}"
     - name: Report dry-run destination
-      if: ${{ inputs.dry-run && (env.HAS_GCP_KEY != 'true' || inputs.layout == 'sha') }}
+      if: >-
+        inputs.dry-run && (!inputs.trusted || env.HAS_GCP_KEY != 'true' || inputs.layout == 'sha')
       env:
         ARTIFACT: ${{ matrix.artifact }}
         LAYOUT: ${{ inputs.layout }}
