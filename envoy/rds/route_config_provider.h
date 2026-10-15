@@ -19,7 +19,7 @@ public:
   struct ConfigInfo {
     // The serialized wire-format bytes of the currently loaded route configuration. Do not hold
     // this reference beyond the caller of configInfo()'s scope.
-    const std::string& config_;
+    const std::string& serialized_config_;
 
     // The name of the route configuration.
     const std::string name_;

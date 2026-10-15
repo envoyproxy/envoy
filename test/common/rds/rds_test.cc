@@ -164,7 +164,7 @@ TEST_F(RdsConfigUpdateReceiverTest, EmptyRouteConfig) {
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("", config_update_->configInfo().value().name_);
   EXPECT_EQ("empty_version", config_update_->configInfo().value().version_);
-  EXPECT_EQ("", config_update_->configInfo().value().config_);
+  EXPECT_EQ("", config_update_->configInfo().value().serialized_config_);
   EXPECT_EQ(time1, config_update_->lastUpdated());
 }
 
