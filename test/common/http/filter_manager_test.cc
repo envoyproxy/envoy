@@ -180,6 +180,107 @@ TEST_F(FilterManagerTest, LowWatermarkWithoutHighWatermark) {
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTest, EncoderFilterLowWatermarkWithoutHighWatermark) {
+  initialize();
+
+  EXPECT_ENVOY_BUG(
+      filter_manager_->callEncoderFilterLowWatermarkCallbacks(),
+      "HTTP filter manager low watermark callback without a preceding high watermark callback");
+  EXPECT_FALSE(filter_manager_->aboveHighWatermark());
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, EncoderFilterWatermarksSeparatedFromDownstreamWatermarks) {
+  initialize();
+
+  auto decoder_filter = std::make_shared<NiceMock<MockStreamDecoderFilter>>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
+        callbacks.setFilterConfigName("");
+        decoder_factory(callbacks);
+        return true;
+      });
+
+  filter_manager_->createDownstreamFilterChain();
+
+  MockDownstreamWatermarkCallbacks downstream_callbacks;
+  MockEncoderFilterWatermarkCallbacks encoder_filter_callbacks;
+
+  decoder_filter->callbacks_->addDownstreamWatermarkCallbacks(downstream_callbacks);
+  decoder_filter->callbacks_->addEncoderFilterWatermarkCallbacks(encoder_filter_callbacks);
+
+  EXPECT_FALSE(filter_manager_->aboveHighWatermark());
+
+  // Encoder filter high watermark: only encoder_filter_callbacks should be notified.
+  EXPECT_CALL(encoder_filter_callbacks, onAboveWriteBufferHighWatermark()).Times(1);
+  EXPECT_CALL(downstream_callbacks, onAboveWriteBufferHighWatermark()).Times(0);
+  filter_manager_->callEncoderFilterHighWatermarkCallbacks();
+  EXPECT_TRUE(filter_manager_->aboveHighWatermark());
+
+  // True downstream high watermark: only downstream_callbacks should be notified.
+  EXPECT_CALL(downstream_callbacks, onAboveWriteBufferHighWatermark()).Times(1);
+  EXPECT_CALL(encoder_filter_callbacks, onAboveWriteBufferHighWatermark()).Times(0);
+  filter_manager_->callHighWatermarkCallbacks();
+  EXPECT_TRUE(filter_manager_->aboveHighWatermark());
+
+  // True downstream low watermark: only downstream_callbacks should be notified.
+  EXPECT_CALL(downstream_callbacks, onBelowWriteBufferLowWatermark()).Times(1);
+  EXPECT_CALL(encoder_filter_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  filter_manager_->callLowWatermarkCallbacks();
+  EXPECT_TRUE(filter_manager_->aboveHighWatermark());
+
+  // Encoder filter low watermark: only encoder_filter_callbacks should be notified.
+  EXPECT_CALL(encoder_filter_callbacks, onBelowWriteBufferLowWatermark()).Times(1);
+  EXPECT_CALL(downstream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  filter_manager_->callEncoderFilterLowWatermarkCallbacks();
+  EXPECT_FALSE(filter_manager_->aboveHighWatermark());
+
+  // Clean up
+  decoder_filter->callbacks_->removeDownstreamWatermarkCallbacks(downstream_callbacks);
+  decoder_filter->callbacks_->removeEncoderFilterWatermarkCallbacks(encoder_filter_callbacks);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, EncoderFilterWatermarkReplayOnRegistration) {
+  initialize();
+
+  auto decoder_filter = std::make_shared<NiceMock<MockStreamDecoderFilter>>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
+        callbacks.setFilterConfigName("");
+        decoder_factory(callbacks);
+        return true;
+      });
+
+  filter_manager_->createDownstreamFilterChain();
+
+  // Raise encoder filter high watermark before registration.
+  filter_manager_->callEncoderFilterHighWatermarkCallbacks();
+  EXPECT_TRUE(filter_manager_->aboveHighWatermark());
+
+  // New encoder filter watermark callback should receive replayed high watermark.
+  MockEncoderFilterWatermarkCallbacks encoder_filter_callbacks;
+  EXPECT_CALL(encoder_filter_callbacks, onAboveWriteBufferHighWatermark()).Times(1);
+  decoder_filter->callbacks_->addEncoderFilterWatermarkCallbacks(encoder_filter_callbacks);
+
+  // New downstream watermark callback should NOT receive replayed encoder filter high watermark.
+  MockDownstreamWatermarkCallbacks downstream_callbacks;
+  EXPECT_CALL(downstream_callbacks, onAboveWriteBufferHighWatermark()).Times(0);
+  decoder_filter->callbacks_->addDownstreamWatermarkCallbacks(downstream_callbacks);
+
+  // Clear watermark
+  EXPECT_CALL(encoder_filter_callbacks, onBelowWriteBufferLowWatermark()).Times(1);
+  EXPECT_CALL(downstream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  filter_manager_->callEncoderFilterLowWatermarkCallbacks();
+  EXPECT_FALSE(filter_manager_->aboveHighWatermark());
+
+  decoder_filter->callbacks_->removeDownstreamWatermarkCallbacks(downstream_callbacks);
+  decoder_filter->callbacks_->removeEncoderFilterWatermarkCallbacks(encoder_filter_callbacks);
+  filter_manager_->destroyFilters();
+}
+
 TEST_F(FilterManagerTest, RequestHeadersOrResponseHeadersAccess) {
   initialize();
 

@@ -727,6 +727,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   // downstream buffers are overrun. This may result in immediate watermark callbacks referencing
   // the encoder.
   parent_.callbacks()->addDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+  parent_.callbacks()->addEncoderFilterWatermarkCallbacks(downstream_watermark_manager_);
 
   std::optional<std::chrono::milliseconds> max_stream_duration;
   if (parent_.dynamicMaxStreamDuration().has_value()) {
@@ -784,6 +785,7 @@ void UpstreamRequest::clearRequestEncoder() {
   // Before clearing the encoder, unsubscribe from callbacks.
   if (upstream_) {
     parent_.callbacks()->removeDownstreamWatermarkCallbacks(downstream_watermark_manager_);
+    parent_.callbacks()->removeEncoderFilterWatermarkCallbacks(downstream_watermark_manager_);
   }
   upstream_.reset();
 }

@@ -1,5 +1,7 @@
 #include "source/common/http/filter_manager.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <functional>
 
 #include "envoy/http/header_map.h"
@@ -1756,20 +1758,39 @@ bool FilterManager::handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::
 }
 
 void FilterManager::callHighWatermarkCallbacks() {
-  ++high_watermark_count_;
+  ++downstream_high_watermark_count_;
   for (auto watermark_callbacks : watermark_callbacks_) {
     watermark_callbacks->onAboveWriteBufferHighWatermark();
   }
 }
 
 void FilterManager::callLowWatermarkCallbacks() {
-  if (high_watermark_count_ == 0) {
+  if (downstream_high_watermark_count_ == 0) {
     IS_ENVOY_BUG("HTTP filter manager low watermark callback without a preceding high watermark "
                  "callback");
     return;
   }
-  --high_watermark_count_;
+  --downstream_high_watermark_count_;
   for (auto watermark_callbacks : watermark_callbacks_) {
+    watermark_callbacks->onBelowWriteBufferLowWatermark();
+  }
+}
+
+void FilterManager::callEncoderFilterHighWatermarkCallbacks() {
+  ++encoder_filter_high_watermark_count_;
+  for (auto watermark_callbacks : encoder_filter_watermark_callbacks_) {
+    watermark_callbacks->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void FilterManager::callEncoderFilterLowWatermarkCallbacks() {
+  if (encoder_filter_high_watermark_count_ == 0) {
+    IS_ENVOY_BUG("HTTP filter manager low watermark callback without a preceding high watermark "
+                 "callback");
+    return;
+  }
+  --encoder_filter_high_watermark_count_;
+  for (auto watermark_callbacks : encoder_filter_watermark_callbacks_) {
     watermark_callbacks->onBelowWriteBufferLowWatermark();
   }
 }
@@ -1887,21 +1908,48 @@ void ActiveStreamDecoderFilter::onDecoderFilterBelowWriteBufferLowWatermark() {
 
 void ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  // This is called exactly once per upstream-stream, by the router filter. Therefore, we
-  // expect the same callbacks to not be registered twice.
+  // This is called by the router filter and sidestreams.
   ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
                    &watermark_callbacks) == parent_.watermark_callbacks_.end());
   parent_.watermark_callbacks_.emplace(parent_.watermark_callbacks_.end(), &watermark_callbacks);
-  for (uint32_t i = 0; i < parent_.high_watermark_count_; ++i) {
+  for (uint32_t i = 0; i < parent_.downstream_high_watermark_count_; ++i) {
     watermark_callbacks.onAboveWriteBufferHighWatermark();
   }
 }
 
 void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
-                   &watermark_callbacks) != parent_.watermark_callbacks_.end());
-  parent_.watermark_callbacks_.remove(&watermark_callbacks);
+  if (std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
+                &watermark_callbacks) != parent_.watermark_callbacks_.end()) {
+    parent_.watermark_callbacks_.remove(&watermark_callbacks);
+  } else {
+    // The watermark callbacks list should be empty at this point.
+    ASSERT(parent_.watermark_callbacks_.empty());
+  }
+}
+
+void ActiveStreamDecoderFilter::addEncoderFilterWatermarkCallbacks(
+    EncoderFilterWatermarkCallbacks& watermark_callbacks) {
+  ASSERT(std::find(parent_.encoder_filter_watermark_callbacks_.begin(),
+                   parent_.encoder_filter_watermark_callbacks_.end(),
+                   &watermark_callbacks) == parent_.encoder_filter_watermark_callbacks_.end());
+  parent_.encoder_filter_watermark_callbacks_.emplace(
+      parent_.encoder_filter_watermark_callbacks_.end(), &watermark_callbacks);
+  for (uint32_t i = 0; i < parent_.encoder_filter_high_watermark_count_; ++i) {
+    watermark_callbacks.onAboveWriteBufferHighWatermark();
+  }
+}
+
+void ActiveStreamDecoderFilter::removeEncoderFilterWatermarkCallbacks(
+    EncoderFilterWatermarkCallbacks& watermark_callbacks) {
+  if (std::find(parent_.encoder_filter_watermark_callbacks_.begin(),
+                parent_.encoder_filter_watermark_callbacks_.end(),
+                &watermark_callbacks) != parent_.encoder_filter_watermark_callbacks_.end()) {
+    parent_.encoder_filter_watermark_callbacks_.remove(&watermark_callbacks);
+  } else {
+    // The encoder filter watermark callbacks list should be empty at this point.
+    ASSERT(parent_.encoder_filter_watermark_callbacks_.empty());
+  }
 }
 
 void ActiveStreamDecoderFilter::addUpstreamWatermarkCallbacks(
@@ -2074,12 +2122,12 @@ void ActiveStreamEncoderFilter::addEncodedMetadata(MetadataMapPtr&& metadata_map
 
 void ActiveStreamEncoderFilter::onEncoderFilterAboveWriteBufferHighWatermark() {
   ENVOY_STREAM_LOG(debug, "Disabling upstream stream due to filter callbacks.", parent_);
-  parent_.callHighWatermarkCallbacks();
+  parent_.callEncoderFilterHighWatermarkCallbacks();
 }
 
 void ActiveStreamEncoderFilter::onEncoderFilterBelowWriteBufferLowWatermark() {
   ENVOY_STREAM_LOG(debug, "Enabling upstream stream due to filter callbacks.", parent_);
-  parent_.callLowWatermarkCallbacks();
+  parent_.callEncoderFilterLowWatermarkCallbacks();
 }
 
 void ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
