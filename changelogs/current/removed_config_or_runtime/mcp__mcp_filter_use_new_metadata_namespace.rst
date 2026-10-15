@@ -1,1 +1,4 @@
-Removed the runtime guard ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` and the legacy code path it guarded. The MCP filter always publishes its dynamic metadata under the ``envoy.filters.http.mcp`` namespace (and the MCP router reads it from there); the legacy ``mcp_proxy`` namespace is no longer available.
+Removed the runtime guard ``envoy.reloadable_features.mcp_filter_use_new_metadata_namespace`` and
+the legacy code path it guarded. The MCP filter always publishes its dynamic metadata under the
+``envoy.filters.http.mcp`` namespace (and the MCP router reads it from there); the legacy
+``mcp_proxy`` namespace is no longer available.
