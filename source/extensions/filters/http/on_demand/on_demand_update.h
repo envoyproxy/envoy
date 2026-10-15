@@ -1,9 +1,16 @@
 #pragma once
 
+#include <memory>
+#include <optional>
+#include <string>
+
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,12 +45,22 @@ using DecodeHeadersBehaviorPtr = std::unique_ptr<DecodeHeadersBehavior>;
 // proto config or the extension's per-route proto config.
 class OnDemandFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
-  explicit OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior);
+  struct StatNames {
+    StatNames(Stats::SymbolTable& symbol_table)
+        : pool_(symbol_table), discovery_time_(pool_.add("odcds.discovery_time")) {}
+
+    Stats::StatNamePool pool_;
+    const Stats::StatName discovery_time_;
+  };
+
+  explicit OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior,
+                                OptRef<Upstream::ClusterManager> cm = {},
+                                OptRef<Stats::Scope> scope = {});
   // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-      absl::Status& creation_status);
+      absl::Status& creation_status, OptRef<Stats::Scope> scope = {});
   // Constructs config from extension's per-route proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
@@ -51,9 +68,15 @@ public:
       absl::Status& creation_status);
 
   DecodeHeadersBehavior& decodeHeadersBehavior() const { return *behavior_; }
+  OptRef<Upstream::ClusterManager> cm() const { return makeOptRefFromPtr(cm_); }
+  OptRef<const StatNames> statNames() const {
+    return makeOptRefFromPtr(stat_names_.has_value() ? &*stat_names_ : nullptr);
+  }
 
 private:
   DecodeHeadersBehaviorPtr behavior_;
+  Upstream::ClusterManager* cm_{nullptr};
+  std::optional<StatNames> stat_names_;
 };
 
 using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;
@@ -93,6 +116,8 @@ public:
   void onDestroy() override;
 
 private:
+  void maybeRecordDiscoveryTime(Upstream::ClusterDiscoveryStatus cluster_status);
+
   OnDemandFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_callback_;
@@ -100,6 +125,8 @@ private:
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
   bool decode_headers_active_{false};
   bool downstream_end_stream_{false};
+  std::string cluster_name_;
+  std::optional<MonotonicTime> fetch_start_time_;
 };
 
 } // namespace OnDemand

@@ -36,9 +36,18 @@ on demand CDS is enabled for requests using this virtual host or route.
 
 Statistics
 ----------
+.. _config_http_filters_on_demand_stats:
 
 The on-demand CDS config sources emit statistics rooted at *cluster_manager.odcds.*, documented in
 the :ref:`cluster manager statistics <config_cluster_manager_odcds_stats>`.
+
+Additionally, the on-demand update filter outputs these statistics in the ``cluster.<cluster_name>.odcds.`` namespace:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  discovery_time, Histogram, Time spent completing successful on-demand cluster discovery requests, in milliseconds
 
 Configuration
 -------------

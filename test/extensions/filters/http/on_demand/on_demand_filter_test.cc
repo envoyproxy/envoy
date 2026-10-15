@@ -3,6 +3,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/on_demand/on_demand_update.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -28,7 +29,11 @@ using StatusHelpers::IsOk;
 class OnDemandFilterTest : public testing::Test {
 public:
   void SetUp() override {
-    auto config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds());
+    cluster_scope_ = store_.createScope("cluster.fake_cluster");
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, statsScope())
+        .WillByDefault(ReturnRef(*cluster_scope_));
+    auto config = std::make_shared<OnDemandFilterConfig>(DecodeHeadersBehavior::rds(), cm_,
+                                                         *store_.rootScope());
     odcds_ = nullptr;
     setupWithConfig(std::move(config));
   }
@@ -37,7 +42,8 @@ public:
     auto mock_odcds = Upstream::MockOdCdsApiHandle::create();
     odcds_ = mock_odcds.get();
     auto config = std::make_shared<OnDemandFilterConfig>(
-        DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)));
+        DecodeHeadersBehavior::cdsRds(std::move(mock_odcds), std::chrono::milliseconds(5000)), cm_,
+        *store_.rootScope());
     setupWithConfig(std::move(config));
   }
 
@@ -46,6 +52,9 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
+  Stats::TestUtil::TestStore store_;
+  Stats::ScopeSharedPtr cluster_scope_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   Upstream::MockOdCdsApiHandle* odcds_;
   std::unique_ptr<OnDemandRouteUpdate> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -512,6 +521,49 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithI
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+}
+
+TEST_F(OnDemandFilterTest, DiscoveryTimeRecordedWhenClusterFound) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_FALSE(store_.histogramRecordedValues("cluster.fake_cluster.odcds.discovery_time"));
+
+  EXPECT_CALL(cm_, getThreadLocalCluster("fake_cluster"))
+      .WillOnce(Return(&cm_.thread_local_cluster_));
+
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+
+  EXPECT_EQ(1, store_.histogramValues("cluster.fake_cluster.odcds.discovery_time", false).size());
+}
+
+TEST_F(OnDemandFilterTest, DiscoveryTimeNotRecordedWhenClusterMissing) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Missing);
+  EXPECT_FALSE(store_.histogramRecordedValues("cluster.fake_cluster.odcds.discovery_time"));
+}
+
+TEST_F(OnDemandFilterTest, DiscoveryTimeNotRecordedWhenStreamDestroyed) {
+  setupWithCds();
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillOnce(Return(OptRef<const Upstream::ClusterInfo>{}));
+  EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  filter_->onDestroy();
+  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
+  EXPECT_FALSE(store_.histogramRecordedValues("cluster.fake_cluster.odcds.discovery_time"));
 }
 
 TEST(OnDemandConfigTest, Basic) {
