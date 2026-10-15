@@ -16,6 +16,4 @@ envoy.code.check>=0.6.10
 frozendict>=2.3.7
 jinja2
 packaging
-pyjwt[crypto]==2.15.1
-cryptography==50.0.0
 pyyaml
