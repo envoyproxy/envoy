@@ -303,6 +303,10 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void addUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& watermark_callbacks) override;
   void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& watermark_callbacks) override;
+  void
+  addEncoderFilterWatermarkCallbacks(EncoderFilterWatermarkCallbacks& watermark_callbacks) override;
+  void removeEncoderFilterWatermarkCallbacks(
+      EncoderFilterWatermarkCallbacks& watermark_callbacks) override;
   bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
@@ -838,12 +842,19 @@ public:
   /**
    * @return bool whether any above high watermark triggers are currently active
    */
-  bool aboveHighWatermark() { return high_watermark_count_ != 0; }
+  bool aboveHighWatermark() const {
+    return downstream_high_watermark_count_ > 0 || encoder_filter_high_watermark_count_ > 0;
+  }
 
   // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
-  // events for this stream and the downstream connection to the router filter.
+  // events for this stream and the downstream connection to the router filter and side streams.
   void callHighWatermarkCallbacks();
   void callLowWatermarkCallbacks();
+
+  // Pass on watermark callbacks originating from encoder filters buffering upstream response
+  // data to subscribers (e.g. upstream requests).
+  void callEncoderFilterHighWatermarkCallbacks();
+  void callEncoderFilterLowWatermarkCallbacks();
 
   // Pass on upstream-request watermark callbacks to subscribers. These are driven by the aggregate
   // back-pressure raised toward the request source via onDecoderFilterAboveWriteBufferHighWatermark
@@ -1177,8 +1188,10 @@ private:
   Buffer::InstancePtr buffered_response_data_;
   Buffer::InstancePtr buffered_request_data_;
   uint64_t buffer_limit_{0};
-  uint32_t high_watermark_count_{0};
+  uint32_t downstream_high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
+  uint32_t encoder_filter_high_watermark_count_{0};
+  std::list<EncoderFilterWatermarkCallbacks*> encoder_filter_watermark_callbacks_;
   // Upstream-request watermark subscribers and the count of outstanding high watermarks, so a
   // filter subscribing mid-stream is brought up to the current back-pressure state.
   uint32_t upstream_high_watermark_count_{0};

@@ -138,10 +138,11 @@ public:
   // applies read disabling to it if there is any pending read disabling.
   void maybeHandleDeferredReadDisable();
 
-  struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks {
+  struct DownstreamWatermarkManager : public Http::DownstreamWatermarkCallbacks,
+                                      public Http::EncoderFilterWatermarkCallbacks {
     DownstreamWatermarkManager(UpstreamRequest& parent) : parent_(parent) {}
 
-    // Http::DownstreamWatermarkCallbacks
+    // Http::DownstreamWatermarkCallbacks and Http::EncoderFilterWatermarkCallbacks
     void onBelowWriteBufferLowWatermark() override;
     void onAboveWriteBufferHighWatermark() override;
 

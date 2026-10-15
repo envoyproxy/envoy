@@ -133,6 +133,7 @@ Http::FilterMetadataStatus UpstreamCodecFilter::decodeMetadata(Http::MetadataMap
 void UpstreamCodecFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   callbacks_->addDownstreamWatermarkCallbacks(*this);
+  callbacks_->addEncoderFilterWatermarkCallbacks(*this);
   callbacks_->upstreamCallbacks()->addUpstreamCallbacks(*this);
   callbacks_->upstreamCallbacks()->setUpstreamToDownstream(bridge_);
 }

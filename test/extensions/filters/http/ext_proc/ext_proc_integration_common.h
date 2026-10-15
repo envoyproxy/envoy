@@ -205,6 +205,10 @@ protected:
   void testSendDynamicMetadata();
   void testSendTypedDynamicMetadata();
   void testSidestreamPushbackDownstream(uint32_t body_size, bool check_downstream_flow_control);
+  void initializeDownstreamPushbackConfig(
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode,
+      bool send_headers = false, bool send_trailers = false);
+  void verifyUpstreamAndSidestreamFlowControlPaused(bool expect_sidestream_paused);
   void performStandAloneModeOverrideNormal(
       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode initial_body_mode,
       bool delay_header_response = false);

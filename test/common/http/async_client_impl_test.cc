@@ -481,6 +481,9 @@ TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
 }
 
 TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);
   TestRequestHeaderMapImpl headers_copy = *headers;
@@ -536,12 +539,17 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   request->sendData(empty, true);
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
-  // On request end, we expect to run the low watermark callbacks.
+  // On request end, we expect to run the low watermark callbacks and remove the
+  // downstream watermark callbacks.
   EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 }
 
 TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);
   TestRequestHeaderMapImpl headers_copy = *headers;
@@ -576,8 +584,10 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
 
-  // Reset the stream, which will call the low watermark callbacks.
+  // Reset the stream, which will call the low watermark callbacks and remove
+  // the downstream watermark callbacks.
   EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
   expectSuccess(request, 503);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
@@ -2233,17 +2243,57 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
 
 TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  stream->setWatermarkCallbacks(watermark_callbacks);
   stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       dynamic_cast<Http::AsyncStreamImpl*>(stream);
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark()).Times(2);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark()).Times(2);
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_FALSE(stream->isAboveWriteBufferHighWatermark());
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
+TEST_F(AsyncClientImplTest, DownstreamWatermarkCallbacks) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+  StrictMock<MockSidestreamWatermarkCallbacks> sidestream_watermark_callbacks;
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  stream->setWatermarkCallbacks(sidestream_watermark_callbacks);
+  stream->sendHeaders(headers_, false);
+  StrictMock<MockDownstreamWatermarkCallbacks> downstream_watermark_callbacks;
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
+  EXPECT_CALL(sidestream_watermark_callbacks, addDownstreamWatermarkCallbacks);
+  filter_callbacks->addDownstreamWatermarkCallbacks(downstream_watermark_callbacks);
+  EXPECT_CALL(sidestream_watermark_callbacks, removeDownstreamWatermarkCallbacks);
+  filter_callbacks->removeDownstreamWatermarkCallbacks(downstream_watermark_callbacks);
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
+TEST_F(AsyncClientImplTest, RemoveWatermarkCallbacks) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+  StrictMock<MockSidestreamWatermarkCallbacks> sidestream_watermark_callbacks;
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  stream->setWatermarkCallbacks(sidestream_watermark_callbacks);
+  stream->sendHeaders(headers_, false);
+  StrictMock<MockDownstreamWatermarkCallbacks> downstream_watermark_callbacks;
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
+  EXPECT_CALL(sidestream_watermark_callbacks, addDownstreamWatermarkCallbacks);
+  filter_callbacks->addDownstreamWatermarkCallbacks(downstream_watermark_callbacks);
+  EXPECT_CALL(sidestream_watermark_callbacks, removeDownstreamWatermarkCallbacks);
+  stream->removeWatermarkCallbacks();
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 
