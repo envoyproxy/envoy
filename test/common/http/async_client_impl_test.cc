@@ -481,6 +481,9 @@ TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
 }
 
 TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);
   TestRequestHeaderMapImpl headers_copy = *headers;
@@ -544,6 +547,9 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
 }
 
 TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
   auto headers = std::make_unique<TestRequestHeaderMapImpl>();
   HttpTestUtility::addDefaultHeaders(*headers);
   TestRequestHeaderMapImpl headers_copy = *headers;
@@ -2256,6 +2262,9 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
 }
 
 TEST_F(AsyncClientImplTest, DownstreamWatermarkCallbacks) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
   StrictMock<MockSidestreamWatermarkCallbacks> sidestream_watermark_callbacks;
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->setWatermarkCallbacks(sidestream_watermark_callbacks);
@@ -2271,6 +2280,9 @@ TEST_F(AsyncClientImplTest, DownstreamWatermarkCallbacks) {
 }
 
 TEST_F(AsyncClientImplTest, RemoveWatermarkCallbacks) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
   StrictMock<MockSidestreamWatermarkCallbacks> sidestream_watermark_callbacks;
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->setWatermarkCallbacks(sidestream_watermark_callbacks);
