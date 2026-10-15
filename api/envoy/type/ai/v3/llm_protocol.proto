@@ -34,16 +34,17 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 enum LLMProtocol {
   LLM_PROTOCOL_UNSPECIFIED = 0;
 
-  // OpenAI Chat Completions API, served as ``/v1/chat/completions``.
+  // OpenAI Chat Completions API. Its own path is ``/v1/chat/completions``.
   OPENAI_CHAT_COMPLETIONS = 1;
 
-  // OpenAI Responses API, served as ``/v1/responses``.
+  // OpenAI Responses API. Its own path is ``/v1/responses``.
   OPENAI_RESPONSES = 2;
 
-  // Anthropic Messages API, served as ``/v1/messages``.
+  // Anthropic Messages API. Its own path is ``/v1/messages``.
   ANTHROPIC_MESSAGES = 3;
 
-  // Gemini ``generateContent`` / ``streamGenerateContent`` APIs, served as
-  // ``/v1beta/models/{model}:generateContent``.
+  // Gemini ``generateContent`` / ``streamGenerateContent`` APIs. Their own
+  // path is ``/v1beta/models/{model}:generateContent``, or
+  // ``:streamGenerateContent`` when streaming.
   GEMINI_GENERATE_CONTENT = 4;
 }
