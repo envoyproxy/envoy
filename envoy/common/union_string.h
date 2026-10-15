@@ -72,9 +72,8 @@ public:
       return StorageLocation::Reference;
     case kInlineStringCapacity:
       return StorageLocation::Inline;
-    default:
-      return StorageLocation::Heap;
     }
+    return StorageLocation::Heap;
   }
   uint32_t size() const { return size_; }
 
