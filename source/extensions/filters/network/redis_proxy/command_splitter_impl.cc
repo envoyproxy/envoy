@@ -4,11 +4,13 @@
 #include <cstdint>
 
 #include "source/common/common/logger.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -1060,8 +1062,8 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
       random_shard_handler_(*router_), split_keys_sum_result_handler_(*router_),
       custom_commands_(std::move(custom_commands)),
       transaction_handler_(*router_, custom_commands_), cluster_scope_handler_(*router_),
-      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source), fault_manager_(std::move(fault_manager)) {
+      stats_{generateStats(scope, stat_prefix)}, time_source_(time_source),
+      fault_manager_(std::move(fault_manager)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
@@ -1108,18 +1110,33 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
 
-  {
-    // See hello_command_stats_ in the header: locally-answered HELLO keeps the per-command
-    // stats the old registration emitted.
-    const std::string command_stat_prefix = fmt::format("{}command.hello.", stat_prefix);
-    Stats::StatNameManagedStorage storage{command_stat_prefix + std::string("latency"),
-                                          scope.symbolTable()};
-    hello_command_stats_.emplace(CommandStats{
-        ALL_COMMAND_STATS(POOL_COUNTER_PREFIX(scope, command_stat_prefix))
-            scope.histogramFromStatName(storage.statName(),
-                                        latency_in_micros ? Stats::Histogram::Unit::Microseconds
-                                                          : Stats::Histogram::Unit::Milliseconds)});
-  }
+  // See hello_command_stats_ in the header: locally-answered HELLO keeps the per-command
+  // stats the old registration emitted.
+  hello_command_stats_.emplace(makeCommandStats(scope, stat_prefix, "hello", latency_in_micros));
+}
+
+InstanceStats InstanceImpl::generateStats(Stats::Scope& scope, absl::string_view stat_prefix) {
+  // The stat prefix is the flat prefix, "redis.(<stat_prefix>.)*": the stat prefix is the tag of
+  // every stat.
+  const Stats::TaggedStatName tagged_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, "splitter");
+  Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
+                                tagged_prefix.name());
+  return {ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER(helper))};
+}
+
+CommandStats InstanceImpl::makeCommandStats(Stats::Scope& scope, absl::string_view stat_prefix,
+                                            absl::string_view command, bool latency_in_micros) {
+  // The stat prefix is the flat prefix, "redis.(<stat_prefix>.)*": the stat prefix is the tag of
+  // every stat; the command stays part of the tag-extracted name.
+  const Stats::TaggedStatName tagged_prefix =
+      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, absl::StrCat("command.", command));
+  Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
+                                tagged_prefix.name());
+  Stats::StatNameManagedStorage storage{"latency", scope.symbolTable()};
+  return CommandStats{ALL_COMMAND_STATS(POOL_COUNTER(helper)) helper.histogramFromStatName(
+      storage.statName(), latency_in_micros ? Stats::Histogram::Unit::Microseconds
+                                            : Stats::Histogram::Unit::Milliseconds)};
 }
 
 // HELLO is handled BEFORE the connectionAllowed gate so that ``HELLO N AUTH <user> <pass>`` can
@@ -1508,18 +1525,10 @@ void InstanceImpl::addHandler(Stats::Scope& scope, const std::string& stat_prefi
                               const std::string& name, bool latency_in_micros,
                               CommandHandler& handler) {
   std::string to_lower_name = absl::AsciiStrToLower(name);
-  const std::string command_stat_prefix = fmt::format("{}command.{}.", stat_prefix, to_lower_name);
-  Stats::StatNameManagedStorage storage{command_stat_prefix + std::string("latency"),
-                                        scope.symbolTable()};
   handler_lookup_table_.add(
       to_lower_name,
       std::make_shared<HandlerData>(HandlerData{
-          CommandStats{ALL_COMMAND_STATS(POOL_COUNTER_PREFIX(scope, command_stat_prefix))
-                           scope.histogramFromStatName(storage.statName(),
-                                                       latency_in_micros
-                                                           ? Stats::Histogram::Unit::Microseconds
-                                                           : Stats::Histogram::Unit::Milliseconds)},
-          handler}));
+          makeCommandStats(scope, stat_prefix, to_lower_name, latency_in_micros), handler}));
 }
 
 } // namespace CommandSplitter

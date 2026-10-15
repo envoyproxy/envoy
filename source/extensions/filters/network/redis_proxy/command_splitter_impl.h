@@ -21,6 +21,7 @@
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -573,6 +574,9 @@ private:
 
   using HandlerDataPtr = std::shared_ptr<HandlerData>;
 
+  static InstanceStats generateStats(Stats::Scope& scope, absl::string_view stat_prefix);
+  static CommandStats makeCommandStats(Stats::Scope& scope, absl::string_view stat_prefix,
+                                       absl::string_view command, bool latency_in_micros);
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   bool latency_in_micros, CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
