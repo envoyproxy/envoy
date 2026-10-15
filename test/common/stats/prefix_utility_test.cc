@@ -154,6 +154,47 @@ TEST_F(MergeStatPrefixTest, EmptySelfWithParent) {
   EXPECT_THAT(tags(p), testing::ElementsAre(std::make_pair(hcm_tag_, "ingress")));
 }
 
+TEST_F(MergeStatPrefixTest, WorkerStatPrefixWorker) {
+  const std::string& worker_tag = Envoy::Config::TagNames::get().WORKER_ID;
+
+  const auto dispatcher = workerStatPrefix(symbol_table_, "", 3, "worker_3", "dispatcher.");
+  EXPECT_EQ(taggedName(dispatcher), "worker_3.dispatcher.name");
+  EXPECT_EQ(taggedName(dispatcher), legacyName("worker_3.dispatcher."));
+  EXPECT_EQ(base(dispatcher), "worker.dispatcher");
+  EXPECT_THAT(tags(dispatcher), testing::ElementsAre(std::make_pair(worker_tag, "3")));
+
+  const auto cluster_manager =
+      workerStatPrefix(symbol_table_, "thread_local_cluster_manager.", 0, "worker_0");
+  EXPECT_EQ(taggedName(cluster_manager), "thread_local_cluster_manager.worker_0.name");
+  EXPECT_EQ(taggedName(cluster_manager), legacyName("thread_local_cluster_manager.worker_0"));
+  EXPECT_EQ(base(cluster_manager), "thread_local_cluster_manager.worker");
+  EXPECT_THAT(tags(cluster_manager), testing::ElementsAre(std::make_pair(worker_tag, "0")));
+
+  // Only the thread name: the stats sit under the 'worker.' segment of the scope.
+  const auto handler = workerStatPrefix(symbol_table_, "", 1, "worker_1");
+  EXPECT_EQ(taggedName(handler), "worker_1.name");
+  EXPECT_EQ(taggedName(handler), legacyName("worker_1."));
+  EXPECT_EQ(base(handler), "worker");
+  EXPECT_THAT(tags(handler), testing::ElementsAre(std::make_pair(worker_tag, "1")));
+}
+
+TEST_F(MergeStatPrefixTest, WorkerStatPrefixNotAWorker) {
+  const auto main_thread =
+      workerStatPrefix(symbol_table_, "server.", std::nullopt, "main_thread", "dispatcher.");
+  EXPECT_EQ(taggedName(main_thread), "server.main_thread.dispatcher.name");
+  EXPECT_EQ(taggedName(main_thread), legacyName("server.main_thread.dispatcher."));
+  EXPECT_EQ(base(main_thread), "server.main_thread.dispatcher");
+  EXPECT_TRUE(tags(main_thread).empty());
+
+  // No thread name at all: just the parent and the own name.
+  const auto no_thread =
+      workerStatPrefix(symbol_table_, "server.", std::nullopt, "", "dispatcher.");
+  EXPECT_EQ(taggedName(no_thread), "server.dispatcher.name");
+  EXPECT_EQ(taggedName(no_thread), legacyName("server.dispatcher."));
+  EXPECT_EQ(base(no_thread), "server.dispatcher");
+  EXPECT_TRUE(tags(no_thread).empty());
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy

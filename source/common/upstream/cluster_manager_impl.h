@@ -816,7 +816,7 @@ private:
 
   private:
     static ThreadLocalClusterManagerStats generateStats(Stats::Scope& scope,
-                                                        const std::string& thread_name);
+                                                        Event::Dispatcher& dispatcher);
 
     Quic::EnvoyQuicNetworkObserverRegistryPtr network_observer_registry_;
   };

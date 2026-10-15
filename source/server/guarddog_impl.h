@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -13,6 +14,7 @@
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
@@ -22,6 +24,20 @@
 
 namespace Envoy {
 namespace Server {
+
+/**
+ * All per-thread watchdog stats. @see stats_macros.h
+ */
+#define ALL_WATCHDOG_STATS(COUNTER)                                                                \
+  COUNTER(watchdog_miss)                                                                           \
+  COUNTER(watchdog_mega_miss)
+
+/**
+ * Struct definition for all per-thread watchdog stats. @see stats_macros.h
+ */
+struct WatchDogStats {
+  ALL_WATCHDOG_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 /**
  * This feature performs deadlock detection stats collection & enforcement.
@@ -113,15 +129,18 @@ private:
   using WatchDogImplSharedPtr = std::shared_ptr<WatchDogImpl>;
   struct WatchedDog {
     WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
-               const WatchDogImplSharedPtr& watch_dog);
+               std::optional<uint32_t> worker_id, const WatchDogImplSharedPtr& watch_dog);
 
     const WatchDogImplSharedPtr dog_;
     MonotonicTime last_checkin_;
     std::optional<MonotonicTime> last_alert_time_;
     bool miss_alerted_{};
     bool megamiss_alerted_{};
-    Stats::Counter& miss_counter_;
-    Stats::Counter& megamiss_counter_;
+    WatchDogStats stats_;
+
+  private:
+    static WatchDogStats generateStats(Stats::Scope& scope, const std::string& thread_name,
+                                       std::optional<uint32_t> worker_id);
   };
   using WatchedDogPtr = std::unique_ptr<WatchedDog>;
 
