@@ -15,13 +15,16 @@ public:
   MOCK_METHOD(void, lookup,
               (Geolocation::LookupRequest && request, Geolocation::LookupGeoHeadersCallback&&),
               (const));
+  MOCK_METHOD(absl::Span<const std::string>, geoHeaderNames, (), (const));
 };
 
 using MockDriverSharedPtr = std::shared_ptr<MockDriver>;
 
 class DummyGeoipProviderFactory : public GeoipProviderFactory {
 public:
-  DummyGeoipProviderFactory() : driver_(new MockDriver()) {}
+  // A NiceMock so that tests which do not care about geoHeaderNames() are not warned about the
+  // call the HTTP filter makes on every request; it returns an empty span by default.
+  DummyGeoipProviderFactory() : driver_(new testing::NiceMock<MockDriver>()) {}
   Geolocation::DriverSharedPtr
   createGeoipProviderDriver(const Protobuf::Message&, const std::string&,
                             Server::Configuration::ServerFactoryContext&) override {
