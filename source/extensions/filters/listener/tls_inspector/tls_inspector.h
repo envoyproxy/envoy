@@ -70,6 +70,7 @@ public:
   // This is the maximum size of a ClientHello that boring ssl will accept.
   // Here is the check in boring ssl:
   // https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20250818.0/ssl/handshake.cc#137
+  // Must stay in sync with max_client_hello_size's bound in tls_inspector.proto.
   static constexpr size_t TLS_MAX_CLIENT_HELLO = SSL3_RT_MAX_PLAIN_LENGTH;
   static const unsigned TLS_MIN_SUPPORTED_VERSION;
   static const unsigned TLS_MAX_SUPPORTED_VERSION;

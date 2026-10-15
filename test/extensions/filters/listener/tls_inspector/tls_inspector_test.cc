@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 #include "openssl/md5.h"
 #include "openssl/ssl.h"
+#include "validate/validate.pb.h"
 
 using testing::_;
 using testing::Eq;
@@ -239,12 +240,22 @@ INSTANTIATE_TEST_SUITE_P(TlsProtocolVersions, TlsInspectorTest,
                                          std::make_tuple(TLS1_2_VERSION, TLS1_2_VERSION),
                                          std::make_tuple(TLS1_3_VERSION, TLS1_3_VERSION)));
 
-// Test that an exception is thrown for an invalid value for max_client_hello_size
-TEST_P(TlsInspectorTest, MaxClientHelloSize) {
-  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  proto_config.mutable_max_client_hello_size()->set_value(Config::TLS_MAX_CLIENT_HELLO + 1);
-  EXPECT_THROW_WITH_MESSAGE(Config(*store_.rootScope(), proto_config), EnvoyException,
-                            "max_client_hello_size of 16385 is greater than maximum of 16384.");
+// Config::Config() only ASSERTs that max_client_hello_size is within TLS_MAX_CLIENT_HELLO,
+// relying on the proto field's own `validate.rules` to reject an out-of-range value before a
+// Config is ever constructed from an incoming (externally supplied) proto. This test guards
+// that assumption: if the proto's upper bound is ever changed independently of
+// TLS_MAX_CLIENT_HELLO, this fails loudly instead of silently turning the ASSERT in
+// Config::Config() into a reachable, unvalidated invariant violation.
+TEST(TlsInspectorConfigTest, MaxClientHelloSizeValidationRuleMatchesCppBound) {
+  const Protobuf::FieldDescriptor* field =
+      envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector::descriptor()
+          ->FindFieldByName("max_client_hello_size");
+  ASSERT_NE(field, nullptr);
+  ASSERT_TRUE(field->options().HasExtension(validate::rules));
+  const validate::FieldRules& rules = field->options().GetExtension(validate::rules);
+  ASSERT_TRUE(rules.has_uint32());
+  ASSERT_TRUE(rules.uint32().has_lte());
+  EXPECT_EQ(rules.uint32().lte(), Config::TLS_MAX_CLIENT_HELLO);
 }
 
 // Test that a ClientHello with an SNI value causes the correct name notification.
