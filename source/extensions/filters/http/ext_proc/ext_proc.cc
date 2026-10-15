@@ -1022,7 +1022,7 @@ FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffe
   auto cb_state = state.callbackState() == ProcessorState::CallbackState::HeadersCallback
                       ? ProcessorState::CallbackState::HeadersCallback
                       : ProcessorState::CallbackState::StreamedBodyCallback;
-  sendBody(state, data, cb_state, end_stream);
+  sendStreamedBodyChunk(state, data, cb_state, end_stream);
   return state.getBodyCallbackResultInStreamedMode(end_stream);
 }
 
@@ -1472,8 +1472,8 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::sendBody(ProcessorState& state, Buffer::Instance& data,
-                      ProcessorState::CallbackState new_state, bool end_stream) {
+void Filter::sendStreamedBodyChunk(ProcessorState& state, Buffer::Instance& data,
+                                   ProcessorState::CallbackState new_state, bool end_stream) {
   if (!max_streamed_body_chunk_size_.has_value() ||
       data.length() < *max_streamed_body_chunk_size_) {
     auto req = setupBodyChunk(state, data, end_stream);

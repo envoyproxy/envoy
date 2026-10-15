@@ -122,8 +122,8 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
     modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
                      buffered_chunk.length());
-    filter_.sendBody(*this, buffered_chunk, ProcessorState::CallbackState::StreamedBodyCallback,
-                     end_stream);
+    filter_.sendStreamedBodyChunk(*this, buffered_chunk,
+                                  ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
   }
   if (queueBelowLowLimit()) {
     clearWatermark();
@@ -836,8 +836,8 @@ bool DecodingProcessorState::handleStandaloneModeOverride(
       modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
       ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
                        buffered_chunk.length());
-      filter_.sendBody(*this, buffered_chunk, ProcessorState::CallbackState::HeadersCallback,
-                       end_stream);
+      filter_.sendStreamedBodyChunk(*this, buffered_chunk,
+                                    ProcessorState::CallbackState::HeadersCallback, end_stream);
     }
 
     if (trailers_ != nullptr) {
