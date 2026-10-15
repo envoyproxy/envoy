@@ -39,12 +39,9 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "config_impl_test_lib",
     srcs = ["config_impl_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
@@ -371,12 +368,9 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "router_ratelimit_test",
     srcs = ["router_ratelimit_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [

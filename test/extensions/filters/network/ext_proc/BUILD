@@ -21,12 +21,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "matching_utils_test",
     srcs = ["matching_utils_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    copts = [
+        "-DUSE_CEL_PARSER",
+    ],
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/common/expr:evaluator_lib",

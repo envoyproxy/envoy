@@ -1582,6 +1582,7 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+#if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatCEL) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
@@ -1768,6 +1769,7 @@ actions:
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"api_key", "default_key"}}}}),
               testing::ContainerEq(descriptors_));
 }
+#endif
 
 TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatPlainString) {
   scoped_runtime_.mergeValues(
@@ -1810,6 +1812,7 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+#if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchDescriptorFormatCEL) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
@@ -1853,6 +1856,7 @@ actions:
   rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
   EXPECT_TRUE(descriptors_.empty());
 }
+#endif
 
 TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorFormat) {
   scoped_runtime_.mergeValues(
@@ -1877,6 +1881,7 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+#if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorFormatCEL) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
@@ -1946,6 +1951,7 @@ actions:
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"api_key", "alpha"}}}}),
               testing::ContainerEq(descriptors_));
 }
+#endif
 
 TEST_F(RateLimitPolicyEntryTest, GenericKeyDescriptorFormatREQWithDefaultValue) {
   scoped_runtime_.mergeValues(
@@ -2015,6 +2021,7 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+#if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, GenericKeyMixedStaticAndDynamicFormatters) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
@@ -2035,6 +2042,7 @@ actions:
                   {{{{"generic_key", "dynamic1_static_value_dynamic2"}}}}),
               testing::ContainerEq(descriptors_));
 }
+#endif
 
 TEST_F(RateLimitPolicyEntryTest, GenericKeyFormatterDisabled) {
   const std::string yaml = R"EOF(
@@ -2055,6 +2063,7 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+#if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchMixedStaticAndDynamicFormatters) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
@@ -2080,6 +2089,7 @@ actions:
                   {{{{"header_match", "dynamic1_static_value_dynamic2"}}}}),
               testing::ContainerEq(descriptors_));
 }
+#endif
 
 TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchFormatterDisabled) {
   const std::string yaml = R"EOF(
@@ -2105,6 +2115,7 @@ actions:
               testing::ContainerEq(descriptors_));
 }
 
+#if defined(USE_CEL_PARSER)
 TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchMixedStaticAndDynamicFormatters) {
   scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.enable_formatter_for_ratelimit_action_descriptor_value",
@@ -2130,6 +2141,7 @@ actions:
                   {{{{"query_match", "dynamic1_static_value_dynamic2"}}}}),
               testing::ContainerEq(descriptors_));
 }
+#endif
 
 TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchFormatterDisabled) {
   const std::string yaml = R"EOF(

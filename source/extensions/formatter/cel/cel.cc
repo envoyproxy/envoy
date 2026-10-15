@@ -116,8 +116,8 @@ CELFormatterCommandParser::CELFormatterCommandParser(
 absl::StatusOr<Envoy::Formatter::FormatterProviderPtr>
 CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
                                  std::optional<size_t> max_length) const {
-#if defined(USE_CEL_PARSER)
   if (command == "CEL" || command == "TYPED_CEL") {
+#if defined(USE_CEL_PARSER)
     auto parse_status = google::api::expr::parser::Parse(subcommand);
     if (!parse_status.ok()) {
       return absl::InvalidArgumentError(
@@ -133,12 +133,14 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
     return std::make_unique<CELFormatter>(context.localInfo(), expr_builder,
                                           parse_status.value().expr(), max_length,
                                           command == "TYPED_CEL");
+#else
+    UNREFERENCED_PARAMETER(subcommand);
+    UNREFERENCED_PARAMETER(max_length);
+    return absl::UnimplementedError("CEL is not available for use in this environment.");
+#endif
   }
 
   return nullptr;
-#else
-  return absl::UnimplementedError("CEL is not available for use in this environment.");
-#endif
 }
 
 } // namespace Formatter

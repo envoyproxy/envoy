@@ -9295,6 +9295,7 @@ virtual_hosts:
                           EnvoyException, "Failed to create path_rewrite formatter");
 }
 
+#if defined(USE_CEL_PARSER)
 // Test path_rewrite with CEL expressions.
 TEST_F(RouteConfigurationV2, RedirectPathRewriteCEL) {
   ScopedThreadLocalServerContextSetter server_context_setter(factory_context_);
@@ -9346,6 +9347,7 @@ virtual_hosts:
     EXPECT_EQ("http://redirect.lyft.com/prefix//suffix", redirect->newUri(headers, stream_info_));
   }
 }
+#endif
 
 // %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% requires real stream info with a populated
 // connection. Passing a StreamInfoImpl with a known remote address produces the correct path.
