@@ -202,9 +202,9 @@ message ServerInfo {
   //   ``-32601`` (``Method not found``) error only after header validation succeeds. A request
   //   with both a header validation error and an unsupported method is rejected with HTTP ``400``.
   //
-  // For stateless MCP `2026-07-28` requests, this filter also validates
-  // the presence of `io.modelcontextprotocol/clientCapabilities` in
-  // `params._meta`. A missing field is rejected with HTTP `400`.
+  // For stateless MCP ``2026-07-28`` requests, this filter also validates
+  // the presence of ``io.modelcontextprotocol/clientCapabilities`` in
+  // ``params._meta``. A missing field is rejected with HTTP ``400``.
   // This validation takes precedence over unsupported method handling.
   //
   // All other (legacy) requests keep their existing behavior: the header validation above does

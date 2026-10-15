@@ -471,7 +471,7 @@ TEST_P(McpJsonRestBridgeIntegrationTest, StatelessUnsupportedMethodReturnsNotFou
                                      {"content-type", "application/json"},
                                      {"mcp-method", "tools/invalid"},
                                      {"mcp-protocol-version", "2026-07-28"}},
-      R"json({"jsonrpc":"2.0","id":1,"method":"tools/invalid","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
+      R"json({"jsonrpc":"2.0","id":1,"method":"tools/invalid","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}})json");
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("404"));
