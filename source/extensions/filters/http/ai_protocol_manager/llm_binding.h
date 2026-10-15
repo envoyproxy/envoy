@@ -38,7 +38,8 @@ public:
 
   static absl::StatusOr<LlmBindingConstSharedPtr>
   create(const envoy::type::ai::v3::LLMBinding& proto);
-  // A filter state value: a URI pattern (`/...`), or an LLMBinding in JSON (`{...}`).
+  // A filter state value: a URI pattern (`/...`), or an LLMBinding in JSON (`{...}`). Whitespace
+  // around it is ignored.
   static absl::StatusOr<LlmBindingConstSharedPtr> parse(absl::string_view text);
 
   // `pattern` nullopt: the API's own path. `mutations` empty: the API's own edits.

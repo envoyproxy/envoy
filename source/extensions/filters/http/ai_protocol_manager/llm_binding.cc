@@ -6,6 +6,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/status/status.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -48,10 +49,6 @@ absl::StatusOr<std::string> fillPlaceholders(absl::string_view text,
     if (!variable.has_value()) {
       return absl::FailedPreconditionError(
           absl::StrCat("a binding mutation has no value for `{", name, "}`"));
-    }
-    if (!isPathToken(*variable)) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("`", *variable, "` cannot fill `{", name, "}` in a binding mutation"));
     }
     absl::StrAppend(&filled, text.substr(0, open), *variable);
     text.remove_prefix(close + 1);
@@ -159,6 +156,7 @@ LlmBinding::create(const envoy::type::ai::v3::LLMBinding& proto) {
 }
 
 absl::StatusOr<LlmBindingConstSharedPtr> LlmBinding::parse(absl::string_view text) {
+  text = absl::StripAsciiWhitespace(text);
   envoy::type::ai::v3::LLMBinding proto;
   if (absl::StartsWith(text, "/")) {
     proto.set_uri_pattern(std::string(text));

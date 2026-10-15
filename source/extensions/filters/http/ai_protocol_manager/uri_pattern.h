@@ -28,7 +28,7 @@ bool isPathToken(absl::string_view value);
 //
 // A path matches the first layout that fits all of it but the query, and each named variable,
 // which matches one segment, reads a value from it. `render()` writes the first layout. A spelling
-// may end in a query, which `render()` appends and `match()` ignores. Unnamed wildcards match
+// may end in a fixed query, which `render()` appends and `match()` ignores. Unnamed wildcards match
 // segments `render()` cannot fill.
 class UriPattern {
 public:

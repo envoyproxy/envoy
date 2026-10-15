@@ -63,8 +63,9 @@ TEST(IsPathTokenTest, AcceptsOnlyWhatStaysInOneSegment) {
 }
 
 TEST(UriPatternParseTest, RejectsMalformedTemplates) {
-  for (absl::string_view pattern : {"", "v1/{model}", "/v1/{model", "/v1/{mo{del}}",
-                                    "/{model}/{model}", "/v1//x", " /v1", "/v1 ", "/v1  /v2"}) {
+  for (absl::string_view pattern :
+       {"", "v1/{model}", "/v1/{model", "/v1/{mo{del}}", "/{model}/{model}", "/v1//x", " /v1",
+        "/v1 ", "/v1  /v2", "/v1/{model}?api-version={version}"}) {
     EXPECT_THAT(UriPattern::parse(pattern), HasStatusCode(absl::StatusCode::kInvalidArgument))
         << pattern;
   }

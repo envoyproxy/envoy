@@ -83,6 +83,9 @@ absl::StatusOr<UriPattern::Layout> UriPattern::parseLayout(absl::string_view lay
   for (absl::string_view text : *texts) {
     const std::pair<absl::string_view, absl::string_view> path_and_query =
         absl::StrSplit(text, absl::MaxSplits('?', 1));
+    if (path_and_query.second.find_first_of("{}") != absl::string_view::npos) {
+      return absl::InvalidArgumentError("a query cannot hold a variable");
+    }
     absl::StatusOr<std::string> regex =
         UriTemplate::convertPathPatternSyntaxToRegex(path_and_query.first);
     if (!regex.ok()) {

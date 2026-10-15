@@ -442,9 +442,9 @@ A URI pattern is a path in the :ref:`URI template syntax
 <envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>` of
 ``path_match_policy``, with one addition: ``{unary|stream}`` spells out, once, the part of the
 path that differs between a unary and a streaming request; either side may be empty, and a side
-may end in a query string, which rendering appends and matching ignores. Several layouts may be
-listed separated by spaces: a path matches the first that fits it entirely, and rendering writes
-the first.
+may end in a fixed query string, which rendering appends and matching ignores. Several layouts
+may be listed separated by spaces: a path matches the first that fits it entirely, and rendering
+writes the first.
 
 Every named variable matches one path segment and reads its value, which must hold only letters,
 digits and ``-``, ``.``, ``_``, ``@``, and start with a letter or a digit. ``{model}`` is the

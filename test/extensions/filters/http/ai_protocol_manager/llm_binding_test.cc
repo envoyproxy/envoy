@@ -103,6 +103,12 @@ TEST(LlmBindingParseTest, RejectsWhatCannotBeApplied) {
   }
 }
 
+// A YAML block scalar leaves a newline after the value.
+TEST(LlmBindingParseTest, IgnoresWhitespaceAroundTheValue) {
+  EXPECT_EQ(parseOk(" /v1/{model}\n")->pattern()->source(), "/v1/{model}");
+  EXPECT_EQ(parseOk("\n{\"uri_pattern\": \"/v1/{model}\"}\n")->pattern()->source(), "/v1/{model}");
+}
+
 TEST(LlmBindingParseTest, KnowsWhatItRemoves) {
   const LlmBindingConstSharedPtr binding = parseOk(R"({"mutations": [
     {"body_field": "model"}, {"body_field": "stream"}, {"body_field": "labels", "value": "x"}
@@ -336,11 +342,13 @@ TEST(LlmBindingWriteTest, KeepingAFieldNeedsNoValues) {
   EXPECT_EQ(body, original);
 }
 
-TEST(LlmBindingWriteTest, RefusesAPlaceholderItCannotFill) {
-  const LlmBindingConstSharedPtr model =
-      parseOk(R"({"mutations": [{"body_field": "x", "value": "{model}"}]})");
-  nlohmann::json body = nlohmann::json::parse(R"({"model": "../x"})");
-  EXPECT_THAT(write(*model, nullptr, body), HasStatusCode(absl::StatusCode::kInvalidArgument));
+// A placeholder fills a JSON string, so any value the request has will do.
+TEST(LlmBindingWriteTest, FillsAPlaceholderWithAnyValueTheRequestHas) {
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "ibm/granite-3-8b-instruct"})");
+  ASSERT_THAT(write(*parseOk(R"({"mutations": [{"body_field": "model_id", "value": "{model}"}]})"),
+                    nullptr, body),
+              IsOk());
+  EXPECT_EQ(body["model_id"], "ibm/granite-3-8b-instruct");
   EXPECT_THAT(write(*parseOk(R"({"mutations": [{"body_field": "x", "value": "{tenant}"}]})"),
                     nullptr, body),
               HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("`{tenant}`")));
