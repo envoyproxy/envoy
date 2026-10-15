@@ -270,27 +270,30 @@ absl::Status ProcessorState::handleHeaderContinue() {
 }
 
 absl::Status ProcessorState::handleCompleteBodyAvailable() {
-  if (callback_state_ == CallbackState::Idle) {
-    // If we get here, then all the body data came in before the header message
-    // was complete, and the server wants the body. It doesn't matter whether the
-    // processing mode is buffered, streamed, or partially buffered.
-    if (bufferedData()) {
-      // Get here, no_body_ = false, and complete_body_available_ = true, the end_stream
-      // flag of decodeData() can be determined by whether the trailers are received.
-      // Also, bufferedData() is not nullptr means decodeData() is called, even though
-      // the data can be an empty chunk.
-      auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
-      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
-      clearWatermark();
-    } else {
+  if (body_mode_ == ProcessingMode::STREAMED ||
+      body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
+    // In streamed modes, always split and send any buffered data via
+    // sendBufferedDataInStreamedMode (which respects max_streamed_body_chunk_size and uses
+    // StreamedBodyCallback).
+    sendBufferedDataInStreamedMode(trailers_ == nullptr);
+    if (callback_state_ == CallbackState::Idle) {
+      // No body chunks are in flight (e.g., headers followed directly by trailers with no body,
+      // or all body chunks already completed while send_body_without_waiting_for_header_response
+      // was enabled), so proceed to handle trailers and cleanup now.
       return handleTrailersAndCleanup();
     }
+    return absl::OkStatus();
+  }
+  if (bufferedData()) {
+    // Get here in BUFFERED or BUFFERED_PARTIAL mode when no_body_ = false and
+    // complete_body_available_ = true. The end_stream flag of decodeData() can be determined by
+    // whether the trailers are received. Also, bufferedData() is not nullptr means decodeData()
+    // is called, even though the data can be an empty chunk.
+    auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
+    filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+    clearWatermark();
   } else {
-    // StreamedBodyCallback state. There is pending body response.
-    // Check whether there is buffered data. If there is, send them.
-    // Do not continue filter chain here so the pending body response have chance to be
-    // served.
-    sendBufferedDataInStreamedMode(trailers_ == nullptr);
+    return handleTrailersAndCleanup();
   }
   return absl::OkStatus();
 }
