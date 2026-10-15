@@ -1908,7 +1908,7 @@ void ActiveStreamDecoderFilter::onDecoderFilterBelowWriteBufferLowWatermark() {
 
 void ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  // This is called by the router filter and sidestreams.
+  // This is called by the router filter and side streams.
   ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
                    &watermark_callbacks) == parent_.watermark_callbacks_.end());
   parent_.watermark_callbacks_.emplace(parent_.watermark_callbacks_.end(), &watermark_callbacks);

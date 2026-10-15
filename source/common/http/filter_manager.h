@@ -847,7 +847,7 @@ public:
   }
 
   // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
-  // events for this stream and the downstream connection to the router filter and sidestreams.
+  // events for this stream and the downstream connection to the router filter and side streams.
   void callHighWatermarkCallbacks();
   void callLowWatermarkCallbacks();
 
