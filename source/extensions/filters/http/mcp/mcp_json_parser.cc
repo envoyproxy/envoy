@@ -996,7 +996,8 @@ void McpJsonParser::reset() {
   parsing_started_ = false;
 }
 
-absl::Status McpJsonParser::rewriteTraceparent(Buffer::Instance& body, absl::string_view new_parent_id) {
+absl::Status McpJsonParser::rewriteTraceparent(Buffer::Instance& body,
+                                               absl::string_view new_parent_id) {
   if (new_parent_id.empty()) {
     return absl::OkStatus();
   }
@@ -1016,10 +1017,12 @@ absl::Status McpJsonParser::rewriteTraceparent(Buffer::Instance& body, absl::str
   ASSERT(range->end > 0);
   ASSERT(range->end >= range->start);
   if (range->end > std::numeric_limits<uint32_t>::max()) {
-    return absl::InvalidArgumentError("Cannot rewrite traceparent because body length exceeds UINT32_MAX");
+    return absl::InvalidArgumentError(
+        "Cannot rewrite traceparent because body length exceeds UINT32_MAX");
   }
 
-  const absl::Span<char> linearized(reinterpret_cast<char*>(body.linearize(range->end)), range->end);
+  const absl::Span<char> linearized(reinterpret_cast<char*>(body.linearize(range->end)),
+                                    range->end);
   absl::Span<char> traceparent = linearized.subspan(range->start);
 
   absl::StatusOr<SpanContext> parsed = SpanContextExtractor::parseTraceparent(

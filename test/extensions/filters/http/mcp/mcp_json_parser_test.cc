@@ -2168,9 +2168,9 @@ TEST(McpJsonParserMemoryTest, HeavyObjectFieldsUnorderedMethod) {
 
 TEST_F(McpJsonParserTest, RewriteTraceparentPreservesLargeNumericToken) {
   // Note that this example contains the key "numeric_edge_case" with a value of
-  // 2^64.  That integer literal should be preserved exactly, even though it
+  // 2^64. That integer literal should be preserved exactly, even though it
   // can't be represented by IEEE 754 binary64.
-  static constexpr absl::string_view kJson=
+  static constexpr absl::string_view kJson =
       R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
@@ -2195,7 +2195,8 @@ TEST_F(McpJsonParserTest, RewriteTraceparentPreservesLargeNumericToken) {
   ASSERT_OK(McpJsonParser::rewriteTraceparent(buffer, kNewParentId));
 
   std::string rewritten_json = buffer.toString();
-  EXPECT_THAT(rewritten_json, HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kNewParentId, "-01")));
+  EXPECT_THAT(rewritten_json,
+              HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kNewParentId, "-01")));
   EXPECT_THAT(rewritten_json, HasSubstr("18446744073709551616"));
 }
 
@@ -2229,11 +2230,13 @@ TEST_F(McpJsonParserTest, RewriteTraceparentSuccessAcrossMultipleBufferSlices) {
   ASSERT_OK(McpJsonParser::rewriteTraceparent(buffer, kNewParentId));
 
   std::string rewritten_json = buffer.toString();
-  EXPECT_THAT(rewritten_json, HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kNewParentId, "-01")));
+  EXPECT_THAT(rewritten_json,
+              HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kNewParentId, "-01")));
 }
 
 TEST_F(McpJsonParserTest, RewriteTraceparentEmptyParentIdIsNoOp) {
-  static constexpr absl::string_view kJson = R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t"}})";
+  static constexpr absl::string_view kJson =
+      R"({"jsonrpc":"2.0","method":"tools/call","id":1,"params":{"name":"t"}})";
   EXPECT_OK(parser_->parse(kJson));
   ASSERT_OK(parser_->finishParse());
 
@@ -2269,7 +2272,6 @@ TEST_F(McpJsonParserTest, RewriteTraceparentInvalidJsonReturnsError) {
   buffer.add(kJson);
 
   ASSERT_THAT(McpJsonParser::rewriteTraceparent(buffer, kNewParentId), Not(IsOk()));
-
 }
 
 } // namespace
