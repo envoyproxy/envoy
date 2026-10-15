@@ -255,7 +255,7 @@ public:
   }
 
   /**
-   * @return raw Storage for cross-class move. This method is used to tranfer ownership
+   * @return raw Storage for cross-class move. This method is used to transfer ownership
    * between UnionString with different Validator.
    */
   Storage& storage() { return buffer_; }

@@ -9,8 +9,17 @@
 #include "test/integration/base_integration_test.h"
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+
+using testing::Contains;
+using testing::IsSupersetOf;
+using testing::Key;
+using testing::Pair;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -19,6 +28,7 @@ namespace ExtProc {
 
 using envoy::service::network_ext_proc::v3::ProcessingRequest;
 using envoy::service::network_ext_proc::v3::ProcessingResponse;
+using testing::Ge;
 
 // Test-only filter that sets both typed and untyped connection metadata based on filter config
 class MetadataSetterFilter : public Network::ReadFilter {
@@ -55,7 +65,7 @@ public:
 
             // Serialize to an Any
             Protobuf::Any typed_value;
-            typed_value.PackFrom(string_proto);
+            std::ignore = typed_value.PackFrom(string_proto);
 
             // Use the appropriate way to add typed metadata
             callbacks_->connection().streamInfo().setDynamicTypedMetadata(namespace_name,
@@ -86,7 +96,7 @@ public:
   absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::FactoryContext&) override {
-    const auto& struct_config = dynamic_cast<const Protobuf::Struct&>(proto_config);
+    const auto& struct_config = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(proto_config);
     return [struct_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<MetadataSetterFilter>(struct_config));
     };
@@ -157,15 +167,15 @@ public:
             auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners(0);
             auto* filter_chain = listeners->mutable_filter_chains(0);
             auto* filters = filter_chain->mutable_filters();
-            for (int i = 0; i < filters->size(); i++) {
-              if ((*filters)[i].name() == "envoy.network_ext_proc.ext_proc_filter") {
+            for (auto& filter : *filters) {
+              if (filter.name() == "envoy.network_ext_proc.ext_proc_filter") {
                 envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
-                (*filters)[i].mutable_typed_config()->UnpackTo(&config);
+                std::ignore = filter.mutable_typed_config()->UnpackTo(&config);
 
                 // Apply the provided modifier function
                 config_modifier(config);
 
-                (*filters)[i].mutable_typed_config()->PackFrom(config);
+                std::ignore = filter.mutable_typed_config()->PackFrom(config);
                 break;
               }
             }
@@ -212,7 +222,7 @@ public:
   // Helper method to set either untyped or typed connection metadata
   void setConnectionMetadata(const std::string& namespace_name,
                              const std::map<std::string, std::string>& untyped_values,
-                             const absl::optional<std::string>& typed_value = absl::nullopt) {
+                             const std::optional<std::string>& typed_value = std::nullopt) {
     config_helper_.addConfigModifier([namespace_name, untyped_values, typed_value](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Find the metadata_setter filter
@@ -220,11 +230,11 @@ public:
       auto* filter_chain = listener->mutable_filter_chains(0);
       auto* filters = filter_chain->mutable_filters();
 
-      for (int i = 0; i < filters->size(); i++) {
-        if ((*filters)[i].name() == "test.metadata_setter") {
+      for (auto& filter : *filters) {
+        if (filter.name() == "test.metadata_setter") {
           Protobuf::Struct existing_config;
-          if ((*filters)[i].has_typed_config()) {
-            (*filters)[i].typed_config().UnpackTo(&existing_config);
+          if (filter.has_typed_config()) {
+            std::ignore = filter.typed_config().UnpackTo(&existing_config);
           }
 
           // Set untyped metadata
@@ -264,7 +274,7 @@ public:
                 .set_string_value(typed_value.value());
           }
 
-          (*filters)[i].mutable_typed_config()->PackFrom(existing_config);
+          std::ignore = filter.mutable_typed_config()->PackFrom(existing_config);
           break;
         }
       }
@@ -338,7 +348,7 @@ public:
 
   void verifyCounters(const std::map<std::string, uint64_t>& expected_counters) {
     for (const auto& [name, value] : expected_counters) {
-      test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix." + name, value);
+      test_server_->waitForCounter("network_ext_proc.ext_proc_prefix." + name, Ge(value));
     }
   }
 
@@ -670,7 +680,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailure) {
   // Close gRPC stream with an error status instead of Ok
   // This should trigger onGrpcError instead of onGrpcClose
   closeGrpcStream();
-  test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.streams_grpc_error", 1);
+  test_server_->waitForCounter("network_ext_proc.ext_proc_prefix.streams_grpc_error", Ge(1));
   ASSERT_FALSE(tcp_client->write("", true));
   tcp_client->waitForDisconnect();
 
@@ -699,7 +709,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, GrpcStreamFailureWithFailureModeAllo
   closeGrpcStream();
 
   // Wait for the failure_mode_allowed counter to increment
-  test_server_->waitForCounterGe("network_ext_proc.ext_proc_prefix.failure_mode_allowed", 1);
+  test_server_->waitForCounter("network_ext_proc.ext_proc_prefix.failure_mode_allowed", Ge(1));
 
   // Should be able to continue using the connection after stream failure
   ASSERT_TRUE(tcp_client->write("more_data", true));
@@ -857,14 +867,10 @@ TEST_P(NetworkExtProcFilterIntegrationTest, UntypedMetadataForwarding) {
 
   // Verify metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("test-namespace"));
-
-  // Verify metadata values
-  const auto& metadata = request.metadata().filter_metadata().at("test-namespace");
-  EXPECT_TRUE(metadata.fields().contains("key1"));
-  EXPECT_TRUE(metadata.fields().contains("key2"));
-  EXPECT_EQ(metadata.fields().at("key1").string_value(), "value1");
-  EXPECT_EQ(metadata.fields().at("key2").string_value(), "value2");
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              Contains(Pair("test-namespace", HasStructFields(UnorderedElementsAre(
+                                                  IsStructString("key1", "value1"),
+                                                  IsStructString("key2", "value2"))))));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -894,18 +900,14 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleUntypedNamespaces) {
 
   // Verify metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("namespace1"));
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("namespace2"));
-  EXPECT_FALSE(request.metadata().filter_metadata().contains("namespace3"));
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              UnorderedElementsAre(Key("namespace1"), Key("namespace2")));
 
   // Verify metadata values
-  const auto& metadata1 = request.metadata().filter_metadata().at("namespace1");
-  EXPECT_TRUE(metadata1.fields().contains("key1"));
-  EXPECT_EQ(metadata1.fields().at("key1").string_value(), "value1");
-
-  const auto& metadata2 = request.metadata().filter_metadata().at("namespace2");
-  EXPECT_TRUE(metadata2.fields().contains("key2"));
-  EXPECT_EQ(metadata2.fields().at("key2").string_value(), "value2");
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              UnorderedElementsAre(
+                  Pair("namespace1", HasStructFields(Contains(IsStructString("key1", "value1")))),
+                  Pair("namespace2", HasStructFields(Contains(IsStructString("key2", "value2"))))));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -986,7 +988,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TypedMetadataForwarding) {
 
   // Verify typed metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().typed_filter_metadata().contains("typed-namespace"));
+  EXPECT_THAT(request.metadata().typed_filter_metadata(), Contains(Key("typed-namespace")));
 
   // Verify typed metadata values
   const auto& typed_metadata = request.metadata().typed_filter_metadata().at("typed-namespace");
@@ -1028,13 +1030,12 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   EXPECT_TRUE(request.has_metadata());
 
   // Verify untyped metadata
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("untyped-ns"));
-  const auto& untyped_metadata = request.metadata().filter_metadata().at("untyped-ns");
-  EXPECT_TRUE(untyped_metadata.fields().contains("key1"));
-  EXPECT_EQ(untyped_metadata.fields().at("key1").string_value(), "value1");
+  EXPECT_THAT(
+      request.metadata().filter_metadata(),
+      Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
 
   // Verify typed metadata
-  EXPECT_TRUE(request.metadata().typed_filter_metadata().contains("typed-ns"));
+  EXPECT_THAT(request.metadata().typed_filter_metadata(), Contains(Key("typed-ns")));
   const auto& typed_metadata = request.metadata().typed_filter_metadata().at("typed-ns");
   EXPECT_EQ(typed_metadata.type_url(), "type.googleapis.com/google.protobuf.StringValue");
 

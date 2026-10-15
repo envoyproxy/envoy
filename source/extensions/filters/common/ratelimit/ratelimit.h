@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -11,8 +12,6 @@
 #include "envoy/singleton/manager.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/tracer.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {

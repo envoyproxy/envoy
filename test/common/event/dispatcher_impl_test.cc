@@ -11,6 +11,7 @@
 #include "source/common/event/deferred_task.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/event/timer_impl.h"
+#include "source/common/event/worker_id.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
@@ -817,7 +818,9 @@ TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
 
   // approximateMonotonicTime is increasing between event loop runs.
   dispatcher_->post([this]() {
-    { EXPECT_LT(time_, dispatcher_->approximateMonotonicTime()); }
+    {
+      EXPECT_LT(time_, dispatcher_->approximateMonotonicTime());
+    }
   });
 
   dispatcher_->run(Dispatcher::RunType::Block);
@@ -1523,6 +1526,51 @@ TEST_F(DispatcherConnectionTest, CreateEnvoyInternalConnectionWhenFactoryNotExis
           Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
           nullptr, nullptr),
       "");
+}
+
+TEST(EvwatchObserverTest, RegisterEvwatchObserver) {
+  class MockEvwatchObserver : public Evwatch::Observer {
+  public:
+    MOCK_METHOD(void, onPrepare,
+                (MonotonicTime prepare_time, std::optional<MonotonicTime::duration> timeout));
+    MOCK_METHOD(void, onCheck, (MonotonicTime check_time));
+    MOCK_METHOD(void, onClose, ());
+  };
+
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
+
+  NiceMock<MockEvwatchObserver> observer;
+
+  EXPECT_CALL(observer, onPrepare(_, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer, onCheck(_)).Times(testing::AtLeast(1));
+  EXPECT_CALL(observer, onClose());
+
+  dispatcher->registerEvwatchObserver(observer);
+
+  auto cb = dispatcher->createSchedulableCallback([]() {});
+  cb->scheduleCallbackCurrentIteration();
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+
+  dispatcher->unregisterEvwatchObserver(observer);
+}
+
+TEST(WorkerIdFromThreadNameTest, All) {
+  EXPECT_EQ(workerIdFromThreadName("worker_0"), 0);
+  EXPECT_EQ(workerIdFromThreadName("worker_12"), 12);
+  EXPECT_FALSE(workerIdFromThreadName("worker_").has_value());
+  EXPECT_FALSE(workerIdFromThreadName("worker_1a").has_value());
+  EXPECT_FALSE(workerIdFromThreadName("worker_-1").has_value());
+  // Out of uint32_t range.
+  EXPECT_FALSE(workerIdFromThreadName("worker_4294967296").has_value());
+  EXPECT_FALSE(workerIdFromThreadName("main_thread").has_value());
+  EXPECT_FALSE(workerIdFromThreadName("").has_value());
+}
+
+TEST(DispatcherWorkerIdTest, ParsedFromNameOnce) {
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_EQ(api->allocateDispatcher("worker_3")->workerId(), 3);
+  EXPECT_FALSE(api->allocateDispatcher("main_thread")->workerId().has_value());
 }
 
 } // namespace

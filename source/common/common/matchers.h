@@ -241,7 +241,7 @@ public:
   }
 
   // StringMatcher
-  bool match(absl::string_view value) const override { return doMatch(value, absl::nullopt); }
+  bool match(absl::string_view value) const override { return doMatch(value, std::nullopt); }
   bool match(absl::string_view value, const StringMatcher::Context& context) const override {
     return doMatch(value, makeOptRef(context));
   }
@@ -404,6 +404,8 @@ public:
                   Server::Configuration::CommonFactoryContext& context);
 
   bool match(absl::string_view path) const override;
+  // The caller has already removed the query and fragment from path.
+  bool matchPathWithoutQuery(absl::string_view path) const { return matcher_.match(path); }
   const std::string& stringRepresentation() const { return matcher_.stringRepresentation(); }
 
 private:

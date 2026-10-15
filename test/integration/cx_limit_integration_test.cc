@@ -11,6 +11,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace {
 
@@ -112,7 +113,7 @@ public:
     const bool isV4 = (version_ == Network::Address::IpVersion::v4);
     const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
-    test_server_->waitForCounterEq(counter_prefix + check_stat, 1);
+    test_server_->waitForCounter(counter_prefix + check_stat, Eq(1));
 
     for (auto& tcp_client : tcp_clients) {
       tcp_client->close();
@@ -230,10 +231,10 @@ TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimitOptOut) {
   const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
   // listener_0 does not hit any connection limits
-  test_server_->waitForCounterEq(counter_prefix + "downstream_global_cx_overflow", 0);
-  test_server_->waitForCounterEq(counter_prefix + "downstream_cx_overflow", 0);
-  test_server_->waitForCounterEq("listener.admin.downstream_global_cx_overflow", 0);
-  test_server_->waitForCounterEq("listener.admin.downstream_cx_overflow", 0);
+  test_server_->waitForCounter(counter_prefix + "downstream_global_cx_overflow", Eq(0));
+  test_server_->waitForCounter(counter_prefix + "downstream_cx_overflow", Eq(0));
+  test_server_->waitForCounter("listener.admin.downstream_global_cx_overflow", Eq(0));
+  test_server_->waitForCounter("listener.admin.downstream_cx_overflow", Eq(0));
 
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();
@@ -282,8 +283,8 @@ TEST_P(ConnectionLimitIntegrationTest, TestListenerLimitWithGlobalOptOut) {
   const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
   // listener_0 does hits the listener connection limit
-  test_server_->waitForCounterEq(counter_prefix + "downstream_global_cx_overflow", 0);
-  test_server_->waitForCounterEq(counter_prefix + "downstream_cx_overflow", 1);
+  test_server_->waitForCounter(counter_prefix + "downstream_global_cx_overflow", Eq(0));
+  test_server_->waitForCounter(counter_prefix + "downstream_cx_overflow", Eq(1));
 
   for (auto& tcp_client : tcp_clients) {
     tcp_client->close();

@@ -4,6 +4,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -18,8 +19,8 @@ namespace {
 
 class MockStreamIdProvider : public StreamInfo::StreamIdProvider {
 public:
-  MOCK_METHOD(absl::optional<absl::string_view>, toStringView, (), (const));
-  MOCK_METHOD(absl::optional<uint64_t>, toInteger, (), (const));
+  MOCK_METHOD(std::optional<absl::string_view>, toStringView, (), (const));
+  MOCK_METHOD(std::optional<uint64_t>, toInteger, (), (const));
 };
 
 class DynamicModuleAccessLogAbiTest : public testing::Test {
@@ -65,6 +66,16 @@ TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseHeaders) {
   // 3 headers: content-type, x-custom, x-custom.
   EXPECT_EQ(3, envoy_dynamic_module_callback_access_logger_get_headers_size(
                    env_ptr, envoy_dynamic_module_type_http_header_type_ResponseHeader));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeRequestTrailers) {
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer", "trailer-value"}};
+  Formatter::Context log_context(&request_headers_, &response_headers_, &response_trailers_);
+  log_context.setRequestTrailers(request_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(1, envoy_dynamic_module_callback_access_logger_get_headers_size(
+                   env_ptr, envoy_dynamic_module_type_http_header_type_RequestTrailer));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, HeadersSizeResponseTrailers) {
@@ -201,6 +212,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetHeaderValueIndexOutOfBounds) {
 // Stream Info Basic Tests
 // =============================================================================
 
+// Tests for deprecated wrapper functions that delegate to generic attribute accessors.
+
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCode) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
@@ -209,7 +222,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCode) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeNotSet) {
-  stream_info_.response_code_ = absl::nullopt;
+  stream_info_.response_code_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -228,7 +241,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetails) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetResponseCodeDetailsNotSet) {
-  stream_info_.response_code_details_ = absl::nullopt;
+  stream_info_.response_code_details_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -257,7 +270,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetProtocolHttp2) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetProtocolNotSet) {
-  stream_info_.protocol_ = absl::nullopt;
+  stream_info_.protocol_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -282,57 +295,6 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetResponseFlags) {
   EXPECT_EQ(stream_info_.legacyResponseFlags(), flags);
 }
 
-TEST_F(DynamicModuleAccessLogAbiTest, GetRouteName) {
-  ON_CALL(stream_info_, getRouteName())
-      .WillByDefault(testing::ReturnRefOfCopy(std::string("test_route")));
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  envoy_dynamic_module_type_envoy_buffer result;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
-  EXPECT_EQ("test_route", std::string(result.ptr, result.length));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, GetRouteNameEmpty) {
-  ON_CALL(stream_info_, getRouteName()).WillByDefault(testing::ReturnRefOfCopy(std::string("")));
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  envoy_dynamic_module_type_envoy_buffer result;
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterName) {
-  stream_info_.virtual_cluster_name_ = "test_vcluster";
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  envoy_dynamic_module_type_envoy_buffer result;
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
-  EXPECT_EQ("test_vcluster", std::string(result.ptr, result.length));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameEmpty) {
-  stream_info_.virtual_cluster_name_ = "";
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  envoy_dynamic_module_type_envoy_buffer result;
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameNotSet) {
-  stream_info_.virtual_cluster_name_ = absl::nullopt;
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  envoy_dynamic_module_type_envoy_buffer result;
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
-}
-
 TEST_F(DynamicModuleAccessLogAbiTest, IsHealthCheck) {
   ON_CALL(stream_info_, healthCheck()).WillByDefault(testing::Return(true));
   Formatter::Context log_context(nullptr, nullptr, nullptr);
@@ -349,6 +311,75 @@ TEST_F(DynamicModuleAccessLogAbiTest, IsNotHealthCheck) {
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_is_health_check(env_ptr));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, GetRouteName) {
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_ = "test_route";
+  stream_info_.route_ = route;
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
+  EXPECT_EQ("test_route", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetRouteNameEmpty) {
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_.clear();
+  stream_info_.route_ = route;
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_route_name(env_ptr, &result));
+  EXPECT_EQ(0, result.length);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterName) {
+  stream_info_.virtual_cluster_name_ = "test_vcluster";
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
+  EXPECT_EQ("test_vcluster", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &result));
+  EXPECT_EQ("test_vcluster", std::string(result.ptr, result.length));
+
+  uint64_t number_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &number_result));
+  bool bool_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &bool_result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameEmpty) {
+  stream_info_.virtual_cluster_name_ = "";
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetVirtualClusterNameNotSet) {
+  stream_info_.virtual_cluster_name_ = std::nullopt;
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_access_logger_get_virtual_cluster_name(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName, &result));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCount) {
   stream_info_.attempt_count_ = 3;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
@@ -358,7 +389,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCount) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetAttemptCountNotSet) {
-  stream_info_.attempt_count_ = absl::nullopt;
+  stream_info_.attempt_count_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -387,7 +418,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionTerminationDetailsEmpty) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionTerminationDetailsNotSet) {
-  stream_info_.connection_termination_details_ = absl::nullopt;
+  stream_info_.connection_termination_details_ = std::nullopt;
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -424,11 +455,13 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoNoDownstreamOrUpstream) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
-  envoy_dynamic_module_type_timing_info timing;
-  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_access_logger_get_timing_info_v2(env_ptr, &timing);
 
   EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_rx_byte_received_ns);
   EXPECT_EQ(-1, timing.first_upstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.last_upstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.first_upstream_rx_byte_received_ns);
@@ -446,6 +479,10 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoWithValues) {
       stream_info_.start_time_monotonic_ + std::chrono::milliseconds(2);
   stream_info_.downstream_timing_.last_downstream_tx_byte_sent_ =
       stream_info_.start_time_monotonic_ + std::chrono::milliseconds(3);
+  stream_info_.downstream_timing_.last_downstream_header_rx_byte_received_ =
+      stream_info_.start_time_monotonic_;
+  stream_info_.downstream_timing_.last_downstream_rx_byte_received_ =
+      stream_info_.start_time_monotonic_ + std::chrono::milliseconds(1);
 
   // Upstream timing.
   auto* upstream =
@@ -463,16 +500,30 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoWithValues) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
-  envoy_dynamic_module_type_timing_info timing;
-  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_access_logger_get_timing_info_v2(env_ptr, &timing);
 
   EXPECT_EQ(5'000'000, timing.request_complete_duration_ns); // 5 ms
   EXPECT_EQ(2'000'000, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(3'000'000, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(0, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(1'000'000, timing.last_downstream_rx_byte_received_ns);
   EXPECT_EQ(4'000'000, timing.first_upstream_tx_byte_sent_ns);
   EXPECT_EQ(5'000'000, timing.last_upstream_tx_byte_sent_ns);
   EXPECT_EQ(6'000'000, timing.first_upstream_rx_byte_received_ns);
   EXPECT_EQ(7'000'000, timing.last_upstream_rx_byte_received_ns);
+
+  envoy_dynamic_module_type_timing_info original_timing;
+  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &original_timing);
+  EXPECT_EQ(8 * sizeof(int64_t), sizeof(original_timing));
+  EXPECT_EQ(10'000'000'000, original_timing.start_time_unix_ns);
+  EXPECT_EQ(5'000'000, original_timing.request_complete_duration_ns);
+  EXPECT_EQ(4'000'000, original_timing.first_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(5'000'000, original_timing.last_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(6'000'000, original_timing.first_upstream_rx_byte_received_ns);
+  EXPECT_EQ(7'000'000, original_timing.last_upstream_rx_byte_received_ns);
+  EXPECT_EQ(2'000'000, original_timing.first_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(3'000'000, original_timing.last_downstream_tx_byte_sent_ns);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfo) {
@@ -501,6 +552,78 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfoWithUpstreamBytesMeter) {
 
   EXPECT_EQ(123, bytes.wire_bytes_received);
   EXPECT_EQ(456, bytes.wire_bytes_sent);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamWireBytesWithoutMeter) {
+  auto upstream = std::make_shared<StreamInfo::BytesMeter>();
+  upstream->addWireBytesReceived(123);
+  upstream->addWireBytesSent(456);
+  stream_info_.setUpstreamBytesMeter(upstream);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_downstream_wire_bytes bytes{123, 456};
+  envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(env_ptr, &bytes);
+
+  EXPECT_EQ(0, bytes.bytes_received);
+  EXPECT_EQ(0, bytes.bytes_sent);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamWireBytesWithoutUpstream) {
+  auto meter = std::make_shared<StreamInfo::BytesMeter>();
+  meter->addWireBytesReceived(129);
+  meter->addWireBytesSent(476);
+  stream_info_.setDownstreamBytesMeter(meter);
+  stream_info_.setUpstreamBytesMeter(nullptr);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_downstream_wire_bytes bytes;
+  envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(env_ptr, &bytes);
+
+  EXPECT_EQ(129, bytes.bytes_received);
+  EXPECT_EQ(476, bytes.bytes_sent);
+
+  envoy_dynamic_module_type_bytes_info upstream_bytes;
+  envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &upstream_bytes);
+  EXPECT_EQ(0, upstream_bytes.wire_bytes_received);
+  EXPECT_EQ(0, upstream_bytes.wire_bytes_sent);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDownstreamWireBytesIndependentOfUpstreamAndBodyBytes) {
+  stream_info_.bytes_received_ = 11;
+  stream_info_.bytes_sent_ = 22;
+  auto downstream = std::make_shared<StreamInfo::BytesMeter>();
+  downstream->addWireBytesReceived(123);
+  downstream->addWireBytesSent(456);
+  stream_info_.setDownstreamBytesMeter(downstream);
+  auto upstream = std::make_shared<StreamInfo::BytesMeter>();
+  upstream->addWireBytesReceived(789);
+  upstream->addWireBytesSent(1024);
+  stream_info_.setUpstreamBytesMeter(upstream);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_downstream_wire_bytes bytes;
+  envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(env_ptr, &bytes);
+  EXPECT_EQ(123, bytes.bytes_received);
+  EXPECT_EQ(456, bytes.bytes_sent);
+
+  envoy_dynamic_module_type_bytes_info existing_bytes;
+  envoy_dynamic_module_callback_access_logger_get_bytes_info(env_ptr, &existing_bytes);
+  EXPECT_EQ(11, existing_bytes.bytes_received);
+  EXPECT_EQ(22, existing_bytes.bytes_sent);
+  EXPECT_EQ(789, existing_bytes.wire_bytes_received);
+  EXPECT_EQ(1024, existing_bytes.wire_bytes_sent);
+
+  downstream->addWireBytesReceived(10);
+  downstream->addWireBytesSent(20);
+  envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(env_ptr, &bytes);
+  EXPECT_EQ(133, bytes.bytes_received);
+  EXPECT_EQ(476, bytes.bytes_sent);
 }
 
 // =============================================================================
@@ -595,7 +718,7 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionIdMissing) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsFields) {
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*ssl_info, peerCertificateValidated()).WillByDefault(testing::Return(true));
+  ON_CALL(*ssl_info, peerCertificatePresented()).WillByDefault(testing::Return(true));
   ON_CALL(*ssl_info, tlsVersion()).WillByDefault(testing::ReturnRefOfCopy(std::string("TLSv1.2")));
   ON_CALL(*ssl_info, subjectPeerCertificate())
       .WillByDefault(testing::ReturnRefOfCopy(std::string("CN=subj")));
@@ -643,8 +766,74 @@ TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsMissing) {
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_is_mtls(env_ptr));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionInfo) {
+  stream_info_.downstream_connection_info_provider_->setConnectionID(12345);
+  stream_info_.downstream_connection_info_provider_->setRequestedServerName("example.com");
+
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, peerCertificatePresented()).WillByDefault(testing::Return(true));
+  ON_CALL(*ssl_info, tlsVersion()).WillByDefault(testing::ReturnRefOfCopy(std::string("TLSv1.3")));
+  ON_CALL(*ssl_info, subjectPeerCertificate())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("CN=client")));
+  ON_CALL(*ssl_info, sha256PeerCertificateDigest())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("digest")));
+
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  EXPECT_EQ(12345, envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr));
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_access_logger_get_requested_server_name(env_ptr, &result));
+  EXPECT_EQ("example.com", std::string(result.ptr, result.length));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_is_mtls(env_ptr));
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(env_ptr, &result));
+  EXPECT_EQ("TLSv1.3", std::string(result.ptr, result.length));
+
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(env_ptr, &result));
+  EXPECT_EQ("CN=client", std::string(result.ptr, result.length));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(env_ptr,
+                                                                                          &result));
+  EXPECT_EQ("digest", std::string(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsEmptySubjectAndDigest) {
+  stream_info_.downstream_connection_info_provider_->setRequestedServerName("");
+
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, peerCertificatePresented()).WillByDefault(testing::Return(true));
+  ON_CALL(*ssl_info, tlsVersion()).WillByDefault(testing::ReturnRefOfCopy(std::string("TLSv1.3")));
+  ON_CALL(*ssl_info, subjectPeerCertificate())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("")));
+  ON_CALL(*ssl_info, sha256PeerCertificateDigest())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("")));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result;
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_access_logger_get_requested_server_name(env_ptr, &result));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(env_ptr, &result));
+  EXPECT_EQ("TLSv1.3", std::string(result.ptr, result.length));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(
+      env_ptr, &result));
+}
+
 // =============================================================================
-// Request ID and Filter State Tests
+// Request ID Tests
 // =============================================================================
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetRequestIdMissingProvider) {
@@ -654,6 +843,10 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetRequestIdMissingProvider) {
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_request_id(env_ptr, &result));
 }
+
+// =============================================================================
+// Filter State Tests
+// =============================================================================
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetFilterStateAlwaysFalse) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
@@ -1027,72 +1220,6 @@ TEST_F(DynamicModuleAccessLogAbiTest, UpstreamTlsFieldsMissingUpstreamInfo) {
 // Connection/TLS Tests
 // =============================================================================
 
-TEST_F(DynamicModuleAccessLogAbiTest, GetConnectionInfo) {
-  stream_info_.downstream_connection_info_provider_->setConnectionID(12345);
-  stream_info_.downstream_connection_info_provider_->setRequestedServerName("example.com");
-
-  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*ssl_info, peerCertificateValidated()).WillByDefault(testing::Return(true));
-  ON_CALL(*ssl_info, tlsVersion()).WillByDefault(testing::ReturnRefOfCopy(std::string("TLSv1.3")));
-  ON_CALL(*ssl_info, subjectPeerCertificate())
-      .WillByDefault(testing::ReturnRefOfCopy(std::string("CN=client")));
-  ON_CALL(*ssl_info, sha256PeerCertificateDigest())
-      .WillByDefault(testing::ReturnRefOfCopy(std::string("digest")));
-
-  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
-
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  EXPECT_EQ(12345, envoy_dynamic_module_callback_access_logger_get_connection_id(env_ptr));
-
-  envoy_dynamic_module_type_envoy_buffer result;
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_access_logger_get_requested_server_name(env_ptr, &result));
-  EXPECT_EQ("example.com", std::string(result.ptr, result.length));
-
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_is_mtls(env_ptr));
-
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(env_ptr, &result));
-  EXPECT_EQ("TLSv1.3", std::string(result.ptr, result.length));
-
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(env_ptr, &result));
-  EXPECT_EQ("CN=client", std::string(result.ptr, result.length));
-
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(env_ptr,
-                                                                                          &result));
-  EXPECT_EQ("digest", std::string(result.ptr, result.length));
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsEmptySubjectAndDigest) {
-  stream_info_.downstream_connection_info_provider_->setRequestedServerName("");
-
-  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*ssl_info, peerCertificateValidated()).WillByDefault(testing::Return(true));
-  ON_CALL(*ssl_info, tlsVersion()).WillByDefault(testing::ReturnRefOfCopy(std::string("TLSv1.3")));
-  ON_CALL(*ssl_info, subjectPeerCertificate())
-      .WillByDefault(testing::ReturnRefOfCopy(std::string("")));
-  ON_CALL(*ssl_info, sha256PeerCertificateDigest())
-      .WillByDefault(testing::ReturnRefOfCopy(std::string("")));
-  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
-
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  envoy_dynamic_module_type_envoy_buffer result;
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_requested_server_name(env_ptr, &result));
-  EXPECT_TRUE(
-      envoy_dynamic_module_callback_access_logger_get_downstream_tls_version(env_ptr, &result));
-  EXPECT_EQ("TLSv1.3", std::string(result.ptr, result.length));
-  EXPECT_FALSE(
-      envoy_dynamic_module_callback_access_logger_get_downstream_peer_subject(env_ptr, &result));
-  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_downstream_peer_cert_digest(
-      env_ptr, &result));
-}
-
 TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsExtendedFields) {
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*ssl_info, ciphersuiteString()).WillByDefault(testing::Return("TLS_AES_128_GCM_SHA256"));
@@ -1140,7 +1267,6 @@ TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsExtendedFields) {
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, DownstreamTlsExtendedFieldsMissing) {
-  // No SSL connection set.
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
@@ -1256,8 +1382,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, DownstreamPeerCertValidity) {
 
 TEST_F(DynamicModuleAccessLogAbiTest, DownstreamPeerCertValidityMissing) {
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*ssl_info, validFromPeerCertificate()).WillByDefault(testing::Return(absl::nullopt));
-  ON_CALL(*ssl_info, expirationPeerCertificate()).WillByDefault(testing::Return(absl::nullopt));
+  ON_CALL(*ssl_info, validFromPeerCertificate()).WillByDefault(testing::Return(std::nullopt));
+  ON_CALL(*ssl_info, expirationPeerCertificate()).WillByDefault(testing::Return(std::nullopt));
   stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
 
   Formatter::Context log_context(nullptr, nullptr, nullptr);
@@ -1497,8 +1623,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, UpstreamPeerCertValidityMissing) {
 TEST_F(DynamicModuleAccessLogAbiTest, UpstreamPeerCertValidityNullopt) {
   // SSL connection exists but validity times are not set.
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*ssl_info, validFromPeerCertificate()).WillByDefault(testing::Return(absl::nullopt));
-  ON_CALL(*ssl_info, expirationPeerCertificate()).WillByDefault(testing::Return(absl::nullopt));
+  ON_CALL(*ssl_info, validFromPeerCertificate()).WillByDefault(testing::Return(std::nullopt));
+  ON_CALL(*ssl_info, expirationPeerCertificate()).WillByDefault(testing::Return(std::nullopt));
 
   stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
 
@@ -1652,6 +1778,24 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNotSet) {
                                                                                 key, &result));
 }
 
+// Verifies that a null metadata path is handled without crashing and resolves to no value.
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNullPath) {
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["key"] = ValueUtil::stringValue("value");
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {nullptr, 0};
+  envoy_dynamic_module_type_envoy_buffer result{};
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata(env_ptr, filter,
+                                                                                key, &result));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNonStringValue) {
   Protobuf::Struct struct_obj;
   auto& fields = *struct_obj.mutable_fields();
@@ -1669,12 +1813,161 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNonStringValue) {
                                                                                 key, &result));
 }
 
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNumber) {
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["handshake_state"] = ValueUtil::numberValue(3.0);
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"handshake_state", 15};
+  double result = 0;
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+      env_ptr, filter, key, &result));
+  EXPECT_DOUBLE_EQ(3.0, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNumberZero) {
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["handshake_state"] = ValueUtil::numberValue(0.0);
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"handshake_state", 15};
+  // Initialize to a sentinel to prove that a stored zero is written, not absence.
+  double result = 999.0;
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+      env_ptr, filter, key, &result));
+  EXPECT_DOUBLE_EQ(0.0, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNumberNestedPath) {
+  Protobuf::Struct struct_obj;
+  auto& nested = *(*struct_obj.mutable_fields())["nested"].mutable_struct_value();
+  (*nested.mutable_fields())["handshake_state"] = ValueUtil::numberValue(2.0);
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"nested.handshake_state", 22};
+  double result = 0;
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+      env_ptr, filter, key, &result));
+  EXPECT_DOUBLE_EQ(2.0, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNumberNotSet) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"handshake_state", 15};
+  double result = 0;
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+      env_ptr, filter, key, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNonNumberValue) {
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["handshake_state"] = ValueUtil::stringValue("not_a_number");
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"handshake_state", 15};
+  double result = 0;
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_number(
+      env_ptr, filter, key, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataBool) {
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["tls_enabled"] = ValueUtil::boolValue(true);
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"tls_enabled", 11};
+  bool result = false;
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(env_ptr, filter,
+                                                                                    key, &result));
+  EXPECT_TRUE(result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataBoolFalse) {
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["tls_enabled"] = ValueUtil::boolValue(false);
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"tls_enabled", 11};
+  // Initialize to true to prove that a stored false is written, not absence.
+  bool result = true;
+
+  ASSERT_TRUE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(env_ptr, filter,
+                                                                                    key, &result));
+  EXPECT_FALSE(result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataBoolNotSet) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"tls_enabled", 11};
+  bool result = false;
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+      env_ptr, filter, key, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetDynamicMetadataNonBoolValue) {
+  Protobuf::Struct struct_obj;
+  auto& fields = *struct_obj.mutable_fields();
+  fields["tls_enabled"] = ValueUtil::numberValue(1.0);
+  (*stream_info_.metadata_.mutable_filter_metadata())["test_filter"] = struct_obj;
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_module_buffer filter = {"test_filter", 11};
+  envoy_dynamic_module_type_module_buffer key = {"tls_enabled", 11};
+  bool result = false;
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_dynamic_metadata_bool(
+      env_ptr, filter, key, &result));
+}
+
 TEST_F(DynamicModuleAccessLogAbiTest, GetRequestId) {
   auto provider = std::make_shared<NiceMock<MockStreamIdProvider>>();
   ON_CALL(*provider, toStringView())
-      .WillByDefault(testing::Return(absl::optional<absl::string_view>("req-id")));
+      .WillByDefault(testing::Return(std::optional<absl::string_view>("req-id")));
 
-  // Wire up getStreamIdProvider to return our mock provider.
   ON_CALL(stream_info_, getStreamIdProvider())
       .WillByDefault(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(*provider)));
 
@@ -1846,6 +2139,15 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocol) {
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
   EXPECT_EQ("HTTP/2", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result));
+  EXPECT_EQ("HTTP/2", std::string(result.ptr, result.length));
+  uint64_t int_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &int_result));
+  bool bool_result;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &bool_result));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolHttp11) {
@@ -1857,6 +2159,9 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolHttp11) {
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
   EXPECT_EQ("HTTP/1.1", std::string(result.ptr, result.length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result));
+  EXPECT_EQ("HTTP/1.1", std::string(result.ptr, result.length));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissing) {
@@ -1865,6 +2170,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissing) {
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result));
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissingUpstreamInfo) {
@@ -1879,6 +2186,8 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetUpstreamProtocolMissingUpstreamInfo) {
 
   envoy_dynamic_module_type_envoy_buffer result;
   EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_upstream_protocol(env_ptr, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamProtocol, &result));
 }
 
 // =============================================================================
@@ -1958,6 +2267,1079 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetWorkerIndex) {
   // The worker_index is set to 1 in createThreadLocalLogger.
   uint32_t worker_index = envoy_dynamic_module_callback_access_logger_get_worker_index(env_ptr);
   EXPECT_EQ(1u, worker_index);
+}
+
+// =============================================================================
+// Generic Attribute Accessor Tests
+// =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringProtocol) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, &result));
+  EXPECT_EQ("HTTP/1.1", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringProtocolNotAvailable) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.protocol_ = std::nullopt;
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestProtocol, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringResponseCodeDetails) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.response_code_details_ = "via_upstream";
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseCodeDetails, &result));
+  EXPECT_EQ("via_upstream", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRouteName) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_ = "test_route";
+  stream_info_.route_ = route;
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsRouteName, &result));
+  EXPECT_EQ("test_route", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRouteNameEmpty) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  route->route_name_.clear();
+  stream_info_.route_ = route;
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsRouteName, &result));
+  EXPECT_EQ(0, result.length);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRouteNameNotSet) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.route_.reset();
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsRouteName, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeXdsScalars) {
+  auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  const std::string cluster_name = "service_cluster";
+  ON_CALL(*cluster_info, name()).WillByDefault(testing::ReturnRef(cluster_name));
+  stream_info_.upstream_cluster_info_ = cluster_info;
+
+  auto listener_info = std::make_shared<NiceMock<Network::MockListenerInfo>>();
+  ON_CALL(*listener_info, direction())
+      .WillByDefault(testing::Return(envoy::config::core::v3::OUTBOUND));
+  stream_info_.downstream_connection_info_provider_->setListenerInfo(listener_info);
+
+  auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
+  filter_chain_info->filter_chain_name_ = "service_filter_chain";
+  stream_info_.downstream_connection_info_provider_->setFilterChainInfo(filter_chain_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  uint64_t int_result = 0;
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsClusterName, &string_result));
+  EXPECT_EQ("service_cluster", absl::string_view(string_result.ptr, string_result.length));
+  stream_info_.upstream_cluster_info_.reset();
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsClusterName, &string_result));
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ("service_filter_chain", absl::string_view(string_result.ptr, string_result.length));
+  stream_info_.downstream_connection_info_provider_->setFilterChainInfo(nullptr);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsFilterChainName, &string_result));
+  EXPECT_EQ(0, string_result.length);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsListenerDirection, &int_result));
+  EXPECT_EQ(static_cast<uint64_t>(envoy::config::core::v3::OUTBOUND), int_result);
+  stream_info_.downstream_connection_info_provider_->setListenerInfo(nullptr);
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsListenerDirection, &int_result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringRequestId) {
+  auto provider = std::make_shared<NiceMock<MockStreamIdProvider>>();
+  ON_CALL(*provider, toStringView())
+      .WillByDefault(testing::Return(std::optional<absl::string_view>("stream-id-123")));
+  ON_CALL(stream_info_, getStreamIdProvider())
+      .WillByDefault(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(*provider)));
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestId, &result));
+  EXPECT_EQ("stream-id-123", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringSourceAddress) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_SourceAddress, &result));
+  // The mock stream info provides a default remote address.
+  EXPECT_GT(result.length, 0u);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionRequestedServerName) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.downstream_connection_info_provider_->setRequestedServerName("example.com");
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName, &result));
+  EXPECT_EQ("example.com", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionTlsVersion) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, tlsVersion()).WillByDefault(testing::ReturnRefOfCopy(std::string("TLSv1.3")));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result));
+  EXPECT_EQ("TLSv1.3", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionSubjectPeerCert) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, subjectPeerCertificate())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("CN=peer")));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate, &result));
+  EXPECT_EQ("CN=peer", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamTransportFailureReason) {
+  stream_info_.upstream_info_->setUpstreamTransportFailureReason("SSL handshake failure");
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamTransportFailureReason, &result));
+  EXPECT_EQ("SSL handshake failure", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUnsupported) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntResponseCode) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseCode, &result));
+  EXPECT_EQ(200u, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntConnectionId) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.downstream_connection_info_provider_->setConnectionID(42);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionId, &result));
+  EXPECT_EQ(42u, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntSourcePort) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  // The mock stream info provides a default remote address with a port.
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_SourcePort, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntAttemptCount) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.setAttemptCount(3);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount, &result));
+  EXPECT_EQ(3u, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntUnsupported) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolMtls) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, peerCertificatePresented()).WillByDefault(testing::Return(true));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  bool result = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionMtls, &result));
+  EXPECT_TRUE(result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolMtlsNoSsl) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  bool result = true;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionMtls, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolUnsupported) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  bool result = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestPath, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolHealthCheck) {
+  ON_CALL(stream_info_, healthCheck()).WillByDefault(testing::Return(true));
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  bool result = false;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_TRUE(result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolHealthCheckFalse) {
+  ON_CALL(stream_info_, healthCheck()).WillByDefault(testing::Return(false));
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  bool result = true;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
+  EXPECT_FALSE(result);
+}
+
+// =============================================================================
+// Generic Attribute Accessor Coverage Tests
+// =============================================================================
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringResponseCodeDetailsNotSet) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  // response_code_details_ defaults to std::nullopt.
+  stream_info_.response_code_details_ = std::nullopt;
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseCodeDetails, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostName) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  virtual_host->name_ = "my_vhost";
+  stream_info_.virtual_host_ = virtual_host;
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualHostName, &result));
+  EXPECT_EQ("my_vhost", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostNameEmpty) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  virtual_host->name_.clear();
+  stream_info_.virtual_host_ = virtual_host;
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualHostName, &result));
+  EXPECT_EQ(0, result.length);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringVirtualHostNameNotSet) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.virtual_host_.reset();
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_XdsVirtualHostName, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionTerminationDetails) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  std::optional<std::string> details = "connection_timeout";
+  ON_CALL(stream_info_, connectionTerminationDetails()).WillByDefault(testing::ReturnRef(details));
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails, &result));
+  EXPECT_EQ("connection_timeout", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionTransportFailureReason) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  ON_CALL(stream_info_, downstreamTransportFailureReason())
+      .WillByDefault(testing::Return("TLS alert"));
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason, &result));
+  EXPECT_EQ("TLS alert", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringDestinationAddress) {
+  auto local_addr = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.0.0.1", 8080)};
+  stream_info_.downstream_connection_info_provider_->setLocalAddress(local_addr);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_DestinationAddress, &result));
+  EXPECT_EQ("127.0.0.1:8080", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeMissingConnectionValues) {
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+  stream_info_.downstream_connection_info_provider_->setLocalAddress(nullptr);
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  uint64_t int_result = 0;
+
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourceAddress,
+                        envoy_dynamic_module_type_attribute_id_DestinationAddress}) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(env_ptr, id,
+                                                                                  &string_result));
+  }
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourcePort,
+                        envoy_dynamic_module_type_attribute_id_DestinationPort,
+                        envoy_dynamic_module_type_attribute_id_ConnectionId}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_access_logger_get_attribute_int(env_ptr, id, &int_result));
+  }
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeNonIpConnectionValues) {
+  auto pipe_or_error = Network::Address::PipeInstance::create("dynamic-module-attribute-test");
+  ASSERT_TRUE(pipe_or_error.ok());
+  Network::Address::InstanceConstSharedPtr pipe_address(std::move(pipe_or_error).value());
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(pipe_address);
+  stream_info_.downstream_connection_info_provider_->setLocalAddress(pipe_address);
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  uint64_t int_result = 0;
+
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourceAddress,
+                        envoy_dynamic_module_type_attribute_id_DestinationAddress}) {
+    EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(env_ptr, id,
+                                                                                 &string_result));
+    EXPECT_EQ("dynamic-module-attribute-test",
+              absl::string_view(string_result.ptr, string_result.length));
+  }
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_SourcePort,
+                        envoy_dynamic_module_type_attribute_id_DestinationPort}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_access_logger_get_attribute_int(env_ptr, id, &int_result));
+  }
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamAddress) {
+  auto remote_addr = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("192.168.1.1", 80)};
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  ON_CALL(*upstream_host, address()).WillByDefault(testing::Return(remote_addr));
+  stream_info_.upstream_info_->setUpstreamHost(upstream_host);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamAddress, &result));
+  EXPECT_EQ("192.168.1.1:80", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamAddressMissing) {
+  stream_info_.upstream_info_->setUpstreamHost(Upstream::HostDescriptionConstSharedPtr{});
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamAddress, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamLocalAddress) {
+  auto local_addr = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("192.168.1.2", 20000)};
+  stream_info_.upstream_info_->setUpstreamLocalAddress(local_addr);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamLocalAddress, &result));
+  EXPECT_EQ("192.168.1.2:20000", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamLocalAddressMissing) {
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  upstream_info->upstream_local_address_ = Network::Address::InstanceConstSharedPtr{};
+  ON_CALL(*upstream_info, upstreamLocalAddress())
+      .WillByDefault(testing::ReturnRef(upstream_info->upstream_local_address_));
+  stream_info_.setUpstreamInfo(upstream_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamLocalAddress, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionSubjectLocalCert) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, subjectLocalCertificate())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("CN=local")));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate, &result));
+  EXPECT_EQ("CN=local", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionSha256PeerCertDigest) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, sha256PeerCertificateDigest())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("sha256digest")));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest,
+      &result));
+  EXPECT_EQ("sha256digest", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionDnsSanLocalCert) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> sans = {"local.example.com"};
+  ON_CALL(*ssl_info, dnsSansLocalCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(sans)));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate, &result));
+  EXPECT_EQ("local.example.com", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionDnsSanLocalCertEmpty) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> empty;
+  ON_CALL(*ssl_info, dnsSansLocalCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(empty)));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionDnsSanPeerCert) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> sans = {"peer.example.com"};
+  ON_CALL(*ssl_info, dnsSansPeerCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(sans)));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate, &result));
+  EXPECT_EQ("peer.example.com", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionDnsSanPeerCertEmpty) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> empty;
+  ON_CALL(*ssl_info, dnsSansPeerCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(empty)));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionUriSanLocalCert) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> sans = {"spiffe://cluster.local/ns/default/sa/local"};
+  ON_CALL(*ssl_info, uriSanLocalCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(sans)));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate, &result));
+  EXPECT_EQ("spiffe://cluster.local/ns/default/sa/local",
+            absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionUriSanLocalCertEmpty) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> empty;
+  ON_CALL(*ssl_info, uriSanLocalCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(empty)));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionUriSanPeerCert) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> sans = {"spiffe://cluster.local/ns/default/sa/peer"};
+  ON_CALL(*ssl_info, uriSanPeerCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(sans)));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate, &result));
+  EXPECT_EQ("spiffe://cluster.local/ns/default/sa/peer",
+            absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringConnectionUriSanPeerCertEmpty) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> empty;
+  ON_CALL(*ssl_info, uriSanPeerCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(empty)));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamTlsVersion) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, tlsVersion()).WillByDefault(testing::ReturnRefOfCopy(std::string("TLSv1.2")));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamTlsVersion, &result));
+  EXPECT_EQ("TLSv1.2", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamSubjectPeerCert) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, subjectPeerCertificate())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("CN=upstream_peer")));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamSubjectPeerCertificate, &result));
+  EXPECT_EQ("CN=upstream_peer", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamSubjectLocalCert) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, subjectLocalCertificate())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("CN=upstream_local")));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamSubjectLocalCertificate, &result));
+  EXPECT_EQ("CN=upstream_local", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamSha256PeerCertDigest) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  ON_CALL(*ssl_info, sha256PeerCertificateDigest())
+      .WillByDefault(testing::ReturnRefOfCopy(std::string("upstream_sha256")));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest,
+      &result));
+  EXPECT_EQ("upstream_sha256", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamDnsSanLocalCert) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> sans = {"upstream-local.example.com"};
+  ON_CALL(*ssl_info, dnsSansLocalCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(sans)));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamDnsSanLocalCertificate, &result));
+  EXPECT_EQ("upstream-local.example.com", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamDnsSanLocalCertEmpty) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> empty;
+  ON_CALL(*ssl_info, dnsSansLocalCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(empty)));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamDnsSanLocalCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamDnsSanPeerCert) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> sans = {"upstream-peer.example.com"};
+  ON_CALL(*ssl_info, dnsSansPeerCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(sans)));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamDnsSanPeerCertificate, &result));
+  EXPECT_EQ("upstream-peer.example.com", absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamDnsSanPeerCertEmpty) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> empty;
+  ON_CALL(*ssl_info, dnsSansPeerCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(empty)));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamDnsSanPeerCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamUriSanLocalCert) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> sans = {"spiffe://cluster.local/ns/envoy/sa/upstream-local"};
+  ON_CALL(*ssl_info, uriSanLocalCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(sans)));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamUriSanLocalCertificate, &result));
+  EXPECT_EQ("spiffe://cluster.local/ns/envoy/sa/upstream-local",
+            absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamUriSanLocalCertEmpty) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> empty;
+  ON_CALL(*ssl_info, uriSanLocalCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(empty)));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamUriSanLocalCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamUriSanPeerCert) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> sans = {"spiffe://cluster.local/ns/envoy/sa/upstream-peer"};
+  ON_CALL(*ssl_info, uriSanPeerCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(sans)));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamUriSanPeerCertificate, &result));
+  EXPECT_EQ("spiffe://cluster.local/ns/envoy/sa/upstream-peer",
+            absl::string_view(result.ptr, result.length));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamUriSanPeerCertEmpty) {
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> empty;
+  ON_CALL(*ssl_info, uriSanPeerCertificate())
+      .WillByDefault(testing::Return(absl::Span<const std::string>(empty)));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamUriSanPeerCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringUpstreamSslMissing) {
+  // Upstream info exists but no SSL connection — all upstream TLS attributes should fail.
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamTlsVersion, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamSubjectPeerCertificate, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamSubjectLocalCertificate, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest,
+      &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeStringDownstreamSslMissing) {
+  // No SSL connection set — all downstream TLS attributes should fail.
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest,
+      &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate, &result));
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeUpstreamRequestedServerName) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &string_result));
+
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::string sni;
+  ON_CALL(*ssl_info, sni()).WillByDefault(testing::ReturnRef(sni));
+  stream_info_.upstream_info_->setUpstreamSslConnection(ssl_info);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &string_result));
+
+  sni = "upstream.example.com";
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &string_result));
+  EXPECT_EQ("upstream.example.com", absl::string_view(string_result.ptr, string_result.length));
+  bool bool_result = false;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &bool_result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeUpstreamRequestedServerNameWithoutUpstreamInfo) {
+  stream_info_.upstream_info_.reset();
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  envoy_dynamic_module_type_envoy_buffer string_result{};
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_string(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName, &string_result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntDestinationPort) {
+  auto local_addr = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("127.0.0.1", 8443)};
+  stream_info_.downstream_connection_info_provider_->setLocalAddress(local_addr);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_DestinationPort, &result));
+  EXPECT_EQ(8443u, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntUpstreamPort) {
+  auto remote_addr = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance("192.168.1.1", 80)};
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  ON_CALL(*upstream_host, address()).WillByDefault(testing::Return(remote_addr));
+  stream_info_.upstream_info_->setUpstreamHost(upstream_host);
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamPort, &result));
+  EXPECT_EQ(80u, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntUpstreamPortMissing) {
+  stream_info_.upstream_info_->setUpstreamHost(Upstream::HostDescriptionConstSharedPtr{});
+
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_UpstreamPort, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntResponseCodeNotSet) {
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  stream_info_.response_code_ = std::nullopt;
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseCode, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntRequestSizes) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_received_ = 17;
+  Http::TestRequestHeaderMapImpl request_headers{{"content-length", "0"}, {"x-test", "value"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer", "value"}};
+  Formatter::Context log_context(&request_headers, nullptr, nullptr);
+  log_context.setRequestTrailers(request_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 1;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(17, result);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestTotalSize, &result));
+  EXPECT_EQ(17 + request_headers.byteSize() + request_trailers.byteSize(), result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntSizeFallbacks) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_received_ = 23;
+  stream_info_.bytes_sent_ = 29;
+  Http::TestRequestHeaderMapImpl request_headers{{"x-test", "value"}};
+  Formatter::Context log_context(&request_headers, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(23, result);
+
+  Formatter::Context no_headers(nullptr, nullptr, nullptr);
+  env_ptr = createThreadLocalLogger(no_headers, stream_info_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(23, result);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestTotalSize, &result));
+  EXPECT_EQ(23, result);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseTotalSize, &result));
+  EXPECT_EQ(29, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntRequestSizeIgnoresInvalidContentLength) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_received_ = 23;
+  Http::TestRequestHeaderMapImpl request_headers{{"content-length", "invalid"}};
+  Formatter::Context log_context(&request_headers, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_RequestSize, &result));
+  EXPECT_EQ(23, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntResponseTotalSize) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  stream_info_.bytes_sent_ = 29;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"x-test", "value"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"x-trailer", "value"}};
+  Formatter::Context log_context(nullptr, &response_headers, &response_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseTotalSize, &result));
+  EXPECT_EQ(29 + response_headers.byteSize() + response_trailers.byteSize(), result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntGrpcStatusPrecedence) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  Http::TestResponseHeaderMapImpl response_headers{{"grpc-status", "3"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"grpc-status", "7"}};
+  Formatter::Context log_context(nullptr, &response_headers, &response_trailers);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+  EXPECT_EQ(7, result);
+
+  Formatter::Context headers_only(nullptr, &response_headers, nullptr);
+  env_ptr = createThreadLocalLogger(headers_only, stream_info_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+  EXPECT_EQ(3, result);
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeIntGrpcStatusFallbacks) {
+  stream_info_.protocol_ = Http::Protocol::Http11;
+  Formatter::Context log_context(nullptr, nullptr, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+  EXPECT_EQ(2, result);
+
+  stream_info_.response_code_ = std::nullopt;
+  EXPECT_FALSE(envoy_dynamic_module_callback_access_logger_get_attribute_int(
+      env_ptr, envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus, &result));
+}
+
+TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeHttpIntsWithoutProtocol) {
+  stream_info_.protocol_ = std::nullopt;
+  Http::TestRequestHeaderMapImpl request_headers{{"content-length", "17"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  Formatter::Context log_context(&request_headers, &response_headers, nullptr);
+  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
+
+  uint64_t result = 0;
+  for (const auto id : {envoy_dynamic_module_type_attribute_id_RequestSize,
+                        envoy_dynamic_module_type_attribute_id_RequestTotalSize,
+                        envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus,
+                        envoy_dynamic_module_type_attribute_id_ResponseTotalSize}) {
+    EXPECT_FALSE(
+        envoy_dynamic_module_callback_access_logger_get_attribute_int(env_ptr, id, &result));
+  }
 }
 
 } // namespace

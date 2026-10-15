@@ -124,7 +124,7 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
 
         auto size = verification_result.ByteSizeLong();
         auto result = alloc_result(size);
-        verification_result.SerializeToArray(result, static_cast<int>(size));
+        std::ignore = verification_result.SerializeToArray(result, static_cast<int>(size));
         return WasmResult::Ok;
       }
       return WasmResult::BadArgument;
@@ -161,7 +161,7 @@ RegisterForeignFunction registerSignForeignFunction(
 
         auto size = signing_result.ByteSizeLong();
         auto result = alloc_result(size);
-        signing_result.SerializeToArray(result, static_cast<int>(size));
+        std::ignore = signing_result.SerializeToArray(result, static_cast<int>(size));
         return WasmResult::Ok;
       }
       return WasmResult::BadArgument;
@@ -210,11 +210,7 @@ RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
        const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
       if (args.ParseFromString(arguments)) {
-        auto context = static_cast<Context*>(
-            Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions")
-                ? proxy_wasm::contextOrEffectiveContext()
-                : proxy_wasm::current_context_);
+        auto context = static_cast<Context*>(proxy_wasm::contextOrEffectiveContext());
         return context->setEnvoyFilterState(args.path(), args.value(),
                                             toFilterStateLifeSpan(args.span()));
       }
@@ -224,11 +220,7 @@ RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
 RegisterForeignFunction registerClearRouteCacheForeignFunction(
     "clear_route_cache",
     [](WasmBase&, std::string_view, const std::function<void*(size_t size)>&) -> WasmResult {
-      auto context = static_cast<Context*>(
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.wasm_use_effective_ctx_for_foreign_functions")
-              ? proxy_wasm::contextOrEffectiveContext()
-              : proxy_wasm::current_context_);
+      auto context = static_cast<Context*>(proxy_wasm::contextOrEffectiveContext());
       context->clearRouteCache();
       return WasmResult::Ok;
     });
@@ -262,7 +254,7 @@ protected:
     const Filters::Common::Expr::Builder* builder() const { return builder_.get(); }
 
   private:
-    const Filters::Common::Expr::BuilderConstPtr builder_{};
+    const Filters::Common::Expr::BuilderConstPtr builder_;
     uint32_t next_expr_token_ = 0;
     absl::flat_hash_map<uint32_t, ExpressionData> expr_;
   };

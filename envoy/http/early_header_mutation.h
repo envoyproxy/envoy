@@ -24,7 +24,7 @@ public:
    *
    * @param headers request headers to be mutated.
    * @param stream_info stream info.
-   * @return true if the mutation is could be continued for the flollowing extensions.
+   * @return true if the mutation is could be continued for the following extensions.
    * Make no sense if there is no following extensions.
    */
   virtual bool mutate(RequestHeaderMap& headers,

@@ -1,6 +1,8 @@
 #include <string>
+#include <vector>
 
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/tag.h"
 
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/null_counter.h"
@@ -36,7 +38,7 @@ protected:
             {{pool_.add("tag1"), pool_.add("value1")}, {pool_.add("tag2"), pool_.add("value2")}}) {
     switch (GetParam()) {
     case StoreType::ThreadLocal:
-      alloc_ = std::make_unique<AllocatorImpl>(*symbol_table_),
+      alloc_ = std::make_unique<Allocator>(*symbol_table_),
       store_ = std::make_unique<ThreadLocalStoreImpl>(*alloc_);
       break;
     case StoreType::Isolated:
@@ -159,7 +161,7 @@ protected:
 
   SymbolTablePtr symbol_table_;
   StatNamePool pool_;
-  std::unique_ptr<AllocatorImpl> alloc_;
+  std::unique_ptr<Allocator> alloc_;
   std::unique_ptr<Store> store_;
   ScopeSharedPtr scope_;
   absl::flat_hash_set<std::string> results_;
@@ -186,6 +188,33 @@ TEST_P(StatsUtilityTest, Counters) {
   Counter& ctags =
       Utility::counterFromElements(*scope, {DynamicName("x"), token, DynamicName("y")}, tags_);
   EXPECT_EQ("scope.x.token.y.tag1.value1.tag2.value2", ctags.name());
+}
+
+// Exercises TaggedStatName directly: it pre-encodes the base name, tagged name, and tags
+// into its own pool, copying the string_view inputs so callers need not keep them alive.
+TEST_P(StatsUtilityTest, TaggedStatNameAccessors) {
+  const std::vector<TagStringView> tag_views{{"tagA", "valA"}, {"tagB", "valB"}};
+  TaggedStatName tagged(*symbol_table_, "base.name", tag_views, "base.valA.name");
+  EXPECT_EQ("base.name", symbol_table_->toString(tagged.baseName()));
+  EXPECT_EQ("base.valA.name", symbol_table_->toString(tagged.name()));
+  const StatNameTagSpan name_tags = tagged.tags();
+  ASSERT_EQ(2, name_tags.size());
+  EXPECT_EQ("tagA", symbol_table_->toString(name_tags[0].first));
+  EXPECT_EQ("valA", symbol_table_->toString(name_tags[0].second));
+  EXPECT_EQ("tagB", symbol_table_->toString(name_tags[1].first));
+  EXPECT_EQ("valB", symbol_table_->toString(name_tags[1].second));
+
+  // Empty tags: base and tagged forms coincide and there are no tags.
+  TaggedStatName empty(*symbol_table_, "base", {}, "base");
+  EXPECT_EQ("base", symbol_table_->toString(empty.baseName()));
+  EXPECT_EQ("base", symbol_table_->toString(empty.name()));
+  EXPECT_TRUE(empty.tags().empty());
+
+  // Empty tags with an empty tagged name: the name falls back to the base name.
+  TaggedStatName fallback(*symbol_table_, "base", {}, "");
+  EXPECT_EQ("base", symbol_table_->toString(fallback.baseName()));
+  EXPECT_EQ("base", symbol_table_->toString(fallback.name()));
+  EXPECT_TRUE(fallback.tags().empty());
 }
 
 TEST_P(StatsUtilityTest, Gauges) {
@@ -280,6 +309,137 @@ TEST_P(StatsUtilityTest, SanitizeStatsName) {
   EXPECT_EQ("a._", Utility::sanitizeStatsName(absl::string_view("a.\0", 3)));
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a://b"));
   EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
+}
+
+#define LITE_SCOPE_HELPER_TEST_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT)                      \
+  COUNTER(requests)                                                                                \
+  GAUGE(active, Accumulate)                                                                        \
+  HISTOGRAM(latency, Milliseconds)                                                                 \
+  TEXT_READOUT(info)
+
+struct LiteScopeHelperTestStats {
+  LITE_SCOPE_HELPER_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                               GENERATE_HISTOGRAM_STRUCT, GENERATE_TEXT_READOUT_STRUCT)
+};
+
+// A helper without a prefix or tags creates the same stats as the scope itself.
+TEST_P(StatsUtilityTest, LiteScopeHelperNoPrefix) {
+  LiteScopeHelper helper(*scope_);
+  EXPECT_TRUE(helper.basePrefix().empty());
+  EXPECT_TRUE(helper.prefix().empty());
+  EXPECT_TRUE(helper.tags().empty());
+  EXPECT_EQ(scope_.get(), &helper.scope());
+  EXPECT_EQ(&scope_->symbolTable(), &helper.symbolTable());
+  EXPECT_EQ(&scope_->constSymbolTable(), &helper.constSymbolTable());
+
+  Counter& c = helper.counterFromString("requests");
+  EXPECT_EQ("scope.requests", c.name());
+  EXPECT_EQ(&c, &scope_->counterFromString("requests"));
+}
+
+// A helper with a prefix but no tags: the flat prefix is ignored, and the stats are the ones the
+// scope creates for the joined name.
+TEST_P(StatsUtilityTest, LiteScopeHelperPrefixOnly) {
+  LiteScopeHelper helper(*scope_, "prefix.", {}, "ignored");
+  EXPECT_EQ("prefix", symbol_table_->toString(helper.basePrefix()));
+  EXPECT_EQ("prefix", symbol_table_->toString(helper.prefix()));
+  EXPECT_TRUE(helper.tags().empty());
+
+  Counter& c = helper.counterFromString("requests");
+  EXPECT_EQ("scope.prefix.requests", c.name());
+  EXPECT_EQ(&c, &scope_->counterFromString("prefix.requests"));
+
+  Gauge& g = helper.gaugeFromString("active", Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("scope.prefix.active", g.name());
+  EXPECT_EQ(&g, &scope_->gaugeFromString("prefix.active", Gauge::ImportMode::Accumulate));
+
+  Histogram& h = helper.histogramFromString("latency", Histogram::Unit::Milliseconds);
+  EXPECT_EQ("scope.prefix.latency", h.name());
+  EXPECT_EQ(&h, &scope_->histogramFromString("prefix.latency", Histogram::Unit::Milliseconds));
+
+  TextReadout& t = helper.textReadoutFromString("info");
+  EXPECT_EQ("scope.prefix.info", t.name());
+  EXPECT_EQ(&t, &scope_->textReadoutFromString("prefix.info"));
+}
+
+// A helper with string tags can be used with the POOL_* macros in place of a scope. The stats are
+// created in the scope, with the tag value at its position in the flat name.
+TEST_P(StatsUtilityTest, LiteScopeHelperWithMacros) {
+  LiteScopeHelper helper(*scope_, "prefix", {{"tag", "value"}}, "prefix.value");
+  EXPECT_EQ("prefix", symbol_table_->toString(helper.basePrefix()));
+  EXPECT_EQ("prefix.value", symbol_table_->toString(helper.prefix()));
+  ASSERT_EQ(1, helper.tags().size());
+  EXPECT_EQ("tag", symbol_table_->toString(helper.tags()[0].first));
+  EXPECT_EQ("value", symbol_table_->toString(helper.tags()[0].second));
+
+  LiteScopeHelperTestStats stats{LITE_SCOPE_HELPER_TEST_STATS(
+      POOL_COUNTER(helper), POOL_GAUGE(helper), POOL_HISTOGRAM(helper), POOL_TEXT_READOUT(helper))};
+  EXPECT_EQ("scope.prefix.value.requests", stats.requests_.name());
+  EXPECT_EQ("scope.prefix.value.active", stats.active_.name());
+  EXPECT_EQ(Gauge::ImportMode::Accumulate, stats.active_.importMode());
+  EXPECT_EQ("scope.prefix.value.latency", stats.latency_.name());
+  EXPECT_EQ(Histogram::Unit::Milliseconds, stats.latency_.unit());
+  EXPECT_EQ("scope.prefix.value.info", stats.info_.name());
+
+  // The helper owns nothing: the stats are found in the scope.
+  bool found = false;
+  scope_->iterate(IterateFn<Counter>([&](const RefcountPtr<Counter>& counter) {
+    found = found || counter.get() == &stats.requests_;
+    return true;
+  }));
+  EXPECT_TRUE(found);
+
+  // The isolated store always honors explicit tags.
+  if (GetParam() == StoreType::Isolated) {
+    EXPECT_EQ("scope.prefix.requests", stats.requests_.tagExtractedName());
+    EXPECT_THAT(stats.requests_.tags(), testing::ElementsAre(Tag{"tag", "value"}));
+  }
+
+  // The macros with an additional string prefix work too.
+  LiteScopeHelperTestStats prefixed_stats{LITE_SCOPE_HELPER_TEST_STATS(
+      POOL_COUNTER_PREFIX(helper, "extra."), POOL_GAUGE_PREFIX(helper, "extra."),
+      POOL_HISTOGRAM_PREFIX(helper, "extra."), POOL_TEXT_READOUT_PREFIX(helper, "extra."))};
+  EXPECT_EQ("scope.prefix.value.extra.requests", prefixed_stats.requests_.name());
+}
+
+// A helper created from pre-encoded StatNames and used with StatName leaves.
+TEST_P(StatsUtilityTest, LiteScopeHelperWithStatNames) {
+  LiteScopeHelper helper(*scope_, pool_.add("prefix"), tags_, pool_.add("prefix.value1.value2"));
+
+  Counter& c = helper.counterFromStatName(pool_.add("requests"));
+  EXPECT_EQ("scope.prefix.value1.value2.requests", c.name());
+  EXPECT_EQ(&c, &helper.counterFromString("requests"));
+
+  Gauge& g = helper.gaugeFromStatName(pool_.add("active"), Gauge::ImportMode::NeverImport);
+  EXPECT_EQ("scope.prefix.value1.value2.active", g.name());
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, g.importMode());
+
+  Histogram& h = helper.histogramFromStatName(pool_.add("latency"), Histogram::Unit::Bytes);
+  EXPECT_EQ("scope.prefix.value1.value2.latency", h.name());
+  EXPECT_EQ(Histogram::Unit::Bytes, h.unit());
+
+  TextReadout& t = helper.textReadoutFromStatName(pool_.add("info"));
+  EXPECT_EQ("scope.prefix.value1.value2.info", t.name());
+
+  if (GetParam() == StoreType::Isolated) {
+    EXPECT_EQ("scope.prefix.requests", c.tagExtractedName());
+    EXPECT_THAT(c.tags(), testing::ElementsAre(Tag{"tag1", "value1"}, Tag{"tag2", "value2"}));
+  }
+}
+
+// A helper created from a pre-encoded StatName prefix without tags: the flat prefix argument is
+// ignored and the base prefix drives both forms. The names are referenced rather than copied, so
+// the pool owning them (here the fixture's pool_) must outlive the helper.
+TEST_P(StatsUtilityTest, LiteScopeHelperStatNamePrefixOnly) {
+  const StatName base = pool_.add("prefix");
+  LiteScopeHelper helper(*scope_, base, {}, pool_.add("ignored"));
+  EXPECT_EQ(base, helper.basePrefix());
+  EXPECT_EQ(base, helper.prefix());
+  EXPECT_TRUE(helper.tags().empty());
+
+  Counter& c = helper.counterFromStatName(pool_.add("requests"));
+  EXPECT_EQ("scope.prefix.requests", c.name());
+  EXPECT_EQ(&c, &scope_->counterFromString("prefix.requests"));
 }
 
 } // namespace

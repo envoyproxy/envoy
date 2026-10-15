@@ -14,13 +14,13 @@ public:
   ~LegacyHttpParserImpl() override;
 
   // Http1::Parser
-  size_t execute(const char* slice, int len) override;
+  size_t execute(const char* slice, size_t len) override;
   void resume() override;
   CallbackResult pause() override;
   ParserStatus getStatus() const override;
   Http::Code statusCode() const override;
   bool isHttp11() const override;
-  absl::optional<uint64_t> contentLength() const override;
+  std::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;
   absl::string_view methodName() const override;
   absl::string_view errorMessage() const override;

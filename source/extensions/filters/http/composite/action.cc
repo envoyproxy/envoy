@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/composite/action.h"
 
+#include "envoy/server/filter_config.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -56,15 +58,15 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
   if (!composite_action.filter_chain_name().empty()) {
     // Create an action that just stores the name. The actual filter chain lookup
     // will happen at runtime in the Composite filter.
-    ASSERT(context.server_factory_context_ != absl::nullopt);
+    ASSERT(context.server_factory_context_ != std::nullopt);
     Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
     return std::make_shared<ExecuteFilterAction>(
         composite_action.filter_chain_name(),
         composite_action.has_sample_percent()
-            ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+            ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                   composite_action.sample_percent())
-            : absl::nullopt,
+            : std::nullopt,
         runtime);
   }
 
@@ -125,15 +127,15 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createActionCommon(
         fmt::format("Failed to get {} filter factory creation function", stream_str));
   }
   std::string name = composite_action.typed_config().name();
-  ASSERT(context.server_factory_context_ != absl::nullopt);
+  ASSERT(context.server_factory_context_ != std::nullopt);
   Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
   return std::make_shared<ExecuteFilterAction>(
       [cb = std::move(callback)]() mutable -> OptRef<Http::FilterFactoryCb> { return cb; }, name,
       composite_action.has_sample_percent()
-          ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+          ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                 composite_action.sample_percent())
-          : absl::nullopt,
+          : std::nullopt,
       runtime);
 }
 
@@ -151,8 +153,8 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionDown
 
   // First, try to create the filter factory creation function from factory context (if exists).
   if (context.factory_context_.has_value()) {
-    auto callback_or_status = factory.createFilterFactoryFromProto(
-        *message, context.stat_prefix_, context.factory_context_.value());
+    auto callback_or_status = Server::Configuration::createHttpFilterFactory(
+        factory, *message, context.stat_prefix_, context.factory_context_.ref());
     THROW_IF_NOT_OK_REF(callback_or_status.status());
     callback = callback_or_status.value();
   }
@@ -160,8 +162,12 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionDown
   // If above failed, for downstream case, try to create the filter factory creation function
   // from server factory context if exists.
   if (callback == nullptr && context.server_factory_context_.has_value()) {
-    callback = factory.createFilterFactoryFromProtoWithServerContext(
-        *message, context.stat_prefix_, context.server_factory_context_.value());
+    Server::Configuration::ExtraFactoryContext extra_context{validation_visitor,
+                                                             context.stat_prefix_};
+    auto callback_or_status = factory.createHttpFilterFactoryFromProto(
+        *message, context.server_factory_context_.value(), extra_context);
+    THROW_IF_NOT_OK_REF(callback_or_status.status());
+    callback = callback_or_status.value();
   }
 
   return createActionCommon(composite_action, context, callback, true);
@@ -182,8 +188,8 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionUpst
   // First, try to create the filter factory creation function from upstream factory context (if
   // exists).
   if (context.upstream_factory_context_.has_value()) {
-    auto callback_or_status = factory.createFilterFactoryFromProto(
-        *message, context.stat_prefix_, context.upstream_factory_context_.value());
+    auto callback_or_status = Server::Configuration::createHttpFilterFactory(
+        factory, *message, context.stat_prefix_, context.upstream_factory_context_.ref());
     THROW_IF_NOT_OK_REF(callback_or_status.status());
     callback = callback_or_status.value();
   }
@@ -216,16 +222,20 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainActio
 
       // First, try to create from factory context.
       if (context.factory_context_.has_value()) {
-        auto callback_or_status = factory.createFilterFactoryFromProto(
-            *message, context.stat_prefix_, context.factory_context_.value());
+        auto callback_or_status = Server::Configuration::createHttpFilterFactory(
+            factory, *message, context.stat_prefix_, context.factory_context_.ref());
         THROW_IF_NOT_OK_REF(callback_or_status.status());
         callback = callback_or_status.value();
       }
 
       // If above failed, try server factory context.
       if (callback == nullptr && context.server_factory_context_.has_value()) {
-        callback = factory.createFilterFactoryFromProtoWithServerContext(
-            *message, context.stat_prefix_, context.server_factory_context_.value());
+        Server::Configuration::ExtraFactoryContext extra_context{validation_visitor,
+                                                                 context.stat_prefix_};
+        auto callback_or_status = factory.createHttpFilterFactoryFromProto(
+            *message, context.server_factory_context_.value(), extra_context);
+        THROW_IF_NOT_OK_REF(callback_or_status.status());
+        callback = callback_or_status.value();
       }
 
       if (callback == nullptr) {
@@ -240,8 +250,8 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainActio
           filter_config.typed_config(), validation_visitor, factory);
 
       if (context.upstream_factory_context_.has_value()) {
-        auto callback_or_status = factory.createFilterFactoryFromProto(
-            *message, context.stat_prefix_, context.upstream_factory_context_.value());
+        auto callback_or_status = Server::Configuration::createHttpFilterFactory(
+            factory, *message, context.stat_prefix_, context.upstream_factory_context_.ref());
         THROW_IF_NOT_OK_REF(callback_or_status.status());
         callback = callback_or_status.value();
       }
@@ -255,16 +265,16 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createFilterChainActio
     filter_factories.push_back(std::move(callback));
   }
 
-  ASSERT(context.server_factory_context_ != absl::nullopt);
+  ASSERT(context.server_factory_context_ != std::nullopt);
   Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
   // Use "filter_chain" as the action name for filter chains.
   return std::make_shared<ExecuteFilterAction>(
       std::move(filter_factories), "filter_chain",
       composite_action.has_sample_percent()
-          ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+          ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                 composite_action.sample_percent())
-          : absl::nullopt,
+          : std::nullopt,
       runtime);
 }
 

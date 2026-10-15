@@ -70,7 +70,7 @@ public:
 
 class NoOpAction : public Matcher::ActionBase<ProtoTransformStat>, public TransformStatAction {
 public:
-  explicit NoOpAction() {}
+  explicit NoOpAction() = default;
   Result apply(std::string&) const override;
 };
 

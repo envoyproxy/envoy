@@ -12,6 +12,7 @@ namespace Router {
 
 using ::testing::AnyNumber;
 using ::testing::Eq;
+using ::testing::Return;
 using ::testing::ReturnRef;
 
 RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
@@ -52,6 +53,14 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
     return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
   }));
+
+  // Wire up a real RouteStatsContextImpl so that route-level retry stats are populated.
+  route_stat_names_ = std::make_unique<RouteStatNames>(stats_store_.symbolTable());
+  Stats::StatNameManagedStorage vhost_stat_name("fake_vhost", stats_store_.symbolTable());
+  route_stats_context_impl_ = std::make_unique<RouteStatsContextImpl>(
+      *stats_store_.rootScope(), *route_stat_names_, vhost_stat_name.statName(), "fake_route");
+  ON_CALL(callbacks_.route_->route_entry_, routeStatsContext())
+      .WillByDefault(Return(RouteStatsContextOptRef(*route_stats_context_impl_)));
 }
 
 void RouterTestBase::expectResponseTimerCreate() {
@@ -92,7 +101,7 @@ AssertionResult RouterTestBase::verifyHostUpstreamStats(uint64_t success, uint64
 }
 
 void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
-                                                      absl::optional<int> preset_count,
+                                                      std::optional<int> preset_count,
                                                       int expected_count) {
   setIncludeAttemptCountInRequest(set_include_attempt_count_in_request);
 
@@ -121,7 +130,7 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
 }
 
 void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_count_in_response,
-                                                       absl::optional<int> preset_count,
+                                                       std::optional<int> preset_count,
                                                        int expected_count) {
   setIncludeAttemptCountInResponse(set_include_attempt_count_in_response);
 
@@ -141,7 +150,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   }
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
@@ -182,7 +191,7 @@ void RouterTestBase::setNumPreviousRedirect(uint32_t num_previous_redirects) {
   callbacks_.streamInfo().filterState()->setData(
       "num_internal_redirects",
       std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
+      StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void RouterTestBase::setIncludeAttemptCountInRequest(bool include) {
@@ -272,7 +281,7 @@ void RouterTestBase::executeMetadataTest(
         validator) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([this, validator](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                                         absl::optional<Http::Protocol>,
+                                         std::optional<Http::Protocol>,
                                          Upstream::LoadBalancerContext* context) {
         auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
         validator(match);

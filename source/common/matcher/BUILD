@@ -86,3 +86,25 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "address_matcher_lib",
+    srcs = ["address_matcher.cc"],
+    hdrs = ["address_matcher.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//source/common/network:cidr_range_lib",
+        "@abseil-cpp//absl/status:statusor",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "regex_replace_lib",
+    srcs = ["regex_replace.cc"],
+    hdrs = ["regex_replace.h"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)

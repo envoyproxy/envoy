@@ -76,14 +76,19 @@ class FilterConfig : public Router::RouteSpecificFilterConfig,
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
-               const bool per_route = false);
+               absl::Status& creation_status, const bool per_route = false);
   ~FilterConfig() override {
-    // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
-    // timer is created and running.
-    auto shared_ptr_wrapper =
-        std::make_shared<std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>>(
-            std::move(rate_limiter_));
-    dispatcher_.post([shared_ptr_wrapper]() { shared_ptr_wrapper->reset(); });
+    // Ensure that the rate limiter and the share provider manager are destroyed on the main
+    // thread. The rate limiter owns a fill timer created on that thread. The share provider
+    // manager is an unpinned singleton, so the singleton manager only holds a weak reference to it
+    // and this configuration may own the last strong one; it in turn owns a cluster membership
+    // callback handle that must be de-registered on the main thread. A route level configuration
+    // can be released on a worker thread when an RDS update replaces the route configuration.
+    dispatcher_.post([rate_limiter = std::move(rate_limiter_),
+                      share_provider_manager = std::move(share_provider_manager_)]() mutable {
+      rate_limiter.reset();
+      share_provider_manager.reset();
+    });
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -108,11 +113,12 @@ public:
   }
   bool rateLimitPerConnection() const { return rate_limit_per_connection_; }
   bool enableXRateLimitHeaders() const { return enable_x_rate_limit_headers_; }
+  bool enableRetryAfterHeader() const { return enable_retry_after_header_; }
   envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
   bool consumeDefaultTokenBucket() const { return always_consume_default_token_bucket_; }
-  const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
+  const std::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
 
@@ -125,7 +131,10 @@ public:
                            const StreamInfo::StreamInfo& info,
                            Filters::Common::RateLimit::RateLimitDescriptors& descriptors) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors);
+    // Local rate limiting runs on the decode path only; no response headers are available to the
+    // formatter (and %RESP()% in hits_addend.format resolves empty, as before).
+    rate_limit_config_->populateDescriptors(headers, /*response_headers=*/nullptr, info,
+                                            local_info_.clusterName(), descriptors);
   }
 
 private:
@@ -157,15 +166,16 @@ private:
   std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::Loader& runtime_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   Router::HeaderParserPtr response_headers_parser_;
   Router::HeaderParserPtr request_headers_parser_;
   const uint64_t stage_;
   const bool has_descriptors_;
   const bool enable_x_rate_limit_headers_;
+  const bool enable_retry_after_header_ = false;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
-  const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
+  const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
 };
 
@@ -195,7 +205,7 @@ private:
   void populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                            std::vector<RateLimit::Descriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
-  VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
+  VhRateLimitOptions getVirtualHostRateLimitOption(OptRef<const Router::Route> route);
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   Filters::Common::LocalRateLimit::LocalRateLimiter::Result
   requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);

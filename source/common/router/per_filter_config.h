@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/optref.h"
+#include "envoy/init/manager.h"
 #include "envoy/server/factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -12,7 +14,7 @@ public:
   static absl::StatusOr<std::unique_ptr<PerFilterConfigs>>
   create(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,
          Server::Configuration::ServerFactoryContext& factory_context,
-         ProtobufMessage::ValidationVisitor& validator);
+         ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager);
 
   struct FilterConfig {
     RouteSpecificFilterConfigConstSharedPtr config_;
@@ -24,20 +26,20 @@ public:
   /**
    * @return true if the filter is explicitly disabled for this route or virtual host, false
    * if the filter is explicitly enabled. If the filter is not explicitly enabled or disabled,
-   * returns absl::nullopt.
+   * returns std::nullopt.
    */
-  absl::optional<bool> disabled(absl::string_view name) const;
+  std::optional<bool> disabled(absl::string_view name) const;
 
 private:
   PerFilterConfigs(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,
                    Server::Configuration::ServerFactoryContext& factory_context,
-                   ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
+                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
+                   absl::Status& creation_status);
 
-  absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr>
-  createRouteSpecificFilterConfig(const std::string& name, const Protobuf::Any& typed_config,
-                                  bool is_optional,
-                                  Server::Configuration::ServerFactoryContext& factory_context,
-                                  ProtobufMessage::ValidationVisitor& validator);
+  absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr> createRouteSpecificFilterConfig(
+      const std::string& name, const Protobuf::Any& typed_config, bool is_optional,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager);
   absl::flat_hash_map<std::string, FilterConfig> configs_;
 };
 

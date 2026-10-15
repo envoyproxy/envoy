@@ -74,7 +74,7 @@ void RpcInvocationImpl::assignAttachmentIfNeed() const {
   }
 }
 
-const absl::optional<std::string>& RpcInvocationImpl::serviceGroup() const {
+const std::optional<std::string>& RpcInvocationImpl::serviceGroup() const {
   assignAttachmentIfNeed();
   return group_;
 }

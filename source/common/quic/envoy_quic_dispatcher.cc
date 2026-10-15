@@ -15,6 +15,7 @@
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
 #include "quiche/quic/core/quic_dispatcher.h"
@@ -119,7 +120,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     // filter chain. Thus early fail the connection.
     if (connection_socket->ioHandle().isOpen()) {
       for (auto address_family : {quiche::IpAddressFamily::IP_V4, quiche::IpAddressFamily::IP_V6}) {
-        absl::optional<quic::QuicSocketAddress> address =
+        std::optional<quic::QuicSocketAddress> address =
             quic_config.GetPreferredAddressToSend(address_family);
         if (address.has_value() && address->IsInitialized() &&
             !listener_filter_manager->shouldAdvertiseServerPreferredAddress(address.value())) {
@@ -157,6 +158,11 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic_session->close(Network::ConnectionCloseType::FlushWrite, "no filter chain found");
   }
   quic_session->Initialize();
+  if (filter_chain != nullptr && drain_event_.has_value()) {
+    // The listener began draining before this session was created. Notify it now that its network
+    // filter chain.
+    quic_session->onDrain(*drain_event_);
+  }
   connection_handler_.incNumConnections();
   listener_stats_.downstream_cx_active_.inc();
   listener_stats_.downstream_cx_total_.inc();
@@ -177,6 +183,20 @@ bool EnvoyQuicDispatcher::processPacket(const quic::QuicSocketAddress& self_addr
 bool EnvoyQuicDispatcher::OnFailedToDispatchPacket(
     const quic::ReceivedPacketInfo& received_packet_info) {
   if (!accept_new_connections()) {
+    // While not accepting (a hot restart parent draining), packets for unknown connections are
+    // handed to the caller for forwarding to the child. A connection this dispatcher closed
+    // recently is not unknown though: it is in the time-wait list, which quiche consults right
+    // after this hook, re-sending the stored CONNECTION_CLOSE (or, for a connection the peer
+    // itself closed, a stateless reset). Forwarding such a packet instead would make the child,
+    // which never knew the connection, answer with a stateless reset to a peer that only missed
+    // our close. Leave those to the time-wait list.
+    // Only reached while draining, so the runtime lookup is off the steady-state path.
+    if (time_wait_list_manager()->IsConnectionIdInTimeWait(
+            received_packet_info.destination_connection_id) &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_hot_restart_time_wait_before_forward")) {
+      return false;
+    }
     current_packet_dispatch_success_ = false;
     return true;
   }
@@ -197,13 +217,66 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
       // from the map as well.
       connection.close(Network::ConnectionCloseType::NoFlush);
     }
-    ASSERT(connections_by_filter_chain_.find(filter_chain) == connections_by_filter_chain_.end());
+    ASSERT(!connections_by_filter_chain_.contains(filter_chain));
     if (num_connections > 0) {
       // Explicitly destroy closed sessions in the current call stack. Because upon
       // returning the filter chain configs will be destroyed, and no longer safe to be accessed.
       // If any filters access those configs during destruction, it'll be use-after-free
       DeleteSessions();
     }
+  }
+}
+
+void EnvoyQuicDispatcher::drainSessionsOfFilterChain(const Network::FilterChain* filter_chain,
+                                                     Network::ConnectionDrainEvent drain_event) {
+  auto iter = connections_by_filter_chain_.find(filter_chain);
+  if (iter == connections_by_filter_chain_.end()) {
+    return;
+  }
+  // Snapshot the sessions before notifying any of them. A drain callback may synchronously close a
+  // session, which removes it from this list, and the last such removal erases the whole map entry
+  // (see EnvoyQuicServerSession::OnConnectionClosed()), destroying the list this would otherwise be
+  // iterating. A closed session is not destroyed until quic::QuicDispatcher deletes it on a later
+  // event loop iteration, so the snapshot stays valid; skip any session a previous callback closed.
+  const std::vector<std::reference_wrapper<Network::Connection>> sessions(iter->second.begin(),
+                                                                          iter->second.end());
+  for (Network::Connection& session : sessions) {
+    if (session.state() != Network::Connection::State::Open) {
+      continue;
+    }
+    session.onDrain(drain_event);
+  }
+}
+
+void EnvoyQuicDispatcher::drainConnectionsWithFilterChains(
+    const std::list<const Network::FilterChain*>& filter_chains,
+    Network::ConnectionDrainEvent drain_event) {
+  for (const Network::FilterChain* filter_chain : filter_chains) {
+    drainSessionsOfFilterChain(filter_chain, drain_event);
+  }
+}
+
+void EnvoyQuicDispatcher::drainAllConnections(Network::ConnectionDrainEvent drain_event) {
+  // Remember the drain so sessions created after this point are also notified (see
+  // CreateQuicSession). As on the TCP path (OwnedActiveStreamListenerBase::onListenerDrainStart),
+  // the first event wins: a listener can be notified more than once (a server drain escalating
+  // from InboundOnly to All), and a later notification neither pushes the drain back nor
+  // re-notifies sessions, all of which have already been notified of the first event.
+  if (drain_event_.has_value()) {
+    return;
+  }
+  drain_event_ = drain_event;
+  // Snapshot the keys before notifying: a drain callback may synchronously close a session, and the
+  // last close for a filter chain erases its entry from connections_by_filter_chain_, which would
+  // invalidate an iterator held across the loop. Entries erased in the meantime are simply not
+  // found on lookup.
+  std::vector<const Network::FilterChain*> filter_chains;
+  filter_chains.reserve(connections_by_filter_chain_.size());
+  for (const auto& entry : connections_by_filter_chain_) {
+    filter_chains.push_back(entry.first);
+  }
+  for (const Network::FilterChain* filter_chain : filter_chains) {
+    drainSessionsOfFilterChain(filter_chain, drain_event);
   }
 }
 
@@ -215,6 +288,7 @@ void EnvoyQuicDispatcher::updateListenerConfig(Network::ListenerConfig& new_list
 void EnvoyQuicDispatcher::closeIdleQuicConnections(bool is_saturated) {
   // This method is called from the worker thread, triggered by the
   // Overload Manager.
+  ASSERT(session_idle_list_ != nullptr);
   session_idle_list_->MaybeTerminateIdleSessions(is_saturated);
 }
 

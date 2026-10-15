@@ -38,7 +38,15 @@ private:
        const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
            field_extractions);
 
-  absl::flat_hash_map<absl::string_view, FieldValueExtractorPtr> per_field_extractors_;
+  struct PerFieldExtractor {
+    // The request field path, used for logging.
+    absl::string_view path;
+
+    FieldValueExtractorPtr extractor;
+  };
+
+  // Keyed by the dynamic metadata key the extracted value is written to.
+  absl::flat_hash_map<absl::string_view, PerFieldExtractor> per_field_extractors_;
 };
 
 class ExtractorFactoryImpl : public ExtractorFactory {

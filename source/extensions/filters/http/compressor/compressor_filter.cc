@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/compressor/compressor_filter.h"
 
 #include <cstdint>
+#include <optional>
 
 #include "envoy/compression/compressor/config.h"
 #include "envoy/registry/registry.h"
@@ -12,7 +13,8 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_set.h"
-#include "absl/types/optional.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,6 +37,11 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     request_content_encoding_handle(Http::CustomHeaders::get().ContentEncoding);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     response_content_encoding_handle(Http::CustomHeaders::get().ContentEncoding);
+
+// True when the ETag uses the weak form (RFC 7232): ``W/`` prefix, case-insensitive on ``W``.
+bool isWeakEtag(absl::string_view value) {
+  return value.length() >= 2 && (value[0] == 'w' || value[0] == 'W') && value[1] == '/';
+}
 
 // Default minimum length of an upstream response that allows compression.
 const uint64_t DefaultMinimumContentLength = 30;
@@ -85,32 +92,77 @@ void compressAndUpdateStats(const Compression::Compressor::CompressorPtr& compre
 CompressorFilterConfig::DirectionConfig::DirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor::CommonDirectionConfig&
         proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+    Server::Configuration::CommonFactoryContext& context)
     : compression_enabled_(proto_config.enabled(), runtime),
       min_content_length_{contentLengthUint(proto_config.min_content_length().value())},
-      content_type_values_(contentTypeSet(proto_config.content_type())),
+      content_type_matchers_(contentTypeMatcherList(proto_config.content_type(),
+                                                    proto_config.content_type_matcher(), context)),
       stats_{generateStats(stats_prefix, scope)} {}
+
+std::vector<Matchers::StringMatcherPtr>
+CompressorFilterConfig::DirectionConfig::contentTypeMatcherList(
+    const Protobuf::RepeatedPtrField<std::string>& content_types,
+    const Protobuf::RepeatedPtrField<envoy::type::matcher::v3::StringMatcher>& matchers,
+    Server::Configuration::CommonFactoryContext& context) {
+  std::vector<Matchers::StringMatcherPtr> list;
+
+  const bool has_matchers = !matchers.empty();
+  const bool has_legacy_types = !content_types.empty();
+
+  // If both are set, log a warning and let the new content_type_matcher take precedence
+  if (has_matchers && has_legacy_types) {
+    ENVOY_LOG_MISC(warn, "Both content_type and content_type_matcher are specified. "
+                         "content_type_matcher takes precedence.");
+  }
+
+  // Populate from content_type_matcher if present
+  if (has_matchers) {
+    list.reserve(matchers.size());
+    for (const auto& matcher : matchers) {
+      list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+    }
+  }
+
+  // Fall back to legacy content_type strings converted into exact matchers
+  else if (has_legacy_types) {
+    list.reserve(content_types.size());
+    for (const auto& type : content_types) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.set_exact(type);
+      matcher.set_ignore_case(true);
+      list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+    }
+  }
+
+  // If both are empty, use default content types as exact matchers
+  else {
+    const auto& default_content_encodings = defaultContentEncoding();
+    list.reserve(default_content_encodings.size());
+    for (const auto& type : default_content_encodings) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.set_exact(type);
+      matcher.set_ignore_case(true);
+      list.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
+    }
+  }
+
+  return list;
+}
 
 CompressorFilterConfig::CompressorFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-    Compression::Compressor::CompressorFactoryPtr compressor_factory)
+    Compression::Compressor::CompressorFactoryPtr compressor_factory,
+    Server::Configuration::CommonFactoryContext& context)
     : common_stats_prefix_(fmt::format("{}compressor.{}.{}", stats_prefix,
                                        proto_config.compressor_library().name(),
                                        compressor_factory->statsPrefix())),
-      request_direction_config_(proto_config, common_stats_prefix_, scope, runtime),
-      response_direction_config_(proto_config, common_stats_prefix_, scope, runtime),
+      request_direction_config_(proto_config, common_stats_prefix_, scope, runtime, context),
+      response_direction_config_(proto_config, common_stats_prefix_, scope, runtime, context),
       content_encoding_(compressor_factory->contentEncoding()),
       compressor_factory_(std::move(compressor_factory)),
       choose_first_(proto_config.choose_first()) {}
-
-StringUtil::CaseUnorderedSet CompressorFilterConfig::DirectionConfig::contentTypeSet(
-    const Protobuf::RepeatedPtrField<std::string>& types) {
-  const auto& default_content_encodings = defaultContentEncoding();
-  return types.empty() ? StringUtil::CaseUnorderedSet(default_content_encodings.begin(),
-                                                      default_content_encodings.end())
-                       : StringUtil::CaseUnorderedSet(types.cbegin(), types.cend());
-}
 
 uint32_t CompressorFilterConfig::DirectionConfig::contentLengthUint(Protobuf::uint32 length) {
   return length > 0 ? length : DefaultMinimumContentLength;
@@ -118,9 +170,10 @@ uint32_t CompressorFilterConfig::DirectionConfig::contentLengthUint(Protobuf::ui
 
 CompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+    Server::Configuration::CommonFactoryContext& context)
     : DirectionConfig(proto_config.request_direction_config().common_config(),
-                      stats_prefix + "request.", scope, runtime),
+                      stats_prefix + "request.", scope, runtime, context),
       is_set_{proto_config.has_request_direction_config()} {}
 
 absl::flat_hash_set<uint32_t>
@@ -130,15 +183,17 @@ uncompressibleResponseCodesSet(const Protobuf::RepeatedField<uint32_t>& codes) {
 
 CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+    Server::Configuration::CommonFactoryContext& context)
     : DirectionConfig(commonConfig(proto_config),
                       proto_config.has_response_direction_config() ? stats_prefix + "response."
                                                                    : stats_prefix,
-                      scope, runtime),
+                      scope, runtime, context),
       disable_on_etag_header_(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().disable_on_etag_header()
               : proto_config.disable_on_etag_header()),
+      weaken_etag_on_compress_(proto_config.response_direction_config().weaken_etag_on_compress()),
       remove_accept_encoding_header_(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
@@ -304,14 +359,13 @@ void CompressorFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallba
   // the method isAcceptEncodingAllowed() the first filter is making a decision which encoder needs
   // to be used for a request, with e.g. "Accept-Encoding: deflate;q=0.75, gzip;q=0.5", and caches
   // it in the state. All other compression filters in the sequence use the cached decision.
-  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks.streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = streamInfo().filterState();
   if (auto registry = filter_state->getDataMutable<CompressorRegistry>(key); registry != nullptr) {
     registry->filter_configs_.push_back(config_);
   } else {
     auto registry_ptr = std::make_unique<CompressorRegistry>();
     registry_ptr->filter_configs_.push_back(config_);
-    filter_state->setData(key, std::move(registry_ptr),
-                          StreamInfo::FilterState::StateType::Mutable);
+    filter_state->setData(key, std::move(registry_ptr));
   }
 }
 
@@ -321,7 +375,7 @@ bool isResponseCodeCompressible(const Http::ResponseHeaderMap& headers,
     return true;
   }
 
-  absl::optional<uint64_t> response_code = Http::Utility::getResponseStatusOrNullopt(headers);
+  std::optional<uint64_t> response_code = Http::Utility::getResponseStatusOrNullopt(headers);
   if (!response_code.has_value()) {
     return true;
   }
@@ -353,7 +407,11 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       isResponseCodeCompressible(headers, config);
   if (!end_stream && isAcceptEncodingAllowed(isEnabledAndContentLengthBigEnough, headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
-    sanitizeEtagHeader(headers);
+    if (config.weakenEtagOnCompress()) {
+      weakenEtagHeader(headers);
+    } else {
+      sanitizeEtagHeader(headers);
+    }
     headers.removeContentLength();
     headers.setInline(response_content_encoding_handle.handle(), getContentEncoding());
     config.stats().compressed_.inc();
@@ -438,7 +496,11 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeadersWithStatusHeader(
     return Http::FilterHeadersStatus::Continue;
   }
 
-  sanitizeEtagHeader(headers);
+  if (config.weakenEtagOnCompress()) {
+    weakenEtagHeader(headers);
+  } else {
+    sanitizeEtagHeader(headers);
+  }
   std::string content_length = std::string(headers.getContentLengthValue());
   headers.removeContentLength();
   headers.setInline(response_content_encoding_handle.handle(), getContentEncoding());
@@ -492,41 +554,27 @@ std::unique_ptr<CompressorFilter::EncodingDecision>
 CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
   using EncPair = std::pair<absl::string_view, float>; // pair of {encoding, q_value}
   std::vector<EncPair> pairs;
-  absl::string_view content_type_value;
-
-  const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type != nullptr) {
-    content_type_value =
-        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
-  }
 
   // Find all compressors enabled for the filter chain.
   std::map<std::string, CompressorInChain> allowed_compressors;
   uint32_t registration_count{0};
 
   auto typed_state =
-      decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(
-          compressorRegistryKey());
+      streamInfo().filterState()->getDataReadOnly<CompressorRegistry>(compressorRegistryKey());
   ASSERT(typed_state != nullptr);
 
   for (const auto& filter_config : (*typed_state).filter_configs_) {
     // A compressor filter may be limited to compress certain Content-Types. If the response's
-    // content type doesn't match the list of content types this filter is enabled for then
-    // it must be excluded from the decision process.
+    // content type doesn't match the configured content type values or matchers, then it must be
+    // excluded from the decision process.
     // For example, there are two compressor filters in the chain e.g. "gzip" and "deflate".
     // "gzip" is configured to compress only "text/html" and "deflate" is configured to compress
     // only "application/javascript". Then comes a request with Accept-Encoding header
     // "gzip;q=1,deflate;q=.5". The corresponding response content type is "application/javascript".
     // If "gzip" is not excluded from the decision process then it will take precedence over
     // "deflate" and the resulting response won't be compressed at all.
-    if (!content_type_value.empty() &&
-        !filter_config->responseDirectionConfig().contentTypeValues().empty()) {
-      auto iter =
-          filter_config->responseDirectionConfig().contentTypeValues().find(content_type_value);
-      if (iter == filter_config->responseDirectionConfig().contentTypeValues().end()) {
-        // Skip adding this filter to the list of allowed compressors.
-        continue;
-      }
+    if (!filter_config->responseDirectionConfig().isContentTypeAllowed(headers)) {
+      continue;
     }
 
     // There could be many compressors registered for the same content encoding, e.g. consider a
@@ -595,9 +643,10 @@ CompressorFilter::chooseEncoding(const Http::ResponseHeaderMap& headers) const {
     if (allowed_compressors.count(std::string(pair.first)) ||
         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Identity ||
         pair.first == Http::CustomHeaders::get().AcceptEncodingValues.Wildcard) {
+      const auto registered = allowed_compressors.find(std::string(pair.first));
       if ((pair.second > choice.second) ||
-          (pair.second == choice.second &&
-           allowed_compressors[std::string(pair.first)].choose_first_)) {
+          (pair.second == choice.second && registered != allowed_compressors.end() &&
+           registered->second.choose_first_)) {
         choice = pair;
       }
     }
@@ -682,8 +731,7 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
   const absl::string_view encoding_decision_key{"encoding_decision"};
 
   // Check if we have already cached our decision on encoding.
-  const StreamInfo::FilterStateSharedPtr& filter_state =
-      decoder_callbacks_->streamInfo().filterState();
+  const StreamInfo::FilterStateSharedPtr& filter_state = streamInfo().filterState();
   if (auto typed_state =
           filter_state->getDataReadOnly<CompressorFilter::EncodingDecision>(encoding_decision_key);
       typed_state != nullptr) {
@@ -693,21 +741,34 @@ bool CompressorFilter::isAcceptEncodingAllowed(const Http::ResponseHeaderMap& he
   // No cached decision found, so decide now.
   std::unique_ptr<CompressorFilter::EncodingDecision> decision = chooseEncoding(headers);
   bool result = shouldCompress(*decision);
-  filter_state->setData(encoding_decision_key, std::move(decision),
-                        StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state->setData(encoding_decision_key, std::move(decision));
   return result;
 }
 
 bool CompressorFilterConfig::DirectionConfig::isContentTypeAllowed(
     const Http::RequestOrResponseHeaderMap& headers) const {
-  const Http::HeaderEntry* content_type = headers.ContentType();
-  if (content_type != nullptr && !content_type_values_.empty()) {
-    const absl::string_view value =
-        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
-    return content_type_values_.find(value) != content_type_values_.end();
+
+  // Default content types are normally always populated, but return true if empty.
+  if (content_type_matchers_.empty()) {
+    return true;
   }
 
-  return true;
+  const Http::HeaderEntry* content_type = headers.ContentType();
+  if (content_type == nullptr) {
+    return true;
+  }
+
+  const absl::string_view value =
+      StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
+
+  // Check content_type_matcher list if populated
+  for (const auto& matcher : content_type_matchers_) {
+    if (matcher->match(value)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 bool CompressorFilter::checkIsEtagAllowedLogResponseStats(Http::ResponseHeaderMap& headers) const {
@@ -719,8 +780,13 @@ bool CompressorFilter::checkIsEtagAllowedLogResponseStats(Http::ResponseHeaderMa
 }
 
 bool CompressorFilter::isEtagAllowed(Http::ResponseHeaderMap& headers) const {
-  return !(config_->responseDirectionConfig().disableOnEtagHeader() &&
-           headers.getInline(etag_handle.handle()));
+  const auto& config = config_->responseDirectionConfig();
+  // When both disable_on_etag_header and weaken_etag_on_compress are true, the new field
+  // takes precedence so compression is applied and the ETag is weakened.
+  if (config.weakenEtagOnCompress()) {
+    return true;
+  }
+  return !(config.disableOnEtagHeader() && headers.getInline(etag_handle.handle()));
 }
 
 bool CompressorFilterConfig::ResponseDirectionConfig::areAllResponseCodesCompressible() const {
@@ -777,7 +843,7 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMa
 
 std::string CompressorFilter::createEnvoyCompressionStatusHeaderValue(
     absl::string_view encoding_type, absl::string_view status_to_set,
-    absl::optional<absl::string_view> original_length) {
+    std::optional<absl::string_view> original_length) {
   const auto& constants = Http::Headers::get().EnvoyCompressionStatusValues;
   if (status_to_set == constants.Compressed && original_length.has_value()) {
     std::string original_length_part =
@@ -789,7 +855,7 @@ std::string CompressorFilter::createEnvoyCompressionStatusHeaderValue(
 
 void CompressorFilter::insertEnvoyCompressionStatusHeader(
     Http::ResponseHeaderMap& headers, absl::string_view encoding_type,
-    absl::string_view status_to_set, absl::optional<absl::string_view> original_length) {
+    absl::string_view status_to_set, std::optional<absl::string_view> original_length) {
   std::string status_value =
       createEnvoyCompressionStatusHeaderValue(encoding_type, status_to_set, original_length);
   headers.addReferenceKey(Http::Headers::get().EnvoyCompressionStatus, status_value);
@@ -820,8 +886,18 @@ void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.getInline(etag_handle.handle());
   if (etag != nullptr) {
     absl::string_view value(etag->value().getStringView());
-    if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
+    if (!isWeakEtag(value)) {
       headers.removeInline(etag_handle.handle());
+    }
+  }
+}
+
+void CompressorFilter::weakenEtagHeader(Http::ResponseHeaderMap& headers) {
+  const Http::HeaderEntry* etag = headers.getInline(etag_handle.handle());
+  if (etag != nullptr) {
+    absl::string_view value(etag->value().getStringView());
+    if (!isWeakEtag(value)) {
+      headers.setInline(etag_handle.handle(), absl::StrCat("W/", value));
     }
   }
 }
@@ -858,6 +934,14 @@ std::string CompressorFilter::getContentEncoding() const {
     return per_route_config_->contentEncoding().value();
   }
   return config_->contentEncoding();
+}
+
+StreamInfo::StreamInfo& CompressorFilter::streamInfo() const {
+  if (decoder_callbacks_ != nullptr && decoder_callbacks_->upstreamCallbacks().has_value()) {
+    return decoder_callbacks_->upstreamCallbacks()->upstreamStreamInfo();
+  }
+  ASSERT(decoder_callbacks_ != nullptr);
+  return decoder_callbacks_->streamInfo();
 }
 
 } // namespace Compressor

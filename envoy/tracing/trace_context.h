@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <string>
 
 #include "envoy/common/optref.h"
@@ -8,7 +9,6 @@
 #include "envoy/http/header_map.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -70,7 +70,7 @@ public:
    * @param key The context key of string view type.
    * @return The optional context value of string_view type.
    */
-  virtual absl::optional<absl::string_view> get(absl::string_view key) const PURE;
+  virtual std::optional<absl::string_view> get(absl::string_view key) const PURE;
 
   /**
    * Set new tracing context key/value pair.

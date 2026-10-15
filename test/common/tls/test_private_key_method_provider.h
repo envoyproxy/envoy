@@ -78,7 +78,7 @@ public:
   static int ecdsaConnectionIndex();
 
 private:
-  Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
+  Ssl::BoringSslPrivateKeyMethodSharedPtr method_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
   TestPrivateKeyConnectionTestOptions test_options_;
   std::string mode_;

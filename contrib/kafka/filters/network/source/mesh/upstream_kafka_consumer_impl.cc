@@ -1,5 +1,7 @@
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_consumer_impl.h"
 
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/kafka_types.h"
 #include "contrib/kafka/filters/network/source/mesh/librdkafka_utils_impl.h"
 
@@ -65,7 +67,7 @@ RichKafkaConsumer::~RichKafkaConsumer() {
   consumer_->unassign();
   consumer_->close();
 
-  ENVOY_LOG(debug, "Kafka consumer [{}] closed succesfully", topic_);
+  ENVOY_LOG(debug, "Kafka consumer [{}] closed successfully", topic_);
 }
 
 // Read timeout constants.
@@ -107,7 +109,7 @@ static NullableBytes toBytes(const void* data, const size_t size) {
     Bytes bytes(as_char, as_char + size);
     return {bytes};
   } else {
-    return absl::nullopt;
+    return std::nullopt;
   }
 }
 

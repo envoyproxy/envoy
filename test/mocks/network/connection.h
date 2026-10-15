@@ -1,9 +1,11 @@
 #pragma once
 
+#include <atomic>
 #include <list>
 #include <ostream>
 
 #include "envoy/network/connection.h"
+#include "envoy/network/drain_decision.h"
 
 #include "source/common/network/filter_manager_impl.h"
 
@@ -24,16 +26,20 @@ public:
   MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(void, onDrain, (Network::ConnectionDrainEvent info));
 };
 
 class MockConnectionBase {
 public:
   void raiseEvent(Network::ConnectionEvent event);
+  // Fan out onDrain(event) to all registered ConnectionCallbacks, mirroring the real connection's
+  // Connection::onDrain(). Used to exercise connection-level drain in tests.
+  void raiseConnectionDrain(Network::ConnectionDrainEvent event);
   void raiseBytesSentCallbacks(uint64_t num_bytes);
   void runHighWatermarkCallbacks();
   void runLowWatermarkCallbacks();
 
-  static uint64_t next_id_;
+  static std::atomic<uint64_t> next_id_;
 
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   std::list<Network::ConnectionCallbacks*> callbacks_;
@@ -50,6 +56,7 @@ public:
   /* Network::Connection */                                                                        \
   MOCK_METHOD(void, addConnectionCallbacks, (ConnectionCallbacks & cb));                           \
   MOCK_METHOD(void, removeConnectionCallbacks, (ConnectionCallbacks & cb));                        \
+  MOCK_METHOD(void, onDrain, (ConnectionDrainEvent info));                                         \
   MOCK_METHOD(void, addBytesSentCallback, (BytesSentCb cb));                                       \
   MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));                                \
   MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));                                          \
@@ -73,7 +80,7 @@ public:
   MOCK_METHOD(ConnectionInfoSetter&, connectionInfoSetter, ());                                    \
   MOCK_METHOD(const ConnectionInfoProvider&, connectionInfoProvider, (), (const));                 \
   MOCK_METHOD(ConnectionInfoProviderSharedPtr, connectionInfoProviderSharedPtr, (), (const));      \
-  MOCK_METHOD(absl::optional<Connection::UnixDomainSocketPeerCredentials>,                         \
+  MOCK_METHOD(std::optional<Connection::UnixDomainSocketPeerCredentials>,                          \
               unixSocketPeerCredentials, (), (const));                                             \
   MOCK_METHOD(void, setConnectionStats, (const ConnectionStats& stats));                           \
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
@@ -84,6 +91,7 @@ public:
   MOCK_METHOD(bool, connecting, (), (const));                                                      \
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));                                            \
+  MOCK_METHOD(void, setBufferHighWatermarkTimeout, (std::chrono::milliseconds timeout));           \
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));                                                 \
   MOCK_METHOD(bool, aboveHighWatermark, (), (const));                                              \
   MOCK_METHOD(const ConnectionSocketPtr&, getSocket, (), (const));                                 \
@@ -94,10 +102,10 @@ public:
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
   MOCK_METHOD(absl::string_view, localCloseReason, (), (const));                                   \
   MOCK_METHOD(bool, startSecureTransport, ());                                                     \
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));          \
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));           \
   MOCK_METHOD(void, configureInitialCongestionWindow,                                              \
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
-  MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));                     \
+  MOCK_METHOD(std::optional<uint64_t>, congestionWindowInBytes, (), (const));                      \
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));                                     \
   MOCK_METHOD(bool, setSocketOption, (Network::SocketOptionName, absl::Span<uint8_t>), ());        \
   MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));
@@ -152,6 +160,8 @@ public:
   MOCK_METHOD(StreamBuffer, getWriteBuffer, ());
   MOCK_METHOD(void, rawWrite, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, closeConnection, (ConnectionCloseAction close_action));
+  MOCK_METHOD(void, onFilterAboveHighWatermark, ());
+  MOCK_METHOD(void, onFilterBelowLowWatermark, ());
 };
 
 } // namespace Network

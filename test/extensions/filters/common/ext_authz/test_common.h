@@ -30,7 +30,7 @@ struct KeyValueOption {
 
 using KeyValueOptionVector = std::vector<KeyValueOption>;
 using HeaderValueOptionVector = std::vector<envoy::config::core::v3::HeaderValueOption>;
-using CheckResponsePtr = std::unique_ptr<envoy::service::auth::v3::CheckResponse>;
+using CheckResponsePtr = Grpc::ResponsePtr<envoy::service::auth::v3::CheckResponse>;
 
 class TestCommon {
 public:
@@ -53,7 +53,7 @@ public:
                     const std::string& body = std::string{},
                     const HeaderValueOptionVector& headers = HeaderValueOptionVector{},
                     const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{},
-                    const absl::optional<Grpc::Status::GrpcStatus>& grpc_status = absl::nullopt);
+                    const std::optional<Grpc::Status::GrpcStatus>& grpc_status = std::nullopt);
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 

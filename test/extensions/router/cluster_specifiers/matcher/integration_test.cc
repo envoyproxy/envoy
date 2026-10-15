@@ -22,7 +22,11 @@ public:
     autonomous_upstream_ = true;
 
     if (refresh_filter) {
-      config_helper_.prependFilter("{ name: refresh-route-cluster }");
+      config_helper_.prependFilter(R"EOF(
+        name: refresh-route-cluster
+        typed_config:
+          "@type": type.googleapis.com/test.integration.filters.RefreshRouteClusterConfig
+      )EOF");
     }
 
     config_helper_.addConfigModifier(
@@ -64,14 +68,14 @@ cluster_matcher:
               ->mutable_routes(0)
               ->mutable_route()
               ->clear_cluster();
-          hcm.mutable_route_config()
-              ->mutable_virtual_hosts(0)
-              ->mutable_routes(0)
-              ->mutable_route()
-              ->mutable_inline_cluster_specifier_plugin()
-              ->mutable_extension()
-              ->mutable_typed_config()
-              ->PackFrom(config);
+          std::ignore = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route()
+                            ->mutable_inline_cluster_specifier_plugin()
+                            ->mutable_extension()
+                            ->mutable_typed_config()
+                            ->PackFrom(config);
           *hcm.mutable_route_config()
                ->mutable_virtual_hosts(0)
                ->mutable_routes(0)

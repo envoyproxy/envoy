@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
+#include <optional>
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -21,7 +23,7 @@
 
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/cleanup.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/watched_directory.h"
 #include "source/common/init/target_impl.h"
@@ -46,8 +48,7 @@ struct SdsApiStats {
 /**
  * SDS API implementation that fetches secrets from SDS server via Subscription.
  */
-class SdsApi : public Envoy::Config::SubscriptionBase<
-                   envoy::extensions::transport_sockets::tls::v3::Secret> {
+class SdsApi : public Config::SubscriptionCallbacks {
 public:
   struct SecretData {
     const std::string resource_name_;
@@ -93,8 +94,12 @@ protected:
   Event::Dispatcher& dispatcher_;
   Api::Api& api_;
 
-  // Invoked for filesystem watches on update. Protected so subclasses can set up the callback.
-  void onWatchUpdate();
+  // Invoked when a filesystem event fires or the polling timer expires. Protected so subclasses
+  // can set up filesystem event callbacks.
+  void onFilesystemUpdate();
+
+  // Whether filesystem-backed secret data is refreshed by polling rather than filesystem events.
+  bool filesystemPollingEnabled() const { return poll_timer_ != nullptr; }
 
   // Initializes the SDS API.
   void initialize(bool warm);
@@ -108,8 +113,12 @@ private:
 
   Stats::ScopeSharedPtr scope_;
   SdsApiStats sds_api_stats_;
+  const Config::ResourceTypeHelper<envoy::extensions::transport_sockets::tls::v3::Secret>
+      resource_type_helper_;
 
   const envoy::config::core::v3::ConfigSource sds_config_;
+  const std::optional<std::chrono::milliseconds> poll_interval_;
+  Event::TimerPtr poll_timer_;
   Config::SubscriptionPtr subscription_;
   const std::string sds_config_name_;
 
@@ -119,6 +128,7 @@ private:
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;
   SecretData secret_data_;
+  bool started_{false};
   std::unique_ptr<Filesystem::Watcher> watcher_;
 };
 
@@ -147,7 +157,7 @@ public:
       : SdsApi(sds_config, sds_config_name, subscription_factory, time_source, validation_visitor,
                stats, std::move(destructor_cb), dispatcher, api, warm) {}
 
-  virtual const SecretType* secret() const override PURE;
+  const SecretType* secret() const override PURE;
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addValidationCallback(std::function<absl::Status(const SecretType&)> callback) override {

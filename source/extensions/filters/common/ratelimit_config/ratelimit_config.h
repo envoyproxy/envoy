@@ -23,7 +23,11 @@ public:
                   Server::Configuration::CommonFactoryContext& context,
                   absl::Status& creation_status, bool no_limit = true);
 
+  // `headers` (request headers) is always present. `response_headers` is optional: it is only set
+  // on the apply_on_stream_done path and is nullptr on the request path; it lets a `hits_addend`
+  // format resolve `%RESP()%` substitutions.
   void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
                            const std::string& local_service_cluster,
                            RateLimitDescriptors& descriptors) const;
@@ -34,8 +38,10 @@ private:
   const bool apply_on_stream_done_ = false;
   const Envoy::RateLimit::XRateLimitOption x_ratelimit_option_{};
   Formatter::FormatterProviderPtr hits_addend_provider_;
-  absl::optional<uint64_t> hits_addend_;
+  std::optional<uint64_t> hits_addend_;
+  bool is_negative_hits_ = false;
   std::vector<Envoy::RateLimit::DescriptorProducerPtr> actions_;
+  std::optional<Envoy::Router::RateLimitOverrideActionPtr> limit_override_ = std::nullopt;
 };
 
 class RateLimitConfig : Logger::Loggable<Envoy::Logger::Id::config> {
@@ -48,7 +54,11 @@ public:
 
   size_t size() const { return rate_limit_policies_.size(); }
 
+  // `headers` (request headers) is always present. `response_headers` is optional: it is only set
+  // on the apply_on_stream_done path and is nullptr on the request path; it lets a `hits_addend`
+  // format resolve `%RESP()%` substitutions.
   void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
                            const std::string& local_service_cluster,
                            RateLimitDescriptors& descriptors, bool on_stream_done = false) const;

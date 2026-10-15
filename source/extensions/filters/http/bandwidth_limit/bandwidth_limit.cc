@@ -77,9 +77,9 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
   // The token bucket is configured with a max token count of the number of
   // bytes per second, and refills at the same rate, so that we have a per
   // second limit which refills gradually in 1/fill_interval increments.
-  token_bucket_ = std::make_shared<SharedTokenBucketImpl>(
-      StreamRateLimiter::kiloBytesToBytes(limit_kbps_), time_source,
-      StreamRateLimiter::kiloBytesToBytes(limit_kbps_));
+  uint64_t max_tokens = StreamRateLimiter::kiloBytesToBytes(limit_kbps_);
+  token_bucket_ = std::make_shared<SharedTokenBucketImpl>(max_tokens, time_source, max_tokens);
+  token_bucket_->maybeReset(max_tokens * fill_interval_.count() / 1000);
 }
 
 BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -97,7 +97,7 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
   if (config.enabled() && (config.enableMode() & BandwidthLimit::REQUEST)) {
     config.stats().request_enabled_.inc();
     request_limiter_ = std::make_unique<StreamRateLimiter>(
-        config.limit(), decoder_callbacks_->bufferLimit(),
+        decoder_callbacks_->bufferLimit(),
         [this] { decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark(); },
         [this] { decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
@@ -110,16 +110,16 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           updateStatsOnDecodeFinish();
           decoder_callbacks_->continueDecoding();
         },
-        [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
+        [&config, this](uint64_t len, uint64_t bytes_buffered, std::chrono::milliseconds delay) {
           config.stats().request_allowed_size_.set(len);
           config.stats().request_allowed_total_size_.add(len);
-          if (limit_enforced) {
+          if (bytes_buffered) {
             config.stats().request_enforced_.inc();
             request_delay_ += delay;
           }
         },
-        const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
-        decoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+        decoder_callbacks_->dispatcher(), decoder_callbacks_->scope(), config.tokenBucket(),
+        config.fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -164,7 +164,7 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
     config.stats().response_enabled_.inc();
 
     response_limiter_ = std::make_unique<StreamRateLimiter>(
-        config.limit(), encoder_callbacks_->bufferLimit(),
+        encoder_callbacks_->bufferLimit(),
         [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
         [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
         [this](Buffer::Instance& data, bool end_stream) {
@@ -177,16 +177,16 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           updateStatsOnEncodeFinish();
           encoder_callbacks_->continueEncoding();
         },
-        [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
+        [&config, this](uint64_t len, uint64_t buffered_bytes, std::chrono::milliseconds delay) {
           config.stats().response_allowed_size_.set(len);
           config.stats().response_allowed_total_size_.add(len);
-          if (limit_enforced) {
+          if (buffered_bytes) {
             config.stats().response_enforced_.inc();
             response_delay_ += delay;
           }
         },
-        const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
-        encoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+        encoder_callbacks_->dispatcher(), encoder_callbacks_->scope(), config.tokenBucket(),
+        config.fillInterval());
   }
 
   return Http::FilterHeadersStatus::Continue;

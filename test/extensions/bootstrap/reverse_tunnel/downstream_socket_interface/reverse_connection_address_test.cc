@@ -4,14 +4,11 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-using testing::_;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -29,9 +26,7 @@ protected:
   }
 
   // Helper function to create a test address.
-  ReverseConnectionAddress createTestAddress() {
-    return ReverseConnectionAddress(createTestConfig());
-  }
+  ReverseConnectionAddress createTestAddress() { return {createTestConfig()}; }
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
@@ -297,6 +292,7 @@ TEST_F(ReverseConnectionAddressTest, CopyAndAssignment) {
   ReverseConnectionAddress original(config);
 
   // Test copy constructor.
+  // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
   ReverseConnectionAddress copied(original);
   EXPECT_TRUE(original == copied);
   EXPECT_EQ(original.logicalName(), copied.logicalName());

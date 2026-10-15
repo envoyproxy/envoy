@@ -9,13 +9,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace A2a {
 
-Http::FilterFactoryCb A2aFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> A2aFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::a2a::v3::A2a& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
 
-  // Use the server_factory_context to access the root scope for stats
-  auto config = std::make_shared<A2aFilterConfig>(proto_config, stats_prefix,
-                                                  context.serverFactoryContext().scope());
+  auto config = std::make_shared<A2aFilterConfig>(proto_config, extra_context.statsPrefixOr(),
+                                                  extra_context.statsPrefixScopeOr(context));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<A2aFilter>(config));

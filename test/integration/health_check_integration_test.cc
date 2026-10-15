@@ -1,9 +1,12 @@
 #include <memory>
 
 #include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
+#include "source/common/common/hex.h"
 #include "source/common/upstream/health_discovery_service.h"
+#include "source/common/upstream/multi_health_checker.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/http2/http2_frame.h"
@@ -13,6 +16,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -74,7 +79,7 @@ public:
     acceptXdsConnection();
 
     // Expect 1 for the statically specified CDS server.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 1);
+    test_server_->waitForGauge("cluster_manager.active_clusters", Ge(1));
 
     registerTestServerPorts({"http"});
 
@@ -84,7 +89,12 @@ public:
     for (auto& cluster : clusters_) {
       auto config = upstreamConfig();
       config.upstream_protocol_ = upstream_protocol_;
-      cluster.host_upstream_ = std::make_unique<FakeUpstream>(0, version_, config);
+      // A TLS host upstream is needed to exercise ALPN negotiation; createUpstreamTlsContext()
+      // offers the ALPN identifier matching `config.upstream_protocol_`.
+      cluster.host_upstream_ =
+          host_upstream_tls_ ? std::make_unique<FakeUpstream>(createUpstreamTlsContext(config), 0,
+                                                              version_, config)
+                             : std::make_unique<FakeUpstream>(0, version_, config);
       cluster.external_host_upstream_ = std::make_unique<FakeUpstream>(0, version_, config);
       cluster.cluster_ = ConfigHelper::buildStaticCluster(
           cluster.name_, cluster.host_upstream_->localAddress()->ip()->port(),
@@ -129,12 +139,32 @@ public:
     return health_check;
   }
 
+  // Adds an upstream TLS transport socket to `cluster`, offering `alpn_protocols` on the handshake.
+  void addUpstreamTls(envoy::config::cluster::v3::Cluster& cluster,
+                      const std::vector<std::string>& alpn_protocols) {
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    // The test certs are for *.lyft.com, so make sure SNI matches.
+    tls_context.set_sni("foo.lyft.com");
+    tls_context.mutable_common_tls_context()
+        ->mutable_validation_context()
+        ->mutable_trusted_ca()
+        ->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+    for (const auto& alpn : alpn_protocols) {
+      tls_context.mutable_common_tls_context()->add_alpn_protocols(alpn);
+    }
+    cluster.mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+    std::ignore = cluster.mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+  }
+
   // The number of clusters and their names must match the clusters in the CDS integration test
   // configuration.
   static constexpr size_t clusters_num_ = 2;
   std::array<ClusterData, clusters_num_> clusters_{{{"cluster_1"}, {"cluster_2"}}};
   Network::Address::IpVersion ip_version_;
   Http::CodecType upstream_protocol_;
+  // Whether the health checked host upstreams terminate TLS.
+  bool host_upstream_tls_{false};
 };
 
 struct HttpHealthCheckIntegrationTestParams {
@@ -241,7 +271,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(1024, true);
 
   // Verify that Envoy detected the health check response.
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -257,7 +287,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyHttp) {
       Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
   clusters_[cluster_idx].host_stream_->encodeData(1024, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -278,14 +308,14 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 
   // Wait until the next attempt is made.
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(2));
 
   // Respond with retriable status
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
@@ -301,13 +331,13 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for second health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Eq(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 
   // Wait until the next attempt is made.
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(3));
 
   // Respond with retriable status a second time, matching unhealthy threshold
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
@@ -323,13 +353,13 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for third health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.failure", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Eq(2));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 0);
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 
   // Wait until the next attempt is made.
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 4);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(4));
 
   // Respond with healthy status again.
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
@@ -345,9 +375,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for fourth health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Eq(2));
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 }
 
@@ -366,10 +396,10 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointExpectedAndRetriablePrecede
   clusters_[cluster_idx].host_stream_->encodeData(0, true);
 
   // Wait for health check
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Eq(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
 }
 
@@ -390,16 +420,16 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointImmediateHealthcheckFailHtt
       false);
   clusters_[cluster_idx].host_stream_->encodeData(1024, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.attempt")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_excluded", 1);
+  test_server_->waitForGauge("cluster.cluster_1.membership_excluded", Eq(1));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 
   // Wait until the next attempt is made.
-  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.attempt", Eq(2));
 
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
       *dispatcher_, clusters_[cluster_idx].host_stream_));
@@ -413,10 +443,10 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointImmediateHealthcheckFailHtt
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
-  test_server_->waitForGaugeEq("cluster.cluster_1.membership_excluded", 0);
+  test_server_->waitForGauge("cluster.cluster_1.membership_excluded", Eq(0));
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 }
@@ -431,7 +461,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointTimeoutHttp) {
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
   // Endpoint doesn't reply, and a healthcheck failure occurs (due to timeout).
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -454,7 +484,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
@@ -476,7 +506,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 2);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(2));
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -515,7 +545,7 @@ TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
   clusters_[cluster_idx].host_fake_connection_->encodeProtocolError();
 
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForDisconnect());
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 
@@ -536,7 +566,7 @@ TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -626,7 +656,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcp) {
   AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -645,7 +675,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointWrongResponseTcp) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -662,7 +692,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcpWithProxyProtocolV
   AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -678,7 +708,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcpWithProxyProtocolV
   AssertionResult result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -692,7 +722,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointTimeoutTcp) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -768,7 +798,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointServingGrpc) {
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -790,7 +820,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointNotServingGrpc) {
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -805,7 +835,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointTimeoutGrpc) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -828,7 +858,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointServiceUnknownGrpc) {
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -851,7 +881,7 @@ TEST_P(GrpcHealthCheckIntegrationTest, SingleEndpointUnknownStatusGrpc) {
           {":status", "200"}, {"content-type", Http::Headers::get().ContentTypeValues.Grpc}},
       response);
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -916,7 +946,7 @@ TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointHealthyExternal) {
   AssertionResult result = clusters_[cluster_idx].external_host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -936,7 +966,7 @@ TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointWrongResponseExternal) 
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -950,7 +980,7 @@ TEST_P(ExternalHealthCheckIntegrationTest, SingleEndpointTimeoutExternal) {
   // Increase time until timeout (30s).
   timeSystem().advanceTimeWait(std::chrono::seconds(30));
 
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -1006,7 +1036,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithPayload) {
   cluster_data.host_stream_->encodeData(1024, true);
 
   // Verify that Envoy detected the health check response.
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
@@ -1061,10 +1091,509 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithBinaryPayloa
   cluster_data.host_stream_->encodeData(1024, true);
 
   // Verify that Envoy detected the health check response.
-  test_server_->waitForCounterGe("cluster.cluster_1.health_check.success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
+// Health checking over TLS with `use_alpn_protocol`, where the codec is selected from
+// the protocol negotiated by ALPN, and with a pinned codec, where it is not.
+class HttpHealthCheckAlpnIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HealthCheckIntegrationTestBase {
+public:
+  HttpHealthCheckAlpnIntegrationTest() : HealthCheckIntegrationTestBase(GetParam()) {}
+
+  void TearDown() override {
+    cleanupHostConnections();
+    cleanUpXdsConnection();
+  }
+
+  // Brings up a TLS host upstream that speaks `upstream_protocol` and offers the matching ALPN
+  // identifier. `cluster_alpn_protocols` is the static list on the cluster's TLS context and
+  // `health_check_alpn_protocols` the health check's `tls_options` override; either may be empty.
+  // What the health check connection advertises follows from those two exactly as it does today,
+  // since this change adds nothing of its own.
+  void initTlsHealthCheck(Http::CodecType upstream_protocol,
+                          const std::vector<std::string>& cluster_alpn_protocols,
+                          const std::vector<std::string>& health_check_alpn_protocols,
+                          bool use_alpn_protocol, uint32_t timeout_seconds = 30,
+                          envoy::type::v3::CodecClientType codec_client_type =
+                              envoy::type::v3::CodecClientType::HTTP1) {
+    host_upstream_tls_ = true;
+    upstream_protocol_ = upstream_protocol;
+    initialize();
+
+    auto& cluster_data = clusters_[0];
+    addUpstreamTls(cluster_data.cluster_, cluster_alpn_protocols);
+    auto* health_check = addHealthCheck(cluster_data.cluster_);
+    health_check->mutable_timeout()->set_seconds(timeout_seconds);
+    health_check->mutable_http_health_check()->set_path("/healthcheck");
+    health_check->mutable_http_health_check()->set_use_alpn_protocol(use_alpn_protocol);
+    health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type);
+    for (const auto& alpn : health_check_alpn_protocols) {
+      health_check->mutable_tls_options()->add_alpn_protocols(alpn);
+    }
+
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {cluster_data.cluster_},
+                                                               {cluster_data.cluster_}, {}, "55");
+  }
+
+  // Waits for a health check probe on the host upstream and answers it with a 200. The upstream
+  // only produces a stream if Envoy spoke the protocol the upstream negotiated, which is what
+  // makes these tests discriminating.
+  void expectHealthCheckProbeAndRespond() {
+    auto& cluster_data = clusters_[0];
+    ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
+        *dispatcher_, cluster_data.host_fake_connection_));
+    ASSERT_TRUE(cluster_data.host_fake_connection_->waitForNewStream(*dispatcher_,
+                                                                     cluster_data.host_stream_));
+    ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
+    EXPECT_EQ(cluster_data.host_stream_->headers().getPathValue(), "/healthcheck");
+
+    cluster_data.host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                                             true);
+    test_server_->waitForCounter("cluster.cluster_1.health_check.success", Ge(1));
+    EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  }
+
+  // Waits for a health check connection, verifies that the TLS handshake completed but no probe
+  // is ever decoded on it - which is only the case when Envoy spoke a protocol the upstream does
+  // not - and that the check is reported as failing. A probe that was decoded but never answered
+  // would also time out into a failure, and so would a failed handshake, so checking the counters
+  // alone would not tell those apart from the wrong protocol being spoken.
+  void expectHealthCheckFailureWithoutProbe() {
+    auto& cluster_data = clusters_[0];
+    ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
+        *dispatcher_, cluster_data.host_fake_connection_));
+    test_server_->waitForCounter("cluster.cluster_1.ssl.handshake", Ge(1));
+    FakeStreamPtr stream;
+    EXPECT_FALSE(cluster_data.host_fake_connection_->waitForNewStream(
+        *dispatcher_, stream, std::chrono::milliseconds(500)));
+    test_server_->waitForCounter("cluster.cluster_1.health_check.failure", Ge(1));
+    EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, HttpHealthCheckAlpnIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// The handshake settles on h2, so the health check is sent over HTTP/2. With a pinned HTTP/1.1
+// codec Envoy would send HTTP/1.1 here and the HTTP/2 upstream would never produce a stream.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, NegotiatesHttp2) {
+  initTlsHealthCheck(Http::CodecType::HTTP2, {"h2", "http/1.1"}, {},
+                     /*use_alpn_protocol=*/true);
+  expectHealthCheckProbeAndRespond();
+}
+
+// The mirror image: the handshake settles on http/1.1, so the health check is sent over HTTP/1.1.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, NegotiatesHttp1) {
+  initTlsHealthCheck(Http::CodecType::HTTP1, {"h2", "http/1.1"}, {},
+                     /*use_alpn_protocol=*/true);
+  expectHealthCheckProbeAndRespond();
+}
+
+// `tls_options.alpn_protocols` overrides the cluster's list, so the health check offers only
+// http/1.1 and negotiates it, and the probe follows. This is the setup from the issue, an HTTP/2
+// cluster whose health check endpoint only speaks HTTP/1.1, which `use_alpn_protocol`
+// handles without pinning the health check to a codec.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, TlsOptionsAlpnOverridesClusterAlpn) {
+  initTlsHealthCheck(Http::CodecType::HTTP1, {"h2"}, {"http/1.1"},
+                     /*use_alpn_protocol=*/true);
+  expectHealthCheckProbeAndRespond();
+}
+
+// With no ALPN configured anywhere the health check advertises nothing, nothing is negotiated, and
+// the codec falls back to HTTP/1.1: Envoy speaks HTTP/1.1 to the HTTP/2 upstream, which never
+// decodes a probe, and the check fails. Were any ALPN added to the connection, h2 would be
+// negotiated and a probe would arrive, so this pins that the option adds none of its own.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, WithoutAlpnFallsBackToHttp1) {
+  initTlsHealthCheck(Http::CodecType::HTTP2, {}, {}, /*use_alpn_protocol=*/true,
+                     /*timeout_seconds=*/1);
+  expectHealthCheckFailureWithoutProbe();
+}
+
+// The same setup with `codec_client_type: HTTP2` as the fallback: nothing is negotiated, so the
+// probe is sent over HTTP/2 and the HTTP/2 upstream answers it.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, WithoutAlpnFallsBackToCodecClientType) {
+  initTlsHealthCheck(Http::CodecType::HTTP2, {}, {}, /*use_alpn_protocol=*/true,
+                     /*timeout_seconds=*/30, envoy::type::v3::CodecClientType::HTTP2);
+  expectHealthCheckProbeAndRespond();
+}
+
+// A pinned codec ignores the negotiated protocol: Envoy speaks HTTP/1.1 to an upstream that
+// negotiated h2, which never decodes a probe, and the health check fails. This is the same outcome
+// the cluster's HTTP/1.1 data traffic would get on that host.
+TEST_P(HttpHealthCheckAlpnIntegrationTest, PinnedHttp1IgnoresNegotiatedH2) {
+  initTlsHealthCheck(Http::CodecType::HTTP2, {"h2", "http/1.1"}, {},
+                     /*use_alpn_protocol=*/false, /*timeout_seconds=*/1);
+  expectHealthCheckFailureWithoutProbe();
+}
+
 } // namespace
+
+class MultiHealthCheckIntegrationTest : public Event::TestUsingSimulatedTime,
+                                        public testing::TestWithParam<Network::Address::IpVersion>,
+                                        public HttpIntegrationTest {
+public:
+  MultiHealthCheckIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam(), ConfigHelper::httpProxyConfig()) {}
+
+  void TearDown() override {
+    for (auto& conn : hc_connections_) {
+      if (conn != nullptr) {
+        AssertionResult result = conn->close();
+        RELEASE_ASSERT(result, result.message());
+      }
+    }
+  }
+
+  void addMultiTcpHealthChecks(envoy::config::cluster::v3::Cluster* cluster,
+                               const std::string& name1, const std::string& name2) {
+    addTcpHealthCheck(cluster, name1, 1);
+    addTcpHealthCheck(cluster, name2, 2);
+  }
+
+  void addTcpHealthCheck(envoy::config::cluster::v3::Cluster* cluster, const std::string& name,
+                         int index) {
+    auto* hc = cluster->add_health_checks();
+    hc->set_name(name);
+    hc->mutable_timeout()->set_seconds(30);
+    hc->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc->mutable_no_traffic_interval()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    hc->mutable_unhealthy_threshold()->set_value(1);
+    hc->mutable_healthy_threshold()->set_value(1);
+    auto send = fmt::format("Ping{}", index);
+    hc->mutable_tcp_health_check()->mutable_send()->set_text(Hex::encode(
+        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(send.data()), send.size())));
+    auto recv = fmt::format("Pong{}", index);
+    hc->mutable_tcp_health_check()->add_receive()->set_text(Hex::encode(
+        absl::Span<const uint8_t>(reinterpret_cast<const uint8_t*>(recv.data()), recv.size())));
+  }
+
+  void initializeWithStaticCluster(const std::string& name1 = "first",
+                                   const std::string& name2 = "second") {
+    use_lds_ = false;
+    defer_listener_finalization_ = true;
+
+    auto up_config = upstreamConfig();
+    up_config.upstream_protocol_ = Http::CodecType::HTTP1;
+    host_upstream_ = std::make_unique<FakeUpstream>(0, version_, up_config);
+
+    config_helper_.addConfigModifier(
+        [this, name1, name2](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+          cluster->set_name("cluster_1");
+          cluster->mutable_connect_timeout()->set_seconds(5);
+
+          auto* load_assignment = cluster->mutable_load_assignment();
+          load_assignment->set_cluster_name("cluster_1");
+          auto* ep = load_assignment->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+          ep->mutable_address()->mutable_socket_address()->set_address(
+              Network::Test::getLoopbackAddressString(GetParam()));
+          ep->mutable_address()->mutable_socket_address()->set_port_value(
+              host_upstream_->localAddress()->ip()->port());
+
+          addMultiTcpHealthChecks(cluster, name1, name2);
+        });
+
+    HttpIntegrationTest::initialize();
+
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+    ASSERT_TRUE(hc_connections_[0]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+    ASSERT_TRUE(hc_connections_[1]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  }
+
+  void initializeWithEds() {
+    use_lds_ = false;
+    defer_listener_finalization_ = true;
+
+    auto up_config = upstreamConfig();
+    up_config.upstream_protocol_ = Http::CodecType::HTTP1;
+    host_upstream_ = std::make_unique<FakeUpstream>(0, version_, up_config);
+
+    auto cla = ConfigHelper::buildClusterLoadAssignment(
+        "cluster_1", Network::Test::getLoopbackAddressString(GetParam()),
+        host_upstream_->localAddress()->ip()->port());
+    eds_helper_.setEds({cla});
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+      cluster->set_name("cluster_1");
+      cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
+      cluster->mutable_connect_timeout()->set_seconds(5);
+      cluster->mutable_eds_cluster_config()
+          ->mutable_eds_config()
+          ->mutable_path_config_source()
+          ->set_path(eds_helper_.edsPath());
+
+      addMultiTcpHealthChecks(cluster, "first", "second");
+    });
+
+    HttpIntegrationTest::initialize();
+
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+    ASSERT_TRUE(hc_connections_[0]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+    ASSERT_TRUE(hc_connections_[1]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  }
+
+  EdsHelper eds_helper_;
+  FakeUpstreamPtr host_upstream_;
+  FakeUpstreamPtr host_upstream_2_;
+  std::vector<FakeRawConnectionPtr> hc_connections_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, MultiHealthCheckIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(MultiHealthCheckIntegrationTest, BothSubCheckersPass) {
+  initializeWithStaticCluster();
+
+  // Write both "Pong1" and "Pong2" to each connection. We don't know which connection maps to
+  // which checker, but TCP PayloadMatcher searches for expected bytes anywhere in accumulated
+  // data, so the combined payload satisfies either checker.
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.membership_total", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.healthy", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.degraded", Eq(0));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, OneSubCheckerTimeout) {
+  initializeWithStaticCluster();
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(30));
+
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.second.failure", Ge(1));
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, StatsWithName) {
+  initializeWithStaticCluster("first", "second");
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.first.attempt", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_1.health_check.name.second.attempt", Ge(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.healthy", Eq(1));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, HostAddAfterStart) {
+  initializeWithEds();
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+
+  auto config = upstreamConfig();
+  config.upstream_protocol_ = Http::CodecType::HTTP1;
+  host_upstream_2_ = std::make_unique<FakeUpstream>(0, version_, config);
+
+  auto cla = ConfigHelper::buildClusterLoadAssignment(
+      "cluster_1", Network::Test::getLoopbackAddressString(GetParam()),
+      host_upstream_->localAddress()->ip()->port());
+  auto* ep2 = cla.mutable_endpoints(0)->add_lb_endpoints()->mutable_endpoint();
+  ep2->mutable_address()->mutable_socket_address()->set_address(
+      Network::Test::getLoopbackAddressString(GetParam()));
+  ep2->mutable_address()->mutable_socket_address()->set_port_value(
+      host_upstream_2_->localAddress()->ip()->port());
+  eds_helper_.setEds({cla});
+
+  ASSERT_TRUE(host_upstream_2_->waitForRawConnection(hc_connections_.emplace_back()));
+  ASSERT_TRUE(host_upstream_2_->waitForRawConnection(hc_connections_.emplace_back()));
+  ASSERT_TRUE(hc_connections_[2]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  ASSERT_TRUE(hc_connections_[3]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+
+  result = hc_connections_[2]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[3]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(2));
+  test_server_->waitForGauge("cluster.cluster_1.membership_total", Eq(2));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, HostRemoveAfterStart) {
+  initializeWithEds();
+
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment empty_cla;
+  empty_cla.set_cluster_name("cluster_1");
+  eds_helper_.setEds({empty_cla});
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_total", Eq(0));
+}
+
+TEST_P(MultiHealthCheckIntegrationTest, MaxCheckersHealthyThenUnhealthy) {
+  constexpr int kNumCheckers = Upstream::MultiHealthChecker::kMaxHealthChecks;
+
+  use_lds_ = false;
+  defer_listener_finalization_ = true;
+
+  auto up_config = upstreamConfig();
+  up_config.upstream_protocol_ = Http::CodecType::HTTP1;
+  host_upstream_ = std::make_unique<FakeUpstream>(0, version_, up_config);
+
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->set_name("cluster_1");
+    cluster->mutable_connect_timeout()->set_seconds(5);
+
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->set_cluster_name("cluster_1");
+    auto* ep = load_assignment->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    ep->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(GetParam()));
+    ep->mutable_address()->mutable_socket_address()->set_port_value(
+        host_upstream_->localAddress()->ip()->port());
+
+    for (int i = 0; i < kNumCheckers; i++) {
+      addTcpHealthCheck(cluster, absl::StrCat("checker_", i), i);
+    }
+  });
+
+  HttpIntegrationTest::initialize();
+
+  // Wait for all 32 connections and their initial send data.
+  for (int i = 0; i < kNumCheckers; i++) {
+    ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+  }
+  for (int i = 0; i < kNumCheckers; i++) {
+    ASSERT_TRUE(hc_connections_[i]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  }
+
+  // All checkers respond successfully.
+  for (int i = 0; i < kNumCheckers; i++) {
+    AssertionResult result = hc_connections_[i]->write(fmt::format("Pong{}", i));
+    RELEASE_ASSERT(result, result.message());
+  }
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+  test_server_->waitForGauge("cluster.cluster_1.health_check.healthy", Eq(1));
+
+  // Now let the last checker time out to transition to unhealthy.
+  // Close its connection so the next health check attempt fails.
+  AssertionResult close_result = hc_connections_[kNumCheckers - 1]->close();
+  RELEASE_ASSERT(close_result, close_result.message());
+  hc_connections_[kNumCheckers - 1].reset();
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(0));
+}
+
+// Verify that x-envoy-immediate-health-check-fail in a proxied upstream response correctly
+// propagates EXCLUDED_VIA_IMMEDIATE_HC_FAIL to the real host when using multi health checkers.
+// This exercises the cross-thread path: the router sets the flag on a worker thread, which posts
+// to the main thread where the multi-checker's flag callbacks run.
+TEST_P(MultiHealthCheckIntegrationTest, ImmediateHealthCheckFailCrossThread) {
+  use_lds_ = false;
+  defer_listener_finalization_ = true;
+
+  auto up_config = upstreamConfig();
+  up_config.upstream_protocol_ = Http::CodecType::HTTP1;
+  host_upstream_ = std::make_unique<FakeUpstream>(0, version_, up_config);
+
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->set_name("cluster_1");
+    cluster->mutable_connect_timeout()->set_seconds(5);
+
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->set_cluster_name("cluster_1");
+    auto* ep = load_assignment->add_endpoints()->add_lb_endpoints()->mutable_endpoint();
+    ep->mutable_address()->mutable_socket_address()->set_address(
+        Network::Test::getLoopbackAddressString(GetParam()));
+    ep->mutable_address()->mutable_socket_address()->set_port_value(
+        host_upstream_->localAddress()->ip()->port());
+
+    addMultiTcpHealthChecks(cluster, "first", "second");
+  });
+
+  // Route traffic to cluster_1 so proxied requests reach the multi-HC host.
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    hcm.mutable_route_config()
+        ->mutable_virtual_hosts(0)
+        ->mutable_routes(0)
+        ->mutable_route()
+        ->set_cluster("cluster_1");
+  });
+
+  HttpIntegrationTest::initialize();
+
+  // Wait for both TCP health check connections.
+  ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+  ASSERT_TRUE(host_upstream_->waitForRawConnection(hc_connections_.emplace_back()));
+  ASSERT_TRUE(hc_connections_[0]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+  ASSERT_TRUE(hc_connections_[1]->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
+
+  // Make both health checks pass.
+  AssertionResult result = hc_connections_[0]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+  result = hc_connections_[1]->write("Pong1Pong2");
+  RELEASE_ASSERT(result, result.message());
+
+  test_server_->waitForGauge("cluster.cluster_1.membership_healthy", Eq(1));
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_excluded")->value());
+
+  // Register listener ports now that health checks have passed and the listener is ready.
+  registerTestServerPorts({"http"});
+
+  // Send a request through the proxy to cluster_1.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+
+  // Wait for the request to arrive at the upstream.
+  FakeHttpConnectionPtr upstream_conn;
+  ASSERT_TRUE(host_upstream_->waitForHttpConnection(*dispatcher_, upstream_conn));
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(upstream_conn->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+
+  // Upstream responds with x-envoy-immediate-health-check-fail header.
+  // This triggers setUnhealthyCrossThread from the worker thread.
+  upstream_request->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"x-envoy-immediate-health-check-fail", "true"}},
+      true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // The EXCLUDED_VIA_IMMEDIATE_HC_FAIL flag should propagate to the real host
+  // via the multi-checker's aggregation, visible as membership_excluded.
+  test_server_->waitForGauge("cluster.cluster_1.membership_excluded", Eq(1));
+
+  codec_client_->close();
+  result = upstream_conn->close();
+  RELEASE_ASSERT(result, result.message());
+}
+
 } // namespace Envoy

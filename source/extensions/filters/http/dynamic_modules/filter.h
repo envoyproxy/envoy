@@ -1,5 +1,11 @@
 #pragma once
 
+#include <atomic>
+#include <deque>
+
+#include "envoy/common/optref.h"
+#include "envoy/event/dispatcher.h"
+
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -42,9 +48,12 @@ public:
   FilterMetadataStatus decodeMetadata(MetadataMap&) override;
   void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    // We always register for downstream watermark callbacks. This allows all filters
-    // including the terminal filter to receive flow control events.
-    decoder_callbacks_->addDownstreamWatermarkCallbacks(*this);
+    // Publish the worker dispatcher for cross-thread `commit()`; see `dispatcher()`.
+    cached_dispatcher_.store(&callbacks.dispatcher(), std::memory_order_release);
+    // Registration is deferred until the in-module filter exists: the factory wires callbacks
+    // before initializeInModuleFilter(), and addDownstreamWatermarkCallbacks() synchronously
+    // replays any pending onAboveWriteBufferHighWatermark() into the newly registered callback.
+    maybeRegisterDownstreamWatermarkCallbacks();
   }
   void decodeComplete() override;
 
@@ -61,16 +70,53 @@ public:
 
   bool isDestroyed() const { return destroyed_; }
 
+  // RAII guard placed at each event hook that can invoke a module filter-state or metadata getter.
+  // Nested hooks share the outermost scope, so the returned views stay valid until the outermost
+  // hook returns and are then cleared.
+  class HookScope {
+  public:
+    explicit HookScope(DynamicModuleHttpFilter& filter) : filter_(filter) { ++filter_.hook_depth_; }
+    ~HookScope() {
+      if (--filter_.hook_depth_ == 0) {
+        filter_.filter_state_scratch_.clear();
+        filter_.metadata_scratch_.clear();
+      }
+    }
+
+  private:
+    DynamicModuleHttpFilter& filter_;
+  };
+
+  // Test-only accessor for the number of buffered filter-state getter results.
+  size_t filterStateScratchSizeForTest() const { return filter_state_scratch_.size(); }
+
+  // Test-only accessor for the number of buffered host metadata snapshots.
+  size_t metadataScratchSizeForTest() const { return metadata_scratch_.size(); }
+
+  /**
+   * Returns the worker dispatcher this filter is running on; safe to call from any thread.
+   * Returns nullptr until callbacks are wired and after `onDestroy()`.
+   */
+  Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
+
   // ----------  Http::DownstreamWatermarkCallbacks  ----------
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
 
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
 
-  // The callbacks for the filter. They are only valid until onDestroy() is called.
+  // Drive the response encoder directly for the streaming-response ABI. These set
+  // sent_local_reply_ so the module's own encode hooks are not re-entered for the response it is
+  // producing, matching sendLocalReply.
+  void sendResponseHeaders(ResponseHeaderMapPtr&& headers, bool end_stream);
+  void sendResponseData(Buffer::Instance& data, bool end_stream);
+  void sendResponseTrailers(ResponseTrailerMapPtr&& trailers);
+
+  // The callbacks for the filter. Worker-thread only; foreign threads must use `dispatcher()`.
+  // They are only valid until onDestroy() is called.
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
   bool destroyed_ = false;
@@ -81,9 +127,16 @@ public:
   Buffer::Instance* current_request_body_ = nullptr;
   Buffer::Instance* current_response_body_ = nullptr;
 
-  // Temporary storage for the serialized typed filter state value returned by
-  // get_filter_state_typed. Valid until the end of the current event hook.
-  absl::optional<std::string> last_serialized_filter_state_;
+  // Scratch buffers for values returned by filter-state and metadata getters. They must
+  // outlive the getter call so the module can read them until the current event hook returns. The
+  // deque keeps stable element addresses, so appending a serialized value never invalidates an
+  // earlier view. Host metadata is held by shared pointer, so its pointee stays valid regardless
+  // of vector growth.
+  std::deque<std::string> filter_state_scratch_;
+  std::vector<Upstream::MetadataConstSharedPtr> metadata_scratch_;
+
+  // Depth of nested event hooks. The scratch buffers are cleared when the outermost hook returns.
+  uint32_t hook_depth_ = 0;
 
   /**
    * Helper to get the correct callbacks.
@@ -102,28 +155,28 @@ public:
     if (decoder_callbacks_) {
       return decoder_callbacks_->requestHeaders();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   RequestTrailerMapOptRef requestTrailers() {
     if (decoder_callbacks_) {
       return decoder_callbacks_->requestTrailers();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ResponseHeaderMapOptRef responseHeaders() {
     if (encoder_callbacks_) {
       return encoder_callbacks_->responseHeaders();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   ResponseTrailerMapOptRef responseTrailers() {
     if (encoder_callbacks_) {
       return encoder_callbacks_->responseTrailers();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   /**
@@ -221,6 +274,7 @@ public:
 
   bool hasConfig() const { return config_ != nullptr; }
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
+  const DynamicModuleHttpFilterConfigSharedPtr& getFilterConfigSharedPtr() const { return config_; }
   Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
 
   /**
@@ -236,27 +290,45 @@ private:
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
 
   /**
-   * Called when filter is destroyed via onDestroy() or destructor. Forwards the call to the
-   * module via on_http_filter_destroy_ and resets in_module_filter_ to null. Subsequent calls are a
+   * Detaches from the module, cancels the pending callouts and streams, and destroys the in-module
+   * filter. When `dispatcher` is given the destroy hook runs from its deferred deletion list, so
+   * that the in-module filter outlives any module event hook on the stack. Subsequent calls are a
    * no-op.
    */
-  void destroy();
+  void destroy(OptRef<Event::Dispatcher> dispatcher = {});
 
-  // True if the filter is in the continue state. This is to avoid prohibited calls to
-  // continueDecoding() or continueEncoding() multiple times.
-  bool in_continue_ = false;
+  /**
+   * Registers this filter for downstream watermark callbacks once both decoder callbacks have been
+   * set and the in-module filter has been constructed. Idempotent; safe to call from either
+   * entry point regardless of which runs first.
+   */
+  void maybeRegisterDownstreamWatermarkCallbacks();
+
+  // True when the decode or encode direction is in the continue state. Tracked per direction to
+  // avoid prohibited repeat continueDecoding() or continueEncoding() calls, and so a continue in
+  // one direction never suppresses a resume in the other.
+  bool decode_in_continue_ = false;
+  bool encode_in_continue_ = false;
 
   // This helps to avoid reentering the module when sending a local reply. For example, if
   // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of
   // the stack calling it, which can be problematic. For example, with Rust, that might cause
-  // multiple mutable borrows of the same object. In practice, a module shouldn't need encodeHeaders
-  // and encodeData to be called for local reply contents, so we just skip them with this flag.
+  // multiple mutable borrows of the same object. In practice, a module shouldn't need its encode
+  // hooks called for local reply contents, so we just skip them with this flag. The
+  // streaming-response ABI (sendResponseHeaders and friends) sets it for the same reason.
   bool sent_local_reply_ = false;
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
   Stats::StatNameDynamicPool stat_name_pool_;
-  uint32_t worker_index_;
+  uint32_t worker_index_ = 0;
+  // Tracks whether addDownstreamWatermarkCallbacks() has been invoked on decoder_callbacks_.
+  // Also gates the paired remove in onDestroy(), because removeDownstreamWatermarkCallbacks()
+  // asserts that the callback was previously added.
+  bool downstream_watermark_callbacks_registered_ = false;
+
+  // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
+  std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -343,7 +415,9 @@ private:
     std::string byte_value;
   };
 
-  std::vector<StoredSocketOption> socket_options_;
+  // A deque keeps element addresses stable as options are appended, so a byte value view handed to
+  // a module stays valid until the filter is destroyed as the ABI promises.
+  std::deque<StoredSocketOption> socket_options_;
 
 public:
   /**
@@ -389,14 +463,24 @@ using DynamicModuleHttpFilterWeakPtr = std::weak_ptr<DynamicModuleHttpFilter>;
  */
 class DynamicModuleHttpFilterScheduler {
 public:
-  DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter,
-                                   Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterWeakPtr filter)
+      : filter_(std::move(filter)) {}
 
+  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
+  // `DynamicModuleHttpFilter::dispatcher()`); it never dereferences `decoder_callbacks_` from a
+  // foreign thread.
   void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleHttpFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
+    DynamicModuleHttpFilterSharedPtr filter_shared = filter_.lock();
+    if (!filter_shared) {
+      return;
+    }
+    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
+    if (dispatcher == nullptr) {
+      return;
+    }
+    dispatcher->post([filter = filter_, event_id]() {
+      if (DynamicModuleHttpFilterSharedPtr fs = filter.lock()) {
+        fs->onScheduled(event_id);
       }
     });
   }
@@ -405,8 +489,6 @@ private:
   // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the filter.
   DynamicModuleHttpFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace HttpFilters

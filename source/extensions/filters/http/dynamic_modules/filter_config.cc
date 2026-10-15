@@ -2,6 +2,14 @@
 
 #include <cstdint>
 
+#include "envoy/common/exception.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/secret/secret_manager.h"
+
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/protobuf/utility.h"
+
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -13,13 +21,94 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context, OptRef<Init::Manager> init_manager)
     : cluster_manager_(context.clusterManager()),
       main_thread_dispatcher_(context.mainThreadDispatcher()),
       stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
-      stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
-      filter_config_(filter_config), metrics_namespace_(metrics_namespace),
-      dynamic_module_(std::move(dynamic_module)) {}
+      metrics_(*stats_scope_), init_manager_(init_manager), server_context_(context),
+      filter_name_(filter_name), filter_config_(filter_config),
+      metrics_namespace_(metrics_namespace), dynamic_module_(std::move(dynamic_module)) {}
+
+size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view name,
+                                                             absl::string_view sds_config_source) {
+  static constexpr absl::string_view failure_prefix =
+      "dynamic module failed to subscribe to the generic secret";
+
+  // Allocating the thread local slot below and reaching into the secret manager are both
+  // main-thread-only. The freeze flag stops a module from subscribing after its configuration has
+  // been loaded, but not from doing so on its own thread while ``config_new`` runs.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  // Acquire-load pairs with the release-store in ``newDynamicModuleHttpFilterConfig``. See
+  // filter_config.h for the memory-order contract.
+  if (secret_subscription_frozen_.load(std::memory_order_acquire)) {
+    ENVOY_LOG(error, "{} '{}': secrets can only be subscribed during config initialization",
+              failure_prefix, name);
+    return 0;
+  }
+  if (name.empty()) {
+    ENVOY_LOG(error, "{}: the name is empty", failure_prefix);
+    return 0;
+  }
+
+  Secret::GenericSecretConfigProviderSharedPtr provider;
+  if (sds_config_source.empty()) {
+    // No config source: the name refers to a statically configured secret, mirroring how an
+    // ``SdsSecretConfig`` without ``sds_config`` is resolved.
+    provider = server_context_.secretManager().findStaticGenericSecretProvider(std::string(name));
+    if (provider == nullptr) {
+      ENVOY_LOG(error, "{} '{}': no such static secret", failure_prefix, name);
+      return 0;
+    }
+  } else {
+#ifdef ENVOY_ENABLE_YAML
+    envoy::config::core::v3::ConfigSource sds_config;
+    bool has_unknown_field = false;
+    if (absl::Status status =
+            MessageUtil::loadFromJsonNoThrow(sds_config_source, sds_config, has_unknown_field);
+        !status.ok()) {
+      ENVOY_LOG(error, "{} '{}': the config source is not a valid ConfigSource JSON: {}",
+                failure_prefix, name, status.message());
+      return 0;
+    }
+    // Creating the subscription validates the config source and can throw, e.g. when the config
+    // source refers to a cluster that does not exist. This is called from the module via the C ABI,
+    // so the exception must not escape this frame.
+    // TODO(wbpcode): remove the exception from the findOrCreateGenericSecretProvider
+    // and make it return a StatusOr instead, so that the exception handling can be removed here.
+    TRY_ASSERT_MAIN_THREAD {
+      provider = server_context_.secretManager().findOrCreateGenericSecretProvider(
+          sds_config, std::string(name), server_context_, init_manager_, true);
+    }
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      ENVOY_LOG(error, "{} '{}': {}", failure_prefix, name, e.what());
+      return 0;
+    });
+    if (provider == nullptr) {
+      ENVOY_LOG(error, "{} '{}': failed to create the SDS subscription", failure_prefix, name);
+      return 0;
+    }
+#else
+    ENVOY_LOG(error,
+              "{} '{}': JSON support is not compiled in, so a config source cannot be "
+              "parsed. Use a static secret instead.",
+              failure_prefix, name);
+    return 0;
+#endif
+  }
+
+  auto thread_local_provider = Secret::ThreadLocalGenericSecretProvider::create(
+      std::move(provider), server_context_.threadLocal(), server_context_.api(),
+      server_context_.mainThreadDispatcher());
+  if (!thread_local_provider.ok()) {
+    ENVOY_LOG(error, "{} '{}': {}", failure_prefix, name, thread_local_provider.status().message());
+    return 0;
+  }
+  generic_secrets_.push_back(std::move(thread_local_provider.value()));
+  // IDs are 1-based so that 0 can signal failure to the module.
+  return generic_secrets_.size();
+}
 
 DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
   // When the initialization of the dynamic module fails, the in_module_config_ is nullptr,
@@ -57,13 +146,31 @@ DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
 }
 
 DynamicModuleHttpPerRouteFilterConfig::~DynamicModuleHttpPerRouteFilterConfig() {
-  (*destroy_)(config_);
+  if (main_dispatcher_.isThreadSafe()) {
+    (*destroy_)(config_);
+    return;
+  }
+  // The module builds its per-route configuration on the main thread, and the destroy hook is
+  // documented to run there as well: a module is free to use configuration callbacks from it, and
+  // those require the main thread. A route configuration can be released on a worker thread when
+  // an RDS update replaces it, so hand the in-module configuration to the main dispatcher, along
+  // with the module handle that has to outlive the call.
+  //
+  // If the main dispatcher has already exited then the posted callback is destroyed together with
+  // the dispatcher and the hook runs at that point instead, still on the main thread.
+  main_dispatcher_.post(
+      [config = config_, destroy = destroy_, module = std::move(dynamic_module_)]() mutable {
+        (*destroy)(config);
+        // The module is unloaded only after its destroy hook has returned.
+        module.reset();
+      });
 }
 
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
-newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name,
+newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
-                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                                   Event::Dispatcher& main_dispatcher) {
   auto constructor =
       dynamic_module
           ->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_per_route_config_new)>(
@@ -74,22 +181,21 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
       "envoy_dynamic_module_on_http_filter_per_route_config_destroy");
   RETURN_IF_NOT_OK_REF(destroy.status());
 
-  const void* filter_config_envoy_ptr =
-      (*constructor.value())({per_route_config_name.data(), per_route_config_name.size()},
-                             {filter_config.data(), filter_config.size()});
+  const void* filter_config_envoy_ptr = (*constructor.value())(
+      {filter_name.data(), filter_name.size()}, {filter_config.data(), filter_config.size()});
   if (filter_config_envoy_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize per-route dynamic module");
   }
 
   return std::make_shared<const DynamicModuleHttpPerRouteFilterConfig>(
-      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module));
+      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module), main_dispatcher);
 }
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     const absl::string_view metrics_namespace, const bool terminal_filter,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context, OptRef<Init::Manager> init_manager) {
   auto constructor =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_config_new)>(
           "envoy_dynamic_module_on_http_filter_config_new");
@@ -202,11 +308,10 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
 
   auto on_local_reply = dynamic_module->getFunctionPointer<OnHttpFilterLocalReplyType>(
       "envoy_dynamic_module_on_http_filter_local_reply");
-  RETURN_IF_NOT_OK_REF(on_local_reply.status());
 
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
       filter_name, filter_config, metrics_namespace, std::move(dynamic_module), stats_scope,
-      context);
+      context, init_manager);
 
   const void* filter_config_envoy_ptr = (*constructor.value())(
       static_cast<void*>(config.get()), {filter_name.data(), filter_name.size()},
@@ -216,7 +321,16 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   }
 
   config->terminal_filter_ = terminal_filter;
-  config->stat_creation_frozen_ = true;
+  // Release-store: pairs with the acquire-loads in the per-request ``define_*`` callbacks
+  // (in abi_impl.cc) so a worker thread that observes ``stat_creation_frozen_=true`` is
+  // guaranteed to also observe all preceding writes to ``config``. Defends against an
+  // adversarial module spawning a worker inside ``on_http_filter_config_new`` that reads the
+  // flag before the C++-side shared_ptr publication establishes happens-before.
+  config->stat_creation_frozen_.store(true, std::memory_order_release);
+  // Same contract for secret subscriptions, which are likewise only allowed while the module's
+  // ``config_new`` hook is running. The init manager reference does not outlive that hook either.
+  config->secret_subscription_frozen_.store(true, std::memory_order_release);
+  config->init_manager_ = std::nullopt;
 
   config->in_module_config_ = filter_config_envoy_ptr;
   config->on_http_filter_config_destroy_ = on_config_destroy.value();
@@ -261,7 +375,9 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
       on_downstream_above_write_buffer_high_watermark.value();
   config->on_http_filter_downstream_below_write_buffer_low_watermark_ =
       on_downstream_below_write_buffer_low_watermark.value();
-  config->on_http_filter_local_reply_ = on_local_reply.value();
+  if (on_local_reply.ok()) {
+    config->on_http_filter_local_reply_ = on_local_reply.value();
+  }
   return config;
 }
 

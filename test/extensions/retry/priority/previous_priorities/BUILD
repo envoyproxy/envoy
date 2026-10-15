@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.retry_priorities.previous_priorities"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/retry/priority/previous_priorities:config",

@@ -1,5 +1,7 @@
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
+#include <optional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 
@@ -7,9 +9,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -65,14 +66,40 @@ IoHandleImpl::~IoHandleImpl() {
   }
 }
 
+void IoHandleImpl::setAbortiveClose() {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_send_rst_on_user_space_socket")) {
+    rst_requested_ = true;
+  }
+}
+
+void IoHandleImpl::onPeerDestroy() {
+  // The peer has called close(). If this handle has already sent EOF to the peer, then this
+  // completes the half-close; otherwise, subsequent read() calls should return ECONNRESET.
+  //
+  // Same guard as the abortive close path in setAbortiveClose(): both turn a peer-side
+  // disconnect into a reset on the read side, so they are enabled and disabled together.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_send_rst_on_user_space_socket") &&
+      !sent_eof_) {
+    receive_data_reset_after_drain_ = true;
+  }
+  peer_handle_ = nullptr;
+  sent_eof_ = true;
+}
+
 Api::IoCallUint64Result IoHandleImpl::close() {
   ASSERT(!closed_);
   if (!closed_) {
     if (peer_handle_) {
       ENVOY_LOG(trace, "socket {} close before peer {} closes.", static_cast<void*>(this),
                 static_cast<void*>(peer_handle_));
-      // Notify the peer we won't write more data. shutdown(WRITE).
-      peer_handle_->setWriteEnd();
+      if (rst_requested_) {
+        peer_handle_->setRst();
+      } else {
+        // Notify the peer that it will not receive more data. shutdown(WRITE).
+        peer_handle_->setEof();
+      }
       // Notify the peer that we no longer accept data. shutdown(RD).
       peer_handle_->onPeerDestroy();
       peer_handle_ = nullptr;
@@ -97,8 +124,14 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
   if (!isOpen()) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_BADF)};
   }
+  if (receive_data_reset_) {
+    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+  }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
+      if (receive_data_reset_after_drain_) {
+        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -122,7 +155,7 @@ Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlic
 }
 
 Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
-                                           absl::optional<uint64_t> max_length_opt) {
+                                           std::optional<uint64_t> max_length_opt) {
   // Below value comes from Buffer::OwnedImpl::default_read_reservation_size_.
   uint64_t max_length = max_length_opt.value_or(MAX_FRAGMENT * FRAGMENT_SIZE);
   if (max_length == 0) {
@@ -131,8 +164,14 @@ Api::IoCallUint64Result IoHandleImpl::read(Buffer::Instance& buffer,
   if (!isOpen()) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_BADF)};
   }
+  if (receive_data_reset_) {
+    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+  }
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
+      if (receive_data_reset_after_drain_) {
+        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -162,16 +201,16 @@ Api::IoCallUint64Result IoHandleImpl::writev(const Buffer::RawSlice* slices, uin
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // Error: write after close.
-  if (peer_handle_->isPeerShutDownWrite()) {
+  if (peer_handle_->hasReceivedEof()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // The peer is valid but temporarily does not accept new data. Likely due to flow control.
-  if (!peer_handle_->isWritable()) {
+  if (!peer_handle_->canReceiveData()) {
     return {0, Network::IoSocketError::getIoSocketEagainError()};
   }
 
-  auto* const dest_buffer = peer_handle_->getWriteBuffer();
+  auto* const dest_buffer = peer_handle_->getReceiveBuffer();
   // Write along with iteration. Buffer guarantee the fragment is always append-able.
   uint64_t bytes_written = 0;
   for (uint64_t i = 0; i < num_slice && !dest_buffer->highWatermarkTriggered(); i++) {
@@ -198,23 +237,28 @@ Api::IoCallUint64Result IoHandleImpl::write(Buffer::Instance& buffer) {
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // Error: write after close.
-  if (peer_handle_->isPeerShutDownWrite()) {
+  if (peer_handle_->hasReceivedEof()) {
     // TODO(lambdai): `EPIPE` or `ENOTCONN`.
     return {0, Network::IoSocketError::create(SOCKET_ERROR_INVAL)};
   }
   // The peer is valid but temporarily does not accept new data. Likely due to flow control.
-  if (!peer_handle_->isWritable()) {
+  if (!peer_handle_->canReceiveData()) {
     return {0, Network::IoSocketError::getIoSocketEagainError()};
   }
   const uint64_t max_bytes_to_write = buffer.length();
   const uint64_t total_bytes_to_write =
-      moveUpTo(*peer_handle_->getWriteBuffer(), buffer,
+      moveUpTo(*peer_handle_->getReceiveBuffer(), buffer,
                // Below value comes from Buffer::OwnedImpl::default_read_reservation_size_.
                MAX_FRAGMENT * FRAGMENT_SIZE);
   peer_handle_->setNewDataAvailable();
   ENVOY_LOG(trace, "socket {} write {} bytes of {}", static_cast<void*>(this), total_bytes_to_write,
             max_bytes_to_write);
   return {total_bytes_to_write, Api::IoError::none()};
+}
+
+Api::IoCallUint64Result IoHandleImpl::send(const void* buffer, size_t length) {
+  Buffer::RawSlice slice{const_cast<void*>(buffer), length};
+  return writev(&slice, 1);
 }
 
 Api::IoCallUint64Result IoHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
@@ -239,9 +283,15 @@ Api::IoCallUint64Result IoHandleImpl::recv(void* buffer, size_t length, int flag
   if (!isOpen()) {
     return {0, Network::IoSocketError::getIoSocketEbadfError()};
   }
+  if (receive_data_reset_) {
+    return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+  }
   // No data and the writer closed.
   if (pending_received_data_.length() == 0) {
     if (receive_data_end_stream_) {
+      if (receive_data_reset_after_drain_) {
+        return {0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET)};
+      }
       return {0, Api::IoError::none()};
     } else {
       return {0, Network::IoSocketError::getIoSocketEagainError()};
@@ -313,7 +363,7 @@ Api::SysCallIntResult IoHandleImpl::ioctl(unsigned long, void*, unsigned long, v
 
 Api::SysCallIntResult IoHandleImpl::setBlocking(bool) { return makeInvalidSyscallResult(); }
 
-absl::optional<int> IoHandleImpl::domain() { return absl::nullopt; }
+std::optional<int> IoHandleImpl::domain() { return std::nullopt; }
 
 absl::StatusOr<Network::Address::InstanceConstSharedPtr> IoHandleImpl::localAddress() {
   return IoHandleImpl::getCommonInternalAddress();
@@ -360,11 +410,11 @@ Api::SysCallIntResult IoHandleImpl::shutdown(int how) {
   // Support only shutdown write.
   ASSERT(how == ENVOY_SHUT_WR);
   ASSERT(!closed_);
-  if (!write_shutdown_) {
+  if (!sent_eof_) {
     ASSERT(peer_handle_);
-    // Notify the peer we won't write more data.
-    peer_handle_->setWriteEnd();
-    write_shutdown_ = true;
+    // Notify the peer that it will not receive more data.
+    peer_handle_->setEof();
+    sent_eof_ = true;
   }
   return {0, 0};
 }
@@ -385,8 +435,8 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
   }
   for (const auto& object : filter_state_objects_) {
     // This should not throw as stream info is new and filter objects are uniquely named.
-    filter_state.setData(object.name_, object.data_, object.state_type_,
-                         StreamInfo::FilterState::LifeSpan::Connection, object.stream_sharing_);
+    filter_state.setData(object.name_, object.data_, StreamInfo::FilterState::LifeSpan::Connection,
+                         object.stream_sharing_);
   }
   metadata_ = nullptr;
   filter_state_objects_.clear();

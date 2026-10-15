@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/http/client_codec_factory.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -291,45 +292,59 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
                                  const Network::TransportSocketOptionsConstSharedPtr& options,
                                  bool should_connect)
     : CodecClient(type, std::move(connection), host, dispatcher) {
-  switch (type) {
-  case CodecType::HTTP1: {
-    // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It will
-    // send fully qualified URLs iff the underlying transport is plaintext.
-    bool proxied = false;
-    if (options && options->http11ProxyInfo().has_value()) {
-      proxied = true;
+  // A per-cluster upstream codec factory (configured via typed_extension_protocol_options) may
+  // build a custom client codec for this connection. It returns nullptr to defer to the stock
+  // codec built below. The stock codec is only constructed when no custom codec is used, because
+  // constructing it has immediate side effects on the connection (e.g. the HTTP/2 codec writes
+  // SETTINGS), so building one we would discard could corrupt the connection.
+  if (auto factory = host->cluster().upstreamHttpClientCodecFactory(); factory.has_value()) {
+    codec_ = factory->createClientCodec(Http::ClientCodecFactory::Context{
+        type, *connection_, *this, host->cluster(), random_generator, options});
+  }
+
+  if (codec_ == nullptr) {
+    switch (type) {
+    case CodecType::HTTP1: {
+      // If the transport socket indicates this is being proxied, inform the HTTP/1.1 codec. It will
+      // send fully qualified URLs iff the underlying transport is plaintext.
+      bool proxied = false;
+      if (options && options->http11ProxyInfo().has_value()) {
+        proxied = true;
+      }
+      codec_ = std::make_unique<Http1::ClientConnectionImpl>(
+          *connection_, host->cluster().http1CodecStats(), *this,
+          host->cluster().httpProtocolOptions().http1Settings(),
+          host->cluster().maxResponseHeadersKb(), host->cluster().maxResponseHeadersCount(),
+          proxied);
+      break;
     }
-    codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        *connection_, host->cluster().http1CodecStats(), *this,
-        host->cluster().httpProtocolOptions().http1Settings(),
-        host->cluster().maxResponseHeadersKb(), host->cluster().maxResponseHeadersCount(), proxied);
-    break;
-  }
-  case CodecType::HTTP2:
-    codec_ = std::make_unique<Http2::ClientConnectionImpl>(
-        *connection_, *this, host->cluster().http2CodecStats(), random_generator,
-        host->cluster().httpProtocolOptions().http2Options(),
-        host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
-        host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
-    break;
-  case CodecType::HTTP3: {
+    case CodecType::HTTP2:
+      codec_ = std::make_unique<Http2::ClientConnectionImpl>(
+          *connection_, *this, host->cluster().http2CodecStats(), random_generator,
+          host->cluster().httpProtocolOptions().http2Options(),
+          host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+          host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
+      break;
+    case CodecType::HTTP3: {
 #ifdef ENVOY_ENABLE_QUIC
-    auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
-    codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
-        quic_session, *this, host->cluster().http3CodecStats(),
-        host->cluster().httpProtocolOptions().http3Options(),
-        host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
-        host->cluster().maxResponseHeadersCount());
-    // Initialize the session after max request header size is changed in above http client
-    // connection creation.
-    quic_session.Initialize();
-    break;
+      auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
+      codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
+          quic_session, *this, host->cluster().http3CodecStats(),
+          host->cluster().httpProtocolOptions().http3Options(),
+          host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+          host->cluster().maxResponseHeadersCount());
+      // Initialize the session after max request header size is changed in above http client
+      // connection creation.
+      quic_session.Initialize();
+      break;
 #else
-    // Should be blocked by configuration checking at an earlier point.
-    PANIC("unexpected");
+      // Should be blocked by configuration checking at an earlier point.
+      PANIC("unexpected");
 #endif
+    }
+    }
   }
-  }
+
   if (should_connect) {
     connect();
   }

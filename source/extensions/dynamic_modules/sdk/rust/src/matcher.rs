@@ -3,9 +3,9 @@
 //! This module provides traits and types for implementing custom input matchers as dynamic modules.
 //! A matcher evaluates HTTP request/response data and returns a boolean match result.
 
-use crate::abi;
+use crate::{abi, EnvoyBuffer};
 use std::ffi::c_void;
-use std::{ptr, slice};
+use std::ptr;
 
 /// Read-only context for accessing HTTP matching data during match evaluation.
 ///
@@ -20,6 +20,15 @@ impl MatchContext {
   #[doc(hidden)]
   pub fn new(envoy_ptr: *mut c_void) -> Self {
     Self { envoy_ptr }
+  }
+
+  /// Reports through the ABI that the module could not complete this evaluation, so Envoy applies
+  /// its configured on_error policy instead of reading a match result. Used by the panic barrier.
+  #[doc(hidden)]
+  pub fn report_error(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_matcher_set_error(self.envoy_ptr);
+    }
   }
 
   /// Get a request header value by key.
@@ -52,51 +61,18 @@ impl MatchContext {
     }
   }
 
-  /// Get all headers from the specified header map as key-value pairs.
+  /// Get all headers from the specified header map as key-value [`EnvoyBuffer`] pairs.
   ///
-  /// Returns a vector of `(key, value)` byte slices, or `None` if the header map
-  /// is not available.
+  /// Returns an empty vector if there are no headers or the header map is not available.
   pub fn get_all_headers(
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
-  ) -> Option<Vec<(&[u8], &[u8])>> {
-    let size = self.get_headers_size(header_type);
-    if size == 0 {
-      return None;
-    }
-
-    let mut headers = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: ptr::null_mut(),
-        key_length: 0,
-        value_ptr: ptr::null_mut(),
-        value_length: 0,
-      };
-      size
-    ];
-
-    let result = unsafe {
-      abi::envoy_dynamic_module_callback_matcher_get_headers(
-        self.envoy_ptr,
-        header_type,
-        headers.as_mut_ptr(),
-      )
-    };
-
-    if !result {
-      return None;
-    }
-
-    Some(
-      headers
-        .iter()
-        .map(|h| unsafe {
-          (
-            slice::from_raw_parts(h.key_ptr as *const u8, h.key_length),
-            slice::from_raw_parts(h.value_ptr as *const u8, h.value_length),
-          )
-        })
-        .collect(),
+  ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    crate::utility::collect_headers(
+      || self.get_headers_size(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_matcher_get_headers(self.envoy_ptr, header_type, headers)
+      },
     )
   }
 
@@ -125,7 +101,7 @@ impl MatchContext {
       )
     } {
       unsafe {
-        Some(slice::from_raw_parts(
+        Some(crate::ffi_helpers::slice_from_raw_or_empty(
           result.ptr as *const u8,
           result.length,
         ))
@@ -170,27 +146,28 @@ pub trait MatcherConfig: Sized + Send + Sync + 'static {
 ///
 /// # Example
 ///
-/// ```ignore
-/// use envoy_dynamic_modules_rust_sdk::{matcher::*, declare_matcher};
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::declare_matcher;
+/// use envoy_proxy_dynamic_modules_rust_sdk::matcher::*;
 ///
 /// struct MyMatcherConfig {
-///     expected_value: String,
+///   expected_value: String,
 /// }
 ///
 /// impl MatcherConfig for MyMatcherConfig {
-///     fn new(_name: &str, config: &[u8]) -> Result<Self, String> {
-///         Ok(Self {
-///             expected_value: String::from_utf8_lossy(config).to_string(),
-///         })
-///     }
+///   fn new(_name: &str, config: &[u8]) -> Result<Self, String> {
+///     Ok(Self {
+///       expected_value: String::from_utf8_lossy(config).to_string(),
+///     })
+///   }
 ///
-///     fn on_matcher_match(&self, ctx: &MatchContext) -> bool {
-///         if let Some(value) = ctx.get_request_header("x-match-header") {
-///             value == self.expected_value.as_bytes()
-///         } else {
-///             false
-///         }
+///   fn on_matcher_match(&self, ctx: &MatchContext) -> bool {
+///     if let Some(value) = ctx.get_request_header("x-match-header") {
+///       value == self.expected_value.as_bytes()
+///     } else {
+///       false
 ///     }
+///   }
 /// }
 ///
 /// declare_matcher!(MyMatcherConfig);
@@ -198,42 +175,56 @@ pub trait MatcherConfig: Sized + Send + Sync + 'static {
 #[macro_export]
 macro_rules! declare_matcher {
   ($config_type:ty) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_config_new(
-      _config_envoy_ptr: *mut ::std::ffi::c_void,
-      name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
-      config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
-    ) -> *const ::std::ffi::c_void {
-      let name_str = unsafe {
-        let slice = ::std::slice::from_raw_parts(name.ptr as *const u8, name.length);
-        ::std::str::from_utf8(slice).unwrap_or("")
-      };
-      let config_bytes =
-        unsafe { ::std::slice::from_raw_parts(config.ptr as *const u8, config.length) };
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_config_new(
+        _config_envoy_ptr: *mut ::std::ffi::c_void,
+        name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
+        config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
+      ) -> *const ::std::ffi::c_void {
+        // Safe under `(nullptr, 0)` via `ffi_helpers`. The matcher name is used as a registry
+        // lookup key by user `MatcherConfig::new` implementations, so invalid UTF-8 must map to
+        // the empty string rather than being rewritten with `U+FFFD` substitutions; the latter
+        // would silently route invalid bytes to a different registry entry.
+        let name_slice = unsafe {
+          $crate::ffi_helpers::slice_from_raw_or_empty(name.ptr as *const u8, name.length)
+        };
+        let name_str: &str = ::std::str::from_utf8(name_slice).unwrap_or("");
+        let config_bytes = unsafe {
+          $crate::ffi_helpers::slice_from_raw_or_empty(config.ptr as *const u8, config.length)
+        };
 
-      match <$config_type as $crate::matcher::MatcherConfig>::new(name_str, config_bytes) {
-        Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,
-        Err(_) => ::std::ptr::null(),
+        match <$config_type as $crate::matcher::MatcherConfig>::new(name_str, config_bytes) {
+          Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,
+          Err(_) => ::std::ptr::null(),
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_config_destroy(config_ptr: *const ::std::ffi::c_void) {
+        unsafe {
+          drop(Box::from_raw(config_ptr as *mut $config_type));
+        }
       }
     }
 
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_config_destroy(
-      config_ptr: *const ::std::ffi::c_void,
-    ) {
-      unsafe {
-        drop(Box::from_raw(config_ptr as *mut $config_type));
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_match(
+        config_ptr: *const ::std::ffi::c_void,
+        matcher_input_envoy_ptr: *mut ::std::ffi::c_void,
+      ) -> bool {
+        let config = unsafe { &*(config_ptr as *const $config_type) };
+        let ctx = $crate::matcher::MatchContext::new(matcher_input_envoy_ptr);
+        <$config_type as $crate::matcher::MatcherConfig>::on_matcher_match(config, &ctx)
       }
-    }
-
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_match(
-      config_ptr: *const ::std::ffi::c_void,
-      matcher_input_envoy_ptr: *mut ::std::ffi::c_void,
-    ) -> bool {
-      let config = unsafe { &*(config_ptr as *const $config_type) };
-      let ctx = $crate::matcher::MatchContext::new(matcher_input_envoy_ptr);
-      config.on_matcher_match(&ctx)
+      // A panic cannot report a match result, so tell Envoy the evaluation did not complete and let
+      // the matcher apply its configured on_error policy. The returned value is unused once the
+      // error is reported.
+      on_panic = {
+        $crate::matcher::MatchContext::new(matcher_input_envoy_ptr).report_error();
+        false
+      }
     }
   };
 }

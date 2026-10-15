@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # Posix signal tests are irrelevant to Windows
     tags = [
         "backtrace",
@@ -21,6 +21,18 @@ envoy_cc_test(
         "//source/common/signal:fatal_error_handler_lib",
         "//source/common/signal:sigaction_lib",
         "//test/common/memory:memory_test_utility_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "non_fatal_signal_test",
+    srcs = ["non_fatal_signal_test.cc"],
+    rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/signal:non_fatal_signal_handler_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -28,10 +40,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fatal_action_test",
     srcs = ["fatal_action_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/signal:fatal_error_handler_lib",
-        "//test/mocks/server:instance_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
     ],
 )

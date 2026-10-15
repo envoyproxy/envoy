@@ -127,23 +127,55 @@ absl::Status ThreadAwareLoadBalancerBase::initialize() {
   // I will look into doing this in a follow up. Doing everything using a background thread heavily
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update")) {
-    member_update_cb_ =
-        priority_set_.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+  //
+  // refresh() rebuilds the factory state (the ring/table) that worker threads snapshot. It must
+  // run before the cluster manager posts the corresponding host update to the worker threads,
+  // otherwise a worker can wake up and snapshot a stale factory (see
+  // https://github.com/envoyproxy/envoy/issues/45055). The cluster manager posts from a
+  // PriorityUpdateCb registered after this load balancer's callbacks, so refreshing from our own
+  // PriorityUpdateCb keeps refresh() ahead of the post.
+  //
+  // The exception is a batch host update: there the per-priority PriorityUpdateCb fires repeatedly
+  // (once per priority) while the MemberUpdateCb fires only once at the end of the batch. To avoid
+  // rebuilding the factory N times per batch, we defer the refresh to the single end-of-batch
+  // MemberUpdateCb while a batch is in progress. This coalescing is gated behind two runtime flags:
+  //   - coalesce_lb_rebuilds_on_batch_update: when false we always refresh from the
+  //     PriorityUpdateCb, regardless of whether a batch is in progress.
+  //   - enable_batch_aware_update: this also makes the cluster manager post the whole batch as a
+  //     single cross-thread update at the end of the batch (from a MemberUpdateCb registered after
+  //     this load balancer's). Deferring our refresh is only safe when that post is also deferred,
+  //     so both flags must be enabled for us to defer.
+  const bool coalesce_lb_rebuilds = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.coalesce_lb_rebuilds_on_batch_update");
+  const bool batch_aware_update =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
+  const bool defer_refresh_during_batch = coalesce_lb_rebuilds && batch_aware_update;
+
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+      [this, defer_refresh_during_batch](uint32_t, const HostVector&, const HostVector&) {
+        // Refresh eagerly here if we didn't enable coalescing or the batch-aware update.
+        if (!defer_refresh_during_batch) {
           processDirtyPriorities();
           refresh();
-        });
+        }
+      });
+  member_update_cb_ = priority_set_.addMemberUpdateCb(
+      [this, defer_refresh_during_batch](const HostVector&, const HostVector&) {
+        // If we enabled coalescing and the batch-aware update. The cluster manager will post the
+        // update to the worker threads at the member update callback. We can safely refresh here
+        // because our member update callback is registered before the cluster manager's, so we will
+        // always refresh before the worker threads snapshot the new state.
+        if (defer_refresh_during_batch) {
+          processDirtyPriorities();
+          refresh();
+        }
+      });
 
-    // PriorityUpdateCb can fire before initialize() during batch host updates, while MemberUpdateCb
-    // (which flushes dirty priorities) is deferred until the batch completes. If initialize() is
-    // invoked mid-batch, process any queued priorities now so per_priority_panic_ is sized for all
-    // current priorities before refresh() indexes into it.
-    processDirtyPriorities();
-  } else {
-    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-        [this](uint32_t, const HostVector&, const HostVector&) { refresh(); });
-  }
+  // PriorityUpdateCb can fire before initialize() during batch host updates, while MemberUpdateCb
+  // (which flushes dirty priorities) is deferred until the batch completes. If initialize() is
+  // invoked mid-batch, process any queued priorities now so per_priority_panic_ is sized for all
+  // current priorities before refresh() indexes into it.
+  processDirtyPriorities();
 
   refresh();
   return absl::OkStatus();
@@ -177,7 +209,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
   }
 
   {
-    absl::WriterMutexLock lock(&factory_->mutex_);
+    absl::WriterMutexLock lock(factory_->mutex_);
     factory_->healthy_per_priority_load_ = healthy_per_priority_load;
     factory_->degraded_per_priority_load_ = degraded_per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;
@@ -196,7 +228,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
   // computeHashKey() may be computed on demand, so get it only once.
-  absl::optional<uint64_t> hash;
+  std::optional<uint64_t> hash;
   if (context) {
     // If there is a hash policy, use the hash policy in the load balancer first.
     if (hash_policy_ != nullptr) {
@@ -236,16 +268,30 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   return host;
 }
 
-LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams) {
-  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_, hash_policy_);
+void ThreadAwareLoadBalancerBase::LoadBalancerImpl::refresh() {
+  // The per priority state is shared across all threads and refreshed on main thread. We need to
+  // copy the latest per priority state to the worker thread load balancer instance under lock.
+  absl::ReaderMutexLock lock(factory_->mutex_);
+  healthy_per_priority_load_ = factory_->healthy_per_priority_load_;
+  degraded_per_priority_load_ = factory_->degraded_per_priority_load_;
+  per_priority_state_ = factory_->per_priority_state_;
+}
 
-  // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
-  // threads. All complex processing has already been precalculated however.
-  absl::ReaderMutexLock lock(mutex_);
-  lb->healthy_per_priority_load_ = healthy_per_priority_load_;
-  lb->degraded_per_priority_load_ = degraded_per_priority_load_;
-  lb->per_priority_state_ = per_priority_state_;
-  return lb;
+ThreadAwareLoadBalancerBase::LoadBalancerImpl::LoadBalancerImpl(
+    std::shared_ptr<LoadBalancerFactoryImpl> factory, ClusterLbStats& stats,
+    Random::RandomGenerator& random, HashPolicySharedPtr hash_policy,
+    const Upstream::PrioritySet& priority_set)
+    : factory_(std::move(factory)), stats_(stats), random_(random),
+      hash_policy_(std::move(hash_policy)) {
+  member_update_cb_ =
+      priority_set.addMemberUpdateCb([this](const HostVector&, const HostVector&) { refresh(); });
+  refresh();
+}
+
+LoadBalancerPtr
+ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
+  return std::make_unique<LoadBalancerImpl>(shared_from_this(), stats_, random_, hash_policy_,
+                                            params.priority_set);
 }
 
 double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverloadFactor(
@@ -379,15 +425,19 @@ TypedHashLbConfigBase::TypedHashLbConfigBase(absl::Span<const HashPolicyProto* c
 absl::Status TypedHashLbConfigBase::validateEndpoints(const PriorityState& priorities) const {
 
   for (const auto& [hosts, locality_weights_map] : priorities) {
-    // Sum should be at most uint32_t max value, so we can validate it by accumulating into uint64_t
-    // and making sure there was no overflow.
-    uint64_t host_sum = 0;
-    for (const auto& host : *hosts) {
-      host_sum += host->weight();
-      if (host_sum > std::numeric_limits<uint32_t>::max()) {
-        return absl::InvalidArgumentError(
-            fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
-                        std::numeric_limits<uint32_t>::max()));
+    // Non-contiguous priorities can leave null entries in the priority vector.
+    // Only skip the host-weight check; locality weights are still validated.
+    if (hosts != nullptr) {
+      // Sum should be at most uint32_t max value, so we can validate it by accumulating into
+      // uint64_t and making sure there was no overflow.
+      uint64_t host_sum = 0;
+      for (const auto& host : *hosts) {
+        host_sum += host->weight();
+        if (host_sum > std::numeric_limits<uint32_t>::max()) {
+          return absl::InvalidArgumentError(
+              fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
+                          std::numeric_limits<uint32_t>::max()));
+        }
       }
     }
 

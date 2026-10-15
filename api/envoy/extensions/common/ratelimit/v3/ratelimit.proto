@@ -118,6 +118,10 @@ message RateLimitDescriptor {
 
     // The unit of time.
     type.v3.RateLimitUnit unit = 2 [(validate.rules).enum = {defined_only: true}];
+
+    // The number of units in the rate limit period. For example, a value of ``30`` with a unit
+    // of ``SECOND`` specifies a 30-second rate limit period. If not specified, defaults to ``1``.
+    google.protobuf.UInt32Value unit_multiplier = 3 [(validate.rules).uint32 = {gt: 0}];
   }
 
   // Descriptor entries.
@@ -129,6 +133,11 @@ message RateLimitDescriptor {
   // Optional hits_addend for the rate limit descriptor. If set the value will override the
   // request level hits_addend.
   google.protobuf.UInt64Value hits_addend = 3;
+
+  // If true, the hits_addend value will be treated as negative, effectively adding to
+  // the rate limit budget instead of consuming from it. This can be used to refill previously consumed
+  // rate limit tokens.
+  bool is_negative_hits = 4;
 }
 
 // Configuration used to enable local rate limiting.

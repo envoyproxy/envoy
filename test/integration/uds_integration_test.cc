@@ -135,7 +135,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
 
   auto credentials = codec_client_->connection()->unixSocketPeerCredentials();
 #ifndef SO_PEERCRED
-  EXPECT_EQ(credentials, absl::nullopt);
+  EXPECT_EQ(credentials, std::nullopt);
 #else
   EXPECT_EQ(credentials->pid, getpid());
   EXPECT_EQ(credentials->uid, getuid());

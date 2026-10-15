@@ -14,7 +14,6 @@ namespace Http {
 namespace Udp {
 
 using ::testing::NiceMock;
-using ::testing::Return;
 
 class UdpGenericConnPoolFactoryTest : public ::testing::Test {
 public:

@@ -1,8 +1,13 @@
+#include "source/common/config/well_known_names.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -12,6 +17,51 @@ namespace {
 class FaultIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
 public:
+  // Whether the stats store derives tags with the explicit-tags logic (the tag-friendly scope API)
+  // rather than with the legacy tag-extraction rules. Both modes must produce identical stat names,
+  // tag-extracted names and tags for the filter stats asserted below.
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+    // server in different modes. The mode is read during server initialization, before the runtime
+    // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
+    HttpProtocolIntegrationTest::initialize();
+
+    // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+    // would silently be exercising the same thing.
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->useExplicitTags(), explicitTags());
+  }
+
+  // Checks a stat's flat name, the name it is tag-extracted to, and the tags attached to it.
+  //
+  // Only used for stats whose tags come entirely from the connection manager's prefix, that is the
+  // 'envoy.http_conn_manager_prefix' tag. The per-downstream-cluster 'fault.<cluster>.' stats,
+  // which carry an 'envoy.fault_downstream_cluster' tag of their own, are not exercised here.
+  void expectStat(const std::string& name, const std::string& tag_extracted_name,
+                  const std::vector<std::pair<std::string, std::string>>& tags) {
+    Stats::CounterSharedPtr counter = test_server_->counter(name);
+    Stats::GaugeSharedPtr gauge = test_server_->gauge(name);
+    const Stats::Metric* metric = counter != nullptr ? static_cast<Stats::Metric*>(counter.get())
+                                                     : static_cast<Stats::Metric*>(gauge.get());
+    ASSERT_NE(metric, nullptr) << "no counter or gauge named '" << name << "'";
+
+    EXPECT_EQ(metric->tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
+
+    std::vector<std::pair<std::string, std::string>> actual_tags;
+    for (const Stats::Tag& tag : metric->tags()) {
+      actual_tags.emplace_back(tag.name_, tag.value_);
+    }
+    std::sort(actual_tags.begin(), actual_tags.end());
+    std::vector<std::pair<std::string, std::string>> expected_tags = tags;
+    std::sort(expected_tags.begin(), expected_tags.end());
+    EXPECT_EQ(actual_tags, expected_tags) << " for stat '" << name << "'";
+  }
+
   void initializeFilter(const std::string& filter_config) {
     config_helper_.prependFilter(filter_config);
     initialize();
@@ -108,6 +158,18 @@ typed_config:
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
   EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
+
+  // The filter's stats live in the connection manager's scope, so they carry its prefix in both
+  // their flat name and its tag.
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  expectStat("http.config_test.fault.aborts_injected", "http.fault.aborts_injected",
+             {{hcm_prefix, "config_test"}});
+  expectStat("http.config_test.fault.delays_injected", "http.fault.delays_injected",
+             {{hcm_prefix, "config_test"}});
+  expectStat("http.config_test.fault.response_rl_injected", "http.fault.response_rl_injected",
+             {{hcm_prefix, "config_test"}});
+  expectStat("http.config_test.fault.active_faults", "http.fault.active_faults",
+             {{hcm_prefix, "config_test"}});
 }
 
 // Response rate limited with no trailers.
@@ -150,8 +212,8 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
                                                  {"x-envoy-fault-delay-request", "200"},
                                                  {"x-envoy-fault-throughput-response", "1"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  test_server_->waitForCounterEq("http.config_test.fault.delays_injected", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("http.config_test.fault.delays_injected", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
   simTime().advanceTimeWait(std::chrono::milliseconds(200));
   waitForNextUpstreamRequest();
 
@@ -286,8 +348,8 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultsConfig100PercentageHeaders)
                                      {"x-envoy-fault-delay-request-percentage", "100"},
                                      {"x-envoy-fault-throughput-response", "100"},
                                      {"x-envoy-fault-throughput-response-percentage", "100"}});
-  test_server_->waitForCounterEq("http.config_test.fault.delays_injected", 1,
-                                 TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter("http.config_test.fault.delays_injected", Eq(1),
+                               TestUtility::DefaultTimeout, dispatcher_.get());
   simTime().advanceTimeWait(std::chrono::milliseconds(100));
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);

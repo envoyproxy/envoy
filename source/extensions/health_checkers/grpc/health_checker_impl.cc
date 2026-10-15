@@ -33,7 +33,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 const std::string& getHostname(const HostSharedPtr& host,
-                               const absl::optional<std::string>& config_hostname,
+                               const std::optional<std::string>& config_hostname,
                                const ClusterInfoConstSharedPtr& cluster) {
   if (config_hostname.has_value()) {
     return HealthCheckerFactory::getHostname(host, config_hostname.value(), cluster);
@@ -47,18 +47,17 @@ Upstream::HealthCheckerSharedPtr GrpcHealthCheckerFactory::createCustomHealthChe
     Server::Configuration::HealthCheckerFactoryContext& context) {
   return std::make_shared<ProdGrpcHealthCheckerImpl>(
       context.cluster(), config, context.mainThreadDispatcher(), context.runtime(),
-      context.api().randomGenerator(), context.eventLogger());
+      context.api().randomGenerator(), context.eventLogger(), context.healthFlagCallbacks());
 }
 
 REGISTER_FACTORY(GrpcHealthCheckerFactory, Server::Configuration::CustomHealthCheckerFactory);
 
-GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
-                                             const envoy::config::core::v3::HealthCheck& config,
-                                             Event::Dispatcher& dispatcher,
-                                             Runtime::Loader& runtime,
-                                             Random::RandomGenerator& random,
-                                             HealthCheckEventLoggerPtr&& event_logger)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(
+    const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
+    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
+    HealthCheckEventLoggerPtr&& event_logger, HealthFlagCallbacks& health_flag_callbacks)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger),
+                            health_flag_callbacks),
       random_generator_(random),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "grpc.health.v1.Health.Check")),
@@ -188,6 +187,13 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
     Upstream::Host::CreateConnectionData conn =
         host_->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                            parent_.transportSocketMatchMetadata().get());
+    // Connection creation can fail, e.g. when binding to a configured network namespace that is
+    // no longer available. Treat this as a network failure rather than crashing on a null
+    // dereference below.
+    if (conn.connection_ == nullptr) {
+      handleFailure(envoy::data::core::v3::NETWORK);
+      return;
+    }
     client_ = parent_.createCodecClient(conn);
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);
@@ -200,7 +206,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
       getHostname(host_, parent_.authority_value_, parent_.cluster_.info());
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
-                                   parent_.service_method_.name(), absl::nullopt);
+                                   parent_.service_method_.name(), std::nullopt);
   headers_message->headers().setReferenceUserAgent(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
 
@@ -345,6 +351,11 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::resetState() {
 }
 
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onTimeout() {
+  // client_ can be null if the connection failed to be created on this interval (e.g. a network
+  // namespace binding failure). The failure has already been reported, so there is nothing to do.
+  if (client_ == nullptr) {
+    return;
+  }
   ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
   expect_reset_ = true;

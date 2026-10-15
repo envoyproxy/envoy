@@ -31,12 +31,16 @@ public:
     HttpProtocolIntegrationTest::SetUp();
 
     config_helper_.prependFilter(R"EOF(
-    name: async-inject-body-at-end-stream-filter
+      name: async-inject-body-at-end-stream-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.AsyncInjectBodyAtEndStreamFilterConfig
     )EOF");
     config_helper_.prependFilter(absl::StrFormat(
         kTranscoderConfig, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
     config_helper_.prependFilter(R"EOF(
-    name: async-inject-body-at-end-stream-filter
+      name: async-inject-body-at-end-stream-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.AsyncInjectBodyAtEndStreamFilterConfig
     )EOF");
 
     initialize();

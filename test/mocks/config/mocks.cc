@@ -82,5 +82,11 @@ MockContextProvider::MockContextProvider() {
 
 MockContextProvider::~MockContextProvider() = default;
 
+MockXdsConfigTracker::MockXdsConfigTracker() = default;
+MockXdsConfigTracker::~MockXdsConfigTracker() = default;
+
+MockXdsResourcesDelegate::MockXdsResourcesDelegate() = default;
+MockXdsResourcesDelegate::~MockXdsResourcesDelegate() = default;
+
 } // namespace Config
 } // namespace Envoy

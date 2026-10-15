@@ -8,6 +8,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
+#include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
 
 namespace Envoy {
@@ -42,8 +43,14 @@ Network::FilterFactoryCb NetworkExtProcConfigFactory::createFilterFactoryFromPro
   if (!result.ok()) {
     throw EnvoyException(std::string(result.message()));
   }
-  ConfigConstSharedPtr ext_proc_config =
-      std::make_shared<const Config>(proto_config, context.scope());
+  absl::Status creation_status = absl::OkStatus();
+  ConfigConstSharedPtr ext_proc_config = std::make_shared<const Config>(
+      proto_config, context.scope(),
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
+      &context.serverFactoryContext().localInfo(), creation_status);
+  if (!creation_status.ok()) {
+    throw EnvoyException(std::string(creation_status.message()));
+  }
 
   return [ext_proc_config, &context](Network::FilterManager& filter_manager) -> void {
     auto client = createExternalProcessorClient(

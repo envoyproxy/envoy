@@ -6,6 +6,7 @@
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/utility.h"
 
@@ -30,8 +31,9 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) 
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   EXPECT_THROW_WITH_REGEX(factory->createProactiveResourceMonitor(config, context),
                           ProtoValidationException,
                           "Proto constraint validation failed "
@@ -52,8 +54,9 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateCustomMonitor) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto monitor = factory->createProactiveResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }
@@ -67,8 +70,9 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateDefaultMonitor) {
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
   auto config = factory->createEmptyConfigProto();
 
   EXPECT_THROW_WITH_REGEX(factory->createProactiveResourceMonitor(*config, context),

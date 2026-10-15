@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,8 +20,6 @@
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -157,8 +156,8 @@ private:
 
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   const InterfaceMatcher interface_matcher_;
-  const absl::optional<std::string> group_;
-  const absl::optional<std::string> version_;
+  const std::optional<std::string> group_;
+  const std::optional<std::string> version_;
 };
 using SingleRouteMatcherImplPtr = std::unique_ptr<SingleRouteMatcherImpl>;
 

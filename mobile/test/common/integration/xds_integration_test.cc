@@ -88,9 +88,9 @@ XdsIntegrationTest::createSingleEndpointClusterConfig(const std::string& cluster
   // Set the protocol options.
   envoy::extensions::upstreams::http::v3::HttpProtocolOptions options;
   options.mutable_explicit_http_config()->mutable_http2_protocol_options();
-  (*config.mutable_typed_extension_protocol_options())
-      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-          .PackFrom(options);
+  std::ignore = (*config.mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                        .PackFrom(options);
   return config;
 }
 

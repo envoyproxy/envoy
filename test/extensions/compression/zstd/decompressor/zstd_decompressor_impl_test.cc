@@ -182,7 +182,7 @@ class ZstdDecompressorStatsTest : public testing::Test {
 protected:
   bool isError(size_t result) { return decompressor_.isError(result); }
 
-  Stats::IsolatedStoreImpl stats_store_{};
+  Stats::IsolatedStoreImpl stats_store_;
   ZstdDDictManagerPtr ddict_manager_{nullptr};
   ZstdDecompressorImpl decompressor_{*stats_store_.rootScope(), "test.", ddict_manager_, 16};
 };

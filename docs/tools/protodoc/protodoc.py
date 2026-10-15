@@ -11,7 +11,7 @@ from collections import defaultdict
 from functools import cached_property, lru_cache
 from typing import Dict, Iterable, Iterator, Set, Tuple
 
-from google.protobuf.descriptor_pb2 import FieldDescriptorProto as field_proto
+from google.protobuf.descriptor_pb2 import FieldDescriptorProto as field_proto  # noqa: N813
 import yaml
 
 from udpa.annotations import security_pb2
@@ -533,6 +533,7 @@ class RstFormatVisitor(visitor.Visitor):
         return dict(
             anchor=field_cross_ref_label(normalize_type_context_name(ctx.name)),
             field=field,
+            is_map=type_name_from_fqn(field.type_name) in ctx.map_typenames,
             field_name=field.name,
             comment=self._field_type(ctx.map_typenames, field.type, field.type_name),
             field_annotations=",".join(field_annotations),

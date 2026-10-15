@@ -31,6 +31,7 @@ namespace {
 using ::testing::MockFunction;
 using ::testing::Ref;
 using ::testing::Return;
+using ::testing::ReturnRef;
 using ::testing::WithArg;
 
 // Test-only custom process object which accepts an `SslCtxCb` for in-test SSL_CTX
@@ -103,11 +104,11 @@ protected:
     envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
         tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
     custom_handshaker->set_name(HandshakerFactoryImplForTest::kFactoryName);
-    custom_handshaker->mutable_typed_config()->PackFrom(Protobuf::StringValue());
+    std::ignore = custom_handshaker->mutable_typed_config()->PackFrom(Protobuf::StringValue());
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::IsolatedStoreImpl stats_store_{server_factory_context_.serverScope().symbolTable()};
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   HandshakerFactoryImplForTest handshaker_factory_;
   Registry::InjectFactory<Ssl::HandshakerFactory> registered_factory_;
@@ -124,7 +125,7 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
-      .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
+      .WillRepeatedly(Return(ProcessContextOptRef(*process_context_impl)));
 
   auto socket_factory = *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
       /*config=*/
@@ -150,7 +151,7 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
-      .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
+      .WillRepeatedly(Return(ProcessContextOptRef(*process_context_impl)));
 
   auto socket_factory = *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
       /*config=*/
@@ -176,7 +177,7 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
-      .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
+      .WillRepeatedly(Return(ProcessContextOptRef(*process_context_impl)));
 
   MockFunction<HandshakerFactoryImplForTest::CreateHandshakerHook> mock_factory_cb;
   handshaker_factory_.handshaker_cb_ = mock_factory_cb.AsStdFunction();
@@ -260,7 +261,7 @@ protected:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::IsolatedStoreImpl stats_store_{server_factory_context_.serverScope().symbolTable()};
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context_;
   Ssl::HandshakerCapabilities capabilities_;
@@ -278,7 +279,7 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
   envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
       tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
   custom_handshaker->set_name(HandshakerFactoryImplForDownstreamTest::kFactoryName);
-  custom_handshaker->mutable_typed_config()->PackFrom(Protobuf::BoolValue());
+  std::ignore = custom_handshaker->mutable_typed_config()->PackFrom(Protobuf::BoolValue());
 
   CustomProcessObjectForTest custom_process_object_for_test(
       /*cb=*/[](SSL_CTX* ssl_ctx) { SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_TLSv1); });
@@ -287,7 +288,7 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
-      .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
+      .WillRepeatedly(Return(ProcessContextOptRef(*process_context_impl)));
 
   auto server_context_config = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       tls_context_, mock_factory_ctx, {}, false);

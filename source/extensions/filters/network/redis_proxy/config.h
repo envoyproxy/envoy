@@ -15,7 +15,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -105,14 +104,14 @@ public:
     return authCredentials(info, api).password;
   }
 
-  static absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+  static std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
   awsIamConfig(const Upstream::ClusterInfoConstSharedPtr info) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options && options->proto_config_.has_aws_iam()) {
       return options->proto_config_.aws_iam();
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
 private:

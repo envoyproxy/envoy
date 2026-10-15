@@ -39,10 +39,10 @@ public:
 // to merge the global config and any route/vhost configs.
 class FileSystemBufferFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
-  explicit FileSystemBufferFilterConfig(
+  FileSystemBufferFilterConfig(
       std::shared_ptr<AsyncFileManagerFactory> factory,
       std::shared_ptr<Extensions::Common::AsyncFiles::AsyncFileManager> async_file_manager,
-      const ProtoFileSystemBufferFilterConfig& config);
+      const ProtoFileSystemBufferFilterConfig& config, absl::Status& creation_status);
 
   const ProtoFileSystemBufferFilterConfig& proto() const { return config_; }
   const std::shared_ptr<AsyncFileManager>& asyncFileManager() const { return async_file_manager_; }

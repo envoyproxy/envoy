@@ -36,6 +36,10 @@ extension EngineImpl: Engine {
     self.engine.dumpStats()
   }
 
+  func drainConnectionsBySocketTag(_ tag: UInt32) {
+    self.engine.drainConnections(bySocketTag: tag)
+  }
+
   func terminate() {
     self.engine.terminate()
   }

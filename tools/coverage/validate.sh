@@ -10,6 +10,20 @@ if [[ -z "$COVERAGE_JSON" || ! -f "$COVERAGE_JSON" ]]; then
     exit 1
 fi
 
+# Bazel 8 changes the runfiles layout, so env vars set via $(location)
+# or Make variables may point to stale paths. Resolve from runfiles if needed.
+if [[ -z "$JQ_BIN" || ! -x "$JQ_BIN" ]]; then
+    if [[ -n "${RUNFILES_DIR:-}" ]]; then
+        RUNFILES="${RUNFILES_DIR}"
+    elif [[ -d "${BASH_SOURCE[0]}.runfiles" ]]; then
+        RUNFILES="${BASH_SOURCE[0]}.runfiles"
+    fi
+    if [[ -n "${RUNFILES:-}" ]]; then
+        JQ_BIN="$(find "${RUNFILES}" \( -type f -o -type l \) -name jq | head -1)"
+        COVERAGE_CONFIG="$(find "${RUNFILES}" \( -type f -o -type l \) -name '*coverage_config.json' | head -1)"
+    fi
+fi
+
 if [[ -z "$COVERAGE_CONFIG" || ! -f "$COVERAGE_CONFIG" ]]; then
     echo "ERROR: Coverage config file not found: $COVERAGE_CONFIG" >&2
     exit 1

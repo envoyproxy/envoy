@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "source/extensions/filters/http/proto_message_extraction/extraction_util/extraction_util.h"
+#include "source/extensions/filters/http/proto_message_extraction/extraction_util/proto_extractor.h"
 
 #include "test/proto/extraction.pb.h"
 #include "test/test_common/environment.h"
@@ -319,8 +320,7 @@ TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_EmptyLastValue) {
 
   absl::StatusOr<std::string> st = SingularFieldUseLastValue(
       "first_value", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_TRUE(st.ok());
-  EXPECT_EQ(st.value(), "first_value");
+  EXPECT_THAT(st, IsOkAndHolds("first_value"));
 }
 
 TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
@@ -332,20 +332,18 @@ TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
 
   absl::StatusOr<std::string> st = SingularFieldUseLastValue(
       "", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_TRUE(st.ok());
-  EXPECT_EQ(st.value(), "repeated-string-0");
+  EXPECT_THAT(st, IsOkAndHolds("repeated-string-0"));
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_EmptyPath) {
   Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
-  EXPECT_TRUE(RedactStructRecursively({}, {}, &message_struct).ok());
+  EXPECT_OK(RedactStructRecursively({}, {}, &message_struct));
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_InvalidPath) {
   Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"invalid", "path_end"};
-  EXPECT_TRUE(
-      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+  EXPECT_OK(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct));
 
   // Verify that the field "level2" has been replaced with an empty Struct
   const auto& level1_field = message_struct.fields().at("level1");
@@ -357,8 +355,7 @@ TEST_F(ExtractionUtilTest, RedactStructRecursively_InvalidPath) {
 TEST_F(ExtractionUtilTest, RedactStructRecursively_ValidPath) {
   Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"level1", "level2"};
-  EXPECT_TRUE(
-      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+  EXPECT_OK(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct));
 
   // Verify that the field "level2" has been replaced with an empty Struct
   const auto& level1_field = message_struct.fields().at("level1");
@@ -370,8 +367,7 @@ TEST_F(ExtractionUtilTest, RedactStructRecursively_ValidPath) {
 TEST_F(ExtractionUtilTest, RedactStructRecursively_MissingIntermediateField) {
   Struct message_struct = createNestedStruct({"level1"}, "value");
   std::vector<std::string> path_pieces = {"level1", "level2"};
-  EXPECT_TRUE(
-      RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
+  EXPECT_OK(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct));
 
   // Verify that "level2" field is created as an empty Struct
   const auto& level1_field = message_struct.fields().at("level1");
@@ -407,8 +403,7 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_SingleStringField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  ASSERT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), "");
+  ASSERT_THAT(result, IsOkAndHolds(""));
 }
 
 TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedStringField) {
@@ -420,8 +415,7 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedStringField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), "repeated-string-0");
+  EXPECT_THAT(result, IsOkAndHolds("repeated-string-0"));
 }
 
 TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedMessageField) {
@@ -432,10 +426,8 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedMessageField) {
 
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
-  ASSERT_TRUE(result.ok());
-  EXPECT_EQ(
-      result.value(),
-      "\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-1\x1A\rtest-object-2\x1A\rtest-object-3");
+  ASSERT_THAT(result, IsOkAndHolds("\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-"
+                                   "1\x1A\rtest-object-2\x1A\rtest-object-3"));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_string) {
@@ -646,7 +638,6 @@ TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NullptrFieldMask) {
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_EmptyFieldMask) {
-  FieldMask field_mask;
   EXPECT_GT(0, ExtractRepeatedFieldSize(*request_type_, type_finder_, &field_mask_,
                                         test_request_raw_proto_));
 }
@@ -671,6 +662,12 @@ TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
       IsOkAndHolds(""));
 }
 
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_RepeatedStringLeafNode) {
+  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
+                                      test_request_raw_proto_),
+              IsOkAndHolds("repeated-string-0"));
+}
+
 TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_EmptyPath) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "", test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
@@ -686,12 +683,6 @@ TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_UnknownField) {
       StatusIs(absl::StatusCode::kInvalidArgument));
 
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "unknown1.unknown2",
-                                      test_request_raw_proto_),
-              StatusIs(absl::StatusCode::kInvalidArgument));
-}
-
-TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_RepeatedStringLeafNode) {
-  EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
                                       test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
@@ -1080,6 +1071,61 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<ExtractLocationIdFromResourceNameTest::ParamType>& info) {
       return info.param.test_name;
     });
+
+// When the extracted field value is non-empty, both target_resource (callback=false) and
+// target_resource_callback (callback=true) should be populated.
+TEST_F(ExtractionUtilTest, GetTargetResourceOrTargetResourceCallback_NonEmptyValue) {
+  FieldPathToExtractType field_policies = {{"bucket.name", {ExtractedMessageDirective::EXTRACT}}};
+  auto extractor = ProtoExtractor::Create(ScrubberContext::kTestScrubbing, type_helper_.get(),
+                                          request_type_, field_policies);
+
+  ExtractedMessageMetadata metadata = extractor->ExtractMessage(test_request_raw_proto_);
+
+  // callback=false path: target_resource is set.
+  ASSERT_TRUE(metadata.target_resource.has_value());
+  EXPECT_EQ(metadata.target_resource.value(), "test-bucket");
+
+  // callback=true path with non-empty value: target_resource_callback is set.
+  ASSERT_TRUE(metadata.target_resource_callback.has_value());
+  EXPECT_EQ(metadata.target_resource_callback.value(), "test-bucket");
+}
+
+// When the extracted field value is empty, callback=false sets target_resource to "" and
+// callback=true falls through to the else branch (also setting target_resource to ""), so
+// target_resource_callback remains unset.
+TEST_F(ExtractionUtilTest, GetTargetResourceOrTargetResourceCallback_EmptyValue) {
+  test_request_proto_.mutable_bucket()->clear_name();
+  test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
+
+  FieldPathToExtractType field_policies = {{"bucket.name", {ExtractedMessageDirective::EXTRACT}}};
+  auto extractor = ProtoExtractor::Create(ScrubberContext::kTestScrubbing, type_helper_.get(),
+                                          request_type_, field_policies);
+
+  ExtractedMessageMetadata metadata = extractor->ExtractMessage(test_request_raw_proto_);
+
+  // callback=false path: target_resource is set with an empty string.
+  ASSERT_TRUE(metadata.target_resource.has_value());
+  EXPECT_EQ(metadata.target_resource.value(), "");
+
+  // callback=true path with empty value hits the else branch, so target_resource_callback is NOT
+  // set.
+  EXPECT_FALSE(metadata.target_resource_callback.has_value());
+}
+
+// When ExtractStringFieldValue fails (field is not a string type), the function returns early
+// without setting either target_resource or target_resource_callback.
+TEST_F(ExtractionUtilTest, GetTargetResourceOrTargetResourceCallback_ExtractionFailure) {
+  // "bucket.ratio" is a float field (not a string), so ExtractStringFieldValue will fail,
+  // but it is a valid field path for the scrubber so no crash occurs.
+  FieldPathToExtractType field_policies = {{"bucket.ratio", {ExtractedMessageDirective::EXTRACT}}};
+  auto extractor = ProtoExtractor::Create(ScrubberContext::kTestScrubbing, type_helper_.get(),
+                                          request_type_, field_policies);
+
+  ExtractedMessageMetadata metadata = extractor->ExtractMessage(test_request_raw_proto_);
+
+  EXPECT_FALSE(metadata.target_resource.has_value());
+  EXPECT_FALSE(metadata.target_resource_callback.has_value());
+}
 
 } // namespace
 } // namespace ProtoMessageExtraction

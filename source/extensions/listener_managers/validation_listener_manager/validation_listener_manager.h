@@ -8,27 +8,33 @@ namespace Server {
 
 class ValidationListenerComponentFactory : public ListenerComponentFactory {
 public:
-  ValidationListenerComponentFactory(Instance& parent) : parent_(parent) {}
+  ValidationListenerComponentFactory(Instance& parent)
+      : parent_(parent), network_config_provider_manager_(
+                             std::make_shared<Filter::NetworkFilterConfigProviderManagerImpl>()),
+        tcp_listener_config_provider_manager_(
+            std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()),
+        quic_listener_config_provider_manager_(
+            std::make_shared<Filter::QuicListenerFilterConfigProviderManagerImpl>()) {}
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                          const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(
-        lds_config, lds_resources_locator, parent_.xdsManager(), parent_.clusterManager(),
-        parent_.initManager(), *parent_.stats().rootScope(), parent_.listenerManager(),
+        lds_config, lds_resources_locator, parent_.clusterManager(), parent_.initManager(),
+        *parent_.stats().rootScope(), parent_.listenerManager(),
         parent_.messageValidationContext().dynamicValidationVisitor());
   }
   absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
     return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-        filters, filter_chain_factory_context, network_config_provider_manager_);
+        filters, filter_chain_factory_context, *network_config_provider_manager_);
   }
   absl::StatusOr<Filter::ListenerFilterFactoriesList> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
-        filters, context, tcp_listener_config_provider_manager_);
+        filters, context, *tcp_listener_config_provider_manager_);
   }
   absl::StatusOr<std::vector<Network::UdpListenerFilterFactoryCb>>
   createUdpListenerFilterFactoryList(
@@ -40,7 +46,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createQuicListenerFilterFactoryListImpl(
-        filters, context, quic_listener_config_provider_manager_);
+        filters, context, *quic_listener_config_provider_manager_);
   }
   absl::StatusOr<Network::SocketSharedPtr>
   createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
@@ -58,22 +64,26 @@ public:
   uint64_t nextListenerTag() override { return 0; }
   Filter::TcpListenerFilterConfigProviderManagerImpl*
   getTcpListenerConfigProviderManager() override {
-    return &tcp_listener_config_provider_manager_;
+    return tcp_listener_config_provider_manager_.get();
   }
 
 private:
-  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
-  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
-  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
   Instance& parent_;
+  std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
+  std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::QuicListenerFilterConfigProviderManagerImpl>
+      quic_listener_config_provider_manager_;
 };
 
 class ValidationListenerManagerFactoryImpl : public ListenerManagerFactory {
 public:
   std::unique_ptr<ListenerManager>
-  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
+  createListenerManager(const Protobuf::Message& config, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                         Quic::QuicStatNames& quic_stat_names) override {
+    (void)config;
     ASSERT(!factory);
     return std::make_unique<ListenerManagerImpl>(
         server, std::make_unique<ValidationListenerComponentFactory>(server), worker_factory,
@@ -83,7 +93,7 @@ public:
     return Config::ServerExtensionValues::get().VALIDATION_LISTENER;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::listener::v3::ValidationListenerManager>();
+    return std::make_unique<envoy::config::bootstrap::v3::ValidationListenerManager>();
   }
 };
 

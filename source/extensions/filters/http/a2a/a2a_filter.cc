@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/a2a/a2a_filter.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
@@ -12,6 +13,8 @@ namespace HttpFilters {
 namespace A2a {
 
 namespace {
+constexpr absl::string_view A2aWellKnownAgentCardPath = "/.well-known/agent-card.json";
+
 A2aFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   const std::string final_prefix = absl::StrCat(prefix, "a2a.");
   return A2aFilterStats{A2A_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -26,13 +29,16 @@ A2aFilterConfig::A2aFilterConfig(const envoy::extensions::filters::http::a2a::v3
       parser_config_(A2aParserConfig::createDefault()), stats_(generateStats(stats_prefix, scope)) {
 }
 
-// A2A support three discovery strategies with GET requests: 1) Well-Known URI 2) Curated Registries
-// 3) Private Discovery
-// Well-Known URI is recommended for public agents or agents intended for broad discovery
-// within a specific domain
+// A2A discovery standardizes GET requests for the Agent Card well-known URI. Registry and
+// private discovery paths are deployment-specific and cannot be inferred by the filter.
 // See: https://a2a-protocol.org/latest/topics/agent-discovery/#discovery-strategies
 bool A2aFilter::isValidA2aGetRequest(const Http::RequestHeaderMap& headers) const {
-  return headers.getMethodValue() == Http::Headers::get().MethodValues.Get;
+  if (headers.getMethodValue() != Http::Headers::get().MethodValues.Get) {
+    return false;
+  }
+
+  return Http::PathUtil::removeQueryAndFragment(headers.getPathValue()) ==
+         A2aWellKnownAgentCardPath;
 }
 
 bool A2aFilter::isValidA2aPostRequest(const Http::RequestHeaderMap& headers) const {
@@ -92,7 +98,7 @@ Http::FilterHeadersStatus A2aFilter::decodeHeaders(Http::RequestHeaderMap& heade
     ENVOY_LOG(debug, "rejecting non-A2A traffic");
     config_->stats().requests_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Only A2A traffic is allowed",
-                                       nullptr, absl::nullopt, "a2a_filter_reject");
+                                       nullptr, std::nullopt, "a2a_filter_reject");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -139,13 +145,14 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       if (!status.ok()) {
         config_->stats().invalid_json_.inc();
         decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "not a valid JSON", nullptr,
-                                           absl::nullopt, "a2a_filter_not_valid_jsonrpc");
+                                           std::nullopt, "a2a_filter_not_valid_jsonrpc");
         return Http::FilterDataStatus::StopIterationNoBuffer;
       }
     }
 
-    if (max_size > 0 && bytes_parsed_ == max_size)
+    if (max_size > 0 && bytes_parsed_ == max_size) {
       break;
+    }
   }
 
   // If we are here, we haven't collected all fields yet.
@@ -156,7 +163,11 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
       // TODO(tyxia) Support the case that size limit hit before optional fields.
       if (size_limit_hit) {
         config_->stats().body_too_large_.inc();
-        handleParseError("request body is too large.");
+        ENVOY_LOG(debug, "request body is too large.");
+        is_a2a_request_ = false;
+        decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge,
+                                           "request body is too large.", nullptr, std::nullopt,
+                                           "a2a_filter_body_too_large");
       } else {
         config_->stats().invalid_json_.inc();
         handleParseError("not a valid JSON (incomplete).");
@@ -172,7 +183,7 @@ Http::FilterDataStatus A2aFilter::decodeData(Buffer::Instance& data, bool end_st
 void A2aFilter::handleParseError(absl::string_view error_msg) {
   ENVOY_LOG(debug, "parse error: {}", error_msg);
   is_a2a_request_ = false;
-  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, error_msg, nullptr, std::nullopt,
                                      "a2a_filter_parse_error");
 }
 
@@ -185,8 +196,18 @@ Http::FilterDataStatus A2aFilter::completeParsing() {
   if (!is_a2a_request_ && shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        "request must be a valid JSON-RPC 2.0 message for A2A",
-                                       nullptr, absl::nullopt, "a2a_filter_not_valid_jsonrpc");
+                                       nullptr, std::nullopt, "a2a_filter_not_valid_jsonrpc");
     return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
+  const auto& metadata = parser_->metadata();
+  if (!metadata.fields().empty()) {
+    // TODO(tyxia): Use the filter config name from the config for now. It can be customized and
+    // controlled by the configuration. Also, the behavior of setting dynamic metadata can be
+    // controlled by the configuration.
+    decoder_callbacks_->streamInfo().setDynamicMetadata(
+        std::string(decoder_callbacks_->filterConfigName()), metadata);
+    ENVOY_LOG(debug, "A2A filter set dynamic metadata: {}", metadata.DebugString());
   }
 
   return Http::FilterDataStatus::Continue;

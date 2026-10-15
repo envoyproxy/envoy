@@ -25,7 +25,7 @@ template <class DataType> using FieldMatcherPtr = std::unique_ptr<FieldMatcher<D
  * A FieldMatcher that attempts to match multiple FieldMatchers, evaluating to true iff all the
  * FieldMatchers evaluate to true.
  *
- * If any of the underlying FieldMatchers are unable to produce a result, absl::nullopt is returned.
+ * If any of the underlying FieldMatchers are unable to produce a result, std::nullopt is returned.
  */
 template <class DataType> class AllFieldMatcher : public FieldMatcher<DataType> {
 public:
@@ -59,7 +59,7 @@ private:
  * FieldMatchers evaluate to true.
  *
  * If any of the underlying FieldMatchers are unable to produce a result before we see a successful
- * match, absl::nullopt is returned.
+ * match, std::nullopt is returned.
  */
 template <class DataType> class AnyFieldMatcher : public FieldMatcher<DataType> {
 public:

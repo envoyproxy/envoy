@@ -1,6 +1,7 @@
 // Usage: bazel run //test/common/upstream:load_balancer_benchmark
 
 #include <memory>
+#include <optional>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/load_balancing_policies/random/v3/random.pb.h"
@@ -15,12 +16,11 @@
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
 #include "test/extensions/load_balancing_policies/common/benchmark_base_tester.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -43,7 +43,8 @@ public:
     auto* child_lb = subset_config_proto.mutable_subset_lb_policy()->mutable_policies()->Add();
     child_lb->mutable_typed_extension_config()->set_name("envoy.load_balancing_policies.random");
     envoy::extensions::load_balancing_policies::random::v3::Random random_lb_config;
-    child_lb->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(random_lb_config);
+    std::ignore = child_lb->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(
+        random_lb_config);
     NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
 
     absl::Status status = absl::OkStatus();
@@ -68,10 +69,10 @@ public:
   void update() {
     priority_set_.updateHosts(
         0, Upstream::HostSetImpl::partitionHosts(smaller_hosts_, smaller_locality_hosts_), nullptr,
-        {}, host_moved_, absl::nullopt);
+        {}, host_moved_, std::nullopt);
     priority_set_.updateHosts(
         0, Upstream::HostSetImpl::partitionHosts(orig_hosts_, orig_locality_hosts_), nullptr,
-        host_moved_, {}, absl::nullopt);
+        host_moved_, {}, std::nullopt);
   }
 
   std::unique_ptr<Upstream::SubsetLoadBalancerConfig> subset_config_;

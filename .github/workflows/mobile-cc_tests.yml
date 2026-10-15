@@ -39,6 +39,8 @@ jobs:
       check-name: mobile-cc
 
   cc-tests:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -59,6 +61,8 @@ jobs:
       target: cc-tests
 
   cc-xds-integration-tests:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

@@ -7,8 +7,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # User/group IDs
-USER_UID="$(id -u)"
-USER_GID="$(id -g)"
+USER_UID="${USER_UID:-$(id -u)}"
+USER_GID="${USER_GID:-$(id -g)}"
 export USER_UID
 export USER_GID
 
@@ -38,10 +38,7 @@ fi
 export DOCKER_COMMAND="${*:-bash}"
 
 COMPOSE_SERVICE="envoy-build"
-if [[ -n "$MOUNT_GPG_HOME" ]]; then
-    COMPOSE_SERVICE="envoy-build-gpg"
-    ENVOY_BUILD_VARIANT=devtools
-elif [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
+if [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
     ENVOY_BUILD_VARIANT=docker
     COMPOSE_SERVICE="envoy-build-dind"
 elif [[ -n "$ENVOY_DOCKER_CI" ]]; then

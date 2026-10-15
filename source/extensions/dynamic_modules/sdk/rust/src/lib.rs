@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -7,24 +8,51 @@
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
+pub mod catch_unwind;
 pub mod cert_validator;
 pub mod cluster;
+pub mod cluster_specifier;
+pub mod config_validator;
+pub mod dns_resolver;
+pub mod early_header_mutation;
+// Implementation detail. Public so SDK-provided macros (for example, `declare_matcher!`) that
+// expand in user crates can reach the safe helpers; users should not depend on this module
+// directly.
+#[doc(hidden)]
+pub mod ffi_helpers;
+pub mod formatter;
+pub mod header_formatter;
+pub mod health_checker;
 pub mod http;
 pub mod listener;
 pub mod load_balancer;
 pub mod matcher;
+pub mod matcher_data_input;
 pub mod network;
+pub mod route_specifier;
+pub mod stats_sink;
+pub mod timing;
+pub mod tracer;
+pub mod transport_socket;
 pub mod udp_listener;
+pub mod upstream_http_tcp_bridge;
 pub mod utility;
 pub use bootstrap::*;
 pub use buffer::*;
+pub use catch_unwind::*;
 pub use cert_validator::*;
 pub use cluster::*;
+pub use config_validator::*;
+pub use dns_resolver::*;
 pub use http::*;
 pub use listener::*;
 pub use load_balancer::*;
 pub use network::*;
+pub use timing::*;
+pub use tracer::*;
+pub use transport_socket::*;
 pub use udp_listener::*;
+pub use upstream_http_tcp_bridge::*;
 pub use utility::*;
 
 #[cfg(test)]
@@ -35,9 +63,43 @@ use crate::abi::envoy_dynamic_module_type_metrics_result;
 use std::any::Any;
 use std::sync::OnceLock;
 
+/// Convert a panic payload (as captured by [`std::panic::catch_unwind`]) into a printable
+/// string. Public so that [`declare_matcher!`] and other macros can format the payload from
+/// the consuming crate.
+#[doc(hidden)]
+pub fn panic_payload_to_string(payload: Box<dyn Any + Send>) -> String {
+  match payload.downcast::<String>() {
+    Ok(s) => *s,
+    Err(payload) => match payload.downcast::<&str>() {
+      Ok(s) => s.to_string(),
+      Err(_) => "<non-string panic payload>".to_string(),
+    },
+  }
+}
+
+/// Log a panic caught at an FFI boundary. Exposed via `#[doc(hidden)]` so SDK-provided macros
+/// such as `declare_matcher!` and `declare_init_functions!` can call it from user crates after
+/// expansion.
+///
+/// Logging runs after `catch_unwind` has already captured the original panic, so a secondary
+/// panic inside `format!` or `envoy_log_error!` would unwind into `libc::abort` rather than
+/// across the FFI boundary. That is intentional: a recursive panic in the log path indicates
+/// the process is too broken to continue safely.
+#[doc(hidden)]
+pub fn log_ffi_panic(function_name: &str, payload: Box<dyn Any + Send>) {
+  crate::envoy_log_error!(
+    "{}: caught panic at FFI boundary: {}",
+    function_name,
+    crate::panic_payload_to_string(payload)
+  );
+}
+
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
+// bindgen derives `PartialEq` on system header structs that hold function pointers, such as
+// `__darwin_pthread_handler_rec` on macOS.
+#[allow(unpredictable_function_pointer_comparisons)]
 pub mod abi {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -76,31 +138,44 @@ pub mod abi {
 #[macro_export]
 macro_rules! declare_init_functions {
   ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_config_fn);
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_per_route_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION,
+          $new_http_filter_config_fn,
+          "NEW_HTTP_FILTER_CONFIG_FUNCTION"
+        );
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+          $new_http_filter_per_route_config_fn,
+          "NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
   ($f:ident, $new_http_filter_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION,
+          $new_http_filter_config_fn,
+          "NEW_HTTP_FILTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
 }
@@ -111,6 +186,73 @@ macro_rules! declare_init_functions {
 /// This function must be called on the main thread.
 pub unsafe fn get_server_concurrency() -> u32 {
   unsafe { abi::envoy_dynamic_module_callback_get_concurrency() }
+}
+
+/// Check if the server is running in config validation mode (`--mode validate`).
+///
+/// This allows modules to optimize by only parsing and validating their config without
+/// performing expensive operations such as provider lookups or loading external resources.
+///
+/// # Safety
+///
+/// This function must be called on the main thread.
+pub unsafe fn is_validation_mode() -> bool {
+  unsafe { abi::envoy_dynamic_module_callback_is_validation_mode() }
+}
+
+/// Read a runtime value as a boolean.
+///
+/// The runtime is the layered key/value configuration described by the `layered_runtime` bootstrap
+/// option, including RTDS layers and values set through the admin `/runtime_modify` endpoint.
+/// [`get_runtime_int`] and [`get_runtime_number`] read the same configuration as other types.
+///
+/// `default_value` is returned whenever the key does not exist, the stored value cannot be read as
+/// a boolean, or the runtime is not reachable from the calling thread.
+///
+/// This may be called from any thread. Note that the runtime is reached through the server context,
+/// which is only installed on the main thread, so a call from a worker thread returns
+/// `default_value`. A module that needs a runtime value on the data path should read it while its
+/// configuration is created (for example in `on_http_filter_config_new`, which runs on the main
+/// thread) and cache the result in its own configuration.
+pub fn get_runtime_bool(key: &str, default_value: bool) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_bool(str_to_module_buffer(key), default_value)
+  }
+}
+
+/// Read a runtime value as an unsigned integer. See [`get_runtime_bool`] for the description of the
+/// runtime and the threading behavior, which are identical here.
+///
+/// Envoy stores every numeric runtime value as a double, so this conversion is lossy at both ends.
+/// A value above 2^53 loses precision and is rounded to the nearest representable value, and a
+/// fractional value is truncated toward zero; in both cases the converted value is returned rather
+/// than `default_value`. Only a negative value, or one beyond the range of a `u64`, stores no
+/// integer at all and therefore yields `default_value`. Use [`get_runtime_number`] to read the
+/// value without either conversion.
+///
+/// Note that `key` must not name one of Envoy's own `envoy.reloadable_features.*` or
+/// `envoy.restart_features.*` guards: those are boolean guards and Envoy asserts against reading
+/// them as a number in debug builds, so read them with [`get_runtime_bool`] instead.
+pub fn get_runtime_int(key: &str, default_value: u64) -> u64 {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_int(str_to_module_buffer(key), default_value)
+  }
+}
+
+/// Read a runtime value as a double. See [`get_runtime_bool`] for the description of the runtime
+/// and the threading behavior, which are identical here.
+///
+/// This is the lossless counterpart to [`get_runtime_int`]: it returns the value exactly as Envoy
+/// stores it, so it neither rounds nor truncates, and it reads negative values, which
+/// [`get_runtime_int`] answers with its default.
+///
+/// Note that, as with [`get_runtime_int`], `key` must not name one of Envoy's own
+/// `envoy.reloadable_features.*` or `envoy.restart_features.*` guards; read those with
+/// [`get_runtime_bool`] instead.
+pub fn get_runtime_number(key: &str, default_value: f64) -> f64 {
+  unsafe {
+    abi::envoy_dynamic_module_callback_get_runtime_number(str_to_module_buffer(key), default_value)
+  }
 }
 
 /// Register a function pointer under a name in the process-wide function registry.
@@ -131,7 +273,8 @@ pub unsafe fn get_server_concurrency() -> u32 {
 /// # Safety
 ///
 /// The `function_ptr` must point to a valid function that remains valid for the lifetime of the
-/// process.
+/// process. A module that registers functions must be loaded with `do_not_close` set to `true` to
+/// avoid being unloaded while the registry still hands out the pointer.
 pub unsafe fn register_function(key: &str, function_ptr: *const std::ffi::c_void) -> bool {
   unsafe {
     abi::envoy_dynamic_module_callback_register_function(
@@ -153,6 +296,58 @@ pub fn get_function(key: &str) -> Option<*const std::ffi::c_void> {
   let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
   let found =
     unsafe { abi::envoy_dynamic_module_callback_get_function(str_to_module_buffer(key), &mut ptr) };
+  if found {
+    Some(ptr as *const std::ffi::c_void)
+  } else {
+    None
+  }
+}
+
+/// Register an opaque data pointer under a name in the process-wide shared data registry.
+///
+/// This allows modules loaded in the same process to share arbitrary state, such as runtime
+/// handles, configuration snapshots, or shared caches without requiring direct access to
+/// each other's globals. For example, a bootstrap extension can register a `Tokio` runtime handle
+/// and HTTP filters or cluster extensions can retrieve and use it for async operations.
+///
+/// Unlike [`register_function`], the shared data registry allows overwriting an existing entry.
+/// If the key already exists, the data pointer is updated and the function returns `true`. This
+/// supports patterns where shared state is refreshed (e.g., after a configuration reload).
+/// Callers are responsible for managing the lifetime of overwritten data pointers.
+///
+/// Registration is typically done once during bootstrap (e.g., in `on_server_initialized` or
+/// `on_scheduled`).
+///
+/// This is thread-safe and can be called from any thread.
+///
+/// # Safety
+///
+/// The `data_ptr` must point to data that remains valid while reachable through the registry. A
+/// module that registers a pointer into its own memory must either be loaded with `do_not_close`
+/// set to `true` or overwrite the pointer on each reload before any consumer reads it. Callers
+/// are responsible for agreeing on the data type out-of-band, since the registry stores opaque
+/// pointers.
+pub unsafe fn register_shared_data(key: &str, data_ptr: *const std::ffi::c_void) -> bool {
+  unsafe {
+    abi::envoy_dynamic_module_callback_register_shared_data(
+      str_to_module_buffer(key),
+      data_ptr as *mut std::ffi::c_void,
+    )
+  }
+}
+
+/// Retrieve a previously registered data pointer by name from the process-wide shared data
+/// registry. The returned pointer can be cast to the expected data type and used directly.
+///
+/// Resolution is typically done once during configuration creation (e.g., in
+/// `on_http_filter_config_new`) and the result cached for per-request use.
+///
+/// This is thread-safe and can be called from any thread.
+pub fn get_shared_data(key: &str) -> Option<*const std::ffi::c_void> {
+  let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+  let found = unsafe {
+    abi::envoy_dynamic_module_callback_get_shared_data(str_to_module_buffer(key), &mut ptr)
+  };
   if found {
     Some(ptr as *const std::ffi::c_void)
   } else {
@@ -239,18 +434,32 @@ macro_rules! envoy_log {
   ($level:expr, $($arg:tt)*) => {
     {
       #[cfg(not(test))]
-      unsafe {
-        // Avoid allocating the message if the log level is not enabled.
-        if $crate::abi::envoy_dynamic_module_callback_log_enabled($level) {
+      {
+        let level = $level;
+        // SAFETY: envoy_dynamic_module_callback_log_enabled and
+        // envoy_dynamic_module_callback_log_v2 are FFI calls provided by the Envoy host.
+        let enabled = unsafe { $crate::abi::envoy_dynamic_module_callback_log_enabled(level) };
+        if enabled {
           let message = format!($($arg)*);
           let message_bytes = message.as_bytes();
-          $crate::abi::envoy_dynamic_module_callback_log(
-            $level,
-            $crate::abi::envoy_dynamic_module_type_module_buffer {
-              ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
-              length: message_bytes.len(),
-            },
-          );
+          // file! and line! expand to the call site of the outer envoy_log_* macro so the host
+          // reports the module location instead of a location inside Envoy.
+          let source_file = file!();
+          let source_file_bytes = source_file.as_bytes();
+          unsafe {
+            $crate::abi::envoy_dynamic_module_callback_log_v2(
+              level,
+              $crate::abi::envoy_dynamic_module_type_module_buffer {
+                ptr: message_bytes.as_ptr() as *const ::std::os::raw::c_char,
+                length: message_bytes.len(),
+              },
+              $crate::abi::envoy_dynamic_module_type_module_buffer {
+                ptr: source_file_bytes.as_ptr() as *const ::std::os::raw::c_char,
+                length: source_file_bytes.len(),
+              },
+              line!(),
+            );
+          }
         }
       }
       // In unit tests, just print to stderr since the Envoy symbols are not available.
@@ -258,6 +467,51 @@ macro_rules! envoy_log {
       {
         let message = format!($($arg)*);
         eprintln!("[{}] {}", stringify!($level), message);
+      }
+    }
+  };
+}
+
+/// Get the current effective log level of the dynamic modules logging stream. This can be used to
+/// align in-module verbosity with the level configured on the Envoy side, including changes applied
+/// at runtime via the admin API.
+pub fn get_log_level() -> abi::envoy_dynamic_module_type_log_level {
+  unsafe { abi::envoy_dynamic_module_callback_get_log_level() }
+}
+
+/// Check whether the given log level is enabled for the dynamic modules logging stream. This can be
+/// used to skip expensive work that is only needed when a message at the given level would actually
+/// be logged.
+pub fn is_log_enabled(level: abi::envoy_dynamic_module_type_log_level) -> bool {
+  unsafe { abi::envoy_dynamic_module_callback_log_enabled(level) }
+}
+
+/// Guard macro that ensures each factory `OnceLock` is registered by exactly one module.
+///
+/// When the same module is re-initialized (for example, static modules loaded multiple times
+/// via `newDynamicModuleByName`, or per-route config triggering a second init), the function
+/// pointer will be identical and the re-registration is silently accepted (idempotent).
+///
+/// If a *different* module (standalone `.so` or consolidated `.so`) tries to register a
+/// different factory function for the same slot, this macro logs a critical message via
+/// `envoy_log_critical!` and returns `null` from the surrounding `on_program_init`, causing
+/// Envoy to refuse to start — the correct behaviour for a data-correctness issue. The macro
+/// is only invoked inside `envoy_dynamic_module_on_program_init` (signature
+/// `-> *const c_char`), where the null return is the documented "init failed" sentinel.
+#[macro_export]
+macro_rules! set_factory_once {
+  ($static:expr, $fn:expr, $name:literal) => {
+    if let Err(new_val) = $static.set($fn) {
+      if !::std::ptr::fn_addr_eq(*$static.get().unwrap(), new_val) {
+        $crate::envoy_log_critical!(
+          "Duplicate factory registration for {}. A different module already registered this \
+           factory. Check dynamic_module_config for conflicting standalone and consolidated .so \
+           loads.",
+          $name,
+        );
+        // Return the "init failed" sentinel rather than panicking; unwinding across the
+        // `extern "C"` boundary is undefined behavior on the default `panic="unwind"`.
+        return ::std::ptr::null();
       }
     }
   };
@@ -317,6 +571,17 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
   }
 }
 
+/// Converts label name or value strings to module buffers for a labeled metric call.
+///
+/// The result is a `SmallVec` inlined for the common case of a few labels, so the typical one to
+/// four labels need no heap allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
+/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
+pub(crate) fn strs_to_module_buffers(
+  strs: &[&str],
+) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_buffer; 4]> {
+  strs.iter().map(|s| str_to_module_buffer(s)).collect()
+}
+
 pub(crate) fn bytes_to_module_buffer(b: &[u8]) -> abi::envoy_dynamic_module_type_module_buffer {
   abi::envoy_dynamic_module_type_module_buffer {
     ptr: b.as_ptr() as *const _ as *mut _,
@@ -338,32 +603,37 @@ pub struct ClusterHostCount {
 /// The identifier for an EnvoyCounter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyCounterId(usize);
+pub struct EnvoyCounterId(pub usize);
 
 /// The identifier for an EnvoyCounterVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyCounterVecId(usize);
+pub struct EnvoyCounterVecId(pub usize);
 
 /// The identifier for an EnvoyGauge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyGaugeId(usize);
+pub struct EnvoyGaugeId(pub usize);
 
 /// The identifier for an EnvoyGaugeVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyGaugeVecId(usize);
+pub struct EnvoyGaugeVecId(pub usize);
 
 /// The identifier for an EnvoyHistogram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyHistogramId(usize);
+pub struct EnvoyHistogramId(pub usize);
 
 /// The identifier for an EnvoyHistogramVec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct EnvoyHistogramVecId(usize);
+pub struct EnvoyHistogramVecId(pub usize);
+
+/// The identifier for a generic secret subscribed to by the module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct EnvoyGenericSecretId(pub usize);
 
 impl From<envoy_dynamic_module_type_metrics_result>
   for Result<(), envoy_dynamic_module_type_metrics_result>
@@ -411,6 +681,67 @@ macro_rules! drop_wrapped_c_void_ptr {
   }};
 }
 
+/// Define an `extern "C"` FFI hook that fails closed on panic.
+///
+/// The body runs inside `std::panic::catch_unwind` so a panic never unwinds across the C boundary.
+/// The value form requires an `on_panic` fallback that is returned when the body panics, which
+/// keeps the fail-closed default explicit at every hook. The void form logs the panic and returns.
+#[macro_export]
+macro_rules! ffi_export {
+  (
+    $(#[$meta:meta])*
+    fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) -> $ret:ty $body:block
+    on_panic = $default:expr $(;)?
+  ) => {
+    $(#[$meta])*
+    #[no_mangle]
+    pub extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
+      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
+        $crate::log_ffi_panic(::std::stringify!($name), panic);
+        $default
+      })
+    }
+  };
+  (
+    $(#[$meta:meta])*
+    unsafe fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) -> $ret:ty $body:block
+    on_panic = $default:expr $(;)?
+  ) => {
+    $(#[$meta])*
+    #[no_mangle]
+    pub unsafe extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
+      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
+        $crate::log_ffi_panic(::std::stringify!($name), panic);
+        $default
+      })
+    }
+  };
+  (
+    $(#[$meta:meta])*
+    fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
+  ) => {
+    $(#[$meta])*
+    #[no_mangle]
+    pub extern "C" fn $name($($arg: $arg_ty),*) {
+      let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
+        $crate::log_ffi_panic(::std::stringify!($name), panic);
+      });
+    }
+  };
+  (
+    $(#[$meta:meta])*
+    unsafe fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
+  ) => {
+    $(#[$meta])*
+    #[no_mangle]
+    pub unsafe extern "C" fn $name($($arg: $arg_ty),*) {
+      let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
+        $crate::log_ffi_panic(::std::stringify!($name), panic);
+      });
+    }
+  };
+}
+
 // =============================================================================
 // Network Filter Support
 // =============================================================================
@@ -428,16 +759,21 @@ macro_rules! drop_wrapped_c_void_ptr {
 #[macro_export]
 macro_rules! declare_network_filter_init_functions {
   ($f:ident, $new_network_filter_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_network_filter_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION,
+          $new_network_filter_config_fn,
+          "NEW_NETWORK_FILTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
 }
@@ -459,63 +795,278 @@ macro_rules! declare_network_filter_init_functions {
 /// - `udp_listener:` — [`NewUdpListenerFilterConfigFunction`] for UDP Listener filters
 /// - `bootstrap:` — [`NewBootstrapExtensionConfigFunction`] for Bootstrap extensions
 /// - `cert_validator:` — [`NewCertValidatorConfigFunction`] for TLS certificate validators
+/// - `upstream_http_tcp_bridge:` — [`NewUpstreamHttpTcpBridgeConfigFunction`] for upstream HTTP TCP
+///   bridges
+/// - `http_per_route:` — [`NewHttpFilterPerRouteConfigFunction`] for HTTP per-route configs
+/// - `load_balancer:` — [`NewLoadBalancerConfigFunction`] for load balancer policies
+/// - `cluster:` — [`NewClusterConfigFunction`] for custom clusters
+/// - `config_validator:` — [`NewConfigValidatorConfigFunction`] for xDS config validators
+/// - `tracer:` — [`NewTracerConfigFunction`] for tracers
+/// - `dns_resolver:` — [`NewDnsResolverConfigFunction`] for DNS resolvers
+/// - `transport_socket:` — [`NewTransportSocketFactoryConfigFunction`] for transport sockets
+/// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
+/// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
+/// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
+/// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
+/// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
+/// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
+/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
+///   mutations
+/// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 ///
 /// # Examples
 ///
 /// HTTP only:
-/// ```ignore
-/// declare_all_init_functions!(my_program_init,
-///     http: my_new_http_filter_config_fn,
-/// );
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// declare_all_init_functions!(my_program_init, http: my_new_http_filter_config_fn);
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
+///   Some(Box::new(MyHttpFilterConfig {}))
+/// }
+///
+/// struct MyHttpFilterConfig {}
+///
+/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyHttpFilterConfig {}
 /// ```
 ///
 /// Network + UDP Listener:
-/// ```ignore
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
 /// declare_all_init_functions!(my_program_init,
-///     network: my_new_network_filter_config_fn,
-///     udp_listener: my_new_udp_listener_filter_config_fn,
+///   network: my_new_network_filter_config_fn,
+///   udp_listener: my_new_udp_listener_filter_config_fn,
 /// );
+///
+/// fn my_program_init() -> bool {
+///   true
+/// }
+///
+/// fn my_new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
+///   Some(Box::new(MyNetworkFilterConfig {}))
+/// }
+///
+/// struct MyNetworkFilterConfig {}
+///
+/// impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for MyNetworkFilterConfig {
+///   fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+///     Box::new(MyNetworkFilter {})
+///   }
+/// }
+///
+/// struct MyNetworkFilter {}
+///
+/// impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for MyNetworkFilter {}
+///
+/// fn my_new_udp_listener_filter_config_fn<
+///   EC: EnvoyUdpListenerFilterConfig,
+///   ELF: EnvoyUdpListenerFilter,
+/// >(
+///   _envoy_filter_config: &mut EC,
+///   _name: &str,
+///   _config: &[u8],
+/// ) -> Option<Box<dyn UdpListenerFilterConfig<ELF>>> {
+///   Some(Box::new(MyUdpListenerFilterConfig {}))
+/// }
+///
+/// struct MyUdpListenerFilterConfig {}
+///
+/// impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilterConfig<ELF> for MyUdpListenerFilterConfig {
+///   fn new_udp_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn UdpListenerFilter<ELF>> {
+///     Box::new(MyUdpListenerFilter {})
+///   }
+/// }
+///
+/// struct MyUdpListenerFilter {}
+///
+/// impl<ELF: EnvoyUdpListenerFilter> UdpListenerFilter<ELF> for MyUdpListenerFilter {}
 /// ```
 #[macro_export]
 macro_rules! declare_all_init_functions {
   ($f:ident, $($filter_type:ident : $filter_fn:expr),+ $(,)?) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      $(
-        declare_all_init_functions!(@register $filter_type : $filter_fn);
-      )+
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        $(
+          declare_all_init_functions!(@register $filter_type : $filter_fn);
+        )+
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
 
   (@register http : $fn:expr) => {
-    envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-      .get_or_init(|| $fn);
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HTTP_FILTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register http_per_route : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION"
+    );
   };
   (@register network : $fn:expr) => {
-    envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION
-      .get_or_init(|| $fn);
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_NETWORK_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_NETWORK_FILTER_CONFIG_FUNCTION"
+    );
   };
   (@register listener : $fn:expr) => {
-    envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
-      .get_or_init(|| $fn);
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_LISTENER_FILTER_CONFIG_FUNCTION"
+    );
   };
   (@register udp_listener : $fn:expr) => {
-    envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
-      .get_or_init(|| $fn);
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION"
+    );
   };
   (@register bootstrap : $fn:expr) => {
-    envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
-      .get_or_init(|| $fn);
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
+      $fn,
+      "NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION"
+    );
+  };
+  (@register load_balancer : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_LOAD_BALANCER_CONFIG_FUNCTION"
+    );
+  };
+  (@register cluster : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CLUSTER_CONFIG_FUNCTION"
+    );
   };
   (@register cert_validator : $fn:expr) => {
-    envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION
-      .get_or_init(|| $fn);
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CERT_VALIDATOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register config_validator : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION"
+    );
+  };
+  (@register upstream_http_tcp_bridge : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
+      $fn,
+      "NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION"
+    );
+  };
+  (@register tracer : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_TRACER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_TRACER_CONFIG_FUNCTION"
+    );
+  };
+  (@register dns_resolver : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_DNS_RESOLVER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_DNS_RESOLVER_CONFIG_FUNCTION"
+    );
+  };
+  (@register transport_socket : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION,
+      $fn,
+      "NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION"
+    );
+  };
+  (@register access_logger : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_ACCESS_LOGGER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_ACCESS_LOGGER_CONFIG_FUNCTION"
+    );
+  };
+  (@register formatter : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_FORMATTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_FORMATTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register cluster_specifier : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+    );
+  };
+  (@register route_specifier : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
+    );
+  };
+  (@register stat_sink : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_STAT_SINK_CONFIG_FUNCTION,
+      $fn,
+      "NEW_STAT_SINK_CONFIG_FUNCTION"
+    );
+  };
+  (@register health_checker : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HEALTH_CHECKER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HEALTH_CHECKER_CONFIG_FUNCTION"
+    );
+  };
+  (@register early_header_mutation : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION,
+      $fn,
+      "NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION"
+    );
+  };
+  (@register header_formatter : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HEADER_FORMATTER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_HEADER_FORMATTER_CONFIG_FUNCTION"
+    );
   };
 }
 
@@ -559,18 +1110,21 @@ pub static NEW_NETWORK_FILTER_CONFIG_FUNCTION: OnceLock<
 #[macro_export]
 macro_rules! declare_listener_filter_init_functions {
   ($f:ident, $new_listener_filter_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init(
-      server_factory_context_ptr: abi::envoy_dynamic_module_type_server_factory_context_envoy_ptr,
-    ) -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_listener_filter_config_fn);
-      if ($f(server_factory_context_ptr)) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_LISTENER_FILTER_CONFIG_FUNCTION,
+          $new_listener_filter_config_fn,
+          "NEW_LISTENER_FILTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
 }
@@ -616,16 +1170,21 @@ pub static NEW_LISTENER_FILTER_CONFIG_FUNCTION: OnceLock<
 #[macro_export]
 macro_rules! declare_udp_listener_filter_init_functions {
   ($f:ident, $new_udp_listener_filter_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_udp_listener_filter_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION,
+          $new_udp_listener_filter_config_fn,
+          "NEW_UDP_LISTENER_FILTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
 }
@@ -720,27 +1279,420 @@ pub type NewBootstrapExtensionConfigFunction = fn(
 #[macro_export]
 macro_rules! declare_bootstrap_init_functions {
   ($f:ident, $new_bootstrap_extension_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION
-        .get_or_init(|| $new_bootstrap_extension_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
+          $new_bootstrap_extension_config_fn,
+          "NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
 }
+
+// =================================================================================================
+// Access Logger Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new access logger configuration.
+///
+/// The `ctx` provides access to the metrics-defining APIs that should be invoked at
+/// configuration time. The `name` is the value of `logger_name` from the `dynamic_modules`
+/// access-log configuration, allowing a single module to dispatch to different logger
+/// implementations. Returning `None` causes Envoy to reject the access-log configuration.
+pub type NewAccessLoggerConfigFunction = fn(
+  ctx: &access_log::ConfigContext,
+  name: &str,
+  config: &[u8],
+) -> Option<Box<dyn access_log::AccessLoggerConfig>>;
+
+/// The global factory function for access logger configurations. This is set via the
+/// `access_logger:` arm of [`declare_all_init_functions!`] (or the legacy
+/// [`declare_access_logger!`] shim) and is not intended to be set directly.
+pub static NEW_ACCESS_LOGGER_CONFIG_FUNCTION: OnceLock<NewAccessLoggerConfigFunction> =
+  OnceLock::new();
+
+// =================================================================================================
+// Formatter Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new formatter command parser configuration.
+///
+/// The `name` is the value of `formatter_name` from the `dynamic_modules` formatter
+/// configuration, allowing a single module to dispatch to different command parser
+/// implementations. The `config` is the raw bytes from the `formatter_config` field. Returning
+/// `None` causes Envoy to reject the formatter configuration.
+pub type NewFormatterConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn formatter::FormatterConfig>>;
+
+/// The global factory function for formatter command parsers. This is set via the `formatter:` arm
+/// of [`declare_all_init_functions!`] (or the [`declare_formatter_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> = OnceLock::new();
+
+/// Declare the init functions for a formatter dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewFormatterConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_formatter_config(_name: &str, _config: &[u8]) -> Option<Box<dyn FormatterConfig>> {
+///   None
+/// }
+///
+/// declare_formatter_init_functions!(program_init, new_formatter_config);
+/// ```
+#[macro_export]
+macro_rules! declare_formatter_init_functions {
+  ($f:ident, $new_formatter_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_FORMATTER_CONFIG_FUNCTION,
+          $new_formatter_config_fn,
+          "NEW_FORMATTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
+// Cluster Specifier Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new cluster specifier configuration.
+///
+/// The `name` is the value of `specifier_name` from the `dynamic_modules` cluster specifier
+/// configuration, allowing a single module to dispatch to different cluster specifier
+/// implementations. The `config` is the raw bytes from the `specifier_config` field. Returning
+/// `None` causes Envoy to reject the cluster specifier configuration.
+pub type NewClusterSpecifierConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    metrics: std::sync::Arc<dyn cluster_specifier::EnvoyClusterSpecifierMetrics>,
+  ) -> Option<Box<dyn cluster_specifier::ClusterSpecifierConfig>>;
+
+/// The global factory function for cluster specifiers. This is set via the `cluster_specifier:` arm
+/// of [`declare_all_init_functions!`] (or the [`declare_cluster_specifier_init_functions!`] shim)
+/// and is not intended to be set directly.
+pub static NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewClusterSpecifierConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a cluster specifier dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewClusterSpecifierConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::cluster_specifier::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_cluster_specifier_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _metrics: std::sync::Arc<dyn EnvoyClusterSpecifierMetrics>,
+/// ) -> Option<Box<dyn ClusterSpecifierConfig>> {
+///   Some(Box::new(MyClusterSpecifierConfig {}))
+/// }
+///
+/// struct MyClusterSpecifierConfig {}
+///
+/// impl ClusterSpecifierConfig for MyClusterSpecifierConfig {
+///   fn on_select(&self, ctx: &mut ClusterSpecifierContext) -> bool {
+///     ctx.set_cluster_name("my_cluster");
+///     true
+///   }
+/// }
+///
+/// declare_cluster_specifier_init_functions!(program_init, new_cluster_specifier_config);
+/// ```
+#[macro_export]
+macro_rules! declare_cluster_specifier_init_functions {
+  ($f:ident, $new_cluster_specifier_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
+          $new_cluster_specifier_config_fn,
+          "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
+// Route Specifier Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new route specifier configuration.
+///
+/// The `name` is the value of `specifier_name` from the `dynamic_modules` route specifier
+/// configuration, allowing a single module to dispatch to different route specifier
+/// implementations. The `config` is the raw bytes from the `specifier_config` field. The
+/// `envoy_config` handle reports what the route specifier configuration declares and defines
+/// metrics. Returning `None` causes Envoy to reject the route specifier configuration.
+pub type NewRouteSpecifierConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    envoy_config: std::sync::Arc<dyn route_specifier::EnvoyRouteSpecifierConfig>,
+  ) -> Option<Box<dyn route_specifier::RouteSpecifierConfig>>;
+
+/// The global factory function for route specifiers. This is set via the `route_specifier:` arm of
+/// [`declare_all_init_functions!`] (or the [`declare_route_specifier_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewRouteSpecifierConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a route specifier dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewRouteSpecifierConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::route_specifier::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_route_specifier_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_config: std::sync::Arc<dyn EnvoyRouteSpecifierConfig>,
+/// ) -> Option<Box<dyn RouteSpecifierConfig>> {
+///   Some(Box::new(MyRouteSpecifierConfig {}))
+/// }
+///
+/// struct MyRouteSpecifierConfig {}
+///
+/// impl RouteSpecifierConfig for MyRouteSpecifierConfig {
+///   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus {
+///     // With the decision left Unspecified, Envoy generates the final route from the selected
+///     // template, or leaves the route the specifier was given unchanged when the identifier is
+///     // not declared.
+///     let _ = ctx.select_template("canary");
+///     OnRouteStatus::StopIteration
+///   }
+/// }
+///
+/// declare_route_specifier_init_functions!(program_init, new_route_specifier_config);
+/// ```
+#[macro_export]
+macro_rules! declare_route_specifier_init_functions {
+  ($f:ident, $new_route_specifier_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
+          $new_route_specifier_config_fn,
+          "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
+// Stats Sink Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new stats sink.
+///
+/// The `name` is the value of `sink_name` from the `dynamic_modules` stats sink configuration,
+/// allowing a single module to dispatch to different sink implementations. The `config` is the
+/// raw bytes from the `sink_config` field. The `envoy_config` handle is used to define gauges and
+/// create a [`stats_sink::EnvoyStatSinkConfigScheduler`] while the configuration is being created.
+/// Returning `None` causes Envoy to reject the stats sink configuration.
+pub type NewStatSinkConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_config: &mut stats_sink::EnvoyStatSinkConfig,
+) -> Option<Box<dyn stats_sink::StatSink>>;
+
+/// The global factory function for stats sinks. This is set via the `stat_sink:` arm of
+/// [`declare_all_init_functions!`] (or [`declare_stat_sink_init_functions!`]) and is not intended
+/// to be set directly.
+pub static NEW_STAT_SINK_CONFIG_FUNCTION: OnceLock<NewStatSinkConfigFunction> = OnceLock::new();
+
+/// Declare the init functions for a stats sink dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewStatSinkConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::stats_sink::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_stat_sink(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_config: &mut EnvoyStatSinkConfig,
+/// ) -> Option<Box<dyn StatSink>> {
+///   Some(Box::new(MyStatSink {}))
+/// }
+///
+/// struct MyStatSink {}
+///
+/// impl StatSink for MyStatSink {
+///   fn on_flush(&self, _snapshot: &MetricSnapshot) {}
+///   fn on_histogram_complete(&self, _name: EnvoyBuffer, _value: u64) {}
+/// }
+///
+/// declare_stat_sink_init_functions!(program_init, new_stat_sink);
+/// ```
+#[macro_export]
+macro_rules! declare_stat_sink_init_functions {
+  ($f:ident, $new_stat_sink_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_STAT_SINK_CONFIG_FUNCTION,
+          $new_stat_sink_config_fn,
+          "NEW_STAT_SINK_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
+// Health Checker Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new health checker configuration.
+///
+/// The `name` is the value of `health_checker_name` from the `dynamic_modules` health-check
+/// configuration, allowing a single module to dispatch to different health checker implementations.
+/// The `config` is the raw configuration bytes. Returning `None` causes Envoy to reject the
+/// health-check configuration.
+pub type NewHealthCheckerConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn health_checker::HealthCheckerConfig>>;
+
+/// The global factory function for health checker configurations. This is set via the
+/// `health_checker:` arm of [`declare_all_init_functions!`] and is not intended to be set directly.
+pub static NEW_HEALTH_CHECKER_CONFIG_FUNCTION: OnceLock<NewHealthCheckerConfigFunction> =
+  OnceLock::new();
+
+// =================================================================================================
+// Early Header Mutation Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new early header mutation configuration.
+///
+/// The `name` is the value of `early_header_mutation_name` from the `dynamic_modules` early header
+/// mutation configuration, allowing a single module to dispatch to different implementations. The
+/// `config` is the raw configuration bytes. Returning `None` causes Envoy to reject the early
+/// header mutation configuration.
+pub type NewEarlyHeaderMutationConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+  ) -> Option<Box<dyn early_header_mutation::EarlyHeaderMutationConfig>>;
+
+/// The global factory function for early header mutation configurations. This is set via the
+/// `early_header_mutation:` arm of [`declare_all_init_functions!`] and is not intended to be set
+/// directly.
+pub static NEW_EARLY_HEADER_MUTATION_CONFIG_FUNCTION: OnceLock<
+  NewEarlyHeaderMutationConfigFunction,
+> = OnceLock::new();
+
+// =================================================================================================
+// Header Formatter Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new HTTP/1 header formatter configuration.
+///
+/// The `name` is the value of `header_formatter_name` from the `dynamic_modules` header formatter
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw configuration bytes. Returning `None` causes Envoy to reject the header formatter
+/// configuration.
+pub type NewHeaderFormatterConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn header_formatter::HeaderFormatterConfig>>;
+
+/// The global factory function for header formatter configurations. This is set via the
+/// `header_formatter:` arm of [`declare_all_init_functions!`] and is not intended to be set
+/// directly.
+pub static NEW_HEADER_FORMATTER_CONFIG_FUNCTION: OnceLock<NewHeaderFormatterConfigFunction> =
+  OnceLock::new();
 
 // =================================================================================================
 // Cluster Dynamic Module
 // =================================================================================================
 
 /// The type of the factory function that creates a new cluster configuration.
-pub type NewClusterConfigFunction =
-  fn(name: &str, config: &[u8]) -> Option<Box<dyn cluster::ClusterConfig>>;
+///
+/// The `envoy_cluster_metrics` parameter provides access to metric-defining and metric-recording
+/// callbacks. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., during cluster lifecycle events) for recording metrics.
+pub type NewClusterConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_cluster_metrics: std::sync::Arc<dyn cluster::EnvoyClusterMetrics>,
+) -> Option<Box<dyn cluster::ClusterConfig>>;
 
 /// Global storage for the cluster config factory function.
 pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = OnceLock::new();
@@ -754,6 +1706,7 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///
 /// ```
 /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
 ///
 /// declare_cluster_init_functions!(my_program_init, my_new_cluster_config_fn);
 ///
@@ -764,33 +1717,45 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 /// fn my_new_cluster_config_fn(
 ///   _name: &str,
 ///   _config: &[u8],
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
 /// ) -> Option<Box<dyn ClusterConfig>> {
-///   Some(Box::new(MyClusterConfig {}))
+///   let counter_id = envoy_cluster_metrics.define_counter("my_counter").ok()?;
+///   Some(Box::new(MyClusterConfig {
+///     counter_id,
+///     envoy_cluster_metrics,
+///   }))
 /// }
 ///
-/// struct MyClusterConfig {}
+/// struct MyClusterConfig {
+///   counter_id: EnvoyCounterId,
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
+/// }
 ///
 /// impl ClusterConfig for MyClusterConfig {
-///   fn new_cluster(
-///     &self,
-///     _envoy_cluster: &dyn EnvoyCluster,
-///   ) -> Box<dyn Cluster> {
-///     Box::new(MyCluster {})
+///   fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+///     Box::new(MyCluster {
+///       counter_id: self.counter_id,
+///       envoy_cluster_metrics: self.envoy_cluster_metrics.clone(),
+///     })
 ///   }
 /// }
 ///
-/// struct MyCluster {}
+/// struct MyCluster {
+///   counter_id: EnvoyCounterId,
+///   envoy_cluster_metrics: Arc<dyn EnvoyClusterMetrics>,
+/// }
 ///
 /// impl Cluster for MyCluster {
 ///   fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+///     self
+///       .envoy_cluster_metrics
+///       .increment_counter(self.counter_id, 1)
+///       .ok();
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(
-///     &self,
-///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
-///   ) -> Box<dyn ClusterLb> {
-///     Box::new(MyClusterLb {})
+///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+///     Some(Box::new(MyClusterLb {}))
 ///   }
 /// }
 ///
@@ -799,25 +1764,31 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 /// impl ClusterLb for MyClusterLb {
 ///   fn choose_host(
 ///     &mut self,
-///     _context: envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
-///   ) -> Option<envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_module_type_cluster_host_envoy_ptr> {
-///     None
+///     _context: Option<&dyn ClusterLbContext>,
+///     _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+///   ) -> HostSelectionResult {
+///     HostSelectionResult::NoHost
 ///   }
 /// }
 /// ```
 #[macro_export]
 macro_rules! declare_cluster_init_functions {
   ($f:ident, $new_cluster_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_cluster_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_CONFIG_FUNCTION,
+          $new_cluster_config_fn,
+          "NEW_CLUSTER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
 }
@@ -847,7 +1818,7 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// use envoy_proxy_dynamic_modules_rust_sdk::*;
 /// use std::sync::Arc;
 ///
@@ -861,7 +1832,10 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///   envoy_lb_config: Arc<dyn EnvoyLbConfig>,
 /// ) -> Option<Box<dyn LoadBalancerConfig>> {
 ///   let counter_id = envoy_lb_config.define_counter("my_counter").ok()?;
-///   Some(Box::new(MyLbConfig { counter_id, envoy_lb_config }))
+///   Some(Box::new(MyLbConfig {
+///     counter_id,
+///     envoy_lb_config,
+///   }))
 /// }
 ///
 /// declare_load_balancer_init_functions!(program_init, new_lb_config);
@@ -895,7 +1869,10 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 ///     }
 ///     let index = self.next_index % count;
 ///     self.next_index += 1;
-///     self.envoy_lb_config.increment_counter(self.counter_id, 1).ok();
+///     self
+///       .envoy_lb_config
+///       .increment_counter(self.counter_id, 1)
+///       .ok();
 ///     Some(HostSelection::at_default_priority(index as u32))
 ///   }
 /// }
@@ -903,16 +1880,21 @@ pub static NEW_LOAD_BALANCER_CONFIG_FUNCTION: OnceLock<NewLoadBalancerConfigFunc
 #[macro_export]
 macro_rules! declare_load_balancer_init_functions {
   ($f:ident, $new_lb_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_LOAD_BALANCER_CONFIG_FUNCTION
-        .get_or_init(|| $new_lb_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_LOAD_BALANCER_CONFIG_FUNCTION,
+          $new_lb_config_fn,
+          "NEW_LOAD_BALANCER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
       }
+      on_panic = ::std::ptr::null()
     }
   };
 }
@@ -935,18 +1917,15 @@ pub static NEW_CERT_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewCertValidatorConfigFu
 ///
 /// # Example
 ///
-/// ```ignore
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// ```
 /// use envoy_proxy_dynamic_modules_rust_sdk::cert_validator::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// fn program_init() -> bool {
 ///   true
 /// }
 ///
-/// fn new_cert_validator_config(
-///   name: &str,
-///   config: &[u8],
-/// ) -> Option<Box<dyn CertValidatorConfig>> {
+/// fn new_cert_validator_config(name: &str, config: &[u8]) -> Option<Box<dyn CertValidatorConfig>> {
 ///   Some(Box::new(MyCertValidatorConfig {}))
 /// }
 ///
@@ -977,16 +1956,290 @@ pub static NEW_CERT_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewCertValidatorConfigFu
 #[macro_export]
 macro_rules! declare_cert_validator_init_functions {
   ($f:ident, $new_cert_validator_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
+          $new_cert_validator_config_fn,
+          "NEW_CERT_VALIDATOR_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =============================================================================
+// Config Validator
+// =============================================================================
+
+/// The function signature for creating a new xDS config validator configuration.
+pub type NewConfigValidatorConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn config_validator::ConfigValidatorConfig>>;
+
+/// Global function for creating xDS config validator configurations.
+pub static NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewConfigValidatorConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a config validator dynamic module.
+///
+/// This macro generates the necessary `extern "C"` functions for the config validator module.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::config_validator::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_config_validator_config(
+///   name: &str,
+///   config: &[u8],
+/// ) -> Option<Box<dyn ConfigValidatorConfig>> {
+///   Some(Box::new(MyConfigValidatorConfig {}))
+/// }
+///
+/// declare_config_validator_init_functions!(program_init, new_config_validator_config);
+///
+/// struct MyConfigValidatorConfig {}
+///
+/// impl ConfigValidatorConfig for MyConfigValidatorConfig {
+///   fn validate(
+///     &self,
+///     _context: &ConfigValidatorContext,
+///     _type_url: &str,
+///     _resources: &[ConfigValidatorResource],
+///   ) -> Result<(), String> {
+///     Ok(())
+///   }
+///
+///   fn validate_delta(
+///     &self,
+///     _context: &ConfigValidatorContext,
+///     _type_url: &str,
+///     _added_resources: &[ConfigValidatorResource],
+///     _removed_resources: &[&str],
+///   ) -> Result<(), String> {
+///     Ok(())
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_config_validator_init_functions {
+  ($f:ident, $new_config_validator_config_fn:expr) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_CERT_VALIDATOR_CONFIG_FUNCTION
-        .get_or_init(|| $new_cert_validator_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
+      match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION,
+          $new_config_validator_config_fn,
+          "NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      })) {
+        ::std::result::Result::Ok(v) => v,
+        ::std::result::Result::Err(payload) => {
+          $crate::log_ffi_panic("envoy_dynamic_module_on_program_init", payload);
+          ::std::ptr::null()
+        },
       }
+    }
+  };
+}
+
+// =================================================================================================
+// Upstream HTTP TCP Bridge Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new upstream HTTP TCP bridge configuration.
+pub type NewUpstreamHttpTcpBridgeConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn UpstreamHttpTcpBridgeConfig>>;
+
+/// Global storage for the upstream HTTP TCP bridge config factory function.
+pub static NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION: OnceLock<
+  NewUpstreamHttpTcpBridgeConfigFunction,
+> = OnceLock::new();
+
+// =================================================================================================
+// Tracer Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new tracer configuration.
+///
+/// The `ctx` provides access to metrics definition and update APIs. Metrics should be defined
+/// during configuration creation and the context stored for runtime metric updates.
+pub type NewTracerConfigFunction =
+  fn(ctx: TracerConfigContext, name: &str, config: &[u8]) -> Option<Box<dyn TracerConfig>>;
+
+/// Global storage for the tracer config factory function.
+pub static NEW_TRACER_CONFIG_FUNCTION: OnceLock<NewTracerConfigFunction> = OnceLock::new();
+
+// =================================================================================================
+// DNS Resolver Dynamic Module Support
+// =================================================================================================
+
+/// The type of the factory function that creates a new DNS resolver configuration.
+///
+/// The `envoy_dns_resolver_config` parameter provides access to the Envoy-side DNS resolver
+/// configuration. The caller receives an `Arc` so it can be stored and used at runtime
+/// (e.g., during resolution) for recording metrics.
+pub type NewDnsResolverConfigFunction = fn(
+  name: &str,
+  config: &[u8],
+  envoy_dns_resolver_config: std::sync::Arc<dyn dns_resolver::EnvoyDnsResolverConfig>,
+) -> Option<Box<dyn dns_resolver::DnsResolverConfig>>;
+
+/// Global storage for the DNS resolver config factory function.
+pub static NEW_DNS_RESOLVER_CONFIG_FUNCTION: OnceLock<NewDnsResolverConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a DNS resolver dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewDnsResolverConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+/// use std::sync::Arc;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_dns_resolver_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_dns_resolver_config: Arc<dyn EnvoyDnsResolverConfig>,
+/// ) -> Option<Box<dyn DnsResolverConfig>> {
+///   Some(Box::new(MyDnsResolverConfig {}))
+/// }
+///
+/// declare_dns_resolver_init_functions!(program_init, new_dns_resolver_config);
+///
+/// struct MyDnsResolverConfig {}
+///
+/// impl DnsResolverConfig for MyDnsResolverConfig {
+///   fn new_resolver(
+///     &self,
+///     envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
+///   ) -> Option<Box<dyn DnsResolverInstance>> {
+///     Some(Box::new(MyDnsResolver { envoy_callback }))
+///   }
+/// }
+///
+/// struct MyDnsResolver {
+///   envoy_callback: Arc<dyn EnvoyDnsResolverCallback>,
+/// }
+///
+/// impl DnsResolverInstance for MyDnsResolver {
+///   fn resolve(
+///     &self,
+///     _dns_name: &str,
+///     _lookup_family: DnsLookupFamily,
+///     _query_id: u64,
+///   ) -> Option<Box<dyn DnsActiveQuery>> {
+///     None
+///   }
+/// }
+/// ```
+#[macro_export]
+macro_rules! declare_dns_resolver_init_functions {
+  ($f:ident, $new_dns_resolver_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_DNS_RESOLVER_CONFIG_FUNCTION,
+          $new_dns_resolver_config_fn,
+          "NEW_DNS_RESOLVER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
+// Transport Socket Dynamic Module Support
+// =================================================================================================
+
+/// The factory function signature for creating a new transport socket factory configuration.
+pub type NewTransportSocketFactoryConfigFunction<ETS> =
+  fn(
+    name: &str,
+    config: &[u8],
+    is_upstream: bool,
+  ) -> Option<Box<dyn transport_socket::TransportSocketFactoryConfig<ETS>>>;
+
+/// Global storage for the transport socket factory configuration function.
+pub static NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION: OnceLock<
+  NewTransportSocketFactoryConfigFunction<EnvoyTransportSocketImpl>,
+> = OnceLock::new();
+
+/// Declare the init functions for a transport socket dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with
+/// [`NewTransportSocketFactoryConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_transport_socket_factory_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _is_upstream: bool,
+/// ) -> Option<Box<dyn TransportSocketFactoryConfig<EnvoyTransportSocketImpl>>> {
+///   None
+/// }
+///
+/// declare_transport_socket_init_functions!(program_init, new_transport_socket_factory_config);
+/// ```
+#[macro_export]
+macro_rules! declare_transport_socket_init_functions {
+  ($f:ident, $new_transport_socket_factory_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION,
+          $new_transport_socket_factory_config_fn,
+          "NEW_TRANSPORT_SOCKET_FACTORY_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
     }
   };
 }

@@ -23,8 +23,8 @@ namespace {
 
 class TestCustomCommandParser : public Formatter::CommandParser {
 public:
-  Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view,
-                                        absl::optional<size_t>) const override {
+  absl::StatusOr<Formatter::FormatterProviderPtr>
+  parse(absl::string_view command, absl::string_view, std::optional<size_t>) const override {
     if (command == "TEST_CUSTOM") {
       return std::make_unique<Formatter::PlainStringFormatter>("custom-value");
     }
@@ -127,7 +127,7 @@ TEST(TcpGrpcAccessLog, TlsLifetimeCheck) {
                          common_config,
                      Common::GrpcAccessLoggerType type) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
-          std::make_pair(MessageUtil::hash(common_config), type);
+          std::ignore = std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;
         });
     // Set tls callback in the TcpGrpcAccessLog constructor,

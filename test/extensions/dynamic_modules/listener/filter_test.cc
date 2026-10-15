@@ -1,3 +1,6 @@
+#include <functional>
+
+#include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
@@ -5,15 +8,22 @@
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace ListenerFilters {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 // A simple mock implementation of ListenerFilterBuffer for testing.
 class TestListenerFilterBuffer : public Network::ListenerFilterBuffer {
@@ -44,15 +54,53 @@ class DynamicModuleListenerFilterTest : public testing::Test {
 public:
   void SetUp() override {
     auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
     auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
         "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
         cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-    EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+    EXPECT_OK(filter_config_or_status);
     filter_config_ = filter_config_or_status.value();
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher));
+  }
+
+  // Runs the reentrancy probe with an inline callout completion and returns how many times the
+  // module observed on_http_callout_done. The gate must keep this at zero for inline completions.
+  uint64_t runInlineCalloutProbe(
+      std::function<void(Http::AsyncClient::Callbacks&, Http::AsyncClient::Request&)> complete) {
+    auto dynamic_module =
+        newDynamicModule(testSharedObjectPath("listener_integration_test", "rust"), false);
+    EXPECT_OK(dynamic_module);
+    auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
+        "http_callout_reentrancy_probe", "", DefaultMetricsNamespace,
+        std::move(dynamic_module.value()), cluster_manager_, *stats_.rootScope(),
+        main_thread_dispatcher_);
+    EXPECT_OK(filter_config_or_status);
+
+    auto cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+    EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"callout_cluster"}))
+        .WillOnce(testing::Return(cluster.get()));
+    EXPECT_CALL(cluster->async_client_, send_(testing::_, testing::_, testing::_))
+        .WillOnce(testing::Invoke(
+            [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
+              complete(callbacks, req);
+              return nullptr;
+            }));
+
+    // The callout path calls shared_from_this, so the filter must be held by a shared_ptr.
+    // Production wraps it in the forwarding adapter that the listener manager owns as a unique_ptr.
+    auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_or_status.value());
+    auto adapter = std::make_unique<SharedListenerFilterAdapter>(filter);
+    EXPECT_EQ(Network::FilterStatus::Continue, adapter->onAccept(callbacks_));
+
+    auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.callout_done_total");
+    EXPECT_NE(counter, nullptr);
+    return counter == nullptr ? 0 : counter->value();
   }
 
   Stats::IsolatedStoreImpl stats_;
@@ -117,12 +165,12 @@ TEST_F(DynamicModuleListenerFilterTest, FilterWithNullInModuleFilterOnClose) {
 TEST_F(DynamicModuleListenerFilterTest, OnAcceptWithNullInModuleFilterClosesSocket) {
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_filter_new_fail", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
-  EXPECT_TRUE(filter_config_or_status.ok()) << filter_config_or_status.status().message();
+  EXPECT_OK(filter_config_or_status);
   auto filter_config = filter_config_or_status.value();
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(filter_config);
@@ -205,12 +253,12 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitialization) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto dynamic_module = newDynamicModule(testSharedObjectPath("listener_no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "some_config", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_OK(filter_config_or_status);
 
   auto config = filter_config_or_status.value();
   EXPECT_NE(nullptr, config->in_module_config_);
@@ -229,12 +277,12 @@ TEST(DynamicModuleListenerFilterConfigTest, MissingSymbols) {
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   // Use the HTTP filter no_op module which lacks listener filter symbols.
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_FALSE(filter_config_or_status.ok());
+  EXPECT_THAT(filter_config_or_status, Not(IsOk()));
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, ConfigInitializationFailure) {
@@ -244,14 +292,13 @@ TEST(DynamicModuleListenerFilterConfigTest, ConfigInitializationFailure) {
   // Use a module that returns nullptr from config_new.
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_config_new_fail", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_FALSE(filter_config_or_status.ok());
-  EXPECT_THAT(filter_config_or_status.status().message(),
-              testing::HasSubstr("Failed to initialize"));
+  EXPECT_THAT(filter_config_or_status,
+              HasStatusMessage(testing::HasSubstr("Failed to initialize")));
 }
 
 TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
@@ -260,12 +307,12 @@ TEST(DynamicModuleListenerFilterConfigTest, StopIterationStatus) {
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_OK(filter_config_or_status);
   auto config = filter_config_or_status.value();
 
   auto filter = std::make_unique<DynamicModuleListenerFilter>(config);
@@ -287,12 +334,12 @@ TEST(DynamicModuleListenerFilterConfigTest, OnDataStopIterationStatus) {
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
   auto dynamic_module =
       newDynamicModule(testSharedObjectPath("listener_stop_iteration", "c"), false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
   auto filter_config_or_status = newDynamicModuleListenerFilterConfig(
       "test_filter", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
       cluster_manager, *stats.rootScope(), main_thread_dispatcher);
-  EXPECT_TRUE(filter_config_or_status.ok());
+  EXPECT_OK(filter_config_or_status);
   auto config = filter_config_or_status.value();
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
@@ -396,8 +443,61 @@ TEST_F(DynamicModuleListenerFilterTest, MetricsInvalidId) {
             envoy_dynamic_module_callback_listener_filter_set_gauge(
                 static_cast<void*>(filter.get()), 999, 1));
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_increment_gauge(
+                static_cast<void*>(filter.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_listener_filter_decrement_gauge(
+                static_cast<void*>(filter.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_listener_filter_record_histogram_value(
                 static_cast<void*>(filter.get()), 999, 1));
+}
+
+// The listener manager owns filters as a unique_ptr, so the adapter holds the filter in a
+// shared_ptr and forwards every ListenerFilter method to it. Shared ownership is what lets the
+// async callout and scheduler paths call shared_from_this. The integration test is the guard for
+// the production factory wiring.
+TEST_F(DynamicModuleListenerFilterTest, AdapterForwardsAndOwnsFilter) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  std::weak_ptr<DynamicModuleListenerFilter> weak = filter;
+  auto adapter = std::make_unique<SharedListenerFilterAdapter>(filter);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, adapter->onAccept(callbacks_));
+  EXPECT_EQ(&callbacks_, filter->callbacks());
+
+  Buffer::OwnedImpl buffer("test data");
+  TestListenerFilterBuffer test_buffer(buffer);
+  EXPECT_EQ(Network::FilterStatus::Continue, adapter->onData(test_buffer));
+  EXPECT_EQ(filter->maxReadBytes(), adapter->maxReadBytes());
+  adapter->onClose();
+
+  // The adapter holds the only remaining strong reference and releases it on destruction.
+  filter.reset();
+  EXPECT_FALSE(weak.expired());
+  adapter.reset();
+  EXPECT_TRUE(weak.expired());
+}
+
+// The async client can complete a callout inline, before send returns a request handle, while the
+// module is still inside the hook that issued the callout. The filter must not call back into the
+// module in that window. An inline reset exercises the onFailure gate.
+TEST_F(DynamicModuleListenerFilterTest, HttpCalloutInlineFailureDoesNotReenterModule) {
+  EXPECT_EQ(0, runInlineCalloutProbe(
+                   [](Http::AsyncClient::Callbacks& callbacks, Http::AsyncClient::Request& req) {
+                     callbacks.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+                   }));
+}
+
+// An inline response, such as a local reply from a cluster with no healthy hosts, exercises the
+// onSuccess gate on the same inline window.
+TEST_F(DynamicModuleListenerFilterTest, HttpCalloutInlineSuccessDoesNotReenterModule) {
+  EXPECT_EQ(
+      0, runInlineCalloutProbe([](Http::AsyncClient::Callbacks& callbacks,
+                                  Http::AsyncClient::Request& req) {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+        callbacks.onSuccess(req, std::move(response));
+      }));
 }
 
 } // namespace ListenerFilters

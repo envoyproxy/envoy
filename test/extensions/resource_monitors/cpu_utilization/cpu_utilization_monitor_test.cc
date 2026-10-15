@@ -1,11 +1,11 @@
 #include <cstdlib>
+#include <optional>
 
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_stats_reader.h"
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_utilization_monitor.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -30,7 +30,7 @@ public:
     pressure_ = usage.resource_pressure_;
   }
 
-  void onFailure(const EnvoyException& error) override { error_ = error; }
+  void onFailure(const absl::Status& error) override { error_ = error; }
 
   bool hasPressure() const { return pressure_.has_value(); }
   bool hasError() const { return error_.has_value(); }
@@ -38,8 +38,8 @@ public:
   double pressure() const { return *pressure_; }
 
 private:
-  absl::optional<double> pressure_;
-  absl::optional<EnvoyException> error_;
+  std::optional<double> pressure_;
+  std::optional<absl::Status> error_;
 };
 
 // =============================================================================

@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/io/io_uring.h"
+#include "envoy/common/optref.h"
 #include "envoy/network/io_handle.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -14,8 +15,7 @@ namespace Network {
 
 class IoUringSocketHandleImpl;
 
-using IoUringSocketHandleImplOptRef =
-    absl::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
+using IoUringSocketHandleImplOptRef = OptRef<IoUringSocketHandleImpl>;
 
 enum class IoUringSocketType {
   Unknown,
@@ -31,17 +31,18 @@ class IoUringSocketHandleImpl : public IoSocketHandleBaseImpl {
 public:
   IoUringSocketHandleImpl(Io::IoUringWorkerFactory& io_uring_worker_factory,
                           os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                          absl::optional<int> domain = absl::nullopt,
-                          bool is_server_socket = false);
+                          std::optional<int> domain = std::nullopt, bool is_server_socket = false);
   ~IoUringSocketHandleImpl() override;
 
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length_opt) override;
+                               std::optional<uint64_t> max_length_opt) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
                                   const Address::Instance& peer_address) override;
@@ -83,12 +84,12 @@ protected:
 
   Io::IoUringWorkerFactory& io_uring_worker_factory_;
   IoUringSocketType io_uring_socket_type_;
-  OptRef<Io::IoUringSocket> io_uring_socket_{absl::nullopt};
+  OptRef<Io::IoUringSocket> io_uring_socket_{std::nullopt};
 
   Event::FileEventPtr file_event_{nullptr};
 
-  absl::optional<Api::IoCallUint64Result> checkReadResult() const;
-  absl::optional<Api::IoCallUint64Result> checkWriteResult() const;
+  std::optional<Api::IoCallUint64Result> checkReadResult() const;
+  std::optional<Api::IoCallUint64Result> checkWriteResult() const;
   Api::IoCallUint64Result copyOut(uint64_t max_length, Buffer::RawSlice* slices,
                                   uint64_t num_slice);
 };

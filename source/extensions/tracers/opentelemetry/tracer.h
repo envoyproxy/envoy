@@ -40,7 +40,7 @@ public:
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler, uint64_t max_cache_size);
+         SamplerSharedPtr sampler, uint64_t max_cache_size, bool set_instrumentation_scope = true);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -76,6 +76,7 @@ private:
   const ResourceConstSharedPtr resource_;
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
+  const bool set_instrumentation_scope_{true};
 };
 
 /**
@@ -91,6 +92,9 @@ public:
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
   void setTag(absl::string_view /*name*/, absl::string_view /*value*/) override;
+  void setTypedTag(absl::string_view name, absl::string_view value,
+                   Tracing::TagValueType type) override;
+  void reserveTags(size_t size) override;
   void log(SystemTime /*timestamp*/, const std::string& /*event*/) override;
   void finishSpan() override;
   void injectContext(Envoy::Tracing::TraceContext& /*trace_context*/,
@@ -107,6 +111,13 @@ public:
    * @return whether the local tracing decision is used by the span.
    */
   bool useLocalDecision() const override { return use_local_decision_; }
+
+  void disableLocalDecision() override { use_local_decision_ = false; }
+
+  /**
+   * @return whether the span will be exported to the OTLP backend.
+   */
+  bool exportedSpan() const override { return sampled_; }
 
   /**
    * @return whether or not the sampled attribute is set
@@ -152,6 +163,12 @@ public:
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
+  /**
+   * Records whether the span's parent context was propagated from a remote parent. Used to
+   * populate the is_remote bits of the exported span's flags field.
+   */
+  void setParentContextIsRemote(bool is_remote) { parent_context_is_remote_ = is_remote; }
+
   absl::string_view tracestate() const { return span_.trace_state(); }
 
   /**
@@ -177,7 +194,8 @@ private:
   Tracer& parent_tracer_;
   Envoy::TimeSource& time_source_;
   bool sampled_;
-  const bool use_local_decision_{false};
+  bool use_local_decision_{false};
+  bool parent_context_is_remote_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

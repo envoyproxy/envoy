@@ -57,8 +57,10 @@ public:
   // is the last message. It only keeps the result from the first one the last.
   virtual void processResponse(Protobuf::field_extraction::MessageData& message) = 0;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual const ExtractedMessageResult& GetResult() const = 0;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   virtual void ClearResult() = 0;
 };
 

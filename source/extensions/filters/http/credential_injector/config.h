@@ -11,10 +11,11 @@ namespace HttpFilters {
 namespace CredentialInjector {
 
 class CredentialInjectorFilterFactory
-    : public Common::DualFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::credential_injector::v3::CredentialInjector> {
 public:
-  CredentialInjectorFilterFactory() : DualFactoryBase("envoy.filters.http.credential_injector") {}
+  CredentialInjectorFilterFactory()
+      : UnifiedFactoryBase("envoy.filters.http.credential_injector") {}
 
 protected:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoHelper(
@@ -23,15 +24,10 @@ protected:
       Stats::Scope& scope, Init::Manager& init_manager) const;
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector& config,
-      const std::string& stats_prefix, DualInfo dual_info,
-      Server::Configuration::ServerFactoryContext& context) override;
-
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const envoy::extensions::filters::http::credential_injector::v3::CredentialInjector& config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 using UpstreamCredentialInjectorFilterFactory = CredentialInjectorFilterFactory;

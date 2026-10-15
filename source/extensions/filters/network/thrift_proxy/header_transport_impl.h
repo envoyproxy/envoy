@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -8,8 +9,6 @@
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
 #include "source/extensions/filters/network/thrift_proxy/transport.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,7 +44,7 @@ private:
                                     const char* desc);
   static void writeVarString(Buffer::Instance& buffer, const absl::string_view str);
 
-  absl::optional<AppExceptionType> exception_;
+  std::optional<AppExceptionType> exception_;
   std::string exception_reason_;
 };
 

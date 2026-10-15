@@ -13,7 +13,7 @@ public:
     HostConstSharedPtr preselected_host_;
     LoadBalancerContext* context_;
 
-    virtual void cancel() override { detachable_->parent_ = nullptr; }
+    void cancel() override { detachable_->parent_ = nullptr; }
 
     // If cancel is called, parent will be nulled out.
     struct Detachable {

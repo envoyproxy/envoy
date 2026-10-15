@@ -1,4 +1,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/common/dns/v3/dns.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
@@ -11,7 +13,6 @@
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/network/connection.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
@@ -21,6 +22,7 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 using testing::AtLeast;
@@ -63,7 +65,7 @@ public:
     cluster_.reset(new Cluster(cluster_config, std::move(cache), config, factory_context,
                                this->get(), creation_status));
     THROW_IF_NOT_OK_REF(creation_status);
-    thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
+    thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
 
@@ -126,10 +128,10 @@ public:
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
     StreamInfo::FilterStateSharedPtr filter_state = lb_context_.requestStreamInfo()->filterState();
 
-    filter_state->setData(
-        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
-        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    filter_state->setData("envoy.upstream.dynamic_host",
+                          std::make_shared<Router::StringAccessorImpl>(host),
+                          StreamInfo::FilterState::LifeSpan::Connection,
+                          StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 
     return &lb_context_;
   }
@@ -224,7 +226,7 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   const std::string cluster_name = "fake_cluster_name";
   const std::string host = "localhost";
   const int port = 80;
-  std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
+  std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>> sub_cluster_pair =
       cluster_->createSubClusterConfig(cluster_name, host, port);
   EXPECT_EQ(true, sub_cluster_pair.first);
   EXPECT_EQ(true, sub_cluster_pair.second.has_value());
@@ -233,6 +235,105 @@ TEST_F(ClusterTest, CreateSubClusterConfig) {
   sub_cluster_pair = cluster_->createSubClusterConfig(cluster_name, host, port);
   EXPECT_EQ(true, sub_cluster_pair.first);
   EXPECT_EQ(false, sub_cluster_pair.second.has_value());
+}
+
+// Sub cluster does not exist and load balancer should return nullptr.
+TEST_F(ClusterTest, SubClusterNotExist) {
+  initialize(sub_cluster_yaml_config_, false);
+
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("DFPCluster:localhost:80"))
+      .WillOnce(Return(nullptr));
+
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("localhost")).host);
+}
+
+// Load balancer will return null host if the cluster is destroyed in the main thread.
+TEST_F(ClusterTest, ClusterDestroyedInMainThread) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  // LB will immediately resolve host1.
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("1.2.3.4:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+  EXPECT_CALL(*host_map_["host1:0"], touch());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
+
+  // Destroy the cluster, LB will return nullptr without accessing the cluster.
+  cluster_.reset();
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
+}
+
+// dns_cluster_config in sub_clusters_config causes sub clusters to use the DnsCluster extension.
+TEST_F(ClusterTest, CreateSubClusterConfigWithDnsClusterConfig) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+      dns_cluster_config:
+        dns_lookup_family: V4_ONLY
+        dns_refresh_rate: 30s
+        all_addresses_in_single_endpoint: true
+        dns_failure_refresh_rate:
+          base_interval: 5s
+          max_interval: 10s
+)EOF";
+  initialize(yaml_config, false);
+
+  const std::string cluster_name = "test_cluster";
+  auto [ok, sub_config] = cluster_->createSubClusterConfig(cluster_name, "example.com", 443);
+
+  EXPECT_TRUE(ok);
+  ASSERT_TRUE(sub_config.has_value());
+  // Sub cluster should use the DnsCluster extension, not legacy STRICT_DNS.
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::kClusterType,
+            sub_config->cluster_discovery_type_case());
+  EXPECT_EQ("envoy.cluster.dns", sub_config->cluster_type().name());
+
+  // DNS settings from the provided config are propagated unchanged, including
+  // all_addresses_in_single_endpoint.
+  envoy::extensions::clusters::dns::v3::DnsCluster dns_config;
+  ASSERT_TRUE(sub_config->cluster_type().typed_config().UnpackTo(&dns_config));
+  EXPECT_EQ(envoy::extensions::clusters::common::dns::v3::V4_ONLY, dns_config.dns_lookup_family());
+  EXPECT_EQ(30, dns_config.dns_refresh_rate().seconds());
+  EXPECT_TRUE(dns_config.all_addresses_in_single_endpoint());
+}
+
+// Without dns_cluster_config, sub clusters use legacy STRICT_DNS and inherit parent DNS settings.
+TEST_F(ClusterTest, CreateSubClusterConfigWithoutDnsClusterConfig) {
+  const std::string yaml_config = R"EOF(
+name: name
+connect_timeout: 0.25s
+dns_lookup_family: V6_ONLY
+dns_refresh_rate: 45s
+cluster_type:
+  name: dynamic_forward_proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+    sub_clusters_config:
+      max_sub_clusters: 1024
+)EOF";
+  initialize(yaml_config, false);
+
+  const std::string cluster_name = "inherit_cluster";
+  auto [ok, sub_config] = cluster_->createSubClusterConfig(cluster_name, "example.com", 80);
+
+  EXPECT_TRUE(ok);
+  ASSERT_TRUE(sub_config.has_value());
+  // No dns_cluster_config: legacy STRICT_DNS type, DNS settings inherited from parent.
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::kType, sub_config->cluster_discovery_type_case());
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::STRICT_DNS, sub_config->type());
+  EXPECT_EQ(envoy::config::cluster::v3::Cluster::V6_ONLY, sub_config->dns_lookup_family());
+  EXPECT_EQ(45, sub_config->dns_refresh_rate().seconds());
 }
 
 // Basic flow of the cluster including adding hosts and removing them.
@@ -249,7 +350,7 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
@@ -257,9 +358,11 @@ TEST_F(ClusterTest, BasicFlow) {
   EXPECT_EQ("1.2.3.4:0",
             lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
-  // After changing the address, LB will immediately resolve the new address with a refresh.
+  // After changing the address, the host is replaced with a new instance and the change is
+  // published as a regular membership update. LB will immediately resolve the new address.
   updateTestHostAddress("host1:0", "2.3.4.5");
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(1)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
@@ -282,13 +385,13 @@ TEST_F(ClusterTest, OutlierDetection) {
   InSequence s;
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
             lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]));
   EXPECT_CALL(*host_map_["host2:0"], touch());
   EXPECT_EQ("5.6.7.8:0",
             lb_->chooseHost(setHostAndReturnContext("host2:0")).host->address()->asString());
@@ -316,12 +419,46 @@ TEST_F(ClusterTest, InvalidLbContext) {
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
 
+TEST_F(ClusterTest, LoadBalancer_CleansUpPendingAsyncHostSelectionOnDestroy) {
+  initialize(default_yaml_config_, false);
+
+  NiceMock<Upstream::MockBasicResourceLimit> resource_limit;
+  auto* dns_cache_handle =
+      new NiceMock<Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle>();
+
+  EXPECT_CALL(resource_limit, inc());
+  auto* dns_request = new Upstream::ResourceAutoIncDec(resource_limit);
+  EXPECT_CALL(resource_limit, dec());
+  EXPECT_CALL(*dns_cache_handle, onDestroy());
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(dns_request));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_("host1", 80, _, _))
+      .WillOnce(Invoke([dns_cache_handle](absl::string_view, uint16_t, bool,
+                                          Extensions::Common::DynamicForwardProxy::DnsCache::
+                                              LoadDnsCacheEntryCallbacks&) {
+        return Extensions::Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+            Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading,
+            dns_cache_handle, std::nullopt};
+      }));
+  EXPECT_CALL(lb_context_, onAsyncHostSelection(_, _))
+      .WillOnce([](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        EXPECT_EQ(host, nullptr);
+        EXPECT_EQ(details, "load_balancer_destroyed");
+      });
+
+  auto host_selection = lb_->chooseHost(setHostAndReturnContext("host1"));
+  ASSERT_EQ(nullptr, host_selection.host);
+  ASSERT_NE(nullptr, host_selection.cancelable);
+
+  lb_.reset();
+}
+
 TEST_F(ClusterTest, FilterStateHostOverride) {
   initialize(default_yaml_config_, false);
   makeTestHost("host1:0", "1.2.3.4");
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ(
       "1.2.3.4:0",
@@ -363,7 +500,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoConnections) {
   EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   EXPECT_FALSE(selection.has_value());
@@ -394,7 +531,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_TRUE(selection.has_value());
@@ -427,7 +564,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_TRUE(selection.has_value());
@@ -461,7 +598,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
   // Drain the connection then no verify that no connection is subsequently selected.
   lifetime_callbacks->onConnectionDraining(pool, hash_key, connection);
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -490,7 +627,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -520,7 +657,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
   std::vector<std::string> dns_sans = {"www.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -549,7 +686,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
   hash_key[0]++;
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -579,7 +716,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -613,7 +750,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolEmptyHostname) {
   Upstream::MockHost empty_host;
   EXPECT_CALL(empty_host, hostname()).WillRepeatedly(testing::ReturnRef(empty_hostname));
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, empty_host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -641,7 +778,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
-  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+  std::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
@@ -760,6 +897,58 @@ TEST(ObjectFactory, DynamicPort) {
   ASSERT_NE(nullptr, object);
   EXPECT_EQ(port, object->serializeAsString());
   ASSERT_EQ(nullptr, factory->createFromBytes("blah"));
+}
+
+TEST_F(ClusterTest, HostReplacedOnAddressChange) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  const auto original_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_CALL(*this, onMemberUpdateCb(_, _))
+      .WillOnce(Invoke(
+          [&](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
+            ASSERT_EQ(1UL, hosts_added.size());
+            ASSERT_EQ(1UL, hosts_removed.size());
+            EXPECT_EQ(original_host, hosts_removed[0]);
+            EXPECT_NE(original_host, hosts_added[0]);
+            EXPECT_EQ("2.3.4.5:0", hosts_added[0]->address()->asString());
+          }));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+
+  // The old instance kept its original address and only the new instance is in the host set.
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("2.3.4.5:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+}
+
+// With the runtime guard disabled, the legacy behavior is retained: the address is swapped in
+// place on the existing host instance and no membership update is published.
+TEST_F(ClusterTest, LegacyInPlaceAddressUpdate) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.dfp_cluster_replace_host_on_address_change", "false"}});
+
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  const auto original_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+
+  // No onMemberUpdateCb expectation: an unexpected call on the mock would fail the test.
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  EXPECT_EQ(original_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ("2.3.4.5:0", original_host->address()->asString());
 }
 
 } // namespace DynamicForwardProxy

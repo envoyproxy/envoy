@@ -108,7 +108,7 @@ class GrpcExternalAuthClient : public GrpcExternalAuthClientAsyncCallbacks,
                                public ExternalAuthClient {
 public:
   GrpcExternalAuthClient(const Grpc::RawAsyncClientSharedPtr& async_client,
-                         const absl::optional<std::chrono::milliseconds>& timeout);
+                         const std::optional<std::chrono::milliseconds>& timeout);
   ~GrpcExternalAuthClient() override;
 
   void cancel() override;
@@ -121,7 +121,7 @@ public:
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
   void onSuccess(
-      std::unique_ptr<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>&& response,
+      Grpc::ResponsePtr<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>&& response,
       Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
@@ -131,7 +131,7 @@ private:
                     envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
-  absl::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
   AuthenticateCallback* callback_{};
   CommandSplitter::SplitCallbacks* pending_request_{};
   const Protobuf::MethodDescriptor& service_method_;

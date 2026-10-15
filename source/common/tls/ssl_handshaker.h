@@ -3,6 +3,7 @@
 #include <sys/types.h>
 
 #include <cstdint>
+#include <optional>
 
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
@@ -21,7 +22,6 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -102,6 +102,8 @@ public:
   }
   absl::string_view certificateValidationError() const override { return cert_validation_error_; }
 
+  void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) override;
+
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
       Envoy::Ssl::ClientValidationStatus::NotValidated};
@@ -116,7 +118,7 @@ private:
   Ssl::ValidateStatus cert_validation_result_{Ssl::ValidateStatus::NotStarted};
   // Latch the in-flight cert selection callback.
   // nullopt if there is none.
-  OptRef<CertificateSelectionCallbackImpl> cert_selection_callback_{absl::nullopt};
+  OptRef<CertificateSelectionCallbackImpl> cert_selection_callback_{std::nullopt};
   // Stores the cert selection result if there is any.
   // NotStarted if no cert selection has ever been kicked off.
   Ssl::CertificateSelectionStatus cert_selection_result_{
@@ -147,13 +149,29 @@ public:
   void setState(Ssl::SocketState state) { state_ = state; }
   Ssl::HandshakeCallbacks* handshakeCallbacks() { return handshake_callbacks_; }
 
+  void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) {
+    validated_chain_ = std::move(chain);
+  }
+  // Returns the direct issuer from the validated chain, or nullptr if unavailable.
+  X509* validatedPeerIssuer() const override {
+    return validated_chain_.size() >= 2 ? validated_chain_[1].get() : nullptr;
+  }
+  // Returns the validated peer certificate chain (leaf first).
+  OptRef<const std::vector<bssl::UniquePtr<X509>>> validatedPeerCertChain() const override {
+    if (validated_chain_.empty()) {
+      return std::nullopt;
+    }
+    return validated_chain_;
+  }
+
   bssl::UniquePtr<SSL> ssl_;
 
 private:
   Ssl::HandshakeCallbacks* handshake_callbacks_;
 
-  Ssl::SocketState state_{Ssl::SocketState::PreHandshake};
+  Ssl::SocketState state_{Ssl::SocketState::HandshakeWaitingForConnectionData};
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
+  std::vector<bssl::UniquePtr<X509>> validated_chain_;
 };
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;

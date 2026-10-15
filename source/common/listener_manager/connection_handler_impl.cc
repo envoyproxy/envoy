@@ -18,12 +18,12 @@ namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                                             absl::optional<uint32_t> worker_index)
+                                             std::optional<uint32_t> worker_index)
     : worker_index_(worker_index), dispatcher_(dispatcher),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                                             absl::optional<uint32_t> worker_index,
+                                             std::optional<uint32_t> worker_index,
                                              OverloadManager& overload_manager,
                                              OverloadManager& null_overload_manager)
     : worker_index_(worker_index), dispatcher_(dispatcher), overload_manager_(overload_manager),
@@ -37,14 +37,14 @@ void ConnectionHandlerImpl::decNumConnections() {
   --num_handler_connections_;
 }
 
-void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
+void ConnectionHandlerImpl::addListener(std::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config, Runtime::Loader& runtime,
                                         Random::RandomGenerator& random) {
   if (overridden_listener.has_value()) {
     ActiveListenerDetailsOptRef listener_detail =
         findActiveListenerByTag(overridden_listener.value());
     ASSERT(listener_detail.has_value());
-    listener_detail->get().invokeListenerMethod(
+    listener_detail->invokeListenerMethod(
         [&config](Network::ConnectionHandler::ActiveListener& listener) {
           listener.updateListenerConfig(config);
         });
@@ -85,9 +85,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         config.shouldBypassOverloadManager()
             ? (null_overload_manager_
                    ? makeOptRef(null_overload_manager_->getThreadLocalOverloadState())
-                   : absl::nullopt)
+                   : std::nullopt)
             : (overload_manager_ ? makeOptRef(overload_manager_->getThreadLocalOverloadState())
-                                 : absl::nullopt);
+                                 : std::nullopt);
     for (auto& socket_factory : config.listenSocketFactories()) {
       auto address = socket_factory->localAddress();
       // worker_index_ doesn't have a value on the main thread for the admin server.
@@ -213,14 +213,14 @@ ConnectionHandlerImpl::findPerAddressActiveListenerDetails(
     const Network::Address::Instance& address) {
   if (active_listener_details.has_value()) {
     // If the tag matches this must be a UDP listener.
-    for (auto& details : active_listener_details->get().per_address_details_list_) {
+    for (auto& details : active_listener_details->per_address_details_list_) {
       if (*details->address_ == address) {
         return *details;
       }
     }
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Network::UdpListenerCallbacksOptRef
@@ -230,10 +230,10 @@ ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag,
       findPerAddressActiveListenerDetails(findActiveListenerByTag(listener_tag), address);
   if (listener.has_value()) {
     // If the tag matches this must be a UDP listener.
-    ASSERT(listener->get().udpListener().has_value());
-    return listener->get().udpListener();
+    ASSERT(listener->udpListener().has_value());
+    return listener->udpListener();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 void ConnectionHandlerImpl::removeFilterChains(
@@ -261,6 +261,29 @@ void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag,
           if (listener.listener() != nullptr) {
             listener.shutdownListener(options);
           }
+        });
+  }
+}
+
+void ConnectionHandlerImpl::onFilterChainDrain(
+    uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
+    Network::ConnectionDrainEvent drain_event) {
+  if (auto listener_it = listener_map_by_tag_.find(listener_tag);
+      listener_it != listener_map_by_tag_.end()) {
+    listener_it->second->invokeListenerMethod(
+        [&filter_chains, drain_event](Network::ConnectionHandler::ActiveListener& listener) {
+          listener.onFilterChainDrainStart(filter_chains, drain_event);
+        });
+  }
+}
+
+void ConnectionHandlerImpl::onListenerDrain(uint64_t listener_tag,
+                                            Network::ConnectionDrainEvent drain_event) {
+  if (auto listener_it = listener_map_by_tag_.find(listener_tag);
+      listener_it != listener_map_by_tag_.end()) {
+    listener_it->second->invokeListenerMethod(
+        [drain_event](Network::ConnectionHandler::ActiveListener& listener) {
+          listener.onListenerDrainStart(drain_event);
         });
   }
 }
@@ -309,13 +332,25 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   }
 }
 
+void ConnectionHandlerImpl::closeIdleHttpConnections(bool is_saturated) {
+  for (const auto& [tag, listener] : listener_map_by_tag_) {
+    listener->invokeListenerMethod(
+        [is_saturated](Network::ConnectionHandler::ActiveListener& active_listener) {
+          if (active_listener.listener() != nullptr &&
+              !active_listener.listener()->shouldBypassOverloadManager()) {
+            active_listener.onCloseIdleHttpConnections(is_saturated);
+          }
+        });
+  }
+}
+
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
   if (auto listener_it =
           internal_listener_map_by_address_.find(address->envoyInternalAddress()->addressId());
       listener_it != internal_listener_map_by_address_.end()) {
-    return {listener_it->second->internalListener().value().get()};
+    return listener_it->second->internalListener();
   }
   return {};
 }
@@ -323,19 +358,19 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::tcpListener() {
   auto* val = absl::get_if<std::reference_wrapper<ActiveTcpListener>>(&typed_listener_);
-  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+  return (val != nullptr) ? makeOptRef(val->get()) : std::nullopt;
 }
 
 ConnectionHandlerImpl::UdpListenerCallbacksOptRef
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::udpListener() {
   auto* val = absl::get_if<std::reference_wrapper<Network::UdpListenerCallbacks>>(&typed_listener_);
-  return (val != nullptr) ? absl::make_optional(*val) : absl::nullopt;
+  return (val != nullptr) ? makeOptRef(val->get()) : std::nullopt;
 }
 
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
   auto* val = absl::get_if<std::reference_wrapper<Network::InternalListener>>(&typed_listener_);
-  return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
+  return (val != nullptr) ? makeOptRef(val->get()) : std::nullopt;
 }
 
 ConnectionHandlerImpl::ActiveListenerDetailsOptRef
@@ -343,7 +378,7 @@ ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
   if (auto iter = listener_map_by_tag_.find(listener_tag); iter != listener_map_by_tag_.end()) {
     return *iter->second;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Network::BalancedConnectionHandlerOptRef
@@ -353,10 +388,10 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
       findPerAddressActiveListenerDetails(findActiveListenerByTag(listener_tag), address);
   if (active_listener.has_value()) {
     // If the tag matches this must be a TCP listener.
-    ASSERT(active_listener->get().tcpListener().has_value());
-    return active_listener->get().tcpListener().value().get();
+    ASSERT(active_listener->tcpListener().has_value());
+    return *active_listener->tcpListener();
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Network::ListenerPtr ConnectionHandlerImpl::createListener(
@@ -379,7 +414,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
       listener_it != tcp_listener_map_by_address_.end() &&
       listener_it->second->listener_->listener() != nullptr) {
-    return {listener_it->second->tcpListener().value().get()};
+    return *listener_it->second->tcpListener();
   }
 
   OptRef<ConnectionHandlerImpl::PerAddressActiveListenerDetails> details;
@@ -399,11 +434,9 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
 
   return (details.has_value())
              ? Network::BalancedConnectionHandlerOptRef(
-                   ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(
-                                               details->typed_listener_))
-                       .value()
+                   absl::get<std::reference_wrapper<ActiveTcpListener>>(details->typed_listener_)
                        .get())
-             : absl::nullopt;
+             : std::nullopt;
 }
 
 REGISTER_FACTORY(ConnectionHandlerFactoryImpl, ConnectionHandlerFactory);

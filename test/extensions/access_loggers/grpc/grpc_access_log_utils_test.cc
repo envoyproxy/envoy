@@ -83,7 +83,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   auto state = std::make_unique<::Envoy::Extensions::Filters::Common::Expr::CelState>(prototype);
   state->setValue("value_from_downstream_peer");
   stream_info.filter_state_->setData("downstream_peer", std::move(state),
-                                     StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   Formatter::Context formatter_context;
@@ -99,7 +98,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   EXPECT_EQ(common_access_log.mutable_custom_tags()->at("format-key"), "format-value");
   auto any = (*(common_access_log.mutable_filter_state_objects()))["downstream_peer"];
   Protobuf::BytesValue gotState;
-  any.UnpackTo(&gotState);
+  std::ignore = any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }
 
@@ -122,7 +121,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromUpstream) {
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   state->setValue("value_from_upstream_peer");
   filter_state->setData("upstream_peer", std::move(state),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Connection);
   stream_info.upstreamInfo()->setUpstreamFilterState(filter_state);
 
@@ -139,7 +137,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromUpstream) {
   EXPECT_EQ(common_access_log.mutable_custom_tags()->at("format-key"), "format-value");
   auto any = (*(common_access_log.mutable_filter_state_objects()))["upstream_peer"];
   Protobuf::BytesValue gotState;
-  any.UnpackTo(&gotState);
+  std::ignore = any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_upstream_peer");
 }
 
@@ -162,7 +160,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
       std::make_unique<::Envoy::Extensions::Filters::Common::Expr::CelState>(prototype);
   downstream_state->setValue("value_from_downstream_peer");
   stream_info.filter_state_->setData("same_key", std::move(downstream_state),
-                                     StreamInfo::FilterState::StateType::Mutable,
                                      StreamInfo::FilterState::LifeSpan::Connection);
 
   auto upstream_state =
@@ -171,7 +168,6 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   upstream_state->setValue("value_from_upstream_peer");
   filter_state->setData("same_key", std::move(upstream_state),
-                        StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Connection);
   stream_info.upstreamInfo()->setUpstreamFilterState(filter_state);
 
@@ -188,7 +184,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
   EXPECT_EQ(common_access_log.mutable_custom_tags()->at("format-key"), "format-value");
   auto any = (*(common_access_log.mutable_filter_state_objects()))["same_key"];
   Protobuf::BytesValue gotState;
-  any.UnpackTo(&gotState);
+  std::ignore = any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }
 #endif // USE_CEL

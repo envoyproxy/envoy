@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "source/common/common/empty_string.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -55,7 +57,8 @@ TokenProvider::TokenProvider(Common::SecretReaderConstSharedPtr secret_reader,
       retry_interval_(
           proto_config.token_fetch_retry_interval().seconds() > 0
               ? std::chrono::seconds(proto_config.token_fetch_retry_interval().seconds())
-              : std::chrono::seconds(2)) {
+              : std::chrono::seconds(2)),
+      auth_type_(proto_config.client_credentials().auth_type()) {
   timer_ = dispatcher_->createTimer([this]() -> void { asyncGetAccessToken(); });
   ThreadLocalOauth2ClientCredentialsTokenSharedPtr empty(
       new ThreadLocalOauth2ClientCredentialsToken(""));
@@ -74,15 +77,18 @@ void TokenProvider::asyncGetAccessToken() {
   if (timer_->enabled()) {
     timer_->disableTimer();
   }
-  if (secret_reader_->credential().empty()) {
+  // For TLS_CLIENT_AUTH, secret_reader_ is null and no client secret is needed.
+  if (secret_reader_ != nullptr && secret_reader_->credential().empty()) {
     ENVOY_LOG(error, "asyncGetAccessToken: client secret is empty, retrying in {} seconds.",
               retry_interval_.count());
     timer_->enableTimer(std::chrono::seconds(retry_interval_));
     stats_.token_fetch_failed_on_client_secret_.inc();
     return;
   }
-  auto result = oauth2_client_->asyncGetAccessToken(client_id_, secret_reader_->credential(),
-                                                    oauth_scopes_, endpoint_params_);
+  const std::string& secret =
+      secret_reader_ != nullptr ? secret_reader_->credential() : EMPTY_STRING;
+  auto result = oauth2_client_->asyncGetAccessToken(client_id_, secret, oauth_scopes_,
+                                                    endpoint_params_, auth_type_);
   if (result == OAuth2Client::GetTokenResult::NotDispatchedAlreadyInFlight) {
     return;
   }
@@ -109,6 +115,7 @@ void TokenProvider::onGetAccessTokenSuccess(const std::string& access_token,
   tls_->set(
       [value](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return value; });
 
+  token_expiry_time_ = dispatcher_->timeSource().monotonicTime() + expires_in;
   stats_.token_fetched_.inc();
   ENVOY_LOG(debug, "onGetAccessTokenSuccess: Token fetched successfully, expires in {} seconds.",
             expires_in.count());
@@ -134,6 +141,16 @@ void TokenProvider::onGetAccessTokenFailure(FailureReason failure_reason) {
     stats_.token_fetch_failed_on_bad_response_code_.inc();
     break;
   }
+
+  // clear the cached expired token, so that requests are not forwarded with a stale token.
+  if (dispatcher_->timeSource().monotonicTime() >= token_expiry_time_) {
+    ENVOY_LOG(warn, "onGetAccessTokenFailure: Cached token has expired, clearing it.");
+    ThreadLocalOauth2ClientCredentialsTokenSharedPtr empty(
+        new ThreadLocalOauth2ClientCredentialsToken(""));
+    tls_->set(
+        [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
+  }
+
   if (!retry) {
     return;
   }

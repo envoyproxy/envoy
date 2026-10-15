@@ -35,6 +35,8 @@ routes:
       retry_on: 5xx
       retry_host_predicate:
       - name: envoy.retry_host_predicates.previous_hosts
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.retry.host.previous_hosts.v3.PreviousHostsPredicate
 )EOF";
 
     envoy::config::route::v3::VirtualHost virtual_host;

@@ -89,7 +89,15 @@ private:
       auto this_shared_ptr = this->shared_from_this();
       // Used for testing to simulate some race condition scenarios
       sync_.syncPoint(DeleteObjectOnMainThread);
-      dispatcher_.post([ptr, this_shared_ptr] { this_shared_ptr->deleteObjectOnMainThread(ptr); });
+      // Transfer ownership of `ptr` into a std::unique_ptr captured by the posted lambda.
+      // If the main dispatcher is torn down before the post runs (e.g. a worker thread
+      // releases the last shared_ptr during server shutdown), the dispatcher destroys the
+      // queued callback; the captured unique_ptr's destructor then frees the object, avoiding
+      // a leak. If the lambda does run, release() hands the raw pointer to the main-thread
+      // cleanup path, which performs the object_pool_ bookkeeping and deletes the object.
+      dispatcher_.post([owned_ptr = std::unique_ptr<T>(ptr), this_shared_ptr]() mutable {
+        this_shared_ptr->deleteObjectOnMainThread(owned_ptr.release());
+      });
     }
   }
 

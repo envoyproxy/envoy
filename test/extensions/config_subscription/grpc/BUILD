@@ -5,15 +5,22 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
+    "envoy_extension_cc_test",
+)
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "new_grpc_mux_impl_test",
     srcs = ["new_grpc_mux_impl_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
@@ -28,7 +35,6 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -40,10 +46,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
@@ -61,7 +68,6 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:load_stats_reporter_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:resources_lib",
@@ -74,10 +80,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "delta_subscription_impl_test",
     srcs = ["delta_subscription_impl_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":delta_subscription_test_harness",
         "//envoy/config:xds_config_tracker_interface",
@@ -90,7 +97,6 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -98,10 +104,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "delta_subscription_state_test",
     srcs = ["delta_subscription_state_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/config_subscription/grpc:delta_subscription_state_lib",
@@ -112,7 +119,6 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -133,17 +139,17 @@ envoy_cc_test_library(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "sotw_subscription_state_test",
     srcs = ["sotw_subscription_state_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:resource_name_lib",
         "//source/common/stats:isolated_store_lib",
@@ -153,7 +159,6 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/container:flat_hash_set",
@@ -161,10 +166,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "xds_grpc_mux_impl_test",
     srcs = ["xds_grpc_mux_impl_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resource_name_lib",
@@ -179,7 +185,6 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -192,10 +197,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "grpc_stream_test",
     srcs = ["grpc_stream_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/config_subscription/grpc:grpc_stream_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -209,19 +215,21 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "pausable_ack_queue_test",
     srcs = ["pausable_ack_queue_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/config_subscription/grpc:pausable_ack_queue_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "watch_map_test",
     srcs = ["watch_map_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:xds_config_tracker_interface",
         "//source/extensions/config_subscription/grpc:watch_map_lib",
@@ -234,19 +242,21 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "xds_source_id_test",
     srcs = ["xds_source_id_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/config_subscription/grpc:xds_source_id_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "eds_resources_cache_impl_test",
     srcs = ["eds_resources_cache_impl_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/config_subscription/grpc:eds_resources_cache_lib",
         "//test/mocks/event:event_mocks",
@@ -263,10 +273,11 @@ envoy_cc_mock(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "grpc_mux_failover_test",
     srcs = ["grpc_mux_failover_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.grpc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":grpc_stream_mocks",
         "//source/extensions/config_subscription/grpc:grpc_mux_failover_lib",
@@ -283,7 +294,8 @@ envoy_cc_test(
     name = "xds_failover_integration_test",
     srcs =
         ["xds_failover_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
+    shard_count = 2,
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
@@ -296,4 +308,22 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
+)
+
+envoy_extension_cc_benchmark_binary(
+    name = "eds_resources_cache_impl_benchmark",
+    srcs = ["eds_resources_cache_impl_benchmark.cc"],
+    extension_names = ["envoy.config_subscription.grpc"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:eds_resources_cache_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_extension_benchmark_test(
+    name = "eds_resources_cache_impl_benchmark_test",
+    benchmark_binary = "eds_resources_cache_impl_benchmark",
+    extension_names = ["envoy.config_subscription.grpc"],
 )

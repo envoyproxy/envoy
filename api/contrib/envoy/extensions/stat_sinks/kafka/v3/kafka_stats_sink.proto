@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package envoy.extensions.stat_sinks.kafka.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.stat_sinks.kafka.v3";
+option java_outer_classname = "KafkaStatsSinkProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/stat_sinks/kafka/v3;kafkav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Kafka Stats Sink]
+// Kafka Stats Sink :ref:`configuration overview <config_stat_sinks_kafka>`.
+// [#extension: envoy.stat_sinks.kafka]
+
+// Serialization format for metrics produced to Kafka.
+enum SerializationFormat {
+  // JSON serialization. Metrics are encoded as human-readable JSON objects.
+  JSON = 0;
+
+  // Protocol Buffers serialization. Each Kafka message value is a binary-serialized
+  // ``envoy.service.metrics.v3.StreamMetricsMessage`` containing
+  // ``io.prometheus.client.MetricFamily`` entries -- the same wire format used by
+  // the gRPC ``envoy.stat_sinks.metrics_service`` sink.
+  PROTOBUF = 1;
+}
+
+// Configuration for the Kafka stats sink. Metrics are serialized and
+// produced to a Kafka topic using librdkafka.
+// [#next-free-field: 9]
+message KafkaStatsSinkConfig {
+  // Comma-separated list of Kafka broker addresses in host:port format.
+  // At least one broker must be specified.
+  string broker_list = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Kafka topic to produce metrics to.
+  string topic = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Number of metrics to batch into a single Kafka message. If 0 or unset,
+  // all metrics from a single flush are sent in one message. Setting a batch
+  // size helps control message sizes when there are many metrics.
+  uint32 batch_size = 3 [(validate.rules).uint32 = {gte: 0}];
+
+  // If true, counters are reported as the delta since last flush rather than
+  // the absolute cumulative value. Defaults to false.
+  google.protobuf.BoolValue report_counters_as_deltas = 4;
+
+  // If true, tag-extracted metric names are used and tags are emitted as
+  // separate labels/JSON fields. If false, the full metric name (including tag
+  // values) is used. Defaults to true.
+  google.protobuf.BoolValue emit_tags_as_labels = 5;
+
+  // Additional librdkafka producer configuration properties as key-value pairs.
+  // These are passed directly to librdkafka and can be used to configure
+  // compression (``compression.type``), authentication (``security.protocol``,
+  // ``sasl.mechanism``, etc.), batching (``batch.num.messages``), and more.
+  // See https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
+  map<string, string> producer_config = 6;
+
+  // Maximum time in milliseconds to buffer messages before forcing a produce.
+  // Maps to librdkafka's ``linger.ms``. If not set, defaults to 500ms.
+  google.protobuf.UInt32Value buffer_flush_timeout_ms = 7;
+
+  // Serialization format for metric messages produced to Kafka.
+  // Defaults to JSON.
+  SerializationFormat format = 8;
+}

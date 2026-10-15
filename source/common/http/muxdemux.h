@@ -50,10 +50,11 @@ public:
 
   // Iterator over streams. Allows sending different headers, body or trailers to different streams.
   struct StreamIterator {
-    using difference_type = std::ptrdiff_t;
-    using element_type = AsyncClient::Stream*;
-    using pointer = element_type*;
-    using reference = element_type&;
+    // Standard iterator aliases intentionally use STL-prescribed snake_case names.
+    using difference_type = std::ptrdiff_t;    // NOLINT(readability-identifier-naming)
+    using element_type = AsyncClient::Stream*; // NOLINT(readability-identifier-naming)
+    using pointer = element_type*;             // NOLINT(readability-identifier-naming)
+    using reference = element_type&;           // NOLINT(readability-identifier-naming)
     explicit StreamIterator(std::vector<CallbacksFacade>::iterator it) : it(it) {}
     StreamIterator() = default;
 
@@ -97,7 +98,7 @@ private:
 
   absl::Status addStream(const AsyncClient::StreamOptions& options, absl::string_view cluster_name,
                          std::weak_ptr<AsyncClient::StreamCallbacks> callbacks,
-                         Server::Configuration::FactoryContext& factory_context);
+                         Server::Configuration::ServerFactoryContext& factory_context);
   void maybeSwitchToIdle();
 
   uint32_t active_streams_{0};
@@ -112,10 +113,10 @@ public:
   struct Callbacks {
     std::string cluster_name;
     std::weak_ptr<AsyncClient::StreamCallbacks> callbacks;
-    absl::optional<AsyncClient::StreamOptions> options;
+    std::optional<AsyncClient::StreamOptions> options;
   };
 
-  static std::shared_ptr<MuxDemux> create(Server::Configuration::FactoryContext& context) {
+  static std::shared_ptr<MuxDemux> create(Server::Configuration::ServerFactoryContext& context) {
     return std::shared_ptr<MuxDemux>(new MuxDemux(context));
   }
 
@@ -137,11 +138,11 @@ public:
 
 private:
   friend class MultiStream;
-  MuxDemux(Server::Configuration::FactoryContext& context);
+  MuxDemux(Server::Configuration::ServerFactoryContext& context);
 
   void switchToIdle() { is_idle_ = true; }
 
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   bool is_idle_{true};
 };
 

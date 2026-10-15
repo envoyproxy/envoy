@@ -8,6 +8,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -114,7 +115,7 @@ xds_matcher:
 
   MatchDelegateConfig match_delegate_config;
   auto status_or_cb = match_delegate_config.createFilterFactoryFromProto(config, factory_context);
-  ASSERT_TRUE(status_or_cb.ok());
+  ASSERT_OK(status_or_cb);
   auto cb = status_or_cb.value();
 
   // Set up filter manager and test that filters are created and added properly
@@ -240,7 +241,7 @@ template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData>
 createMatchingTree(const std::string& name, const std::string& value) {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Network::MatchingData>::create(
-      std::make_unique<InputType>(name), absl::nullopt);
+      std::make_unique<InputType>(name), std::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
                             std::make_shared<ActionType>(), nullptr, false});
@@ -389,7 +390,7 @@ template <class InputType>
 Matcher::MatchTreeSharedPtr<Envoy::Network::MatchingData>
 createMatchingTreeWithTestAction(const std::string& name, const std::string& value) {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Network::MatchingData>::create(
-      std::make_unique<InputType>(name), absl::nullopt);
+      std::make_unique<InputType>(name), std::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Network::MatchingData>{
                             std::make_shared<TestAction>(), nullptr, false});

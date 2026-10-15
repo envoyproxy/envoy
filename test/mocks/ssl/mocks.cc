@@ -1,5 +1,7 @@
 #include "mocks.h"
 
+#include "source/common/tls/context_impl.h"
+
 using testing::_;
 
 namespace Envoy {
@@ -14,7 +16,9 @@ MockContextManager::~MockContextManager() = default;
 MockConnectionInfo::MockConnectionInfo() = default;
 MockConnectionInfo::~MockConnectionInfo() = default;
 
-MockClientContext::MockClientContext() = default;
+MockClientContext::MockClientContext() : default_tls_context_(std::make_unique<TlsContext>()) {
+  ON_CALL(*this, getTlsContext()).WillByDefault(testing::ReturnRef(*default_tls_context_));
+}
 MockClientContext::~MockClientContext() = default;
 
 MockClientContextConfig::MockClientContextConfig() {
@@ -23,13 +27,16 @@ MockClientContextConfig::MockClientContextConfig() {
 
   ON_CALL(*this, serverNameIndication()).WillByDefault(testing::ReturnRef(sni_));
   ON_CALL(*this, cipherSuites()).WillByDefault(testing::ReturnRef(ciphers_));
+  ON_CALL(*this, ecdhCurves()).WillByDefault(testing::ReturnRef(curves_));
+  ON_CALL(*this, minProtocolVersion()).WillByDefault(testing::Return(0));
+  ON_CALL(*this, maxProtocolVersion()).WillByDefault(testing::Return(0));
   ON_CALL(*this, capabilities()).WillByDefault(testing::Return(capabilities_));
   ON_CALL(*this, alpnProtocols()).WillByDefault(testing::ReturnRef(alpn_));
   ON_CALL(*this, signatureAlgorithms()).WillByDefault(testing::ReturnRef(sigalgs_));
   ON_CALL(*this, tlsKeyLogLocal()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogRemote()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogPath()).WillByDefault(testing::ReturnRef(path_));
-  ON_CALL(*this, compliancePolicy()).WillByDefault(testing::Return(absl::nullopt));
+  ON_CALL(*this, compliancePolicy()).WillByDefault(testing::Return(std::nullopt));
 }
 MockClientContextConfig::~MockClientContextConfig() = default;
 
@@ -38,6 +45,9 @@ MockServerContextConfig::MockServerContextConfig() {
   capabilities_.provides_sigalgs = true;
 
   ON_CALL(*this, cipherSuites()).WillByDefault(testing::ReturnRef(ciphers_));
+  ON_CALL(*this, ecdhCurves()).WillByDefault(testing::ReturnRef(curves_));
+  ON_CALL(*this, minProtocolVersion()).WillByDefault(testing::Return(0));
+  ON_CALL(*this, maxProtocolVersion()).WillByDefault(testing::Return(0));
   ON_CALL(*this, capabilities()).WillByDefault(testing::Return(capabilities_));
   ON_CALL(*this, alpnProtocols()).WillByDefault(testing::ReturnRef(alpn_));
   ON_CALL(*this, signatureAlgorithms()).WillByDefault(testing::ReturnRef(sigalgs_));
@@ -45,7 +55,7 @@ MockServerContextConfig::MockServerContextConfig() {
   ON_CALL(*this, tlsKeyLogLocal()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogRemote()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogPath()).WillByDefault(testing::ReturnRef(path_));
-  ON_CALL(*this, compliancePolicy()).WillByDefault(testing::Return(absl::nullopt));
+  ON_CALL(*this, compliancePolicy()).WillByDefault(testing::Return(std::nullopt));
   ON_CALL(*this, serverNames()).WillByDefault(testing::ReturnRef(server_names_));
 }
 MockServerContextConfig::~MockServerContextConfig() = default;

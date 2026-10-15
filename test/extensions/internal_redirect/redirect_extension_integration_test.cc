@@ -1,6 +1,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.h"
+#include "envoy/extensions/internal_redirect/filter_state/v3/filter_state_config.pb.h"
 #include "envoy/extensions/internal_redirect/previous_routes/v3/previous_routes_config.pb.h"
 #include "envoy/extensions/internal_redirect/safe_cross_scheme/v3/safe_cross_scheme_config.pb.h"
 
@@ -30,8 +31,6 @@ public:
   void initialize() override {
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
-    envoy::config::route::v3::RetryPolicy retry_policy;
-
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
     config_helper_.addVirtualHost(pass_through);
 
@@ -114,7 +113,7 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByPreviousRout
       previous_routes_config;
   auto* predicate = internal_redirect_policy->add_predicates();
   predicate->set_name("previous_routes");
-  predicate->mutable_typed_config()->PackFrom(previous_routes_config);
+  std::ignore = predicate->mutable_typed_config()->PackFrom(previous_routes_config);
   config_helper_.addVirtualHost(handle_prevent_repeated_target);
 
   // Validate that header sanitization is only called once.
@@ -178,7 +177,8 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByAllowListedR
   envoy::extensions::internal_redirect::allow_listed_routes::v3::AllowListedRoutesConfig
       allow_listed_routes_config;
   *allow_listed_routes_config.add_allowed_route_names() = "max_three_hop";
-  allow_listed_routes_predicate->mutable_typed_config()->PackFrom(allow_listed_routes_config);
+  std::ignore =
+      allow_listed_routes_predicate->mutable_typed_config()->PackFrom(allow_listed_routes_config);
 
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
 
@@ -233,6 +233,91 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedByAllowListedR
             response->headers().get(test_header_key_)[0]->value().getStringView());
 }
 
+TEST_P(RedirectExtensionIntegrationTest, BooleanFilterStateFollowsRedirect) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.set_filter_state
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: envoy.internal_redirect.gate
+        factory_key: envoy.bool
+        format_string:
+          text_format_source:
+            inline_string: "%REQ(x-redirect-enabled)%"
+  )EOF");
+  auto filter_state_route =
+      config_helper_.createVirtualHost("handle.internal.redirect.filter.state");
+  auto* internal_redirect_policy =
+      filter_state_route.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+  auto* predicate = internal_redirect_policy->add_predicates();
+  predicate->set_name("envoy.internal_redirect_predicates.filter_state");
+  envoy::extensions::internal_redirect::filter_state::v3::FilterStateConfig filter_state_config;
+  filter_state_config.set_redirect_enabled_key("envoy.internal_redirect.gate");
+  std::ignore = predicate->mutable_typed_config()->PackFrom(filter_state_config);
+  config_helper_.addVirtualHost(filter_state_route);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("handle.internal.redirect.filter.state");
+  default_request_headers_.addCopy("x-redirect-enabled", "true");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  auto first_request = waitForNextStream();
+  first_request->encodeHeaders(redirect_response_, true);
+
+  auto second_request = waitForNextStream();
+  EXPECT_EQ("/new/url", second_request->headers().getPathValue());
+  EXPECT_EQ("authority2", second_request->headers().getHostValue());
+  second_request->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(RedirectExtensionIntegrationTest, InvalidBooleanFilterStateUsesAbsentRedirectBehavior) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.set_filter_state
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: envoy.internal_redirect.gate
+        factory_key: envoy.bool
+        format_string:
+          text_format_source:
+            inline_string: "%REQ(x-redirect-enabled)%"
+  )EOF");
+  auto filter_state_route =
+      config_helper_.createVirtualHost("handle.internal.redirect.filter.state");
+  auto* internal_redirect_policy =
+      filter_state_route.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+  auto* predicate = internal_redirect_policy->add_predicates();
+  predicate->set_name("envoy.internal_redirect_predicates.filter_state");
+  envoy::extensions::internal_redirect::filter_state::v3::FilterStateConfig filter_state_config;
+  filter_state_config.set_redirect_enabled_key("envoy.internal_redirect.gate");
+  filter_state_config.set_redirect_if_absent(true);
+  std::ignore = predicate->mutable_typed_config()->PackFrom(filter_state_config);
+  config_helper_.addVirtualHost(filter_state_route);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("handle.internal.redirect.filter.state");
+  default_request_headers_.addCopy("x-redirect-enabled", "garbage");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  auto first_request = waitForNextStream();
+  first_request->encodeHeaders(redirect_response_, true);
+
+  auto second_request = waitForNextStream();
+  EXPECT_EQ("/new/url", second_request->headers().getPathValue());
+  EXPECT_EQ("authority2", second_request->headers().getHostValue());
+  second_request->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedBySafeCrossSchemePredicate) {
   useAccessLog("%RESPONSE_CODE% %RESPONSE_CODE_DETAILS% %RESP(test-header)%");
   auto handle_safe_cross_scheme_route = config_helper_.createVirtualHost(
@@ -247,7 +332,7 @@ TEST_P(RedirectExtensionIntegrationTest, InternalRedirectPreventedBySafeCrossSch
   predicate->set_name("safe_cross_scheme_predicate");
   envoy::extensions::internal_redirect::safe_cross_scheme::v3::SafeCrossSchemeConfig
       predicate_config;
-  predicate->mutable_typed_config()->PackFrom(predicate_config);
+  std::ignore = predicate->mutable_typed_config()->PackFrom(predicate_config);
 
   internal_redirect_policy->mutable_max_internal_redirects()->set_value(10);
 

@@ -27,6 +27,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/network/win32_redirect_records_option_impl.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/context_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
@@ -37,17 +38,15 @@
 #include "test/common/http/common.h"
 #include "test/common/router/router_test_base.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -55,14 +54,20 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Bool;
+using testing::Contains;
+using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::IsSupersetOf;
 using testing::MockFunction;
 using testing::NiceMock;
+using testing::NotNull;
 using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Router {
@@ -76,6 +81,11 @@ public:
 
 private:
   std::function<void(const StreamInfo::StreamInfo&)> func_;
+};
+
+class TestAsyncHostSelectionHandle : public Upstream::AsyncHostSelectionHandle {
+public:
+  void cancel() override {}
 };
 
 class RouterTest : public RouterTestBase {
@@ -111,10 +121,10 @@ public:
     cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
         std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
     envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-    cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
-        generic_config);
+    std::ignore = cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()
+                      ->PackFrom(generic_config);
     callbacks_.route_->route_entry_.connect_config_ =
-        absl::make_optional<RouteEntry::ConnectConfig>();
+        std::make_optional<RouteEntry::ConnectConfig>();
 
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _));
 
@@ -175,7 +185,7 @@ public:
   // and that the first UpstreamSubjectAltNames is alt_server_name if non-empty.
   // UpstreamServerName is pre-set to pre_set_sni if non-empty.
   void testAutoSniOptions(
-      absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> dummy_option,
+      std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> dummy_option,
       Envoy::Http::TestRequestHeaderMapImpl headers, std::string server_name = "",
       std::string alt_server_name = "", std::string pre_set_sni = "",
       StreamInfo::FilterState::LifeSpan pre_set_life_span =
@@ -192,7 +202,6 @@ public:
       // tls_inspector by using the LifeSpan::Connection
       stream_info.filterState()->setData(Network::UpstreamServerName::key(),
                                          std::make_unique<Network::UpstreamServerName>(pre_set_sni),
-                                         StreamInfo::FilterState::StateType::Mutable,
                                          pre_set_life_span);
     }
     expectResponseTimerCreate();
@@ -231,7 +240,7 @@ TEST_F(RouterTest, SenselessTestForCoverage) {
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithoutHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
 
   Http::TestRequestHeaderMapImpl headers{};
@@ -239,7 +248,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithoutHeaderOverride) {
 }
 
 TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExists) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
 
   Http::TestRequestHeaderMapImpl headers{};
@@ -247,7 +256,7 @@ TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExists) {
 }
 
 TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExistsConnectionLifeSpan) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
 
   Http::TestRequestHeaderMapImpl headers{};
@@ -256,7 +265,7 @@ TEST_F(RouterTest, DontUpdateServerNameFilterStateWhenExistsConnectionLifeSpan) 
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_override_auto_sni_header(":authority");
 
@@ -265,7 +274,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHostHeaderOverride) {
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_override_auto_sni_header("x-host");
 
@@ -275,7 +284,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverride) {
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverrideWithMultipleHeaderValues) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_override_auto_sni_header("x-host");
 
@@ -289,7 +298,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverrideWithMultipleHead
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithEmptyValueHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_override_auto_sni_header("x-host");
 
@@ -298,7 +307,7 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithEmptyValueHeaderOverride) {
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithoutHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_auto_san_validation(true);
 
@@ -307,7 +316,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithoutHeaderOverride) {
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHostHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_auto_san_validation(true);
   dummy_option.value().set_override_auto_sni_header(":authority");
@@ -317,7 +326,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHostHeaderOverride) {
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_auto_san_validation(true);
   dummy_option.value().set_override_auto_sni_header("x-host");
@@ -328,7 +337,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithHeaderOverride) {
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_auto_san_validation(true);
   dummy_option.value().set_override_auto_sni_header("x-host");
@@ -338,7 +347,7 @@ TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithEmptyValueHeaderOverride)
 }
 
 TEST_F(RouterTest, UpdateSubjectAltNamesFilterStateWithIpHeaderOverride) {
-  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  auto dummy_option = std::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
   dummy_option.value().set_auto_san_validation(true);
   dummy_option.value().set_override_auto_sni_header("x-host");
@@ -353,7 +362,7 @@ TEST_F(RouterTest, RouteNotFound) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(callbacks_, routeSharedPtr()).WillOnce(Return(nullptr));
 
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1UL, stats_store_.counter("test.no_route").value());
@@ -379,8 +388,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
       }));
   EXPECT_CALL(
       callbacks_,
-      sendLocalReply(Http::Code::ServiceUnavailable,
-                     testing::Eq("missing required header: :method"), _, _,
+      sendLocalReply(Http::Code::ServiceUnavailable, Eq("missing required header: :method"), _, _,
                      "filter_removed_required_request_headers{missing_required_header:_:method}"))
       .WillOnce(InvokeWithoutArgs([] {}));
   router_->decodeHeaders(headers, true);
@@ -417,7 +425,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "146"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "98"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -450,7 +458,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
       }));
 
   Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "134"}, {"content-type", "text/plain"}};
+      {":status", "503"}, {"content-length", "91"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
@@ -468,7 +476,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
 }
 
 TEST_F(RouterTest, Http1Upstream) {
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, std::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -494,7 +502,7 @@ TEST_F(RouterTest, Http1Upstream) {
 }
 
 TEST_F(RouterTest, Http2Upstream) {
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, std::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -516,10 +524,10 @@ TEST_F(RouterTest, HashPolicy) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
-      .WillOnce(Return(absl::optional<uint64_t>(10)));
+      .WillOnce(Return(std::optional<uint64_t>(10)));
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -543,10 +551,10 @@ TEST_F(RouterTest, HashPolicyNoHash) {
   ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
-      .WillOnce(Return(absl::optional<uint64_t>()));
+      .WillOnce(Return(std::optional<uint64_t>()));
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, router_.get()))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_FALSE(context->computeHashKey());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -612,7 +620,7 @@ TEST_F(RouterTest, AddCookie) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -623,7 +631,7 @@ TEST_F(RouterTest, AddCookie) {
           Invoke([&](OptRef<const Http::RequestHeaderMap>, OptRef<const StreamInfo::StreamInfo>,
                      Http::HashPolicy::AddCookieCallback add_cookie) {
             cookie_value = add_cookie("foo", "", std::chrono::seconds(1337), {});
-            return absl::optional<uint64_t>(10);
+            return std::optional<uint64_t>(10);
           }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
@@ -655,7 +663,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -665,7 +673,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
                      Http::HashPolicy::AddCookieCallback add_cookie) {
             // this should be ignored
             add_cookie("foo", "", std::chrono::seconds(1337), {});
-            return absl::optional<uint64_t>(10);
+            return std::optional<uint64_t>(10);
           }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
@@ -696,7 +704,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -708,7 +716,7 @@ TEST_F(RouterTest, AddMultipleCookies) {
                      Http::HashPolicy::AddCookieCallback add_cookie) {
             choco_c = add_cookie("choco", "", std::chrono::seconds(15), {});
             foo_c = add_cookie("foo", "/path", std::chrono::seconds(1337), {});
-            return absl::optional<uint64_t>(10);
+            return std::optional<uint64_t>(10);
           }));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
@@ -743,7 +751,7 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
       .WillByDefault(Return(&callbacks_.route_->route_entry_.metadata_matches_criteria_));
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(context->metadataMatchCriteria(),
                   &callbacks_.route_->route_entry_.metadata_matches_criteria_);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
@@ -817,7 +825,7 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -1011,7 +1019,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 }
 
 TEST_F(RouterTest, NoHost) {
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
@@ -1030,6 +1038,34 @@ TEST_F(RouterTest, NoHost) {
   EXPECT_EQ(0U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(callbacks_.details(), "no_healthy_upstream");
+}
+
+TEST_F(RouterTest, AsyncHostSelectionClusterRemovedBeforeCompletion) {
+  EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_))
+      .WillOnce(Invoke([](Upstream::LoadBalancerContext*) {
+        return Upstream::HostSelectionResponse{nullptr,
+                                               std::make_unique<TestAsyncHostSelectionHandle>()};
+      }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            router_->decodeHeaders(headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream));
+
+  router_->onAsyncHostSelection(nullptr, "load_balancer_destroyed");
+
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(0U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(callbacks_.details(), "load_balancer_destroyed");
 }
 
 TEST_F(RouterTest, RouterLoadShedTest) {
@@ -1189,7 +1225,7 @@ TEST_F(RouterTest, EnvoyUpstreamServiceTime) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([](Http::HeaderMap& headers, bool) {
         EXPECT_FALSE(headers.get(Http::Headers::get().EnvoyUpstreamServiceTime).empty());
@@ -1215,9 +1251,9 @@ TEST_F(RouterTest, OutlierDetectionDegradedHeaderWithSuccessResponse) {
   response_headers->setEnvoyDegraded("");
 
   // Should report degraded, not success
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::ExtOriginRequestDegraded,
-                        absl::optional<uint64_t>(200)));
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestDegraded, std::optional<uint64_t>(200)));
 
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
@@ -1241,7 +1277,7 @@ TEST_F(RouterTest, OutlierDetectionFivexxTakesPriorityOverDegraded) {
   // Should report failed, not degraded (5xx takes priority)
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, absl::optional<uint64_t>(503)));
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, std::optional<uint64_t>(503)));
 
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
@@ -1264,7 +1300,7 @@ TEST_F(RouterTest, OutlierDetectionSuccessResponseWithoutDegradedHeader) {
   // Should report success
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, absl::optional<uint64_t>(200)));
+      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, std::optional<uint64_t>(200)));
 
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
@@ -1286,9 +1322,9 @@ TEST_F(RouterTest, OutlierDetectionFourxxWithDegradedHeader) {
   response_headers->setEnvoyDegraded("");
 
   // Should report degraded (4xx is not an ejection-level error)
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::ExtOriginRequestDegraded,
-                        absl::optional<uint64_t>(404)));
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestDegraded, std::optional<uint64_t>(404)));
 
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
@@ -1297,7 +1333,7 @@ TEST_F(RouterTest, OutlierDetectionFourxxWithDegradedHeader) {
 TEST_F(RouterTest, EnvoyAttemptCountInRequest) {
   verifyAttemptCountInRequestBasic(
       /* set_include_attempt_count_in_request */ true,
-      /* preset_count*/ absl::nullopt,
+      /* preset_count*/ std::nullopt,
       /* expected_count */ 1);
 }
 
@@ -1337,7 +1373,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -1358,7 +1394,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
@@ -1372,7 +1408,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -1389,7 +1425,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
   EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
@@ -1399,7 +1435,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
 TEST_F(RouterTest, EnvoyAttemptCountInResponse) {
   verifyAttemptCountInResponseBasic(
       /* set_include_attempt_count_in_response */ true,
-      /* preset_count */ absl::nullopt,
+      /* preset_count */ std::nullopt,
       /* expected_count */ 1);
 }
 
@@ -1520,7 +1556,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -1536,7 +1572,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1545,7 +1581,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -1560,7 +1596,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([](Http::ResponseHeaderMap& headers, bool) {
         // Because a retry happened the number of attempts in the response headers should be 2.
@@ -1574,7 +1610,6 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponseWithRetries) {
 TEST_F(RouterTest, AllDebugConfig) {
   auto debug_config = DebugConfigFactory().createFromBytes("true");
   callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
-                                                 StreamInfo::FilterState::StateType::ReadOnly,
                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.thread_local_cluster_.conn_pool_.host_->hostname_ = "scooby.doo";
 
@@ -1611,7 +1646,7 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -1626,7 +1661,7 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1635,7 +1670,7 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -1651,9 +1686,19 @@ TEST_F(RouterTest, NoRetriesOverflow) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_overflow_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_overflow_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_overflow_.value());
 }
 
 TEST_F(RouterTest, ResetDuringEncodeHeaders) {
@@ -1674,12 +1719,12 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   // First connection is successful and reset happens later on.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)));
+                        std::optional<uint64_t>(std::nullopt)));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
       .Times(0);
   // The reset will be converted into a local reply.
-  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, testing::Eq(""), _, _,
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq(""), _, _,
                                          "upstream_reset_before_response_started{remote_reset}"))
       .WillOnce(InvokeWithoutArgs([] {}));
   router_->decodeHeaders(headers, true);
@@ -1752,6 +1797,95 @@ TEST_F(RouterTest, UpstreamTimeout) {
                 .value());
   EXPECT_EQ(
       1U, callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Verify that a gRPC request hitting the global response timeout gets
+// DEADLINE_EXCEEDED (grpc-status 4) instead of UNAVAILABLE.
+TEST_F(RouterTest, GrpcUpstreamTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded", "true"}});
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                         {"grpc-timeout", "20S"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  callbacks_.is_grpc_request_ = true;
+  router_->decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"grpc-status", "4"},
+                                                   {"grpc-message", "upstream request timeout"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Verify that a gRPC request hitting the per-try timeout gets
+// DEADLINE_EXCEEDED (grpc-status 4) instead of UNAVAILABLE.
+TEST_F(RouterTest, GrpcUpstreamPerTryTimeout) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.grpc_timeout_returns_deadline_exceeded", "true"}});
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
+                                         {"grpc-timeout", "20S"},
+                                         {"x-envoy-internal", "true"},
+                                         {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  callbacks_.is_grpc_request_ = true;
+  router_->decodeHeaders(headers, false);
+
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-type", "application/grpc"},
+                                                   {"grpc-status", "4"},
+                                                   {"grpc-message", "upstream request timeout"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
+  per_try_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1869,7 +2003,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   Http::ResponseDecoder* response_decoder1 = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder1, Http::Protocol::Http10);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -1901,7 +2035,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "504"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(504)));
+              putResult(_, std::optional<uint64_t>(504)));
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1911,7 +2045,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   Http::ResponseDecoder* response_decoder2 = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder2, Http::Protocol::Http10);
 
   expectPerTryTimerCreate();
@@ -1958,7 +2092,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   Http::ResponseDecoder* response_decoder1 = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder1, Http::Protocol::Http10);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -1989,7 +2123,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   test_time_.advanceTimeWait(std::chrono::milliseconds(160));
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
@@ -2000,7 +2134,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
   Http::ResponseDecoder* response_decoder2 = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder2, Http::Protocol::Http10);
   expectPerTryTimerCreate();
   router_->retry_state_->callback_();
@@ -2058,7 +2192,7 @@ TEST_F(RouterTest, GrpcOkTrailersOnly) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -2080,7 +2214,7 @@ TEST_F(RouterTest, GrpcAlreadyExistsTrailersOnly) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "6"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(409)));
+              putResult(_, std::optional<uint64_t>(409)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
@@ -2103,7 +2237,7 @@ TEST_F(RouterTest, GrpcOutlierDetectionUnavailableStatusCode) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "14"}});
   // Outlier detector will use the gRPC response status code.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -2125,7 +2259,7 @@ TEST_F(RouterTest, GrpcInternalTrailersOnly) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "13"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(500)));
+              putResult(_, std::optional<uint64_t>(500)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -2148,7 +2282,7 @@ TEST_F(RouterTest, GrpcDataEndStream) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   Buffer::OwnedImpl data;
@@ -2174,7 +2308,7 @@ TEST_F(RouterTest, GrpcReset) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -2203,7 +2337,7 @@ TEST_F(RouterTest, GrpcOk) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 
@@ -2232,7 +2366,7 @@ TEST_F(RouterTest, GrpcInternal) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   Http::ResponseTrailerMapPtr response_trailers(
@@ -2264,7 +2398,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   EXPECT_CALL(*router_->retry_state_, shouldRetryReset(_, _, _, _)).Times(0);
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(204)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(204)));
   response_timeout_->invokeCallback();
 
   EXPECT_EQ(1U,
@@ -2429,7 +2563,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   per_try_timeout_->invokeCallback();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -2574,7 +2708,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -2588,7 +2722,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
@@ -2624,7 +2758,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   EXPECT_CALL(*router_->retry_state_, wouldRetryFromHeaders(_, _, _))
       .WillOnce(Return(RetryState::RetryDecision::NoRetry));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(encoder2.stream_, resetStream(_));
 
@@ -2639,6 +2773,55 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   EXPECT_EQ(0U, router_->upstreamRequests().size());
 
   // TODO: Verify hedge stats here once they are implemented.
+}
+
+TEST_F(RouterTest, RetryUpstream5xxRefreshesClusterOnRetry) {
+  callbacks_.route_->route_entry_.retry_policy_->refresh_cluster_on_retry_ = true;
+  cm_.initializeThreadLocalClusters({"fake_cluster", "alt_cluster"});
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  ASSERT(response_decoder);
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).WillOnce(Invoke([this]() {
+    callbacks_.route_->route_entry_.cluster_name_ = "alt_cluster";
+    cm_.thread_local_cluster_.cluster_.info_->name_ = "alt_cluster";
+  }));
+  EXPECT_CALL(cm_, getThreadLocalCluster(absl::string_view("alt_cluster")))
+      .WillOnce(Return(&cm_.thread_local_cluster_));
+
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+
+  router_->retry_state_->callback_();
+
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
 }
 
 // Tests that an upstream request is reset even if it can't be retried as long as there is
@@ -2666,7 +2849,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -2679,7 +2862,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   NiceMock<Http::MockRequestEncoder> encoder2;
   Http::ResponseDecoder* response_decoder2 = nullptr;
@@ -2711,7 +2894,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
   Http::ResponseHeaderMapPtr bad_response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(500)));
+              putResult(_, std::optional<uint64_t>(500)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(encoder2.stream_, resetStream(_));
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
@@ -2725,7 +2908,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
@@ -2737,6 +2920,71 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 
   // TODO: Verify hedge stats here once they are implemented.
+}
+
+TEST_F(RouterTest, HedgedRetryDoesNotRefreshClusterOnRetry) {
+  callbacks_.route_->route_entry_.retry_policy_->refresh_cluster_on_retry_ = true;
+  enableHedgeOnPerTryTimeout();
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
+            response_decoder1 = &decoder;
+            EXPECT_CALL(*router_->retry_state_, onHostAttempted(_));
+            callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                        std::optional<uint64_t>(std::nullopt)))
+      .Times(2);
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  router_->retry_state_->expectHedgedPerTryTimeoutRetry();
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
+  per_try_timeout_->invokeCallback();
+
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  Http::ResponseDecoder* response_decoder2 = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                     const Http::ConnectionPool::Instance::StreamOptions&)
+                     -> Http::ConnectionPool::Cancellable* {
+            response_decoder2 = &decoder;
+            EXPECT_CALL(*router_->retry_state_, onHostAttempted(_));
+            callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+  expectPerTryTimerCreate();
+  router_->retry_state_->callback_();
+  ASSERT(response_decoder2);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(*router_->retry_state_, wouldRetryFromHeaders(_, _, _))
+      .WillOnce(Return(RetryState::RetryDecision::NoRetry));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  EXPECT_CALL(encoder2.stream_, resetStream(_));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, true));
+  ASSERT(response_decoder1);
+  response_decoder1->decodeHeaders(std::move(response_headers), true);
 }
 
 // Three requests sent: 1) 5xx error, 2) per try timeout, 3) gets good response
@@ -2800,10 +3048,10 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   // Local origin connect success happens for first and third try.
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(500)));
+              putResult(_, std::optional<uint64_t>(500)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_->retry_state_->expectHeadersRetry();
@@ -2835,7 +3083,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   router_->retry_state_->expectHedgedPerTryTimeoutRetry();
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   NiceMock<Http::MockRequestEncoder> encoder3;
   Http::ResponseDecoder* response_decoder3 = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
@@ -2864,7 +3112,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(encoder2.stream_, resetStream(_));
   EXPECT_CALL(encoder3.stream_, resetStream(_)).Times(0);
@@ -2905,7 +3153,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -2918,7 +3166,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   router_->retry_state_->expectHedgedPerTryTimeoutRetry();
   per_try_timeout_->invokeCallback();
 
@@ -2943,7 +3191,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(500)));
+              putResult(_, std::optional<uint64_t>(500)));
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _)).Times(0);
   EXPECT_CALL(*router_->retry_state_, wouldRetryFromHeaders(_, _, _))
       .WillOnce(Return(RetryState::RetryDecision::RetryWithBackoff));
@@ -2952,7 +3200,7 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
 
   response_timeout_->invokeCallback();
 }
@@ -2979,7 +3227,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -2992,7 +3240,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   router_->retry_state_->expectHedgedPerTryTimeoutRetry();
   per_try_timeout_->invokeCallback();
 
@@ -3003,7 +3251,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(500)));
+              putResult(_, std::optional<uint64_t>(500)));
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _)).Times(0);
   EXPECT_CALL(*router_->retry_state_, wouldRetryFromHeaders(_, _, _))
       .WillOnce(Return(RetryState::RetryDecision::RetryWithBackoff));
@@ -3037,7 +3285,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 }
 
@@ -3072,7 +3320,7 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
 
   // Complete request. Ensure original headers are present.
   const std::string body("body");
-  EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body), true));
+  EXPECT_CALL(encoder2, encodeData(BufferString(body), true));
   Buffer::OwnedImpl buf(body);
   router_->decodeData(buf, true);
 
@@ -3118,7 +3366,7 @@ TEST_F(RouterTest, RetryRequestDuringBody) {
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
-  EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1), false));
+  EXPECT_CALL(encoder2, encodeData(BufferString(body1), false));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
@@ -3126,7 +3374,7 @@ TEST_F(RouterTest, RetryRequestDuringBody) {
 
   // Complete request. Ensure original headers are present.
   const std::string body2("body2");
-  EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body2), true));
+  EXPECT_CALL(encoder2, encodeData(BufferString(body2), true));
   Buffer::OwnedImpl buf2(body2);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
   router_->decodeData(buf2, true);
@@ -3176,7 +3424,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
-  EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1 + body2), false));
+  EXPECT_CALL(encoder2, encodeData(BufferString(body1 + body2), false));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
@@ -3184,7 +3432,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
 
   // Complete request. Ensure original headers are present.
   const std::string body3("body3");
-  EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body3), true));
+  EXPECT_CALL(encoder2, encodeData(BufferString(body3), true));
   Buffer::OwnedImpl buf3(body3);
   router_->decodeData(buf3, true);
 
@@ -3259,7 +3507,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
-  EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1 + body2), true));
+  EXPECT_CALL(encoder2, encodeData(BufferString(body1 + body2), true));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
@@ -3309,7 +3557,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
-  EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1), false));
+  EXPECT_CALL(encoder2, encodeData(BufferString(body1), false));
   EXPECT_CALL(encoder2, encodeTrailers(HeaderMapEqualRef(&trailers)));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -3335,45 +3583,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(10));
-
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  Http::TestRequestHeaderMapImpl headers{
-      {"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}, {"myheader", "present"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-  const std::string body1("body1");
-  Buffer::OwnedImpl buf1(body1);
-  EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
-  router_->decodeData(buf1, false);
-
-  router_->retry_state_->expectResetRetry();
-  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-
-  // Send additional 15 bytes - total 55 bytes, which should exceed request body buffer limit (50).
-  const std::string body2(15, 'y');
-  Buffer::OwnedImpl buf2(body2);
-  router_->decodeData(buf2, false);
-
-  EXPECT_EQ(callbacks_.details(), "request_payload_exceeded_retry_buffer_limit");
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("retry_or_shadow_abandoned")
-                    .value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Test that router uses request_body_buffer_limit when configured instead of
-// per_request_buffer_limit.
-TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  // Configure a large request body buffer limit (50 bytes) but small request buffer limit (10
-  // bytes).
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3385,7 +3594,7 @@ TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
 
-  // Send 40 bytes - should be within request body buffer limit (50) but exceeds retry limit (10).
+  // Send 40 bytes - should be within request body buffer limit (50).
   const std::string body1(40, 'x');
   Buffer::OwnedImpl buf1(body1);
   EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
@@ -3414,8 +3623,7 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
 
-  // Case 1: request_body_buffer_limit=60, per_request_buffer_limit_bytes=20
-  // Should use request_body_buffer_limit = 60
+  // Use route level buffer limit.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(60));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3448,8 +3656,7 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
-// When per_request_buffer_limit_bytes is set but request_body_buffer_limit is not set,
-// we should use min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes).
+// Route level request buffer limit will override the connection buffer limit.
 TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
@@ -3458,8 +3665,8 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   // Set up the connection buffer limit mock to return 40 as expected
   EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
 
-  // Case 2: per_request_buffer_limit_bytes=20, request_body_buffer_limit=not set
-  // Should use min(20, connection_buffer_limit) = 20 (since connection limit is default 40)
+  // Route level request buffer limit is set to 20, which should override connection buffer limit
+  // of 40.
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -3481,51 +3688,6 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
   // Send additional data (10 bytes) - total 25 bytes should exceed limit of 20
-  const std::string body2(10, 'y');
-  Buffer::OwnedImpl buf2(body2);
-  router_->decodeData(buf2, false);
-
-  EXPECT_EQ(callbacks_.details(), "request_payload_exceeded_retry_buffer_limit");
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-                    .counter("retry_or_shadow_abandoned")
-                    .value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Test that when connection limit is smaller than per_request limit,
-// we use min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes) = connection limit.
-TEST_F(RouterTest, BufferLimitLogicCase2ConnectionLimitSmaller) {
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  // Set up the connection buffer limit mock to return 40 as expected
-  EXPECT_CALL(callbacks_, bufferLimit()).WillRepeatedly(Return(40));
-
-  // Case 2: per_request_buffer_limit_bytes=50, request_body_buffer_limit=not set
-  // Should use min(50, connection_limit) = min(50, 40) = 40
-  // With consolidated approach, the effective limit should be 40
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(40));
-
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-
-  // Send initial data (35 bytes)
-  const std::string body1(35, 'x');
-  Buffer::OwnedImpl buf1(body1);
-  EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
-  router_->decodeData(buf1, false);
-
-  // Simulate upstream failure to trigger retry logic
-  router_->retry_state_->expectResetRetry();
-  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-
-  // Send additional data (10 bytes) - total 45 bytes should exceed connection limit of 40
   const std::string body2(10, 'y');
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
@@ -3723,7 +3885,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -3736,7 +3898,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_->retry_state_->expectHedgedPerTryTimeoutRetry();
@@ -3767,7 +3929,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
   EXPECT_CALL(encoder2.stream_, resetStream(_));
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool) -> void {
@@ -3799,7 +3961,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)));
+                        std::optional<uint64_t>(std::nullopt)));
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
 
@@ -3811,7 +3973,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_->retry_state_->expectHedgedPerTryTimeoutRetry();
@@ -3832,7 +3994,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
           }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)));
+                        std::optional<uint64_t>(std::nullopt)));
   expectPerTryTimerCreate();
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -3844,7 +4006,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   Http::ResponseHeaderMapPtr bad_response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
 
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
       .WillOnce(Return(RetryStatus::NoRetryLimitExceeded));
@@ -3857,7 +4019,7 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   Http::ResponseHeaderMapPtr bad_response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
 
   // We should not call shouldRetryHeaders() because you never retry the same
   // request twice.
@@ -3870,6 +4032,16 @@ TEST_F(RouterTest, HedgingRetriesExhaustedBadResponse) {
   response_decoder1->decodeHeaders(std::move(bad_response_headers2), true);
 
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_limit_exceeded_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_limit_exceeded_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_limit_exceeded_.value());
 }
 
 // Sequence: 1) per try timeout w/ hedge retry, 2) first request gets reset by upstream,
@@ -3886,7 +4058,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)))
+                        std::optional<uint64_t>(std::nullopt)))
       .Times(2);
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
@@ -3899,7 +4071,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_->retry_state_->expectHedgedPerTryTimeoutRetry();
@@ -3937,7 +4109,7 @@ TEST_F(RouterTest, HedgingRetriesProceedAfterReset) {
         EXPECT_EQ(headers.Status()->value(), "200");
       }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder2->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
@@ -3969,7 +4141,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
 
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, absl::optional<uint64_t>(504)));
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, std::optional<uint64_t>(504)));
   EXPECT_CALL(encoder.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   per_try_timeout_->invokeCallback();
@@ -4008,7 +4180,7 @@ TEST_F(RouterTest, HedgingRetryImmediatelyReset) {
         EXPECT_EQ(headers.Status()->value(), "200");
       }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
 
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
@@ -4033,7 +4205,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(std::nullopt));
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
@@ -4045,6 +4217,49 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   // Pool failure for the first try, so only 1 upstream request was made.
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+}
+
+TEST_F(RouterTest, RetryAsyncHostSelectionClusterRemovedBeforeCompletion) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_))
+      .WillOnce(Invoke([](Upstream::LoadBalancerContext*) {
+        return Upstream::HostSelectionResponse{nullptr,
+                                               std::make_unique<TestAsyncHostSelectionHandle>()};
+      }));
+  router_->retry_state_->callback_();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream));
+
+  router_->onAsyncHostSelection(nullptr, "load_balancer_destroyed");
+
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(callbacks_.details(), "load_balancer_destroyed");
 }
 
 TEST_F(RouterTest, RetryUpstreamReset) {
@@ -4087,7 +4302,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
             response_decoder = &decoder;
             EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                         putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                                  absl::optional<uint64_t>(absl::nullopt)));
+                                  std::optional<uint64_t>(std::nullopt)));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -4104,9 +4319,20 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 TEST_F(RouterTest, RetryHttp3UpstreamReset) {
@@ -4150,7 +4376,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
             response_decoder = &decoder;
             EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                         putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                                  absl::optional<uint64_t>(absl::nullopt)));
+                                  std::optional<uint64_t>(std::nullopt)));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -4167,7 +4393,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
@@ -4192,8 +4418,53 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
   EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
   Buffer::OwnedImpl body("t");
   router_->decodeData(body, false);
+  Buffer::OwnedImpl body2("t");
+  // Ensure subsequent chunks after overflow are also not buffered.
+  router_->decodeData(body2, false);
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, EnableRedirectAndRetryButNoRetryWithBodyLimit) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
+
+  recreateFilter();
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  // Enable redirects also. This feature will not be used but will affect buffer logic.
+  enableRedirects(3);
+
+  // Set a per route body limit which disallows any buffering.
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(0));
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  // Unlike RetryUpstreamReset above the data won't be buffered as the body exceeds the buffer limit
+  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  Buffer::OwnedImpl body("t");
+  router_->decodeData(body, false);
+  Buffer::OwnedImpl body2("t");
+  // Ensure subsequent chunks after overflow are also not buffered.
+  router_->decodeData(body2, false);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -4231,7 +4502,7 @@ TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
 
   response_decoder->decodeHeaders(std::move(response_headers), true);
   // router filter no longer resets the stream due to upstream half closing first
@@ -4284,7 +4555,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
             response_decoder = &decoder;
             EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                         putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                                  absl::optional<uint64_t>(absl::nullopt)));
+                                  std::optional<uint64_t>(std::nullopt)));
             callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -4301,10 +4572,21 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Asserts that onHostAttempted is *not* called when the upstream connection fails in such
@@ -4359,9 +4641,20 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
@@ -4387,7 +4680,7 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   Buffer::OwnedImpl body("test body");
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   per_try_timeout_->invokeCallback();
   EXPECT_CALL(callbacks_, encodeData(_, true));
@@ -4420,7 +4713,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
@@ -4473,7 +4766,7 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -4489,7 +4782,7 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -4498,7 +4791,7 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   router_->retry_state_->callback_();
@@ -4513,9 +4806,123 @@ TEST_F(RouterTest, RetryUpstream5xx) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
+}
+
+// Verify that upstream_rq_retry_backoff_exponential_ is incremented when the retry
+// state indicates the retry used exponential backoff.
+TEST_F(RouterTest, RetryUpstreamExponentialBackoff) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // 5xx response triggers a retry.
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(503)));
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // The retry uses exponential backoff.
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+  EXPECT_CALL(*router_->retry_state_, doRetryType())
+      .WillOnce(Return(RetryState::DoRetryType::Exponential));
+  router_->retry_state_->callback_();
+
+  // Normal response.
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_backoff_exponential_.value());
+  EXPECT_EQ(0UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_backoff_ratelimited_.value());
+}
+
+// Verify that upstream_rq_retry_backoff_ratelimited_ is incremented when the retry
+// state indicates the retry used rate-limited backoff.
+TEST_F(RouterTest, RetryUpstreamRateLimitedBackoff) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "envoy-ratelimited"},
+                                         {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // Rate-limited response triggers a retry.
+  router_->retry_state_->expectHeadersRetry();
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "429"}, {"x-envoy-ratelimited", "true"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(429)));
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // The retry uses rate-limited backoff.
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
+  expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
+  EXPECT_CALL(*router_->retry_state_, doRetryType())
+      .WillOnce(Return(RetryState::DoRetryType::Ratelimited));
+  router_->retry_state_->callback_();
+
+  // Normal response.
+  EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+      .WillOnce(Return(RetryStatus::No));
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+
+  EXPECT_EQ(0UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_backoff_exponential_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
+                     ->upstream_rq_retry_backoff_ratelimited_.value());
 }
 
 TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
@@ -4536,7 +4943,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -4678,7 +5085,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHost) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -4731,7 +5138,7 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelayWithUpstreamRequestNoHostAltRespo
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -4766,7 +5173,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -4790,7 +5197,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(encoder1.stream_, resetStream(Http::StreamResetReason::LocalReset));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   EXPECT_EQ(
@@ -4801,7 +5208,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -4816,7 +5223,7 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
       .WillOnce(Return(RetryStatus::No));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_, putResponseTime(_));
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->health_checker_,
@@ -4842,6 +5249,17 @@ TEST_F(RouterTest, RetryUpstream5xxNotComplete) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("zone.zone_name.to_az.upstream_rq_2xx")
                     .value());
+  EXPECT_EQ(1UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(1UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Test retry with 2 attempts before success: 503 -> 503 -> 200
@@ -4850,7 +5268,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
   expectResponseTimerCreate();
 
@@ -4874,7 +5292,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(encoder1.stream_, resetStream(Http::StreamResetReason::LocalReset));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -4882,7 +5300,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -4899,7 +5317,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(encoder2.stream_, resetStream(Http::StreamResetReason::LocalReset));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers2), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
 
@@ -4907,7 +5325,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   NiceMock<Http::MockRequestEncoder> encoder3;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder3, &response_decoder, Http::Protocol::Http10);
 
   EXPECT_CALL(encoder3, encodeHeaders(_, false));
@@ -4921,7 +5339,7 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
       .WillOnce(Return(RetryStatus::No));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_, putResponseTime(_));
   Http::ResponseHeaderMapPtr response_headers3(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -4946,6 +5364,17 @@ TEST_F(RouterTest, RetryUpstream5xxTwoAttempts) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("zone.zone_name.to_az.upstream_rq_2xx")
                     .value());
+  EXPECT_EQ(2UL,
+            cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_.value());
+  EXPECT_EQ(2UL,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_retry_.value());
+  EXPECT_EQ(2UL, route_stats_context_impl_->stats().upstream_rq_retry_.value());
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, callbacks_.route_->virtual_host_->virtual_cluster_.stats()
+                     .upstream_rq_retry_success_.value());
+  EXPECT_EQ(1UL, route_stats_context_impl_->stats().upstream_rq_retry_success_.value());
 }
 
 // Validate gRPC Cancelled response stats are sane when retry is taking effect.
@@ -4954,7 +5383,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)));
+                        std::optional<uint64_t>(std::nullopt)));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -4973,7 +5402,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "1"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(499)));
+              putResult(_, std::optional<uint64_t>(499)));
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -4982,7 +5411,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
-                        absl::optional<uint64_t>(absl::nullopt)));
+                        std::optional<uint64_t>(std::nullopt)));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   router_->retry_state_->callback_();
@@ -4995,7 +5424,7 @@ TEST_F(RouterTest, RetryUpstreamGrpcCancelled) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "0"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
@@ -5009,7 +5438,7 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -5038,7 +5467,7 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(encoder1.stream_, resetStream(Http::StreamResetReason::LocalReset));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -5046,7 +5475,7 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -5068,7 +5497,7 @@ TEST_F(RouterTest, RetryRespectsMaxHostSelectionCount) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
@@ -5082,7 +5511,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -5111,7 +5540,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(encoder1.stream_, resetStream(Http::StreamResetReason::LocalReset));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   response_decoder->decodeHeaders(std::move(response_headers1), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -5119,7 +5548,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   ON_CALL(callbacks_, decodingBuffer()).WillByDefault(Return(body_data.get()));
@@ -5141,7 +5570,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
@@ -5169,7 +5598,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithEmptyLocation) {
   sendRequest();
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(302)));
+              putResult(_, std::optional<uint64_t>(302)));
 
   redirect_headers_->setLocation("");
 
@@ -5273,12 +5702,78 @@ TEST_F(RouterTest, InternalRedirectAcceptedWithRequestBody) {
                    ->value());
 }
 
+TEST_F(RouterTest, InternalRedirectWithRequestBodyBufferOverflow) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(10));
+
+  enableRedirects();
+  sendRequest(false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("random_fake_data"));
+  // We will not buffer the body data because it exceeds the buffer limit. But note the initial
+  // request is still valid.
+  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
+
+  // No redirect because buffer overflowed.
+  EXPECT_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, responseHeadersToCopy())
+      .Times(0);
+  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(callbacks_, recreateStream(_)).Times(0);
+
+  response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
+  Buffer::OwnedImpl response_data("1234567890");
+  response_decoder_->decodeData(response_data, false);
+
+  router_->onDestroy();
+  EXPECT_FALSE(callbacks_.streamInfo().filterState()->hasDataWithName("num_internal_redirects"));
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_internal_redirect_failed_total")
+                    .value());
+}
+
+// Regression test: when an upstream filter (e.g. the buffer filter) has already buffered all
+// request data, the decoding buffer and the data argument to decodeData() are the same object.
+// The buffer overflow check must not double-count the size in this case.
+TEST_F(RouterTest, InternalRedirectNoDoubleCountWhenDecodingBufferIsData) {
+  // Body is 15 bytes, limit is 20. Without the fix, the check would compute 15+15=30 > 20
+  // and incorrectly mark the request as buffer-overflowed.
+  Buffer::OwnedImpl body_data("fifteen_bytes!!");
+  ASSERT_EQ(15, body_data.length());
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
+  // Return a pointer to the SAME buffer to simulate the buffer filter having
+  // already buffered the data into the shared decoding buffer.
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&body_data));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true));
+
+  enableRedirects();
+  sendRequest(false);
+
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+
+  // Data should be buffered (not rejected) since 15 < 20.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(body_data, true));
+
+  // The redirect should proceed because the buffer did not overflow.
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+
+  router_->onDestroy();
+}
+
 TEST_F(RouterTest, CrossSchemeRedirectRejectedByPolicy) {
   enableRedirects();
   sendRequest();
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(302)));
+              putResult(_, std::optional<uint64_t>(302)));
 
   redirect_headers_->setLocation("https://www.foo.com");
 
@@ -5408,7 +5903,7 @@ TEST_F(RouterTest, InternalRedirectKeepsFragmentWithOveride) {
   sendRequest();
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(302)));
+              putResult(_, std::optional<uint64_t>(302)));
 
   EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(callbacks_, recreateStream(_)).WillOnce(Return(true));
@@ -5510,8 +6005,8 @@ namespace {
 
 std::shared_ptr<ShadowPolicyImpl>
 makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
-                 absl::optional<std::string> runtime_key = absl::nullopt,
-                 absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
+                 std::optional<std::string> runtime_key = std::nullopt,
+                 std::optional<envoy::type::v3::FractionalPercent> default_value = std::nullopt,
                  bool trace_sampled = true,
                  std::vector<envoy::config::common::mutation_rules::v3::HeaderMutation>
                      request_headers_mutations = {},
@@ -5563,7 +6058,7 @@ protected:
   TestScopedRuntime scoped_runtime_;
 };
 
-INSTANTIATE_TEST_SUITE_P(StreamingShadow, RouterShadowingTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(StreamingShadow, RouterShadowingTest, Bool());
 
 TEST_P(RouterShadowingTest, ShadowNoClusterHeaderInHeader) {
   ShadowPolicyPtr policy = makeShadowPolicy("", "some_header", "bar");
@@ -5637,7 +6132,7 @@ TEST_P(RouterShadowingTest, ShadowClusterNameEmptyInHeader) {
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -5680,7 +6175,7 @@ TEST_P(RouterShadowingTest, StreamingShadow) {
   EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
       .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
                            const Http::AsyncClient::RequestOptions& options) {
-        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
+        EXPECT_EQ(std::optional<std::chrono::milliseconds>(10), options.timeout);
         EXPECT_TRUE(options.sampled_.value());
         return &foo_request;
       }));
@@ -5690,7 +6185,7 @@ TEST_P(RouterShadowingTest, StreamingShadow) {
       .Times(1)
       .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
                            const Http::AsyncClient::RequestOptions& options) {
-        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
+        EXPECT_EQ(std::optional<std::chrono::milliseconds>(10), options.timeout);
         EXPECT_FALSE(options.sampled_.value());
         return &fizz_request;
       }));
@@ -5698,8 +6193,8 @@ TEST_P(RouterShadowingTest, StreamingShadow) {
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
-  EXPECT_CALL(foo_request, sendData(BufferStringEqual("hello"), false));
-  EXPECT_CALL(fizz_request, sendData(BufferStringEqual("hello"), false));
+  EXPECT_CALL(foo_request, sendData(BufferString("hello"), false));
+  EXPECT_CALL(fizz_request, sendData(BufferString("hello"), false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -5729,6 +6224,42 @@ TEST_P(RouterShadowingTest, NoShadowForConnect) {
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
+
+  router_->onDestroy();
+}
+
+TEST_P(RouterShadowingTest, NoShadowWhenRequestRejectedImmediately) {
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_(_, _, _)).Times(0);
+  EXPECT_CALL(*shadow_writer_, shadow_(_, _, _)).Times(0);
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
+      .WillOnce(InvokeWithoutArgs([] {}));
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([this](const Http::RequestHeaderMap&, bool) -> Http::Status {
+        callbacks_.sendLocalReply(Http::Code::ServiceUnavailable, "", {}, std::nullopt,
+                                  "rejected_immediately");
+        Http::StreamFilterBase::LocalReplyData local_reply_data{
+            Http::Code::ServiceUnavailable, std::nullopt, "rejected_immediately", false};
+        router_->onLocalReply(local_reply_data);
+        return Http::okStatus();
+      }));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
 
   router_->onDestroy();
 }
@@ -5768,6 +6299,208 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesParentContext) {
   router_->onDestroy();
 }
 
+// The downstream request's dynamic ``envoy.lb`` metadata (request-level merged over
+// connection-level) must be forwarded to the shadow stream so that subset load balancing can
+// select the same host subset as the main request.
+TEST_P(RouterShadowingTest, ShadowRequestInheritsDynamicMetadata) {
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v1
+    from_connection: "yes"
+)EOF");
+  setRequestMetadata({{"version", "v2"}});
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        const auto it =
+            options.metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        EXPECT_NE(it, options.metadata.filter_metadata().end());
+        const auto& fields = it->second.fields();
+        // Request-level value wins; connection-only value is preserved.
+        EXPECT_THAT(fields, UnorderedElementsAre(IsStructString("version", "v2"),
+                                                 IsStructString("from_connection", "yes")));
+        return &foo_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+
+  router_->onDestroy();
+}
+
+// With the guard disabled, the shadow stream receives no forwarded ``envoy.lb`` metadata.
+TEST_P(RouterShadowingTest, ShadowRequestDoesNotInheritDynamicMetadataWhenDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata", "false"}});
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  setRequestMetadata({{"version", "v2"}});
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_TRUE(options.metadata.filter_metadata().empty());
+        return &foo_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+
+  router_->onDestroy();
+}
+
+// Connection-level ``envoy.lb`` metadata alone (no request-level) is still inherited.
+TEST_P(RouterShadowingTest, ShadowRequestInheritsConnectionOnlyDynamicMetadata) {
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v1
+    from_connection: "yes"
+)EOF");
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        const auto it =
+            options.metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        EXPECT_NE(it, options.metadata.filter_metadata().end());
+        const auto& fields = it->second.fields();
+        EXPECT_THAT(fields, UnorderedElementsAre(IsStructString("version", "v1"),
+                                                 IsStructString("from_connection", "yes")));
+        return &foo_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+
+  router_->onDestroy();
+}
+
+// Every policy receives the same forwarded metadata. Guards the move-into-last-policy optimization:
+// non-last policies must still see a full copy.
+TEST_P(RouterShadowingTest, ShadowRequestForwardsDynamicMetadataToAllPolicies) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP();
+  }
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  policy = makeShadowPolicy("fizz", "", "buzz");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  setRequestMetadata({{"version", "v2"}});
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("buzz",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)), 43))
+      .WillOnce(Return(true));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+  NiceMock<Http::MockAsyncClient> fizz_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> fizz_request(&fizz_client);
+
+  auto expect_metadata = [](const Http::AsyncClient::RequestOptions& options) {
+    const auto it =
+        options.metadata.filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    EXPECT_NE(it, options.metadata.filter_metadata().end());
+    EXPECT_THAT(it->second.fields(), Contains(IsStructString("version", "v2")));
+  };
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        expect_metadata(options);
+        return &foo_request;
+      }));
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("fizz", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        expect_metadata(options);
+        return &fizz_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
+  EXPECT_CALL(fizz_request, removeWatermarkCallbacks());
+  EXPECT_CALL(fizz_request, cancel());
+
+  router_->onDestroy();
+}
+
 TEST_P(RouterShadowingTest, ShadowWithHeaderManipulation) {
   const std::vector<std::string> mutation_yamls = {
       R"EOF(
@@ -5798,7 +6531,7 @@ remove: "authorization"
     mutations.push_back(mutation);
   }
 
-  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar", absl::nullopt, true, mutations);
+  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar", std::nullopt, true, mutations);
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
@@ -5882,7 +6615,7 @@ remove: "x-remove-me"
   }
 
   ShadowPolicyPtr policy =
-      makeShadowPolicy("foo", "", "bar", absl::nullopt, true, mutations, "shadow-host.example.com");
+      makeShadowPolicy("foo", "", "bar", std::nullopt, true, mutations, "shadow-host.example.com");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
@@ -5954,7 +6687,7 @@ TEST_F(RouterTest, AltStatName) {
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_, putResponseTime(_));
 
   Http::ResponseHeaderMapPtr response_headers(
@@ -5983,7 +6716,7 @@ TEST_F(RouterTest, AltStatName) {
 
 TEST_F(RouterTest, Redirect) {
   MockDirectResponseEntry direct_response;
-  EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, newUri(_, _)).WillOnce(Return("hello"));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::MovedPermanently));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillOnce(Return(EMPTY_STRING));
@@ -6004,7 +6737,7 @@ TEST_F(RouterTest, Redirect) {
 
 TEST_F(RouterTest, RedirectFound) {
   MockDirectResponseEntry direct_response;
-  EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("hello"));
+  EXPECT_CALL(direct_response, newUri(_, _)).WillOnce(Return("hello"));
   EXPECT_CALL(direct_response, rewritePathHeader(_, _));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Found));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillOnce(Return(EMPTY_STRING));
@@ -6064,7 +6797,7 @@ TEST_F(RouterTest, DirectResponseWithBody) {
 
 TEST_F(RouterTest, DirectResponseWithLocation) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("http://host/"));
+  EXPECT_CALL(direct_response, newUri(_, _)).WillOnce(Return("http://host/"));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::Created));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillRepeatedly(Return(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
@@ -6084,7 +6817,7 @@ TEST_F(RouterTest, DirectResponseWithLocation) {
 
 TEST_F(RouterTest, DirectResponseWithoutLocation) {
   NiceMock<MockDirectResponseEntry> direct_response;
-  EXPECT_CALL(direct_response, newUri(_)).WillOnce(Return("http://host/"));
+  EXPECT_CALL(direct_response, newUri(_, _)).WillOnce(Return("http://host/"));
   EXPECT_CALL(direct_response, responseCode()).WillRepeatedly(Return(Http::Code::OK));
   EXPECT_CALL(direct_response, formatBody(_, _, _, _)).WillRepeatedly(Return(EMPTY_STRING));
   EXPECT_CALL(*callbacks_.route_, directResponseEntry()).WillRepeatedly(Return(&direct_response));
@@ -6165,7 +6898,7 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
 
   upstream_stream_info_.filterState()->setData(
       "upstream data", std::make_unique<StreamInfo::UInt32AccessorImpl>(123),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
   expectResponseTimerCreate();
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
@@ -6199,7 +6932,7 @@ TEST_F(RouterTest, PropagatesShadowState) {
   Http::TestRequestHeaderMapImpl headers{};
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
-  ASSERT_THAT(response_decoder, testing::NotNull());
+  ASSERT_THAT(response_decoder, NotNull());
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -6660,7 +7393,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(10)));
     Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                            {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, true, false);
@@ -6714,7 +7447,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(0)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
@@ -6723,7 +7456,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    EXPECT_CALL(route, maxGrpcTimeout()).WillRepeatedly(Return(absl::nullopt));
+    EXPECT_CALL(route, maxGrpcTimeout()).WillRepeatedly(Return(std::nullopt));
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false, false);
@@ -6734,7 +7467,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(0)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false, false);
@@ -6745,7 +7478,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(999)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false, false);
@@ -6756,7 +7489,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(999)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "0m"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false, false);
@@ -6767,9 +7500,9 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(999)));
     EXPECT_CALL(route, grpcTimeoutOffset())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(10)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "100m"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false, false);
@@ -6779,9 +7512,9 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(999)));
     EXPECT_CALL(route, grpcTimeoutOffset())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(10)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1m"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false, false);
@@ -6791,7 +7524,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(0)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
                                            {"x-envoy-upstream-rq-timeout-ms", "15"}};
@@ -6805,7 +7538,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(0)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
                                            {"x-envoy-upstream-rq-timeout-ms", "bad"}};
@@ -6819,7 +7552,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(0)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
                                            {"x-envoy-upstream-rq-timeout-ms", "15"},
@@ -6835,7 +7568,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(0)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
                                            {"x-envoy-upstream-rq-timeout-ms", "15"},
@@ -6851,7 +7584,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(0)));
     route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
@@ -6867,7 +7600,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(0)));
     route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
@@ -6884,7 +7617,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
-        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10000)));
+        .WillRepeatedly(Return(std::optional<std::chrono::milliseconds>(10000)));
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "6666666666666H"}};
     FilterUtility::finalTimeout(route, headers, true, true, false, false);
@@ -7064,7 +7797,7 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
     envoy::type::v3::FractionalPercent fractional_percent;
     fractional_percent.set_numerator(5);
     fractional_percent.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-    auto policy = makeShadowPolicy("cluster", "", absl::nullopt, fractional_percent);
+    auto policy = makeShadowPolicy("cluster", "", std::nullopt, fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_,
                 featureEnabled(
@@ -7086,8 +7819,8 @@ TEST_F(RouterTest, CanaryStatusTrue) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                          {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  const absl::optional<std::string> virtual_cluster_name =
-      absl::optional<std::string>("fake_virtual_cluster");
+  const std::optional<std::string> virtual_cluster_name =
+      std::optional<std::string>("fake_virtual_cluster");
   EXPECT_CALL(callbacks_.stream_info_, setVirtualClusterName(virtual_cluster_name));
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
@@ -7118,8 +7851,8 @@ TEST_F(RouterTest, CanaryStatusFalse) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                          {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  const absl::optional<std::string> virtual_cluster_name =
-      absl::optional<std::string>("fake_virtual_cluster");
+  const std::optional<std::string> virtual_cluster_name =
+      std::optional<std::string>("fake_virtual_cluster");
   EXPECT_CALL(callbacks_.stream_info_, setVirtualClusterName(virtual_cluster_name));
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
@@ -7243,7 +7976,7 @@ TEST_F(RouterTest, RedirectRecords) {
   router_->downstream_connection_.stream_info_.filterState()->setData(
       Network::UpstreamSocketOptionsFilterState::key(),
       std::make_unique<Network::UpstreamSocketOptionsFilterState>(),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
   router_->downstream_connection_.stream_info_.filterState()
       ->getDataMutable<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key())
@@ -7270,11 +8003,11 @@ TEST_F(RouterTest, ApplicationProtocols) {
   callbacks_.streamInfo().filterState()->setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
             context->upstreamTransportSocketOptions();
         EXPECT_NE(transport_socket_options, nullptr);
@@ -7323,7 +8056,7 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
   router_->decodeData(data, true);
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
 
   // Now send the response headers, and ensure the deferred payload is proxied.
   EXPECT_CALL(encoder, encodeData(_, _));
@@ -7341,8 +8074,9 @@ TEST_F(RouterTest, InvalidUpstream) {
       std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   // Configure a TCP upstream rather than an HTTP upstream.
   envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
-      generic_config);
+  std::ignore =
+      cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+          generic_config);
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -7372,8 +8106,9 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::http::v3::HttpConnectionPoolProto http_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
-      http_config);
+  std::ignore =
+      cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+          http_config);
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -7405,10 +8140,10 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
-      tcp_config);
-  callbacks_.route_->route_entry_.connect_config_ =
-      absl::make_optional<RouteEntry::ConnectConfig>();
+  std::ignore =
+      cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+          tcp_config);
+  callbacks_.route_->route_entry_.connect_config_ = std::make_optional<RouteEntry::ConnectConfig>();
 
   // Make sure newConnection is called on the TCP pool, not newStream on the HTTP pool.
   EXPECT_CALL(cm_.thread_local_cluster_.tcp_conn_pool_, newConnection(_));
@@ -7426,10 +8161,10 @@ TEST_F(RouterTest, PostExplicitTcpUpstream) {
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
-      generic_config);
-  callbacks_.route_->route_entry_.connect_config_ =
-      absl::make_optional<RouteEntry::ConnectConfig>();
+  std::ignore =
+      cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+          generic_config);
+  callbacks_.route_->route_entry_.connect_config_ = std::make_optional<RouteEntry::ConnectConfig>();
   callbacks_.route_->route_entry_.connect_config_.value().set_allow_post(true);
 
   // Make sure newConnection is called on the TCP pool, not newStream on the HTTP pool.
@@ -7447,10 +8182,10 @@ TEST_F(RouterTest, PostHttpUpstream) {
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
       std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
-      generic_config);
-  callbacks_.route_->route_entry_.connect_config_ =
-      absl::make_optional<RouteEntry::ConnectConfig>();
+  std::ignore =
+      cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+          generic_config);
+  callbacks_.route_->route_entry_.connect_config_ = std::make_optional<RouteEntry::ConnectConfig>();
 
   // Make sure POST request result in the HTTP pool.
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _));
@@ -7474,6 +8209,22 @@ TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
   max_stream_duration_timer_->invokeCallback();
+
+  router_->onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
+TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfHeaderOverflows) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder_, Http::Protocol::Http10);
+
+  // The timer will not be created.
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_).Times(0);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-upstream-stream-duration-ms", "18446744073709551615"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
 
   router_->onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
@@ -7507,7 +8258,7 @@ TEST_F(RouterTest, Http3DisabledForHttp11Proxies) {
   callbacks_.stream_info_.filterState()->setData(
       Network::Http11ProxyInfoFilterState::key(),
       std::make_unique<Network::Http11ProxyInfoFilterState>(hostname, address),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+      StreamInfo::FilterState::LifeSpan::FilterChain);
   testRequestResponse(true, false);
 }
 
@@ -7522,7 +8273,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   expectResponseTimerCreate();
@@ -7549,7 +8300,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   Http::ResponseHeaderMapPtr response_headers1(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(503)));
+              putResult(_, std::optional<uint64_t>(503)));
   // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
@@ -7563,7 +8314,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   EXPECT_CALL(
       cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, absl::optional<uint64_t>{}));
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, std::optional<uint64_t>{}));
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
   router_->retry_state_->callback_();
@@ -7583,7 +8334,7 @@ TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   Http::ResponseHeaderMapPtr response_headers2(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
   EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
@@ -7768,12 +8519,13 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // Simulate the load balancer to call the `overrideHostToSelect`. When `overrideHostToSelect` of
   // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
   // called to get address of upstream host that should be selected first.
+  Upstream::LoadBalancerContext::OverrideHost expected_host{"1.2.3.4", false};
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
-      .WillOnce(Return(absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>(
-          std::make_pair("1.2.3.4", false))));
+      .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(expected_host)));
 
-  auto override_host = router_->overrideHostToSelect();
-  EXPECT_EQ("1.2.3.4", override_host.value().first);
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      router_->overrideHostToSelect();
+  EXPECT_EQ("1.2.3.4", override_host->host);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -7806,7 +8558,7 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // Simulate the load balancer to call the `overrideHostToSelect` again. The upstream override host
   // will be ignored when the request is retried.
   EXPECT_CALL(callbacks_, upstreamOverrideHost()).Times(0);
-  EXPECT_EQ(absl::nullopt, router_->overrideHostToSelect());
+  EXPECT_FALSE(router_->overrideHostToSelect().has_value());
 
   // Normal response.
   Http::ResponseHeaderMapPtr response_headers_200(
@@ -7825,7 +8577,7 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
 
 TEST_F(RouterTest, OverwriteSchemeWithUpstreamTransportProtocol) {
   EXPECT_CALL(callbacks_.stream_info_, shouldSchemeMatchUpstream()).WillRepeatedly(Return(true));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, std::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -7858,7 +8610,7 @@ TEST_F(RouterTest, OrcaLoadReport) {
   router_->decodeHeaders(headers, true);
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
 
   // Create LRS endpoint metric reporting config with three metrics.
   Envoy::Orca::LrsReportMetricNames metric_names;
@@ -7916,12 +8668,6 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
   ASSERT_EQ(load_metric_stats_map, nullptr);
 }
 
-class TestOrcaLoadReportLbData : public Upstream::HostLbPolicyData {
-public:
-  MOCK_METHOD(absl::Status, onOrcaLoadReport,
-              (const Upstream::OrcaLoadReport&, const StreamInfo::StreamInfo&), (override));
-};
-
 TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
@@ -7936,14 +8682,14 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   router_->decodeHeaders(headers, true);
 
   // Configure the HostLbData to receive the report.
-  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
       .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                           const StreamInfo::StreamInfo&) {
+                           OptRef<const StreamInfo::StreamInfo>) {
         received_orca_load_report = orca_load_report;
         return absl::OkStatus();
       }));
@@ -7990,14 +8736,14 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   router_->decodeHeaders(headers, true);
 
   // Configure the HostLbData to receive the report.
-  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
       .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                           const StreamInfo::StreamInfo&) {
+                           OptRef<const StreamInfo::StreamInfo>) {
         received_orca_load_report = orca_load_report;
         // Return an error that gets logged by router filter.
         return absl::InvalidArgumentError("Unexpected ORCA load Report");
@@ -8031,9 +8777,9 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
 
   // Configure the HostLbData to receive the report, but don't expect it to be
   // called for invalid orca header.
-  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
   auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
-  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(host_lb_policy_data));
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
 
   // Send report with invalid ORCA proto.
@@ -8043,6 +8789,139 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
   Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
       {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, OrcaLoadReportCallbacksFanOutToMultipleHostDataEntries) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  auto first_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
+  auto* first_lb_policy_data_raw_ptr = first_lb_policy_data.get();
+  auto second_lb_policy_data = std::make_unique<Upstream::MockHostLbPolicyData>();
+  auto* second_lb_policy_data_raw_ptr = second_lb_policy_data.get();
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(first_lb_policy_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(second_lb_policy_data));
+
+  EXPECT_CALL(*first_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
+      .WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(*second_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
+      .WillOnce(Return(absl::OkStatus()));
+
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_cpu_utilization(0.5);
+  orca_load_report.mutable_named_metrics()->insert({"good", 0.7});
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, OrcaLoadReportSkipsEntriesNotInterestedInOrca) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // First entry opts out of ORCA reports.
+  auto non_orca_data =
+      std::make_unique<Upstream::MockHostLbPolicyData>(/*receives_orca_load_report=*/false);
+  auto* non_orca_data_raw_ptr = non_orca_data.get();
+  auto orca_data = std::make_unique<Upstream::MockHostLbPolicyData>();
+  auto* orca_data_raw_ptr = orca_data.get();
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(non_orca_data));
+  cm_.thread_local_cluster_.conn_pool_.host_->addLbPolicyData(std::move(orca_data));
+
+  // Non-ORCA entry should never be called, ORCA entry should be called.
+  EXPECT_CALL(*non_orca_data_raw_ptr, onOrcaLoadReport(_, _)).Times(0);
+  EXPECT_CALL(*orca_data_raw_ptr, onOrcaLoadReport(_, _)).WillOnce(Return(absl::OkStatus()));
+
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_cpu_utilization(0.5);
+  std::string proto_string = TestUtility::getProtobufBinaryStringFromMessage(orca_load_report);
+  std::string orca_load_report_header_bin =
+      Envoy::Base64::encode(proto_string.c_str(), proto_string.length());
+  Http::ResponseHeaderMapPtr response_headers(new Http::TestResponseHeaderMapImpl{
+      {":status", "200"}, {"endpoint-load-metrics-bin", orca_load_report_header_bin}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+// Verify that RemoteResetNoError after response headers have been sent downstream
+// (downstream_response_started_ = true) resets the downstream stream without error flags.
+TEST_F(RouterTest, RemoteResetNoErrorAfterResponseStarted) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                        std::optional<uint64_t>(std::nullopt)));
+  router_->decodeHeaders(headers, false);
+
+  // Upstream sends response headers (not end_stream), setting downstream_response_started_.
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(_, std::optional<uint64_t>(200)));
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+
+  // RemoteResetNoError arrives — should reset downstream stream, no error.
+  EXPECT_CALL(callbacks_, resetStream(Http::StreamResetReason::RemoteResetNoError, _));
+  encoder.stream_.resetStream(Http::StreamResetReason::RemoteResetNoError);
+
+  // No error response flags should be set.
+  EXPECT_FALSE(
+      callbacks_.stream_info_.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset));
+
+  router_->onDestroy();
+}
+
+// Verify that RemoteResetNoError before the downstream response has started (defensive case)
+// sends a local reply instead of silently dropping the request.
+TEST_F(RouterTest, RemoteResetNoErrorBeforeResponseStarted) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                        std::optional<uint64_t>(std::nullopt)));
+  router_->decodeHeaders(headers, true);
+
+  // RemoteResetNoError arrives before any response headers — should trigger IS_ENVOY_BUG
+  // and send a local reply to avoid a downstream request hang.
+  EXPECT_ENVOY_BUG(encoder.stream_.resetStream(Http::StreamResetReason::RemoteResetNoError),
+                   "RemoteResetNoError should not be raised unless the entire "
+                   "response was received already.");
+
+  router_->onDestroy();
 }
 
 } // namespace Router

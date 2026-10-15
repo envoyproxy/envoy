@@ -72,7 +72,7 @@ FilterHeadersStatus GrpcCallContextProto::onRequestHeaders(uint32_t, bool end_of
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("cluster");
   std::string grpc_service_string;
-  grpc_service.SerializeToString(&grpc_service_string);
+  std::ignore = grpc_service.SerializeToString(&grpc_service_string);
   google::protobuf::Value value;
   value.set_string_value("request");
   HeaderStringPairs initial_metadata;

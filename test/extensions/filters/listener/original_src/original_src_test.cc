@@ -46,7 +46,7 @@ protected:
   MockBuffer buffer_;
   NiceMock<Network::MockListenerFilterCallbacks> callbacks_;
 
-  absl::optional<Network::Socket::Option::Details>
+  std::optional<Network::Socket::Option::Details>
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
                     envoy::config::core::v3::SocketOption::SocketState state) {
     for (const auto& option : options) {
@@ -56,7 +56,7 @@ protected:
       }
     }
 
-    return absl::nullopt;
+    return std::nullopt;
   }
 };
 

@@ -8,3 +8,5 @@ Health checkers
 
   redis
   thrift
+  dynamic_modules
+  multi

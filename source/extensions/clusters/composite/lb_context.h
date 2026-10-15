@@ -25,7 +25,7 @@ public:
   }
 
   // Upstream::LoadBalancerContext - delegate all methods to the wrapped context.
-  absl::optional<uint64_t> computeHashKey() override { return context_->computeHashKey(); }
+  std::optional<uint64_t> computeHashKey() override { return context_->computeHashKey(); }
 
   const Network::Connection* downstreamConnection() const override {
     return context_->downstreamConnection();
@@ -67,7 +67,7 @@ public:
     return context_->upstreamTransportSocketOptions();
   }
 
-  absl::optional<OverrideHost> overrideHostToSelect() const override {
+  OptRef<const OverrideHost> overrideHostToSelect() const override {
     return context_->overrideHostToSelect();
   }
 

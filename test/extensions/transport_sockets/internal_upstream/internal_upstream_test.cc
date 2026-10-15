@@ -12,7 +12,11 @@
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
+
+using testing::Contains;
+using testing::Pair;
 
 namespace Envoy {
 namespace Extensions {
@@ -28,13 +32,14 @@ class TestObject : public StreamInfo::FilterState::Object {};
 
 class MockUserSpaceIoHandle : public Network::MockIoHandle, public IoHandle {
 public:
-  MOCK_METHOD(void, setWriteEnd, ());
-  MOCK_METHOD(bool, isPeerShutDownWrite, (), (const));
+  MOCK_METHOD(void, setEof, ());
+  MOCK_METHOD(void, setRst, ());
+  MOCK_METHOD(bool, hasReceivedEof, (), (const));
   MOCK_METHOD(void, onPeerDestroy, ());
   MOCK_METHOD(void, setNewDataAvailable, ());
-  MOCK_METHOD(Buffer::Instance*, getWriteBuffer, ());
-  MOCK_METHOD(bool, isWritable, (), (const));
-  MOCK_METHOD(bool, isPeerWritable, (), (const));
+  MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, ());
+  MOCK_METHOD(bool, canReceiveData, (), (const));
+  MOCK_METHOD(bool, isWriteUnblocked, (), (const));
   MOCK_METHOD(void, onPeerBufferLowWatermark, ());
   MOCK_METHOD(bool, isReadable, (), (const));
   MOCK_METHOD(std::shared_ptr<PassthroughState>, passthroughState, ());
@@ -81,8 +86,8 @@ TEST_F(InternalSocketTest, NativeSocket) {
 TEST_F(InternalSocketTest, PassthroughStateInjected) {
   auto filter_state_object = std::make_shared<TestObject>();
   filter_state_objects_.push_back(
-      {filter_state_object, StreamInfo::FilterState::StateType::ReadOnly,
-       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "test.object"});
+      {filter_state_object, StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection,
+       "test.object"});
   Protobuf::Struct& map = (*metadata_->mutable_filter_metadata())["envoy.test"];
   Protobuf::Value val;
   val.set_string_value("val");
@@ -94,8 +99,9 @@ TEST_F(InternalSocketTest, PassthroughStateInjected) {
   EXPECT_CALL(*state, initialize(_, _))
       .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
                            const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
-        ASSERT_EQ("val",
-                  metadata->filter_metadata().at("envoy.test").fields().at("key").string_value());
+        ASSERT_THAT(
+            metadata->filter_metadata(),
+            Contains(Pair("envoy.test", HasStructFields(Contains(IsStructString("key", "val"))))));
         ASSERT_EQ(1, filter_state_objects.size());
         const auto& object = filter_state_objects.at(0);
         ASSERT_EQ("test.object", object.name_);

@@ -224,7 +224,7 @@ std::string ProtobufSerializer::serialize(const std::vector<Span>& zipkin_spans)
     spans.MergeFrom(toListOfSpans(zipkin_span));
   }
   std::string serialized;
-  spans.SerializeToString(&serialized);
+  std::ignore = spans.SerializeToString(&serialized);
   return serialized;
 }
 

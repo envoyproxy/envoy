@@ -87,8 +87,8 @@ connection and HTTP stream (i.e., HTTP request/response pair)
 respectively. ``StreamInfo`` contains a set of fixed attributes as part of
 the class definition (e.g., HTTP protocol, requested server name, etc.). In
 addition, it provides a facility to store typed objects in a map
-(``map<string, FilterState::Object>``). The state stored per filter can be
-either write-once (immutable), or write-many (mutable).
+(``map<string, FilterState::Object>``). The state stored per filter is
+write-many (mutable).
 
 See :ref:`the well-known dynamic metadata <well_known_dynamic_metadata>` and
 :ref:`the well-known filter state <well_known_filter_state>` for the reference

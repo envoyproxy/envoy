@@ -117,6 +117,103 @@ Lua script as follows:
     :linenos:
     :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
+.. _config_http_filters_lua_package_paths:
+
+Requiring Lua modules
+---------------------
+
+:ref:`source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>` selects
+which script a route runs; it does not make those scripts available to ``require``. To load a Lua
+module, add the location it lives in to the interpreter's search path with :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>`, or, for modules which are
+loadable C libraries, :ref:`package_cpaths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_cpaths>`:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      package_paths:
+      - /etc/envoy/lua/?.lua
+      - /etc/envoy/lua/?/init.lua
+      package_cpaths:
+      - /etc/envoy/lua/?.so
+      default_source_code:
+        inline_string: |
+          local json = require("dkjson")
+
+          function envoy_on_request(request_handle)
+            -- Do something with json.
+          end
+
+Each entry is one Lua path pattern, in which ``?`` is replaced by the required module's name. The
+entries are joined with ``;`` in the order given and placed ahead of the interpreter's built-in
+search path, which is kept, so a module present in both places resolves to the configured copy.
+
+The patterns are in place before any configured code runs, including the run that validates the
+configuration at load time. A ``require`` at the top level of a script whose module cannot be found
+is therefore a configuration error rather than a per-request failure.
+
+Passing that check is not the end of it: every worker builds its own Lua VM and runs the script
+again to do so, loading the modules independently, and those VMs are created after the
+configuration has been accepted. The files a script requires must therefore stay readable for as
+long as the process runs, not only while the configuration is being loaded.
+
+A route which supplies its own :ref:`source_code
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.source_code>` runs in its own Lua
+VM, which the filter-level patterns do not reach; configure :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.package_paths>` on the route as
+well. A route which selects a script by :ref:`name
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.name>`, or which configures no
+script at all, runs in a VM belonging to the filter and already has the filter-level patterns; its
+own patterns are unused.
+
+.. _config_http_filters_lua_shared_vm_id:
+
+Sharing Lua VMs between configurations
+--------------------------------------
+
+Every configured script gets its own set of Lua VMs: one per worker thread plus one on the main
+thread. A deployment that repeats the same script across many listeners, filter chains or routes
+therefore pays for the same code many times over. Setting :ref:`shared_vm_id
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.shared_vm_id>` opts a configuration into
+sharing those VMs with every other Lua configuration that sets the same id:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      shared_vm_id: my_scripts
+      default_source_code:
+        filename: /etc/envoy/lua/common.lua
+
+Sharing is decided per script rather than per configuration. Two configurations that agree on the
+id share a VM only for the scripts whose contents match and whose :ref:`package_paths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_paths>` and :ref:`package_cpaths
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.package_cpaths>` match, since a script that
+resolves its ``require`` calls elsewhere does not produce an equivalent VM. The id applies to every
+script the configuration defines: the default script, the deprecated ``inline_code``, and each
+entry of :ref:`source_codes <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.source_codes>`.
+Routes draw from the same pool, so a route setting :ref:`LuaPerRoute.shared_vm_id
+<envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.shared_vm_id>` can reuse a VM a
+filter configuration already built, and the other way around.
+
+.. attention::
+
+  A Lua VM is not only an amount of memory, it is also a set of Lua globals that outlive a
+  request. Scripts sharing a VM see each other's globals, exactly as separate requests through one
+  configuration already do. Only share VMs between configurations whose scripts are prepared for
+  that.
+
+A shared VM lives for as long as at least one configuration using it is alive. Once the last one is
+drained the VM is torn down, and the next configuration asking for that id and script builds a
+fresh one. Leaving the field unset, which is the default, keeps every configuration's scripts in
+VMs of their own.
+
 Upstream Filter
 ---------------
 
@@ -139,6 +236,12 @@ individual filter instance/script can be tracked by providing a per-filter
 
   errors, Counter, Total script execution errors.
   executions, Counter, Total number of times ``envoy_on_request`` and ``envoy_on_response`` was executed.
+
+In addition, a single process-wide ``lua.lua_vm_count`` gauge (not affected by ``stat_prefix``) tracks
+the total number of active Lua VMs across every filter-config-level and route-level Lua script
+configured in the process. Each configured script accounts for ``concurrency + 1`` VMs (one per
+worker thread, plus the main thread), except that scripts sharing VMs through :ref:`shared_vm_id
+<config_http_filters_lua_shared_vm_id>` are counted once between them.
 
 Script examples
 ---------------
@@ -297,6 +400,32 @@ Returns the stream's headers. The headers can be modified as long as they have n
 the next filter in the filter chain. For example, they can be modified after an ``httpCall()`` or
 after a ``body()`` call returns. The script will fail if the headers are modified in any other
 situation.
+
+Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
+
+``requestHeaders()``
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local request_headers = handle:requestHeaders()
+
+Returns the stream's request headers, on both the request and the response path. In
+``envoy_on_request`` this is the same header map that ``headers()`` returns. In
+``envoy_on_response`` it is the request's headers, which are otherwise unreachable from the
+response path -- previously the only ways to carry a request value into ``envoy_on_response`` were
+dynamic metadata and filter state, both of which cost a write and a read per request.
+
+The returned handle may be modified on either path. On the response path the request has already
+been sent upstream, so a write does not change what the upstream saw; it is visible to access
+logging, tracing, and any later filter that reads the request headers on the encode path. This
+matches what native C++ encode-path filters can already do through
+``StreamEncoderFilterCallbacks::requestHeaders()``.
+
+Returns ``nil`` if the stream has no request headers. That happens when a response is generated
+before the request headers were fully received -- for example an early error response from a
+request-header timeout, a stream idle timeout that fires before headers arrive, or a
+protocol-level rejection during header parsing.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
@@ -475,6 +604,7 @@ body. May be nil.
 .. code-block:: lua
 
   local metadata = handle:metadata()
+  local metadata = handle:metadata(ns)
 
 Returns the current route entry metadata. Note that the metadata should be specified
 under the :ref:`filter config name
@@ -482,6 +612,10 @@ under the :ref:`filter config name
 If no entry could be found by the filter config name, then the filter canonical name
 i.e. ``envoy.filters.http.lua`` will be used as an alternative. Note that this downgrade will be
 deprecated in the future.
+
+``ns`` is an optional string that supplies the namespace, i.e. the key in the ``filter_metadata``
+of the route entry, to get the metadata from. If it is set, only the metadata under the given
+namespace is returned and neither the filter config name nor the filter canonical name is used.
 
 .. note::
 
@@ -600,8 +734,17 @@ Example:
 
   local filter_context = handle:filterContext()
 
-Returns the filter context that is configured in the
-:ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context>`.
+Returns the filter context that is configured in the route's
+:ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.LuaPerRoute.filter_context>`,
+or, for a request whose route does not configure one, the filter-level
+:ref:`filter_context <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.filter_context>`. A
+route's context replaces the filter-level one rather than merging into it, so a route which
+configures an empty ``filter_context`` sees an empty context. Only the most specific
+``LuaPerRoute`` is consulted, so a context configured on a less specific one is not a fallback for
+a route that has its own ``LuaPerRoute``; the filter-level context is.
+
+The returned object is a wrapper rather than a plain Lua table. Read a key with ``get()``;
+indexing it by key returns ``nil``. It can be iterated with ``pairs()``.
 
 For example, given the following filter context in the route entry:
 
@@ -622,8 +765,25 @@ The filter context can be accessed in the related Lua script as follows:
     local filter_context = request_handle:filterContext()
 
     -- Access the filter context data
-    local value = filter_context["key"]
+    local value = filter_context:get("key")
   end
+
+The same script reads a filter-level context the same way, which is useful for values shared by
+every route the filter serves:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.lua
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+      default_source_code:
+        inline_string: |
+          function envoy_on_request(request_handle)
+            local value = request_handle:filterContext():get("key")
+          end
+      filter_context:
+        key: xxxxxx
 
 ``importPublicKey()``
 ^^^^^^^^^^^^^^^^^^^^^
@@ -661,6 +821,37 @@ which means the signature is verified; otherwise, the second element will store 
   local base64_encoded = handle:base64Escape("input string")
 
 Encodes the input string as base64. This can be useful for escaping binary data.
+
+.. _config_http_filters_lua_stream_handle_api_base64_decode:
+
+``base64Decode()``
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local decoded = handle:base64Decode("aW5wdXQgc3RyaW5n")
+
+Decodes a base64 encoded string, the inverse of :ref:`base64Escape()
+<config_http_filters_lua_stream_handle_api_base64_escape>`. Returns ``nil`` if the input is not
+valid base64, so a value taken from a header or an upstream body can be checked rather than
+having to be trusted:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local claim = request_handle:headers():get("x-encoded-claim")
+    if claim ~= nil then
+      local decoded = request_handle:base64Decode(claim)
+      if decoded == nil then
+        request_handle:respond({[":status"] = "400"}, "malformed claim")
+        return
+      end
+      request_handle:headers():add("x-decoded-claim", decoded)
+    end
+  end
+
+The decoded value may contain NUL bytes, since base64 carries arbitrary binary data; Lua strings
+are length-counted, so this is preserved.
 
 ``timestamp()``
 ^^^^^^^^^^^^^^^
@@ -718,6 +909,17 @@ matches, calling methods on the returned object will return ``nil`` or, in the c
 an empty metadata object.
 
 Returns a :ref:`route object <config_http_filters_lua_route_wrapper>`.
+
+``stats()``
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local stats = handle:stats()
+
+Returns a stats scope object that can be used to create and modify stats (counters, gauges, and
+histograms). See :ref:`Stats scope object API <config_http_filters_lua_stats_scope_wrapper>` for
+available methods.
 
 .. _config_http_filters_lua_header_wrapper:
 
@@ -1345,6 +1547,50 @@ Objects that support field access can have specific fields retrieved using the o
     end
   end
 
+``set()``
+^^^^^^^^^
+
+.. code-block:: lua
+
+  filterState:set(objectKey, factoryKey, payload)
+
+Sets a filter state object by name using a registered :ref:`object factory <well_known_filter_state>`.
+
+* ``objectKey`` is a string that specifies the name under which the object is stored in filter state.
+* ``factoryKey`` is a string that specifies the registered ``ObjectFactory`` name used to create the object. See :ref:`well-known filter state objects <well_known_filter_state>` for the list of available factory keys.
+* ``payload`` is a string passed to the factory's ``createFromBytes`` method.
+
+The object is stored with filter chain lifespan and no upstream sharing.
+
+Raises a Lua error if the factory key is not registered or if the factory fails to create an object from the given payload.
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local filter_state = request_handle:streamInfo():filterState()
+
+    -- Set a simple string value using the generic string factory.
+    filter_state:set("my.custom.key", "envoy.string", "my-value")
+
+    -- Override upstream SNI.
+    filter_state:set("envoy.network.upstream_server_name", "envoy.network.upstream_server_name", "upstream.example.com")
+
+    -- Override upstream SAN validation with a comma-separated list.
+    filter_state:set("envoy.network.upstream_subject_alt_names", "envoy.network.upstream_subject_alt_names", "san1.example.com,san2.example.com")
+
+    -- Read back the SANs that were just set.
+    local sans = filter_state:get("envoy.network.upstream_subject_alt_names")
+    if sans then
+      request_handle:logInfo("Upstream SANs: " .. sans)
+    end
+
+    -- Read back a value that was just set.
+    local value = filter_state:get("my.custom.key")
+    if value then
+      request_handle:headers():add("x-custom-value", value)
+    end
+  end
+
 .. _config_http_filters_lua_connection_wrapper:
 
 Connection object API
@@ -1464,6 +1710,35 @@ certificate, or no serial number.
 
 Returns the issuer field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no issuer.
+
+``sha256PeerCertificateIssuerDigest()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:sha256PeerCertificateIssuerDigest()
+
+Returns the hex-encoded SHA-256 fingerprint of the direct issuer certificate from the
+validated peer certificate chain. The issuer is the second certificate in the validated chain
+(i.e., the certificate that directly signed the peer leaf certificate), as determined by
+BoringSSL during the TLS handshake. Requires the peer certificate chain to have been
+successfully validated (e.g., mTLS with ``require_client_certificate: true`` and a
+``validation_context``). Returns ``""`` if there is no validated peer certificate chain or
+the validated chain contains fewer than two certificates.
+
+``serialNumberPeerCertificateIssuer()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:serialNumberPeerCertificateIssuer()
+
+Returns the serial number of the direct issuer certificate from the validated peer certificate
+chain. The issuer is the second certificate in the validated chain (i.e., the certificate that
+directly signed the peer leaf certificate), as determined by BoringSSL during the TLS handshake.
+Requires the peer certificate chain to have been successfully validated (e.g., mTLS with
+``require_client_certificate: true`` and a ``validation_context``). Returns ``""`` if there is
+no validated peer certificate chain or the validated chain contains fewer than two certificates.
 
 ``subjectPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1708,10 +1983,15 @@ Route object API
 .. code-block:: lua
 
   local metadata = route:metadata()
+  local metadata = route:metadata(ns)
 
 Returns the route metadata. Note that the metadata should be specified
 under the :ref:`filter config name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+
+``ns`` is an optional string that supplies the namespace, i.e. the key in the ``filter_metadata``
+of the route entry, to get the metadata from. If it is set, the metadata under the given
+namespace is returned rather than the metadata under the filter config name.
 
 Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
@@ -1723,3 +2003,156 @@ Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_c
     :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
+
+.. _config_http_filters_lua_stats_scope_wrapper:
+
+Stats scope object API
+----------------------
+
+.. code-block:: lua
+
+  local stats = handle:stats()
+
+``handle:stats()`` returns a stats scope object that can be used to create and
+modify stats (counters, gauges, and histograms). Stats created through this API
+are prefixed with ``lua.`` followed by the optional ``stat_prefix`` from the Lua
+filter configuration.
+
+counter()
+^^^^^^^^^
+
+.. code-block:: lua
+
+  local counter = stats:counter("my_counter")
+
+Returns a :ref:`counter object <config_http_filters_lua_counter_wrapper>` with
+the given name. The counter is created if it doesn't exist.
+
+gauge()
+^^^^^^^
+
+.. code-block:: lua
+
+  local gauge = stats:gauge("my_gauge")
+
+Returns a :ref:`gauge object <config_http_filters_lua_gauge_wrapper>` with
+the given name. The gauge is created if it doesn't exist. Gauges created through
+Lua use ``NeverImport`` mode, meaning they track local process state and are not
+aggregated across the cluster during hot restart.
+
+histogram()
+^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local histogram = stats:histogram("my_histogram", "ms")
+
+Returns a :ref:`histogram object <config_http_filters_lua_histogram_wrapper>`
+with the given name and unit. The second argument specifies the unit and must be
+one of: ``"unspecified"``, ``"bytes"``, ``"nanoseconds"``, ``"microseconds"``, ``"milliseconds"``,
+or ``"ms"`` (shorthand for milliseconds).
+
+.. _config_http_filters_lua_counter_wrapper:
+
+Counter object API
+------------------
+
+inc()
+^^^^^
+
+.. code-block:: lua
+
+  counter:inc()
+
+Increments the counter by 1.
+
+add()
+^^^^^
+
+.. code-block:: lua
+
+  counter:add(5)
+
+Adds the specified value to the counter. The value must be a non-negative integer.
+
+value()
+^^^^^^^
+
+.. code-block:: lua
+
+  local val = counter:value()
+
+Returns the current value of the counter.
+
+.. _config_http_filters_lua_gauge_wrapper:
+
+Gauge object API
+----------------
+
+inc()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:inc()
+
+Increments the gauge by 1.
+
+dec()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:dec()
+
+Decrements the gauge by 1.
+
+add()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:add(5)
+
+Adds the specified value to the gauge. The value must be a non-negative integer.
+
+sub()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:sub(3)
+
+Subtracts the specified value from the gauge. The value must be a non-negative integer.
+
+set()
+^^^^^
+
+.. code-block:: lua
+
+  gauge:set(10)
+
+Sets the gauge to the specified value. The value must be a non-negative integer (zero is valid).
+
+value()
+^^^^^^^
+
+.. code-block:: lua
+
+  local val = gauge:value()
+
+Returns the current value of the gauge.
+
+.. _config_http_filters_lua_histogram_wrapper:
+
+Histogram object API
+--------------------
+
+recordValue()
+^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  histogram:recordValue(42)
+
+Records a value in the histogram. The value must be a non-negative integer.

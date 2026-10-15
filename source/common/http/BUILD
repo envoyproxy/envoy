@@ -82,6 +82,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "character_set_validation_lib",
     hdrs = ["character_set_validation.h"],
+    deps = [
+        "@abseil-cpp//absl/strings:string_view",
+    ],
 )
 
 envoy_cc_library(
@@ -94,6 +97,7 @@ envoy_cc_library(
         ":status_lib",
         ":utility_lib",
         "//envoy/event:deferred_deletable",
+        "//envoy/http:client_codec_factory_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
@@ -158,7 +162,10 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "//source/common/config:well_known_names",
         "//source/common/stats:symbol_table_lib",
+        "@abseil-cpp//absl/strings:string_view",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -194,6 +201,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/router:route_config_provider_manager_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/filter:config_discovery_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -263,6 +271,7 @@ envoy_cc_library(
         "//source/common/common:key_value_store_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/container:linked_hash_map",
         "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@quiche//:http2_core_alt_svc_wire_format_lib",
@@ -397,6 +406,7 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/router:scopes_interface",
         "//envoy/runtime:runtime_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/server/overload:overload_manager_interface",
         "//envoy/ssl:connection_interface",
         "//envoy/stats:stats_interface",
@@ -414,18 +424,23 @@ envoy_cc_library(
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/config:well_known_names",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/matching:data_impl_lib",
+        "//source/common/json:json_streamer_lib",
         "//source/common/matcher:matcher_lib",
+        "//source/common/network:drain_close_util_lib",
         "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_server_factory_stub_lib",
         "//source/common/router:config_lib",
         "//source/common/stats:timespan_lib",
+        "//source/common/stats:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
@@ -520,6 +535,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "http_service_headers_lib",
+    srcs = ["http_service_headers.cc"],
+    hdrs = ["http_service_headers.h"],
+    deps = [
+        ":headers_lib",
+        "//envoy/formatter:substitution_formatter_interface",
+        "//envoy/http:header_map_interface",
+        "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/formatter:substitution_formatter_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/server:generic_factory_context_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "user_agent_lib",
     srcs = ["user_agent.cc"],
     hdrs = ["user_agent.h"],
@@ -530,6 +561,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//envoy/stats:timespan_interface",
+        "//source/common/config:well_known_names",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
     ],
@@ -554,10 +586,12 @@ envoy_cc_library(
         ":message_lib",
         "//bazel/external/http_parser",
         "//envoy/common:regex_interface",
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
         "//envoy/http:query_params_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -569,7 +603,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/container:node_hash_set",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@quiche//:http2_adapter_http2_protocol",
@@ -612,7 +645,6 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@abseil-cpp//absl/types:optional",
         "@googleurl//url",
     ],
 )
@@ -675,7 +707,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/strings:string_view",
-        "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:span",
     ],
 )

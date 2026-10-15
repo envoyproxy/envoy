@@ -30,6 +30,7 @@
 #include "source/common/router/header_parser.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/udp_source_address_policy.h"
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
 
@@ -93,7 +94,7 @@ public:
 
   virtual const std::string proxyHost(const StreamInfo::StreamInfo& stream_info) const PURE;
   virtual const std::string targetHost(const StreamInfo::StreamInfo& stream_info) const PURE;
-  virtual const absl::optional<uint32_t>& proxyPort() const PURE;
+  virtual const std::optional<uint32_t>& proxyPort() const PURE;
   virtual uint32_t defaultTargetPort() const PURE;
   virtual bool usePost() const PURE;
   virtual const std::string& postPath() const PURE;
@@ -138,7 +139,7 @@ public:
   virtual bool hasSessionFilters() const PURE;
   virtual const UdpTunnelingConfigPtr& tunnelingConfig() const PURE;
   virtual bool flushAccessLogOnTunnelConnected() const PURE;
-  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const PURE;
+  virtual const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() const PURE;
   virtual Random::RandomGenerator& randomGenerator() const PURE;
 };
 
@@ -158,11 +159,11 @@ public:
     }
   }
 
-  absl::optional<uint64_t> computeHashKey() override { return hash_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_; }
   StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_; }
 
 private:
-  absl::optional<uint64_t> hash_;
+  std::optional<uint64_t> hash_;
   StreamInfo::StreamInfo* const stream_info_;
 };
 
@@ -338,7 +339,7 @@ private:
       if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.tunnel_creation_callbacks_.has_value()) {
-        parent_.tunnel_creation_callbacks_.value().get().onStreamSuccess(*parent_.request_encoder_);
+        parent_.tunnel_creation_callbacks_->onStreamSuccess(*parent_.request_encoder_);
         parent_.tunnel_creation_callbacks_.reset();
       }
     }
@@ -375,7 +376,7 @@ private:
   UpstreamTunnelCallbacks& upstream_callbacks_;
   StreamInfo::StreamInfo& downstream_info_;
   const UdpTunnelingConfig& tunnel_config_;
-  absl::optional<std::reference_wrapper<TunnelCreationCallbacks>> tunnel_creation_callbacks_;
+  OptRef<TunnelCreationCallbacks> tunnel_creation_callbacks_;
 };
 
 /**
@@ -441,10 +442,10 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Http::RequestEncoder& request_encoder,
                    Upstream::HostDescriptionConstSharedPtr upstream_host,
-                   StreamInfo::StreamInfo& upstream_info, absl::optional<Http::Protocol>) override;
+                   StreamInfo::StreamInfo& upstream_info, std::optional<Http::Protocol>) override;
 
 private:
-  absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
+  std::optional<Upstream::HttpPoolData> conn_pool_data_;
   HttpStreamCallbacks* callbacks_{};
   UpstreamTunnelCallbacks& upstream_callbacks_;
   std::unique_ptr<HttpUpstreamImpl> upstream_;
@@ -493,7 +494,7 @@ class PerSessionCluster : public StreamInfo::FilterState::Object {
 public:
   PerSessionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }
-  absl::optional<std::string> serializeAsString() const override { return cluster_; }
+  std::optional<std::string> serializeAsString() const override { return cluster_; }
   static const std::string& key();
 
 private:
@@ -584,13 +585,11 @@ protected:
 
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     ClusterInfo* cluster() const { return cluster_; }
-    absl::optional<std::reference_wrapper<const Upstream::Host>> host() const {
-      if (host_) {
-        return *host_;
-      }
 
-      return absl::nullopt;
-    }
+    // Registers the session so the listener keeps it on this instance during a hot restart, unless
+    // per-packet load balancing is enabled.
+    void maybeRegisterForHotRestart();
+    OptRef<const Upstream::Host> host() const { return makeOptRefFromPtr(host_.get()); }
 
     bool onNewSession();
     void onData(Network::UdpRecvData& data);
@@ -658,6 +657,8 @@ protected:
     const Network::UdpRecvData::LocalPeerAddresses addresses_;
     Upstream::HostConstSharedPtr host_;
     ClusterInfo* cluster_{nullptr};
+    // Keeps this session on the same instance during a hot restart.
+    Network::UdpHotRestartSessionHandlePtr hot_restart_session_handle_;
     uint64_t session_id_;
     // TODO(mattklein123): Consider replacing an idle timer for each session with a last used
     // time stamp and a periodic scan of all sessions to look for timeouts. This solution is simple,
@@ -725,7 +726,7 @@ protected:
 
   private:
     void onReadReady();
-    void createUdpSocket(const Upstream::HostConstSharedPtr& host);
+    bool createUdpSocket(const Upstream::HostConstSharedPtr& host);
 
     // The socket is used for writing packets to the selected upstream host as well as receiving
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
@@ -733,7 +734,7 @@ protected:
     Network::SocketPtr udp_socket_;
     // The socket has been connected to avoid port exhaustion.
     bool connected_{};
-    const bool use_original_src_ip_;
+    Upstream::UdpSourceAddressPolicy source_address_policy_;
   };
 
   /**
@@ -798,7 +799,7 @@ protected:
 
   struct LocalPeerHostAddresses {
     const Network::UdpRecvData::LocalPeerAddresses& local_peer_addresses_;
-    absl::optional<std::reference_wrapper<const Upstream::Host>> host_;
+    OptRef<const Upstream::Host> host_;
   };
 
   struct HeterogeneousActiveSessionHash {
@@ -819,7 +820,7 @@ protected:
     size_t operator()(const LocalPeerHostAddresses& value) const {
       auto hash = this->operator()(value.local_peer_addresses_);
       if (consider_host_) {
-        hash = absl::HashOf(hash, value.host_.value().get().address()->asStringView());
+        hash = absl::HashOf(hash, value.host_->address()->asStringView());
       }
       return hash;
     }
@@ -847,7 +848,7 @@ protected:
     }
     bool operator()(const ActiveSessionSharedPtr& lhs, const LocalPeerHostAddresses& rhs) const {
       return this->operator()(lhs, rhs.local_peer_addresses_) &&
-             (consider_host_ ? &lhs->host().value().get() == &rhs.host_.value().get() : true);
+             (consider_host_ ? lhs->host().ptr() == rhs.host_.ptr() : true);
     }
     bool operator()(const ActiveSessionSharedPtr& lhs, const ActiveSession* rhs) const {
       LocalPeerHostAddresses key{rhs->addresses(), rhs->host()};
@@ -920,13 +921,13 @@ private:
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             Upstream::ThreadLocalClusterCommand& get_cluster) final;
-  void onClusterRemoval(const std::string& cluster_name) override;
+  void onClusterRemoval(absl::string_view cluster_name) override;
 
   const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_;
   // Map for looking up cluster info with its name.
   absl::flat_hash_map<std::string, ClusterInfoPtr> cluster_infos_;
 
-  absl::optional<StreamInfo::StreamInfoImpl> udp_proxy_stats_;
+  std::optional<StreamInfo::StreamInfoImpl> udp_proxy_stats_;
 };
 
 /**

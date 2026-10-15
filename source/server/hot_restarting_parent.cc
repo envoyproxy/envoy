@@ -1,6 +1,7 @@
 #include "source/server/hot_restarting_parent.h"
 
 #include "envoy/server/instance.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/memory/stats.h"
 #include "source/common/network/utility.h"
@@ -12,6 +13,36 @@ namespace Envoy {
 namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
+
+namespace {
+
+// Records a metric's programmatic tags into the tag map keyed by the metric's fully qualified
+// name, so the hot restart child can re-create the stat with identical labels. Entries are
+// emitted only for metrics whose tags did NOT come from tag extraction: extraction on the child
+// re-derives extracted tags from the name during the merge (the common case, including the
+// default tag regexes), so re-transmitting those would only bloat the transfer. Tags supplied
+// programmatically at creation (whose values are embedded in the flat name) are the ones that
+// need the metadata.
+void recordTags(Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::MetricTags>* tag_map,
+                const std::string& name, const Stats::Metric& metric) {
+  if (!metric.noTagExtraction()) {
+    return;
+  }
+  const Stats::TagVector tags = metric.tags();
+  if (tags.empty()) {
+    return;
+  }
+  HotRestartMessage::Reply::Stats::MetricTags& tagged = (*tag_map)[name];
+  tagged.set_base_name(metric.tagExtractedName());
+  tagged.mutable_tags()->Reserve(tags.size());
+  for (const Stats::Tag& tag : tags) {
+    HotRestartMessage::Reply::Stats::Tag* tag_proto = tagged.add_tags();
+    tag_proto->set_name(tag.name_);
+    tag_proto->set_value(tag.value_);
+  }
+}
+
+} // namespace
 
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
                                          const std::string& socket_path, mode_t socket_mode)
@@ -35,10 +66,15 @@ void HotRestartingParent::sendHotRestartMessage(envoy::HotRestartMessage&& msg) 
 
 // Network::NonDispatchedUdpPacketHandler
 void HotRestartingParent::Internal::handle(uint32_t worker_index,
+                                           const Network::Address::Instance& listener_address,
                                            const Network::UdpRecvData& packet) {
   envoy::HotRestartMessage msg;
   auto* packet_msg = msg.mutable_request()->mutable_forwarded_udp_packet();
   packet_msg->set_local_addr(Network::Utility::urlFromDatagramAddress(*packet.addresses_.local_));
+  packet_msg->set_listener_addr(Network::Utility::urlFromDatagramAddress(listener_address));
+  if (listener_address.networkNamespace().has_value()) {
+    packet_msg->set_network_namespace(*listener_address.networkNamespace());
+  }
   packet_msg->set_peer_addr(Network::Utility::urlFromDatagramAddress(*packet.addresses_.peer_));
   packet_msg->set_receive_time_epoch_microseconds(
       std::chrono::duration_cast<std::chrono::microseconds>(packet.receive_time_.time_since_epoch())
@@ -182,6 +218,7 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
       const std::string name = gauge.name();
       (*stats->mutable_gauges())[name] = gauge.value();
       recordDynamics(stats, name, gauge.statName());
+      recordTags(stats->mutable_gauge_tags(), name, gauge);
     }
   });
 
@@ -194,6 +231,7 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
         const std::string name = counter.name();
         (*stats->mutable_counter_deltas())[name] = latched_value;
         recordDynamics(stats, name, counter.statName());
+        recordTags(stats->mutable_counter_tags(), name, counter);
       }
     }
   });

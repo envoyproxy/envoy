@@ -237,6 +237,14 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
     quic_ccopts.append(quic::QuicTagToString(ccopt));
   }
   EXPECT_EQ(quic_ccopts, "6RTOAKD4");
+
+  config.mutable_enable_scone()->set_value(true);
+  convertQuicConfig(config, quic_config);
+  EXPECT_TRUE(quic_config.parse_scone_packets());
+
+  config.mutable_enable_scone()->set_value(false);
+  convertQuicConfig(config, quic_config);
+  EXPECT_FALSE(quic_config.parse_scone_packets());
 }
 
 TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {

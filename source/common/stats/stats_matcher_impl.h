@@ -21,7 +21,10 @@ namespace Stats {
 class StatsMatcherImpl : public StatsMatcher {
 public:
   StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config, SymbolTable& symbol_table,
-                   Server::Configuration::CommonFactoryContext& context);
+                   Server::Configuration::CommonFactoryContext& context)
+      : StatsMatcherImpl(config.stats_matcher(), symbol_table, context) {}
+  StatsMatcherImpl(const envoy::config::metrics::v3::StatsMatcher& stats_matcher,
+                   SymbolTable& symbol_table, Server::Configuration::CommonFactoryContext& context);
 
   // Default constructor simply allows everything.
   StatsMatcherImpl() = default;

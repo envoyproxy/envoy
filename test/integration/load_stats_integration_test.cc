@@ -1,10 +1,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/endpoint/v3/load_report.pb.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
+#include "envoy/type/v3/http.pb.h"
 
 #include "source/common/common/base64.h"
 
@@ -16,6 +18,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -106,9 +110,12 @@ public:
     HttpIntegrationTest::createUpstreams();
   }
 
-  void initialize() override {
+  void initialize() override { initialize(false); }
+
+  void initialize(bool active_health_check) {
     setUpstreamCount(upstream_endpoints_);
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this, active_health_check](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup load reporting and corresponding gRPC cluster.
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
       loadstats_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -134,6 +141,17 @@ public:
       eds_cluster_config->mutable_eds_config()->mutable_path_config_source()->set_path(
           eds_helper_.edsPath());
       eds_cluster_config->set_service_name("service_name_0");
+      if (active_health_check) {
+        auto* health_check = cluster_0->add_health_checks();
+        health_check->mutable_timeout()->set_seconds(1);
+        health_check->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::SecondsToDuration(2));
+        health_check->mutable_no_traffic_interval()->CopyFrom(
+            Protobuf::util::TimeUtil::SecondsToDuration(2));
+        health_check->mutable_unhealthy_threshold()->set_value(1);
+        health_check->mutable_healthy_threshold()->set_value(1);
+        health_check->mutable_http_health_check()->set_path("/healthcheck");
+        health_check->mutable_http_health_check()->set_codec_client_type(envoy::type::v3::HTTP1);
+      }
       if (locality_weighted_lb_) {
         cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
       }
@@ -161,6 +179,22 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = fake_loadstats_connection_->waitForNewStream(*dispatcher_, loadstats_stream_);
     RELEASE_ASSERT(result, result.message());
+  }
+
+  void respondToHealthCheck(uint32_t endpoint_index, FakeHttpConnectionPtr& connection,
+                            uint32_t response_code) {
+    if (!connection) {
+      const auto result =
+          service_upstream_[endpoint_index]->waitForHttpConnection(*dispatcher_, connection);
+      RELEASE_ASSERT(result, result.message());
+    }
+    auto result = connection->waitForNewStream(*dispatcher_, health_check_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = health_check_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+    EXPECT_EQ("/healthcheck", health_check_request_->headers().getPathValue());
+    health_check_request_->encodeHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", std::to_string(response_code)}}, true);
   }
 
   void mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
@@ -227,6 +261,27 @@ public:
               upstream_locality_stats->total_issued_requests() +
               local_upstream_locality_stats.total_issued_requests());
           // Unlike most stats, current requests in progress replaces old requests in progress.
+
+          // Merge load_metric_stats.
+          for (int k = 0; k < local_upstream_locality_stats.load_metric_stats_size(); ++k) {
+            const auto& local_metric = local_upstream_locality_stats.load_metric_stats(k);
+            bool found_metric = false;
+            for (int l = 0; l < upstream_locality_stats->load_metric_stats_size(); ++l) {
+              auto* metric = upstream_locality_stats->mutable_load_metric_stats(l);
+              if (metric->metric_name() == local_metric.metric_name()) {
+                found_metric = true;
+                metric->set_num_requests_finished_with_metric(
+                    metric->num_requests_finished_with_metric() +
+                    local_metric.num_requests_finished_with_metric());
+                metric->set_total_metric_value(metric->total_metric_value() +
+                                               local_metric.total_metric_value());
+                break;
+              }
+            }
+            if (!found_metric) {
+              upstream_locality_stats->add_load_metric_stats()->CopyFrom(local_metric);
+            }
+          }
           break;
         }
       }
@@ -368,7 +423,7 @@ public:
     loadstats_response.set_report_endpoint_granularity(report_endpoint_granularity);
     loadstats_stream_->sendGrpcMessage(loadstats_response);
     // Wait until the request has been received by Envoy.
-    test_server_->waitForCounterGe("load_reporter.requests", ++load_requests_);
+    test_server_->waitForCounter("load_reporter.requests", Ge(++load_requests_));
   }
 
   envoy::config::endpoint::v3::UpstreamLocalityStats localityStats(const std::string& sub_zone,
@@ -427,6 +482,7 @@ public:
     initiateClientConnection();
     waitForUpstreamResponse(endpoint_index, response_code, send_orca_load_report);
     cleanupUpstreamAndDownstream();
+    test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
   }
 
   void updateDropOverloadConfig() {
@@ -448,6 +504,7 @@ public:
   std::string sub_zone_{"winter"};
   FakeHttpConnectionPtr fake_loadstats_connection_;
   FakeStreamPtr loadstats_stream_;
+  FakeStreamPtr health_check_request_;
   FakeUpstream* load_report_upstream_{};
   FakeUpstream* service_upstream_[upstream_endpoints_]{};
   uint32_t load_requests_{};
@@ -456,12 +513,39 @@ public:
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
-  const uint32_t load_report_interval_ms_ = 500;
+  const uint32_t load_report_interval_ms_ = 1000;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS,
                          Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(LoadStatsIntegrationTest, EmptyLocalityAfterHealthCheckFailure) {
+  initialize(true);
+
+  FakeHttpConnectionPtr winter_connection;
+  FakeHttpConnectionPtr dragon_connection;
+
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+
+  // The load report upstream is index 0, so these health checks target service upstreams 0 and 1.
+  updateClusterLoadAssignment({{0}}, {{1}}, {}, {});
+  respondToHealthCheck(0, winter_connection, 200);
+  respondToHealthCheck(1, dragon_connection, 200);
+  test_server_->waitForGauge("cluster.cluster_0.membership_healthy", Eq(2));
+
+  // EDS removes the dragon endpoint, but active health checking retains it until it fails.
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(2));
+  respondToHealthCheck(1, dragon_connection, 503);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(1));
+
+  requestLoadStatsResponse({"cluster_0"});
+  ASSERT_TRUE(waitForLoadStatsRequest({}, 0, false, true));
+  cleanupLoadStatsConnection();
+}
 
 // Validate the load reports for successful requests as cluster membership
 // changes.
@@ -512,7 +596,7 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   // Change to 50/50 for the failover clusters.
   updateClusterLoadAssignment({}, {}, {{3}}, {{4}});
   requestLoadStatsResponse({"cluster_0"});
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(2));
 
   for (uint32_t i = 0; i < 4; ++i) {
     sendAndReceiveUpstream(i % 2 + 3);
@@ -706,9 +790,9 @@ TEST_P(LoadStatsIntegrationTest, InProgressThenSuccess) {
   waitForUpstreamResponse(0, 200);
 
   // Second window:
-  // rq_issued=0, rq_active=0. Stats NOT sent for the locality.
-  // We expect cluster stats to be present but with empty locality stats.
-  ASSERT_TRUE(waitForLoadStatsRequest({}, 0, false, true));
+  // rq_success=1. Stats are sent for the locality.
+  ASSERT_TRUE(
+      waitForLoadStatsRequest({localityStats("winter", /*success*/ 1, 0, 0, 0)}, 0, false, true));
 
   cleanupUpstreamAndDownstream();
   cleanupLoadStatsConnection();
@@ -727,19 +811,15 @@ TEST_P(LoadStatsIntegrationTest, RequestActiveForMultipleWindows) {
   // First window: stats should be sent because rq_issued=1, rq_active=1.
   ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 1)}));
 
-  // Second window: request is still active.
-  // Stats ARE sent because rq_active=1 and the runtime feature
-  // "envoy.reloadable_features.report_load_when_rq_active_is_non_zero" is
-  // enabled by default.
-  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 0, 0, 1, 0)}));
-
   // Finish the request now
   waitForUpstreamResponse(0, 200);
 
-  // Third window: Stats are NOT sent because rq_issued=0 and rq_active=0.
-  // Even though rq_success=1, it is not checked by the current logic.
-  // This demonstrates that success/error stats are lost if no new requests are
-  // issued in the window.
+  // Second window: rq_active=0 and rq_success=1. Stats ARE sent for the locality because of the
+  // rq_success=1.
+  ASSERT_TRUE(
+      waitForLoadStatsRequest({localityStats("winter", /*success*/ 1, 0, 0, 0)}, 0, false, true));
+
+  // Third window: rq_success=0. Stats are NOT sent for the locality.
   ASSERT_TRUE(waitForLoadStatsRequest({}, 0, false, true));
 
   cleanupUpstreamAndDownstream();
@@ -857,7 +937,7 @@ TEST_P(LoadStatsIntegrationTest, SuccessWithCustomMetrics) {
   // Change to 50/50 for the failover clusters.
   updateClusterLoadAssignment({}, {}, {{3}}, {{4}});
   requestLoadStatsResponse({"cluster_0"});
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(2));
 
   for (uint32_t i = 0; i < 4; ++i) {
     sendAndReceiveUpstream(i % 2 + 3, 200, true);
@@ -981,7 +1061,7 @@ TEST_P(LoadStatsIntegrationTest, EndpointLevelStatsReportingSuccessAndFailure) {
   // Configure cluster_0 with one endpoint (service_upstream_[0], which is fake_upstreams_[1])
   // in the "winter" locality.
   updateClusterLoadAssignment({{0}}, {}, {}, {});
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 1);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(1));
 
   sendAndReceiveUpstream(0, 200, false /*send_orca_load_report*/);
   sendAndReceiveUpstream(0, 503, false /*send_orca_load_report*/);
@@ -1008,6 +1088,57 @@ TEST_P(LoadStatsIntegrationTest, EndpointLevelStatsReportingSuccessAndFailure) {
   EXPECT_EQ(2, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
+  cleanupLoadStatsConnection();
+}
+
+// Validate that load reports are sent when only a successful request occurs within the interval.
+TEST_P(LoadStatsIntegrationTest, ReportLoadForNonZeroStatsSuccessOnly) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.report_load_for_non_zero_stats",
+                                    "true");
+  initialize();
+
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+
+  requestLoadStatsResponse({"cluster_0"});
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+
+  sendAndReceiveUpstream(0, 200);
+
+  ASSERT_TRUE(waitForLoadStatsRequest({localityStats("winter", 1, 0, 0, 1)}));
+
+  // In the next interval, there are no new requests and no active requests, so no report is sent.
+  cleanupLoadStatsConnection();
+}
+
+// Validate that load reports are sent when only a custom metric is present.
+TEST_P(LoadStatsIntegrationTest, ReportLoadForNonZeroStatsCustomMetricOnly) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.report_load_for_non_zero_stats",
+                                    "true");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster_0->add_lrs_report_endpoint_metrics("cpu_utilization");
+  });
+  initialize();
+
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+
+  requestLoadStatsResponse({"cluster_0"});
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+
+  sendAndReceiveUpstream(0, 200, true);
+
+  auto expected_uls = localityStats("winter", 1, 0, 0, 1);
+  auto* metric = expected_uls.add_load_metric_stats();
+  metric->set_metric_name("cpu_utilization");
+  metric->set_num_requests_finished_with_metric(1);
+  metric->set_total_metric_value(0.3);
+  ASSERT_TRUE(waitForLoadStatsRequest({expected_uls}));
+
+  // In the next interval, there are no new requests and no custom metrics, so no report is sent.
   cleanupLoadStatsConnection();
 }
 

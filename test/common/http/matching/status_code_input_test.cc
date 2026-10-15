@@ -1,4 +1,5 @@
 #include "envoy/http/filter.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/http/matching/status_code_input.h"
@@ -37,7 +38,7 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
   {
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
@@ -52,7 +53,7 @@ TEST(MatchingData, HttpResponseStatusCodeInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
 }
 
@@ -65,7 +66,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
   {
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
   {
     TestResponseHeaderMapImpl response_headers({{"header", "bar"}});
@@ -109,7 +110,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
   {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
@@ -117,7 +118,7 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
   }
   {
     TestResponseHeaderMapImpl response_headers({{"not-header", "baz"}});
@@ -125,7 +126,61 @@ TEST(MatchingData, HttpResponseStatusCodeClassInput) {
     data.onResponseHeaders(response_headers);
     auto result = input.get(data);
     EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
-    EXPECT_EQ(result.stringData(), absl::nullopt);
+    EXPECT_EQ(result.stringData(), std::nullopt);
+  }
+}
+
+TEST(MatchingData, HttpResponseLocalReplyInputNoDetails) {
+  HttpResponseLocalReplyInput input;
+  StreamInfo::StreamInfoImpl stream_info(
+      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connectionInfoProvider(),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  HttpMatchingDataImpl data(stream_info);
+
+  auto result = input.get(data);
+  EXPECT_EQ(result.availability(), Matcher::DataAvailability::NotAvailable);
+  EXPECT_EQ(result.stringData(), std::nullopt);
+}
+
+TEST(MatchingData, HttpResponseLocalReplyInputUpstreamResponse) {
+  HttpResponseLocalReplyInput input;
+  StreamInfo::StreamInfoImpl stream_info(
+      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connectionInfoProvider(),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  HttpMatchingDataImpl data(stream_info);
+
+  stream_info.setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+  auto result = input.get(data);
+  EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "false");
+}
+
+TEST(MatchingData, HttpResponseLocalReplyInputLocalReply) {
+  HttpResponseLocalReplyInput input;
+  StreamInfo::StreamInfoImpl stream_info(
+      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connectionInfoProvider(),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  HttpMatchingDataImpl data(stream_info);
+
+  stream_info.setResponseCodeDetails("route_not_found");
+  auto result = input.get(data);
+  EXPECT_EQ(result.availability(), Matcher::DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.stringData().value(), "true");
+}
+
+TEST(MatchingData, HttpResponseLocalReplyInputVariousLocalDetails) {
+  HttpResponseLocalReplyInput input;
+  StreamInfo::StreamInfoImpl stream_info(
+      Http::Protocol::Http2, Event::GlobalTimeSystem().timeSystem(), connectionInfoProvider(),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  HttpMatchingDataImpl data(stream_info);
+
+  // Verify multiple local reply detail strings are correctly identified.
+  for (const auto& details :
+       {"direct_response", "cluster_not_found", "maintenance_mode", "request_timeout"}) {
+    stream_info.setResponseCodeDetails(details);
+    auto result = input.get(data);
+    EXPECT_EQ(result.stringData().value(), "true") << "Failed for details: " << details;
   }
 }
 

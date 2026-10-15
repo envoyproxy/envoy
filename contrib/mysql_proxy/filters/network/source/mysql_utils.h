@@ -8,11 +8,45 @@
 #include "source/common/common/logger.h"
 
 #include "contrib/mysql_proxy/filters/network/source/mysql_codec.h"
+#include "openssl/crypto.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
+
+// Secure memory buffer that is guaranteed to be zeroed on destruction
+// via OPENSSL_cleanse, preventing password leakage in memory.
+class SecureBytes {
+public:
+  explicit SecureBytes(size_t len) : data_(new uint8_t[len]), len_(len) {}
+
+  ~SecureBytes() {
+    if (data_ != nullptr) {
+      OPENSSL_cleanse(data_, len_);
+      delete[] data_;
+    }
+  }
+
+  SecureBytes(const SecureBytes&) = delete;
+  SecureBytes& operator=(const SecureBytes&) = delete;
+
+  SecureBytes(SecureBytes&& other) noexcept : data_(other.data_), len_(other.len_) {
+    other.data_ = nullptr;
+    other.len_ = 0;
+  }
+
+  uint8_t* data() { return data_; }
+  const uint8_t* data() const { return data_; }
+  size_t size() const { return len_; }
+
+  uint8_t operator[](size_t i) const { return data_[i]; }
+  uint8_t& operator[](size_t i) { return data_[i]; }
+
+private:
+  uint8_t* data_{nullptr};
+  size_t len_{0};
+};
 
 /**
  * IO helpers for reading/writing MySQL data from/to a buffer.
@@ -50,6 +84,11 @@ public:
   static DecodeStatus peekUint8(Buffer::Instance& buffer, uint8_t& val);
   static void consumeHdr(Buffer::Instance& buffer);
   static DecodeStatus peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq);
+
+  // Read `len` bytes from buffer into a SecureBytes object backed by guarded memory,
+  // then zero the original data in the buffer to prevent password leakage.
+  static DecodeStatus readSecureBytes(Buffer::Instance& buffer, size_t len,
+                                      std::unique_ptr<SecureBytes>& out);
 };
 
 } // namespace MySQLProxy

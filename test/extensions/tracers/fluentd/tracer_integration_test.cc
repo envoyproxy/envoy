@@ -4,7 +4,6 @@
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"

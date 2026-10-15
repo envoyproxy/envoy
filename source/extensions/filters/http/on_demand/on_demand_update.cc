@@ -53,7 +53,7 @@ DecodeHeadersBehaviorPtr DecodeHeadersBehavior::cdsRds(Upstream::OdCdsApiHandleP
 
 namespace {
 
-DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
+absl::StatusOr<DecodeHeadersBehaviorPtr> createDecodeHeadersBehavior(
     OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds> odcds_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor) {
   if (!odcds_config.has_value()) {
@@ -65,10 +65,10 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
     // For xDS-TP based configs, both the odcds_config->source and
     // odcds_config->resources_locator must be empty.
     if (!odcds_config->has_source() && odcds_config->resources_locator().empty()) {
-      odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
-                                                        odcds_config->source(), absl::nullopt,
-                                                        validation_visitor),
-                                    Upstream::OdCdsApiHandlePtr);
+      auto odcds_or = cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
+                                          odcds_config->source(), std::nullopt, validation_visitor);
+      RETURN_IF_NOT_OK_REF(odcds_or.status());
+      odcds = std::move(odcds_or.value());
     }
   }
   // TODO(adisuissa): Once the
@@ -77,31 +77,28 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
   // (odcds_config->resources_locator().empty())").
   if (odcds == nullptr) {
     if (odcds_config->resources_locator().empty()) {
-      // If the config-source is ADS, use a singleton-subscription mechanism,
-      // similar to xDS-TP based configs.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_over_ads_fix")) {
-        if (odcds_config->source().config_source_specifier_case() ==
-            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
-          odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
-                                                            odcds_config->source(), absl::nullopt,
-                                                            validation_visitor),
-                                        Upstream::OdCdsApiHandlePtr);
-        }
-      }
-      if (odcds == nullptr) {
-        odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
-                                                          odcds_config->source(), absl::nullopt,
-                                                          validation_visitor),
-                                      Upstream::OdCdsApiHandlePtr);
+      if (odcds_config->source().config_source_specifier_case() ==
+          envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
+        // If the config-source is ADS, use a singleton-subscription mechanism,
+        // similar to xDS-TP based configs.
+        auto odcds_or =
+            cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create, odcds_config->source(),
+                                std::nullopt, validation_visitor);
+        RETURN_IF_NOT_OK_REF(odcds_or.status());
+        odcds = std::move(odcds_or.value());
+      } else {
+        auto odcds_or = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(),
+                                            std::nullopt, validation_visitor);
+        RETURN_IF_NOT_OK_REF(odcds_or.status());
+        odcds = std::move(odcds_or.value());
       }
     } else {
-      auto locator = THROW_OR_RETURN_VALUE(
-          Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
-          xds::core::v3::ResourceLocator);
-      odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
-                                                        odcds_config->source(), locator,
-                                                        validation_visitor),
-                                    Upstream::OdCdsApiHandlePtr);
+      auto locator_or = Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator());
+      RETURN_IF_NOT_OK_REF(locator_or.status());
+      auto odcds_or = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(),
+                                          locator_or.value(), validation_visitor);
+      RETURN_IF_NOT_OK_REF(odcds_or.status());
+      odcds = std::move(odcds_or.value());
     }
   }
   // If changing the default timeout, please update the documentation in on_demand.proto too.
@@ -114,7 +111,7 @@ template <typename ProtoConfig>
 OptRef<const envoy::extensions::filters::http::on_demand::v3::OnDemandCds>
 getOdCdsConfig(const ProtoConfig& proto_config) {
   if (!proto_config.has_odcds()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return proto_config.odcds();
 }
@@ -126,15 +123,23 @@ OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(
-          createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)) {}
+    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+    absl::Status& creation_status) {
+  auto behavior_or =
+      createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
+  SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
+  behavior_ = std::move(behavior_or.value());
+}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(
-          createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)) {}
+    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+    absl::Status& creation_status) {
+  auto behavior_or =
+      createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
+  SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
+  behavior_ = std::move(behavior_or.value());
+}
 
 OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
     : config_(std::move(config)) {
@@ -145,7 +150,7 @@ OnDemandRouteUpdate::OnDemandRouteUpdate(OnDemandFilterConfigSharedPtr config)
 }
 
 OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
-  if (auto route = callbacks_->route(); route != nullptr) {
+  if (auto route = callbacks_->route(); route) {
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return *route;
   }
@@ -158,7 +163,7 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   callbacks_->downstreamCallbacks()->requestRouteConfigUpdate(route_config_updated_callback_);
   // decodeHeaders() is completed.
   decode_headers_active_ = false;
-  return makeOptRefFromPtr(callbacks_->route().get());
+  return callbacks_->route();
 }
 
 Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&,
@@ -174,7 +179,7 @@ Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeader
 void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
                                             Upstream::OdCdsApiHandle& odcds,
                                             std::chrono::milliseconds timeout) {
-  if (callbacks_->clusterInfo() != nullptr) {
+  if (callbacks_->clusterInfo().has_value()) {
     // Cluster already exists, so nothing to do here.
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return;
@@ -245,14 +250,41 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
-  bool can_recreate_stream = false;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.on_demand_track_end_stream")) {
-    // New behavior: track end_stream state to support stream recreation with fully read bodies.
-    can_recreate_stream = downstream_end_stream_;
-  } else {
-    // Old behavior: reject all requests with bodies.
-    can_recreate_stream = !callbacks_->decodingBuffer();
+  // VHDS only reports that the virtual host exists. If none of its routes match the request,
+  // requesting the same virtual host again cannot resolve one, so let the router reply instead.
+  const bool require_route_match = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.on_demand_vhds_require_route_match");
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.on_demand_vhds_no_recreate_stream")) {
+    // Continue the existing stream so the decoder filters before on_demand do not run again.
+    // Refreshing the route config snapshot lets the router see the newly discovered virtual host,
+    // and re-running decodeHeaders() starts on-demand CDS if the resolved cluster is unknown. In
+    // that case onClusterDiscoveryCompletion() resumes the stream.
+    if (route_exists) {
+      callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
+      callbacks_->downstreamCallbacks()->clearRouteCache();
+      if (!require_route_match || callbacks_->route().has_value()) {
+        getConfig()->decodeHeadersBehavior().decodeHeaders(*this);
+        if (filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration) {
+          return;
+        }
+      }
+    }
+    callbacks_->continueDecoding();
+    return;
   }
+
+  if (route_exists && require_route_match) {
+    callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+    route_exists = callbacks_->route().has_value();
+  }
+
+  // Legacy behavior (guard disabled): recreate the stream so processing restarts from the
+  // beginning against the newly-discovered route.
+  // Track end_stream state to support stream recreation with fully read bodies.
+  const bool can_recreate_stream = downstream_end_stream_;
   if (route_exists &&        // route can be resolved after an on-demand
                              // VHDS update
       can_recreate_stream && // Redirects require fully read body.
@@ -275,18 +307,15 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     // Whether or not the cluster exists, we continue decoding. Filters further down the
     // chain may want to weigh in on cluster selection, so we don't send a local reply
     // here.
+    if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
+      callbacks_->downstreamCallbacks()->recreateClusterInfo();
+    }
     callbacks_->continueDecoding();
     return;
   }
 
-  bool can_recreate_stream = false;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.on_demand_track_end_stream")) {
-    // New behavior: track end_stream state to support stream recreation with fully read bodies.
-    can_recreate_stream = downstream_end_stream_;
-  } else {
-    // Old behavior: reject all requests with bodies.
-    can_recreate_stream = !callbacks_->decodingBuffer();
-  }
+  // Track end_stream state to support stream recreation with fully read bodies.
+  const bool can_recreate_stream = downstream_end_stream_;
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available && can_recreate_stream) {
     // Redirects require fully read body.
     const Http::ResponseHeaderMap* headers = nullptr;
@@ -298,6 +327,9 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
 
   // Cluster still does not exist or we did not recreate the stream. Either way,
   // continue with the filter chain.
+  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
+    callbacks_->downstreamCallbacks()->recreateClusterInfo();
+  }
   callbacks_->continueDecoding();
 }
 

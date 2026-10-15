@@ -1,11 +1,13 @@
 #include <sys/types.h>
 
 #include "envoy/common/exception.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
+#include "source/extensions/tracers/opentelemetry/trace_exporter.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -14,6 +16,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -34,10 +37,63 @@ public:
   MOCK_METHOD(Resource, getResource,
               (const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
                    resource_detectors,
-               Server::Configuration::ServerFactoryContext& context,
-               absl::string_view service_name),
+               Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+               const ResourceProviderOptions& options),
               (const));
 };
+
+namespace {
+
+class DummyTraceExporter : public OpenTelemetryTraceExporter {
+public:
+  bool log(const ExportTraceServiceRequest& /*request*/) override {
+    logged_count_++;
+    return true;
+  }
+
+  inline static std::atomic<uint32_t> logged_count_{0};
+};
+
+class DummyTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
+public:
+  absl::StatusOr<OpenTelemetryTraceExporterPtr>
+  createExporter(const Protobuf::Message& config,
+                 Server::Configuration::TracerFactoryContext& /*context*/) const override {
+    EXPECT_NE(Envoy::Protobuf::DynamicCastMessage<Protobuf::Empty>(&config), nullptr);
+    return std::make_unique<DummyTraceExporter>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Empty>();
+  }
+
+  std::string name() const override {
+    return "envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test";
+  }
+};
+
+REGISTER_FACTORY(DummyTraceExporterFactory, OpenTelemetryTraceExporterFactory);
+
+class NullTraceExporterFactory : public OpenTelemetryTraceExporterFactory {
+public:
+  absl::StatusOr<OpenTelemetryTraceExporterPtr>
+  createExporter(const Protobuf::Message& /*config*/,
+                 Server::Configuration::TracerFactoryContext& /*context*/) const override {
+    return OpenTelemetryTraceExporterPtr(nullptr);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Duration>();
+  }
+
+  std::string name() const override {
+    return "envoy.tracers.opentelemetry.exporters.null_tracer_test";
+  }
+};
+
+REGISTER_FACTORY(NullTraceExporterFactory, OpenTelemetryTraceExporterFactory);
+
+} // namespace
 
 class OpenTelemetryDriverTest : public testing::Test {
 public:
@@ -59,7 +115,7 @@ public:
     resource.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
 
     auto mock_resource_provider = NiceMock<MockResourceProvider>();
-    EXPECT_CALL(mock_resource_provider, getResource(_, _, _)).WillRepeatedly(Return(resource));
+    EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _)).WillRepeatedly(Return(resource));
 
     driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
   }
@@ -95,6 +151,36 @@ public:
     setup(opentelemetry_config);
   }
 
+  void setupValidDriverWithAlwaysOnSampler() {
+    const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    sampler:
+      name: envoy.tracers.opentelemetry.samplers.always_on
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+    )EOF";
+    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+    setup(opentelemetry_config);
+  }
+
+  void setupValidDriverWithCustomExporter() {
+    const std::string yaml_string = R"EOF(
+    exporter:
+      name: envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Empty
+    )EOF";
+    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+    setup(opentelemetry_config);
+  }
+
 protected:
   const std::string operation_name_{"test"};
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
@@ -116,14 +202,312 @@ TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
   EXPECT_NE(driver_, nullptr);
 }
 
+// Tests the tracer initialization with the custom exporter
+TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfigCustomExporter) {
+  setupValidDriverWithCustomExporter();
+  EXPECT_NE(driver_, nullptr);
+}
+
+// Tests exporting a span with custom exporter
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanCustomExporter) {
+  DummyTraceExporter::logged_count_ = 0;
+  setupValidDriverWithCustomExporter();
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .WillRepeatedly(Return(1));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span, nullptr);
+
+  span->finishSpan();
+
+  EXPECT_EQ(1U, DummyTraceExporter::logged_count_);
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
 // Tests the tracer initialization with the HTTP exporter
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfigHttpExporter) {
   setupValidDriverWithHttpExporter();
   EXPECT_NE(driver_, nullptr);
 }
 
-// Verifies that the tracer cannot be configured with two exporters at the same time
-TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
+// Verifies that set_telemetry_sdk_resource_attributes=false is passed to ResourceProvider
+TEST_F(OpenTelemetryDriverTest, PassSetTelemetrySdkResourceAttributesFalse) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    set_telemetry_sdk_resource_attributes: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  mock_client_ = mock_client.get();
+  ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillByDefault(Return(ByMove(std::move(mock_client))));
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+
+  ResourceProviderOptions expected_options;
+  expected_options.set_telemetry_sdk_resource_attributes = false;
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
+      .WillOnce(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
+}
+
+// Verifies that set_telemetry_sdk_resource_attributes defaults to true
+TEST_F(OpenTelemetryDriverTest, PassSetTelemetrySdkResourceAttributesDefaultTrue) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  mock_client_ = mock_client.get();
+  ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillByDefault(Return(ByMove(std::move(mock_client))));
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+
+  ResourceProviderOptions expected_options;
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
+      .WillOnce(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
+}
+
+// Verifies that set_service_name_resource_attribute=false is passed to ResourceProvider
+TEST_F(OpenTelemetryDriverTest, PassSetServiceNameResourceAttributeFalse) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    set_service_name_resource_attribute: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  mock_client_ = mock_client.get();
+  ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillByDefault(Return(ByMove(std::move(mock_client))));
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+
+  ResourceProviderOptions expected_options;
+  expected_options.set_service_name_resource_attribute = false;
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
+      .WillOnce(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
+}
+
+// Verifies that set_service_name_resource_attribute defaults to true
+TEST_F(OpenTelemetryDriverTest, PassSetServiceNameResourceAttributeDefaultTrue) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
+  mock_client_ = mock_client.get();
+  ON_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillByDefault(Return(ByMove(std::move(mock_client))));
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+
+  ResourceProviderOptions expected_options;
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, expected_options))
+      .WillOnce(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
+}
+
+// Verifies that set_instrumentation_scope=false omits scope name and version
+TEST_F(OpenTelemetryDriverTest, SetInstrumentationScopeFalse) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    set_instrumentation_scope: false
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  setup(opentelemetry_config);
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             "test", {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span, nullptr);
+
+  constexpr absl::string_view request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
+  scope_spans:
+    scope: {{}}
+    spans:
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      flags: 257
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(absl::HexStringToBytes(span->getTraceId()));
+  expected_span->set_span_id(absl::HexStringToBytes(span->getSpanId()));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(
+      *mock_client_,
+      sendRaw(_, _, Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies that when a gRPC async client fails to initialize, spans are dropped
+// gracefully and spans_dropped metric is incremented.
+TEST_F(OpenTelemetryDriverTest, UnconfiguredExporterIncrementsSpansDropped) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
+  EXPECT_CALL(*mock_client_factory, createUncachedRawAsyncClient())
+      .WillOnce(Return(absl::InternalError("gRPC client creation failed")));
+
+  auto& factory_context = context_.server_factory_context_;
+  ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
+      .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
+  ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
+
+  Resource resource;
+  auto mock_resource_provider = NiceMock<MockResourceProvider>();
+  EXPECT_CALL(mock_resource_provider, getResource(_, _, _, _)).WillRepeatedly(Return(resource));
+
+  driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .WillRepeatedly(Return(1));
+
+  span->finishSpan();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies that when custom exporter factory returns nullptr, spans are dropped
+// gracefully and spans_dropped metric is incremented.
+TEST_F(OpenTelemetryDriverTest, NullCustomExporterIncrementsSpansDropped) {
+  const std::string yaml_string = R"EOF(
+    exporter:
+      name: envoy.tracers.opentelemetry.exporters.null_tracer_test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Duration
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  setup(opentelemetry_config);
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .WillRepeatedly(Return(1));
+
+  span->finishSpan();
+
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_dropped").value());
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies that the tracer cannot be configured with multiple exporters at the same time
+TEST_F(OpenTelemetryDriverTest, MultipleExportersConfigured) {
   const std::string yaml_string = R"EOF(
     grpc_service:
       envoy_grpc:
@@ -134,13 +518,50 @@ TEST_F(OpenTelemetryDriverTest, BothGrpcAndHttpExportersConfigured) {
         cluster: "my_o11y_backend"
         uri: "https://some-o11y.com/otlp/v1/traces"
         timeout: 0.250s
+    exporter:
+      name: envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Empty
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(opentelemetry_config), EnvoyException,
+      "OpenTelemetry Tracer must have exactly one of gRPC, HTTP, or custom exporter configured.");
+  EXPECT_EQ(driver_, nullptr);
+}
+
+// Verifies that an exception is thrown when an unknown custom exporter factory
+// is configured
+TEST_F(OpenTelemetryDriverTest, CustomExporterFactoryNotFound) {
+  const std::string yaml_string = R"EOF(
+    exporter:
+      name: envoy.tracers.opentelemetry.exporters.unknown
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Timestamp
     )EOF";
   envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
   TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
 
   EXPECT_THROW_WITH_MESSAGE(setup(opentelemetry_config), EnvoyException,
-                            "OpenTelemetry Tracer cannot have both gRPC and HTTP exporters "
-                            "configured. OpenTelemetry tracer will be disabled.");
+                            "OpenTelemetry trace exporter factory not found: "
+                            "'envoy.tracers.opentelemetry.exporters.unknown'");
+  EXPECT_EQ(driver_, nullptr);
+}
+
+// Verifies that an exception is thrown when an invalid opaque configuration is
+// provided to a custom exporter factory.
+TEST_F(OpenTelemetryDriverTest, CustomExporterInvalidOpaqueConfig) {
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  auto* exporter = opentelemetry_config.mutable_exporter();
+  exporter->set_name("envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test");
+  exporter->mutable_typed_config()->set_type_url("type.googleapis.com/google.protobuf.Empty");
+  exporter->mutable_typed_config()->set_value("invalid_protobuf_data_\xff\xff");
+
+  EXPECT_THROW_WITH_REGEX(setup(opentelemetry_config), EnvoyException,
+                          ".*Failed to translate opaque config for "
+                          "OpenTelemetry trace exporter factory "
+                          "'envoy.tracers.opentelemetry.exporters.dummy_tracer_impl_test'.*");
   EXPECT_EQ(driver_, nullptr);
 }
 
@@ -216,6 +637,7 @@ resource_spans:
       start_time_unix_nano: {}
       end_time_unix_nano: {}
       trace_state: "test=foo"
+      flags: 769
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   SystemTime timestamp = time_system_.systemTime();
@@ -478,6 +900,64 @@ TEST_F(OpenTelemetryDriverTest, SpawnChildSpan) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies the OTLP span flags field is populated per the OTLP spec: bits 0-7 carry the W3C
+// trace flags (bit 0: sampled), bit 8 records that the parent-remoteness is known, and bit 9
+// records whether the parent span context was remote.
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanFlags) {
+  setupValidDriver();
+
+  constexpr uint32_t sampled_flag = 0x1;
+  constexpr uint32_t has_is_remote_flag = static_cast<uint32_t>(
+      ::opentelemetry::proto::trace::v1::SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK);
+  constexpr uint32_t is_remote_flag =
+      static_cast<uint32_t>(::opentelemetry::proto::trace::v1::SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK);
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  {
+    // A sampled root span has no remote parent.
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    span->finishSpan();
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().flags(),
+              has_is_remote_flag | sampled_flag);
+  }
+  {
+    // An unsampled span still records that the parent-remoteness is known.
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    span->setSampled(false);
+    span->finishSpan();
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().flags(), has_is_remote_flag);
+  }
+  {
+    // A span spawned from another local span has a local parent.
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    Tracing::SpanPtr child_span =
+        span->spawnChild(mock_tracing_config_, operation_name_, time_system_.systemTime());
+    child_span->finishSpan();
+    EXPECT_EQ(dynamic_cast<Span*>(child_span.get())->spanForTest().flags(),
+              has_is_remote_flag | sampled_flag);
+  }
+  {
+    // A span continuing a trace from an extracted traceparent header has a remote parent.
+    Tracing::TestTraceContextImpl request_headers_with_parent{
+        {":authority", "test.com"},
+        {":path", "/"},
+        {":method", "GET"},
+        {"traceparent", "00-0000000000000000000000000000000a-"
+                        "000000000000000a-01"}};
+    Tracing::SpanPtr span =
+        driver_->startSpan(mock_tracing_config_, request_headers_with_parent, stream_info_,
+                           operation_name_, {Tracing::Reason::Sampling, true});
+    span->finishSpan();
+    EXPECT_EQ(dynamic_cast<Span*>(span.get())->spanForTest().flags(),
+              has_is_remote_flag | is_remote_flag | sampled_flag);
+  }
+}
+
 // Verifies the span types
 TEST_F(OpenTelemetryDriverTest, SpanType) {
   // Set up driver
@@ -646,6 +1126,7 @@ resource_spans:
       kind: SPAN_KIND_SERVER
       start_time_unix_nano: {}
       end_time_unix_nano: {}
+      flags: 257
       attributes:
         - key: "first_tag_name"
           value:
@@ -653,6 +1134,299 @@ resource_spans:
         - key: "second_tag_name"
           value:
             string_value: "second_tag_value"
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(
+      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
+  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(
+      *mock_client_,
+      sendRaw(_, _, Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies typed span attributes are exported as native OTLP values
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithTypedAttributes) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  int64_t generated_int = 1;
+  EXPECT_CALL(mock_random_generator_, random()).Times(3).WillRepeatedly(Return(generated_int));
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  span->setTypedTag("int_tag", "42", Tracing::TagValueType::Int);
+  span->setTypedTag("double_tag", "3.5", Tracing::TagValueType::Double);
+  span->setTypedTag("bool_tag", "true", Tracing::TagValueType::Bool);
+  span->setTypedTag("string_tag", "hello", Tracing::TagValueType::String);
+  // A value that does not parse to the requested type falls back to a string attribute.
+  span->setTypedTag("fallback_tag", "not-a-number", Tracing::TagValueType::Int);
+
+  constexpr absl::string_view request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
+  scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
+    spans:
+      trace_id: "AAA"
+      span_id: "AAA"
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      flags: 257
+      attributes:
+        - key: "int_tag"
+          value:
+            int_value: 42
+        - key: "double_tag"
+          value:
+            double_value: 3.5
+        - key: "bool_tag"
+          value:
+            bool_value: true
+        - key: "string_tag"
+          value:
+            string_value: "hello"
+        - key: "fallback_tag"
+          value:
+            string_value: "not-a-number"
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(
+      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
+  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(
+      *mock_client_,
+      sendRaw(_, _, Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBatchAttributes) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  int64_t generated_int = 1;
+  EXPECT_CALL(mock_random_generator_, random()).Times(3).WillRepeatedly(Return(generated_int));
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  span->reserveTags(2);
+  span->setTag("first_tag_name", "first_tag_value");
+  span->setTag("second_tag_name", "second_tag_value");
+
+  constexpr absl::string_view request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
+  scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
+    spans:
+      trace_id: "AAA"
+      span_id: "AAA"
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      flags: 257
+      attributes:
+        - key: "first_tag_name"
+          value:
+            string_value: "first_tag_value"
+        - key: "second_tag_name"
+          value:
+            string_value: "second_tag_value"
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(
+      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
+  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(
+      *mock_client_,
+      sendRaw(_, _, Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies spans are exported with known HTTP method
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithKnownMethod) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  int64_t generated_int = 1;
+  EXPECT_CALL(mock_random_generator_, random()).Times(3).WillRepeatedly(Return(generated_int));
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  span->setTag("http.method", "GET");
+
+  constexpr absl::string_view request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
+  scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
+    spans:
+      trace_id: "AAA"
+      span_id: "AAA"
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      flags: 257
+      attributes:
+        - key: "http.method"
+          value:
+            string_value: "GET"
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
+  std::string generated_int_hex = Hex::uint64ToHex(generated_int);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(
+      absl::HexStringToBytes(absl::StrCat(generated_int_hex, generated_int_hex)));
+  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(generated_int_hex)));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(
+      *mock_client_,
+      sendRaw(_, _, Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies spans are exported with unknown HTTP method mapped to _OTHER
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithUnknownMethod) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  int64_t generated_int = 1;
+  EXPECT_CALL(mock_random_generator_, random()).Times(3).WillRepeatedly(Return(generated_int));
+  SystemTime timestamp = time_system_.systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  span->setTag("http.method", "PURGE");
+
+  constexpr absl::string_view request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      key: "service.name"
+      value:
+        string_value: "unknown_service:envoy"
+      key: "key1"
+      value:
+        string_value: "val1"
+  scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
+    spans:
+      trace_id: "AAA"
+      span_id: "AAA"
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      flags: 257
+      attributes:
+        - key: "http.method"
+          value:
+            string_value: "_OTHER"
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
@@ -719,6 +1493,7 @@ resource_spans:
       kind: SPAN_KIND_SERVER
       start_time_unix_nano: {}
       end_time_unix_nano: {}
+      flags: 257
       events:
         - name: event1
           time_unix_nano: 1000000
@@ -794,6 +1569,7 @@ resource_spans:
       kind: SPAN_KIND_SERVER
       start_time_unix_nano: {}
       end_time_unix_nano: {}
+      flags: 257
       status:
         code: STATUS_CODE_ERROR
       attributes:
@@ -878,6 +1654,7 @@ resource_spans:
       kind: SPAN_KIND_SERVER
       start_time_unix_nano: {}
       end_time_unix_nano: {}
+      flags: 257
       status:
         code: STATUS_CODE_ERROR
       attributes:
@@ -963,13 +1740,73 @@ TEST_F(OpenTelemetryDriverTest, UseLocalDecisionFalse) {
       {":method", "GET"},
       {"traceparent", "00-00000000000000010000000000000002-0000000000000003-01"}};
 
-  // The traceparent header indicates the span is sampled and the Envoy tracing decision is
-  // ignored.
+  // A propagated parent disables local-decision mode, but the request-entry tracing decision
+  // still acts as a final veto.
   Tracing::SpanPtr span =
       driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
                          {Tracing::Reason::NotTraceable, false});
   // The `useLocalDecision` should be false because there is a traceparent header in the request.
   EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, RootSpanWithAlwaysOnSamplerStillHonorsEnvoyDecision) {
+  setupValidDriverWithAlwaysOnSampler();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, PropagatedSpanWithAlwaysOnSamplerStillHonorsEnvoyDecision) {
+  setupValidDriverWithAlwaysOnSampler();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"},
+      {":path", "/"},
+      {":method", "GET"},
+      {"traceparent", "00-00000000000000010000000000000002-0000000000000003-01"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, AlwaysOnSamplerExportsWhenEnvoyDecisionAllowsTracing) {
+  setupValidDriverWithAlwaysOnSampler();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"},
+      {":path", "/"},
+      {":method", "GET"},
+      {"traceparent", "00-00000000000000010000000000000002-0000000000000003-01"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
@@ -979,28 +1816,65 @@ TEST_F(OpenTelemetryDriverTest, UseLocalDecisionFalse) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
-// Verifies tracer is "disabled" when no exporter is configured
-TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
-  const std::string yaml_string = "{}";
-  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
-  setup(opentelemetry_config);
-
+// Disabling the local decision keeps a setSampled(false) decision and drops the span.
+TEST_F(OpenTelemetryDriverTest, DisableLocalDecisionWithSampledFalse) {
+  setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
 
   Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
-  EXPECT_NE(span.get(), nullptr);
+  // The span starts on the local decision and is sampled because there is no traceparent header.
+  EXPECT_TRUE(span->useLocalDecision());
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
 
-  // Flush after a single span.
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
-      .Times(1)
-      .WillRepeatedly(Return(1));
-  // We should see a call to sendMessage to export that single span.
+  span->setSampled(false);
+  span->disableLocalDecision();
+  // Disabling the local decision stops the connection manager from re-deriving the decision.
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
   EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
   span->finishSpan();
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Disabling the local decision keeps a setSampled(true) decision and keeps the span.
+TEST_F(OpenTelemetryDriverTest, DisableLocalDecisionWithSampledTrue) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+  // The span starts on the local decision and is unsampled because there is no traceparent header.
+  EXPECT_TRUE(span->useLocalDecision());
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+
+  span->setSampled(true);
+  span->disableLocalDecision();
+  EXPECT_FALSE(span->useLocalDecision());
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Verifies tracer throws exception when no exporter is configured
+TEST_F(OpenTelemetryDriverTest, NoExporterConfigured) {
+  const std::string yaml_string = "{}";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  EXPECT_THROW_WITH_MESSAGE(setup(opentelemetry_config), EnvoyException,
+                            "OpenTelemetry Tracer must have exactly one of gRPC, HTTP, or custom "
+                            "exporter configured.");
+  EXPECT_EQ(driver_, nullptr);
 }
 
 // Verifies a custom service name is properly set on exported spans
@@ -1050,6 +1924,7 @@ resource_spans:
       kind: SPAN_KIND_SERVER
       start_time_unix_nano: {}
       end_time_unix_nano: {}
+      flags: 257
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();

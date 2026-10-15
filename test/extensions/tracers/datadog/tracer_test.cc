@@ -6,6 +6,7 @@
 #include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/tracer.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -159,12 +160,6 @@ TEST_F(DatadogTracerTest, SpanProperties) {
   EXPECT_EQ("envoy.proxy", dd_span.name());
   EXPECT_EQ("do.thing", dd_span.resource_name());
   EXPECT_EQ("envoy", dd_span.service_name());
-  // The sampling decision is deferred to injectContext()/finishSpan(), so
-  // the trace segment does not have it set immediately after startSpan().
-  // Verify it is applied after injecting context.
-  EXPECT_FALSE(dd_span.trace_segment().sampling_decision());
-  Tracing::TestTraceContextImpl inject_context{};
-  span->injectContext(inject_context, Tracing::UpstreamContext());
   ASSERT_TRUE(dd_span.trace_segment().sampling_decision());
   EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_DROP),
             dd_span.trace_segment().sampling_decision()->priority);
@@ -261,6 +256,59 @@ TEST_F(DatadogTracerTest, UseLocalDecisionFalse) {
   EXPECT_EQ(false, span->useLocalDecision());
 }
 
+TEST_F(DatadogTracerTest, FinalFlushBeforeThreadShutdown) {
+  // Destroying the thread local tracer sends the finished traces, then cancels
+  // the request when its HTTP client is shut down.
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+  config.telemetry.enabled = false;
+  config.trace_sampler.sample_rate = 1.0; // 100%
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  ON_CALL(stream_info_, startTime())
+      .WillByDefault(testing::Return(time_.timeSystem().systemTime()));
+  Tracing::TestTraceContextImpl context{};
+  Tracing::SpanPtr span = tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, "do.thing",
+                                           {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+  span.reset();
+
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_,
+              send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::Return(&request));
+  EXPECT_CALL(request, cancel());
+  thread_local_slot_allocator_.shutdownThread();
+}
+
+TEST_F(DatadogTracerTest, SpanOutlivesThreadLocalTracer) {
+  // A span still open when the thread local tracer is destroyed keeps the
+  // collector alive. Finishing it later, for example from a stream reset while
+  // the thread local cluster manager is torn down, must not send a request.
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+  config.telemetry.enabled = false;
+  config.trace_sampler.sample_rate = 1.0; // 100%
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  ON_CALL(stream_info_, startTime())
+      .WillByDefault(testing::Return(time_.timeSystem().systemTime()));
+  Tracing::TestTraceContextImpl context{};
+  Tracing::SpanPtr span = tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, "do.thing",
+                                           {Tracing::Reason::Sampling, true});
+
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_,
+              send_(testing::_, testing::_, testing::_))
+      .Times(0);
+  thread_local_slot_allocator_.shutdownThread();
+  span->finishSpan();
+  span.reset();
+}
+
 TEST_F(DatadogTracerTest, ExtractionFailure) {
   // Verify that if there is invalid trace information in the `TraceContext`
   // supplied to `startSpan`, that the resulting span is nonetheless valid (it
@@ -297,7 +345,13 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
   ASSERT_TRUE(maybe_dd_span);
 }
 
-TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
+class DatadogTracerSamplingTest : public DatadogTracerTest,
+                                  public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(SamplingModes, DatadogTracerSamplingTest, testing::Bool());
+
+TEST_P(DatadogTracerSamplingTest, EnvoySamplingVersusExtractedSampling) {
+  const bool delegate_sampling = GetParam();
   // Verify that sampling decisions extracted from incoming requests are honored
   // regardless of the sampling decision made by Envoy (i.e. `bool
   // Tracing::Decision::traced`).
@@ -309,9 +363,9 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
   // must be the same as that which was extracted.
   //
   // If a sampling decision is not present in the extracted trace context, then
-  // an Envoy decision of "drop" is honored. An Envoy decision of "keep"
-  // delegates the sampling decision to the underlying Datadog tracer, which
-  // will not make a sampling decision immediately.
+  // Envoy's decision is applied immediately unless delegated sampling is
+  // enabled. In delegated mode, the decision is deferred until injection or
+  // completion.
 
   struct Case {
     int line;
@@ -380,7 +434,7 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
     config.report_traces = false;
     config.telemetry.enabled = false;
     Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                  thread_local_slot_allocator_, time_);
+                  thread_local_slot_allocator_, time_, delegate_sampling);
 
     Tracing::Decision envoy_decision;
     envoy_decision.reason = Tracing::Reason::Sampling;
@@ -426,12 +480,15 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
 
     const datadog::tracing::Optional<datadog::tracing::SamplingDecision> decision =
         dd_span.trace_segment().sampling_decision();
-    if (test_case.resulting_sampling_priority) {
+    auto expected_priority = test_case.resulting_sampling_priority;
+    if (!delegate_sampling && !expected_priority) {
+      expected_priority = test_case.envoy_decision_keep ? 2 : -1;
+    }
+    if (expected_priority) {
       // We expect that the tracer made a sampling decision immediately, and
       // that it has the expected sampling priority.
       ASSERT_NE(datadog::tracing::nullopt, decision) << failure_context.str();
-      EXPECT_EQ(*test_case.resulting_sampling_priority, decision->priority)
-          << failure_context.str();
+      EXPECT_EQ(*expected_priority, decision->priority) << failure_context.str();
     } else {
       // We expect that the tracer did not immediately make a sampling decision.
       EXPECT_EQ(datadog::tracing::nullopt, decision) << failure_context.str();

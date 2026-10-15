@@ -31,15 +31,20 @@ bool SocketTagSocketOptionImpl::setOption(
   return true;
 }
 
-void SocketTagSocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
-  pushScalarToByteVector(uid_, hash_key);
-  pushScalarToByteVector(traffic_stats_tag_, hash_key);
+void SocketTagSocketOptionImpl::generateHashKey(uid_t uid, uint32_t traffic_stats_tag,
+                                                std::vector<uint8_t>& hash_key) {
+  pushScalarToByteVector(uid, hash_key);
+  pushScalarToByteVector(traffic_stats_tag, hash_key);
 }
 
-absl::optional<Socket::Option::Details> SocketTagSocketOptionImpl::getOptionDetails(
+void SocketTagSocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
+  generateHashKey(uid_, traffic_stats_tag_, hash_key);
+}
+
+std::optional<Socket::Option::Details> SocketTagSocketOptionImpl::getOptionDetails(
     const Socket&, envoy::config::core::v3::SocketOption::SocketState /*state*/) const {
   if (!isSupported()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   static std::string name = "socket_tag";
@@ -49,7 +54,7 @@ absl::optional<Socket::Option::Details> SocketTagSocketOptionImpl::getOptionDeta
   pushScalarToByteVector(uid_, data);
   pushScalarToByteVector(traffic_stats_tag_, data);
   details.value_ = std::string(reinterpret_cast<char*>(data.data()), data.size());
-  return absl::make_optional(std::move(details));
+  return std::make_optional(std::move(details));
 }
 
 bool SocketTagSocketOptionImpl::isSupported() const { return optname_.hasValue(); }

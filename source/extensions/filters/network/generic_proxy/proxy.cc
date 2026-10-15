@@ -8,6 +8,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/network/generic_proxy/interface/filter.h"
 #include "source/extensions/filters/network/generic_proxy/route_impl.h"
@@ -45,7 +46,7 @@ StreamInfo::CoreResponseFlag flagFromDownstreamReasonReason(DownstreamStreamRese
 } // namespace
 
 ActiveStream::ActiveStream(Filter& parent, RequestHeaderFramePtr request,
-                           absl::optional<StartTime> start_time)
+                           std::optional<StartTime> start_time)
     : parent_(parent), request_header_frame_(std::move(request)),
       stream_info_(parent_.time_source_,
                    parent_.callbacks_->connection().connectionInfoProviderSharedPtr(),
@@ -609,7 +610,7 @@ void ActiveStream::deferredDelete() {
   }
 }
 
-void ActiveStream::completeStream(absl::optional<DownstreamStreamResetReason> reason) {
+void ActiveStream::completeStream(std::optional<DownstreamStreamResetReason> reason) {
   if (stream_reset_or_complete_) {
     return;
   }
@@ -673,7 +674,7 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool 
 }
 
 void Filter::onDecodingSuccess(RequestHeaderFramePtr request_header_frame,
-                               absl::optional<StartTime> start_time) {
+                               std::optional<StartTime> start_time) {
   if (request_header_frame == nullptr) {
     ENVOY_LOG(error, "generic proxy: request header frame from codec is null");
     onDecodingFailure();
@@ -742,7 +743,7 @@ void Filter::registerFrameHandler(uint64_t stream_id, ActiveStream* raw_stream) 
 
 void Filter::unregisterFrameHandler(uint64_t stream_id) { frame_handlers_.erase(stream_id); }
 
-void Filter::newDownstreamRequest(StreamRequestPtr request, absl::optional<StartTime> start_time) {
+void Filter::newDownstreamRequest(StreamRequestPtr request, std::optional<StartTime> start_time) {
   auto stream = std::make_unique<ActiveStream>(*this, std::move(request), start_time);
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);
@@ -777,9 +778,18 @@ void Filter::closeDownstreamConnection() {
   downstreamConnection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
+bool Filter::shouldDrainClose() {
+  if (!use_connection_event_drain_) {
+    return drain_decision_.drainClose(Network::DrainDirection::All);
+  }
+
+  return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
+}
+
 void Filter::mayBeDrainClose() {
-  if ((drain_decision_.drainClose(Network::DrainDirection::All) || stream_drain_decision_) &&
-      active_streams_.empty()) {
+  // Note that the drain decision is only evaluated once it is known to be needed, since either
+  // path consumes a random number on every call.
+  if (active_streams_.empty() && (stream_drain_decision_ || shouldDrainClose())) {
     onDrainCloseAndNoActiveStreams();
   }
 }

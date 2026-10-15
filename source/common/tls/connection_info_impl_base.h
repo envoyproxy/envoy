@@ -1,13 +1,14 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/ssl/connection.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/tls/utility.h"
 
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -27,11 +28,16 @@ public:
   const std::string& serialNumberPeerCertificate() const override;
   absl::Span<const std::string> serialNumbersPeerCertificates() const override;
   const std::string& issuerPeerCertificate() const override;
+  const std::string& sha256PeerCertificateIssuerDigest() const override;
+  const std::string& serialNumberPeerCertificateIssuer() const override;
   const std::string& subjectPeerCertificate() const override;
   Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
+  const std::string& pemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
+  absl::Span<const std::string> pemEncodedPeerCertificateChain() const override;
+  absl::Span<const std::string> pemEncodedValidatedPeerCertificateChain() const override;
   bool peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const override;
   absl::Span<const std::string> uriSanPeerCertificate() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
@@ -45,16 +51,41 @@ public:
   absl::Span<const std::string> othernameSansLocalCertificate() const override;
   absl::Span<const std::string> oidsPeerCertificate() const override;
   absl::Span<const std::string> oidsLocalCertificate() const override;
-  absl::optional<SystemTime> validFromPeerCertificate() const override;
-  absl::optional<SystemTime> expirationPeerCertificate() const override;
+  std::optional<SystemTime> validFromPeerCertificate() const override;
+  std::optional<SystemTime> expirationPeerCertificate() const override;
   const std::string& sessionId() const override;
   uint16_t ciphersuiteId() const override;
-  std::string ciphersuiteString() const override;
+  absl::string_view ciphersuiteString() const override;
+  uint16_t tlsGroupId() const override;
+  absl::string_view tlsGroupString() const override;
   const std::string& tlsVersion() const override;
   const std::string& alpn() const override;
   const std::string& sni() const override;
 
   virtual SSL* ssl() const PURE;
+
+  // Returns the direct issuer cert from the validated chain, or nullptr if unavailable.
+  // Subclasses that store the validated chain should override this.
+  virtual X509* validatedPeerIssuer() const { return nullptr; }
+
+  // Returns the validated peer certificate chain (leaf first) if the subclass stores one.
+  // Subclasses that store the validated chain should override this.
+  virtual OptRef<const std::vector<bssl::UniquePtr<X509>>> validatedPeerCertChain() const {
+    return std::nullopt;
+  }
+
+protected:
+  // Returns the peer leaf certificate, or nullptr if not presented. The default implementation
+  // uses the X509-based BoringSSL API, which is only usable on connections whose SSL object was
+  // created with an X509-capable method (TCP TLS). QUIC connections use the CRYPTO_BUFFER-based
+  // method and override this accordingly.
+  virtual bssl::UniquePtr<X509> peerCertificate() const;
+
+  // Returns the full peer certificate chain including the leaf, or nullptr if not presented.
+  // This is the list of certificates as presented by the peer, NOT the chain built during
+  // validation; see validatedPeerCertChain() for the latter. The returned stack is not owned by
+  // the caller and is valid for the lifetime of this object.
+  virtual STACK_OF(X509)* peerCertificateChain() const;
 
 private:
   // Enum values should be the name of the calling function, but capitalized.
@@ -73,6 +104,8 @@ private:
     SerialNumberPeerCertificate,
     SerialNumbersPeerCertificates,
     IssuerPeerCertificate,
+    Sha256PeerCertificateIssuerDigest,
+    SerialNumberPeerCertificateIssuer,
     SubjectPeerCertificate,
     ParsedSubjectPeerCertificate,
     SubjectLocalCertificate,
@@ -82,7 +115,10 @@ private:
     EmailSansPeerCertificate,
     OthernameSansPeerCertificate,
     UrlEncodedPemEncodedPeerCertificate,
+    PemEncodedPeerCertificate,
     UrlEncodedPemEncodedPeerCertificateChain,
+    PemEncodedValidatedPeerCertificateChain,
+    PemEncodedPeerCertificateChain,
     PeerCertificateSanMatches,
     DnsSansPeerCertificate,
     IpSansPeerCertificate,

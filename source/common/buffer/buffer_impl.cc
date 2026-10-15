@@ -204,7 +204,7 @@ void OwnedImpl::drainImpl(uint64_t size) {
   }
 }
 
-RawSliceVector OwnedImpl::getRawSlices(absl::optional<uint64_t> max_slices) const {
+RawSliceVector OwnedImpl::getRawSlices(std::optional<uint64_t> max_slices) const {
   uint64_t max_out = slices_.size();
   if (max_slices.has_value()) {
     max_out = std::min(max_out, max_slices.value());
@@ -245,7 +245,7 @@ RawSlice OwnedImpl::frontSlice() const {
   return {nullptr, 0};
 }
 
-SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
+Slice OwnedImpl::extractFrontSlice() {
   RELEASE_ASSERT(length_ > 0, "Extract called on empty buffer");
   // Remove zero byte fragments from the front of the queue to ensure
   // that the extracted slice has data.
@@ -253,12 +253,17 @@ SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
     slices_.pop_front();
   }
   ASSERT(!slices_.empty());
-  auto slice = std::move(slices_.front());
-  auto size = slice.dataSize();
-  length_ -= size;
+  Slice slice = std::move(slices_.front());
+  length_ -= slice.dataSize();
   slices_.pop_front();
+  return slice;
+}
+
+SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
+  Slice slice = extractFrontSlice();
   if (!slice.isMutable()) {
     // Create a mutable copy of the immutable slice data.
+    const uint64_t size = slice.dataSize();
     Slice mutable_slice{size, nullptr};
     auto copy_size = mutable_slice.append(slice.data(), size);
     ASSERT(copy_size == size);
@@ -270,6 +275,10 @@ SliceDataPtr OwnedImpl::extractMutableFrontSlice() {
     slice.callAndClearDrainTrackersAndCharges();
     return std::make_unique<SliceDataImpl>(std::move(slice));
   }
+}
+
+SliceDataPtr OwnedImpl::extractImmutableFrontSlice() {
+  return std::make_unique<SliceDataImpl>(extractFrontSlice());
 }
 
 uint64_t OwnedImpl::length() const {
@@ -285,6 +294,8 @@ uint64_t OwnedImpl::length() const {
 
   return length_;
 }
+
+uint64_t OwnedImpl::sliceCount() const { return slices_.size(); }
 
 void* OwnedImpl::linearize(uint32_t size) {
   RELEASE_ASSERT(size <= length(), "Linearize size exceeds buffer size");
@@ -590,7 +601,7 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
     return false;
   }
 
-  if (data.length() == 0) {
+  if (data.empty()) {
     return true;
   }
 

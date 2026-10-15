@@ -39,6 +39,5 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//source/common/stats:symbol_table_lib",
         "@abseil-cpp//absl/types:any",
-        "@abseil-cpp//absl/types:optional",
     ],
 )

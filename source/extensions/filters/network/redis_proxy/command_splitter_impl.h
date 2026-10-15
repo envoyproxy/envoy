@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,23 +20,22 @@
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
-struct ResponseValues {
-  const std::string OK = "OK";
-  const std::string InvalidRequest = "invalid request";
-  const std::string NoUpstreamHost = "no upstream host";
-  const std::string UpstreamFailure = "upstream failure";
-  const std::string UpstreamProtocolError = "upstream protocol error";
-  const std::string AuthRequiredError = "NOAUTH Authentication required.";
-  const std::string UnsupportedProtocol = "NOPROTO unsupported protocol version";
-};
-
-using Response = ConstSingleton<ResponseValues>;
+/**
+ * Build the HELLO command reply (Map for a RESP3 downstream; the encoder converts to a flat
+ * array on a RESP2 downstream) for the given negotiated protocol version. Exposed so
+ * ``ProxyFilter`` can emit a deferred HELLO reply after an external-auth round trip completes
+ * for ``HELLO N AUTH <user> <pass>`` — the splitter's HELLO handler returns control before
+ * the reply is built in that case.
+ */
+Common::Redis::RespValuePtr buildHelloReply(uint32_t downstream_version);
 
 /**
  * All command level stats. @see stats_macros.h
@@ -158,6 +158,27 @@ public:
   }
   void onResponse(Common::Redis::RespValuePtr&& response) override;
   Common::Redis::Client::Transaction& transaction() override { return callbacks_.transaction(); }
+  void setDownstreamRespVersion(uint32_t version) override {
+    callbacks_.setDownstreamRespVersion(version);
+  }
+  Common::Redis::RespProtocolVersion protocolVersion() const override {
+    return callbacks_.protocolVersion();
+  }
+  AuthAttempt attemptDownstreamAuthInline(const std::string& username, const std::string& password,
+                                          uint32_t requested_version) override {
+    return callbacks_.attemptDownstreamAuthInline(username, password, requested_version);
+  }
+  // Forward the version state through the decorator so any command answered through this
+  // wrapper is encoded against the real filter's per-connection RESP version, not the
+  // default RESP2. (HELLO is dispatched before fault injection runs and so does not flow
+  // through DelayFaultRequest in practice; the forward stays correct for any future fault-
+  // wrapped command that observes the version.)
+  uint32_t currentDownstreamRespVersion() const override {
+    return callbacks_.currentDownstreamRespVersion();
+  }
+  std::optional<uint32_t> takePendingHelloAuthVersion() override {
+    return callbacks_.takePendingHelloAuthVersion();
+  }
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -232,7 +253,8 @@ public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool delay_command_latency,
-                                const StreamInfo::StreamInfo& stream_info);
+                                const StreamInfo::StreamInfo& stream_info,
+                                const absl::flat_hash_set<std::string>& custom_commands);
 
 private:
   TransactionRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -494,6 +516,28 @@ public:
 };
 
 /**
+ * CommandHandlerFactory for transaction requests, which additionally provides the set of
+ * commands configured via custom_commands so they can be accepted within transactions.
+ */
+class TransactionCommandHandlerFactory : public CommandHandler, CommandHandlerBase {
+public:
+  TransactionCommandHandlerFactory(Router& router,
+                                   const absl::flat_hash_set<std::string>& custom_commands)
+      : CommandHandlerBase(router), custom_commands_(custom_commands) {}
+  SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
+                               CommandStats& command_stats, TimeSource& time_source,
+                               bool delay_command_latency,
+                               const StreamInfo::StreamInfo& stream_info) override {
+    return TransactionRequest::create(router_, std::move(request), callbacks, command_stats,
+                                      time_source, delay_command_latency, stream_info,
+                                      custom_commands_);
+  }
+
+private:
+  const absl::flat_hash_set<std::string>& custom_commands_;
+};
+
+/**
  * All splitter stats. @see stats_macros.h
  */
 #define ALL_COMMAND_SPLITTER_STATS(COUNTER)                                                        \
@@ -532,6 +576,11 @@ private:
   void addHandler(Stats::Scope& scope, const std::string& stat_prefix, const std::string& name,
                   bool latency_in_micros, CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
+  // Handle a downstream ``HELLO`` command: protocol-version exact-match, AUTH/SETNAME option
+  // parsing, inline-auth dispatch, and the local HELLO reply. Always terminal (returns nullptr);
+  // factored out of ``makeRequest`` to keep that dispatcher readable.
+  SplitRequestPtr handleHelloCommand(const Common::Redis::RespValue& request,
+                                     SplitCallbacks& callbacks);
 
   RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
@@ -543,13 +592,21 @@ private:
   CommandHandlerFactory<ShardInfoRequest> shard_info_handler_;
   CommandHandlerFactory<RandomShardRequest> random_shard_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
-  CommandHandlerFactory<TransactionRequest> transaction_handler_;
+  // Initialized before transaction_handler_, which keeps a reference to it.
+  absl::flat_hash_set<std::string> custom_commands_;
+  TransactionCommandHandlerFactory transaction_handler_;
   CommandHandlerFactory<ClusterScopeCmdRequest> cluster_scope_handler_;
   RadixTree<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
-  absl::flat_hash_set<std::string> custom_commands_;
+  // HELLO is answered locally (handleHelloCommand) and does not route through
+  // handler_lookup_table_, but the ``command.hello.*`` stats its old cluster-scope registration
+  // emitted must survive for operators alarming on them. Latency exists for schema parity and
+  // is not recorded — the local reply has no round trip to time. One intended gap: the deferred
+  // external-auth path (AuthAttempt::ImplOwnsResponse) is total-only, since success/error
+  // resolve inside the filter after the round trip (see handleHelloCommand).
+  std::optional<CommandStats> hello_command_stats_;
 };
 
 } // namespace CommandSplitter

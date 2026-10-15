@@ -14,21 +14,28 @@ namespace DynamicForwardProxy {
  * Config registration for the dynamic forward proxy filter.
  */
 class DynamicForwardProxyFilterFactory
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig,
           envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig> {
 public:
   DynamicForwardProxyFilterFactory()
-      : ExceptionFreeFactoryBase("envoy.filters.http.dynamic_forward_proxy") {}
+      : UnifiedFactoryBase("envoy.filters.http.dynamic_forward_proxy") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config,
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+
+  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
+  // (ServerFactoryContext) paths.
+  static absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
+      Server::Configuration::ServerFactoryContext& context);
 };
 
 DECLARE_FACTORY(DynamicForwardProxyFilterFactory);

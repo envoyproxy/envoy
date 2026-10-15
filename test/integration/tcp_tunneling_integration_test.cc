@@ -13,11 +13,17 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/tcp_tunneling_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
+using testing::Eq;
+using testing::Ge;
+
 namespace {
 
 // Terminating CONNECT and sending raw TCP upstream.
@@ -166,7 +172,7 @@ TEST_P(ConnectTerminationIntegrationTest, Basic) {
 
   setUpConnection();
   sendBidirectionalDataAndCleanShutdown();
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(2));
   cleanupUpstreamAndDownstream();
 
   setUpConnection();
@@ -238,7 +244,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicWithClusterconfig) {
         bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_upstream_config();
     envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
     upgrade->set_name("envoy.filters.connection_pools.http.tcp");
-    upgrade->mutable_typed_config()->PackFrom(tcp_config);
+    std::ignore = upgrade->mutable_typed_config()->PackFrom(tcp_config);
   });
 
   initialize();
@@ -371,6 +377,53 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
   cleanupUpstreamAndDownstream();
 }
 
+// Verify that upstream RST through tunneled CONNECT propagates as downstream RST
+// (default behavior with both guards enabled).
+TEST_P(ConnectTerminationIntegrationTest, UpstreamRstPropagationThroughTunnel) {
+  enableHalfClose(false);
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Upstream sends RST (AbortReset).
+  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
+
+  // Downstream should be disconnected (stream reset or connection close).
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  }
+}
+
+// Verify that upstream RST through tunneled CONNECT does NOT propagate as downstream RST
+// when the HTTP guard is explicitly disabled.
+TEST_P(ConnectTerminationIntegrationTest, UpstreamRstNotPropagatedWithoutHttpGuard) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.map_http_stream_reset_to_tcp_rst",
+                                    "false");
+  useAccessLog("%UPSTREAM_DETECTED_CLOSE_TYPE%");
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Upstream sends RST.
+  ASSERT_TRUE(fake_raw_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForDisconnect());
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  }
+
+  // With HTTP guard disabled, close type should not be RemoteReset.
+  auto log_result = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log_result, testing::Ne("RemoteReset"));
+}
+
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   enable_timeout_ = true;
   initialize();
@@ -421,7 +474,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
   setUpConnection();
   sendBidirectionalData();
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_max_duration_reached", Ge(1));
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -450,9 +503,14 @@ TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
 }
 
 TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) {
-  // TODO(yanavlasov): fix the test
-  GTEST_SKIP() << "Test is too flaky for CI. "
-                  "https://github.com/envoyproxy/envoy/issues/39856#issuecomment-3637976574";
+  // Hold CONNECT headers before the router until the first data frame is decoded. In HTTP/3,
+  // encodeHeaders() and encodeData() can be delivered in separate QUIC packets even when the client
+  // flushes them together, allowing the upstream connection to complete before the data arrives.
+  config_helper_.addFilter(R"EOF(
+    name: stop-in-headers-continue-in-body-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.StopInHeadersContinueInBodyFilterConfig
+  )EOF");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -460,10 +518,10 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) 
           if (filter.name() == "envoy.filters.http.router") {
             envoy::extensions::filters::http::router::v3::Router router_config;
             if (filter.has_typed_config()) {
-              filter.typed_config().UnpackTo(&router_config);
+              std::ignore = filter.typed_config().UnpackTo(&router_config);
             }
             router_config.mutable_reject_connect_request_early_data()->set_value(true);
-            filter.mutable_typed_config()->PackFrom(router_config);
+            std::ignore = filter.mutable_typed_config()->PackFrom(router_config);
             break;
           }
         }
@@ -472,13 +530,11 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataRejectedWithOverride) 
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // Send CONNECT request and immediately send some data without waiting for 200
-  // response from Envoy.
-  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  codec_client_->sendData(*request_encoder_, "premature data", false);
-  response_ = std::move(encoder_decoder.second);
+  // response from Envoy. The test filter releases the headers when it sees this data, ensuring the
+  // router processes both before the upstream connection can synthesize the 200 tunnel response.
+  response_ = codec_client_->makeRequestWithBody(connect_headers_, "premature data", false);
 
-  // Envoy will try top open upstream connection before the premature CONNECT data is detected.
+  // Envoy will try to open an upstream connection before the premature CONNECT data is detected.
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
 
   response_->waitForHeaders();
@@ -529,14 +585,59 @@ TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataAllowedByDefault) {
   cleanupUpstreamAndDownstream();
 }
 
+TEST_P(ConnectTerminationIntegrationTest, EarlyConnectDataAfterResponseTunneled) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        for (auto& filter : *hcm.mutable_http_filters()) {
+          if (filter.name() == "envoy.filters.http.router") {
+            envoy::extensions::filters::http::router::v3::Router router_config;
+            if (filter.has_typed_config()) {
+              std::ignore = filter.typed_config().UnpackTo(&router_config);
+            }
+            router_config.mutable_reject_connect_request_early_data()->set_value(true);
+            std::ignore = filter.mutable_typed_config()->PackFrom(router_config);
+            break;
+          }
+        }
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send the CONNECT request and wait for the 200 response before sending any data.
+  auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  response_ = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
+  response_->waitForHeaders();
+  EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+  // Data sent after the 200 response has started is legitimate tunnel data, so it is
+  // forwarded upstream rather than rejected as early CONNECT data.
+  codec_client_->sendData(*request_encoder_, "late data", false);
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForData(
+      FakeRawConnection::waitForInexactMatch("late data")));
+
+  codec_client_->sendData(*request_encoder_, "", true);
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+  ASSERT_TRUE(fake_raw_upstream_connection_->close());
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(response_->waitForEndStream());
+    ASSERT_FALSE(response_->reset());
+  }
+  cleanupUpstreamAndDownstream();
+}
+
 INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ConnectTerminationIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
                               Http::CodecType::HTTP3},
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
 
 // Test with proxy protocol headers.
 class ProxyProtocolConnectTerminationIntegrationTest : public ConnectTerminationIntegrationTest {
@@ -903,7 +1004,7 @@ public:
 
           auto* filter_chain = listener->add_filter_chains();
           auto* filter = filter_chain->add_filters();
-          filter->mutable_typed_config()->PackFrom(proxy_config);
+          std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
           filter->set_name("envoy.filters.network.tcp_proxy");
         });
     BaseTcpTunnelingIntegrationTest::SetUp();
@@ -920,7 +1021,7 @@ public:
           envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
               request_id_extension;
           envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_config;
-          request_id_extension.mutable_typed_config()->PackFrom(uuid_config);
+          std::ignore = request_id_extension.mutable_typed_config()->PackFrom(uuid_config);
           proxy_config.mutable_tunneling_config()->mutable_request_id_extension()->CopyFrom(
               request_id_extension);
 
@@ -930,7 +1031,7 @@ public:
           fal.set_path(tunnel_access_log_path_);
           fal.mutable_log_format()->mutable_text_format_source()->set_inline_string(
               "%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%\n");
-          proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal);
+          std::ignore = proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal);
 
           auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
           for (auto& listener : *listeners) {
@@ -939,7 +1040,7 @@ public:
             }
             auto* filter_chain = listener.mutable_filter_chains(0);
             auto* filter = filter_chain->mutable_filters(0);
-            filter->mutable_typed_config()->PackFrom(proxy_config);
+            std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
             break;
           }
         });
@@ -958,7 +1059,7 @@ public:
           envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
               request_id_extension;
           envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_config;
-          request_id_extension.mutable_typed_config()->PackFrom(uuid_config);
+          std::ignore = request_id_extension.mutable_typed_config()->PackFrom(uuid_config);
           proxy_config.mutable_tunneling_config()->mutable_request_id_extension()->CopyFrom(
               request_id_extension);
           proxy_config.mutable_tunneling_config()->set_request_id_header(header_name);
@@ -968,7 +1069,7 @@ public:
           fal.set_path(log_path);
           fal.mutable_log_format()->mutable_text_format_source()->set_inline_string(
               absl::StrCat("%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:", md_key, ")%\n"));
-          proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal);
+          std::ignore = proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal);
 
           auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
           for (auto& listener : *listeners) {
@@ -977,7 +1078,7 @@ public:
             }
             auto* filter_chain = listener.mutable_filter_chains(0);
             auto* filter = filter_chain->mutable_filters(0);
-            filter->mutable_typed_config()->PackFrom(proxy_config);
+            std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
             break;
           }
         });
@@ -990,7 +1091,7 @@ public:
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
-    filter_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 
@@ -999,7 +1100,7 @@ public:
     filter_config.set_name("stop-iteration-and-continue-filter");
     auto configuration = test::integration::filters::StopAndContinueConfig();
     configuration.set_stop_and_buffer(true);
-    filter_config.mutable_typed_config()->PackFrom(configuration);
+    std::ignore = filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
 
@@ -1100,7 +1201,6 @@ TEST_P(TcpTunnelingIntegrationTest, SchemeHeader) {
   if (!(GetParam().upstream_protocol == Http::CodecType::HTTP2)) {
     return;
   }
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
     proxy_config.set_stat_prefix("tcp_stats");
@@ -1115,7 +1215,7 @@ TEST_P(TcpTunnelingIntegrationTest, SchemeHeader) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1256,7 +1356,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1295,7 +1395,8 @@ TEST_P(TcpTunnelingIntegrationTest, TcpTunnelingAccessLog) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%ACCESS_LOG_TYPE%-%UPSTREAM_CONNECTION_ID%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1304,7 +1405,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpTunnelingAccessLog) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1349,7 +1450,8 @@ TEST_P(TcpTunnelingIntegrationTest, BytesMeterAccessLog) {
         "%ACCESS_LOG_TYPE%-%BYTES_RECEIVED%-%BYTES_SENT%-%UPSTREAM_HEADER_BYTES_SENT%-%UPSTREAM_"
         "HEADER_BYTES_RECEIVED%-%UPSTREAM_WIRE_BYTES_SENT%-%UPSTREAM_WIRE_BYTES_RECEIVED%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1358,7 +1460,7 @@ TEST_P(TcpTunnelingIntegrationTest, BytesMeterAccessLog) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1421,7 +1523,8 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
         "RESPONSE_HEADERS=%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)% "
         "RESPONSE_TRAILERS=%FILTER_STATE(envoy.tcp_proxy.propagate_response_trailers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1430,7 +1533,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1486,7 +1589,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1528,15 +1631,15 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
               .set_number_value(2);
           auto* filter_chain = listener.mutable_filter_chains(0);
           auto* filter = filter_chain->mutable_filters(0);
-          filter->mutable_typed_config()->PackFrom(proxy_config);
+          std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
           break;
         }
       });
   new_config_helper.setLds("1");
 
-  test_server_->waitForCounterEq("listener_manager.listener_modified", 1);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
-  test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+  test_server_->waitForCounter("listener_manager.listener_modified", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(0));
+  test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
 
   // Start a connection, and verify the upgrade headers are received upstream.
   auto tcp_client_2 = makeTcpConnection(lookupPort("tcp_proxy"));
@@ -1575,7 +1678,7 @@ TEST_P(TcpTunnelingIntegrationTest, Goaway) {
   setUpConnection(fake_upstream_connection_);
   sendBidiData(fake_upstream_connection_, true);
   closeConnection(fake_upstream_connection_);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
 
   // Make sure a subsequent connection can be established successfully.
   FakeHttpConnectionPtr fake_upstream_connection;
@@ -1585,7 +1688,7 @@ TEST_P(TcpTunnelingIntegrationTest, Goaway) {
 
   // Make sure the last stream is finished before doing test teardown.
   fake_upstream_connection->encodeGoAway();
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(2));
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
@@ -1614,6 +1717,59 @@ TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
   tcp_client_->close();
 }
 
+// Issue #43977: when upstream rejects CONNECT with a non-2xx status, the status code
+// must appear in %UPSTREAM_TRANSPORT_FAILURE_REASON% in the access log.
+TEST_P(TcpTunnelingIntegrationTest, NonSuccessConnectResponseIncludesStatusInFailureReason) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%UPSTREAM_TRANSPORT_FAILURE_REASON%\n");
+    access_log_config.set_path(access_log_filename);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+  initialize();
+
+  // Start a connection and wait for the CONNECT request to reach the upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Upstream rejects the CONNECT with a 403.
+  default_response_headers_.setStatus(enumToInt(Http::Code::Forbidden));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
+
+  // The access log must contain the CONNECT response status as the transport failure reason.
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("tunnel_response:403"));
+}
+
 TEST_P(TcpTunnelingIntegrationTest, CopyValidResponseHeaders) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
@@ -1628,7 +1784,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyValidResponseHeaders) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1637,7 +1794,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyValidResponseHeaders) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1675,7 +1832,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeaders) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1684,7 +1842,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeaders) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1733,7 +1891,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeadersWithRetry) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1742,7 +1901,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeadersWithRetry) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1796,7 +1955,8 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseTrailers) {
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%FILTER_STATE(envoy.tcp_proxy.propagate_response_trailers:TYPED)%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -1805,7 +1965,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseTrailers) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -1938,14 +2098,15 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
 
       // Use TLS because it will respond to a TCP half-close during handshake by closing the
       // connection.
       envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
       ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context(), false);
       filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
-      filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
+      std::ignore =
+          filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 
       break;
     }
@@ -1968,52 +2129,6 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
 
   ASSERT_TRUE(upstream_request_->waitForReset());
   ASSERT_TRUE(fake_upstream_connection_->close());
-}
-
-// Test idle timeout when connection establishment is prevented by not sending upstream response
-TEST_P(TcpTunnelingIntegrationTest,
-       IdleTimeoutNoUpstreamConnectionNoIdleTimeoutSetOnNewConnection) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection", "false");
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
-    auto* filter_chain = listener->mutable_filter_chains(0);
-    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
-
-    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
-            *config_blob);
-
-    tcp_proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-    tcp_proxy_config.mutable_idle_timeout()->CopyFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(1));
-
-    config_blob->PackFrom(tcp_proxy_config);
-  });
-
-  initialize();
-
-  // Start downstream TCP connection (CONNECT will be sent upstream).
-  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
-
-  // Don't send response headers - this prevents the tunnel from being fully established.
-  // The TCP proxy will wait for the response, and the idle timeout will not trigger as
-  // the idle timeout is not set immediately on new connection.
-
-  // Verify the stream wasn't reset due to timeout
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_FALSE(fake_upstream_connection_->waitForDisconnect(std::chrono::milliseconds(10)));
-  } else {
-    ASSERT_FALSE(upstream_request_->waitForReset(std::chrono::milliseconds(10)));
-  }
-
-  // Clean up the TCP client
-  tcp_client_->close();
 }
 
 // Test that a downstream flush works correctly (all data is flushed)
@@ -2043,7 +2158,8 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
     upstream_request_->encodeData(data, true);
   }
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               Ge(1));
   tcp_client_->readDisable(false);
   tcp_client_->waitForData(data);
   tcp_client_->waitForHalfClose();
@@ -2395,7 +2511,8 @@ TEST_P(
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -2404,7 +2521,7 @@ TEST_P(
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -2462,7 +2579,8 @@ TEST_P(TcpTunnelingIntegrationTest,
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
         "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n");
     access_log_config.set_path(access_log_filename);
-    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+    std::ignore =
+        proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -2471,7 +2589,7 @@ TEST_P(TcpTunnelingIntegrationTest,
       }
       auto* filter_chain = listener.mutable_filter_chains(0);
       auto* filter = filter_chain->mutable_filters(0);
-      filter->mutable_typed_config()->PackFrom(proxy_config);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
       break;
     }
   });
@@ -2513,6 +2631,30 @@ TEST_P(TcpTunnelingIntegrationTest,
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
 }
 
+TEST_P(TcpTunnelingIntegrationTest, UpstreamRstAfterCompleteResponseNotPropagatedDownstream) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  initialize();
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Send a complete response with Connection: close, then RST.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"connection", "close"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(5, true);
+
+  // Upstream RSTs after completing the response.
+  ASSERT_TRUE(fake_upstream_connection_->close(Network::ConnectionCloseType::AbortReset));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Client should receive the full response data, not EOF.
+  ASSERT_TRUE(tcp_client_->waitForData(5));
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     testing::ValuesIn(BaseTcpTunnelingIntegrationTest::getProtocolTestParams(
@@ -2545,7 +2687,7 @@ public:
 
           auto* filter_chain = listener->add_filter_chains();
           auto* filter = filter_chain->add_filters();
-          filter->mutable_typed_config()->PackFrom(proxy_config);
+          std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
           filter->set_name("envoy.filters.network.tcp_proxy");
         });
     BaseTcpTunnelingIntegrationTest::SetUp();
@@ -2568,7 +2710,7 @@ TEST_P(TcpTunnelingIntegrationTestSimTime, TestIdletimeoutWithLargeOutstandingDa
             *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->CopyFrom(
         ProtobufUtil::TimeUtil::SecondsToDuration(idle_timeout));
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -2582,7 +2724,7 @@ TEST_P(TcpTunnelingIntegrationTestSimTime, TestIdletimeoutWithLargeOutstandingDa
   // Advance simulated time to trigger the idle timeout deterministically.
   timeSystem().advanceTimeAndRun(std::chrono::seconds(idle_timeout), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
-  test_server_->waitForCounterGe("tcp.tcp_stats.idle_timeout", 1);
+  test_server_->waitForCounter("tcp.tcp_stats.idle_timeout", Ge(1));
 
   tcp_client_->waitForDisconnect();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
@@ -2612,7 +2754,7 @@ TEST_P(TcpTunnelingIntegrationTestSimTime,
     tcp_proxy_config.mutable_idle_timeout()->CopyFrom(
         ProtobufUtil::TimeUtil::SecondsToDuration(idle_timeout));
 
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
 
   initialize();
@@ -2631,7 +2773,7 @@ TEST_P(TcpTunnelingIntegrationTestSimTime,
   timeSystem().advanceTimeAndRun(std::chrono::seconds(idle_timeout), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  test_server_->waitForCounterGe("tcp.tcp_stats.idle_timeout", 1);
+  test_server_->waitForCounter("tcp.tcp_stats.idle_timeout", Ge(1));
   tcp_client_->waitForHalfClose();
 
   if (upstreamProtocol() == Http::CodecType::HTTP1) {

@@ -1,6 +1,5 @@
 #include "source/extensions/config_subscription/grpc/eds_resources_cache_impl.h"
 
-#include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 

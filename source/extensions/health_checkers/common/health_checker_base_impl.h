@@ -60,7 +60,7 @@ protected:
   public:
     ~ActiveHealthCheckSession() override;
     HealthTransition setUnhealthy(envoy::data::core::v3::HealthCheckFailureType type,
-                                  bool retriable);
+                                  bool retriable, uint64_t http_status_code = 0);
     void onDeferredDeleteBase();
     void start() { onInitialInterval(); }
 
@@ -68,7 +68,8 @@ protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
     void handleSuccess(bool degraded = false);
-    void handleFailure(envoy::data::core::v3::HealthCheckFailureType type, bool retriable = false);
+    void handleFailure(envoy::data::core::v3::HealthCheckFailureType type, bool retriable = false,
+                       uint64_t http_status_code = 0);
 
     HostSharedPtr host_;
 
@@ -97,7 +98,8 @@ protected:
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
+                        HealthFlagCallbacks& health_flag_callbacks);
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
@@ -115,6 +117,7 @@ protected:
   Random::RandomGenerator& random_;
   const bool reuse_connection_;
   HealthCheckEventLoggerPtr event_logger_;
+  HealthFlagCallbacks& health_flag_callbacks_;
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
@@ -132,7 +135,7 @@ private:
   void addHosts(const HostVector& hosts);
   void decHealthy();
   void decDegraded();
-  HealthCheckerStats generateStats(Stats::Scope& scope);
+  HealthCheckerStats generateStats(Stats::Scope& scope, absl::string_view name);
   void incHealthy();
   void incDegraded();
   std::chrono::milliseconds interval(HealthState state, HealthTransition changed_state) const;
@@ -162,6 +165,7 @@ private:
   const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
   const MetadataConstSharedPtr transport_socket_match_metadata_;
   const Common::CallbackHandlePtr member_update_cb_;
+  bool started_{false};
 };
 
 } // namespace Upstream

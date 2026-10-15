@@ -130,7 +130,7 @@ public:
   /**
    * Sets the srtt estimate for an origin.
    * @param origin The origin to set network characteristics for.
-   * @param srtt The smothed round trip time for the origin.
+   * @param srtt The smoothed round trip time for the origin.
    */
   virtual void setSrtt(const Origin& origin, std::chrono::microseconds srtt) PURE;
 

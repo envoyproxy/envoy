@@ -9,11 +9,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "terminate_thread_lib",
-    srcs = ["terminate_thread.cc"],
-    hdrs = ["terminate_thread.h"],
+    name = "signal_thread_lib",
+    srcs = ["signal_thread.cc"],
+    hdrs = ["signal_thread.h"],
     deps = [
         "//envoy/thread:thread_interface",
+        "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
     ],
 )

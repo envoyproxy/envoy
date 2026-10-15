@@ -27,8 +27,8 @@ public:
   void setEndStreamAndDecodeTimer() {
     decode_end_stream_seen_ = true;
     decode_delay_timer_ = decoder_callbacks_->dispatcher().createTimer([this]() -> void {
-      absl::optional<MessageTrackedObject> msg;
-      absl::optional<ScopeTrackerScopeState> state;
+      std::optional<MessageTrackedObject> msg;
+      std::optional<ScopeTrackerScopeState> state;
       if (set_tracked_object_) {
         msg.emplace("StopIterationAndContinue decode_delay_timer");
         state.emplace(&msg.value(), decoder_callbacks_->dispatcher());
@@ -41,8 +41,8 @@ public:
   void setEndStreamAndEncodeTimer() {
     encode_end_stream_seen_ = true;
     encode_delay_timer_ = decoder_callbacks_->dispatcher().createTimer([this]() -> void {
-      absl::optional<MessageTrackedObject> msg;
-      absl::optional<ScopeTrackerScopeState> state;
+      std::optional<MessageTrackedObject> msg;
+      std::optional<ScopeTrackerScopeState> state;
       if (set_tracked_object_) {
         msg.emplace("StopIterationAndContinue encode_delay_timer");
         state.emplace(&msg.value(), decoder_callbacks_->dispatcher());

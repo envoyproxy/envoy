@@ -5,7 +5,6 @@
 #include "source/common/grpc/google_grpc_creds_impl.h"
 
 #include "test/common/grpc/utility.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -81,7 +80,9 @@ TEST_F(CredsUtilityTest, CallCredentials) {
 }
 
 TEST_F(CredsUtilityTest, DefaultChannelCredentials) {
-  { EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials({}, *api_)); }
+  {
+    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials({}, *api_));
+  }
   {
     envoy::config::core::v3::GrpcService config;
     TestUtility::setTestSslGoogleGrpcConfig(config, true);

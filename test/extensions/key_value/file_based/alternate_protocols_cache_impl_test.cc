@@ -36,9 +36,10 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithFlushingAndConcurrency)
   config.set_filename("foo");
   envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
   kv_config.mutable_config()->set_name("envoy.key_value.file_based");
-  kv_config.mutable_config()->mutable_typed_config()->PackFrom(config);
+  std::ignore = kv_config.mutable_config()->mutable_typed_config()->PackFrom(config);
   options_.mutable_key_value_store_config()->set_name("envoy.common.key_value");
-  options_.mutable_key_value_store_config()->mutable_typed_config()->PackFrom(kv_config);
+  std::ignore =
+      options_.mutable_key_value_store_config()->mutable_typed_config()->PackFrom(kv_config);
   initialize();
   manager_->getCache(options_, dispatcher_);
 }

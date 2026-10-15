@@ -39,7 +39,6 @@ bool PreviousRoutesPredicate::acceptTargetRoute(StreamInfo::FilterState& filter_
       absl::StrCat(PreviousRoutesPredicateStateNamePrefix, ".", current_route_name_);
   if (!filter_state.hasData<PreviousRoutesPredicateState>(filter_state_name)) {
     filter_state.setData(filter_state_name, std::make_unique<PreviousRoutesPredicateState>(),
-                         StreamInfo::FilterState::StateType::Mutable,
                          StreamInfo::FilterState::LifeSpan::Request);
   }
   auto predicate_state =

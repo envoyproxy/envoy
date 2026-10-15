@@ -28,14 +28,14 @@ PYBIND11_MODULE(envoy_engine, m) {
 
   // -- Enums --
 
-  py::enum_<Envoy::Logger::Logger::Levels>(m, "LogLevel")
-      .value("trace", Envoy::Logger::Logger::Levels::trace)
-      .value("debug", Envoy::Logger::Logger::Levels::debug)
-      .value("info", Envoy::Logger::Logger::Levels::info)
-      .value("warn", Envoy::Logger::Logger::Levels::warn)
-      .value("error", Envoy::Logger::Logger::Levels::error)
-      .value("critical", Envoy::Logger::Logger::Levels::critical)
-      .value("off", Envoy::Logger::Logger::Levels::off);
+  py::enum_<Envoy::Logger::Levels>(m, "LogLevel")
+      .value("trace", Envoy::Logger::Levels::trace)
+      .value("debug", Envoy::Logger::Levels::debug)
+      .value("info", Envoy::Logger::Levels::info)
+      .value("warn", Envoy::Logger::Levels::warn)
+      .value("error", Envoy::Logger::Levels::error)
+      .value("critical", Envoy::Logger::Levels::critical)
+      .value("off", Envoy::Logger::Levels::off);
 
   py::enum_<envoy_status_t>(m, "EnvoyStatus")
       .value("success", ENVOY_SUCCESS)
@@ -93,7 +93,7 @@ PYBIND11_MODULE(envoy_engine, m) {
           },
           [](Envoy::EnvoyError& e, py::object val) {
             if (val.is_none()) {
-              e.attempt_count_ = absl::nullopt;
+              e.attempt_count_ = std::nullopt;
             } else {
               e.attempt_count_ = val.cast<int>();
             }
@@ -164,10 +164,12 @@ PYBIND11_MODULE(envoy_engine, m) {
   // -- Engine --
 
   py::class_<Envoy::Platform::Engine, Envoy::Platform::EngineSharedPtr>(m, "Engine")
-      .def("stream_client", &Envoy::Platform::Engine::streamClient)
+      .def("stream_client", &Envoy::Platform::Engine::streamClient, py::arg("listener_name") = "")
       .def("terminate", &Envoy::Platform::Engine::terminate,
            py::call_guard<py::gil_scoped_release>())
       .def("dump_stats", &Envoy::Platform::Engine::dumpStats,
+           py::call_guard<py::gil_scoped_release>())
+      .def("drain_connections_by_socket_tag", &Envoy::Platform::Engine::drainConnectionsBySocketTag,
            py::call_guard<py::gil_scoped_release>());
 
   // -- EngineBuilder --
@@ -176,7 +178,7 @@ PYBIND11_MODULE(envoy_engine, m) {
       .def(py::init<>())
       .def(
           "set_log_level",
-          [](Envoy::Platform::EngineBuilder& self, Envoy::Logger::Logger::Levels level)
+          [](Envoy::Platform::EngineBuilder& self, Envoy::Logger::Levels level)
               -> Envoy::Platform::EngineBuilder& { return self.setLogLevel(level); },
           py::arg("log_level"), py::return_value_policy::reference)
       .def(
@@ -378,6 +380,12 @@ PYBIND11_MODULE(envoy_engine, m) {
             return self.enableStatsCollection(on);
           },
           py::arg("stats_collection_on"), py::return_value_policy::reference)
+      .def(
+          "enable_worker_thread",
+          [](Envoy::Platform::EngineBuilder& self, bool on) -> Envoy::Platform::EngineBuilder& {
+            return self.enableWorkerThread(on);
+          },
+          py::arg("use_worker_thread_on"), py::return_value_policy::reference)
       .def("build", &Envoy::Platform::EngineBuilder::build,
            py::call_guard<py::gil_scoped_release>());
 }

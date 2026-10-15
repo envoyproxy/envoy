@@ -13,12 +13,17 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/datasource.h"
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/escaping.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -106,13 +111,18 @@ void parseOptionsFromTable(lua_State* state, int index,
   }
 }
 
-const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks->route() == nullptr) {
+const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks, absl::string_view ns) {
+  if (!callbacks->route()) {
     return Protobuf::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->metadata();
 
-  {
+  if (!ns.empty()) {
+    auto filter_it = metadata.filter_metadata().find(ns);
+    if (filter_it != metadata.filter_metadata().end()) {
+      return filter_it->second;
+    }
+  } else {
     auto filter_it = metadata.filter_metadata().find(callbacks->filterConfigName());
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
@@ -193,10 +203,114 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
 
+// Joins configured search patterns into the ';'-separated form Lua's package.path uses.
+Filters::Common::Lua::PackagePaths
+packagePaths(const Protobuf::RepeatedPtrField<std::string>& paths,
+             const Protobuf::RepeatedPtrField<std::string>& cpaths) {
+  return {absl::StrJoin(paths, ";"), absl::StrJoin(cpaths, ";")};
+}
+
+// Looks up (creating if necessary) the process-wide `lua.lua_vm_count` gauge directly on the
+// given server root scope. Both the filter-config-level and route-level VM setups call this same
+// helper against the server root scope so the stat name is always identical, regardless of
+// listener/route stat prefixes.
+Stats::Gauge& lookupLuaVmCountGauge(Stats::Scope& server_scope) {
+  Stats::StatNameManagedStorage stat_name("lua.lua_vm_count", server_scope.symbolTable());
+  return server_scope.gaugeFromStatName(stat_name.statName(), Stats::Gauge::ImportMode::Accumulate);
+}
+
 } // namespace
 
-PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
-    : lua_state_(lua_code, tls) {
+SINGLETON_MANAGER_REGISTRATION(lua_shared_http_filter_code_setups);
+
+namespace {
+
+// Identifies a shareable VM setup. The digest covers the package search paths as well as the
+// code, because two configurations that agree on an id and on a script but disagree on where
+// `require` looks for modules do not describe equivalent VMs and must not share one. Each part
+// is length-prefixed so that no two distinct inputs produce the same string to digest.
+std::string sharedVmKey(absl::string_view shared_vm_id, absl::string_view lua_code,
+                        const Filters::Common::Lua::PackagePaths& package_paths) {
+  const std::string digest_input =
+      absl::StrCat(lua_code.size(), ":", lua_code, package_paths.path.size(), ":",
+                   package_paths.path, package_paths.cpath.size(), ":", package_paths.cpath);
+  // The digest is a fixed-length hex string at the end of the key, so an id that happens to
+  // contain the separator cannot be mistaken for a different id with a different digest.
+  return absl::StrCat(
+      shared_vm_id, "/",
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(digest_input)));
+}
+
+SharedLuaCodeSetupRegistrySharedPtr sharedCodeSetupRegistry(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<SharedLuaCodeSetupRegistry>(
+      SINGLETON_MANAGER_REGISTERED_NAME(lua_shared_http_filter_code_setups),
+      [] { return std::make_shared<SharedLuaCodeSetupRegistry>(); });
+}
+
+// Builds the VM setup for one configured script, reusing an already built one when the
+// configuration opted into sharing. `registry` is null when it did not, which keeps the
+// original behavior of one dedicated set of VMs per configured script.
+PerLuaCodeSetupSharedPtr
+createPerLuaCodeSetup(const SharedLuaCodeSetupRegistrySharedPtr& registry,
+                      absl::string_view shared_vm_id, const std::string& lua_code,
+                      const Filters::Common::Lua::PackagePaths& package_paths,
+                      ThreadLocal::SlotAllocator& tls, Stats::Gauge& vm_count_gauge,
+                      uint32_t concurrency, absl::Status& creation_status) {
+  if (registry == nullptr) {
+    return std::make_shared<PerLuaCodeSetup>(lua_code, package_paths, tls, vm_count_gauge,
+                                             concurrency, creation_status);
+  }
+  return registry->getOrCreate(shared_vm_id, lua_code, package_paths, tls, vm_count_gauge,
+                               concurrency, creation_status);
+}
+
+} // namespace
+
+PerLuaCodeSetupSharedPtr SharedLuaCodeSetupRegistry::getOrCreate(
+    absl::string_view shared_vm_id, const std::string& lua_code,
+    const Filters::Common::Lua::PackagePaths& package_paths, ThreadLocal::SlotAllocator& tls,
+    Stats::Gauge& vm_count_gauge, uint32_t concurrency, absl::Status& creation_status) {
+  // Filter and route configurations are only ever built on the main thread, so the map needs no
+  // lock. Nothing touches it when a setup is released, which is what makes that safe: a setup
+  // whose last owner goes away on a worker thread just leaves an expired entry behind.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  const std::string key = sharedVmKey(shared_vm_id, lua_code, package_paths);
+  const auto it = setups_.find(key);
+  if (it != setups_.end()) {
+    if (PerLuaCodeSetupSharedPtr setup = it->second.lock()) {
+      ENVOY_LOG(debug, "reusing shared Lua VM for shared_vm_id '{}'", shared_vm_id);
+      return setup;
+    }
+  }
+
+  PerLuaCodeSetupSharedPtr setup = std::make_shared<PerLuaCodeSetup>(
+      lua_code, package_paths, tls, vm_count_gauge, concurrency, creation_status);
+  if (!creation_status.ok()) {
+    // A script that does not parse is rejected for this configuration; it must not be handed to
+    // the next one that asks for the same id.
+    return nullptr;
+  }
+
+  // Drop the entries whose last user has gone away, so that a server churning through scripts
+  // over its lifetime does not accumulate dead keys.
+  absl::erase_if(setups_, [](const auto& entry) { return entry.second.expired(); });
+  setups_[key] = setup;
+  ENVOY_LOG(debug, "created shared Lua VM for shared_vm_id '{}'", shared_vm_id);
+  return setup;
+}
+
+PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code,
+                                 const Filters::Common::Lua::PackagePaths& package_paths,
+                                 ThreadLocal::SlotAllocator& tls, Stats::Gauge& vm_count_gauge,
+                                 uint32_t concurrency, absl::Status& creation_status)
+    : lua_state_(lua_code, package_paths, tls, creation_status), vm_count_gauge_(vm_count_gauge),
+      vm_count_delta_(concurrency + 1) {
+  // Account for this VM up-front so the count stays balanced with the destructor's sub() even if
+  // construction stops early below.
+  vm_count_gauge_.add(vm_count_delta_);
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+
   lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
@@ -216,14 +330,22 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
   lua_state_.registerType<VirtualHostWrapper>();
   lua_state_.registerType<RouteWrapper>();
+  lua_state_.registerType<CounterWrapper>();
+  lua_state_.registerType<GaugeWrapper>();
+  lua_state_.registerType<HistogramWrapper>();
+  lua_state_.registerType<StatsScopeWrapper>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
       {
           [](lua_State* state) {
             lua_newtable(state);
-            { LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond); }
-            { LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond); }
+            {
+              LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
+            }
+            {
+              LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond);
+            }
             lua_setglobal(state, "EnvoyTimestampResolution");
           },
           // Add more initializers here.
@@ -240,21 +362,28 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   }
 }
 
+PerLuaCodeSetup::~PerLuaCodeSetup() { vm_count_gauge_.sub(vm_count_delta_); }
+
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
                                          Http::RequestOrResponseHeaderMap& headers, bool end_stream,
                                          Filter& filter, FilterCallbacks& callbacks,
                                          TimeSource& time_source)
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
-      callbacks_(callbacks), yield_callback_([this]() {
+      callbacks_(callbacks), yield_callback_([this]() -> absl::Status {
         if (state_ == State::Running) {
-          throw Filters::Common::Lua::LuaException("script performed an unexpected yield");
+          return absl::InternalError("script performed an unexpected yield");
         }
+        return absl::OkStatus();
       }),
       time_source_(time_source) {}
 
 Http::FilterHeadersStatus StreamHandleWrapper::start(int function_ref) {
   // We are on the top of the stack.
-  coroutine_.start(function_ref, 1, yield_callback_);
+  coroutine_status_ = coroutine_.start(function_ref, 1, yield_callback_);
+  if (!coroutine_status_.ok()) {
+    // The Filter observes coroutine_status_ after this returns and reports the error.
+    return Http::FilterHeadersStatus::Continue;
+  }
   Http::FilterHeadersStatus status =
       (state_ == State::WaitForBody || state_ == State::HttpCall || state_ == State::Responded)
           ? Http::FilterHeadersStatus::StopIteration
@@ -277,16 +406,21 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
         Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
-    resumeCoroutine(1, yield_callback_);
+    coroutine_status_ = resumeCoroutine(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
     ENVOY_LOG(debug, "resuming body due to end stream");
     callbacks_.addData(data);
     state_ = State::Running;
-    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
+    coroutine_status_ = resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   } else if (state_ == State::WaitForTrailers && end_stream_) {
     ENVOY_LOG(debug, "resuming nil trailers due to end stream");
     state_ = State::Running;
-    resumeCoroutine(0, yield_callback_);
+    coroutine_status_ = resumeCoroutine(0, yield_callback_);
+  }
+
+  if (!coroutine_status_.ok()) {
+    // The Filter observes coroutine_status_ after this returns and reports the error.
+    return Http::FilterDataStatus::Continue;
   }
 
   if (state_ == State::HttpCall) {
@@ -310,17 +444,22 @@ Http::FilterTrailersStatus StreamHandleWrapper::onTrailers(Http::HeaderMap& trai
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(debug, "resuming nil body chunk due to trailers");
     state_ = State::Running;
-    resumeCoroutine(0, yield_callback_);
+    coroutine_status_ = resumeCoroutine(0, yield_callback_);
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(debug, "resuming body due to trailers");
     state_ = State::Running;
-    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
+    coroutine_status_ = resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   }
 
-  if (state_ == State::WaitForTrailers) {
+  if (coroutine_status_.ok() && state_ == State::WaitForTrailers) {
     // Mimic a call to trailers which will push the trailers onto the stack and then resume.
     state_ = State::Running;
-    resumeCoroutine(luaTrailers(coroutine_.luaState()), yield_callback_);
+    coroutine_status_ = resumeCoroutine(luaTrailers(coroutine_.luaState()), yield_callback_);
+  }
+
+  if (!coroutine_status_.ok()) {
+    // The Filter observes coroutine_status_ after this returns and reports the error.
+    return Http::FilterTrailersStatus::Continue;
   }
 
   Http::FilterTrailersStatus status = (state_ == State::HttpCall || state_ == State::Responded)
@@ -374,7 +513,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
       // By default, do not enforce a sampling decision on this `httpCall`'s span.
       // Instead, reuse the parent span's sampling decision. Callers can override
       // this default with the `trace_sampled` flag in the table argument below.
-      .setSampled(absl::nullopt);
+      .setSampled(std::nullopt);
 
   // Check if the last argument is table of options. For example:
   // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
@@ -483,11 +622,12 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     state_ = State::Running;
     markLive();
 
-    TRY_NEEDS_AUDIT {
-      resumeCoroutine(2, yield_callback_);
+    const absl::Status status = resumeCoroutine(2, yield_callback_);
+    if (status.ok()) {
       markDead();
+    } else {
+      filter_.scriptError(status);
     }
-    END_TRY catch (const Filters::Common::Lua::LuaException& e) { filter_.scriptError(e); }
 
     if (state_ == State::Running) {
       headers_continued_ = true;
@@ -533,6 +673,35 @@ int StreamHandleWrapper::luaHeaders(lua_State* state) {
                                                     }),
                            true);
   }
+  return 1;
+}
+
+int StreamHandleWrapper::luaRequestHeaders(lua_State* state) {
+  ASSERT(state_ == State::Running);
+
+  if (request_headers_wrapper_.get() != nullptr) {
+    request_headers_wrapper_.pushStack();
+    return 1;
+  }
+
+  Http::RequestHeaderMapOptRef request_headers = callbacks_.requestHeaders();
+  if (!request_headers.has_value()) {
+    // Push nil rather than returning no values. A lua_CFunction that returns 0 yields *nothing*,
+    // which is not the same as nil: `tostring(handle:requestHeaders())` then raises "value
+    // expected" instead of evaluating, and because scriptError() continues the filter chain the
+    // script silently stops running. Returning a real nil keeps the documented contract usable in
+    // an argument position, and matches luaBase64Decode above.
+    lua_pushnil(state);
+    return 1;
+  }
+
+  // Always modifiable. Request headers stay on the stream for the whole encode path, so unlike the
+  // response headers there is no point at which they are continued on and the write window closes.
+  // Writing to them on the response path is what makes this useful for logging and tracing, and is
+  // what native C++ encode-path filters already do through
+  // StreamEncoderFilterCallbacks::requestHeaders().
+  request_headers_wrapper_.reset(
+      HeaderMapWrapper::create(state, request_headers.value().get(), [] { return true; }), true);
   return 1;
 }
 
@@ -629,11 +798,15 @@ int StreamHandleWrapper::luaTrailers(lua_State* state) {
 
 int StreamHandleWrapper::luaMetadata(lua_State* state) {
   ASSERT(state_ == State::Running);
-  if (metadata_wrapper_.get() != nullptr) {
-    metadata_wrapper_.pushStack();
+  const absl::string_view ns = lua_isnoneornil(state, 2)
+                                   ? absl::string_view()
+                                   : Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  if (auto it = metadata_wrappers_.find(ns); it != metadata_wrappers_.end()) {
+    it->second.pushStack();
   } else {
-    metadata_wrapper_.reset(
-        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.metadata()), true);
+    const auto wrapper =
+        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.metadata(ns));
+    metadata_wrappers_[ns].reset(wrapper, true);
   }
   return 1;
 }
@@ -673,11 +846,16 @@ int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
 
 int StreamHandleWrapper::luaConnectionStreamInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
+  const auto* connection = callbacks_.connection();
+  if (connection == nullptr) {
+    lua_pushnil(state);
+    return 1;
+  }
   if (connection_stream_info_wrapper_.get() != nullptr) {
     connection_stream_info_wrapper_.pushStack();
   } else {
     connection_stream_info_wrapper_.reset(
-        ConnectionStreamInfoWrapper::create(state, callbacks_.connection()->streamInfo()), true);
+        ConnectionStreamInfoWrapper::create(state, connection->streamInfo()), true);
   }
   return 1;
 }
@@ -767,6 +945,20 @@ int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaBase64Decode(lua_State* state) {
+  absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  std::string output;
+  if (!absl::Base64Unescape(input, &output)) {
+    // Returning nil rather than raising keeps a malformed value recoverable by the script, which
+    // is the common case when the input came from a header or an upstream response body.
+    lua_pushnil(state);
+    return 1;
+  }
+  lua_pushlstring(state, output.data(), output.size());
+
+  return 1;
+}
+
 int StreamHandleWrapper::luaTimestamp(lua_State* state) {
   auto now = time_source_.systemTime().time_since_epoch();
 
@@ -829,47 +1021,79 @@ StreamHandleWrapper::getTimestampResolution(absl::string_view unit_parameter) {
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                            ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
-                           Stats::Scope& scope, const std::string& stats_prefix)
+                           Stats::Scope& scope, const std::string& stats_prefix,
+                           uint32_t concurrency, Singleton::Manager& singleton_manager,
+                           absl::Status& creation_status)
     : cluster_manager_(cluster_manager),
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
-      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
+      filter_context_(proto_config.filter_context()),
+      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
+      lua_stats_scope_(
+          scope.createScope(proto_config.stat_prefix().empty()
+                                ? absl::StrCat(stats_prefix, "lua")
+                                : absl::StrCat(stats_prefix, "lua.", proto_config.stat_prefix()))) {
+  Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(api.rootScope());
+  const Filters::Common::Lua::PackagePaths package_paths =
+      packagePaths(proto_config.package_paths(), proto_config.package_cpaths());
+  // Left null when no id is configured, which is what tells the helper below to build VMs that
+  // belong to this configuration alone.
+  if (!proto_config.shared_vm_id().empty()) {
+    shared_code_setup_registry_ = sharedCodeSetupRegistry(singleton_manager);
+  }
+
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
-      throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
-                           "for the Lua filter.");
+      SET_AND_RETURN(
+          absl::InvalidArgumentError("Error: Only one of `inline_code` or `default_source_code` "
+                                     "can be set for the Lua filter."),
+          creation_status);
     }
 
-    const std::string code = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(proto_config.default_source_code(), true, api), std::string);
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
+    auto code_or = Config::DataSource::read(proto_config.default_source_code(), true, api);
+    SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
+    default_lua_code_setup_ = createPerLuaCodeSetup(
+        shared_code_setup_registry_, proto_config.shared_vm_id(), code_or.value(), package_paths,
+        tls, vm_count_gauge, concurrency, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   } else if (!proto_config.inline_code().empty()) {
-    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
+    default_lua_code_setup_ = createPerLuaCodeSetup(
+        shared_code_setup_registry_, proto_config.shared_vm_id(), proto_config.inline_code(),
+        package_paths, tls, vm_count_gauge, concurrency, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   }
 
   for (const auto& source : proto_config.source_codes()) {
-    const std::string code =
-        THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
-    auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
-    if (!per_lua_code_setup_ptr) {
-      continue;
-    }
+    auto code_or = Config::DataSource::read(source.second, true, api);
+    SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
+    auto per_lua_code_setup_ptr = createPerLuaCodeSetup(
+        shared_code_setup_registry_, proto_config.shared_vm_id(), code_or.value(), package_paths,
+        tls, vm_count_gauge, concurrency, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
     per_lua_code_setups_map_[source.first] = std::move(per_lua_code_setup_ptr);
   }
 }
 
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
-    Server::Configuration::ServerFactoryContext& context)
-    : disabled_(config.disabled()), name_(config.name()), filter_context_(config.filter_context()) {
+    Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
+    : disabled_(config.disabled()), name_(config.name()),
+      has_filter_context_(config.has_filter_context()), filter_context_(config.filter_context()) {
   if (disabled_ || !name_.empty()) {
     return; // Filter is disabled or explicit script name is provided.
   }
   if (config.has_source_code()) {
     // Read and parse the inline Lua code defined in the route configuration.
-    const std::string code_str = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(config.source_code(), true, context.api()), std::string);
-    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+    auto code_or = Config::DataSource::read(config.source_code(), true, context.api());
+    SET_AND_RETURN_IF_NOT_OK(code_or.status(), creation_status);
+    Stats::Gauge& vm_count_gauge = lookupLuaVmCountGauge(context.api().rootScope());
+    if (!config.shared_vm_id().empty()) {
+      shared_code_setup_registry_ = sharedCodeSetupRegistry(context.singletonManager());
+    }
+    per_lua_code_setup_ptr_ = createPerLuaCodeSetup(
+        shared_code_setup_registry_, config.shared_vm_id(), code_or.value(),
+        packagePaths(config.package_paths(), config.package_cpaths()), context.threadLocal(),
+        vm_count_gauge, context.options().concurrency(), creation_status);
   }
 }
 
@@ -897,16 +1121,18 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
                                            *this, callbacks, time_source_),
                true);
 
-  Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
-  TRY_NEEDS_AUDIT {
-    // The counter will increment twice if the supplied script has both request and response
-    // handles. This is intentionally kept so as to provide consistency with the way the 'errors'
-    // counter is incremented.
-    stats_.executions_.inc();
-    status = handle.get()->start(function_ref);
+  // The counter will increment twice if the supplied script has both request and response
+  // handles. This is intentionally kept so as to provide consistency with the way the 'errors'
+  // counter is incremented.
+  stats_.executions_.inc();
+  Http::FilterHeadersStatus status = handle.get()->start(function_ref);
+  // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
+  const absl::Status coroutine_status = handle.get()->coroutineStatus();
+  if (coroutine_status.ok()) {
     handle.markDead();
+  } else {
+    scriptError(coroutine_status);
   }
-  END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
 
   return status;
 }
@@ -915,12 +1141,15 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
                                       bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
-    TRY_NEEDS_AUDIT {
-      handle.markLive();
-      status = handle.get()->onData(data, end_stream);
+    handle.markLive();
+    status = handle.get()->onData(data, end_stream);
+    // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
+    const absl::Status coroutine_status = handle.get()->coroutineStatus();
+    if (coroutine_status.ok()) {
       handle.markDead();
+    } else {
+      scriptError(coroutine_status);
     }
-    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
@@ -929,20 +1158,23 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
 Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
-    TRY_NEEDS_AUDIT {
-      handle.markLive();
-      status = handle.get()->onTrailers(trailers);
+    handle.markLive();
+    status = handle.get()->onTrailers(trailers);
+    // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
+    const absl::Status coroutine_status = handle.get()->coroutineStatus();
+    if (coroutine_status.ok()) {
       handle.markDead();
+    } else {
+      scriptError(coroutine_status);
     }
-    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
 }
 
-void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
+void Filter::scriptError(const absl::Status& status) {
   stats_.errors_.inc();
-  scriptLog(spdlog::level::err, e.what());
+  scriptLog(spdlog::level::err, status.message());
   request_stream_wrapper_.reset();
   response_stream_wrapper_.reset();
 }
@@ -967,8 +1199,8 @@ int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
     strict = lua_toboolean(state, 3);
   }
 
-  // Set the upstream override host
-  callbacks_.setUpstreamOverrideHost(std::make_pair(std::string(host, len), strict));
+  callbacks_.setUpstreamOverrideHost(
+      Upstream::LoadBalancerContext::OverrideHost{std::string(host, len), strict});
 
   return 0;
 }
@@ -989,6 +1221,16 @@ int StreamHandleWrapper::luaFilterContext(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaStats(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (stats_scope_wrapper_.get() != nullptr) {
+    stats_scope_wrapper_.pushStack();
+  } else {
+    stats_scope_wrapper_.reset(StatsScopeWrapper::create(state, callbacks_.statsScope()), true);
+  }
+  return 1;
+}
+
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
   uint64_t status = Http::Utility::getResponseStatus(*headers);
@@ -1001,12 +1243,12 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
         });
   };
   callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
-                             modify_headers, absl::nullopt,
+                             modify_headers, std::nullopt,
                              HttpResponseCodeDetails::get().LuaResponse);
 }
 
-const Protobuf::Struct& Filter::DecoderCallbacks::metadata() const {
-  return getMetadata(callbacks_);
+const Protobuf::Struct& Filter::DecoderCallbacks::metadata(absl::string_view ns) const {
+  return getMetadata(callbacks_, ns);
 }
 
 void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Instance*,
@@ -1016,8 +1258,8 @@ void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Ins
   luaL_error(state, "respond not currently supported in the response path");
 }
 
-const Protobuf::Struct& Filter::EncoderCallbacks::metadata() const {
-  return getMetadata(callbacks_);
+const Protobuf::Struct& Filter::EncoderCallbacks::metadata(absl::string_view ns) const {
+  return getMetadata(callbacks_, ns);
 }
 
 } // namespace Lua

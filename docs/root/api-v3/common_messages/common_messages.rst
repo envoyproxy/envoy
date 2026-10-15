@@ -9,6 +9,8 @@ Common messages
   ../config/core/v3/backoff.proto
   ../service/discovery/v3/discovery.proto
   ../extensions/filters/common/fault/v3/fault.proto
+  ../extensions/filters/common/jwks/v3/jwks.proto
+  ../extensions/filters/common/jwks/v3/jwt_handshake.proto
   ../config/core/v3/base.proto
   ../config/core/v3/cel.proto
   ../extensions/filters/common/matcher/action/v3/skip_action.proto
@@ -36,9 +38,11 @@ Common messages
   ../config/common/mutation_rules/v3/mutation_rules.proto
   ../extensions/early_data/v3/default_early_data_policy.proto
   ../config/core/v3/http_uri.proto
+  ../type/v3/scope.proto
   ../extensions/matching/input_matchers/ip/v3/ip.proto
   ../extensions/matching/input_matchers/metadata/v3/metadata.proto
   ../extensions/matching/input_matchers/runtime_fraction/v3/runtime_fraction.proto
+  ../extensions/matching/input_matchers/uri_template/v3/uri_template.proto
   ../config/core/v3/address.proto
   ../config/core/v3/protocol.proto
   ../config/core/v3/proxy_protocol.proto

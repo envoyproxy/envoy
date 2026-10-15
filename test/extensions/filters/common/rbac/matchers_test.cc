@@ -12,13 +12,17 @@
 #include "source/extensions/filters/common/rbac/principals/mtls_authenticated/mtls_authenticated.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
@@ -527,7 +531,7 @@ TEST(MtlsAuthenticatedMatcher, ValidateConfig) {
   envoy::extensions::rbac::principals::mtls_authenticated::v3::Config
       mtls_authenticated; // Leave empty which is invalid.
   envoy::config::rbac::v3::Principal principal;
-  principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
+  std::ignore = principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
   EXPECT_THROW_WITH_MESSAGE(
       { Matcher::create(principal, factory_context); }, EnvoyException,
       "envoy.rbac.principals.mtls_authenticated did not have any configured "
@@ -545,13 +549,13 @@ TEST(MtlsAuthenticatedMatcher, NoSSL) {
   envoy::extensions::rbac::principals::mtls_authenticated::v3::Config mtls_authenticated;
   mtls_authenticated.set_any_validated_client_certificate(true);
   envoy::config::rbac::v3::Principal principal;
-  principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
+  std::ignore = principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
   checkMatcher(*Matcher::create(principal, factory_context), false, conn);
 
   auto* matcher = mtls_authenticated.mutable_san_matcher();
   matcher->set_san_type(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
   matcher->mutable_matcher()->MergeFrom(TestUtility::createRegexMatcher(".*"));
-  principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
+  std::ignore = principal.mutable_custom()->mutable_typed_config()->PackFrom(mtls_authenticated);
   checkMatcher(*Matcher::create(principal, factory_context), false, conn);
 }
 
@@ -626,6 +630,21 @@ TEST(MtlsAuthenticatedMatcher, SanMatcher) {
   name = "wrong";
   ASN1_STRING_set(san.d.dNSName, name.data(), name.length());
   checkMatcher(Principals::MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+}
+
+TEST(MtlsAuthenticatedMatcher, InvalidOid) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  envoy::extensions::rbac::principals::mtls_authenticated::v3::Config auth;
+  auto* matcher = auth.mutable_san_matcher();
+  matcher->set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::OTHER_NAME);
+  matcher->mutable_matcher()->set_exact("test_value");
+  matcher->set_oid("not_a_valid_oid");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      { Principals::MtlsAuthenticatedMatcher m(auth, factory_context); }, EnvoyException,
+      "Failed to create SAN matcher for OTHER_NAME with OID: not_a_valid_oid");
 }
 
 TEST(MetadataMatcher, MetadataMatcher) {
@@ -777,7 +796,7 @@ TEST(PathMatcher, ValidPathInHeader) {
 
 class TestObject : public StreamInfo::FilterState::Object {
 public:
-  absl::optional<std::string> serializeAsString() const override { return "test.value"; }
+  std::optional<std::string> serializeAsString() const override { return "test.value"; }
 };
 
 TEST(FilterStateMatcher, FilterStateMatcher) {
@@ -793,8 +812,7 @@ TEST(FilterStateMatcher, FilterStateMatcher) {
   matcher.mutable_string_match()->set_prefix("test");
 
   checkMatcher(FilterStateMatcher(matcher, context), false, conn, header, info);
-  filter_state.setData("test.key", std::make_shared<TestObject>(),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state.setData("test.key", std::make_shared<TestObject>());
   checkMatcher(FilterStateMatcher(matcher, context), true, conn, header, info);
 }
 
@@ -862,7 +880,7 @@ TEST(MetadataMatcher, SourcedMetadataMatcher) {
   route_metadata.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", route_label));
   EXPECT_CALL(*route, metadata()).WillRepeatedly(ReturnRef(route_metadata));
-  EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.route_ = route;
 
   // Test DYNAMIC source metadata match
   {
@@ -902,7 +920,7 @@ TEST(MetadataMatcher, SourcedMetadataMatcher) {
 
   // Test ROUTE source with null route
   {
-    EXPECT_CALL(info, route()).WillRepeatedly(Return(nullptr));
+    info.route_ = nullptr;
 
     envoy::type::matcher::v3::MetadataMatcher matcher;
     matcher.set_filter("rbac");
@@ -1011,6 +1029,51 @@ TEST(HeaderMatcher, MultipleHeaderValues) {
   config.mutable_string_match()->set_contains("value1");
   RBAC::HeaderMatcher matcher5(config, factory_context);
   checkMatcher(matcher5, true, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(HeaderMatcher, TreatMissingAsEmpty) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::route::v3::HeaderMatcher config;
+  config.set_name("optional-header");
+  config.set_treat_missing_header_as_empty(true);
+
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  Envoy::Http::LowerCaseString header_name("optional-header");
+
+  // Missing header with exact empty string match should succeed
+  config.mutable_string_match()->set_exact("");
+  RBAC::HeaderMatcher matcher1(config, factory_context);
+  checkMatcher(matcher1, true, Envoy::Network::MockConnection(), headers);
+
+  // Missing header with non-empty exact match should fail
+  config.mutable_string_match()->set_exact("some-value");
+  RBAC::HeaderMatcher matcher2(config, factory_context);
+  checkMatcher(matcher2, false, Envoy::Network::MockConnection(), headers);
+
+  // Missing header with prefix match on empty prefix should succeed
+  config.mutable_string_match()->set_prefix("");
+  RBAC::HeaderMatcher matcher3(config, factory_context);
+  checkMatcher(matcher3, true, Envoy::Network::MockConnection(), headers);
+
+  // Missing header with non-empty prefix should fail
+  config.mutable_string_match()->set_prefix("pre");
+  RBAC::HeaderMatcher matcher4(config, factory_context);
+  checkMatcher(matcher4, false, Envoy::Network::MockConnection(), headers);
+
+  // Header present with matching value should still work
+  headers.setReference(header_name, "some-value");
+  config.mutable_string_match()->set_exact("some-value");
+  RBAC::HeaderMatcher matcher5(config, factory_context);
+  checkMatcher(matcher5, true, Envoy::Network::MockConnection(), headers);
+
+  // With invert_match=true, missing header treated as empty should match
+  // when the pattern doesn't match empty string
+  headers.remove(header_name);
+  config.set_invert_match(true);
+  config.mutable_string_match()->set_exact("non-empty-value");
+  RBAC::HeaderMatcher matcher6(config, factory_context);
+  // Empty string doesn't match "non-empty-value", and invert_match=true, so should return true
+  checkMatcher(matcher6, true, Envoy::Network::MockConnection(), headers);
 }
 
 TEST(AuthenticatedMatcher, EmptyCertificateFields) {
@@ -1134,8 +1197,7 @@ TEST(PrincipalMatcher, UrlPathAndFilterState) {
 
   NiceMock<StreamInfo::MockStreamInfo> info;
   StreamInfo::FilterStateImpl filter_state_impl(StreamInfo::FilterState::LifeSpan::Connection);
-  filter_state_impl.setData("test.key", std::make_shared<TestObject>(),
-                            StreamInfo::FilterState::StateType::ReadOnly);
+  filter_state_impl.setData("test.key", std::make_shared<TestObject>());
   EXPECT_CALL(Const(info), filterState()).WillRepeatedly(ReturnRef(filter_state_impl));
 
   auto matcher_filter_state = Matcher::create(principal_filter_state, factory_context);
@@ -1268,8 +1330,7 @@ TEST(IPMatcher, CreateWithInvalidCidrRange) {
   invalid_range->mutable_prefix_len()->set_value(24);
 
   auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to create CIDR range"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Failed to create CIDR range")));
 }
 
 TEST(IPMatcher, CreateWithEmptyRangeList) {
@@ -1277,8 +1338,7 @@ TEST(IPMatcher, CreateWithEmptyRangeList) {
   Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> empty_ranges;
 
   auto result = IPMatcher::create(empty_ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr("Empty IP range list provided"));
+  EXPECT_THAT(result, HasStatusMessage(testing::HasSubstr("Empty IP range list provided")));
 }
 
 TEST(IPMatcher, MatchesWithNullIpAddress) {
@@ -1345,8 +1405,7 @@ TEST(IPMatcher, MultipleRangesCreateSuccess) {
   range3->mutable_prefix_len()->set_value(32);
 
   auto result = IPMatcher::create(ranges, IPMatcher::Type::ConnectionRemote);
-  EXPECT_TRUE(result.ok());
-  EXPECT_NE(result.value(), nullptr);
+  EXPECT_THAT(result, IsOkAndHolds(::testing::NotNull()));
 
   // Test that the created matcher works
   NiceMock<Envoy::Network::MockConnection> conn;
@@ -1842,6 +1901,125 @@ TEST(PrincipalMatcher, MetadataCreation) {
 
   checkMatcher(*matcher, true, Envoy::Network::MockConnection(),
                Envoy::Http::TestRequestHeaderMapImpl(), info);
+}
+
+TEST(PathMatcher, PathParametersBypass) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->set_exact("/exact/value");
+
+  // Case 1: ignore_path_parameters_in_path_matching = false (default)
+  // Request path: "/exact;foo=bar/value;ver=1"
+  // It should NOT match because the parameter is not ignored, so "/exact;foo=bar" != "/exact"
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(false));
+
+    headers.setPath("/exact;foo=bar/value;ver=1");
+    checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers,
+                 info);
+  }
+
+  // Case 2: ignore_path_parameters_in_path_matching = true
+  // Request path: "/exact;foo=bar/value;ver=1"
+  // It SHOULD match because the parameter is ignored, so it is sanitized to "/exact"
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(true));
+
+    headers.setPath("/exact;foo=bar/value;ver=1");
+    checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers,
+                 info);
+  }
+
+  // Case 3: ignore_path_parameters_in_path_matching = true, BUT rbac_respect_ignore_path_parameters
+  // is false (disabled) Request path: "/exact;foo=bar" It should NOT match because the runtime flag
+  // is disabled.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.rbac_respect_ignore_path_parameters", "false"}});
+
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(true));
+
+    headers.setPath("/exact;foo=bar/value;ver=1");
+    checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers,
+                 info);
+  }
+}
+
+TEST(UriTemplateMatcher, PathMatchingWithParameters) {
+  envoy::extensions::path::match::uri_template::v3::UriTemplateMatchConfig
+      uri_template_match_config;
+  uri_template_match_config.set_path_template("/bar/{lang}/target");
+  Router::PathMatcherSharedPtr raw_matcher =
+      std::make_shared<Envoy::Extensions::UriTemplate::Match::UriTemplateMatcher>(
+          uri_template_match_config);
+  UriTemplateMatcher matcher(raw_matcher);
+
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+
+  // Case 1: ignore_path_parameters_in_path_matching = false (default)
+  // Request path: "/bar/lang;ver=1/target;foo=bar"
+  // It should NOT match.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(false));
+
+    headers.setPath("/bar/lang;ver=1/target;foo=bar");
+    checkMatcher(matcher, false, Envoy::Network::MockConnection(), headers, info);
+  }
+
+  // Case 2: ignore_path_parameters_in_path_matching = true
+  // Request path: "/bar/lang;ver=1/target;foo=bar"
+  // It SHOULD match.
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(true));
+
+    headers.setPath("/bar/lang;ver=1/target;foo=bar");
+    checkMatcher(matcher, true, Envoy::Network::MockConnection(), headers, info);
+  }
+
+  // Case 3: ignore_path_parameters_in_path_matching = true, BUT rbac_respect_ignore_path_parameters
+  // is false (disabled) Request path: "/bar/lang;ver=1/target;foo=bar" It should NOT match.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.rbac_respect_ignore_path_parameters", "false"}});
+
+    NiceMock<StreamInfo::MockStreamInfo> info;
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(OptRef<const Router::Route>(*route)));
+    NiceMock<Router::MockConfig> route_config;
+    EXPECT_CALL(*route->virtual_host_, routeConfig()).WillRepeatedly(ReturnRef(route_config));
+    EXPECT_CALL(route_config, ignorePathParametersInPathMatching()).WillRepeatedly(Return(true));
+
+    headers.setPath("/bar/lang;ver=1/target;foo=bar");
+    checkMatcher(matcher, false, Envoy::Network::MockConnection(), headers, info);
+  }
 }
 
 } // namespace

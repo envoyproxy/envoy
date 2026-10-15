@@ -1,13 +1,15 @@
 #pragma once
 
-#include "envoy/common/optref.h"
+#include <functional>
+#include <string>
+
 #include "envoy/common/pure.h"
 #include "envoy/config/extension_config_provider.h"
 #include "envoy/network/filter.h"
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "absl/types/optional.h"
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Config {

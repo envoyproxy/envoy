@@ -40,6 +40,7 @@ public:
   std::string config() const override;
 
   // Provides JSON configuration for debug logging.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const nlohmann::json& config_json() const;
 
 private:

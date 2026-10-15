@@ -54,12 +54,13 @@ class FuzzConfig : public ConnectionManagerConfig {
 public:
   FuzzConfig(envoy::extensions::filters::network::http_connection_manager::v3::
                  HttpConnectionManager::ForwardClientCertDetails forward_client_cert)
-      : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
-                                        POOL_GAUGE(fake_stats_),
-                                        POOL_HISTOGRAM(*fake_stats_.rootScope()))},
-               "", *fake_stats_.rootScope()),
+      : stats_({ALL_HTTP_CONN_MAN_STATS(
+                   POOL_COUNTER(*fake_stats_.rootScope()), POOL_GAUGE(fake_stats_),
+                   POOL_HISTOGRAM(*fake_stats_.rootScope()), POOL_COUNTER(fake_stats_))},
+               *fake_stats_.rootScope()),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
-        listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))},
+        listener_stats_{
+            CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_), POOL_COUNTER(fake_stats_))},
         local_reply_(LocalReply::Factory::createDefault()) {
     ON_CALL(route_config_provider_, lastUpdated()).WillByDefault(Return(time_system_.systemTime()));
     ON_CALL(scoped_route_config_provider_, lastUpdated())
@@ -127,7 +128,7 @@ public:
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
     return flush_access_log_on_tunnel_successfully_established_;
   }
-  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+  const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return access_log_flush_interval_;
   }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
@@ -142,19 +143,19 @@ public:
   bool alwaysSetRequestIdInResponse() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  std::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return true; }
-  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+  std::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
   }
   bool http1SafeMaxConnectionDuration() const override {
     return http1_safe_max_connection_duration_;
   }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+  std::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
-  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+  std::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
     return stream_flush_timeout_;
   }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -185,7 +186,7 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
-  const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
+  const std::optional<std::string>& schemeToSet() const override { return scheme_; }
   bool shouldSchemeMatchUpstream() const override { return scheme_match_upstream_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
@@ -200,11 +201,12 @@ public:
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
+  Http::ClientCertFormat clientCertFormat() const override { return Http::ClientCertFormat::Text; }
   const Matcher::MatchTreePtr<Http::HttpMatchingData>& forwardClientCertMatcher() const override {
     return forward_client_cert_matcher_;
   }
   const Network::Address::Instance& localAddress() override { return local_address_; }
-  const absl::optional<std::string>& userAgent() override { return user_agent_; }
+  const std::optional<std::string>& userAgent() override { return user_agent_; }
   Tracing::TracerSharedPtr tracer() override { return tracer_; }
   const TracingConnectionManagerConfig* tracingConfig() override { return tracing_config_.get(); }
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
@@ -216,6 +218,7 @@ public:
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
   bool shouldStripTrailingHostDot() const override { return false; }
+  bool recordRouteResolutionStats() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -263,7 +266,7 @@ public:
   AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_ = false;
   bool flush_access_log_on_tunnel_successfully_established_ = false;
-  absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
+  std::optional<std::chrono::milliseconds> access_log_flush_interval_;
   MockServerConnection* codec_{};
   MockStreamDecoderFilter* decoder_filter_{};
   MockStreamEncoderFilter* encoder_filter_{};
@@ -277,7 +280,7 @@ public:
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
-  absl::optional<std::string> scheme_;
+  std::optional<std::string> scheme_;
   bool scheme_match_upstream_{};
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;
@@ -285,10 +288,10 @@ public:
   ConnectionManagerListenerStats listener_stats_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  std::optional<std::chrono::milliseconds> idle_timeout_;
+  std::optional<std::chrono::milliseconds> max_connection_duration_;
   bool http1_safe_max_connection_duration_{false};
-  absl::optional<std::chrono::milliseconds> max_stream_duration_;
+  std::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds stream_flush_timeout_{};
   std::chrono::milliseconds request_timeout_{};
@@ -299,7 +302,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Matcher::MatchTreePtr<Http::HttpMatchingData> forward_client_cert_matcher_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
-  absl::optional<std::string> user_agent_;
+  std::optional<std::string> user_agent_;
   Tracing::TracerSharedPtr tracer_{std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
@@ -606,9 +609,9 @@ public:
   MockStreamEncoderFilter* encoder_filter_{};
   StreamState request_state_;
   StreamState response_state_;
-  absl::optional<Http::FilterHeadersStatus> header_status_;
-  absl::optional<Http::FilterDataStatus> data_status_;
-  absl::optional<Http::FilterTrailersStatus> trailers_status_;
+  std::optional<Http::FilterHeadersStatus> header_status_;
+  std::optional<Http::FilterDataStatus> data_status_;
+  std::optional<Http::FilterTrailersStatus> trailers_status_;
   bool decoding_done_{};
 };
 
@@ -632,6 +635,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   NiceMock<Server::MockOverloadManager> overload_manager;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   bool connection_alive = true;
 
@@ -648,7 +652,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
                                      cluster_manager, overload_manager, config->time_system_,
-                                     envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+                                     envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
+                                     server_factory_context);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;

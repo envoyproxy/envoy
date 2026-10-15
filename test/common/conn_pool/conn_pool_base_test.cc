@@ -1,4 +1,10 @@
+#include <algorithm>
+#include <list>
+
+#include "envoy/extensions/queue_policy/fifo/v3/fifo.pb.h"
+
 #include "source/common/conn_pool/conn_pool_base.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
@@ -33,7 +39,7 @@ public:
   uint64_t id() const override { return 1; }
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
-  absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
+  std::optional<Http::Protocol> protocol() const override { return std::nullopt; }
   void onEvent(Network::ConnectionEvent event) override {
     parent_.onConnectionEvent(*this, "", event);
   }
@@ -43,7 +49,7 @@ public:
     ASSERT_TRUE(testClient != nullptr);
     testClient->active_streams_++;
   }
-  int64_t currentUnusedCapacity() const override {
+  uint32_t currentUnusedCapacity() const override {
     if (capacity_override_.has_value()) {
       return capacity_override_.value();
     }
@@ -68,7 +74,7 @@ public:
   bool supportsEarlyData() const override { return supports_early_data_; }
   uint32_t active_streams_{};
 
-  absl::optional<uint64_t> capacity_override_;
+  std::optional<uint32_t> capacity_override_;
 
 private:
   bool supports_early_data_;
@@ -81,6 +87,90 @@ public:
   AttachContext& context() override { return context_; }
   AttachContext& context_;
 };
+
+class TestPendingStreamQueue : public Extensions::QueuePolicy::QueueBase<PendingStream> {
+public:
+  size_t size() const override { return items_.size(); }
+
+  bool empty() const override { return items_.empty(); }
+
+  void add(PendingStream& item, Extensions::QueuePolicy::QueueItemMetadata) override {
+    items_.push_back(&item);
+  }
+
+  void remove(PendingStream& item) override {
+    const auto entry = std::find(items_.begin(), items_.end(), &item);
+    ASSERT(entry != items_.end());
+    items_.erase(entry);
+  }
+
+  // Use LIFO ordering so connection-pool tests exercise policy-defined ordering.
+  const PendingStream& peek() const override { return *items_.back(); }
+  PendingStream& peek() override { return *items_.back(); }
+
+  void pop() override {
+    ASSERT(!items_.empty());
+    items_.pop_back();
+  }
+
+  bool isOverloaded() const override { return items_.size() > 1; }
+
+  void forEach(absl::FunctionRef<bool(PendingStream&)> cb) override {
+    for (auto it = items_.begin(); it != items_.end();) {
+      PendingStream& item = **it;
+      ++it;
+      if (!cb(item)) {
+        return;
+      }
+    }
+  }
+
+private:
+  std::list<PendingStream*> items_;
+};
+
+class TestPendingStreamQueueFactory
+    : public Extensions::QueuePolicy::QueuePolicyFactory<PendingStream> {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
+    return std::make_unique<TestPendingStreamQueue>();
+  }
+
+  std::string name() const override { return "envoy.queue_policy.fifo"; }
+  std::string stat_prefix_;
+};
+
+// Creates a resolved queue policy bundle for the test factory, mirroring what
+// ClusterInfoImpl produces at cluster configuration load time.
+std::unique_ptr<Upstream::ClusterInfo::PendingRqQueuePolicy>
+makeTestQueuePolicyBundle(TestPendingStreamQueueFactory& factory) {
+  auto policy = std::make_unique<Upstream::ClusterInfo::PendingRqQueuePolicy>();
+  policy->factory_ = &factory;
+  policy->config_ =
+      std::make_unique<envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig>();
+  policy->stat_prefix_ = "cluster.test_cluster.envoy.queue_policy.fifo";
+  return policy;
+}
+
+std::unique_ptr<Upstream::ClusterInfo::PendingRqQueuePolicy> makeTestQueuePolicyBundle() {
+  static TestPendingStreamQueueFactory factory;
+  return makeTestQueuePolicyBundle(factory);
+}
+
+std::shared_ptr<Upstream::MockClusterInfo> makeClusterWithTestQueuePolicy() {
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  cluster->pending_rq_queue_policy_ = makeTestQueuePolicyBundle();
+  cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
+
+  return cluster;
+}
 
 class TestConnPoolImplBase : public ConnPoolImplBase {
 public:
@@ -95,6 +185,7 @@ public:
               (const Upstream::HostDescriptionConstSharedPtr& n, absl::string_view,
                ConnectionPool::PoolFailureReason, AttachContext&));
   MOCK_METHOD(void, onPoolReady, (ActiveClient&, AttachContext&));
+  void setSkipPendingOverflowForTest(bool value) { skip_pending_overflow_on_active_rq_ = value; }
 };
 
 class ConnPoolImplBaseTest : public testing::Test {
@@ -138,6 +229,87 @@ public:
   AttachContext context_;
   std::vector<TestActiveClient*> clients_;
 };
+
+class ConnPoolImplBaseQueuePolicyTest : public testing::Test {
+public:
+  ConnPoolImplBaseQueuePolicyTest()
+      : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
+        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_,
+              overload_manager_) {}
+
+  Upstream::ClusterConnectivityState state_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_{makeClusterWithTestQueuePolicy()};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
+  TestConnPoolImplBase pool_;
+  AttachContext context_;
+};
+
+TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueuePolicy) {
+  TestPendingStreamQueueFactory factory;
+  auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  cluster->pending_rq_queue_policy_ = makeTestQueuePolicyBundle(factory);
+  cluster->resetResourceManager(1024, 1024, 1024, 1, 1);
+
+  NiceMock<Event::MockDispatcher> dispatcher;
+  new NiceMock<Event::MockSchedulableCallback>(&dispatcher);
+  NiceMock<Server::MockOverloadManager> overload_manager;
+  Upstream::ClusterConnectivityState state;
+  Upstream::HostSharedPtr host = Upstream::makeTestHost(cluster, "tcp://127.0.0.1:80");
+
+  TestConnPoolImplBase pool(host, Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
+                            state, overload_manager);
+  EXPECT_EQ("cluster.test_cluster.envoy.queue_policy.fifo", factory.stat_prefix_);
+}
+
+TEST_F(ConnPoolImplBaseQueuePolicyTest, QueueOverloadedGaugeTracksTransitions) {
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  auto* first = pool_.newPendingStream(context_, /*can_send_early_data=*/false);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  AttachContext second_context;
+  auto* second = pool_.newPendingStream(second_context, /*can_send_early_data=*/false);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  AttachContext third_context;
+  auto* third = pool_.newPendingStream(third_context, /*can_send_early_data=*/false);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  first->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(1, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  third->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+
+  second->cancel(ConnectionPool::CancelPolicy::Default);
+  EXPECT_EQ(0, cluster_->trafficStats()->upstream_queue_overloaded_.value());
+}
+
+TEST_F(ConnPoolImplBaseQueuePolicyTest, PurgeRespectsQueuePolicyOrder) {
+  pool_.newPendingStream(context_, /*can_send_early_data=*/false);
+  AttachContext second_context;
+  pool_.newPendingStream(second_context, /*can_send_early_data=*/false);
+  AttachContext third_context;
+  pool_.newPendingStream(third_context, /*can_send_early_data=*/false);
+
+  testing::InSequence sequence;
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(third_context)));
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(second_context)));
+  EXPECT_CALL(pool_, onPoolFailure(testing::_, testing::_,
+                                   ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   testing::Ref(context_)));
+
+  pool_.purgePendingStreams(nullptr, "failure",
+                            ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  EXPECT_EQ(0, state_.pending_streams_);
+}
 
 class ConnPoolImplDispatcherBaseTest : public testing::Test {
 public:
@@ -235,7 +407,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
   uint32_t max_connection_duration_ = 5000;
-  absl::optional<std::chrono::milliseconds> max_connection_duration_opt_{max_connection_duration_};
+  std::optional<std::chrono::milliseconds> max_connection_duration_opt_{max_connection_duration_};
   uint32_t stream_limit_ = 100;
   uint32_t concurrent_streams_ = 1;
   Upstream::ClusterConnectivityState state_;
@@ -360,10 +532,63 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
   EXPECT_FALSE(pool_.maybePreconnectImpl(1));
 }
 
+TEST_F(ConnPoolImplBaseTest, PreconnectIfEligible) {
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, shouldPreconnect(_)).WillByDefault(Return(true));
+
+  // One on-demand connection, one preconnect.
+  EXPECT_CALL(pool_, instantiateActiveClient).Times(2);
+  auto cancelable = pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*connecting capacity*/);
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(0U, cluster_->trafficStats()->upstream_cx_preconnect_skipped_.value());
+
+  cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);
+  pool_.destructAllConnections();
+}
+
+TEST_F(ConnPoolImplBaseTest, NoPreconnectIfNotEligible) {
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, shouldPreconnect(_)).WillByDefault(Return(false));
+
+  // One on-demand connection, no preconnects.
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  auto cancelable = pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 1 /*connecting capacity*/);
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_preconnect_skipped_.value());
+
+  cancelable->cancel(ConnectionPool::CancelPolicy::CloseExcess);
+  pool_.destructAllConnections();
+}
+
+TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectEligible) {
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, shouldPreconnect(_)).WillByDefault(Return(true));
+
+  // Expect one preconnect.
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  EXPECT_TRUE(pool_.maybePreconnectImpl(1));
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(0U, cluster_->trafficStats()->upstream_cx_preconnect_skipped_.value());
+
+  pool_.destructAllConnections();
+}
+
+TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotEligible) {
+  ON_CALL(*cluster_, perUpstreamPreconnectRatio).WillByDefault(Return(1.5));
+  ON_CALL(*cluster_, shouldPreconnect(_)).WillByDefault(Return(false));
+
+  // Preconnects are skipped.
+  EXPECT_FALSE(pool_.maybePreconnectImpl(1));
+  EXPECT_EQ(0U, cluster_->trafficStats()->upstream_cx_total_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_preconnect_skipped_.value());
+}
+
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerNull) {
   // Force a null max connection duration optional.
   // newActiveClientAndStream() will expect the connection duration timer to remain null.
-  max_connection_duration_opt_ = absl::nullopt;
+  max_connection_duration_opt_ = std::nullopt;
   newActiveClientAndStream();
   closeStreamAndDrainClient();
 }
@@ -688,6 +913,49 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
 
   // Clean up.
   closeStream();
+}
+
+// Test that when max_active_requests circuit breaker fires in attachStreamToClient(),
+// upstream_rq_active_overflow is incremented and upstream_rq_pending_overflow is not
+// (runtime flag enabled by default).
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflow) {
+  // Allow 2 concurrent streams per connection so the client stays Ready after the first stream,
+  // and cap active requests at 1 so the second newStreamImpl() overflows the circuit breaker.
+  concurrent_streams_ = 2;
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
+
+  // Attach first stream — rq counter reaches its limit (1/1); client stays Ready.
+  newActiveClientAndStream(ActiveClient::State::Ready);
+
+  // Second stream: finds the Ready client, attachStreamToClient() overflows.
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
+
+  closeStreamAndDrainClient();
+}
+
+// Test legacy behavior: when the runtime flag is disabled, both upstream_rq_active_overflow
+// and upstream_rq_pending_overflow are incremented for the max_active_requests path.
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxActiveRequestsOverflowLegacy) {
+  // Simulate the legacy behavior where skip_pending_overflow_count_on_active_rq is false.
+  // We set the cached flag directly since the pool is constructed before the test body runs.
+  pool_.setSkipPendingOverflowForTest(false);
+
+  concurrent_streams_ = 2;
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
+
+  newActiveClientAndStream(ActiveClient::State::Ready);
+
+  EXPECT_CALL(pool_, onPoolFailure(_, _, ConnectionPool::PoolFailureReason::Overflow, _));
+  pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
+
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_active_overflow_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
+
+  closeStreamAndDrainClient();
 }
 
 } // namespace ConnectionPool

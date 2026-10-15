@@ -12,6 +12,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -30,6 +31,7 @@
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/notification.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_manager_impl.h"
@@ -52,6 +54,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/cgroup_cpu_util.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
@@ -67,7 +70,7 @@ std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
   auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
       "envoy.connection_handler.default");
   if (factory) {
-    return factory->createConnectionHandler(dispatcher, absl::nullopt);
+    return factory->createConnectionHandler(dispatcher, std::nullopt);
   }
   ENVOY_LOG_MISC(debug, "Unable to find envoy.connection_handler.default factory");
   return nullptr;
@@ -93,7 +96,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       random_generator_(std::move(random_generator)),
       api_(new Api::Impl(
           thread_factory, store, time_system, file_system, *random_generator_, bootstrap_,
-          process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
+          process_context ? ProcessContextOptRef(std::ref(*process_context)) : std::nullopt,
           watermark_factory)),
       dispatcher_(api_->allocateDispatcher("main_thread")),
       access_log_manager_(options.fileFlushIntervalMsec(), options.fileFlushMinSizeKB(), *api_,
@@ -103,8 +106,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+      hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this) {
   // Register the server factory context on the main thread.
   Configuration::ServerFactoryContextInstance::initialize(&server_contexts_);
 }
@@ -160,6 +162,16 @@ void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
                                                        : Network::ExtraShutdownListenerOptions{});
+  // Notify the connections of every listener that draining has begun, so connection-level drain
+  // logic can react. Server-wide drains notify from their entry
+  // point rather than from DrainManagerImpl, whose per-listener children must not fan out. The
+  // start time and strategy are captured once here so every notified connection shares a single,
+  // consistent drain timeline.
+  listener_manager_->onServerDrainStart(
+      Network::DrainDirection::All,
+      Network::ConnectionDrainEvent{api().timeSource().monotonicTime(),
+                                    InstanceBase::options().drainStrategy()});
+
   drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
 }
 
@@ -235,7 +247,8 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, S
   }
 }
 
-void InstanceBase::flushStats() {
+void InstanceBase::flushStats() { flushStatsImpl(); }
+void InstanceBase::flushStatsImpl() {
   if (stats_flush_in_progress_) {
     ENVOY_LOG(debug, "skipping stats flush as flush is already in progress");
     server_stats_->dropped_stat_flushes_.inc();
@@ -248,7 +261,7 @@ void InstanceBase::flushStats() {
   // completion callback is not called immediately. As a result of this server stats will
   // not be updated and flushed to stat sinks. So skip mergeHistograms call if workers are
   // not started yet.
-  if (initManager().state() == Init::Manager::State::Initialized) {
+  if (init_manager_.state() == Init::Manager::State::Initialized) {
     // A shutdown initiated before this callback may prevent this from being called as per
     // the semantics documented in ThreadLocal's runOnAllThreads method.
     stats_store_.mergeHistograms([this]() -> void { flushStatsInternal(); });
@@ -267,22 +280,21 @@ void InstanceBase::updateServerStats() {
                                        parent_stats.parent_memory_allocated_);
   server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
-  if (!options().hotRestartDisabled()) {
+  if (!options_.hotRestartDisabled()) {
     server_stats_->parent_connections_.set(parent_stats.parent_connections_);
   }
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires().value_or(0));
+      ssl_context_manager_->daysUntilFirstCertExpires().value_or(0));
 
   auto secs_until_ocsp_response_expires =
-      sslContextManager().secondsUntilFirstOcspResponseExpires();
+      ssl_context_manager_->secondsUntilFirstOcspResponseExpires();
   if (secs_until_ocsp_response_expires) {
     server_stats_->seconds_until_first_ocsp_response_expiring_.set(
         secs_until_ocsp_response_expires.value());
   }
-  server_stats_->state_.set(
-      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->state_.set(enumToInt(Utility::serverState(init_manager_.state(), !live_.load())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }
@@ -290,8 +302,9 @@ void InstanceBase::updateServerStats() {
 void InstanceBase::flushStatsInternal() {
   updateServerStats();
   auto& stats_config = config_.statsConfig();
-  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
-                                    timeSource());
+  ASSERT(config_.clusterManager() != nullptr);
+  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, *config_.clusterManager(),
+                                    time_source_);
   if (const auto evict_on_flush = stats_config.evictOnFlush(); evict_on_flush > 0) {
     stats_eviction_counter_ = (stats_eviction_counter_ + 1) % evict_on_flush;
     if (stats_eviction_counter_ == 0) {
@@ -310,7 +323,7 @@ bool InstanceBase::healthCheckFailed() { return !live_.load(); }
 
 ProcessContextOptRef InstanceBase::processContext() {
   if (process_context_ == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return *process_context_;
@@ -385,7 +398,7 @@ absl::Status InstanceUtil::loadBootstrapConfig(
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
 #else
     // Treat the yaml as proto
-    Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
+    std::ignore = Protobuf::TextFormat::ParseFromString(config_yaml, &bootstrap_override);
 #endif
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -397,27 +410,12 @@ absl::Status InstanceUtil::loadBootstrapConfig(
 }
 
 void InstanceUtil::raiseFileLimits() {
-  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
-    return;
-  }
-  struct rlimit rlim;
-  if (const auto result = Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+  if (const auto result = Api::OsSysCallsSingleton::get().raiseFileLimits();
       result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to read file descriptor limit, error {}.", errorDetails(result.errno_));
-    return;
-  }
-  const auto old = rlim.rlim_cur;
-  if (old == rlim.rlim_max) {
-    return;
-  }
-  rlim.rlim_cur = rlim.rlim_max;
-  if (const auto result = Api::OsSysCallsSingleton::get().setrlimit(RLIMIT_NOFILE, &rlim);
-      result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Failed to raise file descriptor limit to maximum, error {}.",
+    ENVOY_LOG(warn, "Failed to raise file descriptor limit, error {}.",
               errorDetails(result.errno_));
     return;
   }
-  ENVOY_LOG(info, "Raised file descriptor limits from {} to {}.", old, rlim.rlim_max);
 }
 
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
@@ -481,6 +479,23 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   RETURN_IF_NOT_OK(InstanceUtil::loadBootstrapConfig(
       bootstrap_, options_, messageValidationContext().staticValidationVisitor(), *api_));
   bootstrap_config_update_time_ = time_source_.systemTime();
+
+  // Decide whether the stats store should use the explicit-tags logic. The explicit-tags logic
+  // use the tags specified by the caller when creating a stat and will ignore any tags extraction
+  // rules.
+  // To keep the backwards compatibility, we only enable the explicit-tags logic if the user
+  // has not specified any custom tags extraction rules and has not disabled the use of default
+  // tags.
+  {
+    const auto& stats_config = bootstrap_.stats_config();
+    const bool use_all_default_tags =
+        !stats_config.has_use_all_default_tags() || stats_config.use_all_default_tags().value();
+    if (stats_config.stats_tags().empty() && use_all_default_tags &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_explicit_tags")) {
+      stats_store_.setUseExplicitTags(true);
+      http_context_.setUseExplicitTags(true);
+    }
+  }
 
   if (bootstrap_.has_application_log_config()) {
     RETURN_IF_NOT_OK(
@@ -573,6 +588,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
   server_stats_->concurrency_.set(options_.concurrency());
+  ENVOY_LOG(debug, "server concurrency set to {}", options_.concurrency());
+  // Logging is now initialized; emit the cgroup CPU detection result stashed during the
+  // OptionsImpl constructor.
+  CgroupDetectorSingleton::get().logResult();
   if (!options().hotRestartDisabled()) {
     server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
   }
@@ -665,6 +684,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   loadServerFlags(initial_config.flagsPath());
 
+  // Runtime is initialized before the overload manager so resource monitor factories can use
+  // runtime keys (e.g. RuntimeUInt64).
+  runtime_ = component_factory.createRuntime(*this, initial_config);
+  validation_context_.setRuntime(runtime());
+
   // Initialize the overload manager early so other modules can register for actions.
   auto overload_manager_or_error = createOverloadManager();
   RETURN_IF_NOT_OK(overload_manager_or_error.status());
@@ -721,9 +745,25 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
         Config::ServerExtensionValues::get().DEFAULT_LISTENER);
   }
 
+  ProtobufTypes::MessagePtr listener_manager_config =
+      listener_manager_factory->createEmptyConfigProto();
+  if (bootstrap_.has_listener_manager()) {
+    listener_manager_config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_.listener_manager().typed_config(),
+        messageValidationContext().staticValidationVisitor(), *listener_manager_factory);
+  }
+
   // Workers get created first so they register for thread local updates.
   listener_manager_ = listener_manager_factory->createListenerManager(
-      *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+      *listener_manager_config, *this, nullptr, worker_factory_,
+      bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+
+  // Runtime is initialized before the overload manager so resource monitors can read runtime keys;
+  // that means the first runtime snapshot is published before workers register for thread-local
+  // updates. Refresh the snapshot now so worker threads receive a valid TLS snapshot.
+  if (runtime_) {
+    RETURN_IF_NOT_OK(runtime().onWorkerThreadsRegistered());
+  }
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
@@ -747,11 +787,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // Please note: this order requires that RTDS is provisioned using a primary cluster. If RTDS is
   // provisioned through ADS then ADS must use primary cluster as well. This invariant is enforced
   // during RTDS initialization and invalid configuration will be rejected.
-
-  // Runtime gets initialized before the main configuration since during main configuration
-  // load things may grab a reference to the loader for later use.
-  runtime_ = component_factory.createRuntime(*this, initial_config);
-  validation_context_.setRuntime(runtime());
 
 #ifndef WIN32
   // Envoy automatically raises soft file limits, but we do it here in order to allow
@@ -823,6 +858,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
   RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
+
+  // All the bootstrap (static) resources have been loaded at this point, so the default message
+  // validation visitor switches to the dynamic one.
+  bootstrap_config_loaded_.store(true);
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -959,7 +998,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
   return std::move(loader.value());
 }
 
-void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path) {
+void InstanceBase::loadServerFlags(const std::optional<std::string>& flags_path) {
   if (!flags_path) {
     return;
   }
@@ -1032,18 +1071,14 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
-    // Pause RDS to ensure that we don't send any requests until we've
-    // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
-    // so we pause RDS until we've completed all the callbacks.
-    Config::ScopedResume resume_rds = xds_manager.pause(type_url);
+    // Pause all Listener-dependent resource types (RDS, SRDS, VHDS, SDS) to ensure
+    // that no subscription requests are sent until all subscriptions have been registered
+    // in the init callbacks. The pause is lifted when resume goes out of scope.
+    const auto listener_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>();
+    Config::ScopedResume resume = xds_manager.pause(Config::dependentTypeUrls(listener_type_url));
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);
-
-    // Now that we're execute all the init callbacks we can resume RDS
-    // as we've subscribed to all the statically defined RDS resources.
-    // This is done by tearing down the maybe_resume_rds Cleanup object.
   });
 }
 
@@ -1064,8 +1099,6 @@ void InstanceBase::run() {
     watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                       "main_thread", *dispatcher_);
   }
-
-  main_dispatch_loop_started_.store(true);
 
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -1112,7 +1145,7 @@ void InstanceBase::terminate() {
 
   // Only flush if we have not been hot restarted.
   if (stat_flush_timer_) {
-    flushStats();
+    flushStatsImpl();
   }
 
   if (config_.clusterManager() != nullptr) {

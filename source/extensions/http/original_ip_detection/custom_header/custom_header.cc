@@ -21,7 +21,7 @@ CustomHeaderIPDetection::CustomHeaderIPDetection(
 
 CustomHeaderIPDetection::CustomHeaderIPDetection(
     const std::string& header_name,
-    absl::optional<Envoy::Http::OriginalIPRejectRequestOptions> reject_options)
+    std::optional<Envoy::Http::OriginalIPRejectRequestOptions> reject_options)
     : header_name_(header_name), reject_options_(reject_options) {}
 
 Envoy::Http::OriginalIPDetectionResult
@@ -38,7 +38,7 @@ CustomHeaderIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) 
   auto header_value = hdr[0]->value().getStringView();
   auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(header_value));
   if (addr) {
-    return {addr, allow_trusted_address_checks_, absl::nullopt, skip_xff_append};
+    return {addr, allow_trusted_address_checks_, std::nullopt, skip_xff_append};
   }
 
   return {nullptr, false, reject_options_, skip_xff_append};

@@ -70,19 +70,19 @@ TEST(GrpcContextTest, GetGrpcMessage) {
 
 TEST(GrpcContextTest, GetGrpcTimeout) {
   Http::TestRequestHeaderMapImpl empty_headers;
-  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(empty_headers));
+  EXPECT_EQ(std::nullopt, Common::getGrpcTimeout(empty_headers));
 
   Http::TestRequestHeaderMapImpl empty_grpc_timeout{{"grpc-timeout", ""}};
-  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(empty_grpc_timeout));
+  EXPECT_EQ(std::nullopt, Common::getGrpcTimeout(empty_grpc_timeout));
 
   Http::TestRequestHeaderMapImpl missing_unit{{"grpc-timeout", "123"}};
-  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(missing_unit));
+  EXPECT_EQ(std::nullopt, Common::getGrpcTimeout(missing_unit));
 
   Http::TestRequestHeaderMapImpl small_missing_unit{{"grpc-timeout", "1"}};
-  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(small_missing_unit));
+  EXPECT_EQ(std::nullopt, Common::getGrpcTimeout(small_missing_unit));
 
   Http::TestRequestHeaderMapImpl illegal_unit{{"grpc-timeout", "123F"}};
-  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(illegal_unit));
+  EXPECT_EQ(std::nullopt, Common::getGrpcTimeout(illegal_unit));
 
   Http::TestRequestHeaderMapImpl unit_hours{{"grpc-timeout", "0H"}};
   EXPECT_EQ(std::chrono::milliseconds(0), Common::getGrpcTimeout(unit_hours));
@@ -107,11 +107,11 @@ TEST(GrpcContextTest, GetGrpcTimeout) {
 
   // Test max 8 digits to prevent millisecond overflow.
   Http::TestRequestHeaderMapImpl value_overflow{{"grpc-timeout", "6666666666666H"}};
-  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(value_overflow));
+  EXPECT_EQ(std::nullopt, Common::getGrpcTimeout(value_overflow));
 
   // Reject negative values.
   Http::TestRequestHeaderMapImpl value_negative{{"grpc-timeout", "-1S"}};
-  EXPECT_EQ(absl::nullopt, Common::getGrpcTimeout(value_negative));
+  EXPECT_EQ(std::nullopt, Common::getGrpcTimeout(value_negative));
 
   // Allow positive values marked with +.
   Http::TestRequestHeaderMapImpl value_positive{{"grpc-timeout", "+1S"}};
@@ -170,7 +170,7 @@ TEST(GrpcContextTest, ToGrpcTimeout) {
 TEST(GrpcContextTest, PrepareHeaders) {
   {
     Http::RequestMessagePtr message =
-        Common::prepareHeaders("cluster", "service_name", "method_name", absl::nullopt);
+        Common::prepareHeaders("cluster", "service_name", "method_name", std::nullopt);
 
     EXPECT_EQ("POST", message->headers().getMethodValue());
     EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
@@ -179,7 +179,7 @@ TEST(GrpcContextTest, PrepareHeaders) {
   }
   {
     Http::RequestMessagePtr message = Common::prepareHeaders(
-        "cluster", "service_name", "method_name", absl::optional<std::chrono::milliseconds>(1));
+        "cluster", "service_name", "method_name", std::optional<std::chrono::milliseconds>(1));
 
     EXPECT_EQ("POST", message->headers().getMethodValue());
     EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
@@ -189,7 +189,7 @@ TEST(GrpcContextTest, PrepareHeaders) {
   }
   {
     Http::RequestMessagePtr message = Common::prepareHeaders(
-        "cluster", "service_name", "method_name", absl::optional<std::chrono::seconds>(1));
+        "cluster", "service_name", "method_name", std::optional<std::chrono::seconds>(1));
 
     EXPECT_EQ("POST", message->headers().getMethodValue());
     EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
@@ -199,7 +199,7 @@ TEST(GrpcContextTest, PrepareHeaders) {
   }
   {
     Http::RequestMessagePtr message = Common::prepareHeaders(
-        "cluster", "service_name", "method_name", absl::optional<std::chrono::minutes>(1));
+        "cluster", "service_name", "method_name", std::optional<std::chrono::minutes>(1));
 
     EXPECT_EQ("POST", message->headers().getMethodValue());
     EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
@@ -209,7 +209,7 @@ TEST(GrpcContextTest, PrepareHeaders) {
   }
   {
     Http::RequestMessagePtr message = Common::prepareHeaders(
-        "cluster", "service_name", "method_name", absl::optional<std::chrono::hours>(1));
+        "cluster", "service_name", "method_name", std::optional<std::chrono::hours>(1));
 
     EXPECT_EQ("POST", message->headers().getMethodValue());
     EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
@@ -219,7 +219,7 @@ TEST(GrpcContextTest, PrepareHeaders) {
   }
   {
     Http::RequestMessagePtr message = Common::prepareHeaders(
-        "cluster", "service_name", "method_name", absl::optional<std::chrono::hours>(100000000));
+        "cluster", "service_name", "method_name", std::optional<std::chrono::hours>(100000000));
 
     EXPECT_EQ("POST", message->headers().getMethodValue());
     EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());
@@ -230,7 +230,7 @@ TEST(GrpcContextTest, PrepareHeaders) {
   {
     Http::RequestMessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name",
-                               absl::optional<std::chrono::milliseconds>(100000000000));
+                               std::optional<std::chrono::milliseconds>(100000000000));
 
     EXPECT_EQ("POST", message->headers().getMethodValue());
     EXPECT_EQ("/service_name/method_name", message->headers().getPathValue());

@@ -56,39 +56,44 @@ public:
         enable_x_ratelimit_headers_(
             config.enable_x_ratelimit_headers() ==
             envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_03),
+        rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
+        enable_retry_after_header_(config.enable_retry_after_header() &&
+                                   rate_limited_status_ == Http::Code::TooManyRequests),
         disable_x_envoy_ratelimited_header_(config.disable_x_envoy_ratelimited_header()),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
-                ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
-                : absl::nullopt),
+                ? std::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
+                : std::nullopt),
         http_context_(context.httpContext()),
         stat_names_(scope.symbolTable(), config.stat_prefix()),
-        rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
         filter_enabled_(
             config.has_filter_enabled()
-                ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                ? std::optional<Envoy::Runtime::FractionalPercent>(
                       Envoy::Runtime::FractionalPercent(config.filter_enabled(), runtime_))
-                : absl::nullopt),
+                : std::nullopt),
         filter_enforced_(
             config.has_filter_enforced()
-                ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                ? std::optional<Envoy::Runtime::FractionalPercent>(
                       Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
-                : absl::nullopt),
+                : std::nullopt),
         failure_mode_deny_percent_(config.has_failure_mode_deny_percent()
-                                       ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                                       ? std::optional<Envoy::Runtime::FractionalPercent>(
                                              Envoy::Runtime::FractionalPercent(
                                                  config.failure_mode_deny_percent(), runtime_))
-                                       : absl::nullopt) {
+                                       : std::nullopt),
+        metadata_namespace_(config.metadata_namespace().empty() ? "envoy.filters.http.ratelimit"
+                                                                : config.metadata_namespace()) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
     response_headers_parser_ = std::move(response_headers_parser_or_.value());
     rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
-        config.rate_limits(), context, creation_status);
+        config.rate_limits(), context, creation_status, /*no_limit=*/false);
   }
 
   const std::string& domain() const { return domain_; }
+  const std::string& metadataNamespace() const { return metadata_namespace_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() { return runtime_; }
@@ -101,8 +106,9 @@ public:
     return !failure_mode_deny_;
   }
   bool enableXRateLimitHeaders() const { return enable_x_ratelimit_headers_; }
+  bool enableRetryAfterHeader() const { return enable_retry_after_header_; }
   bool enableXEnvoyRateLimitedHeader() const { return !disable_x_envoy_ratelimited_header_; }
-  const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
+  const std::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
   Http::Context& httpContext() { return http_context_; }
@@ -117,12 +123,13 @@ public:
     return !rate_limit_config_->empty();
   }
   void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
                            Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
                            bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
-                                            on_stream_done);
+    rate_limit_config_->populateDescriptors(headers, response_headers, info,
+                                            local_info_.clusterName(), descriptors, on_stream_done);
   }
 
 private:
@@ -161,17 +168,19 @@ private:
   Runtime::Loader& runtime_;
   const bool failure_mode_deny_;
   const bool enable_x_ratelimit_headers_;
+  const Http::Code rate_limited_status_;
+  const bool enable_retry_after_header_ = false;
   const bool disable_x_envoy_ratelimited_header_;
-  const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
+  const std::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
   Filters::Common::RateLimit::StatNames stat_names_;
-  const Http::Code rate_limited_status_;
   Router::HeaderParserPtr response_headers_parser_;
   const Http::Code status_on_error_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
+  const std::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
+  const std::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
   std::unique_ptr<RateLimitConfig> rate_limit_config_;
+  const std::string metadata_namespace_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -185,7 +194,7 @@ public:
       : local_info_(context.localInfo()), vh_rate_limits_(config.vh_rate_limits()),
         domain_(config.domain()) {
     rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
-        config.rate_limits(), context, creation_status);
+        config.rate_limits(), context, creation_status, /*no_limit=*/false);
   }
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
@@ -199,12 +208,13 @@ public:
   }
 
   void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
                            Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
                            bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
-                                            on_stream_done);
+    rate_limit_config_->populateDescriptors(headers, response_headers, info,
+                                            local_info_.clusterName(), descriptors, on_stream_done);
   }
 
   std::string domain() const { return domain_; }
@@ -259,8 +269,12 @@ public:
 
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
+  // `headers` (request headers) is always present. `response_headers` is optional: it is only set
+  // on the stream-done path (captured in encodeHeaders()) and is nullptr on the request path.
   void populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                    const Http::RequestHeaderMap& headers, bool on_stream_done);
+                                    const Http::RequestHeaderMap& headers,
+                                    const Http::ResponseHeaderMap* response_headers,
+                                    bool on_stream_done);
   void populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
                                              std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                              const Http::RequestHeaderMap& headers,
@@ -286,6 +300,11 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
+  // Response headers captured at encodeHeaders() time so the stream-done
+  // (onDestroy) descriptor population can resolve %RESP()% in hits_addend.format.
+  // Stored as a raw pointer with the same lifetime guarantee as request_headers_:
+  // both header maps are owned by the ActiveStream and outlive destroyFilters().
+  Http::ResponseHeaderMap* response_headers_{};
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;
 };
 

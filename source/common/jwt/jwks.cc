@@ -4,8 +4,7 @@
 
 #include "source/common/jwt/jwks.h"
 
-#include <assert.h>
-
+#include <cassert>
 #include <iostream>
 
 #include "source/common/jwt/struct_utils.h"
@@ -133,7 +132,7 @@ private:
     if (!absl::WebSafeBase64Unescape(s, &s_decoded)) {
       return nullptr;
     }
-    return bssl::UniquePtr<BIGNUM>(BN_bin2bn(castToUChar(s_decoded), s_decoded.length(), NULL));
+    return bssl::UniquePtr<BIGNUM>(BN_bin2bn(castToUChar(s_decoded), s_decoded.length(), nullptr));
   };
 };
 

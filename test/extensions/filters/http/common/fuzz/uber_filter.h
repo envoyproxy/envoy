@@ -61,12 +61,12 @@ private:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 
-  Api::MockApi api_{};
+  Api::MockApi api_;
   Thread::ThreadFactory& thread_factory_;
   Event::DispatcherPtr worker_thread_dispatcher_;
   std::function<void()> destroy_filters_ = []() {};
 
-  Buffer::InstancePtr decoding_buffer_{};
+  Buffer::InstancePtr decoding_buffer_;
 };
 
 } // namespace HttpFilters

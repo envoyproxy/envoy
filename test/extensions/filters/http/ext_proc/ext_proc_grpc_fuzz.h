@@ -1,4 +1,6 @@
 #pragma once
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
 
 // TODO(ikepolinsky): Major action items to improve this fuzzer
 // 1. Move external process from separate thread to have test all in one thread
@@ -111,7 +113,7 @@ public:
       // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
@@ -122,9 +124,9 @@ public:
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
-  IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
-      absl::string_view http_method = "GET") {
+  IntegrationStreamDecoderPtr
+  sendDownstreamRequest(std::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
+                        absl::string_view http_method = "GET") {
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     if (modify_headers) {
       (*modify_headers)(headers);
@@ -135,7 +137,7 @@ public:
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
       absl::string_view body,
-      absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
+      std::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "POST") {
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     HttpTestUtility::addDefaultHeaders(headers, false);
@@ -147,7 +149,7 @@ public:
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithChunks(
       FuzzedDataProvider* fdp,
-      absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
+      std::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers,
       absl::string_view http_method = "POST") {
     Http::TestRequestHeaderMapImpl headers{{":method", std::string(http_method)}};
     HttpTestUtility::addDefaultHeaders(headers, false);
@@ -191,16 +193,16 @@ public:
     switch (fdp->ConsumeEnum<HttpMethod>()) {
     case HttpMethod::GET:
       ENVOY_LOG_MISC(trace, "Sending GET request");
-      return sendDownstreamRequest(absl::nullopt);
+      return sendDownstreamRequest(std::nullopt);
     case HttpMethod::POST:
       if (fdp->ConsumeBool()) {
         ENVOY_LOG_MISC(trace, "Sending POST request with body");
         const uint32_t data_size = fdp->ConsumeIntegralInRange<uint32_t>(0, ExtProcFuzzMaxDataSize);
         const std::string data = std::string(data_size, 'a');
-        return sendDownstreamRequestWithBody(data, absl::nullopt);
+        return sendDownstreamRequestWithBody(data, std::nullopt);
       } else {
         ENVOY_LOG_MISC(trace, "Sending POST request with chunked body");
-        return sendDownstreamRequestWithChunks(fdp, absl::nullopt);
+        return sendDownstreamRequestWithChunks(fdp, std::nullopt);
       }
       break;
     default:
@@ -208,7 +210,7 @@ public:
     }
   }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   TestProcessor test_processor_;
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;

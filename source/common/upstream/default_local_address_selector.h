@@ -1,11 +1,10 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "envoy/upstream/upstream.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {

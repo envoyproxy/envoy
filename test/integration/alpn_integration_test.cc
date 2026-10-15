@@ -3,6 +3,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -102,8 +104,8 @@ TEST_P(AlpnIntegrationTest, Http1RememberLimits) {
   default_request_headers_.addCopy(AutonomousStream::CLOSE_AFTER_RESPONSE, "yes");
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
   fake_upstreams_.clear();
   {
     IntegrationCodecClientPtr codec_client1 = makeHttpConnection(lookupPort("http"));
@@ -111,7 +113,7 @@ TEST_P(AlpnIntegrationTest, Http1RememberLimits) {
     IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
     auto response2 = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
     // Envoy should attempt to establish 2 new connections, one for each stream.
-    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 3);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(3));
     codec_client1->close();
     codec_client2->close();
   }
@@ -138,12 +140,12 @@ TEST_P(AlpnIntegrationTest, Http2RememberSettings) {
   upstream_request_->postToConnectionThread([this, &settings_buffer]() {
     fake_upstream_connection_->connection().write(settings_buffer, false);
   });
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_rx_bytes_total",
-                                 bytes_read + settings_data.size());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_rx_bytes_total",
+                               Ge(bytes_read + settings_data.size()));
   // Close the connection.
   ASSERT_TRUE(fake_upstream_connection_->close());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
 
   {
     absl::MutexLock l(fake_upstreams_[0]->lock());
@@ -152,7 +154,7 @@ TEST_P(AlpnIntegrationTest, Http2RememberSettings) {
     IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort("http"));
     auto response2 = codec_client2->makeHeaderOnlyRequest(default_request_headers_);
     // Envoy should attempt to establish 2 new connections, one for each stream.
-    test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 3);
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(3));
     codec_client1->close();
     codec_client2->close();
   }
@@ -203,15 +205,15 @@ TEST_P(AlpnIntegrationTest, DisconnectDuringHandshake) {
   // Connect and wait for the upstream connection to be established.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(1));
 
   // Close the downstream connection and wait for the upstream stream to go away.
   codec_client_->close();
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_cancelled", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_cancelled", Eq(1));
 
   // Allow the connection to complete.
   unblock_accept.Notify();
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_http2_total", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Ge(1));
 }
 
 } // namespace

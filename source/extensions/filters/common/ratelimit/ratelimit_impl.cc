@@ -20,7 +20,7 @@ namespace Common {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
+                               const std::optional<std::chrono::milliseconds>& timeout)
     : async_client_(async_client), timeout_(timeout),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.ratelimit.v3.RateLimitService.ShouldRateLimit")) {}
@@ -37,7 +37,6 @@ void GrpcClientImpl::cancel() {
 }
 
 void GrpcClientImpl::detach() {
-  ASSERT(callbacks_ != nullptr);
   if (request_) {
     request_->detach();
     request_ = nullptr;
@@ -66,9 +65,15 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
           new_descriptor->mutable_limit();
       new_limit->set_requests_per_unit(descriptor.limit_.value().requests_per_unit_);
       new_limit->set_unit(descriptor.limit_.value().unit_);
+      if (descriptor.limit_.value().unit_multiplier_ != 1) {
+        new_limit->mutable_unit_multiplier()->set_value(descriptor.limit_.value().unit_multiplier_);
+      }
     }
     if (descriptor.hits_addend_.has_value()) {
       new_descriptor->mutable_hits_addend()->set_value(descriptor.hits_addend_.value());
+    }
+    if (descriptor.is_negative_hits_) {
+      new_descriptor->set_is_negative_hits(true);
     }
   }
 }
@@ -77,8 +82,11 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                            Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
                            uint32_t hits_addend) {
+  // The client should only be used for one outstanding request at a time,
+  // so we assert that there is no existing request or callback.
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
+  request_ = nullptr;
 
   envoy::service::ratelimit::v3::RateLimitRequest request;
   createRequest(request, domain, descriptors, hits_addend);
@@ -93,7 +101,7 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
 }
 
 void GrpcClientImpl::onSuccess(
-    std::unique_ptr<envoy::service::ratelimit::v3::RateLimitResponse>&& response,
+    Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>&& response,
     Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
   ASSERT(response->overall_code() != envoy::service::ratelimit::v3::RateLimitResponse::UNKNOWN);
@@ -130,6 +138,7 @@ void GrpcClientImpl::onSuccess(
   // callback, so we release the callback here to make the destructor happy.
   auto call_backs = callbacks_;
   callbacks_ = nullptr;
+  request_ = nullptr;
   call_backs->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
                        std::move(request_headers_to_add), response->raw_body(),
                        std::move(dynamic_metadata));
@@ -144,19 +153,18 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   // callback, so we release the callback here to make the destructor happy.
   auto call_backs = callbacks_;
   callbacks_ = nullptr;
+  request_ = nullptr;
   call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
 }
 
-ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
+ClientPtr rateLimitClient(Server::Configuration::ServerFactoryContext& context,
                           const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                          const absl::optional<std::chrono::milliseconds>& timeout) {
+                          const std::optional<std::chrono::milliseconds>& timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.
   auto client_or_error =
-      context.serverFactoryContext()
-          .clusterManager()
-          .grpcAsyncClientManager()
-          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+      context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClientWithHashKey(
+          config_with_hash_key, context.scope(), true);
   THROW_IF_NOT_OK_REF(client_or_error.status());
   return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(client_or_error.value(),
                                                                       timeout);

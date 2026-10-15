@@ -18,7 +18,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
@@ -47,8 +47,6 @@ public:
   // Filter
   Router::RetryStatePtr createRetryState(const Router::RetryPolicy&, RequestHeaderMap&,
                                          const Upstream::ClusterInfo&,
-                                         const Router::VirtualCluster*,
-                                         Router::RouteStatsContextOptRef,
                                          Server::Configuration::CommonFactoryContext&,
                                          Event::Dispatcher&, Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -227,7 +225,7 @@ public:
   }
 
   void newUpstream(Router::GenericConnectionPoolCallbacks* request,
-                   absl::optional<Envoy::Http::Protocol> protocol) {
+                   std::optional<Envoy::Http::Protocol> protocol) {
     auto upstream = std::make_unique<FuzzUpstream>(request->upstreamToDownstream());
     auto stream = std::make_unique<Extensions::Upstreams::Http::Http::HttpUpstream>(
         request->upstreamToDownstream(), &upstream->mock_request_encoder_);
@@ -284,7 +282,7 @@ public:
     ON_CALL(*direct_response_entry_, responseCode()).WillByDefault(Return(code));
     ON_CALL(*direct_response_entry_, formatBody(_, _, _, _))
         .WillByDefault(Return(direct_response_body_));
-    ON_CALL(*direct_response_entry_, newUri(_)).WillByDefault(Return(new_uri));
+    ON_CALL(*direct_response_entry_, newUri(_, _)).WillByDefault(Return(new_uri));
     ON_CALL(*mock_route_, directResponseEntry())
         .WillByDefault(Return(direct_response_entry_.get()));
   }
@@ -415,7 +413,7 @@ public:
   createGenericConnPool(Upstream::HostConstSharedPtr,
                         Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        Upstream::ResourcePriority, absl::optional<Envoy::Http::Protocol> protocol,
+                        Upstream::ResourcePriority, std::optional<Envoy::Http::Protocol> protocol,
                         Upstream::LoadBalancerContext*, const Protobuf::Message&) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       return nullptr;
@@ -515,7 +513,7 @@ public:
     hcm_ = std::make_unique<ConnectionManagerImpl>(
         hcm_config_, drain_close_, random_, hcm_config_->http_context_, runtime_, local_info_,
         hcm_config_->cm_, overload_manager_, hcm_config_->time_system_,
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
+        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, server_factory_context_);
     hcm_->initializeReadFilterCallbacks(filter_callbacks_);
     Buffer::OwnedImpl data;
     hcm_->onData(data, false);
@@ -596,6 +594,7 @@ private:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
+  NiceMock<Server::Configuration::StatelessMockServerFactoryContext> server_factory_context_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<ConnectionManagerImpl> hcm_;
 

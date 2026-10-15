@@ -69,6 +69,30 @@ TEST(IoSocketHandleImpl, TestIoSocketError) {
   EXPECT_EQ(errorDetails(123), error10->getErrorDetails());
 }
 
+TEST(IoSocketHandleImpl, CloseWithSendRstTrueSetsLingerZeroAndCloses) {
+  NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+
+  os_fd_t test_fd = 42;
+  IoSocketHandleImpl io_handle(test_fd);
+
+  EXPECT_CALL(os_sys_calls, setsockopt_(test_fd, SOL_SOCKET, SO_LINGER, _, sizeof(struct linger)))
+      .WillOnce(Invoke([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+        const auto* l = static_cast<const struct linger*>(optval);
+        EXPECT_EQ(1, l->l_onoff);
+        EXPECT_EQ(0, l->l_linger);
+        return 0;
+      }));
+  EXPECT_CALL(os_sys_calls, close(test_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  io_handle.setAbortiveClose();
+  auto res = io_handle.close();
+  EXPECT_EQ(0, res.return_value_);
+  EXPECT_FALSE(io_handle.isOpen());
+}
+
 TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) {
   NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
   auto os_calls =
@@ -79,7 +103,7 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsEmptyOptionalIfGetSocketFails) 
       .WillOnce(Return(Api::SysCallBoolResult{false, -1}));
 
   IoSocketHandleImpl io_handle;
-  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(absl::optional<std::chrono::microseconds>{}));
+  EXPECT_THAT(io_handle.lastRoundTripTime(), Eq(std::optional<std::chrono::microseconds>{}));
 }
 
 TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
@@ -278,6 +302,61 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
   EXPECT_EQ(dropped_packets, 5);
 }
 
+TEST(IoSocketHandleImpl, SendEmptyPayloadCallsSend) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  uint8_t empty_payload = 0;
+  EXPECT_CALL(os_sys_calls, send(_, _, 0, 0))
+      .WillOnce(Invoke([&](os_fd_t, void* buffer, size_t, int) -> Api::SysCallSizeResult {
+        EXPECT_EQ(&empty_payload, buffer);
+        return {0, 0};
+      }));
+
+  IoSocketHandleImpl io_handle;
+  const Api::IoCallUint64Result result = io_handle.send(&empty_payload, 0);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(IoSocketHandleImpl, SendmsgEmptyPayloadUsesDummyIovec) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, 0))
+      .WillOnce(Invoke([](os_fd_t, const msghdr* message, int) -> Api::SysCallSizeResult {
+        EXPECT_NE(nullptr, message->msg_name);
+        EXPECT_EQ(1, message->msg_iovlen);
+        EXPECT_NE(nullptr, message->msg_iov);
+        if (message->msg_iov != nullptr && message->msg_iovlen == 1) {
+          EXPECT_NE(nullptr, message->msg_iov[0].iov_base);
+          EXPECT_EQ(0, message->msg_iov[0].iov_len);
+        }
+        return {0, 0};
+      }));
+
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+  IoSocketHandleImpl io_handle;
+  const Api::IoCallUint64Result result = io_handle.sendmsg(nullptr, 0, 0, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(IoSocketHandleImpl, WritevEmptyPayloadRemainsNoOp) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).Times(0);
+
+  uint8_t empty_payload = 0;
+  const Buffer::RawSlice slice{&empty_payload, 0};
+  IoSocketHandleImpl io_handle;
+  const Api::IoCallUint64Result result = io_handle.writev(&slice, 1);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -304,7 +383,7 @@ TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopback) {
 class IoSocketHandleImplTestWrapper {
 public:
   void runGetAddressTests(const int cache_size) {
-    IoSocketHandleImpl io_handle(-1, false, absl::nullopt, cache_size);
+    IoSocketHandleImpl io_handle(-1, false, std::nullopt, cache_size);
 
     // New address.
     sockaddr_storage ss = Test::getV6SockAddr("2001:DB8::1234", 51234);

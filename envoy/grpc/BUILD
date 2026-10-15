@@ -20,7 +20,6 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

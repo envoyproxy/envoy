@@ -26,22 +26,14 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/custom_static_cluster.h"
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/registry.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -89,7 +81,7 @@ public:
 
   Http::ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, std::vector<Http::Protocol>&,
-      const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+      const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
           alternate_protocol_options,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
@@ -105,7 +97,7 @@ public:
                       const Network::ConnectionSocket::OptionsSharedPtr&,
                       Network::TransportSocketOptionsConstSharedPtr,
                       Upstream::ClusterConnectivityState&,
-                      absl::optional<std::chrono::milliseconds>) override {
+                      std::optional<std::chrono::milliseconds>) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
@@ -114,6 +106,9 @@ public:
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
     auto result = clusterFromProto_(cluster, outlier_event_logger, added_via_api);
+    if (result.first == nullptr) {
+      return absl::InvalidArgumentError("Failed to create cluster from proto");
+    }
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
@@ -132,7 +127,7 @@ public:
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(Http::ConnectionPool::Instance*, allocateConnPool_,
               (HostConstSharedPtr host,
-               const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+               const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                    alternate_protocol_options,
                Network::ConnectionSocket::OptionsSharedPtr,
                Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&,

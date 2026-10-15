@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,7 @@
 #include "source/common/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
+#include "absl/types/span.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -70,6 +72,17 @@ public:
 
   Ssl::CurveNIDVector getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
 
+  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
+                           HMAC_CTX* hmac_ctx, int encrypt);
+  bool hasSessionTicketKeys() const { return !session_ticket_keys_.empty(); }
+
+  // The session context id that scopes session resumption to this configuration, or empty when it
+  // is not computed, for example when certificates are supplied dynamically by a selector.
+  absl::Span<const uint8_t> sessionContextId() const {
+    return session_context_id_.has_value() ? absl::MakeConstSpan(*session_context_id_)
+                                           : absl::Span<const uint8_t>();
+  }
+
 protected:
   ServerContextImpl(
       Stats::Scope& scope, const Envoy::Ssl::ServerContextConfig& config,
@@ -82,14 +95,13 @@ private:
 
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
                          unsigned int inlen);
-  int sessionTicketProcess(SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx,
-                           HMAC_CTX* hmac_ctx, int encrypt);
 
   absl::StatusOr<SessionContextID>
   generateHashForSessionContextId(const std::vector<std::string>& server_names);
 
   Ssl::TlsCertificateSelectorPtr tls_certificate_selector_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
+  std::optional<SessionContextID> session_context_id_;
 
 protected:
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;

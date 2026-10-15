@@ -13,7 +13,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/cds_api_helper.h"
 
@@ -32,8 +32,7 @@ struct CdsStats {
  * CDS API implementation that fetches via Subscription.
  * This supports the wildcard subscription to a single source.
  */
-class CdsApiImpl : public CdsApi,
-                   Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster> {
+class CdsApiImpl : public CdsApi, public Config::SubscriptionCallbacks {
 public:
   static absl::StatusOr<CdsApiPtr>
   create(const envoy::config::core::v3::ConfigSource& cds_config,
@@ -66,6 +65,7 @@ private:
   void runInitializeCallbackIfAny();
 
   CdsApiHelper helper_;
+  const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
   ClusterManager& cm_;
   Stats::ScopeSharedPtr scope_;
   Server::Configuration::ServerFactoryContext& factory_context_;

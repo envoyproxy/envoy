@@ -11,9 +11,10 @@ DynamicModuleBootstrapExtension::DynamicModuleBootstrapExtension(
 
 DynamicModuleBootstrapExtension::~DynamicModuleBootstrapExtension() { destroy(); }
 
-void DynamicModuleBootstrapExtension::initializeInModuleExtension() {
+bool DynamicModuleBootstrapExtension::initializeInModuleExtension() {
   in_module_extension_ =
       config_->on_bootstrap_extension_new_(config_->in_module_config_, thisAsVoidPtr());
+  return in_module_extension_ != nullptr;
 }
 
 void DynamicModuleBootstrapExtension::destroy() {
@@ -24,10 +25,11 @@ void DynamicModuleBootstrapExtension::destroy() {
   destroyed_ = true;
 }
 
-void DynamicModuleBootstrapExtension::onServerInitialized(Server::Instance&) {
+void DynamicModuleBootstrapExtension::onServerInitialized(Server::Instance& server) {
   if (in_module_extension_ == nullptr) {
     return;
   }
+  config_->setListenerManager(server.listenerManager());
   config_->on_bootstrap_extension_server_initialized_(thisAsVoidPtr(), in_module_extension_);
   registerLifecycleCallbacks();
 }

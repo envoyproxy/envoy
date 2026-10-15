@@ -65,7 +65,7 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
       // + 1 to include the initial query.
       pending_queries_.push_back({std::move(new_query), config_.num_retries().value() + 1});
     } else {
-      pending_queries_.push_back({std::move(new_query), absl::nullopt});
+      pending_queries_.push_back({std::move(new_query), std::nullopt});
     }
   }
   return active_query;
@@ -142,7 +142,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
   while (true) {
     std::unique_ptr<PendingQuery> next_query;
-    absl::optional<uint32_t> num_retries;
+    std::optional<uint32_t> num_retries;
     {
       absl::MutexLock guard(mutex_);
       auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -193,7 +193,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
           next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
           {
             absl::MutexLock guard(mutex_);
-            pending_queries_.push_back({std::move(next_query), absl::nullopt});
+            pending_queries_.push_back({std::move(next_query), std::nullopt});
           }
           continue;
         }

@@ -312,6 +312,10 @@ int32_t HeaderTransportImpl::drainVarIntI32(Buffer::Instance& buffer, int32_t& h
 std::string HeaderTransportImpl::drainVarString(Buffer::Instance& buffer, int32_t& header_size,
                                                 const char* desc) {
   const int16_t str_len = drainVarIntI16(buffer, header_size, desc);
+  if (str_len < 0) {
+    throw EnvoyException(fmt::format(
+        "unable to read header transport {}: invalid negative length {}", desc, str_len));
+  }
   if (str_len == 0) {
     return "";
   }

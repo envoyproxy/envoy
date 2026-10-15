@@ -229,7 +229,7 @@ TEST_P(AltsTsiHandshakerTest, ClientSideFullHandshake) {
 
     auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
-    EXPECT_TRUE(result->status_.ok());
+    EXPECT_OK(result->status_);
     EXPECT_EQ(result->to_send_->toString(), ClientInit);
     EXPECT_THAT(result->result_, IsNull());
   }
@@ -242,11 +242,11 @@ TEST_P(AltsTsiHandshakerTest, ClientSideFullHandshake) {
     Buffer::OwnedImpl received_bytes;
     received_bytes.add(ServerInit.data(), ServerInit.size());
     received_bytes.add(ServerFinished.data(), ServerFinished.size());
-    EXPECT_TRUE(tsi_handshaker->next(received_bytes).ok());
+    EXPECT_OK(tsi_handshaker->next(received_bytes));
 
     auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
-    EXPECT_TRUE(result->status_.ok());
+    EXPECT_OK(result->status_);
     EXPECT_EQ(result->to_send_->toString(), ClientFinished);
     EXPECT_THAT(result->result_, NotNull());
     EXPECT_THAT(result->result_->frame_protector, NotNull());
@@ -273,7 +273,7 @@ TEST_P(AltsTsiHandshakerTest, ServerSideFullHandshake) {
 
     auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
-    EXPECT_TRUE(result->status_.ok());
+    EXPECT_OK(result->status_);
     EXPECT_EQ(result->to_send_->toString(), absl::StrCat(ServerInit, ServerFinished));
     EXPECT_THAT(result->result_, IsNull());
   }
@@ -285,11 +285,11 @@ TEST_P(AltsTsiHandshakerTest, ServerSideFullHandshake) {
     EXPECT_CALL(dispatcher, post(_)).WillOnce([](Envoy::Event::PostCb cb) { cb(); });
     Buffer::OwnedImpl received_bytes;
     received_bytes.add(ClientFinished.data(), ClientFinished.size());
-    EXPECT_TRUE(tsi_handshaker->next(received_bytes).ok());
+    EXPECT_OK(tsi_handshaker->next(received_bytes));
 
     auto result = capturing_callbacks.getNextResult();
     EXPECT_THAT(result, NotNull());
-    EXPECT_TRUE(result->status_.ok());
+    EXPECT_OK(result->status_);
     EXPECT_EQ(result->to_send_->toString(), "");
     EXPECT_THAT(result->result_, NotNull());
     EXPECT_THAT(result->result_->frame_protector, NotNull());

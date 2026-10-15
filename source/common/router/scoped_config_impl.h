@@ -14,6 +14,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/numeric/int128.h"
 #include "absl/strings/str_format.h"
 
@@ -95,8 +96,7 @@ private:
   const uint64_t config_hash_;
 };
 using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;
-// Ordered map for consistent config dumping.
-using ScopedRouteMap = std::map<std::string, ScopedRouteInfoConstSharedPtr>;
+using ScopedRouteMap = absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr>;
 
 /**
  * Each Envoy worker is assigned an instance of this type. When config updates are received,
@@ -123,7 +123,10 @@ public:
 
 private:
   // From scope name to cached ScopedRouteInfo.
-  absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
+  // WARNING: The absl::string_view keys point to strings owned by the ScopedRouteInfo
+  // objects stored as values. To avoid dangling pointers, any update to this map MUST
+  // first erase the old entry before inserting a new one.
+  absl::flat_hash_map<absl::string_view, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_name_;
   // Hash by ScopeKey hash to lookup in constant time.
   absl::flat_hash_map<uint64_t, ScopedRouteInfoConstSharedPtr> scoped_route_info_by_key_;
 };

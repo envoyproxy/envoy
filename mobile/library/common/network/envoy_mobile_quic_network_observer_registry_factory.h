@@ -3,6 +3,8 @@
 #include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/quic_network_connectivity_observer.h"
 
+#include "absl/synchronization/mutex.h"
+
 #include "library/common/network/network_types.h"
 
 namespace Envoy {
@@ -66,22 +68,18 @@ class EnvoyMobileQuicNetworkObserverRegistryFactory
     : public EnvoyQuicNetworkObserverRegistryFactory {
 public:
   explicit EnvoyMobileQuicNetworkObserverRegistryFactory(
-      NetworkConnectivityTracker& network_tracker)
-      : network_tracker_(network_tracker) {
-    thread_local_observer_registries_.reserve(1);
-  }
+      NetworkConnectivityTracker& network_tracker);
 
   EnvoyQuicNetworkObserverRegistryPtr
   createQuicNetworkObserverRegistry(Event::Dispatcher& dispatcher) override;
 
-  std::vector<std::reference_wrapper<EnvoyMobileQuicNetworkObserverRegistry>>&
-  getCreatedObserverRegistries() {
-    return thread_local_observer_registries_;
-  }
+  std::vector<std::reference_wrapper<EnvoyMobileQuicNetworkObserverRegistry>>
+  getCreatedObserverRegistries();
 
 private:
+  absl::Mutex mutex_;
   std::vector<std::reference_wrapper<EnvoyMobileQuicNetworkObserverRegistry>>
-      thread_local_observer_registries_;
+      thread_local_observer_registries_ ABSL_GUARDED_BY(mutex_);
   NetworkConnectivityTracker& network_tracker_;
 };
 

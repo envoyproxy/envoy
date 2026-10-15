@@ -41,7 +41,7 @@ TEST(NetworkConfigurationRetryOptionsPredicateTest, PredicateTest) {
   auto proto_config = factory->createEmptyConfigProto();
   auto predicate = factory->createOptionsPredicate(*proto_config, retry_extension_factory_context);
 
-  ASSERT_EQ(absl::nullopt,
+  ASSERT_EQ(std::nullopt,
             predicate->updateOptions({mock_stream_info, nullptr}).new_upstream_socket_options_);
 }
 

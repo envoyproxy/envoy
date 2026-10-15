@@ -10,7 +10,9 @@
 #include "source/common/quic/quic_network_connectivity_observer.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/scone_state.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
 
 namespace Envoy {
@@ -77,8 +79,32 @@ public:
   void StartDraining() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  quic::WebTransportHttp3VersionSet LocallySupportedWebTransportVersions() const override;
+#endif
   std::vector<std::string> GetAlpnsToOffer() const override;
   void OnConfigNegotiated() override;
+  void OnSconePacket(quic::QuicBandwidth bandwidth) override;
+
+  // quic::QuicSpdySession
+  // Overridden to flush WebTransport CONNECT requests that were deferred until the peer's HTTP/3
+  // SETTINGS arrived. See registerStreamWaitingForSettings().
+  bool OnSettingsFrame(const quic::SettingsFrame& frame) override;
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Registers/unregisters a client stream that buffered a WebTransport CONNECT request in
+  // encodeHeaders() because the peer's HTTP/3 SETTINGS had not yet been received. QUICHE creates
+  // the upstream WebTransport session synchronously inside WriteHeaders, but only if WebTransport
+  // is already negotiated (which is known only after SETTINGS). When the SETTINGS frame arrives,
+  // OnSettingsFrame() flushes every registered stream. Streams are tracked by ID rather than
+  // pointer: a stream that is destroyed without unregistering simply fails the GetActiveStream()
+  // lookup at flush time, so there is no dangling reference. Only WebTransport CONNECT streams ever
+  // wait here; all other requests are written immediately and the connection becomes ready right
+  // after the handshake.
+  void registerStreamWaitingForSettings(quic::QuicStreamId stream_id);
+  void unregisterStreamWaitingForSettings(quic::QuicStreamId stream_id);
+#endif
 
   // quic::QuicSpdyClientSessionBase
   bool ShouldKeepConnectionAlive() const override;
@@ -103,13 +129,16 @@ public:
   // Register this session to the given registry for receiving network change events.
   void registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry);
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   const quic::TransportParameters::ParameterMap& received_custom_transport_parameters() {
     return received_custom_transport_parameters_;
   }
-  const absl::optional<quic::QuicSocketAddress>& received_ipv6_alternate_server_address() {
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  const std::optional<quic::QuicSocketAddress>& received_ipv6_alternate_server_address() {
     return received_ipv6_alternate_server_address_;
   }
-  const absl::optional<quic::QuicSocketAddress>& received_ipv4_alternate_server_address() {
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  const std::optional<quic::QuicSocketAddress>& received_ipv4_alternate_server_address() {
     return received_ipv4_alternate_server_address_;
   }
 
@@ -120,12 +149,12 @@ protected:
   std::unique_ptr<quic::QuicSpdyClientStream> CreateClientStream() override;
   // quic::QuicSpdySession
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
-  quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
   bool ShouldCreateOutgoingBidirectionalStream() override {
-    ASSERT(quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream());
-    // Prefer creating an "invalid" stream outside of current stream bounds to
-    // crashing when dereferencing a nullptr in QuicHttpClientConnectionImpl::newStream
+    // quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream()
+    // might return false, but we want to create the stream anyway
+    // because otherwise we crash dereferencing a nullptr, so we
+    // don't even ask it, and just return true.
     return true;
   }
   // QuicFilterManagerConnectionImpl
@@ -136,6 +165,12 @@ protected:
 
 private:
   uint64_t streamsAvailable();
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // IDs of client streams that buffered a WebTransport CONNECT request awaiting the peer's HTTP/3
+  // SETTINGS. Flushed and cleared in OnSettingsFrame(). See registerStreamWaitingForSettings().
+  absl::flat_hash_set<quic::QuicStreamId> streams_waiting_for_settings_;
+#endif
 
   // These callbacks are owned by network filters and quic session should outlive
   // them.
@@ -152,8 +187,8 @@ private:
   QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
   OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
   quic::TransportParameters::ParameterMap received_custom_transport_parameters_;
-  absl::optional<quic::QuicSocketAddress> received_ipv6_alternate_server_address_;
-  absl::optional<quic::QuicSocketAddress> received_ipv4_alternate_server_address_;
+  std::optional<quic::QuicSocketAddress> received_ipv6_alternate_server_address_;
+  std::optional<quic::QuicSocketAddress> received_ipv4_alternate_server_address_;
 };
 
 } // namespace Quic

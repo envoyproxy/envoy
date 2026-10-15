@@ -1,14 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "dynamic_modules_cert_validator_test",
     srcs = ["dynamic_modules_cert_validator_test.cc"],
     data = [
@@ -22,7 +25,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:cert_validator_not_validated",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.tls.cert_validator.dynamic_modules"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/transport_sockets/tls/cert_validator/dynamic_modules:config",
@@ -32,6 +36,8 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/cert_validator/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

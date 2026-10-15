@@ -46,14 +46,14 @@ public:
                      Server::Configuration::ServerFactoryContext& factory_context,
                      const envoy::config::core::v3::ConfigSource& config_source,
                      OptRef<Init::Manager> init_manager, UpdateCb update_cb, RemoveCb remove_cb);
-  const absl::optional<Ssl::TlsCertificateConfigImpl>& certConfig() const { return cert_config_; }
+  const std::optional<Ssl::TlsCertificateConfigImpl>& certConfig() const { return cert_config_; }
 
 private:
   absl::Status loadCert();
 
   Server::Configuration::ServerFactoryContext& factory_context_;
   const std::string cert_name_;
-  absl::optional<Ssl::TlsCertificateConfigImpl> cert_config_;
+  std::optional<Ssl::TlsCertificateConfigImpl> cert_config_;
   const Secret::TlsCertificateConfigProviderSharedPtr cert_provider_;
   UpdateCb update_cb_;
   const Common::CallbackHandlePtr update_cb_handle_;
@@ -200,7 +200,7 @@ public:
   /**
    * Retrieve the thread local certificate.
    */
-  absl::optional<AsyncContextConstSharedPtr> getContext(absl::string_view secret_name) const;
+  std::optional<AsyncContextConstSharedPtr> getContext(absl::string_view secret_name) const;
 
   /**
    * Start fetching the certificate via a subscription.

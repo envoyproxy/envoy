@@ -28,25 +28,21 @@ private:
 /**
  * Config registration. @see NamedHttpFilterConfigFactory.
  */
-class SetFilterStateConfig
-    : public Common::FactoryBase<envoy::extensions::filters::http::set_filter_state::v3::Config> {
+class SetFilterStateConfig : public Common::UnifiedFactoryBase<
+                                 envoy::extensions::filters::http::set_filter_state::v3::Config> {
 public:
-  SetFilterStateConfig() : FactoryBase("envoy.filters.http.set_filter_state") {}
+  SetFilterStateConfig() : UnifiedFactoryBase("envoy.filters.http.set_filter_state") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& server_context) override;
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 } // namespace SetFilterState

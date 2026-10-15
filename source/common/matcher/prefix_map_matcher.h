@@ -2,7 +2,6 @@
 
 #include "source/common/common/radix_tree.h"
 #include "source/common/matcher/map_matcher.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Matcher {
@@ -14,7 +13,7 @@ namespace Matcher {
 template <class DataType> class PrefixMapMatcher : public MapMatcher<DataType> {
 public:
   static absl::StatusOr<std::unique_ptr<PrefixMapMatcher>>
-  create(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match) {
+  create(DataInputPtr<DataType>&& data_input, std::optional<OnMatch<DataType>> on_no_match) {
     absl::Status creation_status = absl::OkStatus();
     auto ret = std::unique_ptr<PrefixMapMatcher<DataType>>(
         new PrefixMapMatcher<DataType>(std::move(data_input), on_no_match, creation_status));
@@ -28,23 +27,20 @@ public:
 
 protected:
   PrefixMapMatcher(DataInputPtr<DataType>&& data_input,
-                   absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
+                   std::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
       : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
 
   ActionMatchResult doMatch(const DataType& data, absl::string_view key,
                             SkippedMatchCb skipped_match_cb) override {
     const absl::InlinedVector<std::shared_ptr<OnMatch<DataType>>, 4> results =
         children_.findMatchingPrefixes(key);
-    bool retry_shorter = Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss");
     for (auto it = results.rbegin(); it != results.rend(); ++it) {
       const std::shared_ptr<OnMatch<DataType>>& on_match = *it;
       ActionMatchResult result =
           MatchTree<DataType>::handleRecursionAndSkips(*on_match, data, skipped_match_cb);
-      if (!result.isNoMatch() || !retry_shorter) {
-        // If the match failed to complete, or if it matched, or
-        // if we're doing the legacy "don't try additional matchers"
-        // behavior, return whatever the first match's result was.
+      if (!result.isNoMatch()) {
+        // If the match failed to complete, or if it matched, return whatever this match's
+        // result was. Otherwise fall back to the next shorter prefix.
         return result;
       }
     }

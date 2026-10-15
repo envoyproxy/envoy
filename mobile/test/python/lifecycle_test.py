@@ -3,7 +3,7 @@
 import threading
 import unittest
 
-from library.python.envoy_engine import (
+from envoy_mobile import (
     EngineBuilder,
     LogLevel,
     StreamIntel,

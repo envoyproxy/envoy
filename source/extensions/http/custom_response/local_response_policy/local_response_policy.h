@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.pb.h"
 #include "envoy/extensions/http/custom_response/local_response_policy/v3/local_response_policy.pb.validate.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/http/custom_response/policy.h"
@@ -36,16 +37,23 @@ private:
   // Rewrite the response body for locally specified bodies.
   void formatBody(const Envoy::Http::RequestHeaderMap& request_headers,
                   const Envoy::Http::ResponseHeaderMap& response_headers,
-                  const StreamInfo::StreamInfo& stream_info, std::string& body) const;
+                  const StreamInfo::StreamInfo& stream_info, const Tracing::Span& active_span,
+                  std::string& body) const;
 
   // Body read from local data source.
-  const absl::optional<std::string> local_body_;
+  const std::optional<std::string> local_body_;
 
   // body format
   Formatter::FormatterPtr formatter_;
 
-  const absl::optional<Envoy::Http::Code> status_code_;
+  const std::optional<Envoy::Http::Code> status_code_;
   const std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+
+  // When true, pass existing StreamInfo response_code_details into sendLocalReply.
+  // When false and response_code_details_ is unset, pass "" (legacy Clear behavior).
+  const bool preserve_response_code_details_ = false;
+  // When set, pass this explicit value into sendLocalReply (Override).
+  const std::optional<std::string> response_code_details_;
 };
 } // namespace CustomResponse
 } // namespace Http

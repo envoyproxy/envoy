@@ -2,7 +2,9 @@
 
 #include "source/extensions/filters/http/header_mutation/config.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -71,7 +73,7 @@ public:
             envoy::config::route::v3::FilterConfig filter_config;
             filter_config.set_disabled(true);
             Protobuf::Any per_route_config;
-            per_route_config.PackFrom(filter_config);
+            std::ignore = per_route_config.PackFrom(filter_config);
             another_route->mutable_typed_per_filter_config()->insert(
                 {"downstream-header-mutation", per_route_config});
           }
@@ -88,7 +90,7 @@ public:
               envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
 
           Protobuf::Any per_route_config;
-          per_route_config.PackFrom(header_mutation);
+          std::ignore = per_route_config.PackFrom(header_mutation);
           route->mutable_typed_per_filter_config()->insert(
               {absl::StrCat(prefix, "-header-mutation"), per_route_config});
 
@@ -107,7 +109,7 @@ public:
                 envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
 
             Protobuf::Any per_route_config_vhost;
-            per_route_config_vhost.PackFrom(header_mutation_vhost);
+            std::ignore = per_route_config_vhost.PackFrom(header_mutation_vhost);
 
             auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
             vhost->mutable_typed_per_filter_config()->insert(
@@ -125,7 +127,7 @@ public:
                 envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
 
             Protobuf::Any per_route_config_rt;
-            per_route_config_rt.PackFrom(header_mutation_rt);
+            std::ignore = per_route_config_rt.PackFrom(header_mutation_rt);
 
             auto* route_table = hcm.mutable_route_config();
             route_table->mutable_typed_per_filter_config()->insert(
@@ -161,7 +163,7 @@ public:
     if (most_specific_header_mutations_wins) {
       header_mutation.set_most_specific_header_mutations_wins(true);
     }
-    http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
+    std::ignore = http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
 
     config_helper_.prependFilter(
         MessageUtil::getJsonStringFromMessageOrError(http_mutation_filter));
@@ -178,7 +180,7 @@ public:
       if (most_specific_header_mutations_wins) {
         header_mutation.set_most_specific_header_mutations_wins(true);
       }
-      http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
+      std::ignore = http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
       config_helper_.prependFilter(
           MessageUtil::getJsonStringFromMessageOrError(http_mutation_filter), false);
       // Set per filter configs for `upstream-header-mutation` filter and disable downstream filter.
@@ -205,7 +207,7 @@ public:
     // We are testing enabled from various level, so disable the filter by default
     http_mutation_filter.set_disabled(!disabled_at_route_level);
     header_mutation.set_most_specific_header_mutations_wins(most_specific_header_mutations_wins);
-    http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
+    std::ignore = http_mutation_filter.mutable_typed_config()->PackFrom(header_mutation);
     config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(http_mutation_filter),
                                  false);
 
@@ -221,9 +223,9 @@ public:
           if (route_level.test(RouteLevel::PerRoute)) {
             per_route_filter_config.set_disabled(disabled_at_route_level);
             PerRouteProtoConfig header_mutation;
-            per_route_filter_config.mutable_config()->PackFrom(header_mutation);
+            std::ignore = per_route_filter_config.mutable_config()->PackFrom(header_mutation);
             Protobuf::Any per_route_config;
-            per_route_config.PackFrom(per_route_filter_config);
+            std::ignore = per_route_config.PackFrom(per_route_filter_config);
             route->mutable_typed_per_filter_config()->insert(
                 {"upstream-header-mutation", per_route_config});
           }
@@ -233,9 +235,10 @@ public:
           if (route_level.test(RouteLevel::VirtualHost)) {
             per_route_filter_config_vhost.set_disabled(disabled_at_route_level);
             PerRouteProtoConfig header_mutation_vhost;
-            per_route_filter_config_vhost.mutable_config()->PackFrom(header_mutation_vhost);
+            std::ignore =
+                per_route_filter_config_vhost.mutable_config()->PackFrom(header_mutation_vhost);
             Protobuf::Any per_route_config_vhost;
-            per_route_config_vhost.PackFrom(per_route_filter_config_vhost);
+            std::ignore = per_route_config_vhost.PackFrom(per_route_filter_config_vhost);
 
             auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
             vhost->mutable_typed_per_filter_config()->insert(
@@ -247,9 +250,9 @@ public:
           if (route_level.test(RouteLevel::RouteTable)) {
             per_route_filter_config_rt.set_disabled(disabled_at_route_level);
             PerRouteProtoConfig header_mutation_rt;
-            per_route_filter_config_rt.mutable_config()->PackFrom(header_mutation_rt);
+            std::ignore = per_route_filter_config_rt.mutable_config()->PackFrom(header_mutation_rt);
             Protobuf::Any per_route_config_rt;
-            per_route_config_rt.PackFrom(per_route_filter_config_rt);
+            std::ignore = per_route_config_rt.PackFrom(per_route_filter_config_rt);
 
             auto* route_table = hcm.mutable_route_config();
             route_table->mutable_typed_per_filter_config()->insert(
@@ -389,7 +392,7 @@ disabled: true
                   envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
               Protobuf::Any per_route_config;
-              per_route_config.PackFrom(header_mutation);
+              std::ignore = per_route_config.PackFrom(header_mutation);
               route->mutable_typed_per_filter_config()->insert(
                   {"downstream-header-mutation", per_route_config});
             }
@@ -406,7 +409,7 @@ disabled: true
               response_mutation->mutable_append()->set_append_action(
                   envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
               Protobuf::Any per_route_config;
-              per_route_config.PackFrom(header_mutation);
+              std::ignore = per_route_config.PackFrom(header_mutation);
               route->mutable_typed_per_filter_config()->insert(
                   {"upstream-header-mutation", per_route_config});
             }
@@ -414,10 +417,10 @@ disabled: true
             {
               // Per route enable the filter that is disabled by default.
               envoy::config::route::v3::FilterConfig filter_config;
-              filter_config.mutable_config()->PackFrom(PerRouteProtoConfig());
+              std::ignore = filter_config.mutable_config()->PackFrom(PerRouteProtoConfig());
               filter_config.set_disabled(false);
               Protobuf::Any per_route_config;
-              per_route_config.PackFrom(filter_config);
+              std::ignore = per_route_config.PackFrom(filter_config);
               // Try enable the filter that is disabled by default.
               route->mutable_typed_per_filter_config()->insert(
                   {"downstream-header-mutation-disabled-by-default", per_route_config});
@@ -430,7 +433,7 @@ disabled: true
               envoy::config::route::v3::FilterConfig filter_config;
               filter_config.set_disabled(true);
               Protobuf::Any per_route_config;
-              per_route_config.PackFrom(filter_config);
+              std::ignore = per_route_config.PackFrom(filter_config);
               another_route->mutable_typed_per_filter_config()->insert(
                   {"downstream-header-mutation", per_route_config});
               another_route->mutable_typed_per_filter_config()->insert(
@@ -452,7 +455,7 @@ disabled: true
                   envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
               Protobuf::Any per_route_config_vhost;
-              per_route_config_vhost.PackFrom(header_mutation_vhost);
+              std::ignore = per_route_config_vhost.PackFrom(header_mutation_vhost);
 
               auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
               vhost->mutable_typed_per_filter_config()->insert(
@@ -471,7 +474,7 @@ disabled: true
                   envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
               Protobuf::Any per_route_config_vhost;
-              per_route_config_vhost.PackFrom(header_mutation_vhost);
+              std::ignore = per_route_config_vhost.PackFrom(header_mutation_vhost);
 
               auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
               vhost->mutable_typed_per_filter_config()->insert(
@@ -493,7 +496,7 @@ disabled: true
                   envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
               Protobuf::Any per_route_config_rt;
-              per_route_config_rt.PackFrom(header_mutation_rt);
+              std::ignore = per_route_config_rt.PackFrom(header_mutation_rt);
 
               auto* route_table = hcm.mutable_route_config();
               route_table->mutable_typed_per_filter_config()->insert(
@@ -512,7 +515,7 @@ disabled: true
                   envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
               Protobuf::Any per_route_config_rt;
-              per_route_config_rt.PackFrom(header_mutation_rt);
+              std::ignore = per_route_config_rt.PackFrom(header_mutation_rt);
 
               auto* route_table = hcm.mutable_route_config();
               route_table->mutable_typed_per_filter_config()->insert(
@@ -1292,6 +1295,84 @@ TEST_P(HeaderMutationIntegrationTest,
 
   checkHeader(__LINE__, *response, "upstream-global-flag-header", true);
   checkHeader(__LINE__, *response, "request-method-in-upstream-filter", true, "GET");
+
+  codec_client_->close();
+}
+
+TEST_P(HeaderMutationIntegrationTest, TestCustomFormatter) {
+  Formatter::TestCommandFactory factory;
+  Registry::InjectFactory<Formatter::CommandParserFactory> register_factory(factory);
+
+  config_helper_.prependFilter(R"EOF(
+name: downstream-header-mutation
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.header_mutation.v3.HeaderMutation
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "request-custom-formatter-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    response_mutations:
+    - append:
+        header:
+          key: "response-custom-formatter-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        PerRouteProtoConfig header_mutation;
+        TestUtility::loadFromYaml(R"EOF(
+mutations:
+  request_mutations:
+  - append:
+      header:
+        key: "per-route-custom-formatter-header"
+        value: "%COMMAND_EXTENSION()%"
+      append_action: APPEND_IF_EXISTS_OR_ADD
+  formatters:
+  - name: envoy.formatter.TestFormatter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+)EOF",
+                                  header_mutation);
+        Protobuf::Any per_route_config;
+        std::ignore = per_route_config.PackFrom(header_mutation);
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_typed_per_filter_config()
+            ->insert({"downstream-header-mutation", per_route_config});
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("TestFormatter", upstream_request_->headers()
+                                 .get(Http::LowerCaseString("request-custom-formatter-header"))[0]
+                                 ->value()
+                                 .getStringView());
+  EXPECT_EQ("TestFormatter", upstream_request_->headers()
+                                 .get(Http::LowerCaseString("per-route-custom-formatter-header"))[0]
+                                 ->value()
+                                 .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  checkHeader(__LINE__, *response, "response-custom-formatter-header", true, "TestFormatter");
 
   codec_client_->close();
 }

@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::NiceMock;
 
 // Simple filter for test purposes. This filter will be injected into the filter chain during
 // tests. The filter reacts only to few keywords. If received payload does not contain
@@ -180,22 +181,25 @@ void StartTlsIntegrationTest::initialize() {
   EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       // Connection constructor will first create write buffer.
       // Test tracks how many bytes are sent.
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer_, move(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer_, drain(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer_;
-      }))
+      .WillOnce(
+          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+                std::move(below_low), std::move(above_high), std::move(above_overflow));
+            ON_CALL(*client_write_buffer_, move(_))
+                .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+            ON_CALL(*client_write_buffer_, drain(_))
+                .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+            return client_write_buffer_;
+          }))
       // Connection constructor will also create read buffer, but the test does
       // not track received bytes.
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-      }));
+      .WillOnce(
+          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                               std::move(above_overflow));
+          }));
   config_helper_.renameListener("tcp_proxy");
   addStartTlsSwitchFilter(config_helper_);
 
@@ -210,7 +214,8 @@ void StartTlsIntegrationTest::initialize() {
   // Setup factories and contexts for tls transport socket.
   tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
       server_factory_context_);
-  tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
+  tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_,
+                                                            &server_factory_context_.serverScope());
   payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 
   BaseIntegrationTest::initialize();

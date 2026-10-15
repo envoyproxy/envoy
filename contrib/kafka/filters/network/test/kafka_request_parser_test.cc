@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/kafka_request_parser.h"
 #include "contrib/kafka/filters/network/test/buffer_based_test.h"
 #include "contrib/kafka/filters/network/test/serialization_utilities.h"
@@ -109,7 +111,7 @@ TEST_F(KafkaRequestParserTest, RequestDataParserShouldHandleDeserializerExceptio
     int32_t get() const override { throw std::runtime_error("should not be invoked at all"); };
   };
 
-  RequestContextSharedPtr request_context{new RequestContext{1024, {0, 0, 0, absl::nullopt}}};
+  RequestContextSharedPtr request_context{new RequestContext{1024, {0, 0, 0, std::nullopt}}};
   RequestDataParser<int32_t, ThrowingDeserializer> testee{request_context};
 
   absl::string_view data = putGarbageIntoBuffer();
@@ -144,7 +146,7 @@ TEST_F(KafkaRequestParserTest,
   // given
   const int32_t request_size = 1024; // There are still 1024 bytes to read to complete the request.
   RequestContextSharedPtr request_context{
-      new RequestContext{request_size, {0, 0, 0, absl::nullopt}}};
+      new RequestContext{request_size, {0, 0, 0, std::nullopt}}};
 
   RequestDataParser<int32_t, SomeBytesDeserializer> testee{request_context};
 

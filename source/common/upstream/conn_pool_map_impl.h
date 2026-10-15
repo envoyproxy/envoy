@@ -28,7 +28,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
   // here. Maybe we'll pass them to the factory function?
   auto pool_iter = active_pools_.find(key);
   if (pool_iter != active_pools_.end()) {
-    return std::ref(*(pool_iter->second));
+    return *pool_iter->second;
   }
   ResourceLimit& connPoolResource = host_->cluster().resourceManager(priority_).connectionPools();
   // We need a new pool. Check if we have room.
@@ -36,7 +36,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
     // We're full. Try to free up a pool. If we can't, bail out.
     if (!freeOnePool()) {
       host_->cluster().trafficStats()->upstream_cx_pool_overflow_.inc();
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     ASSERT(size() < connPoolResource.max(),
@@ -57,7 +57,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
   }
 
   auto inserted = active_pools_.emplace(key, std::move(new_pool));
-  return std::ref(*inserted.first->second);
+  return *inserted.first->second;
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -116,6 +116,25 @@ void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections(
 
   for (auto* pool : pools) {
     pool->drainConnections(drain_behavior);
+  }
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnectionsIf(
+    Envoy::ConnectionPool::DrainConnectionsPoolPredicate predicate,
+    Envoy::ConnectionPool::DrainBehavior drain_behavior) {
+  // Copy the `active_pools_` so that it is safe for the call to result
+  // in deletion, and avoid iteration through a mutating container.
+  std::vector<POOL_TYPE*> pools;
+  pools.reserve(active_pools_.size());
+  for (auto& pool_pair : active_pools_) {
+    pools.push_back(pool_pair.second.get());
+  }
+
+  for (auto* pool : pools) {
+    if (predicate(*pool)) {
+      pool->drainConnections(drain_behavior);
+    }
   }
 }
 

@@ -1,6 +1,10 @@
 #pragma once
 
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 28
+#if defined(_WIN32)
+#include <malloc.h>
+
+#define ALIGNED_ALLOCATOR_USE_WIN32_ALIGNED_MALLOC 1
+#elif defined(__ANDROID_API__) && __ANDROID_API__ < 28
 #include <stdlib.h>
 
 #define ALIGNED_ALLOCATOR_USE_POSIX_MEMALIGN 1
@@ -20,13 +24,14 @@ public:
   static_assert((Alignment % sizeof(void*)) == 0,
                 "Alignment must be a multiple of sizeof(void*) when using posix_memalign");
 #endif
-  using value_type = T;
+  using value_type = T; // NOLINT(readability-identifier-naming)
 
   AlignedAllocator() noexcept = default;
 
   // Copy constructor for rebind compatibility.
   template <typename U> explicit AlignedAllocator(const AlignedAllocator<U, Alignment>&) noexcept {}
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   static std::size_t round_up_to_alignment(std::size_t bytes) {
     return (bytes + Alignment - 1) & ~(Alignment - 1);
   }
@@ -39,7 +44,9 @@ public:
       return nullptr;
     }
     std::size_t bytes = n * sizeof(T);
-#ifdef ALIGNED_ALLOCATOR_USE_POSIX_MEMALIGN
+#if defined(ALIGNED_ALLOCATOR_USE_WIN32_ALIGNED_MALLOC)
+    return static_cast<T*>(_aligned_malloc(bytes, Alignment));
+#elif defined(ALIGNED_ALLOCATOR_USE_POSIX_MEMALIGN)
     void* ptr = nullptr;
     if (posix_memalign(&ptr, Alignment, bytes) != 0) {
       return nullptr;
@@ -54,7 +61,9 @@ public:
 
   void deallocate(T* p, std::size_t) noexcept {
     if (p != nullptr) {
-#ifdef ALIGNED_ALLOCATOR_USE_POSIX_MEMALIGN
+#if defined(ALIGNED_ALLOCATOR_USE_WIN32_ALIGNED_MALLOC)
+      _aligned_free(p);
+#elif defined(ALIGNED_ALLOCATOR_USE_POSIX_MEMALIGN)
       free(p);
 #else
       std::free(p);
@@ -72,8 +81,8 @@ public:
   }
 
   // Satisfy libc++ requirement.
-  template <typename U> struct rebind {
-    using other = AlignedAllocator<U, Alignment>;
+  template <typename U> struct rebind {           // NOLINT(readability-identifier-naming)
+    using other = AlignedAllocator<U, Alignment>; // NOLINT(readability-identifier-naming)
   };
 };
 

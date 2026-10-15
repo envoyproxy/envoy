@@ -15,8 +15,8 @@ namespace EnvoyDefault {
 ::Envoy::Http::HeaderValidatorFactoryPtr HeaderValidatorFactoryConfig::createFromProto(
     const Protobuf::Message& message, Server::Configuration::ServerFactoryContext& server_context) {
   auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-      dynamic_cast<const Protobuf::Any&>(message), server_context.messageValidationVisitor(),
-      *this);
+      Envoy::Protobuf::DynamicCastMessage<Protobuf::Any>(message),
+      server_context.messageValidationVisitor(), *this);
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                            envoy_default::v3::HeaderValidatorConfig&>(

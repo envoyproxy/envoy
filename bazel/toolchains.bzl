@@ -1,23 +1,21 @@
-load("@envoy_repo//:compiler.bzl", "LLVM_PATH", "USE_LOCAL_SYSROOT")
-load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
-load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
+load("@envoy_repo//:compiler.bzl", _USE_LIBSTDCPP = "USE_LIBSTDCPP")
+load(
+    "@llvm_toolchain_llvm//:llvm.bzl",
+    _LLVM_IS_HOST = "LLVM_IS_HOST",
+    _LLVM_LIB_DIR = "LLVM_LIB_DIR",
+    _LLVM_MAJOR = "LLVM_MAJOR",
+    _LLVM_MAJOR_MINOR = "LLVM_MAJOR_MINOR",
+    _LLVM_VERSION = "LLVM_VERSION",
+)
 
-def envoy_toolchains():
-    native.register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain")
-    arch_alias(
-        name = "clang_platform",
-        aliases = {
-            "amd64": "@envoy//bazel/platforms/rbe:linux_x64",
-            "aarch64": "@envoy//bazel/platforms/rbe:linux_arm64",
-        },
-    )
-    llvm_toolchain(
-        name = "llvm_toolchain",
-        llvm_version = "18.1.8",
-        cxx_standard = {"": "c++20"},
-        sysroot = {} if USE_LOCAL_SYSROOT else {
-            "linux-x86_64": "@sysroot_linux_amd64//:sysroot",
-            "linux-aarch64": "@sysroot_linux_arm64//:sysroot",
-        },
-        toolchain_roots = {"": LLVM_PATH} if LLVM_PATH else {},
-    )
+LLVM_IS_HOST = _LLVM_IS_HOST
+LLVM_LIB_DIR = _LLVM_LIB_DIR
+LLVM_MAJOR = _LLVM_MAJOR
+LLVM_MAJOR_MINOR = _LLVM_MAJOR_MINOR
+LLVM_VERSION = _LLVM_VERSION
+USE_LIBSTDCPP = _USE_LIBSTDCPP
+
+LIBCLANG_CPP = "@llvm_toolchain_llvm//:%s/libclang-cpp.so.%s" % (LLVM_LIB_DIR, LLVM_MAJOR_MINOR)
+
+# Distro-packaged LLVM splits libLLVM.so out of libclang-cpp.so; the hermetic bundle folds it in.
+LIBLLVM = ("@llvm_toolchain_llvm//:%s/libLLVM.so.%s" % (LLVM_LIB_DIR, LLVM_MAJOR_MINOR)) if LLVM_IS_HOST else None

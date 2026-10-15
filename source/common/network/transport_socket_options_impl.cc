@@ -59,7 +59,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   std::vector<std::string> application_protocols;
   std::vector<std::string> subject_alt_names;
   std::vector<std::string> alpn_fallback;
-  absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
+  std::optional<Network::ProxyProtocolData> proxy_protocol_options;
   std::unique_ptr<const TransportSocketOptions::Http11ProxyInfo> proxy_info;
 
   bool needs_transport_socket_options = false;

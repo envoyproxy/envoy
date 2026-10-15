@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/api/api.h"
+#include "envoy/common/logger.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -64,8 +65,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupWithAuth() {
@@ -101,8 +102,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupAlwaysLogHealthCheckFailures() {
@@ -126,8 +127,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupExistsHealthcheck() {
@@ -151,8 +152,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupExistsHealthcheckWithAuth() {
@@ -189,8 +190,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setupDontReuseConnection() {
@@ -214,8 +215,8 @@ public:
 
     health_checker_ = std::make_shared<RedisHealthChecker>(
         *cluster_, health_check_config, redis_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, absl::nullopt,
-        absl::nullopt);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this, std::nullopt,
+        std::nullopt, Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
@@ -223,10 +224,11 @@ public:
          const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
          Stats::Scope&, const std::string& username, const std::string& password, bool,
-         absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
-         absl::optional<
-             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>)
-      override {
+         std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
+         std::optional<
+             NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>,
+         Extensions::NetworkFilters::Common::Redis::RespProtocolVersion,
+         OptRef<Stats::Counter>) override {
     EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
@@ -321,7 +323,7 @@ TEST_F(RedisHealthCheckerTest, PingWithAuth) {
   interval_timer_->invokeCallback();
 
   // Failure, invalid auth
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -369,7 +371,7 @@ TEST_F(RedisHealthCheckerTest, ExistsWithAuth) {
   interval_timer_->invokeCallback();
 
   // Failure, invalid auth
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -415,7 +417,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   interval_timer_->invokeCallback();
 
   // Failure
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -483,8 +485,8 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   interval_timer_->invokeCallback();
 
   // Failure
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -494,7 +496,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   interval_timer_->invokeCallback();
 
   // Fail again
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -529,8 +531,8 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   client_->runLowWatermarkCallbacks();
 
   // Redis failure via disconnect
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   pool_callbacks_->onFailure();
@@ -591,7 +593,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   interval_timer_->invokeCallback();
 
   // Failure, exists
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
@@ -688,7 +690,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   interval_timer_->invokeCallback();
 
   // The connection will close on failure.
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*client_, close());
@@ -733,14 +735,13 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
 
 TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
   auto cluster = new NiceMock<Upstream::MockClusterMockPrioritySet>();
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockLoader> runtime;
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   Api::ApiPtr api = Api::createApiForTest();
   Envoy::Extensions::Common::Aws::CredentialsPendingCallback capture;
@@ -777,15 +778,13 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
   aws_iam_config.set_region("region");
   aws_iam_config.set_cache_name("cachename");
   aws_iam_config.set_service_name("elasticache");
-  const envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config_const =
-      aws_iam_config;
 
   auto signer = std::make_unique<Extensions::Common::Aws::MockSigner>();
 
   auto mock_authenticator =
       std::make_shared<NetworkFilters::Common::Redis::AwsIamAuthenticator::MockAwsIamAuthenticator>(
           std::move(signer));
-  absl::optional<NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+  std::optional<NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       authenticator = mock_authenticator;
 
   EXPECT_CALL(*mock_authenticator, getAuthToken("testusername", _)).WillOnce(Return("auth_token"));
@@ -830,7 +829,7 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
       *cluster, health_check_config, redis_config, dispatcher, runtime,
       Upstream::HealthCheckEventLoggerPtr(event_logger_), *api,
       NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_, aws_iam_config,
-      mock_authenticator);
+      mock_authenticator, Upstream::DefaultHealthFlagCallbacks::instance());
   health_checker->start();
   delete (cluster);
 }

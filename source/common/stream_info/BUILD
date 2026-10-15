@@ -31,6 +31,8 @@ envoy_cc_library(
     hdrs = ["filter_state_impl.h"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:compiled_string_map_lib",
+        "//source/common/common:macros",
     ],
 )
 
@@ -46,7 +48,6 @@ envoy_cc_library(
         "//source/common/network:cidr_range_lib",
         "//source/common/runtime:runtime_features_lib",
         "@abseil-cpp//absl/container:node_hash_map",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

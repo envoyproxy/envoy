@@ -9,12 +9,14 @@
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 
 #include "source/common/http/codec_client.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/network/filter_impl.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -173,9 +175,9 @@ protected:
   // Makes a http connection object without checking its connected state.
   virtual IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
-      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
-          absl::nullopt,
+      std::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      std::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          std::nullopt,
       bool wait_till_connected = true);
   // Makes a downstream network connection object based on client codec version.
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
@@ -211,7 +213,7 @@ protected:
 
   struct Result {
     IntegrationStreamDecoderPtr response;
-    absl::optional<uint64_t> upstream_index;
+    std::optional<uint64_t> upstream_index;
   };
 
   Result sendRequestAndWaitForResponse(
@@ -224,14 +226,14 @@ protected:
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
   // In cases where the upstream that will receive the request is not deterministic, a second
   // upstream index may be provided, in which case both upstreams will be checked for requests.
-  absl::optional<uint64_t> waitForNextUpstreamRequest(
+  std::optional<uint64_t> waitForNextUpstreamRequest(
       const std::vector<uint64_t>& upstream_indices,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
   void waitForNextUpstreamRequest(
       uint64_t upstream_index = 0,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
-  absl::optional<uint64_t>
+  std::optional<uint64_t>
   waitForNextUpstreamConnection(const std::vector<uint64_t>& upstream_indices,
                                 std::chrono::milliseconds connection_wait_timeout,
                                 FakeHttpConnectionPtr& fake_upstream_connection);
@@ -252,8 +254,8 @@ protected:
                                     const int request_size,
                                     const Http::TestResponseHeaderMapImpl& response_headers,
                                     const int response_size, const int backend_idx,
-                                    absl::optional<const Http::TestResponseHeaderMapImpl>
-                                        expected_response_headers = absl::nullopt);
+                                    std::optional<const Http::TestResponseHeaderMapImpl>
+                                        expected_response_headers = std::nullopt);
 
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
@@ -385,6 +387,17 @@ protected:
   // Set this to true when sending malformed requests to avoid test client codec rejecting it.
   // This flag is only valid when UHV build flag is enabled.
   bool disable_client_header_validation_{false};
+
+  // Stops the codecs from validating the request headers they encode, so that a test can use
+  // Envoy's own client codecs to send a deliberately malformed request at Envoy. Only needed in
+  // non-UHV builds, where the codecs do this check themselves; the destructor restores it. Call
+  // this before initialize(), so that the write is ordered before the workers that read the flag
+  // are created.
+  // TODO(yanavlasov): fold this into `disable_client_header_validation_`.
+  void disableCodecHeaderValidation() {
+    Http::HeaderUtility::disable_request_header_validation_for_tests_.store(
+        true, std::memory_order_relaxed);
+  }
 
 #ifdef ENVOY_ENABLE_QUIC
   quic::DeterministicConnectionIdGenerator connection_id_generator_{

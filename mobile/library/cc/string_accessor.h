@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "absl/types/optional.h"
+#include <optional>
 #include "library/common/api/c_types.h"
 
 namespace Envoy {

@@ -111,6 +111,8 @@ public:
 
   // RateLimitTokenBucket
   bool consume(double factor = 1.0, uint64_t tokens = 1);
+  // Refill tokens back to the bucket, capped at max_tokens.
+  void refill(uint64_t tokens);
   double fillRate() const { return token_bucket_.fillRate(); }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
@@ -120,7 +122,8 @@ public:
     return static_cast<uint64_t>(token_bucket_.remainingTokens());
   }
   uint64_t resetSeconds() const override {
-    return static_cast<uint64_t>(std::ceil(token_bucket_.nextTokenAvailable().count() / 1000));
+    return static_cast<uint64_t>(
+        std::chrono::ceil<std::chrono::seconds>(token_bucket_.nextTokenAvailable()).count());
   }
 
 private:
@@ -156,6 +159,10 @@ private:
 
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
   const bool always_consume_default_token_bucket_{};
+  bool always_deny_default_{false};
+  // If true, an exhausted shadow mode descriptor doesn't stop the evaluation of the remaining
+  // descriptors and the default token bucket.
+  const bool shadow_mode_no_short_circuit_{false};
 };
 
 class AlwaysDenyLocalRateLimiter : public LocalRateLimiter {

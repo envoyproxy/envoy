@@ -40,30 +40,34 @@ using ResponseTranslator = ::google::grpc::transcoding::JsonRequestTranslator;
 using ResponseInfo = ::google::grpc::transcoding::RequestInfo;
 using ::envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
     GrpcJsonReverseTranscoder;
-using ::google::api::HttpRule;
 using ::google::grpc::transcoding::Transcoder;
 using ::google::grpc::transcoding::TranscoderInputStream;
 using ::google::grpc::transcoding::TypeHelper;
 
 GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
-    const GrpcJsonReverseTranscoder& transcoder_config, Api::Api& api) {
+    const GrpcJsonReverseTranscoder& transcoder_config, Api::Api& api,
+    absl::Status& creation_status) {
   Protobuf::FileDescriptorSet descriptor_set;
   if (!transcoder_config.descriptor_path().empty()) {
     auto file_or_error = api.fileSystem().fileReadToEnd(transcoder_config.descriptor_path());
-    THROW_IF_NOT_OK(file_or_error.status());
+    SET_AND_RETURN_IF_NOT_OK(file_or_error.status(), creation_status);
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
-      throw EnvoyException("Unable to parse proto descriptor");
+      creation_status = absl::InvalidArgumentError("Unable to parse proto descriptor");
+      return;
     }
   } else if (!transcoder_config.descriptor_binary().empty()) {
     if (!descriptor_set.ParseFromString(transcoder_config.descriptor_binary())) {
-      throw EnvoyException("Unable to parse proto descriptor binary");
+      creation_status = absl::InvalidArgumentError("Unable to parse proto descriptor binary");
+      return;
     }
   } else {
-    throw EnvoyException("Descriptor set not set");
+    creation_status = absl::InvalidArgumentError("Descriptor set not set");
+    return;
   }
   for (auto& file : descriptor_set.file()) {
     if (descriptor_pool_.BuildFile(file) == nullptr) {
-      throw EnvoyException("Unable to build proto descriptor pool");
+      creation_status = absl::InvalidArgumentError("Unable to build proto descriptor pool");
+      return;
     }
   }
 
@@ -71,15 +75,15 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
       Grpc::Common::typeUrlPrefix(), &descriptor_pool_));
   max_request_body_size_ =
       transcoder_config.has_max_request_body_size()
-          ? absl::make_optional(transcoder_config.max_request_body_size().value())
+          ? std::make_optional(transcoder_config.max_request_body_size().value())
           : std::nullopt;
   max_response_body_size_ =
       transcoder_config.has_max_response_body_size()
-          ? absl::make_optional(transcoder_config.max_response_body_size().value())
+          ? std::make_optional(transcoder_config.max_response_body_size().value())
           : std::nullopt;
   api_version_header_ = transcoder_config.api_version_header().empty()
                             ? std::nullopt
-                            : absl::make_optional(transcoder_config.api_version_header());
+                            : std::make_optional(transcoder_config.api_version_header());
 
   const auto& print_options = transcoder_config.request_json_print_options();
   request_translate_options_.json_print_options.always_print_enums_as_ints =

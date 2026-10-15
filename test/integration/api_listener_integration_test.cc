@@ -74,7 +74,7 @@ api_listener:
       )EOF";
   }
 
-  NiceMock<Http::MockResponseEncoder> stream_encoder_;
+  testing::NiceMock<Http::MockResponseEncoder> stream_encoder_;
 };
 
 ACTION_P(Notify, notification) { notification->Notify(); }
@@ -89,9 +89,9 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
   Http::ApiListenerPtr http_api_listener;
   test_server_->server().dispatcher().post([this, &done, &http_api_listener]() -> void {
     ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
-    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
+    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->name());
     http_api_listener =
-        test_server_->server().listenerManager().apiListener()->get().createHttpApiListener(
+        test_server_->server().listenerManager().apiListener()->createHttpApiListener(
             test_server_->server().dispatcher());
     ASSERT_TRUE(http_api_listener != nullptr);
 
@@ -103,7 +103,7 @@ TEST_P(ApiListenerIntegrationTest, Basic) {
     Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
     EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
     EXPECT_CALL(stream_encoder_, encodeData(_, false));
-    EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
+    EXPECT_CALL(stream_encoder_, encodeData(BufferString(""), true)).WillOnce(Notify(&done));
 
     // Send a headers-only request
     stream_decoder->get()->decodeHeaders(
@@ -129,9 +129,9 @@ TEST_P(ApiListenerIntegrationTest, DestroyWithActiveStreams) {
 
   test_server_->server().dispatcher().post([this, &done]() -> void {
     ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
-    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
+    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->name());
     auto http_api_listener =
-        test_server_->server().listenerManager().apiListener()->get().createHttpApiListener(
+        test_server_->server().listenerManager().apiListener()->createHttpApiListener(
             test_server_->server().dispatcher());
     ASSERT_TRUE(http_api_listener != nullptr);
 
@@ -177,9 +177,9 @@ TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
   Http::ApiListenerPtr http_api_listener;
   dispatchers[0]->post([this, &done, &http_api_listener, &dispatchers]() -> void {
     ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
-    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
+    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->name());
     http_api_listener =
-        test_server_->server().listenerManager().apiListener()->get().createHttpApiListener(
+        test_server_->server().listenerManager().apiListener()->createHttpApiListener(
             *dispatchers[0]);
     ASSERT_TRUE(http_api_listener != nullptr);
 
@@ -191,7 +191,7 @@ TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
     Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
     EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
     EXPECT_CALL(stream_encoder_, encodeData(_, false));
-    EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true)).WillOnce(Notify(&done));
+    EXPECT_CALL(stream_encoder_, encodeData(BufferString(""), true)).WillOnce(Notify(&done));
 
     // Send a headers-only request
     stream_decoder->get()->decodeHeaders(

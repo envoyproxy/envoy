@@ -8,6 +8,7 @@ namespace Matching {
 REGISTER_FACTORY(HttpResponseStatusCodeInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
 REGISTER_FACTORY(HttpResponseStatusCodeClassInputFactory,
                  Matcher::DataInputFactory<HttpMatchingData>);
+REGISTER_FACTORY(HttpResponseLocalReplyInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
 
 } // namespace Matching
 } // namespace Http

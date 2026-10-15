@@ -131,8 +131,8 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::stri
 
 Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& operation_name,
                                    Envoy::SystemTime start_time,
-                                   const absl::optional<XRayHeader>& xray_header,
-                                   const absl::optional<absl::string_view> client_ip) {
+                                   const std::optional<XRayHeader>& xray_header,
+                                   const std::optional<absl::string_view> client_ip) {
 
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, random_, *daemon_broker_);
   span_ptr->setName(segment_name_);
@@ -170,7 +170,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   return span_ptr;
 }
 
-XRay::SpanPtr Tracer::createNonSampledSpan(const absl::optional<XRayHeader>& xray_header) const {
+XRay::SpanPtr Tracer::createNonSampledSpan(const std::optional<XRayHeader>& xray_header) const {
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, random_, *daemon_broker_);
   if (xray_header) {
     // There's a previous span that this span should be based-on.

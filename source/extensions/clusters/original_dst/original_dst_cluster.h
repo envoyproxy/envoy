@@ -5,6 +5,8 @@
 #include <string>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/original_dst/v3/original_dst.pb.h"
+#include "envoy/extensions/clusters/original_dst/v3/original_dst.pb.validate.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
@@ -88,22 +90,27 @@ public:
    */
   class LoadBalancer : public Upstream::LoadBalancer {
   public:
-    LoadBalancer(const OriginalDstClusterHandleSharedPtr& parent)
+    LoadBalancer(const OriginalDstClusterHandleSharedPtr& parent, const PrioritySet& priority_set)
         : parent_(parent), http_header_name_(parent->cluster_->httpHeaderName()),
           metadata_key_(parent->cluster_->metadataKey()),
           port_override_(parent->cluster_->portOverride()),
-          host_map_(parent->cluster_->getCurrentHostMap()) {}
+          host_map_(parent->cluster_->getCurrentHostMap()) {
+      member_update_cb_ =
+          priority_set.addMemberUpdateCb([this](const HostVector&, const HostVector&) {
+            host_map_ = parent_->cluster_->getCurrentHostMap();
+          });
+    }
 
     // Upstream::LoadBalancer
     HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
     // Preconnecting is not implemented for OriginalDstCluster
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
     // Pool selection not implemented for OriginalDstCluster
-    absl::optional<Upstream::SelectedPoolAndConnection>
+    std::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
                              std::vector<uint8_t>& /*hash_key*/) override {
-      return absl::nullopt;
+      return std::nullopt;
     }
     // Lifetime tracking not implemented for OriginalDstCluster
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
@@ -117,19 +124,22 @@ public:
   private:
     const OriginalDstClusterHandleSharedPtr parent_;
     // The optional original host provider that extracts the address from HTTP header map.
-    const absl::optional<Http::LowerCaseString>& http_header_name_;
-    const absl::optional<Config::MetadataKey>& metadata_key_;
-    const absl::optional<uint32_t> port_override_;
+    const std::optional<Http::LowerCaseString>& http_header_name_;
+    const std::optional<Config::MetadataKey>& metadata_key_;
+    const std::optional<uint32_t> port_override_;
     HostMultiMapConstSharedPtr host_map_;
+    Common::CallbackHandlePtr member_update_cb_;
   };
 
-  const absl::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
-  const absl::optional<Config::MetadataKey>& metadataKey() { return metadata_key_; }
-  const absl::optional<uint32_t> portOverride() { return port_override_; }
+  const std::optional<Http::LowerCaseString>& httpHeaderName() { return http_header_name_; }
+  const std::optional<Config::MetadataKey>& metadataKey() { return metadata_key_; }
+  const std::optional<uint32_t> portOverride() { return port_override_; }
 
 protected:
-  OriginalDstCluster(const envoy::config::cluster::v3::Cluster& config,
-                     ClusterFactoryContext& context, absl::Status& creation_status);
+  OriginalDstCluster(
+      const envoy::config::cluster::v3::Cluster& config,
+      const envoy::extensions::clusters::original_dst::v3::OriginalDstCluster& original_dst_config,
+      ClusterFactoryContext& context, absl::Status& creation_status);
 
 private:
   friend class OriginalDstClusterFactory;
@@ -139,9 +149,10 @@ private:
     LoadBalancerFactory(const OriginalDstClusterHandleSharedPtr& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
-    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
-      return std::make_unique<LoadBalancer>(cluster_);
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
+      return std::make_unique<LoadBalancer>(cluster_, params.priority_set);
     }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     const OriginalDstClusterHandleSharedPtr cluster_;
   };
@@ -180,9 +191,9 @@ private:
 
   absl::Mutex host_map_lock_;
   HostMultiMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
-  absl::optional<Http::LowerCaseString> http_header_name_;
-  absl::optional<Config::MetadataKey> metadata_key_;
-  absl::optional<uint32_t> port_override_;
+  std::optional<Http::LowerCaseString> http_header_name_;
+  std::optional<Config::MetadataKey> metadata_key_;
+  std::optional<uint32_t> port_override_;
   friend class OriginalDstClusterFactory;
   friend class OriginalDstClusterHandle;
 };
@@ -190,16 +201,25 @@ private:
 constexpr absl::string_view OriginalDstClusterFilterStateKey =
     "envoy.network.transport_socket.original_dst_address";
 
-class OriginalDstClusterFactory : public ClusterFactoryImplBase {
+class OriginalDstClusterFactory
+    : public ConfigurableClusterFactoryBase<
+          envoy::extensions::clusters::original_dst::v3::OriginalDstCluster> {
 public:
-  OriginalDstClusterFactory() : ClusterFactoryImplBase("envoy.cluster.original_dst") {}
+  OriginalDstClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.original_dst") {}
 
+private:
+  friend class OriginalDstClusterTest;
+
+  // Override to handle both legacy type: ORIGINAL_DST and new cluster_type paths.
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     ClusterFactoryContext& context) override;
 
-private:
-  friend class OriginalDstClusterTest;
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+  createClusterWithConfig(
+      const envoy::config::cluster::v3::Cluster& cluster,
+      const envoy::extensions::clusters::original_dst::v3::OriginalDstCluster& proto_config,
+      ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(OriginalDstClusterFactory);

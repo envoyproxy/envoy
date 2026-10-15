@@ -11,6 +11,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -66,8 +67,10 @@ private:
 };
 
 constexpr char MetadataStopAllFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<MetadataStopAllFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<MetadataStopAllFilter,
+                             test::integration::filters::MetadataStopAllFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

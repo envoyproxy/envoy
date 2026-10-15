@@ -4,7 +4,6 @@
 #include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -68,8 +67,10 @@ withhold_grpc_frames: true
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Config config_factory;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      config_factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      config_factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

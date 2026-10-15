@@ -1,3 +1,4 @@
+#include "envoy/common/logger.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
@@ -10,6 +11,7 @@
 
 #include "fmt/printf.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -41,7 +43,7 @@ public:
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
     // Enable debug logging for all loggers to ensure coverage of debug log statements
-    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+    Envoy::Logger::Registry::setLogLevel(Logger::Levels::debug);
 
     rbac_config = absl::StrCat(ConfigHelper::baseConfig(), R"EOF(
     filter_chains:
@@ -110,10 +112,10 @@ typed_config:
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
 
-  test_server_->waitForCounterGe("tcp.rbac.allowed", 1);
+  test_server_->waitForCounter("tcp.rbac.allowed", Ge(1));
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.denied")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
-  test_server_->waitForCounterGe("tcp.rbac.shadow_denied", 1);
+  test_server_->waitForCounter("tcp.rbac.shadow_denied", Ge(1));
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
@@ -233,10 +235,10 @@ typed_config:
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
 
-  test_server_->waitForCounterGe("tcp.rbac.allowed", 1);
+  test_server_->waitForCounter("tcp.rbac.allowed", Ge(1));
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.denied")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
-  test_server_->waitForCounterGe("tcp.rbac.shadow_denied", 1);
+  test_server_->waitForCounter("tcp.rbac.shadow_denied", Ge(1));
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, MatcherDenied) {

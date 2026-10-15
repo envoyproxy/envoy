@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
@@ -45,6 +46,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
           absl::InvalidArgumentError("hits_addend must contain either a format or a number");
       return;
     }
+    is_negative_hits_ = config.hits_addend().is_negative_hits();
   }
 
   if (config.has_stage() || !config.disable_key().empty()) {
@@ -57,6 +59,18 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
     if (no_limit) {
       creation_status = absl::InvalidArgumentError("'limit' field is not supported");
       return;
+    }
+    switch (config.limit().override_specifier_case()) {
+    case ProtoRateLimit::Override::OverrideSpecifierCase::kDynamicMetadata:
+      limit_override_.emplace(
+          new Envoy::Router::DynamicMetadataRateLimitOverride(config.limit().dynamic_metadata()));
+      break;
+    case ProtoRateLimit::Override::OverrideSpecifierCase::kRateLimit:
+      limit_override_.emplace(
+          new Envoy::Router::StaticRateLimitOverride(config.limit().rate_limit()));
+      break;
+    case ProtoRateLimit::Override::OverrideSpecifierCase::OVERRIDE_SPECIFIER_NOT_SET:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
   }
 
@@ -174,6 +188,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
 }
 
 void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
+                                          const Http::ResponseHeaderMap* response_headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           const std::string& local_service_cluster,
                                           RateLimitDescriptors& descriptors) const {
@@ -191,7 +206,7 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
   // Populate hits_addend if set.
   if (hits_addend_provider_ != nullptr) {
     const Protobuf::Value hits_addend_value =
-        hits_addend_provider_->formatValue({&headers}, stream_info);
+        hits_addend_provider_->formatValue({&headers, response_headers}, stream_info);
 
     double hits_addend = 0;
     bool success = true;
@@ -222,6 +237,14 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
     descriptor.hits_addend_ = hits_addend_.value();
   }
 
+  // Populate is_negative.
+  descriptor.is_negative_hits_ = is_negative_hits_;
+
+  // Populate the limit override if configured.
+  if (limit_override_) {
+    limit_override_.value()->populateOverride(descriptor, &stream_info.dynamicMetadata());
+  }
+
   // Populate enable_x_rate_limit_headers.
   descriptor.x_ratelimit_option_ = x_ratelimit_option_;
   descriptors.emplace_back(std::move(descriptor));
@@ -238,6 +261,7 @@ RateLimitConfig::RateLimitConfig(const Protobuf::RepeatedPtrField<ProtoRateLimit
 }
 
 void RateLimitConfig::populateDescriptors(const Http::RequestHeaderMap& headers,
+                                          const Http::ResponseHeaderMap* response_headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           const std::string& local_service_cluster,
                                           RateLimitDescriptors& descriptors,
@@ -246,7 +270,8 @@ void RateLimitConfig::populateDescriptors(const Http::RequestHeaderMap& headers,
     if (generator.applyOnStreamDone() != on_stream_done) {
       continue;
     }
-    generator.populateDescriptors(headers, stream_info, local_service_cluster, descriptors);
+    generator.populateDescriptors(headers, response_headers, stream_info, local_service_cluster,
+                                  descriptors);
   }
 }
 

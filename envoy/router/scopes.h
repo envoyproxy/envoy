@@ -53,11 +53,9 @@ public:
 private:
   // Update the key's hash with the new fragment hash.
   void updateHash(const ScopeKeyFragmentBase& fragment) {
-    std::stringbuf buffer;
-    buffer.sputn(reinterpret_cast<const char*>(&hash_), sizeof(hash_));
-    const auto& fragment_hash = fragment.hash();
-    buffer.sputn(reinterpret_cast<const char*>(&fragment_hash), sizeof(fragment_hash));
-    hash_ = HashUtil::xxHash64(buffer.str());
+    const uint64_t hashes[2] = {hash_, fragment.hash()};
+    hash_ = HashUtil::xxHash64(
+        absl::string_view(reinterpret_cast<const char*>(hashes), sizeof(hashes)));
   }
 
   uint64_t hash_{0};
@@ -69,13 +67,11 @@ using ScopeKeyPtr = std::unique_ptr<ScopeKey>;
 // String fragment.
 class StringKeyFragment : public ScopeKeyFragmentBase {
 public:
-  explicit StringKeyFragment(absl::string_view value)
-      : value_(value), hash_(HashUtil::xxHash64(value_)) {}
+  explicit StringKeyFragment(absl::string_view value) : hash_(HashUtil::xxHash64(value)) {}
 
   uint64_t hash() const override { return hash_; }
 
 private:
-  const std::string value_;
   const uint64_t hash_;
 };
 

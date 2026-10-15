@@ -27,7 +27,7 @@ using QuicEnvoyAddressPair = std::pair<quic::QuicSocketAddress, Address::Instanc
 class IoSocketHandleImpl : public IoSocketHandleBaseImpl {
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                              absl::optional<int> domain = absl::nullopt,
+                              std::optional<int> domain = std::nullopt,
                               size_t address_cache_max_capacity = 0)
       : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
         address_cache_max_capacity_(address_cache_max_capacity) {
@@ -39,16 +39,19 @@ public:
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
 
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length) override;
+                               std::optional<uint64_t> max_length) override;
 
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
+
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override;
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
@@ -123,7 +126,7 @@ private:
   // and the cache size defaults to 4.
   size_t address_cache_max_capacity_;
   // Only non-null if address_cache_max_capacity_ is greater than 0.
-  absl::optional<std::vector<QuicEnvoyAddressPair>> recent_received_addresses_ = absl::nullopt;
+  std::optional<std::vector<QuicEnvoyAddressPair>> recent_received_addresses_ = std::nullopt;
 
   // For testing and benchmarking non-public methods.
   friend class IoSocketHandleImplTestWrapper;

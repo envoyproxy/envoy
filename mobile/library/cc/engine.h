@@ -2,9 +2,11 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "library/cc/network_change_monitor.h"
 #include "library/cc/stream_client.h"
 #include "library/common/types/c_types.h"
 
@@ -17,7 +19,7 @@ namespace Platform {
 class StreamClient;
 using StreamClientSharedPtr = std::shared_ptr<StreamClient>;
 
-class Engine : public std::enable_shared_from_this<Engine> {
+class Engine : public std::enable_shared_from_this<Engine>, public NetworkChangeListener {
 public:
   // Creates a non-owning Engine wrapper around an existing InternalEngine handle.
   // The returned Engine will not auto-terminate the underlying InternalEngine in its destructor.
@@ -27,16 +29,23 @@ public:
   ~Engine();
 
   std::string dumpStats();
-  StreamClientSharedPtr streamClient();
+  /**
+   * Creates a new StreamClient.
+   * @param listener_name The name of the API listener to route streams to.
+   *                      If empty, the default listener will be used.
+   */
+  StreamClientSharedPtr streamClient(absl::string_view listener_name = "");
   int64_t getInternalEngineHandle() const;
   void onDefaultNetworkChangeEvent(int network);
   // TODO(abeyad): Remove once migrated to onDefaultNetworkChangeEvent().
   void onDefaultNetworkChanged(int network);
   void onDefaultNetworkUnavailable();
   void onDefaultNetworkAvailable();
+  void initializeNetworkChangeMonitor();
   envoy_status_t setProxySettings(absl::string_view host, const uint16_t port);
 
   envoy_status_t terminate();
+  void drainConnectionsBySocketTag(uint32_t tag);
   Envoy::InternalEngine* engine() { return engine_; }
 
 private:
@@ -44,6 +53,7 @@ private:
 
   // required to access private constructor
   friend class EngineBuilder;
+  template <typename T> friend class EngineBuilderBase;
   // required to use envoy_engine_t without exposing it publicly
   friend class StreamPrototype;
   // for testing only
@@ -52,6 +62,7 @@ private:
   Envoy::InternalEngine* engine_;
   const bool handle_termination_;
   StreamClientSharedPtr stream_client_;
+  std::unique_ptr<NetworkChangeMonitor> network_change_monitor_;
 };
 
 } // namespace Platform

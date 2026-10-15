@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "quiche/quic/core/quic_stream.h"
 
 namespace Envoy {

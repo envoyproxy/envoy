@@ -1,7 +1,8 @@
 #pragma once
 
+#include <atomic>
+#include <deque>
 #include <string>
-#include <vector>
 
 #include "envoy/http/async_client.h"
 #include "envoy/network/connection.h"
@@ -48,16 +49,47 @@ public:
   // Accessors for ABI callbacks.
   Network::ReadFilterCallbacks* readCallbacks() { return read_callbacks_; }
   Network::WriteFilterCallbacks* writeCallbacks() { return write_callbacks_; }
-  Buffer::Instance* currentReadBuffer() { return current_read_buffer_; }
+  Buffer::Instance* currentReadBuffer() {
+    if (current_read_buffer_ != nullptr) {
+      return current_read_buffer_;
+    }
+    // Outside on_read the connection read buffer stays valid for the connection lifetime, so use it
+    // rather than the possibly transient buffer on_read received.
+    return read_callbacks_ != nullptr ? read_callbacks_->readBuffer().ptr() : nullptr;
+  }
   Buffer::Instance* currentWriteBuffer() { return current_write_buffer_; }
 
   // Test-only setters for buffer pointers.
   void setCurrentReadBufferForTest(Buffer::Instance* buffer) { current_read_buffer_ = buffer; }
   void setCurrentWriteBufferForTest(Buffer::Instance* buffer) { current_write_buffer_ = buffer; }
 
-  // Temporary storage for the serialized typed filter state value returned by
-  // get_filter_state_typed. Valid until the end of the current event hook.
-  absl::optional<std::string> last_serialized_filter_state_;
+  // RAII guard placed at each event hook that can invoke a module filter-state getter. Nested hooks
+  // share the outermost scope, so the returned views stay valid until the outermost hook returns
+  // and are then cleared.
+  class HookScope {
+  public:
+    explicit HookScope(DynamicModuleNetworkFilter& filter) : filter_(filter) {
+      ++filter_.hook_depth_;
+    }
+    ~HookScope() {
+      if (--filter_.hook_depth_ == 0) {
+        filter_.filter_state_scratch_.clear();
+      }
+    }
+
+  private:
+    DynamicModuleNetworkFilter& filter_;
+  };
+
+  // Test-only accessor for the number of buffered filter-state getter results.
+  size_t filterStateScratchSizeForTest() const { return filter_state_scratch_.size(); }
+
+  // Scratch buffer for serialized typed filter-state getter results. A deque keeps stable element
+  // addresses, so consecutive getter calls in the same hook stay valid until the hook returns.
+  std::deque<std::string> filter_state_scratch_;
+
+  // Depth of nested event hooks. The scratch is cleared when the outermost hook returns.
+  uint32_t hook_depth_ = 0;
 
   // Test-only setter for callbacks.
   void setCallbacksForTest(Network::ReadFilterCallbacks* read_callbacks) {
@@ -145,12 +177,10 @@ public:
   void onScheduled(uint64_t event_id);
 
   /**
-   * Get the dispatcher for the worker thread this filter is running on.
-   * Returns nullptr if callbacks are not set.
+   * Returns the worker dispatcher this filter is running on; safe to call from any thread.
+   * Returns nullptr until callbacks are wired and after the filter is destroyed.
    */
-  Event::Dispatcher* dispatcher() {
-    return read_callbacks_ != nullptr ? &read_callbacks_->connection().dispatcher() : nullptr;
-  }
+  Event::Dispatcher* dispatcher() { return cached_dispatcher_.load(std::memory_order_acquire); }
 
   /**
    * Returns the worker index assigned to this filter.
@@ -177,17 +207,23 @@ private:
   const DynamicModuleNetworkFilterConfigSharedPtr config_;
   envoy_dynamic_module_type_network_filter_module_ptr in_module_filter_ = nullptr;
 
+  // Worker-thread only; foreign threads must use `dispatcher()`.
   Network::ReadFilterCallbacks* read_callbacks_ = nullptr;
   Network::WriteFilterCallbacks* write_callbacks_ = nullptr;
 
-  // Current buffers. Set on the first on_read/on_write callback and kept for the lifetime of the
-  // connection so that modules can access buffered data outside of on_read/on_write callbacks.
+  // The buffer passed to the active on_read callback, or null outside on_read. Deferred read access
+  // resolves the connection read buffer via currentReadBuffer() instead.
   Buffer::Instance* current_read_buffer_ = nullptr;
+  // The write buffer for the active on_write callback only. The connection reuses or moves it after
+  // on_write, so it is restored when the call returns rather than cached.
   Buffer::Instance* current_write_buffer_ = nullptr;
 
   bool destroyed_ = false;
 
-  uint32_t worker_index_;
+  // Worker dispatcher published at callback-init, cleared on destroy. Read via `dispatcher()`.
+  std::atomic<Event::Dispatcher*> cached_dispatcher_{nullptr};
+
+  uint32_t worker_index_ = 0;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -230,7 +266,9 @@ private:
     std::string byte_value;
   };
 
-  std::vector<StoredSocketOption> socket_options_;
+  // A deque keeps element addresses stable as options are appended, so a byte value view handed to
+  // a module stays valid until the filter is destroyed as the ABI promises.
+  std::deque<StoredSocketOption> socket_options_;
 };
 
 /**
@@ -241,14 +279,24 @@ private:
  */
 class DynamicModuleNetworkFilterScheduler {
 public:
-  DynamicModuleNetworkFilterScheduler(DynamicModuleNetworkFilterWeakPtr filter,
-                                      Event::Dispatcher& dispatcher)
-      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+  explicit DynamicModuleNetworkFilterScheduler(DynamicModuleNetworkFilterWeakPtr filter)
+      : filter_(std::move(filter)) {}
 
+  // Safe to call from any thread. Reads only the weak_ptr and the atomic dispatcher cache (see
+  // `DynamicModuleNetworkFilter::dispatcher()`); it never dereferences `read_callbacks_` from a
+  // foreign thread.
   void commit(uint64_t event_id) {
-    dispatcher_.post([filter = filter_, event_id]() {
-      if (DynamicModuleNetworkFilterSharedPtr filter_shared = filter.lock()) {
-        filter_shared->onScheduled(event_id);
+    DynamicModuleNetworkFilterSharedPtr filter_shared = filter_.lock();
+    if (!filter_shared) {
+      return;
+    }
+    Event::Dispatcher* dispatcher = filter_shared->dispatcher();
+    if (dispatcher == nullptr) {
+      return;
+    }
+    dispatcher->post([filter = filter_, event_id]() {
+      if (DynamicModuleNetworkFilterSharedPtr fs = filter.lock()) {
+        fs->onScheduled(event_id);
       }
     });
   }
@@ -257,8 +305,6 @@ private:
   // The filter that this scheduler is associated with. Using a weak pointer to avoid unnecessarily
   // extending the lifetime of the filter.
   DynamicModuleNetworkFilterWeakPtr filter_;
-  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
-  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace NetworkFilters

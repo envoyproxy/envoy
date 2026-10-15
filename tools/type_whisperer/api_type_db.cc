@@ -49,16 +49,15 @@ const tools::type_whisperer::TypeDb& getApiTypeDb() {
 
 } // namespace
 
-absl::optional<TypeInformation>
-ApiTypeDb::getExistingTypeInformation(const std::string& type_name) {
+std::optional<TypeInformation> ApiTypeDb::getExistingTypeInformation(const std::string& type_name) {
   auto it = getApiTypeDb().types().find(type_name);
   if (it == getApiTypeDb().types().end()) {
     return {};
   }
-  return absl::make_optional<TypeInformation>(type_name, it->second.proto_path(), false);
+  return std::make_optional<TypeInformation>(type_name, it->second.proto_path(), false);
 }
 
-absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::string& type_name) {
+std::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::string& type_name) {
   std::string latest_type_name;
   const tools::type_whisperer::TypeDbDescription* latest_type_desc{};
   std::string current_type_name = type_name;
@@ -76,8 +75,8 @@ absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::s
   }
   const auto* enum_desc = getDescriptorPool().FindEnumTypeByName(type_name);
   if (enum_desc != nullptr) {
-    auto result = absl::make_optional<TypeInformation>(latest_type_name,
-                                                       latest_type_desc->proto_path(), true);
+    auto result =
+        std::make_optional<TypeInformation>(latest_type_name, latest_type_desc->proto_path(), true);
     for (int index = 0; index < enum_desc->value_count(); ++index) {
       const auto* value = enum_desc->value(index);
       if (value->options().HasExtension(udpa::annotations::enum_value_migrate)) {
@@ -89,8 +88,8 @@ absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::s
   }
   const auto* message_desc = getDescriptorPool().FindMessageTypeByName(type_name);
   if (message_desc != nullptr) {
-    auto result = absl::make_optional<TypeInformation>(latest_type_name,
-                                                       latest_type_desc->proto_path(), false);
+    auto result = std::make_optional<TypeInformation>(latest_type_name,
+                                                      latest_type_desc->proto_path(), false);
     for (int index = 0; index < message_desc->field_count(); ++index) {
       const auto* field = message_desc->field(index);
       if (field->options().HasExtension(udpa::annotations::field_migrate)) {

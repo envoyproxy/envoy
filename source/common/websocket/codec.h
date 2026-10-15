@@ -61,7 +61,7 @@ struct Frame {
   uint8_t opcode_;
   // The 4 byte fixed size masking key used to mask the payload. Masking/unmasking should be
   // performed as described in https://datatracker.ietf.org/doc/html/rfc6455#section-5.3
-  absl::optional<uint32_t> masking_key_;
+  std::optional<uint32_t> masking_key_;
   // Length of the payload as the number of bytes.
   uint64_t payload_length_;
   // WebSocket payload data (extension data and application data).
@@ -76,7 +76,7 @@ public:
   // Creates a new Websocket data frame header with the given frame data.
   // @param frame supplies the frame to be encoded.
   // @return std::vector<uint8_t> buffer with encoded header data.
-  absl::optional<std::vector<uint8_t>> encodeFrameHeader(const Frame& frame);
+  std::optional<std::vector<uint8_t>> encodeFrameHeader(const Frame& frame);
 };
 
 // Decoder decodes bytes in input buffer into in-memory WebSocket frames.
@@ -89,7 +89,7 @@ public:
   // frame until the next decode calls feed rest of the frame data.
   // @param input supplies the binary octets wrapped in a WebSocket frame.
   // @return the decoded frames.
-  absl::optional<std::vector<Frame>> decode(const Buffer::Instance& input);
+  std::optional<std::vector<Frame>> decode(const Buffer::Instance& input);
 
 private:
   void resetDecoder();

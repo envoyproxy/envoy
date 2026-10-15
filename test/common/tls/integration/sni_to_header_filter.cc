@@ -4,6 +4,7 @@
 
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/common/tls/integration/sni_to_header_filter.pb.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 
@@ -21,8 +22,10 @@ public:
 };
 
 constexpr char SniToHeaderFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<SniToHeaderFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<SniToHeaderFilter,
+                             test::common::tls::integration::SniToHeaderFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

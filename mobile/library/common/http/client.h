@@ -17,7 +17,7 @@
 #include "source/common/stats/timespan_impl.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/types/optional.h"
+#include <optional>
 #include "library/common/engine_types.h"
 #include "library/common/event/provisional_dispatcher.h"
 #include "library/common/network/synthetic_address_impl.h"
@@ -54,7 +54,7 @@ class Client : public Logger::Loggable<Logger::Id::http> {
 public:
   Client(ApiListenerPtr&& api_listener, Event::ProvisionalDispatcher& dispatcher,
          Stats::Scope& scope, Random::RandomGenerator& random,
-         absl::optional<size_t> high_watermark = absl::nullopt)
+         std::optional<size_t> high_watermark = std::nullopt)
       : api_listener_(std::move(api_listener)), dispatcher_(dispatcher),
         stats_(
             HttpClientStats{ALL_HTTP_CLIENT_STATS(POOL_COUNTER_PREFIX(scope, "http.client."),
@@ -64,6 +64,11 @@ public:
         // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
         // and having local data of 2M + kernel-buffer-limit for HTTP/1.1
         random_(random), high_watermark_(high_watermark.value_or(2 * 1024 * 1024)) {}
+
+  ~Client() {
+    ASSERT(api_listener_ == nullptr,
+           "shutdownApiListener must be called before Client is destructed");
+  }
 
   /**
    * Attempts to open a new stream to the remote. Note that this function is asynchronous and
@@ -139,7 +144,10 @@ public:
     CONSTRUCT_ON_FIRST_USE(std::string, "client_cancelled_stream");
   }
 
-  void shutdownApiListener() { api_listener_.reset(); }
+  void shutdownApiListener() {
+    ENVOY_LOG(debug, "shutdownApiListener called");
+    api_listener_.reset();
+  }
 
 private:
   class DirectStream;
@@ -168,7 +176,7 @@ private:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const ResponseTrailerMap& trailers) override;
     Stream& getStream() override { return direct_stream_; }
-    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return std::nullopt; }
     void encode1xxHeaders(const ResponseHeaderMap&) override {
       IS_ENVOY_BUG("Unexpected 100 continue"); // proxy_100_continue_ false by default.
     }
@@ -213,7 +221,7 @@ private:
     DirectStream& direct_stream_;
     EnvoyStreamCallbacks stream_callbacks_;
     Client& http_client_;
-    absl::optional<EnvoyError> error_;
+    std::optional<EnvoyError> error_;
     bool success_{};
 
     // Buffered response data when in explicit flow control mode.
@@ -280,7 +288,7 @@ private:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override;
 
-    absl::optional<uint32_t> codecStreamId() const override { return absl::nullopt; }
+    std::optional<uint32_t> codecStreamId() const override { return std::nullopt; }
 
     void setResponseDetails(absl::string_view response_details) {
       response_details_ = response_details;
@@ -349,7 +357,7 @@ private:
     // read faster than the mobile caller can process it.
     bool explicit_flow_control_ = false;
     // Latest intel data retrieved from the StreamInfo.
-    envoy_stream_intel stream_intel_{-1, -1, 0, 0};
+    envoy_stream_intel stream_intel_{-1, -1, 0, 0, -1, -1};
     envoy_final_stream_intel envoy_final_stream_intel_{-1, -1, -1, -1, -1, -1, -1, -1,
                                                        -1, -1, -1, 0,  0,  0,  0,  -1};
     StreamInfo::BytesMeterSharedPtr bytes_meter_;

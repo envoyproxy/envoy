@@ -31,17 +31,22 @@ TransportTapStats TapSocket::generateStats(Stats::Scope& stats_scope, const std:
 void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!tapper_);
   transport_socket_->setTransportSocketCallbacks(callbacks);
-  tapper_ = config_
-                ? config_->createPerSocketTapper(socket_tap_config_, stats_, callbacks.connection())
-                : nullptr;
+  if (config_ != nullptr) {
+    if (config_->shouldRecord()) {
+      tapper_ = config_->createPerSocketTapper(socket_tap_config_, stats_, callbacks.connection());
+    } else {
+      // Sampling rejected this connection. Track for observability.
+      stats_.cx_sampled_out_.inc();
+    }
+  }
 }
 
-void TapSocket::closeSocket(Network::ConnectionEvent event) {
+void TapSocket::closeSocket(Network::ConnectionEvent event, bool abort_reset) {
   if (tapper_ != nullptr) {
     tapper_->closeSocket(event);
   }
 
-  transport_socket_->closeSocket(event);
+  transport_socket_->closeSocket(event, abort_reset);
 }
 
 Network::IoResult TapSocket::doRead(Buffer::Instance& buffer) {
@@ -54,10 +59,14 @@ Network::IoResult TapSocket::doRead(Buffer::Instance& buffer) {
 }
 
 Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
-  // TODO(htuch): avoid copy.
+  if (tapper_ == nullptr) {
+    return transport_socket_->doWrite(buffer, end_stream);
+  }
+  // The wrapped socket drains whatever it writes and only reports how much on return, so the bytes
+  // handed to the tapper have to be snapshotted before delegating.
   Buffer::OwnedImpl copy(buffer);
-  Network::IoResult result = transport_socket_->doWrite(buffer, end_stream);
-  if (tapper_ != nullptr && result.bytes_processed_ > 0) {
+  const Network::IoResult result = transport_socket_->doWrite(buffer, end_stream);
+  if (result.bytes_processed_ > 0) {
     tapper_->onWrite(copy, result.bytes_processed_, end_stream);
   }
   return result;

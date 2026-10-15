@@ -87,13 +87,13 @@ ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header) {
 
 CacheFileHeader makeCacheFileHeaderProto(Buffer::Instance& buffer) {
   CacheFileHeader ret;
-  ret.ParseFromString(buffer.toString());
+  std::ignore = ret.ParseFromString(buffer.toString());
   return ret;
 }
 
 CacheFileTrailer makeCacheFileTrailerProto(Buffer::Instance& buffer) {
   CacheFileTrailer ret;
-  ret.ParseFromString(buffer.toString());
+  std::ignore = ret.ParseFromString(buffer.toString());
   return ret;
 }
 

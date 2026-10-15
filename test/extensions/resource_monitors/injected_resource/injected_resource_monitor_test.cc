@@ -5,6 +5,7 @@
 #include "source/extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 #include "source/server/resource_monitor_config_impl.h"
 
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -41,7 +42,7 @@ private:
 class MockedCallbacks : public Server::ResourceUpdateCallbacks {
 public:
   MOCK_METHOD(void, onSuccess, (const Server::ResourceUsage&));
-  MOCK_METHOD(void, onFailure, (const EnvoyException&));
+  MOCK_METHOD(void, onFailure, (const absl::Status&));
 };
 
 class InjectedResourceMonitorTest : public testing::Test {
@@ -63,13 +64,16 @@ protected:
     envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig config;
     config.set_filename(resource_filename_);
     Server::Configuration::ResourceMonitorFactoryContextImpl context(
-        *dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor());
-    return std::make_unique<TestableInjectedResourceMonitor>(config, context);
+        *dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor(), runtime_);
+    auto monitor = std::make_unique<TestableInjectedResourceMonitor>(config, context);
+    THROW_IF_NOT_OK(monitor->init());
+    return monitor;
   }
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   Server::MockOptions options_;
+  testing::NiceMock<Runtime::MockLoader> runtime_;
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;
   MockedCallbacks cb_;
@@ -84,23 +88,23 @@ TEST_F(InjectedResourceMonitorTest, ReportsCorrectPressure) {
   updateResource(0.7);
 }
 
-MATCHER_P(ExceptionContains, rhs, "") { return absl::StrContains(arg.what(), rhs); }
+MATCHER_P(StatusContains, rhs, "") { return absl::StrContains(arg.message(), rhs); }
 
 TEST_F(InjectedResourceMonitorTest, ReportsParseError) {
-  EXPECT_CALL(cb_, onFailure(ExceptionContains("failed to parse injected resource pressure")));
+  EXPECT_CALL(cb_, onFailure(StatusContains("failed to parse injected resource pressure")));
   updateResource("bad content");
 }
 
 TEST_F(InjectedResourceMonitorTest, ReportsErrorForOutOfRangePressure) {
-  EXPECT_CALL(cb_, onFailure(ExceptionContains("pressure out of range")));
+  EXPECT_CALL(cb_, onFailure(StatusContains("pressure out of range")));
   updateResource(-1);
 
-  EXPECT_CALL(cb_, onFailure(ExceptionContains("pressure out of range")));
+  EXPECT_CALL(cb_, onFailure(StatusContains("pressure out of range")));
   updateResource(2);
 }
 
 TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
-  EXPECT_CALL(cb_, onFailure(ExceptionContains("Invalid path")));
+  EXPECT_CALL(cb_, onFailure(StatusContains("Invalid path")));
   monitor_->updateResourceUsage(cb_);
 }
 

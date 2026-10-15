@@ -98,7 +98,7 @@ private:
         : next_state_(next_state), filter_status_(filter_status) {};
 
     ProtocolState next_state_;
-    absl::optional<FilterStatus> filter_status_;
+    std::optional<FilterStatus> filter_status_;
   };
 
   // These functions map directly to the matching ProtocolState values. Each returns the next state

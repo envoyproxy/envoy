@@ -1,8 +1,11 @@
 #include "source/common/http/http1/balsa_parser.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
+#include <iterator>
 
 #include "source/common/common/assert.h"
 #include "source/common/http/headers.h"
@@ -25,34 +28,63 @@ constexpr absl::string_view kColonSlashSlash = "://";
 constexpr char kResponseFirstByte = 'H';
 constexpr absl::string_view kHttpVersionPrefix = "HTTP/";
 
-// Allowed characters for field names according to Section 5.1
-// and for methods according to Section 9.1 of RFC 9110:
+// RFC 9110 Sections 5.1 and 9.1 define field names and methods as tokens:
 // https://www.rfc-editor.org/rfc/rfc9110.html
-constexpr absl::string_view kValidCharacters =
+constexpr char kValidCharacters[] =
     "!#$%&'*+-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ^_`abcdefghijklmnopqrstuvwxyz|~";
-constexpr absl::string_view::iterator kValidCharactersBegin = kValidCharacters.begin();
-constexpr absl::string_view::iterator kValidCharactersEnd = kValidCharacters.end();
+
+consteval std::array<uint64_t, 4> makeValidCharacterMask() {
+  std::array<uint64_t, 4> mask{};
+  for (size_t i = 0; i < sizeof(kValidCharacters) - 1; ++i) {
+    const uint8_t index = static_cast<uint8_t>(kValidCharacters[i]);
+    mask[index / 64] |= 1ULL << (index % 64);
+  }
+  return mask;
+}
+
+// This keeps the per-character hot path branch-light and avoids a binary search through the valid
+// character list for every byte in every HTTP/1 header name.
+constexpr std::array<uint64_t, 4> kValidCharacterMask = makeValidCharacterMask();
+
+constexpr bool isValidTokenCharacter(char c) {
+  const uint8_t index = static_cast<uint8_t>(c);
+  return (kValidCharacterMask[index / 64] & (1ULL << (index % 64))) != 0;
+}
+
+static_assert(isValidTokenCharacter('a'));
+static_assert(isValidTokenCharacter('Z'));
+static_assert(isValidTokenCharacter('-'));
+static_assert(!isValidTokenCharacter(':'));
+static_assert(!isValidTokenCharacter(' '));
 
 // TODO(#21245): Skip method validation altogether when UHV method validation is
 // enabled.
-bool isMethodValid(absl::string_view method, bool allow_custom_methods) {
+bool isMethodValid(absl::string_view method, bool allow_custom_methods, bool allow_query_method) {
   if (allow_custom_methods) {
     return !method.empty() &&
-           std::all_of(method.begin(), method.end(), [](absl::string_view::value_type c) {
-             return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
-           });
+           std::all_of(method.begin(), method.end(),
+                       [](absl::string_view::value_type c) { return isValidTokenCharacter(c); });
   }
 
+  // Must remain sorted: searched by std::binary_search() below.
   static constexpr absl::string_view kValidMethods[] = {
-      "ACL",       "BIND",    "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
-      "HEAD",      "LINK",    "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
-      "MOVE",      "MSEARCH", "NOTIFY",   "OPTIONS", "PATCH",      "POST",       "PROPFIND",
-      "PROPPATCH", "PURGE",   "PUT",      "REBIND",  "REPORT",     "SEARCH",     "SOURCE",
-      "SUBSCRIBE", "TRACE",   "UNBIND",   "UNLINK",  "UNLOCK",     "UNSUBSCRIBE"};
+      "ACL",       "BIND",      "CHECKOUT", "CONNECT", "COPY",       "DELETE",     "GET",
+      "HEAD",      "LINK",      "LOCK",     "MERGE",   "MKACTIVITY", "MKCALENDAR", "MKCOL",
+      "MOVE",      "MSEARCH",   "NOTIFY",   "OPTIONS", "PATCH",      "POST",       "PROPFIND",
+      "PROPPATCH", "PURGE",     "PUT",      "QUERY",   "REBIND",     "REPORT",     "SEARCH",
+      "SOURCE",    "SUBSCRIBE", "TRACE",    "UNBIND",  "UNLINK",     "UNLOCK",     "UNSUBSCRIBE"};
+  static_assert(std::is_sorted(std::begin(kValidMethods), std::end(kValidMethods)));
 
   const auto* begin = &kValidMethods[0];
-  const auto* end = &kValidMethods[ABSL_ARRAYSIZE(kValidMethods) - 1] + 1;
-  return std::binary_search(begin, end, method);
+  const auto* end = &kValidMethods[std::size(kValidMethods) - 1] + 1;
+  if (!std::binary_search(begin, end, method)) {
+    return false;
+  }
+
+  // Recognizing QUERY (registered by RFC 10008) makes Envoy forward requests it previously
+  // rejected with a 400, so the previous behavior remains available by disabling the runtime
+  // guard `envoy.reloadable_features.http1_allow_query_method`.
+  return allow_query_method || method != Headers::get().MethodValues.Query;
 }
 
 // This function is crafted to match the URL validation behavior of the http-parser library.
@@ -76,13 +108,13 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
   if (!is_connect) {
     // Scheme must start with alpha and be non-empty.
     auto it = url.begin();
-    if (!std::isalpha(*it)) {
+    if (!absl::ascii_isalpha(*it)) {
       return false;
     }
     ++it;
     // Scheme started with an alpha character and the rest of it is alpha, digit, '+', '-' or '.'.
     const auto is_scheme_suffix = [](char c) {
-      return std::isalpha(c) || std::isdigit(c) || c == '+' || c == '-' || c == '.';
+      return absl::ascii_isalpha(c) || absl::ascii_isdigit(c) || c == '+' || c == '-' || c == '.';
     };
     it = std::find_if_not(it, url.end(), is_scheme_suffix);
     url.remove_prefix(it - url.begin());
@@ -101,7 +133,7 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
   const absl::string_view path_query = url.substr(path_query_begin - url.begin());
 
   const auto valid_host_char = [](char c) {
-    return std::isalnum(c) || c == '!' || c == '$' || c == '%' || c == '&' || c == '\'' ||
+    return absl::ascii_isalnum(c) || c == '!' || c == '$' || c == '%' || c == '&' || c == '\'' ||
            c == '(' || c == ')' || c == '*' || c == '+' || c == ',' || c == '-' || c == '.' ||
            c == ':' || c == ';' || c == '=' || c == '@' || c == '[' || c == ']' || c == '_' ||
            c == '~';
@@ -131,9 +163,8 @@ bool isVersionValid(absl::string_view version_input) {
 }
 
 bool isHeaderNameValid(absl::string_view name) {
-  return std::all_of(name.begin(), name.end(), [](absl::string_view::value_type c) {
-    return std::binary_search(kValidCharactersBegin, kValidCharactersEnd, c);
-  });
+  return std::all_of(name.begin(), name.end(),
+                     [](absl::string_view::value_type c) { return isValidTokenCharacter(c); });
 }
 
 } // anonymous namespace
@@ -141,7 +172,9 @@ bool isHeaderNameValid(absl::string_view name) {
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
                          bool enable_trailers, bool allow_custom_methods)
     : message_type_(type), connection_(connection), enable_trailers_(enable_trailers),
-      allow_custom_methods_(allow_custom_methods) {
+      allow_custom_methods_(allow_custom_methods),
+      allow_query_method_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_allow_query_method")) {
   ASSERT(connection_ != nullptr);
 
   quiche::HttpValidationPolicy http_validation_policy;
@@ -153,6 +186,10 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   http_validation_policy.require_content_length_if_body_required = false;
   http_validation_policy.disallow_invalid_header_characters_in_response = true;
   http_validation_policy.disallow_lone_cr_in_chunk_extension = true;
+
+  http_validation_policy.disallow_stray_data_after_chunk =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_chunk_parsing");
+
   framer_.set_http_validation_policy(http_validation_policy);
 
   framer_.set_balsa_headers(&headers_);
@@ -171,7 +208,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   }
 }
 
-size_t BalsaParser::execute(const char* slice, int len) {
+size_t BalsaParser::execute(const char* slice, size_t len) {
   ASSERT(status_ != ParserStatus::Error);
 
   if (len > 0 && !first_byte_processed_) {
@@ -237,9 +274,9 @@ bool BalsaParser::isHttp11() const {
   }
 }
 
-absl::optional<uint64_t> BalsaParser::contentLength() const {
+std::optional<uint64_t> BalsaParser::contentLength() const {
   if (!headers_.content_length_valid()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return headers_.content_length();
 }
@@ -281,7 +318,7 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-  if (!isMethodValid(method_input, allow_custom_methods_)) {
+  if (!isMethodValid(method_input, allow_custom_methods_, allow_query_method_)) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_METHOD";
     return;

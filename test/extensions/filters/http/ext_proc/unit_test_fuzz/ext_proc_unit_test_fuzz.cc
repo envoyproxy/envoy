@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
@@ -98,9 +101,14 @@ DEFINE_PROTO_FUZZER(
     auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder({});
     auto builder = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
         std::move(builder_ptr));
+    absl::Status creation_status = absl::OkStatus();
     config = std::make_shared<ExternalProcessing::FilterConfig>(
         proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "", false,
-        builder, mocks.factory_context_);
+        builder, mocks.factory_context_, creation_status);
+    if (!creation_status.ok()) {
+      ENVOY_LOG_MISC(debug, "Error creating ext_proc filter config: {}", creation_status.message());
+      return;
+    }
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during ext_proc filter config validation: {}", e.what());
     return;

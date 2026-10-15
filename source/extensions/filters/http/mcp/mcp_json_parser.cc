@@ -54,6 +54,20 @@ void McpParserConfig::initializeDefaults() {
                   {AttributeExtractionRule(std::string(Paths::PARAMS_PROTOCOL_VERSION)),
                    AttributeExtractionRule(std::string(Paths::PARAMS_CLIENT_INFO_NAME))});
 
+  // Discovery.
+  addMethodConfig(Methods::SERVER_DISCOVER, {});
+
+  // Subscriptions.
+  addMethodConfig(Methods::SUBSCRIPTIONS_LISTEN, {});
+
+  // Tasks.
+  addMethodConfig(Methods::TASKS_GET,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+  addMethodConfig(Methods::TASKS_UPDATE,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+  addMethodConfig(Methods::TASKS_CANCEL,
+                  {AttributeExtractionRule(std::string(Paths::PARAMS_TASK_ID))});
+
   // Notifications.
   addMethodConfig(Methods::NOTIFICATION_INITIALIZED, {});
   addMethodConfig(Methods::NOTIFICATION_CANCELLED,
@@ -121,6 +135,25 @@ McpParserConfig::getFieldsForMethod(const std::string& method) const {
   return (it != method_fields_.end()) ? it->second : empty;
 }
 
+std::string McpParserConfig::getNameAttributePath(const std::string& method) const {
+  using namespace Methods;
+  using namespace Paths;
+
+  if (method == TOOLS_CALL || method == PROMPTS_GET) {
+    return std::string(PARAMS_NAME);
+  }
+
+  if (method == RESOURCES_READ) {
+    return std::string(PARAMS_URI);
+  }
+
+  if (method == TASKS_GET || method == TASKS_UPDATE || method == TASKS_CANCEL) {
+    return std::string(PARAMS_TASK_ID);
+  }
+
+  return "";
+}
+
 const McpParserConfig::FieldRequirements&
 McpParserConfig::getFieldRequirementsForMethod(const std::string& method) const {
   auto it = method_requirements_.find(method);
@@ -149,6 +182,21 @@ std::string McpParserConfig::getBuiltInMethodGroup(const std::string& method) co
   // Lifecycle methods
   if (method == INITIALIZE || method == NOTIFICATION_INITIALIZED || method == PING) {
     return std::string(LIFECYCLE);
+  }
+
+  // Discovery methods
+  if (method == SERVER_DISCOVER) {
+    return std::string(DISCOVERY);
+  }
+
+  // Subscription methods
+  if (method == SUBSCRIPTIONS_LISTEN) {
+    return std::string(SUBSCRIPTION);
+  }
+
+  // Task methods
+  if (method == TASKS_GET || method == TASKS_UPDATE || method == TASKS_CANCEL) {
+    return std::string(TASK);
   }
 
   // Tool methods
@@ -228,9 +276,74 @@ McpFieldExtractor::McpFieldExtractor(Protobuf::Struct& metadata, const McpParser
   // Start with temp storage
   context_stack_.push({&temp_storage_, ""});
 
-  // Pre-calculate total fields needed for early stop optimization
+  // Pre-calculate total fields needed for field tracking
   required_fields_needed_ = config_.getAlwaysExtract().size();
   fields_needed_ = required_fields_needed_;
+
+  updateActiveTargetPaths();
+}
+
+void McpFieldExtractor::updateActiveTargetPaths() {
+  active_target_paths_.clear();
+  absl::flat_hash_set<std::string> paths;
+
+  for (const auto& field : config_.getAlwaysExtract()) {
+    paths.insert(field);
+  }
+  paths.insert(std::string(Paths::PARAMS_META));
+
+  if (!method_.empty()) {
+    const auto& fields = config_.getFieldsForMethod(method_);
+    for (const auto& field : fields) {
+      paths.insert(field.path);
+    }
+  } else {
+    for (const auto& entry : config_.getAllMethodFields()) {
+      for (const auto& rule : entry.second) {
+        paths.insert(rule.path);
+      }
+    }
+  }
+
+  for (const auto& p : paths) {
+    active_target_paths_.push_back({p, absl::StrCat(p, ".")});
+  }
+}
+
+bool McpFieldExtractor::isPathInteresting(absl::string_view path) const {
+  if (path.empty()) {
+    return true;
+  }
+  for (const auto& info : active_target_paths_) {
+    // 1. Exact match
+    if (path == info.path) {
+      return true;
+    }
+    // 2. Ancestor/prefix of a target path (e.g. path is "params" and target is "params.name")
+    if (absl::StartsWith(info.path, path) && info.path.size() > path.size() &&
+        info.path[path.size()] == '.') {
+      return true;
+    }
+    // 3. Child/descendant of an object target path (e.g. path is "params.ref.type" and target is
+    // "params.ref")
+    if (absl::StartsWith(path, info.path_dot)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool McpFieldExtractor::checkDuplicateKey(absl::string_view name) {
+  if (name.empty() || scope_key_sets_.empty()) {
+    return false;
+  }
+  auto& current_scope = scope_key_sets_.back();
+  if (!current_scope.insert(std::string(name)).second) {
+    has_duplicate_keys_ = true;
+    ENVOY_LOG(debug, "duplicate JSON key detected: '{}' at path '{}'", name, current_path_cache_);
+    return true;
+  }
+  return false;
 }
 
 McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
@@ -245,7 +358,11 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
 
   depth_++;
 
+  bool is_duplicate = false;
   if (!name.empty()) {
+    // Check for duplicate key in the parent scope before entering this object
+    is_duplicate = checkDuplicateKey(name);
+
     path_stack_.push_back(std::string(name));
     // Update cached path
     if (!current_path_cache_.empty()) {
@@ -257,16 +374,44 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
     if (depth_ == 2 && name == "params") {
       params_depth_ = depth_;
     }
+
+    // Detect "result" or "error" objects at top level (JSON-RPC responses).
+    if (depth_ == 2) {
+      if (name == "result") {
+        has_result_ = true;
+        if (has_jsonrpc_) {
+          is_valid_mcp_ = true;
+        }
+      } else if (name == "error") {
+        has_error_ = true;
+        if (has_jsonrpc_) {
+          is_valid_mcp_ = true;
+        }
+      }
+    }
   }
 
+  // Push a new key set for tracking duplicate keys within this object scope
+  scope_key_sets_.emplace_back();
+
   auto* parent = context_stack_.top().struct_ptr;
-  if (parent && !name.empty()) {
-    // Create nested structure in temp storage
-    auto* nested = (*parent->mutable_fields())[std::string(name)].mutable_struct_value();
+  bool should_create_node =
+      (depth_ == 1) || (parent != nullptr && isPathInteresting(current_path_cache_));
+
+  if (parent && !name.empty() && should_create_node) {
+    auto& field = (*parent->mutable_fields())[std::string(name)];
+    // For last-key-wins: if this is a duplicate object key, clear the old struct
+    // so the new object's fields fully replace the previous one.
+    if (is_duplicate) {
+      field.mutable_struct_value()->Clear();
+    }
+    auto* nested = field.mutable_struct_value();
     context_stack_.push({nested, std::string(name)});
   } else if (depth_ == 1) {
     // Root object
     context_stack_.push({&temp_storage_, ""});
+  } else {
+    context_stack_.push({nullptr, std::string(name)});
   }
 
   return this;
@@ -278,10 +423,10 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
   }
 
   if (depth_ > 0) {
-    // Before updating path, mark object path as collected for early-stop optimization.
+    // Before updating path, mark object path as collected for field tracking.
     // This enables extraction rules targeting object paths (e.g., "params.ref") to work
-    // with early termination, since objects themselves are not rendered as primitives.
-    if (!current_path_cache_.empty()) {
+    // with streaming parsing, since objects themselves are not rendered as primitives.
+    if (!current_path_cache_.empty() && context_stack_.top().struct_ptr != nullptr) {
       if (collected_fields_.insert(current_path_cache_).second) {
         fields_collected_count_++;
       }
@@ -289,20 +434,20 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
 
     depth_--;
 
+    // Pop the key set for this object scope
+    if (!scope_key_sets_.empty()) {
+      scope_key_sets_.pop_back();
+    }
+
     // Check if we just exited the "params" object using depth tracking
     if (params_depth_ > 0 && depth_ < params_depth_) {
       params_depth_ = 0; // Reset - we've exited params
-      checkEarlyStop();
     }
 
     if (!path_stack_.empty()) {
-      // Update cached path before removing from stack
-      size_t last_dot = current_path_cache_.rfind('.');
-      if (last_dot != std::string::npos) {
-        current_path_cache_.resize(last_dot);
-      } else {
-        current_path_cache_.clear();
-      }
+      const size_t trim_size = path_stack_.back().size() + (path_stack_.size() > 1 ? 1 : 0);
+      ASSERT(current_path_cache_.size() >= trim_size);
+      current_path_cache_.resize(current_path_cache_.size() - trim_size);
       path_stack_.pop_back();
     }
     if (context_stack_.size() > 1) {
@@ -357,14 +502,22 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
     return this;
   }
 
+  // Check for duplicate key in current scope
+  checkDuplicateKey(name);
+
   std::string full_path = buildFullPath(name);
   ENVOY_LOG_MISC(debug, "render string name {} path {}, value {}", name, full_path, value);
 
-  // Check top-level fields for method detection
+  // Check top-level fields for method/response detection
   if (depth_ == 1) {
     if (name == JSONRPC_FIELD && value == JSONRPC_VERSION) {
       has_jsonrpc_ = true;
-      if (has_method_) {
+      if (has_method_ || has_result_ || has_error_) {
+        is_valid_mcp_ = true;
+      }
+    } else if (name == RESULT_FIELD) {
+      has_result_ = true;
+      if (has_jsonrpc_) {
         is_valid_mcp_ = true;
       }
     } else if (name == METHOD_FIELD) {
@@ -374,16 +527,17 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
       }
       method_ = std::string(value);
       is_notification_ = absl::StartsWith(method_, Methods::NOTIFICATION_PREFIX);
+      updateActiveTargetPaths();
     }
   }
 
-  // Store in temp storage
-  Protobuf::Value proto_value;
-  proto_value.set_string_value(std::string(value));
-  storeField(full_path, proto_value);
+  if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
+    // Store in temp storage
+    Protobuf::Value proto_value;
+    proto_value.set_string_value(std::string(value));
+    storeField(full_path, name, proto_value);
+  }
 
-  // Check for early stop
-  checkEarlyStop();
   return this;
 }
 
@@ -392,13 +546,16 @@ McpFieldExtractor* McpFieldExtractor::RenderBool(absl::string_view name, bool va
     return this;
   }
 
+  checkDuplicateKey(name);
+
   std::string full_path = buildFullPath(name);
 
-  Protobuf::Value proto_value;
-  proto_value.set_bool_value(value);
-  storeField(full_path, proto_value);
+  if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
+    Protobuf::Value proto_value;
+    proto_value.set_bool_value(value);
+    storeField(full_path, name, proto_value);
+  }
 
-  checkEarlyStop();
   return this;
 }
 
@@ -415,13 +572,16 @@ McpFieldExtractor* McpFieldExtractor::RenderInt64(absl::string_view name, int64_
     return this;
   }
 
+  checkDuplicateKey(name);
+
   std::string full_path = buildFullPath(name);
 
-  Protobuf::Value proto_value;
-  proto_value.set_number_value(static_cast<double>(value));
-  storeField(full_path, proto_value);
+  if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
+    Protobuf::Value proto_value;
+    proto_value.set_number_value(static_cast<double>(value));
+    storeField(full_path, name, proto_value);
+  }
 
-  checkEarlyStop();
   return this;
 }
 
@@ -430,13 +590,16 @@ McpFieldExtractor* McpFieldExtractor::RenderUint64(absl::string_view name, uint6
     return this;
   }
 
+  checkDuplicateKey(name);
+
   std::string full_path = buildFullPath(name);
 
-  Protobuf::Value proto_value;
-  proto_value.set_number_value(static_cast<double>(value));
-  storeField(full_path, proto_value);
+  if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
+    Protobuf::Value proto_value;
+    proto_value.set_number_value(static_cast<double>(value));
+    storeField(full_path, name, proto_value);
+  }
 
-  checkEarlyStop();
   return this;
 }
 
@@ -445,13 +608,16 @@ McpFieldExtractor* McpFieldExtractor::RenderDouble(absl::string_view name, doubl
     return this;
   }
 
+  checkDuplicateKey(name);
+
   std::string full_path = buildFullPath(name);
 
-  Protobuf::Value proto_value;
-  proto_value.set_number_value(value);
-  storeField(full_path, proto_value);
+  if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
+    Protobuf::Value proto_value;
+    proto_value.set_number_value(value);
+    storeField(full_path, name, proto_value);
+  }
 
-  checkEarlyStop();
   return this;
 }
 
@@ -464,13 +630,16 @@ McpFieldExtractor* McpFieldExtractor::RenderNull(absl::string_view name) {
     return this;
   }
 
+  checkDuplicateKey(name);
+
   std::string full_path = buildFullPath(name);
 
-  Protobuf::Value proto_value;
-  proto_value.set_null_value(Protobuf::NULL_VALUE);
-  storeField(full_path, proto_value);
+  if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
+    Protobuf::Value proto_value;
+    proto_value.set_null_value(Protobuf::NULL_VALUE);
+    storeField(full_path, name, proto_value);
+  }
 
-  checkEarlyStop();
   return this;
 }
 
@@ -478,75 +647,21 @@ McpFieldExtractor* McpFieldExtractor::RenderBytes(absl::string_view name, absl::
   return RenderString(name, value);
 }
 
-void McpFieldExtractor::storeField(const std::string& path, const Protobuf::Value& value) {
+void McpFieldExtractor::storeField(const std::string& path, absl::string_view name,
+                                   const Protobuf::Value& value) {
   // Store in nested structure in temp storage
   if (!context_stack_.empty() && context_stack_.top().struct_ptr) {
     auto* current = context_stack_.top().struct_ptr;
-    size_t last_dot = path.rfind('.');
-    std::string field_name = (last_dot != std::string::npos) ? path.substr(last_dot + 1) : path;
-    if (!field_name.empty()) {
-      (*current->mutable_fields())[field_name] = value;
+
+    if (!name.empty()) {
+      (*current->mutable_fields())[std::string(name)] = value;
     }
   }
 
-  // Track new fields for early stop optimization
+  // Track new fields for field collection
   if (collected_fields_.insert(path).second) {
     fields_collected_count_++;
   }
-}
-
-void McpFieldExtractor::checkEarlyStop() {
-  // Can't stop if we haven't seen the method yet
-  if (!has_jsonrpc_ || !has_method_) {
-    return;
-  }
-
-  updateFieldRequirements();
-
-  // Fast path: check if we have collected enough fields
-  if (fields_collected_count_ < required_fields_needed_) {
-    return; // Still missing required fields
-  }
-
-  if (!requiredFieldsCollected()) {
-    return;
-  }
-
-  // No optional fields configured - can stop now.
-  if (!has_optional_fields_) {
-    can_stop_parsing_ = true;
-    ENVOY_LOG(debug, "early stop: Have all required fields for method {}", method_);
-    return;
-  }
-
-  // Check if we've collected all optional fields
-  bool all_optional_collected = true;
-  for (const auto& field : optional_fields_) {
-    if (collected_fields_.count(field) == 0) {
-      all_optional_collected = false;
-      break;
-    }
-  }
-
-  if (all_optional_collected) {
-    can_stop_parsing_ = true;
-    ENVOY_LOG(debug, "early stop: Have all required + optional fields for method {}", method_);
-    return;
-  }
-
-  // If we're currently inside the params object, we must continue parsing because
-  // optional fields (like params._meta) may still appear.
-  if (params_depth_ > 0) {
-    ENVOY_LOG(debug, "still inside params object (depth={}), waiting for optional fields",
-              params_depth_);
-    return;
-  }
-
-  // params_depth_ == 0 means: either we never entered params, or we already exited it.
-  // In either case, params.* optional fields can't appear anymore.
-  can_stop_parsing_ = true;
-  ENVOY_LOG(debug,
-            "early stop: params object exited or not present - optional fields cannot appear");
 }
 
 void McpFieldExtractor::updateFieldRequirements() {
@@ -582,13 +697,22 @@ bool McpFieldExtractor::requiredFieldsCollected() const {
     if (is_notification_ && field == "id") {
       continue;
     }
-    if (collected_fields_.count(field) == 0) {
+    // Responses don't have a "method" field.
+    if (!has_method_ && (has_result_ || has_error_) && field == "method") {
+      continue;
+    }
+    if (!collected_fields_.contains(field)) {
       return false;
     }
   }
 
+  // Responses have no method-specific required fields.
+  if (!has_method_ && (has_result_ || has_error_)) {
+    return true;
+  }
+
   for (const auto& field : required_fields_) {
-    if (collected_fields_.count(field) == 0) {
+    if (!collected_fields_.contains(field)) {
       return false;
     }
   }
@@ -597,9 +721,17 @@ bool McpFieldExtractor::requiredFieldsCollected() const {
 }
 
 void McpFieldExtractor::finalizeExtraction() {
-  if (!has_jsonrpc_ || !has_method_) {
+  if (!has_jsonrpc_ || (!has_method_ && !has_result_ && !has_error_)) {
     ENVOY_LOG(debug, "not a valid MCP message");
     is_valid_mcp_ = false;
+    return;
+  }
+
+  if (!has_method_) {
+    // JSON-RPC response: copy only always-extract fields (jsonrpc, id).
+    for (const auto& field : config_.getAlwaysExtract()) {
+      copyFieldByPath(field);
+    }
     return;
   }
 
@@ -619,8 +751,11 @@ bool McpFieldExtractor::hasOptionalFields() {
 }
 
 bool McpFieldExtractor::hasAllRequiredFields() {
-  if (!has_jsonrpc_ || !has_method_) {
+  if (!has_jsonrpc_ || (!has_method_ && !has_result_ && !has_error_)) {
     return false;
+  }
+  if (!has_method_ && (has_result_ || has_error_)) {
+    return requiredFieldsCollected();
   }
   updateFieldRequirements();
   return requiredFieldsCollected();
@@ -649,8 +784,8 @@ void McpFieldExtractor::copySelectedFields() {
   }
 }
 
-void McpFieldExtractor::copyFieldByPath(const std::string& path) {
-  std::vector<std::string> segments = absl::StrSplit(path, '.');
+void McpFieldExtractor::copyFieldByPath(absl::string_view path) {
+  std::vector<absl::string_view> segments = absl::StrSplit(path, '.');
 
   // Navigate source to find value
   const Protobuf::Struct* current_source = &temp_storage_;
@@ -692,13 +827,13 @@ void McpFieldExtractor::copyFieldByPath(const std::string& path) {
 
   // Copy the final value
   (*current_dest->mutable_fields())[segments.back()] = *value;
-  extracted_fields_.insert(path);
+  extracted_fields_.emplace(std::string(path));
 }
 
 void McpFieldExtractor::validateRequiredFields() {
   updateFieldRequirements();
   for (const auto& field : required_fields_) {
-    if (extracted_fields_.count(field) == 0) {
+    if (!extracted_fields_.contains(field)) {
       missing_required_fields_.push_back(field);
       ENVOY_LOG(debug, "missing required field for {}: {}", method_, field);
     }
@@ -717,9 +852,11 @@ absl::Status McpJsonParser::parse(absl::string_view data) {
 
   auto status = stream_parser_->Parse(data);
   ENVOY_LOG(trace, "status ok: {}, {}", status.ok(), status.message());
+  if (!status.ok()) {
+    return status;
+  }
   if (extractor_->shouldStopParsing()) {
-    ENVOY_LOG(trace, "Parser stopped early - all required fields collected");
-    all_fields_collected_ = true;
+    ENVOY_LOG(trace, "Parsing complete - root object closed");
     return finishParse();
   }
   return status;
@@ -737,10 +874,16 @@ absl::Status McpJsonParser::finishParse() {
 
 bool McpJsonParser::isValidMcpRequest() const { return extractor_ && extractor_->isValidMcp(); }
 
+bool McpJsonParser::isResponse() const { return extractor_ && extractor_->isResponse(); }
+
 bool McpJsonParser::hasOptionalFields() { return extractor_ && extractor_->hasOptionalFields(); }
 
 bool McpJsonParser::hasAllRequiredFields() {
   return extractor_ && extractor_->hasAllRequiredFields();
+}
+
+bool McpJsonParser::hasDuplicateKeys() const {
+  return extractor_ && extractor_->hasDuplicateKeys();
 }
 
 const std::string& McpJsonParser::getMethod() const {
@@ -748,12 +891,12 @@ const std::string& McpJsonParser::getMethod() const {
   return extractor_ ? extractor_->getMethod() : empty;
 }
 
-const Protobuf::Value* McpJsonParser::getNestedValue(const std::string& dotted_path) const {
+const Protobuf::Value* McpJsonParser::getNestedValue(absl::string_view dotted_path) const {
   if (dotted_path.empty()) {
     return nullptr;
   }
 
-  std::vector<std::string> path = absl::StrSplit(dotted_path, '.');
+  std::vector<absl::string_view> path = absl::StrSplit(dotted_path, '.');
   const Protobuf::Struct* current = &metadata_;
 
   for (size_t i = 0; i < path.size(); ++i) {
@@ -777,8 +920,8 @@ const Protobuf::Value* McpJsonParser::getNestedValue(const std::string& dotted_p
 
 void McpJsonParser::reset() {
   metadata_.Clear();
-  extractor_.reset();
   stream_parser_.reset();
+  extractor_.reset();
   parsing_started_ = false;
 }
 

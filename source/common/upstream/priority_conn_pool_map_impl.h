@@ -73,6 +73,15 @@ void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections(
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
+void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnectionsIf(
+    ConnectionPool::DrainConnectionsPoolPredicate predicate,
+    ConnectionPool::DrainBehavior drain_behavior) {
+  for (auto& pool_map : conn_pool_maps_) {
+    pool_map->drainConnectionsIf(predicate, drain_behavior);
+  }
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
 size_t PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::getPriorityIndex(ResourcePriority priority) const {
   size_t index = static_cast<size_t>(priority);
   ASSERT(index < conn_pool_maps_.size());

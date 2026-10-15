@@ -30,17 +30,20 @@ public:
   using FilterConfigProvider = std::function<OptRef<Http::FilterFactoryCb>()>;
 
   // Constructor for single filter which is either typed_config or dynamic_config.
+  // config_provider_manager is a keep-alive for dynamic_config actions; see the member comment
+  // below. It is nullptr for typed_config actions.
   explicit ExecuteFilterAction(
       FilterConfigProvider config_provider, const std::string& name,
-      const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
-      Runtime::Loader& runtime)
-      : config_provider_(std::move(config_provider)), name_(name), sample_(sample),
+      const std::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
+      Runtime::Loader& runtime, std::shared_ptr<void> config_provider_manager = nullptr)
+      : config_provider_manager_(std::move(config_provider_manager)),
+        config_provider_(std::move(config_provider)), name_(name), sample_(sample),
         runtime_(runtime), is_filter_chain_(false) {}
 
   // Constructor for filter chain (inline filter_chain).
   explicit ExecuteFilterAction(
       FilterFactoryCbList filter_factories, const std::string& name,
-      const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
+      const std::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
       Runtime::Loader& runtime)
       : filter_factories_(std::move(filter_factories)), name_(name), sample_(sample),
         runtime_(runtime), is_filter_chain_(true) {}
@@ -48,7 +51,7 @@ public:
   // Constructor for named filter chain lookup.
   explicit ExecuteFilterAction(
       const std::string& filter_chain_name,
-      const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
+      const std::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
       Runtime::Loader& runtime)
       : name_(filter_chain_name), sample_(sample), runtime_(runtime), is_filter_chain_(false),
         is_named_filter_chain_lookup_(true) {}
@@ -70,12 +73,17 @@ public:
   const std::string& filterChainName() const { return name_; }
 
 private:
+  // For dynamic_config actions, keeps the filter config provider manager alive. The manager is an
+  // unpinned singleton, and the dynamic provider held by config_provider_ owns a
+  // FilterConfigSubscription that dereferences a raw reference to the manager from its destructor.
+  // Declared before config_provider_ so that it is destroyed after it.
+  std::shared_ptr<void> config_provider_manager_;
   // Used for single filter mode which is either typed_config or dynamic_config.
   FilterConfigProvider config_provider_;
   // Used for filter chain mode.
   FilterFactoryCbList filter_factories_;
   const std::string name_;
-  const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> sample_;
+  const std::optional<envoy::config::core::v3::RuntimeFractionalPercent> sample_;
   Runtime::Loader& runtime_;
   const bool is_filter_chain_;
   const bool is_named_filter_chain_lookup_{false};
@@ -114,17 +122,18 @@ private:
     HttpExtensionConfigProviderSharedPtr provider =
         provider_manager->createDynamicFilterConfigProvider(
             config_discovery, name, server_factory_context, factory_context,
-            server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
+            server_factory_context.clusterManager(), false, filter_chain_type, nullptr,
+            context.stat_prefix_);
 
     Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
 
     return std::make_shared<ExecuteFilterAction>(
         [provider]() -> OptRef<Http::FilterFactoryCb> { return provider->config(); }, name,
         composite_action.has_sample_percent()
-            ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+            ? std::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
                   composite_action.sample_percent())
-            : absl::nullopt,
-        runtime);
+            : std::nullopt,
+        runtime, provider_manager);
   }
 
   Matcher::ActionConstSharedPtr createDynamicActionDownstream(

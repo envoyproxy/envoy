@@ -37,6 +37,7 @@ envoy_cc_library(
         ":real_time_system_lib",
         ":scaled_range_timer_manager_lib",
         ":signal_lib",
+        ":worker_id_lib",
         "//envoy/common:scope_tracker_interface",
         "//envoy/common:time_interface",
         "//envoy/event:signal_interface",
@@ -48,6 +49,15 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:default_client_connection_factory",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "worker_id_lib",
+    srcs = ["worker_id.cc"],
+    hdrs = ["worker_id.h"],
+    deps = [
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -81,6 +91,7 @@ envoy_cc_win32_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:thread_lib",
         "//source/common/network:default_socket_interface_lib",
+        "@abseil-cpp//absl/status",
     ],
 )
 
@@ -88,9 +99,7 @@ envoy_cc_library(
     name = "event_impl_base_lib",
     srcs = ["event_impl_base.cc"],
     hdrs = ["event_impl_base.h"],
-    deps = [
-        "//bazel/foreign_cc:event",
-    ],
+    deps = ["//bazel/deps:libevent"],
 )
 
 envoy_cc_library(
@@ -134,9 +143,22 @@ envoy_cc_library(
     srcs = ["libevent.cc"],
     hdrs = ["libevent.h"],
     deps = [
-        "//bazel/foreign_cc:event",
+        "//bazel/deps:libevent",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "evwatch_observer_manager_impl_lib",
+    srcs = ["evwatch_observer_manager_impl.cc"],
+    hdrs = ["evwatch_observer_manager_impl.h"],
+    deps = [
+        "//bazel/deps:libevent",
+        "//envoy/common:optref_lib",
+        "//envoy/common:time_interface",
+        "//envoy/event:evwatch_interface",
+        "//envoy/event:evwatch_observer_manager_interface",
     ],
 )
 
@@ -145,11 +167,14 @@ envoy_cc_library(
     srcs = ["libevent_scheduler.cc"],
     hdrs = ["libevent_scheduler.h"],
     deps = [
+        ":evwatch_observer_manager_impl_lib",
         ":libevent_lib",
         ":schedulable_cb_lib",
         ":timer_lib",
-        "//bazel/foreign_cc:event",
+        "//bazel/deps:libevent",
         "//envoy/event:dispatcher_interface",
+        "//envoy/event:evwatch_interface",
+        "//envoy/event:evwatch_observer_manager_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
     ],
@@ -162,7 +187,7 @@ envoy_cc_library(
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
-        "//bazel/foreign_cc:event",
+        "//bazel/deps:libevent",
         "//envoy/event:schedulable_cb_interface",
     ],
 )
@@ -174,7 +199,7 @@ envoy_cc_library(
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
-        "//bazel/foreign_cc:event",
+        "//bazel/deps:libevent",
         "//envoy/event:timer_interface",
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",

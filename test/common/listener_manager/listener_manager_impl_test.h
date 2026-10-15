@@ -24,6 +24,7 @@
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
@@ -71,12 +72,22 @@ protected:
   ListenerManagerImplTest()
       : listener_factory_ptr_(std::make_unique<NiceMock<MockListenerComponentFactory>>()),
         listener_factory_(*listener_factory_ptr_),
-        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
+        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()),
+        network_config_provider_manager_(
+            std::make_shared<Filter::NetworkFilterConfigProviderManagerImpl>()),
+        tcp_listener_config_provider_manager_(
+            std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()),
+        quic_listener_config_provider_manager_(
+            std::make_shared<Filter::QuicListenerFilterConfigProviderManagerImpl>()) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
+    // Drain notifications are scheduled whenever a listener or its filter chains begin draining.
+    // They are not the focus of these tests, so allow them in any number.
+    EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(::testing::AnyNumber());
+    EXPECT_CALL(*worker_, onFilterChainDrain(_, _, _)).Times(::testing::AnyNumber());
     ON_CALL(server_.validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
@@ -91,12 +102,12 @@ protected:
             [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
               return ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, filter_chain_factory_context, network_config_provider_manager_);
+                  filters, filter_chain_factory_context, *network_config_provider_manager_);
             }));
     ON_CALL(listener_factory_, getTcpListenerConfigProviderManager())
-        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
+        .WillByDefault(Return(tcp_listener_config_provider_manager_.get()));
     ON_CALL(listener_factory_, getQuicListenerConfigProviderManager())
-        .WillByDefault(Return(&quic_listener_config_provider_manager_));
+        .WillByDefault(Return(quic_listener_config_provider_manager_.get()));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -340,7 +351,7 @@ protected:
     auto message_ptr =
         server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"](name_matcher);
     const auto& listeners_config_dump =
-        dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
+        Envoy::Protobuf::DynamicCastMessage<envoy::admin::v3::ListenersConfigDump>(*message_ptr);
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
@@ -387,8 +398,8 @@ protected:
                                                  bool multiple_addresses = false) {
     InSequence s;
 
-    EXPECT_CALL(*worker_, start(_, _));
-    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+    EXPECT_CALL(*worker_, start(_, _, _));
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
@@ -436,8 +447,8 @@ protected:
                                                          const std::string& message) {
     InSequence s;
 
-    EXPECT_CALL(*worker_, start(_, _));
-    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+    EXPECT_CALL(*worker_, start(_, _, _));
+    ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
@@ -492,9 +503,11 @@ protected:
   NiceMock<testing::MockFunction<void()>> callback_;
   // Test parameter indicating whether the unified filter chain matcher is enabled.
   bool use_matcher_;
-  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
-  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
-  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
+  std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
+  std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::QuicListenerFilterConfigProviderManagerImpl>
+      quic_listener_config_provider_manager_;
 };
 } // namespace Server
 } // namespace Envoy

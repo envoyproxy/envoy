@@ -6,6 +6,7 @@
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/config_overrides.h"
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
@@ -54,11 +55,8 @@ public:
   HeaderValueValidationResult validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
 
   /*
-   * Validate the Content-Length request and response header as a whole number integer. The RFC
-   * states that multiple Content-Length values are acceptable if they are all the same value.
-   * However, UHV does not allow multiple values currently because the comma character will be
-   * rejected. We can add an option to allow multiple Content-Length values in the future if
-   * needed.
+   * Validate the Content-Length request and response header. RFC 9110 Section 8.6 states that
+   * multiple Content-Length values are acceptable if they are all the same value.
    */
   HeaderValueValidationResult validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
 
@@ -170,8 +168,8 @@ protected:
    */
   HeaderValueValidationResult
   validatePathHeaderCharacterSet(const ::Envoy::Http::HeaderString& value,
-                                 const std::array<uint32_t, 8>& allowed_path_chracters,
-                                 const std::array<uint32_t, 8>& allowed_query_fragment_characters);
+                                 const ::Envoy::Http::CharTable& allowed_path_chracters,
+                                 const ::Envoy::Http::CharTable& allowed_query_fragment_characters);
 
   // URL-encode additional characters in URL path. This method is called iff
   // `envoy.uhv.allow_non_compliant_characters_in_path` is true.

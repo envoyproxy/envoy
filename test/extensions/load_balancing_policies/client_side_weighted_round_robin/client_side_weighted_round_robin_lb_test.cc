@@ -5,21 +5,29 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/extensions/load_balancing_policies/client_side_weighted_round_robin/client_side_weighted_round_robin_lb.h"
+#include "source/extensions/load_balancing_policies/common/orca_weight_manager.h"
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_impl_base_test.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace Upstream {
 
+using OrcaHostLbPolicyData = Extensions::LoadBalancingPolicies::Common::OrcaHostLbPolicyData;
+using OrcaLoadReportHandler = Extensions::LoadBalancingPolicies::Common::OrcaLoadReportHandler;
+using OrcaWeightManager = Extensions::LoadBalancingPolicies::Common::OrcaWeightManager;
+
 class ClientSideWeightedRoundRobinLoadBalancerFriend {
 public:
-  explicit ClientSideWeightedRoundRobinLoadBalancerFriend(
+  ClientSideWeightedRoundRobinLoadBalancerFriend(
       std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb,
-      std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb)
-      : lb_(std::move(lb)), worker_lb_(std::move(worker_lb)) {}
+      std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb,
+      Extensions::LoadBalancingPolicies::Common::OrcaLoadReportHandlerSharedPtr report_handler)
+      : lb_(std::move(lb)), worker_lb_(std::move(worker_lb)),
+        report_handler_(std::move(report_handler)) {}
 
   HostSelectionResponse chooseHost(LoadBalancerContext* context) {
     return worker_lb_->chooseHost(context);
@@ -33,36 +41,37 @@ public:
 
   absl::Status initialize() { return lb_->initialize(); }
 
-  void updateWeightsOnMainThread() { lb_->updateWeightsOnMainThread(); }
+  void updateWeightsOnMainThread() { lb_->orca_weight_manager_->updateWeightsOnMainThread(); }
 
-  void updateWeightsOnHosts(const HostVector& hosts) { lb_->updateWeightsOnHosts(hosts); }
+  void updateWeightsOnHosts(const HostVector& hosts) {
+    lb_->orca_weight_manager_->updateWeightsOnHosts(hosts);
+  }
 
-  static absl::optional<uint32_t>
+  static std::optional<uint32_t>
   getClientSideWeightIfValidFromHost(const Host& host, const MonotonicTime& min_non_empty_since,
                                      const MonotonicTime& max_last_update_time) {
-    return ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
-        host, min_non_empty_since, max_last_update_time);
+    return OrcaWeightManager::getWeightIfValidFromHost(host, min_non_empty_since,
+                                                       max_last_update_time);
   }
 
   static double
   getUtilizationFromOrcaReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
                                const std::vector<std::string>& utilization_from_metric_names) {
-    return ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::
-        getUtilizationFromOrcaReport(orca_load_report, utilization_from_metric_names);
+    return OrcaLoadReportHandler::getUtilizationFromOrcaReport(orca_load_report,
+                                                               utilization_from_metric_names);
   }
 
   static absl::StatusOr<uint32_t>
   calculateWeightFromOrcaReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
                                 const std::vector<std::string>& utilization_from_metric_names,
                                 double error_utilization_penalty) {
-    return ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::
-        calculateWeightFromOrcaReport(orca_load_report, utilization_from_metric_names,
-                                      error_utilization_penalty);
+    return OrcaLoadReportHandler::calculateWeightFromOrcaReport(
+        orca_load_report, utilization_from_metric_names, error_utilization_penalty);
   }
 
   absl::Status updateClientSideDataFromOrcaLoadReport(
       const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-      ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData& client_side_data) {
+      OrcaHostLbPolicyData& client_side_data) {
     Envoy::StreamInfo::MockStreamInfo mock_stream_info;
     return client_side_data.onOrcaLoadReport(orca_load_report, mock_stream_info);
   }
@@ -70,22 +79,23 @@ public:
   void setHostClientSideWeight(HostSharedPtr& host, uint32_t weight,
                                long long non_empty_since_seconds,
                                long long last_update_time_seconds) {
-    auto client_side_data =
-        std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
-            lb_->report_handler_, weight, /*non_empty_since=*/
-            MonotonicTime(std::chrono::seconds(non_empty_since_seconds)),
-            /*last_update_time=*/
-            MonotonicTime(std::chrono::seconds(last_update_time_seconds)));
-    host->setLbPolicyData(std::move(client_side_data));
+    auto client_side_data = std::make_unique<OrcaHostLbPolicyData>(
+        report_handler_, weight, /*non_empty_since=*/
+        MonotonicTime(std::chrono::seconds(non_empty_since_seconds)),
+        /*last_update_time=*/
+        MonotonicTime(std::chrono::seconds(last_update_time_seconds)));
+    host->addLbPolicyData(std::move(client_side_data));
   }
 
-  ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandlerSharedPtr orcaLoadReportHandler() {
-    return lb_->report_handler_;
+  Extensions::LoadBalancingPolicies::Common::OrcaLoadReportHandlerSharedPtr
+  orcaLoadReportHandler() {
+    return report_handler_;
   }
 
 private:
   std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb_;
   std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb_;
+  Extensions::LoadBalancingPolicies::Common::OrcaLoadReportHandlerSharedPtr report_handler_;
 };
 
 namespace {
@@ -112,12 +122,20 @@ public:
         "metric2");
 
     EXPECT_CALL(mock_tls_, allocateSlot());
+    // Handler equivalent to the one the LB builds internally from the same config.
+    auto report_handler = std::make_shared<OrcaLoadReportHandler>(
+        Extensions::LoadBalancingPolicies::Common::OrcaWeightManagerConfig{
+            lb_config_.metric_names_for_computing_utilization, lb_config_.error_utilization_penalty,
+            lb_config_.blackout_period, lb_config_.weight_expiration_period,
+            lb_config_.weight_update_period},
+        simTime());
     lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancerFriend>(
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
             lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/absl::nullopt));
+            lb_config_.round_robin_overrides_, simTime(), /*tls_shim=*/std::nullopt),
+        std::move(report_handler));
 
     // Initialize the thread aware load balancer from config.
     ASSERT_EQ(lb_->initialize(), absl::OkStatus());
@@ -130,7 +148,7 @@ public:
         0,
         updateHostsParams(hosts, hosts_per_locality,
                           std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-        {}, empty_host_vector_, empty_host_vector_, random_.random(), absl::nullopt);
+        {}, empty_host_vector_, empty_host_vector_, random_.random(), std::nullopt);
   }
 
   void peekThenPick(std::vector<int> picks) {
@@ -145,17 +163,17 @@ public:
   envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
       ClientSideWeightedRoundRobin client_side_weighted_round_robin_config_;
 
-  std::shared_ptr<PrioritySetImpl> local_priority_set_;
-  std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancerFriend> lb_;
-  HostsPerLocalityConstSharedPtr empty_locality_;
-  HostVector empty_host_vector_;
-
   NiceMock<MockLoadBalancerContext> lb_context_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Envoy::ThreadLocal::MockInstance> mock_tls_;
   NiceMock<MockClusterInfo> cluster_info_;
   ClientSideWeightedRoundRobinLbConfig lb_config_ = ClientSideWeightedRoundRobinLbConfig(
       client_side_weighted_round_robin_config_, dispatcher_, mock_tls_);
+
+  std::shared_ptr<PrioritySetImpl> local_priority_set_;
+  std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancerFriend> lb_;
+  HostsPerLocalityConstSharedPtr empty_locality_;
+  HostVector empty_host_vector_;
 };
 
 //////////////////////////////////////////////////////
@@ -288,7 +306,8 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     xds::data::orca::v3::OrcaLoadReport orca_load_report;
     orca_load_report.set_rps_fractional(1000);
     orca_load_report.set_application_utilization(0.5);
-    EXPECT_EQ(host->lbPolicyData()->onOrcaLoadReport(orca_load_report, mock_stream_info),
+    EXPECT_EQ(host->typedLbPolicyData<OrcaHostLbPolicyData>()->onOrcaLoadReport(orca_load_report,
+                                                                                mock_stream_info),
               absl::OkStatus());
     EXPECT_EQ(host->weight(), 1);
   }
@@ -326,9 +345,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_First
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_application_utilization(0.5);
 
-  auto client_side_data =
-      std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
-          lb_->orcaLoadReportHandler());
+  auto client_side_data = std::make_shared<OrcaHostLbPolicyData>(lb_->orcaLoadReportHandler());
   EXPECT_EQ(lb_->updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data),
             absl::OkStatus());
   // First report, so non_empty_since_ is updated.
@@ -347,11 +364,10 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_Updat
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_application_utilization(0.5);
 
-  auto client_side_data =
-      std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
-          lb_->orcaLoadReportHandler(), 42,
-          /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-          /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+  auto client_side_data = std::make_shared<OrcaHostLbPolicyData>(
+      lb_->orcaLoadReportHandler(), 42,
+      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
+      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
   EXPECT_EQ(lb_->updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data),
             absl::OkStatus());
   // Not a first report, so non_empty_since_ is not updated.
@@ -371,11 +387,10 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ProcessOrcaLoadReport_Updat
   orca_load_report.set_rps_fractional(0);
   orca_load_report.set_application_utilization(0.5);
 
-  auto client_side_data =
-      std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
-          lb_->orcaLoadReportHandler(), 42,
-          /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-          /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+  auto client_side_data = std::make_shared<OrcaHostLbPolicyData>(
+      lb_->orcaLoadReportHandler(), 42,
+      /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
+      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
   EXPECT_EQ(lb_->updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data),
             absl::InvalidArgumentError("QPS must be positive"));
   // None of the client side data is updated.
@@ -414,12 +429,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   size_t h1_count = 0, h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Expect h1 to be chosen noticeably more often (ratio ~ (1):(0.35)).
   EXPECT_GT(h1_count, h2_count);
@@ -432,12 +448,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Now expect closer to 2:1 ratio in favor of h1; i.e., still h1 > h2.
   EXPECT_GT(h1_count, h2_count);
@@ -450,12 +467,13 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, SlowStartConfig_RampUp) {
   h2_count = 0;
   for (size_t i = 0; i < picks1; ++i) {
     auto chosen = lb_->chooseHost(nullptr).host;
-    if (chosen == h1)
+    if (chosen == h1) {
       ++h1_count;
-    else if (chosen == h2)
+    } else if (chosen == h2) {
       ++h2_count;
-    else
+    } else {
       FAIL();
+    }
   }
   // Expect approximately equal selection; allow 30% tolerance.
   double final_ratio =
@@ -517,46 +535,39 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooRecent) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ =
-      std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
-          nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
-          /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+  host.addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
+      nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
+      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   // Non empty since is too recent (5 > 2).
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
       /*min_non_empty_since=*/MonotonicTime(std::chrono::seconds(2)),
       /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8))));
   // non_empty_since_ is not updated.
-  EXPECT_EQ(
-      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
-          ->non_empty_since_.load(),
-      MonotonicTime(std::chrono::seconds(5)));
+  EXPECT_EQ(host.typedLbPolicyData<OrcaHostLbPolicyData>()->non_empty_since_.load(),
+            MonotonicTime(std::chrono::seconds(5)));
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooStale) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ =
-      std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
-          nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-          /*last_update_time=*/MonotonicTime(std::chrono::seconds(7)));
+  host.addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
+      nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
+      /*last_update_time=*/MonotonicTime(std::chrono::seconds(7))));
   // Last update time is too stale (7 < 8).
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
       /*min_non_empty_since=*/MonotonicTime(std::chrono::seconds(2)),
       /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8))));
   // Also resets the non_empty_since_ time.
-  EXPECT_EQ(
-      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
-          ->non_empty_since_.load(),
-      ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData::kDefaultNonEmptySince);
+  EXPECT_EQ(host.typedLbPolicyData<OrcaHostLbPolicyData>()->non_empty_since_.load(),
+            OrcaHostLbPolicyData::kDefaultNonEmptySince);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_Valid) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  host.lb_policy_data_ =
-      std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
-          nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
-          /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
+  host.addLbPolicyData(std::make_unique<OrcaHostLbPolicyData>(
+      nullptr, 42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
+      /*last_update_time=*/MonotonicTime(std::chrono::seconds(10))));
   // Not empty since is not too recent (1 < 2) and last update time is not too
   // old (10 > 8).
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
@@ -566,17 +577,14 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
                 .value(),
             42);
   // non_empty_since_ is not updated.
-  EXPECT_EQ(
-      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
-          ->non_empty_since_.load(),
-      MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_EQ(host.typedLbPolicyData<OrcaHostLbPolicyData>()->non_empty_since_.load(),
+            MonotonicTime(std::chrono::seconds(1)));
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
      GetUtilizationFromOrcaReport_ApplicationUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_application_utilization(0.5);
-  orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
                 orca_load_report, {"named_metrics.foo"}),
@@ -590,6 +598,26 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
                 orca_load_report, {"named_metrics.foo"}),
             0.3);
+}
+
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_Preference) {
+  xds::data::orca::v3::OrcaLoadReport orca_load_report;
+  orca_load_report.set_application_utilization(0.5);
+  orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
+  orca_load_report.set_cpu_utilization(0.6);
+
+  // By default (flag enabled), named metrics win.
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"named_metrics.foo"}),
+            0.3);
+
+  // With flag disabled, application utilization wins.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.orca_weight_manager_use_named_metrics_first", "false"}});
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"named_metrics.foo"}),
+            0.5);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_CpuUtilization) {
@@ -669,6 +697,23 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
                 orca_load_report, {"named_metrics.foo"}, 2.0)
                 .value(),
             1428);
+}
+
+TEST(ClientSideWeightedRoundRobinConfigTest, OobConfigDefaultsAndOverridePropagate) {
+  envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+      ClientSideWeightedRoundRobin proto;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+
+  ClientSideWeightedRoundRobinLbConfig defaults(proto, dispatcher, tls);
+  EXPECT_FALSE(defaults.enable_oob_load_report);
+  EXPECT_EQ(defaults.oob_manager_config.reporting_period, std::chrono::seconds(10));
+
+  proto.mutable_enable_oob_load_report()->set_value(true);
+  proto.mutable_oob_reporting_period()->set_seconds(5);
+  ClientSideWeightedRoundRobinLbConfig override(proto, dispatcher, tls);
+  EXPECT_TRUE(override.enable_oob_load_report);
+  EXPECT_EQ(override.oob_manager_config.reporting_period, std::chrono::seconds(5));
 }
 
 } // namespace

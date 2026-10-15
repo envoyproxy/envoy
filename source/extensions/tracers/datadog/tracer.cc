@@ -35,8 +35,9 @@ std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
     TimeSource& time_source) {
   config.logger = std::make_shared<Logger>(logger);
   config.agent.event_scheduler = std::make_shared<EventScheduler>(dispatcher);
-  config.agent.http_client = std::make_shared<AgentHTTPClient>(
+  auto http_client = std::make_shared<AgentHTTPClient>(
       cluster_manager, collector_cluster, collector_reference_host, tracer_stats, time_source);
+  config.agent.http_client = http_client;
 
   // Disable telemetry to avoid needing a separate HTTP client for telemetry.
   // Envoy has its own telemetry system and doesn't need dd-trace-cpp's telemetry.
@@ -51,19 +52,28 @@ std::shared_ptr<Tracer::ThreadLocalTracer> makeThreadLocalTracer(
     return std::make_shared<Tracer::ThreadLocalTracer>();
   }
 
-  return std::make_shared<Tracer::ThreadLocalTracer>(*maybe_config);
+  return std::make_shared<Tracer::ThreadLocalTracer>(*maybe_config, std::move(http_client));
 }
 
 } // namespace
 
-Tracer::ThreadLocalTracer::ThreadLocalTracer(const datadog::tracing::FinalizedTracerConfig& config)
-    : tracer(config) {}
+Tracer::ThreadLocalTracer::ThreadLocalTracer(const datadog::tracing::FinalizedTracerConfig& config,
+                                             std::shared_ptr<AgentHTTPClient> http_client)
+    : tracer(config), http_client(std::move(http_client)) {}
+
+Tracer::ThreadLocalTracer::~ThreadLocalTracer() {
+  tracer.reset();
+  if (http_client != nullptr) {
+    http_client->shutdown();
+  }
+}
 
 Tracer::Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                const datadog::tracing::TracerConfig& config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-               ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source)
-    : tracer_stats_(makeTracerStats(scope)),
+               ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source,
+               bool delegate_sampling)
+    : delegate_sampling_(delegate_sampling), tracer_stats_(makeTracerStats(scope)),
       thread_local_slot_(
           ThreadLocal::TypedSlot<ThreadLocalTracer>::makeUnique(thread_local_slot_allocator)) {
   const bool allow_added_via_api = true;
@@ -106,18 +116,9 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   datadog::tracing::Span span =
       extractOrCreateSpan(*thread_local_tracer.tracer, span_config, reader);
 
-  // If we did not extract a sampling decision, and if Envoy is telling us to
-  // drop the trace, then we treat that as a "user drop" (manual override).
-  //
-  // If Envoy is telling us to keep the trace, then we leave it up to the
-  // tracer's internal sampler (which might decide to drop the trace anyway).
   const bool use_local_decision = !span.trace_segment().sampling_decision().has_value();
-
-  auto result = std::make_unique<Span>(std::move(span), use_local_decision);
+  auto result = std::make_unique<Span>(std::move(span), use_local_decision, delegate_sampling_);
   if (use_local_decision) {
-    // Defer the sampling decision to Span::injectContext()/finishSpan().
-    // This allows a subsequent setSampled(true) (e.g. from a route cache
-    // refresh) to undo this initial drop decision.
     result->setSampled(tracing_decision.traced);
   }
   return result;

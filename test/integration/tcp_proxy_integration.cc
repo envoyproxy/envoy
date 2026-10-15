@@ -1,5 +1,6 @@
 #include "test/integration/tcp_proxy_integration.h"
 
+#include "absl/functional/any_invocable.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -21,7 +22,8 @@ void BaseTcpProxySslIntegrationTest::initialize() {
 
   context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
       server_factory_context_);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options_, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
 }
 
 BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
@@ -32,16 +34,17 @@ BaseTcpProxySslIntegrationTest::ClientSslConnection::ClientSslConnection(
   // buffer. This allows us to track the bytes actually written to the socket.
   EXPECT_CALL(*parent.mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(::testing::AtLeast(1))
-      .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
-                           std::function<void()> above_overflow) -> Buffer::Instance* {
-        client_write_buffer_ =
-            new NiceMock<MockWatermarkBuffer>(below_low, above_high, above_overflow);
-        ON_CALL(*client_write_buffer_, move(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
-        ON_CALL(*client_write_buffer_, drain(_))
-            .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
-        return client_write_buffer_;
-      }));
+      .WillOnce(
+          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            client_write_buffer_ = new testing::NiceMock<MockWatermarkBuffer>(
+                std::move(below_low), std::move(above_high), std::move(above_overflow));
+            ON_CALL(*client_write_buffer_, move(_))
+                .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
+            ON_CALL(*client_write_buffer_, drain(_))
+                .WillByDefault(Invoke(client_write_buffer_, &MockWatermarkBuffer::trackDrains));
+            return client_write_buffer_;
+          }));
   // Set up the SSL client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(parent.version_, parent.lookupPort("tcp_proxy"));
@@ -131,11 +134,26 @@ void BaseTcpProxySslIntegrationTest::ClientRawConnection::waitForDisconnect() {
   tcp_client_.close();
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 BaseTcpProxySslIntegrationTest::ClientSslConnection::tlsSessionId() const {
   const Ssl::ConnectionInfoConstSharedPtr ssl_info =
       ssl_client_->connectionInfoProvider().sslConnection();
-  return ssl_info ? absl::make_optional<std::string>(ssl_info->sessionId()) : absl::nullopt;
+  return ssl_info ? std::make_optional<std::string>(ssl_info->sessionId()) : std::nullopt;
+}
+
+std::optional<std::string>
+BaseTcpProxySslIntegrationTest::ClientSslConnection::peerCertificateSha256Digest() const {
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info =
+      ssl_client_->connectionInfoProvider().sslConnection();
+  return ssl_info ? std::make_optional<std::string>(ssl_info->sha256PeerCertificateDigest())
+                  : std::nullopt;
+}
+
+std::optional<std::string>
+BaseTcpProxySslIntegrationTest::ClientSslConnection::ciphersuite() const {
+  const Ssl::ConnectionInfoConstSharedPtr ssl_info =
+      ssl_client_->connectionInfoProvider().sslConnection();
+  return ssl_info ? std::make_optional<std::string>(ssl_info->ciphersuiteString()) : std::nullopt;
 }
 
 void BaseTcpProxySslIntegrationTest::setupConnections() {

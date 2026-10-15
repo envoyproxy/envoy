@@ -56,7 +56,8 @@ public:
   BalancedConnectionHandler&
   pickTargetHandler(BalancedConnectionHandler& current_handler) override {
     // In the NOP case just increment the connection count and return the current handler.
-    current_handler.incNumConnections();
+    current_handler.preIncNumConnections();
+    current_handler.postIncNumConnections();
     return current_handler;
   }
 };

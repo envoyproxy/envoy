@@ -12,10 +12,11 @@ envoy_package()
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = envoy_select_enable_http3(["conn_pool_test.cc"]),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
@@ -25,9 +26,10 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
+        "//test/test_common:test_runtime_lib",
     ]),
 )

@@ -151,7 +151,7 @@ private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
   const bool allow_requests_without_proxy_protocol_;
   const bool pass_all_tlvs_;
-  absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
+  absl::flat_hash_set<uint8_t> pass_through_tlvs_;
   bool allow_v1_{true};
   bool allow_v2_{true};
   const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::TlvLocation
@@ -203,7 +203,7 @@ private:
    */
   bool parseV1Header(const char* buf, size_t len);
   bool parseV2Header(const char* buf);
-  absl::optional<size_t> lenV2Address(const char* buf);
+  std::optional<size_t> lenV2Address(const char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
 
@@ -214,7 +214,7 @@ private:
 
   ConfigSharedPtr config_;
 
-  absl::optional<WireHeader> proxy_protocol_header_;
+  std::optional<WireHeader> proxy_protocol_header_;
   size_t max_proxy_protocol_len_{MAX_PROXY_PROTO_LEN_V2};
 
   // Store the parsed proxy protocol TLVs.

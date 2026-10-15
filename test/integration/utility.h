@@ -21,6 +21,7 @@
 #include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/integration/ssl_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -228,6 +229,15 @@ public:
       Api::Api& api, Stats::Store& store, Ssl::ContextManager& context_manager,
       ThreadLocal::Instance& threadlocal, const std::string& san_to_match,
       // Allow configuring TLS to talk to upstreams instead of Envoy
+      bool connect_to_fake_upstreams = false);
+
+  /**
+   * Create a QUIC client transport socket factory from explicit client TLS options, e.g. to
+   * select the client certificate presented to a QUIC listener.
+   */
+  static Network::UpstreamTransportSocketFactoryPtr createQuicUpstreamTransportSocketFactory(
+      Api::Api& api, Stats::Store& store, Ssl::ContextManager& context_manager,
+      ThreadLocal::Instance& threadlocal, const Ssl::ClientSslTransportOptions& options,
       bool connect_to_fake_upstreams = false);
 
   static Http::HeaderValidatorFactoryPtr makeHeaderValidationFactory(

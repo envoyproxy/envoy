@@ -6,13 +6,15 @@ namespace Http {
 // TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
 void RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     RouteCache& route_cache, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
-    absl::optional<Router::ConfigConstSharedPtr> route_config, Event::Dispatcher& dispatcher,
+    std::optional<Router::ConfigConstSharedPtr> route_config, Event::Dispatcher& dispatcher,
     RequestHeaderMap& request_headers) {
   if (route_config.has_value() && route_config.value()->usesVhds()) {
-    ASSERT(!request_headers.Host()->value().empty());
-    const auto& host_header = absl::AsciiStrToLower(request_headers.getHostValue());
-    requestVhdsUpdate(host_header, dispatcher, std::move(route_config_updated_cb));
-    return;
+    const absl::string_view host = request_headers.getHostValue();
+    if (!host.empty()) {
+      requestVhdsUpdate(absl::AsciiStrToLower(host), dispatcher,
+                        std::move(route_config_updated_cb));
+      return;
+    }
   } else if (scope_key_builder_.has_value()) {
     Router::ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(request_headers);
     // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.

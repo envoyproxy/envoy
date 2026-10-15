@@ -42,15 +42,16 @@ public:
 
   void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                          const HostDescriptionConstSharedPtr& host,
-                         envoy::data::core::v3::HealthCheckFailureType failure_type) override;
+                         envoy::data::core::v3::HealthCheckFailureType failure_type,
+                         uint64_t http_status_code) override;
   void logAddHealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                      const HostDescriptionConstSharedPtr& host, bool first_check) override;
   void logSuccessfulHealthCheck(envoy::data::core::v3::HealthCheckerType health_checker_type,
                                 const HostDescriptionConstSharedPtr& host) override;
   void logUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                     const HostDescriptionConstSharedPtr& host,
-                    envoy::data::core::v3::HealthCheckFailureType failure_type,
-                    bool first_check) override;
+                    envoy::data::core::v3::HealthCheckFailureType failure_type, bool first_check,
+                    uint64_t http_status_code) override;
   void logDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
                    const HostDescriptionConstSharedPtr& host) override;
   void logNoLongerDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,

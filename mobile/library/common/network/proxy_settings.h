@@ -7,7 +7,7 @@
 #include "source/common/network/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
+#include <optional>
 
 namespace Envoy {
 namespace Network {
@@ -16,7 +16,7 @@ class ProxySettings;
 class SystemProxySettings;
 using ProxySettingsConstSharedPtr = std::shared_ptr<const ProxySettings>;
 using ProxySettingsResolvedCallback = std::function<void(const std::vector<ProxySettings>&)>;
-using SystemProxySettingsReadCallback = std::function<void(absl::optional<SystemProxySettings>)>;
+using SystemProxySettingsReadCallback = std::function<void(std::optional<SystemProxySettings>)>;
 
 /**
  * Proxy settings coming from platform specific APIs, i.e. ConnectivityManager in

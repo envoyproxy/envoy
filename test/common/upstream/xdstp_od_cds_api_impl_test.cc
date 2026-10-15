@@ -8,9 +8,10 @@
 
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/missing_cluster_notifier.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -126,7 +127,7 @@ TEST_F(XdstpOdCdsApiImplTest, SuccessfulClusterAddition) {
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
 
-  EXPECT_TRUE(odcds_callbacks_->onConfigUpdate(resources, version).ok());
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate(resources, version));
 }
 
 // Tests cluster removal.
@@ -156,12 +157,12 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterRemoval) {
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
 
-  EXPECT_TRUE(odcds_callbacks_->onConfigUpdate(resources, version).ok());
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate(resources, version));
 
   // Now remove the cluster.
   const std::string version2 = "v2";
   EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
-  EXPECT_TRUE(odcds_callbacks_->onConfigUpdate({}, version2).ok());
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate({}, version2));
 }
 
 // Tests that a config update failure is handled correctly.
@@ -180,6 +181,23 @@ TEST_F(XdstpOdCdsApiImplTest, SubscriptionFailure) {
   EnvoyException e("rejecting update");
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                          &e);
+}
+
+// Tests that a config update failure with a null exception pointer is handled correctly.
+TEST_F(XdstpOdCdsApiImplTest, SubscriptionFailureNullException) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+
+  ASSERT_NE(odcds_callbacks_, nullptr);
+
+  EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _)).Times(0);
+  EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
+
+  odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
+                                         nullptr);
 }
 
 // Tests that an existing cluster is updated.
@@ -209,7 +227,7 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterUpdate) {
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
 
-  EXPECT_TRUE(odcds_callbacks_->onConfigUpdate(resources, version).ok());
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate(resources, version));
 
   // Now update the cluster.
   const auto updated_cluster =
@@ -229,7 +247,7 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterUpdate) {
   std::vector<Config::DecodedResourceRef> resources2;
   resources2.emplace_back(decoded_resource2);
 
-  EXPECT_TRUE(odcds_callbacks_->onConfigUpdate(resources2, version2).ok());
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate(resources2, version2));
 }
 
 // Tests that multiple subscriptions are handled independently.
@@ -281,7 +299,7 @@ TEST_F(XdstpOdCdsApiImplTest, MultipleSubscriptions) {
       std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), cluster_name1, {}, version);
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
-  EXPECT_TRUE(callbacks1->onConfigUpdate(resources, version).ok());
+  EXPECT_OK(callbacks1->onConfigUpdate(resources, version));
 
   // Verify that the failed subscription works as expected.
   EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _)).Times(0);
@@ -315,15 +333,90 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterRemovalViaDeltaUpdate) {
       std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), cluster_name, {}, version);
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
-  EXPECT_TRUE(odcds_callbacks_->onConfigUpdate(resources, version).ok());
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate(resources, version));
 
   // Now, remove the cluster using a delta update.
   const std::string version2 = "v2";
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   removed_resources.Add(std::string(cluster_name));
   EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
-  EXPECT_TRUE(odcds_callbacks_->onConfigUpdate({}, removed_resources, version2).ok());
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate({}, removed_resources, version2));
 }
+
+// Check that a cluster the server answered as removed is reported as known-missing, and that a
+// later update delivering the cluster withdraws the answer.
+TEST_F(XdstpOdCdsApiImplTest, KnownMissingAfterRemoval) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+  ASSERT_NE(odcds_callbacks_, nullptr);
+  EXPECT_FALSE(odcds_->isKnownMissing(cluster_name));
+
+  // An empty response: the server answers that the resource doesn't exist.
+  EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate({}, "v1"));
+  EXPECT_TRUE(odcds_->isKnownMissing(cluster_name));
+
+  // The cluster comes into existence, which withdraws the remembered answer.
+  const auto cluster =
+      TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
+    name: {}
+    connect_timeout: 1.250s
+    lb_policy: ROUND_ROBIN
+    type: STATIC
+  )EOF",
+                                                                              cluster_name));
+  EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(cluster), "v2", false));
+  Config::DecodedResourceImpl decoded_resource(
+      std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), cluster_name, {}, "v2");
+  std::vector<Config::DecodedResourceRef> resources;
+  resources.emplace_back(decoded_resource);
+  EXPECT_OK(odcds_callbacks_->onConfigUpdate(resources, "v2"));
+  EXPECT_FALSE(odcds_->isKnownMissing(cluster_name));
+}
+
+// Check that a failed fetch is not remembered as a missing answer: the waiting parties are
+// notified, but a later request should retry instead of being answered from an answer the
+// server never gave.
+TEST_F(XdstpOdCdsApiImplTest, FailureIsNotKnownMissing) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  expectSingletonSubscription(cluster_name);
+  odcds_->updateOnDemand(cluster_name);
+  ASSERT_NE(odcds_callbacks_, nullptr);
+
+  EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
+  odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
+                                         nullptr);
+  EXPECT_FALSE(odcds_->isKnownMissing(cluster_name));
+}
+
+// Check that a resource whose subscription failed to register is not remembered as missing, so
+// a later request retries the registration instead of being answered from a remembered answer
+// that can never be withdrawn (no subscription persists for it).
+TEST_F(XdstpOdCdsApiImplTest, RegistrationFailureIsNotKnownMissing) {
+  InSequence s;
+
+  const std::string cluster_name = "fake_cluster";
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name, _, _, _, _, _, _))
+      .WillOnce(testing::Return(absl::InvalidArgumentError("invalid resource name")));
+  EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
+  odcds_->updateOnDemand(cluster_name);
+  EXPECT_FALSE(odcds_->isKnownMissing(cluster_name));
+}
+
+// Check that answers served from the remembered answer are recorded in the
+// cluster_manager.odcds.known_missing_answers counter.
+TEST_F(XdstpOdCdsApiImplTest, RecordKnownMissingAnswerIncrementsStat) {
+  odcds_->recordKnownMissingAnswer();
+  EXPECT_EQ(
+      1UL,
+      TestUtility::findCounter(store_, "cluster_manager.odcds.known_missing_answers")->value());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

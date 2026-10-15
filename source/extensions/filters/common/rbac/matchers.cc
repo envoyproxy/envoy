@@ -5,6 +5,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 #include "source/extensions/filters/common/rbac/principal_extension.h"
 
@@ -187,9 +189,18 @@ bool NotMatcher::matches(const Network::Connection& connection,
   return !matcher_->matches(connection, headers, info);
 }
 
+HeaderMatcher::HeaderMatcher(const envoy::config::route::v3::HeaderMatcher& matcher,
+                             Server::Configuration::CommonFactoryContext& context)
+    : header_(Http::HeaderUtility::createHeaderData(matcher, context)),
+      match_headers_individually_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.rbac_match_headers_individually")) {}
+
 bool HeaderMatcher::matches(const Network::Connection&,
                             const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo&) const {
+  if (match_headers_individually_) {
+    return header_->matchesHeadersIndividually(headers);
+  }
   return header_->matchesHeaders(headers);
 }
 
@@ -346,7 +357,8 @@ bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::Req
                               const StreamInfo::StreamInfo& info) const {
   if (metadata_source_ == envoy::config::rbac::v3::MetadataSource::ROUTE) {
     // Return false if there's no route since we can't match its metadata
-    return info.route() ? matcher_.match(info.route()->metadata()) : false;
+    const auto route = info.route();
+    return route ? matcher_.match(route->metadata()) : false;
   }
   return matcher_.match(info.dynamicMetadata());
 }
@@ -376,17 +388,41 @@ bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
 }
 
 bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap& headers,
-                          const StreamInfo::StreamInfo&) const {
+                          const StreamInfo::StreamInfo& info) const {
   if (headers.Path() == nullptr) {
     return false;
   }
-  return path_matcher_.match(headers.getPathValue());
+  std::string path_without_parameters;
+  absl::string_view path = headers.getPathValue();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.rbac_respect_ignore_path_parameters") &&
+      info.route().has_value() &&
+      info.route()->virtualHost().routeConfig().ignorePathParametersInPathMatching()) {
+    std::optional<std::string> modified_path = Http::PathUtil::removePathParameters(path);
+    if (modified_path.has_value()) {
+      path_without_parameters = std::move(modified_path).value();
+      path = path_without_parameters;
+    }
+  }
+  return path_matcher_.match(path);
 }
 
 bool UriTemplateMatcher::matches(const Network::Connection&,
                                  const Envoy::Http::RequestHeaderMap& headers,
-                                 const StreamInfo::StreamInfo&) const {
-  return uri_template_matcher_->match(headers.getPathValue());
+                                 const StreamInfo::StreamInfo& info) const {
+  std::string path_without_parameters;
+  absl::string_view path = headers.getPathValue();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.rbac_respect_ignore_path_parameters") &&
+      info.route().has_value() &&
+      info.route()->virtualHost().routeConfig().ignorePathParametersInPathMatching()) {
+    std::optional<std::string> modified_path = Http::PathUtil::removePathParameters(path);
+    if (modified_path.has_value()) {
+      path_without_parameters = std::move(modified_path).value();
+      path = path_without_parameters;
+    }
+  }
+  return uri_template_matcher_->match(path);
 }
 
 } // namespace RBAC

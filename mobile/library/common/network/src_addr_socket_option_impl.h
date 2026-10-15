@@ -33,7 +33,7 @@ public:
    */
   void hashKey(std::vector<uint8_t>& key) const override;
 
-  absl::optional<Details>
+  std::optional<Details>
   getOptionDetails(const Network::Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;
   bool isSupported() const override { return true; }

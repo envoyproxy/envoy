@@ -10,6 +10,8 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -90,8 +92,8 @@ typed_config:
     // Load the CDS cluster and wait for it to initialize.
     cds_helper_.setCds({cluster_});
     HttpIntegrationTest::initialize();
-    test_server_->waitForCounterEq("cluster_manager.cluster_added", 1);
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Eq(1));
+    test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
   }
 
   void createUpstreams() override {
@@ -105,8 +107,8 @@ typed_config:
 
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("http"));
-    auto client_transport_socket_factory_ptr =
-        Ssl::createClientSslTransportSocketFactory(options, context_manager_, *api_);
+    auto client_transport_socket_factory_ptr = Ssl::createClientSslTransportSocketFactory(
+        options, context_manager_, *api_, &server_factory_context_.serverScope());
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
         client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -149,7 +151,7 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, CircuitBreakerInvokedUpstreamTls) {
   setup(1024, 0);
 
   codec_client_ = makeRawHttpConnection(
-      makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("localhost")), absl::nullopt);
+      makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("localhost")), std::nullopt);
   ASSERT_FALSE(codec_client_->connected());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_rq_pending_overflow")->value());
 }
@@ -218,12 +220,12 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, DnsCacheQueryFailureStatistics) {
   codec_client_ =
       makeRawHttpConnection(makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni(
                                 "invalid.doesnotexist.example.com")),
-                            absl::nullopt);
+                            std::nullopt);
   ASSERT_FALSE(codec_client_->connected());
 
   // Verify DNS failure statistics.
-  test_server_->waitForCounterGe("dns_cache.foo.dns_query_attempt", 1);
-  test_server_->waitForCounterGe("dns_cache.foo.dns_query_failure", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Ge(1));
+  test_server_->waitForCounter("dns_cache.foo.dns_query_failure", Ge(1));
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_failure")->value());
 }
@@ -294,8 +296,8 @@ typed_config:
   config_helper_.addListenerFilter(ConfigHelper::tlsInspectorFilter());
   cds_helper_.setCds({cluster_});
   HttpIntegrationTest::initialize();
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 1);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounter("cluster_manager.cluster_added", Eq(1));
+  test_server_->waitForGauge("cluster_manager.warming_clusters", Eq(0));
 
   // Initial state. It should have no timeouts yet.
   EXPECT_EQ(0, test_server_->counter("dns_cache.foo.dns_query_timeout")->value());
@@ -303,11 +305,11 @@ typed_config:
   // Attempt connection with hostname that should trigger DNS timeout.
   codec_client_ = makeRawHttpConnection(
       makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("slowresolve.example.com")),
-      absl::nullopt);
+      std::nullopt);
   ASSERT_FALSE(codec_client_->connected());
 
   // Verify DNS timeout statistics.
-  test_server_->waitForCounterGe("dns_cache.foo.dns_query_attempt", 1);
+  test_server_->waitForCounter("dns_cache.foo.dns_query_attempt", Ge(1));
   // Note: timeout detection can be flaky in test environment, so we check attempts were made.
   EXPECT_GE(test_server_->counter("dns_cache.foo.dns_query_attempt")->value(), 1);
 }

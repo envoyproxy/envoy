@@ -26,7 +26,7 @@ public:
     return parent_.requestIDExtension();
   }
   const AccessLog::InstanceSharedPtrVector& accessLogs() override { return parent_.accessLogs(); }
-  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
+  const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return parent_.accessLogFlushInterval();
   }
   bool flushAccessLogOnNewRequest() override { return parent_.flushAccessLogOnNewRequest(); }
@@ -46,11 +46,11 @@ public:
   bool alwaysSetRequestIdInResponse() const override {
     return parent_.alwaysSetRequestIdInResponse();
   }
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+  std::optional<std::chrono::milliseconds> idleTimeout() const override {
     return parent_.idleTimeout();
   }
   bool isRoutable() const override { return parent_.isRoutable(); }
-  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+  std::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return parent_.maxConnectionDuration();
   }
   bool http1SafeMaxConnectionDuration() const override {
@@ -61,7 +61,7 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override {
     return parent_.streamIdleTimeout();
   }
-  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+  std::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
     return parent_.streamFlushTimeout();
   }
   std::chrono::milliseconds requestTimeout() const override { return parent_.requestTimeout(); }
@@ -71,7 +71,7 @@ public:
   std::chrono::milliseconds delayedCloseTimeout() const override {
     return parent_.delayedCloseTimeout();
   }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+  std::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return parent_.maxStreamDuration();
   }
   Router::RouteConfigProvider* routeConfigProvider() override {
@@ -88,7 +88,7 @@ public:
   serverHeaderTransformation() const override {
     return parent_.serverHeaderTransformation();
   }
-  const absl::optional<std::string>& schemeToSet() const override { return parent_.schemeToSet(); }
+  const std::optional<std::string>& schemeToSet() const override { return parent_.schemeToSet(); }
   bool shouldSchemeMatchUpstream() const override { return parent_.shouldSchemeMatchUpstream(); }
   ConnectionManagerStats& stats() override { return parent_.stats(); }
   ConnectionManagerTracingStats& tracingStats() override { return parent_.tracingStats(); }
@@ -103,11 +103,12 @@ public:
   const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return parent_.setCurrentClientCertDetails();
   }
+  ClientCertFormat clientCertFormat() const override { return parent_.clientCertFormat(); }
   const Matcher::MatchTreePtr<HttpMatchingData>& forwardClientCertMatcher() const override {
     return parent_.forwardClientCertMatcher();
   }
   const Network::Address::Instance& localAddress() override { return parent_.localAddress(); }
-  const absl::optional<std::string>& userAgent() override { return parent_.userAgent(); }
+  const std::optional<std::string>& userAgent() override { return parent_.userAgent(); }
   Tracing::TracerSharedPtr tracer() override { return parent_.tracer(); }
   const TracingConnectionManagerConfig* tracingConfig() override { return parent_.tracingConfig(); }
   ConnectionManagerListenerStats& listenerStats() override { return parent_.listenerStats(); }
@@ -136,6 +137,7 @@ public:
     return parent_.earlyHeaderMutationExtensions();
   }
   bool shouldStripTrailingHostDot() const override { return parent_.shouldStripTrailingHostDot(); }
+  bool recordRouteResolutionStats() const override { return parent_.recordRouteResolutionStats(); }
   uint32_t maxRequestsPerConnection() const override { return parent_.maxRequestsPerConnection(); }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return parent_.proxyStatusConfig();
@@ -166,12 +168,13 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
           *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
-      stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
-                                      POOL_GAUGE(*fake_stats_.rootScope()),
-                                      POOL_HISTOGRAM(*fake_stats_.rootScope()))},
-             "", *fake_stats_.rootScope()),
+      stats_({ALL_HTTP_CONN_MAN_STATS(
+                 POOL_COUNTER(*fake_stats_.rootScope()), POOL_GAUGE(*fake_stats_.rootScope()),
+                 POOL_HISTOGRAM(*fake_stats_.rootScope()), POOL_COUNTER(*fake_stats_.rootScope()))},
+             *fake_stats_.rootScope()),
 
-      listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
+      listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_),
+                                               POOL_COUNTER(fake_listener_stats_))}),
       request_id_extension_(
           Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_)),
       local_reply_(LocalReply::Factory::createDefault()) {
@@ -225,10 +228,16 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
       ->setRequestedServerName(server_name_);
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
       ssl_connection_);
+  // The connection manager reads the drain type from the listener that accepted the connection,
+  // in initializeReadFilterCallbacks() below.
+  ON_CALL(*listener_info_, drainType()).WillByDefault(Return(drain_type_));
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setListenerInfo(
+      listener_info_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       std::make_shared<ConnectionManagerConfigProxyObject>(*this), drain_close_, random_,
       http_context_, runtime_, local_info_, cluster_manager_, overload_manager_,
-      test_time_.timeSystem(), factory_context_.listenerInfo().direction());
+      test_time_.timeSystem(), factory_context_.listenerInfo().direction(),
+      factory_context_.server_factory_context_);
 
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
@@ -278,8 +287,8 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
           for (int i = 0; i < num_decoder_filters; i++) {
             auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
-            std::string name = absl::StrCat(req * num_decoder_filters + i);
-            callbacks.setFilterConfigName(name);
+            filter_names_.push_back(absl::StrCat("decoder_", req, "_", i));
+            callbacks.setFilterConfigName(filter_names_.back());
             factory(callbacks);
             applied_filters = true;
           }
@@ -287,8 +296,8 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
           for (int i = 0; i < num_encoder_filters; i++) {
             auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
-            std::string name = absl::StrCat(req * num_decoder_filters + i);
-            callbacks.setFilterConfigName(name);
+            filter_names_.push_back(absl::StrCat("encoder_", req, "_", i));
+            callbacks.setFilterConfigName(filter_names_.back());
             factory(callbacks);
             applied_filters = true;
           }
@@ -352,7 +361,7 @@ void HttpConnectionManagerImplMixin::setUpEncoderAndDecoder(bool request_with_da
 }
 
 void HttpConnectionManagerImplMixin::startRequest(bool end_stream,
-                                                  absl::optional<std::string> body) {
+                                                  std::optional<std::string> body) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{
@@ -390,7 +399,7 @@ void HttpConnectionManagerImplMixin::sendRequestHeadersAndData() {
 
 ResponseHeaderMap* HttpConnectionManagerImplMixin::sendResponseHeaders(
     ResponseHeaderMapPtr&& response_headers,
-    absl::optional<StreamInfo::CoreResponseFlag> response_flag, std::string response_code_details) {
+    std::optional<StreamInfo::CoreResponseFlag> response_flag, std::string response_code_details) {
   ResponseHeaderMap* altered_response_headers = nullptr;
 
   EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))

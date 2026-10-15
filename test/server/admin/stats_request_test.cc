@@ -89,7 +89,7 @@ protected:
 
   Stats::SymbolTableImpl symbol_table_;
   Stats::StatNamePool pool_;
-  Stats::AllocatorImpl alloc_;
+  Stats::Allocator alloc_;
   NiceMock<Stats::MockSink> sink_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -215,6 +215,31 @@ TEST_F(StatsRequestTest, OneStatPrometheus) {
   EXPECT_ENVOY_BUG(iterateChunks(*makeRequest(false, StatsFormat::Prometheus, StatsType::All), true,
                                  Http::Code::BadRequest),
                    "reached Prometheus case in switch unexpectedly");
+}
+
+TEST_F(StatsRequestTest, ShouldShowMetric) {
+  store_.rootScope()->counterFromStatName(makeStatName("foo"));
+  store_.rootScope()->counterFromStatName(makeStatName("bar"));
+  Buffer::OwnedImpl resp;
+
+  {
+    StatsParams params;
+    params.parse("?filter=foo&format=text", resp);
+    StatsRequest request(store_, params, endpoints_helper_.cm_);
+    EXPECT_EQ("foo: 0\n", response(request));
+  }
+  {
+    StatsParams params;
+    params.parse("?filter=foo&invert_filter&format=text", resp);
+    StatsRequest request(store_, params, endpoints_helper_.cm_);
+    EXPECT_EQ("bar: 0\n", response(request));
+  }
+  {
+    StatsParams params;
+    params.parse("?format=text", resp);
+    StatsRequest request(store_, params, endpoints_helper_.cm_);
+    EXPECT_EQ("bar: 0\nfoo: 0\n", response(request));
+  }
 }
 
 } // namespace Server

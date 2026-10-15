@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
@@ -12,8 +13,6 @@
 
 #include "test/test_common/network_utility.h"
 
-#include "absl/types/optional.h"
-
 /**
  * TestSocketInterface allows overriding the behavior of the IoHandle interface.
  */
@@ -22,18 +21,18 @@ namespace Network {
 
 class TestIoSocketHandle : public Test::IoSocketHandlePlatformImpl {
 public:
-  using WriteOverrideType = absl::optional<Api::IoCallUint64Result>(
+  using WriteOverrideType = std::optional<Api::IoCallUint64Result>(
       TestIoSocketHandle* io_handle, const Buffer::RawSlice* slices, uint64_t num_slice,
       Address::InstanceConstSharedPtr& peer_address_override_out);
   using WriteOverrideProc = std::function<WriteOverrideType>;
   using ReadOverrideProc = std::function<void(RecvMsgOutput& output)>;
-  using ConnectOverrideProc = std::function<absl::optional<Api::IoCallUint64Result>(
+  using ConnectOverrideProc = std::function<std::optional<Api::IoCallUint64Result>(
       TestIoSocketHandle* io_handle, Address::InstanceConstSharedPtr& peer_address_override_out)>;
 
   TestIoSocketHandle(ConnectOverrideProc connect_override_proc,
                      WriteOverrideProc write_override_proc, ReadOverrideProc read_override_proc,
                      size_t address_cache_max_capacity, os_fd_t fd = INVALID_SOCKET,
-                     bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
+                     bool socket_v6only = false, std::optional<int> domain = std::nullopt)
       : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain, address_cache_max_capacity),
         connect_override_(connect_override_proc), write_override_(write_override_proc),
         read_override_(read_override_proc) {
@@ -76,6 +75,7 @@ private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Address::Ip* self_ip,
                                   const Address::Instance& peer_address) override;
@@ -105,11 +105,11 @@ private:
 class TestSocketInterface : public SocketInterfaceImpl {
 public:
   /**
-   * Override the behavior of the IoSocketHandleImpl::writev() and
+   * Override the behavior of the IoSocketHandleImpl::writev(), IoSocketHandleImpl::send(), and
    * IoSocketHandleImpl::sendmsg() methods.
    * The supplied callback is invoked with the slices arguments of the write method and the index
    * of the accepted socket.
-   * Returning absl::nullopt from the callback continues normal execution of the
+   * Returning std::nullopt from the callback continues normal execution of the
    * write methods. Returning a Api::IoCallUint64Result from callback skips
    * the write methods with the returned result value.
    */
@@ -121,7 +121,7 @@ public:
 private:
   // SocketInterfaceImpl
   IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, Socket::Type socket_type,
-                         absl::optional<int> domain,
+                         std::optional<int> domain,
                          const SocketCreationOptions& options) const override;
 
   const TestIoSocketHandle::ConnectOverrideProc connect_override_proc_;

@@ -147,7 +147,7 @@ public:
 private:
   const KeySources key_sources_;
   Credentials credentials_;
-  absl::optional<Forwarding> forwarding_;
+  std::optional<Forwarding> forwarding_;
 };
 
 class RouteConfig : public Router::RouteSpecificFilterConfig {
@@ -189,7 +189,7 @@ private:
 struct AuthResult {
   bool authenticated{};
   bool authorized{};
-  absl::string_view response_code_details{};
+  absl::string_view response_code_details;
 };
 
 class FilterConfig {

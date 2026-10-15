@@ -148,9 +148,18 @@ public:
 
   using quic::QuicSpdySession::ActivateStream;
 
+  // Lets tests enable WebTransport negotiation. Empty by default so existing tests are unaffected:
+  // WebTransport is not negotiated and a stream's web_transport() stays null.
+  void setLocallySupportedWebTransportVersions(quic::WebTransportHttp3VersionSet versions) {
+    locally_supported_web_transport_versions_ = versions;
+  }
+
 protected:
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override {
     return quic::HttpDatagramSupport::kRfc;
+  }
+  quic::WebTransportHttp3VersionSet LocallySupportedWebTransportVersions() const override {
+    return locally_supported_web_transport_versions_;
   }
   bool hasDataToWrite() override { return HasDataToWrite(); }
   const quic::QuicConnection* quicConnection() const override {
@@ -160,6 +169,7 @@ protected:
 
 private:
   std::unique_ptr<quic::QuicCryptoStream> crypto_stream_;
+  quic::WebTransportHttp3VersionSet locally_supported_web_transport_versions_;
 };
 
 class TestQuicCryptoClientStream : public quic::QuicCryptoClientStream {
@@ -173,6 +183,8 @@ public:
 
   bool encryption_established() const override { return true; }
   quic::HandshakeState GetHandshakeState() const override { return quic::HANDSHAKE_CONFIRMED; }
+  void SetServerApplicationStateForResumption(
+      std::unique_ptr<quic::ApplicationState> /*application_state*/) override {}
 };
 
 class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
@@ -254,15 +266,19 @@ protected:
   QuicStatNames quic_stat_names_{stats_store_.symbolTable()};
 };
 
-Buffer::OwnedImpl generateChloPacketToSend(quic::ParsedQuicVersion quic_version,
-                                           quic::QuicConfig& quic_config,
-                                           quic::QuicConnectionId connection_id) {
-  std::unique_ptr<quic::QuicReceivedPacket> packet =
-      std::move(quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id)[0]);
-  return {packet->data(), packet->length()};
+inline std::vector<Buffer::OwnedImpl>
+generateChloPacketsToSend(quic::ParsedQuicVersion quic_version, quic::QuicConfig& quic_config,
+                          quic::QuicConnectionId connection_id) {
+  std::vector<std::unique_ptr<quic::QuicReceivedPacket>> packets =
+      quic::test::GetFirstFlightOfPackets(quic_version, quic_config, connection_id);
+  std::vector<Buffer::OwnedImpl> results;
+  for (auto& packet : packets) {
+    results.emplace_back(packet->data(), packet->length());
+  }
+  return results;
 }
 
-void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
+inline void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
   quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
       config, quic::kDefaultMaxStreamsPerConnection);
   quic::test::QuicConfigPeer::SetReceivedMaxUnidirectionalStreams(
@@ -277,7 +293,7 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header) {
+inline std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
@@ -292,7 +308,7 @@ std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header
   return absl::StrCat(headers_frame_header, payload);
 }
 
-std::string bodyToHttp3StreamPayload(const std::string& body) {
+inline std::string bodyToHttp3StreamPayload(const std::string& body) {
   quiche::SimpleBufferAllocator allocator;
   quiche::QuicheBuffer header =
       quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &allocator);
@@ -304,7 +320,8 @@ class QuicMultiVersionTest : public testing::TestWithParam<
                                  std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> {
 };
 
-std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> generateTestParam() {
+inline std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>
+generateTestParam() {
   std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> param;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (const auto& quic_version : quic::CurrentSupportedHttp3Versions()) {
@@ -314,7 +331,7 @@ std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> gen
   return param;
 }
 
-std::string testParamsToString(
+inline std::string testParamsToString(
     const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>&
         params) {
   return absl::StrCat(TestUtility::ipVersionToString(params.param.first),

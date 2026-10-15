@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
 )
@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "base_header_validator_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -38,7 +38,7 @@ envoy_extension_cc_test(
         "http_common_validation_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -57,7 +57,7 @@ envoy_extension_cc_test(
         "http1_header_validator_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -74,7 +74,7 @@ envoy_extension_cc_test(
         "http2_header_validator_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -108,12 +108,12 @@ envoy_extension_cc_test(
         "header_validator_factory_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:config",
         "//test/mocks/http:header_validator_mocks",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
@@ -125,7 +125,7 @@ envoy_extension_cc_test(
         "path_normalizer_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/http/header_validators/envoy_default:path_normalizer",
         "//test/test_common:test_runtime_lib",
@@ -137,11 +137,11 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/extensions/http/header_validators/envoy_default:config",
-        "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
@@ -155,11 +155,12 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "path_normalizer_fuzz_test",
     srcs = ["path_normalizer_fuzz_test.cc"],
     corpus = "path_normalizer_corpus",
-    rbe_pool = "6gig",
+    extension_names = ["envoy.http.header_validators.envoy_default"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":path_normalizer_fuzz_proto_cc_proto",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",

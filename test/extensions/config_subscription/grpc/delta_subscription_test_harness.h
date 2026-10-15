@@ -20,7 +20,6 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/stats/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -181,7 +180,7 @@ public:
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(*load_assignment);
+        std::ignore = resource->mutable_resource()->PackFrom(*load_assignment);
       }
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version)).WillOnce(ThrowOnRejectedConfig(accept));

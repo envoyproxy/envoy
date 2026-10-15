@@ -35,9 +35,9 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoHelper(
   if (!signer.ok()) {
     return absl::InvalidArgumentError(std::string(signer.status().message()));
   }
-  auto filter_config =
-      std::make_shared<FilterConfigImpl>(std::move(signer.value()), stats_prefix, scope,
-                                         config.host_rewrite(), config.use_unsigned_payload());
+  auto filter_config = std::make_shared<FilterConfigImpl>(
+      std::move(signer.value()), stats_prefix, scope, config.host_rewrite(),
+      config.use_unsigned_payload(), server_context.mainThreadDispatcher());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamDecoderFilter(filter);
@@ -45,22 +45,12 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoHelper(
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
-AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
-    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix, DualInfo dual_info,
-    Server::Configuration::ServerFactoryContext& server_context) {
-  return createFilterFactoryFromProtoHelper(config, stats_prefix, server_context, dual_info.scope);
-}
-
-Http::FilterFactoryCb
-AwsRequestSigningFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
-    const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix,
-    Server::Configuration::ServerFactoryContext& server_context) {
-  auto result = createFilterFactoryFromProtoHelper(config, stats_prefix, server_context,
-                                                   server_context.scope());
-  if (!result.ok()) {
-    ExceptionUtil::throwEnvoyException(std::string(result.status().message()));
-  }
-  return std::move(result.value());
+AwsRequestSigningFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const AwsRequestSigningProtoConfig& config,
+    Server::Configuration::ServerFactoryContext& server_context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
+  return createFilterFactoryFromProtoHelper(config, extra_context.statsPrefixOr(), server_context,
+                                            extra_context.statsPrefixScopeOr(server_context));
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
@@ -77,7 +67,8 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   return std::make_shared<const FilterConfigImpl>(
       std::move(signer.value()), per_route_config.stat_prefix(), server_context.scope(),
       per_route_config.aws_request_signing().host_rewrite(),
-      per_route_config.aws_request_signing().use_unsigned_payload());
+      per_route_config.aws_request_signing().use_unsigned_payload(),
+      server_context.mainThreadDispatcher());
 }
 
 absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
@@ -86,8 +77,6 @@ AwsRequestSigningFilterFactory::createSigner(
     Server::Configuration::ServerFactoryContext& server_context) const {
 
   std::string region = config.region();
-
-  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   // If we have an overriding credential provider configuration, read it here as it may contain
   // references to the region
@@ -101,7 +90,7 @@ AwsRequestSigningFilterFactory::createSigner(
   if (region.empty()) {
     auto region_provider =
         std::make_shared<Extensions::Common::Aws::RegionProviderChain>(credential_file_config);
-    absl::optional<std::string> regionOpt;
+    std::optional<std::string> regionOpt;
     if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
       regionOpt = region_provider->getRegionSet();
     } else {

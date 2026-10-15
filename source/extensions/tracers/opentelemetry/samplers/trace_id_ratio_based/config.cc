@@ -15,7 +15,8 @@ namespace OpenTelemetry {
 SamplerSharedPtr TraceIdRatioBasedSamplerFactory::createSampler(
     const Protobuf::Message& config, Server::Configuration::TracerFactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      dynamic_cast<const Protobuf::Any&>(config), context.messageValidationVisitor(), *this);
+      Envoy::Protobuf::DynamicCastMessage<Protobuf::Any>(config),
+      context.messageValidationVisitor(), *this);
 
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::tracers::opentelemetry::samplers::

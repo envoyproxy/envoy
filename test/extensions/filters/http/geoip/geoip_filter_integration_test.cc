@@ -1,12 +1,15 @@
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
 
+#include "source/common/stats/utility.h"
+
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -238,7 +241,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataDontPopulatedWhenCalledFromLocalhosNoX
   ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-anon")).empty());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.total")->value());
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.city_db.hit"));
@@ -259,7 +262,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoAnonDataPopulatedUseXff) {
   EXPECT_EQ("true", headerValue("x-geo-anon-vpn"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.anon_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.anon_db.hit")->value());
 }
@@ -280,7 +283,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXff) {
   EXPECT_EQ("209", headerValue("x-geo-asn"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.total")->value());
@@ -305,7 +308,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXffWithIspAndAsn) {
   EXPECT_EQ("false", headerValue("x-geo-apple-private-relay"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
@@ -332,7 +335,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseXffWithIsp) {
   EXPECT_EQ("false", headerValue("x-geo-apple-private-relay"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
@@ -360,7 +363,7 @@ TEST_P(GeoipFilterIntegrationTest, AsnDbTakesPrecedenceOverIspDbForAsnOrg) {
   EXPECT_EQ("Bredband2 AB", headerValue("x-geo-asn-org"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.hit")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
@@ -380,7 +383,7 @@ TEST_P(GeoipFilterIntegrationTest, AsnOrgFallsBackToIspDbWhenAsnDbNotConfigured)
   EXPECT_EQ("Telstra Internet", headerValue("x-geo-asn-org"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.asn_db.total"));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.hit")->value());
@@ -401,7 +404,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoHeadersOverridenInRequest) {
   EXPECT_EQ("Milton", headerValue("x-geo-city"));
   EXPECT_EQ("US", headerValue("x-geo-country"));
   ASSERT_TRUE(response->complete());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.total")->value());
@@ -421,7 +424,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataNotPopulatedOnEmptyLookupResult) {
   // 10.10.10.10 is a private IP and is absent in test_data/GeoIP2-Anonymous-IP-Test.mmdb database.
   ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-anon")).empty());
   ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-anon-vpn")).empty());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.anon_db.total")->value());
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.maxmind.anon_db.hit"));
 }
@@ -439,9 +442,9 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
           listener->mutable_listener_filters_timeout()->set_seconds(10);
         });
     new_config_helper.setLds("1");
-    test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 1);
-    test_server_->waitForCounterEq("listener_manager.lds.update_success", 2);
-    test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
+    test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(1));
+    test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+    test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
   }
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -458,7 +461,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
   auto response2 = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 2);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(2));
   EXPECT_EQ(2, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(2, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
 }
@@ -479,7 +482,7 @@ TEST_P(GeoipFilterIntegrationTest, OnlyApplePrivateRelayHeaderIsPopulated) {
   EXPECT_EQ("false", headerValue("x-geo-apple-private-relay"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.hit")->value());
 }
@@ -487,8 +490,16 @@ TEST_P(GeoipFilterIntegrationTest, OnlyApplePrivateRelayHeaderIsPopulated) {
 TEST_P(GeoipFilterIntegrationTest, MetricForDbBuildEpochIsEmitted) {
   config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
   initialize();
-  EXPECT_EQ(1671567063,
-            test_server_->gauge("http.config_test.maxmind.city_db.db_build_epoch")->value());
+  // A database file is shared between listeners, so the stats describing it are rooted at the
+  // provider's own "maxmind." namespace rather than at the listener's stat prefix, and they name
+  // the file they describe.
+  const std::string db_name = Stats::Utility::sanitizeStatsName(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/"
+      "GeoLite2-City-Test.mmdb"));
+  const Stats::GaugeSharedPtr build_epoch =
+      test_server_->gauge(absl::StrCat("maxmind.city_db.", db_name, ".db_build_epoch"));
+  ASSERT_NE(build_epoch, nullptr);
+  EXPECT_EQ(1671567063, build_epoch->value());
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDb) {
@@ -504,7 +515,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDb) {
   EXPECT_EQ("US", headerValue("x-geo-country"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.country_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.country_db.hit")->value());
 }
@@ -523,7 +534,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseCountryDbAndCityDb) {
   EXPECT_EQ("Milton", headerValue("x-geo-city"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   // Country should be looked up from Country DB.
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.country_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.country_db.hit")->value());
@@ -548,7 +559,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataPopulatedUseIpAddressHeader) {
   EXPECT_EQ("209", headerValue("x-geo-asn"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.total")->value());
@@ -570,7 +581,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataNotPopulatedWhenIpAddressHeaderMissing
   ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-asn")).empty());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
 }
 
 TEST_P(GeoipFilterIntegrationTest, GeoDataNotPopulatedWhenIpAddressHeaderInvalid) {
@@ -595,7 +606,7 @@ TEST_P(GeoipFilterIntegrationTest, GeoDataNotPopulatedWhenIpAddressHeaderInvalid
         ASSERT_TRUE(response->headers().get(Http::LowerCaseString("x-geo-asn")).empty());
         ASSERT_TRUE(response->complete());
         EXPECT_EQ("200", response->headers().getStatusValue());
-        test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+        test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
       });
 }
 
@@ -637,7 +648,7 @@ TEST_P(GeoipFilterIntegrationTest,
   EXPECT_EQ("209", headerValue("x-geo-asn"));
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  test_server_->waitForCounterEq("http.config_test.geoip.total", 1);
+  test_server_->waitForCounter("http.config_test.geoip.total", Eq(1));
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.total")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.city_db.hit")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.asn_db.total")->value());

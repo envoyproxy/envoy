@@ -71,7 +71,7 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
   addTagIfNotNull(span, Tracing::Tags::get().GrpcMessage, headers.GrpcMessage());
   // Set error tag when Grpc status code represents an upstream error. See
   // https://github.com/envoyproxy/envoy/issues/18877.
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
+  std::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
   if (grpc_status_code.has_value()) {
     const auto& status = grpc_status_code.value();
     if (status != Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
@@ -151,6 +151,12 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                                                const Http::ResponseTrailerMap* response_trailers,
                                                const StreamInfo::StreamInfo& stream_info,
                                                const Config& tracing_config) {
+  // Early exit if tags are not needed
+  if (!span.exportedSpan()) {
+    span.finishSpan();
+    return;
+  }
+
   // Pre response data.
   if (request_headers) {
     if (request_headers->RequestId()) {
@@ -204,11 +210,13 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span, const StreamInfo::Strea
 
   if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
     auto upstream_address = stream_info.upstreamInfo()->upstreamHost()->address();
-    // TODO(wbpcode): separated `upstream_address` may be meaningful to the downstream span.
-    // But for the upstream span, `peer.address` should be used.
-    span.setTag(Tracing::Tags::get().UpstreamAddress, upstream_address->asStringView());
-    // TODO(wbpcode): may be set this tag in the setCommonTags.
-    span.setTag(Tracing::Tags::get().PeerAddress, upstream_address->asStringView());
+    if (upstream_address != nullptr) {
+      // TODO(wbpcode): separated `upstream_address` may be meaningful to the downstream span.
+      // But for the upstream span, `peer.address` should be used.
+      span.setTag(Tracing::Tags::get().UpstreamAddress, upstream_address->asStringView());
+      // TODO(wbpcode): may be set this tag in the setCommonTags.
+      span.setTag(Tracing::Tags::get().PeerAddress, upstream_address->asStringView());
+    }
   }
 
   setCommonTags(span, stream_info, tracing_config, true);
@@ -236,11 +244,9 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
   // Cluster info.
-  if (auto cluster_info = stream_info.upstreamClusterInfo();
-      cluster_info.has_value() && cluster_info.value() != nullptr) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info.value()->name());
-    span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                cluster_info.value()->observabilityName());
+  if (const auto cluster_info = stream_info.upstreamClusterInfo()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster, cluster_info->name());
+    span.setTag(Tracing::Tags::get().UpstreamClusterName, cluster_info->observabilityName());
   }
 
   setSpanHttpStatusCode(span, stream_info);

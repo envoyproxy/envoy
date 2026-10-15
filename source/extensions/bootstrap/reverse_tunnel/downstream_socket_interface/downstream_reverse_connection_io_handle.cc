@@ -1,5 +1,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 
+#include <algorithm>
+
 #include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 
@@ -13,13 +15,58 @@ namespace ReverseConnection {
 // DownstreamReverseConnectionIOHandle constructor implementation
 DownstreamReverseConnectionIOHandle::DownstreamReverseConnectionIOHandle(
     Network::ConnectionSocketPtr socket, ReverseConnectionIOHandle* parent,
-    const std::string& connection_key)
+    const std::string& connection_key, uint64_t connection_id, Buffer::InstancePtr residual_bytes)
     : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), owned_socket_(std::move(socket)),
-      parent_(parent), connection_key_(connection_key) {
+      parent_(parent), connection_key_(connection_key), connection_id_(connection_id),
+      residual_bytes_(std::move(residual_bytes)) {
   ENVOY_LOG(debug,
             "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {} for "
             "connection key: {}",
             fd_, connection_key_);
+  // Register with the parent so it can null this back-pointer if it is torn down first.
+  if (parent_ != nullptr) {
+    parent_->registerChildIoHandle(*this);
+  }
+}
+
+Api::IoCallUint64Result
+DownstreamReverseConnectionIOHandle::read(Buffer::Instance& buffer,
+                                          std::optional<uint64_t> max_length) {
+  if (residual_bytes_ != nullptr) {
+    const uint64_t available = residual_bytes_->length();
+    const uint64_t to_move =
+        max_length.has_value() ? std::min<uint64_t>(*max_length, available) : available;
+    buffer.move(*residual_bytes_, to_move);
+    if (residual_bytes_->length() == 0) {
+      residual_bytes_.reset();
+    }
+    // Residual bytes are application data, so RPING echo stops.
+    ping_echo_active_ = false;
+    return Api::IoCallUint64Result{to_move, Api::IoError::none()};
+  }
+  return RpingInterceptor::read(buffer, max_length);
+}
+
+Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::readv(uint64_t max_length,
+                                                                   Buffer::RawSlice* slices,
+                                                                   uint64_t num_slice) {
+  if (residual_bytes_ != nullptr) {
+    const uint64_t to_copy = std::min<uint64_t>(max_length, residual_bytes_->length());
+    uint64_t copied = 0;
+    for (uint64_t i = 0; i < num_slice && copied < to_copy; i++) {
+      const uint64_t n = std::min<uint64_t>(slices[i].len_, to_copy - copied);
+      residual_bytes_->copyOut(copied, n, slices[i].mem_);
+      copied += n;
+    }
+    residual_bytes_->drain(copied);
+    if (residual_bytes_->length() == 0) {
+      residual_bytes_.reset();
+    }
+    // Residual bytes are application data, so RPING echo stops.
+    ping_echo_active_ = false;
+    return Api::IoCallUint64Result{copied, Api::IoError::none()};
+  }
+  return RpingInterceptor::readv(max_length, slices, num_slice);
 }
 
 // DownstreamReverseConnectionIOHandle destructor implementation
@@ -28,6 +75,14 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
       debug,
       "DownstreamReverseConnectionIOHandle: destroying handle for FD: {} with connection key: {}",
       fd_, connection_key_);
+  // A handle disposed without an explicit close(), for example a listener filter timeout or
+  // rejection, must still run the terminal cleanup so the parent drops the tunnel key and redials.
+  // close() is idempotent through its fd_ guard, so this is a no-op when close() already ran.
+  close();
+  if (parent_ != nullptr) {
+    parent_->unregisterChildIoHandle(*this);
+  }
+  SET_SOCKET_INVALID(fd_);
 }
 
 void DownstreamReverseConnectionIOHandle::onPingMessage() {
@@ -48,16 +103,6 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
       "DownstreamReverseConnectionIOHandle: closing handle for FD: {} with connection key: {}", fd_,
       connection_key_);
 
-  // If we're ignoring close calls during socket hand-off, just return success.
-  if (ignore_close_and_shutdown_) {
-    ENVOY_LOG(
-        debug,
-        "DownstreamReverseConnectionIOHandle: ignoring close() call during socket hand-off for "
-        "connection key: {}",
-        connection_key_);
-    return Api::ioCallUint64ResultNoError();
-  }
-
   // Prevent double-closing by checking if already closed.
   if (fd_ < 0) {
     ENVOY_LOG(debug,
@@ -66,10 +111,14 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
     return Api::ioCallUint64ResultNoError();
   }
 
+  // Similar to the IoSocketHandleImpl::close().
+  // TODO(aakugan): Implement logic for pings from the downstream side too.
+  resetFileEvents();
+
   // Notify the parent that this downstream connection has been closed.
   // This can trigger re-initiation of the reverse connection if needed.
   if (parent_) {
-    parent_->onDownstreamConnectionClosed(connection_key_);
+    parent_->onDownstreamConnectionClosed(connection_key_, connection_id_);
     ENVOY_LOG(
         debug,
         "DownstreamReverseConnectionIOHandle: notified parent of connection closure for key: {}",
@@ -80,7 +129,8 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
   if (owned_socket_) {
     owned_socket_.reset();
   }
-  return IoSocketHandleImpl::close();
+  SET_SOCKET_INVALID(fd_);
+  return Api::ioCallUint64ResultNoError();
 }
 
 Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
@@ -89,17 +139,17 @@ Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
             "key: {}",
             how, fd_, connection_key_);
 
-  // If shutdown is ignored during socket hand-off, return success.
-  if (ignore_close_and_shutdown_) {
-    ENVOY_LOG(
-        debug,
-        "DownstreamReverseConnectionIOHandle: ignoring shutdown() call during socket hand-off for "
-        "connection key: {}",
-        connection_key_);
-    return Api::SysCallIntResult{0, 0};
+  if (owned_socket_) {
+    return owned_socket_->ioHandle().shutdown(how);
   }
 
-  return IoSocketHandleImpl::shutdown(how);
+  return Api::SysCallIntResult{0, 0};
+}
+
+void DownstreamReverseConnectionIOHandle::markTunnelDrainingAndDialReplacement() {
+  if (parent_) {
+    parent_->markTunnelDrainingAndDialReplacement(connection_key_, connection_id_);
+  }
 }
 
 } // namespace ReverseConnection

@@ -77,7 +77,7 @@ TEST_F(FileSystemBufferFilterFragmentTest, CreatesFragmentFromPartialBufferAndCo
 TEST_F(FileSystemBufferFilterFragmentTest, WritesAndReadsBack) {
   Buffer::OwnedImpl input("hello");
   Fragment frag(input);
-  EXPECT_CALL(*handle_, write(_, BufferStringEqual("hello"), 123, _))
+  EXPECT_CALL(*handle_, write(_, BufferString("hello"), 123, _))
       .WillOnce([](Event::Dispatcher* dispatcher, Buffer::Instance&, off_t,
                    absl::AnyInvocable<void(absl::StatusOr<size_t>)> callback) {
         dispatcher->post([callback = std::move(callback)]() mutable { std::move(callback)(5); });
@@ -124,7 +124,7 @@ TEST_F(FileSystemBufferFilterFragmentTest, WritesAndReadsBack) {
 TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnWriteError) {
   Buffer::OwnedImpl input("hello");
   Fragment frag(input);
-  EXPECT_CALL(*handle_, write(_, BufferStringEqual("hello"), 123, _))
+  EXPECT_CALL(*handle_, write(_, BufferString("hello"), 123, _))
       .WillOnce([](Event::Dispatcher* dispatcher, Buffer::Instance&, off_t,
                    absl::AnyInvocable<void(absl::StatusOr<size_t>)> callback) {
         dispatcher->post([callback = std::move(callback)]() mutable {
@@ -142,7 +142,7 @@ TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnWriteError) {
 TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnWriteIncomplete) {
   Buffer::OwnedImpl input("hello");
   Fragment frag(input);
-  EXPECT_CALL(*handle_, write(_, BufferStringEqual("hello"), 123, _))
+  EXPECT_CALL(*handle_, write(_, BufferString("hello"), 123, _))
       .WillOnce([](Event::Dispatcher* dispatcher, Buffer::Instance&, off_t,
                    absl::AnyInvocable<void(absl::StatusOr<size_t>)> callback) {
         dispatcher->post([callback = std::move(callback)]() mutable { std::move(callback)(2); });

@@ -40,8 +40,8 @@ public:
   Config(const envoy::extensions::filters::http::set_metadata::v3::Config& config,
          Stats::Scope& scope, const std::string& stats_prefix);
 
-  const std::vector<UntypedMetadataEntry>& untyped() { return untyped_; }
-  const std::vector<TypedMetadataEntry>& typed() { return typed_; }
+  const std::vector<UntypedMetadataEntry>& untyped() const { return untyped_; }
+  const std::vector<TypedMetadataEntry>& typed() const { return typed_; }
   const FilterStats& stats() const { return stats_; }
 
 private:

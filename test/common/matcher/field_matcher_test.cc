@@ -19,7 +19,7 @@ public:
     matchers.reserve(values.size());
     for (const auto& v : values) {
       matchers.emplace_back(
-          SingleFieldMatcher<TestData>::create(std::make_unique<TestInput>(absl::nullopt, v.second),
+          SingleFieldMatcher<TestData>::create(std::make_unique<TestInput>(std::nullopt, v.second),
                                                std::make_unique<BoolMatcher>(v.first))
               .value());
     }
@@ -45,16 +45,15 @@ TEST_F(FieldMatcherTest, SingleFieldMatcher) {
   EXPECT_EQ(createSingleMatcher("foo", [](auto v) { return v != "foo"; })->match(TestData()),
             MatchResult::NoMatch);
   EXPECT_EQ(createSingleMatcher(
-                absl::nullopt, [](auto v) { return v == "foo"; }, DataAvailability::NotAvailable)
+                std::nullopt, [](auto v) { return v == "foo"; }, DataAvailability::NotAvailable)
                 ->match(TestData()),
             MatchResult::InsufficientData);
   EXPECT_EQ(createSingleMatcher(
                 "fo", [](auto v) { return v == "foo"; }, DataAvailability::MoreDataMightBeAvailable)
                 ->match(TestData()),
             MatchResult::InsufficientData);
-  EXPECT_EQ(
-      createSingleMatcher(absl::nullopt, [](auto v) { return v == "foo"; })->match(TestData()),
-      MatchResult::NoMatch);
+  EXPECT_EQ(createSingleMatcher(std::nullopt, [](auto v) { return v == "foo"; })->match(TestData()),
+            MatchResult::NoMatch);
 }
 
 TEST_F(FieldMatcherTest, AnyMatcher) {

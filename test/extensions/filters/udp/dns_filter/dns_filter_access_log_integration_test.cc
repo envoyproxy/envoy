@@ -14,6 +14,7 @@ namespace UdpFilters {
 namespace DnsFilter {
 namespace {
 
+using testing::NiceMock;
 using ResponseValidator = Utils::DnsResponseValidator;
 
 class DnsFilterAccessLogIntegrationTest
@@ -112,7 +113,7 @@ listener_filters:
       envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
           config;
       config.mutable_num_retries()->set_value(1);
-      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
+      std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
     });
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

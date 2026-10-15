@@ -50,7 +50,7 @@ CredentialInjectorFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, 
   bool succeed = config_->injectCredential(headers);
   if (!succeed) {
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::Unauthorized,
-                                       "Failed to inject credential.", nullptr, absl::nullopt,
+                                       "Failed to inject credential.", nullptr, std::nullopt,
                                        "failed_to_inject_credential");
     return Envoy::Http::FilterHeadersStatus::StopIteration;
   }

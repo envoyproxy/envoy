@@ -27,7 +27,8 @@ public:
   MappedAttributeBuilder(const envoy::extensions::http::ext_proc::processing_request_modifiers::
                              mapped_attribute_builder::v3::MappedAttributeBuilder& config,
                          Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-                         Server::Configuration::CommonFactoryContext& context);
+                         Server::Configuration::CommonFactoryContext& context,
+                         absl::Status& creation_status);
 
   bool modifyRequest(const Params& params,
                      envoy::service::ext_proc::v3::ProcessingRequest& request) override;

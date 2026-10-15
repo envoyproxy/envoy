@@ -69,6 +69,9 @@ public:
   const std::string& tagExtractedName() const { return tag_extracted_name_; }
   const std::string& name() const { return name_; }
   const Stats::TagVector& tags() const { return tags_; }
+
+  // Returns the current tags, leaves tags_ in an unknown state.
+  Stats::TagVector getAndClearTags() { return std::move(tags_); }
   bool used() const { return true; }
   bool hidden() const { return false; }
 

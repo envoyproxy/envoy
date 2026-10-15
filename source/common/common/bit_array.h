@@ -81,8 +81,8 @@ public:
    * Sets the given fixed width bit to the given value.
    */
   inline void set(size_t index, uint32_t value) {
-    if (index > num_items_) {
-      ENVOY_BUG(true, "BitArray::set requested index out of bounds");
+    if (index >= num_items_) {
+      ENVOY_BUG(false, "BitArray::set requested index out of bounds");
       return;
     }
     // We locate the first byte that contains part of the element located at

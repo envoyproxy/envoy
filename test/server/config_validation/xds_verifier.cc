@@ -21,7 +21,7 @@ XdsVerifier::XdsVerifier(test::server::config_validation::Config::SotwOrDelta so
 std::string XdsVerifier::getRoute(const envoy::config::listener::v3::Listener& listener) {
   envoy::config::listener::v3::Filter filter0 = listener.filter_chains()[0].filters()[0];
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager conn_man;
-  filter0.typed_config().UnpackTo(&conn_man);
+  std::ignore = filter0.typed_config().UnpackTo(&conn_man);
   return conn_man.rds().route_config_name();
 }
 
@@ -245,9 +245,7 @@ void XdsVerifier::updateSotwListeners() {
       rep.state = ACTIVE;
     }
   }
-  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                  [&](auto& listener) { return listener.state == REMOVED; }),
-                   listeners_.end());
+  std::erase_if(listeners_, [&](auto& listener) { return listener.state == REMOVED; });
 }
 
 /**
@@ -268,9 +266,7 @@ void XdsVerifier::updateDeltaListeners(const envoy::config::route::v3::RouteConf
     }
   }
   // erase any active listeners that were replaced
-  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
-                                  [&](auto& listener) { return listener.state == REMOVED; }),
-                   listeners_.end());
+  std::erase_if(listeners_, [&](auto& listener) { return listener.state == REMOVED; });
 }
 
 /**

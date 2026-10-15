@@ -26,6 +26,7 @@ envoy_cc_library(
         ":path_normalizer",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "@abseil-cpp//absl/container:node_hash_map",
         "@abseil-cpp//absl/container:node_hash_set",

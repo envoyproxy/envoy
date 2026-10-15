@@ -6,7 +6,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/mocks/http/header_validator.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

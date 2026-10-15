@@ -35,6 +35,11 @@ protected:
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 
+  void setAbortiveClose() override {
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->setAbortiveClose();
+    }
+  }
   void close() override {
     if (io_handle_ != nullptr && io_handle_->isOpen()) {
       io_handle_->close();
@@ -71,7 +76,7 @@ public:
   NetworkListenSocket(
       IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
       const Network::Socket::OptionsSharedPtr& options,
-      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar = absl::nullopt,
+      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar = std::nullopt,
       bool bind_to_port = false)
       : ListenSocketImpl(std::move(io_handle), address),
         parent_drained_callback_registrar_(parent_drained_callback_registrar) {
@@ -110,11 +115,14 @@ public:
     ASSERT(io_handle_ != nullptr);
     return *io_handle_;
   }
+  void setAbortiveClose() override {
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->setAbortiveClose();
+    }
+  }
   void close() override {
-    if (io_handle_ != nullptr) {
-      if (io_handle_->isOpen()) {
-        io_handle_->close();
-      }
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->close();
     }
   }
   bool isOpen() const override {

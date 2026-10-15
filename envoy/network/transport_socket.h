@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "envoy/api/io_error.h"
@@ -13,8 +14,6 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/ssl/context.h"
 #include "envoy/stream_info/filter_state.h"
-
-#include "absl/types/optional.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 namespace quic {
@@ -42,10 +41,10 @@ enum class ConnectionEvent;
 struct IoResult {
   IoResult(PostIoAction action, uint64_t bytes_processed, bool end_stream_read)
       : action_(action), bytes_processed_(bytes_processed), end_stream_read_(end_stream_read),
-        err_code_(absl::nullopt) {}
+        err_code_(std::nullopt) {}
 
   IoResult(PostIoAction action, uint64_t bytes_processed, bool end_stream_read,
-           absl::optional<Api::IoError::IoErrorCode> err_code)
+           std::optional<Api::IoError::IoErrorCode> err_code)
       : action_(action), bytes_processed_(bytes_processed), end_stream_read_(end_stream_read),
         err_code_(err_code) {}
 
@@ -65,7 +64,7 @@ struct IoResult {
   /**
    * The underlying I/O error code.
    */
-  absl::optional<Api::IoError::IoErrorCode> err_code_;
+  std::optional<Api::IoError::IoErrorCode> err_code_;
 };
 
 /**
@@ -161,8 +160,11 @@ public:
   /**
    * Closes the transport socket.
    * @param event supplies the connection event that is closing the socket.
+   * @param abort_reset if true, the connection is being torn down with a TCP RST and the
+   *        transport socket should skip any graceful shutdown (e.g. TLS close_notify) so the
+   *        peer reliably observes the reset rather than racing it against a clean close.
    */
-  virtual void closeSocket(Network::ConnectionEvent event) PURE;
+  virtual void closeSocket(Network::ConnectionEvent event, bool abort_reset = false) PURE;
 
   /**
    * @param buffer supplies the buffer to read to.
@@ -226,7 +228,7 @@ public:
    *         and should pass it through to the connection pool to ensure the correct endpoints are
    *         selected and the upstream connection is set up accordingly.
    */
-  virtual const absl::optional<std::string>& serverNameOverride() const PURE;
+  virtual const std::optional<std::string>& serverNameOverride() const PURE;
 
   /**
    * @return the optional overridden SAN names to verify, if the transport socket supports SAN
@@ -258,7 +260,7 @@ public:
   /**
    * @return optional PROXY protocol address information.
    */
-  virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
+  virtual std::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
 
   // Information for use by the http_11_proxy transport socket.
   struct Http11ProxyInfo {
@@ -315,6 +317,13 @@ public:
                         std::shared_ptr<const Upstream::HostDescription> host) const PURE;
 
   /**
+   * @return the default Http11ProxyInfo if configured, or nullopt.
+   */
+  virtual OptRef<const TransportSocketOptions::Http11ProxyInfo> defaultHttp11ProxyInfo() const {
+    return {};
+  }
+
+  /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
    * negotiation.
    */
@@ -342,7 +351,7 @@ public:
   virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return nullptr; }
 
   /*
-   * @return the ClientContextConfig, or absl::nullopt for non-TLS factories.
+   * @return the ClientContextConfig, or std::nullopt for non-TLS factories.
    */
   virtual OptRef<const Ssl::ClientContextConfig> clientContextConfig() const { return {}; }
 

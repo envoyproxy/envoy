@@ -63,3 +63,12 @@ In practice, UDP listeners are configured with the ``SO_REUSEPORT`` kernel optio
 will cause the kernel to consistently hash each UDP 4-tuple to the same worker. This allows a
 UDP listener filter to be "session" oriented if it so desires. A built-in example of this
 functionality is the :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>` listener filter.
+
+During a :ref:`hot restart <arch_overview_hot_restart>`, the draining instance continues handling
+sessions a listener filter has registered to keep on the same instance, and forwards datagrams for
+any other session to the new instance, identified by the listener's bind address and
+:ref:`network namespace <envoy_v3_api_field_config.core.v3.SocketAddress.network_namespace_filepath>`
+so listeners sharing an address across namespaces stay distinct. Currently only
+:ref:`udp_proxy <config_udp_listener_filters_udp_proxy>` sticky sessions do this. The forwarding can
+be turned off with the ``envoy.reloadable_features.udp_hot_restart_session_handoff`` runtime guard,
+in which case the draining instance serves everything itself until it exits.

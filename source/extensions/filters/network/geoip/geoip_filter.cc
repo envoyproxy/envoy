@@ -12,19 +12,23 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Geoip {
 
-ProtobufTypes::MessagePtr GeoipInfo::serializeAsProto() const {
-  auto proto_struct = std::make_unique<Protobuf::Struct>();
-  auto& proto_fields = *proto_struct->mutable_fields();
-  for (const auto& [key, value] : fields_) {
+namespace {
+Protobuf::Struct toStruct(const absl::flat_hash_map<std::string, std::string>& fields) {
+  Protobuf::Struct proto_struct;
+  auto& proto_fields = *proto_struct.mutable_fields();
+  for (const auto& [key, value] : fields) {
     proto_fields[key] = ValueUtil::stringValue(value);
   }
   return proto_struct;
 }
+} // namespace
 
-absl::optional<std::string> GeoipInfo::serializeAsString() const {
-  auto proto_struct = serializeAsProto();
-  return Json::Factory::loadFromProtobufStruct(dynamic_cast<const Protobuf::Struct&>(*proto_struct))
-      ->asJsonString();
+ProtobufTypes::MessagePtr GeoipInfo::serializeAsProto() const {
+  return std::make_unique<Protobuf::Struct>(toStruct(fields_));
+}
+
+std::optional<std::string> GeoipInfo::serializeAsString() const {
+  return Json::Factory::loadFromProtobufStruct(toStruct(fields_))->asJsonString();
 }
 
 StreamInfo::FilterState::Object::FieldType GeoipInfo::getField(absl::string_view field_name) const {
@@ -42,6 +46,7 @@ GeoipFilterConfig::GeoipFilterConfig(const envoy::extensions::filters::network::
       stats_prefix_(stat_name_set_->add(stat_prefix + "geoip")),
       client_ip_formatter_(std::move(client_ip_formatter)) {
   stat_name_set_->rememberBuiltin("total");
+  stat_name_set_->rememberBuiltin("skipped");
 }
 
 void GeoipFilterConfig::incCounter(Stats::StatName name) {
@@ -84,6 +89,17 @@ Network::FilterStatus GeoipFilter::onNewConnection() {
     remote_address = read_callbacks_->connection().connectionInfoProvider().remoteAddress();
   }
 
+  // A geolocation lookup needs an IP address, and the downstream connection address is not
+  // necessarily one: a connection accepted on an internal listener carries an Envoy internal
+  // address, and a Unix domain socket carries a pipe address. Skip the lookup rather than hand
+  // either to the provider.
+  if (remote_address == nullptr || remote_address->ip() == nullptr) {
+    ENVOY_LOG(debug, "geoip: skipping lookup, no IP address available for the connection");
+    config_->incSkipped();
+    config_->incTotal();
+    return Network::FilterStatus::Continue;
+  }
+
   // Capture weak_ptr to GeoipFilter so that filter can be safely accessed in the posted callback.
   // This protects against the case when filter gets deleted before the callback is run
   // (e.g., on LDS update).
@@ -118,7 +134,6 @@ void GeoipFilter::onLookupComplete(Geolocation::LookupResult&& result) {
   if (!geoip_info->empty()) {
     read_callbacks_->connection().streamInfo().filterState()->setData(
         std::string(GeoipFilterStateKey), std::move(geoip_info),
-        StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
     ENVOY_LOG(debug, "geoip: stored data in filter state key '{}'", GeoipFilterStateKey);
   }

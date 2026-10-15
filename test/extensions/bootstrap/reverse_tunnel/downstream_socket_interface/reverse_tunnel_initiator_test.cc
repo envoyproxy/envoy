@@ -12,7 +12,6 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
@@ -123,15 +122,29 @@ TEST_F(ReverseTunnelInitiatorTest, CreateBootstrapExtension) {
   EXPECT_NE(socket_interface_->getExtension(), nullptr);
 }
 
+// Socket creation fails cleanly when the bootstrap extension has not been instantiated, rather than
+// dereferencing a null server context and crashing at listener creation.
+TEST_F(ReverseTunnelInitiatorTest, CreateReverseConnectionSocketWithoutExtensionReturnsNullptr) {
+  ReverseTunnelInitiator uninitialized;
+  EXPECT_FALSE(uninitialized.isInitialized());
+
+  ReverseConnectionSocketConfig config;
+  config.remote_clusters.push_back(RemoteClusterConnectionConfig("remote-cluster", 1));
+  auto handle = uninitialized.createReverseConnectionSocket(
+      Network::Socket::Type::Stream, Network::Address::Type::Ip, Network::Address::IpVersion::v4,
+      config);
+  EXPECT_EQ(handle, nullptr);
+}
+
 TEST_F(ReverseTunnelInitiatorTest, CreateEmptyConfigProto) {
   // Test createEmptyConfigProto function.
   auto config = socket_interface_->createEmptyConfigProto();
   EXPECT_NE(config, nullptr);
 
   // Should be able to cast to the correct type.
-  auto* typed_config =
-      dynamic_cast<envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
-                       DownstreamReverseConnectionSocketInterface*>(config.get());
+  auto* typed_config = Protobuf::DynamicCastMessage<
+      envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+          DownstreamReverseConnectionSocketInterface>(config.get());
   EXPECT_NE(typed_config, nullptr);
 }
 

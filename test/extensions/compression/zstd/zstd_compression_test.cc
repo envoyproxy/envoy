@@ -6,6 +6,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -245,7 +246,7 @@ TEST_F(ZstdCompressionDictionaryTest, UpdateCompressorDictionary) {
   verifyByDictPath(compressor_dictionary_, dictionary_1_path_, true);
 
   writeTmpFile(dictionary_2_path_, compressor_dictionary_);
-  ASSERT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  ASSERT_OK(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   verifyByCompressions(false);
 }
 
@@ -254,7 +255,7 @@ TEST_F(ZstdCompressionDictionaryTest, UpdateDecompressorDictionary) {
   verifyByDictPath(dictionary_1_path_, decompressor_dictionary_, true);
 
   writeTmpFile(dictionary_2_path_, decompressor_dictionary_);
-  ASSERT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
+  ASSERT_OK(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo));
   verifyByCompressions(true);
 }
 
@@ -264,11 +265,11 @@ TEST_F(ZstdCompressionDictionaryTest, UpdateCompressorBeforeDecompressorDictiona
   verifyByDictPath(compressor_dictionary_, decompressor_dictionary_, true);
 
   writeTmpFile(dictionary_2_path_, compressor_dictionary_);
-  ASSERT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  ASSERT_OK(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   verifyByCompressions(false);
 
   writeTmpFile(dictionary_2_path_, decompressor_dictionary_);
-  ASSERT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
+  ASSERT_OK(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo));
   verifyByCompressions(true);
 }
 
@@ -278,11 +279,11 @@ TEST_F(ZstdCompressionDictionaryTest, UpdateCompressorAfterDecompressorDictionar
   verifyByDictPath(compressor_dictionary_, decompressor_dictionary_, true);
 
   writeTmpFile(dictionary_2_path_, decompressor_dictionary_);
-  ASSERT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
+  ASSERT_OK(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo));
   verifyByCompressions(true);
 
   writeTmpFile(dictionary_2_path_, compressor_dictionary_);
-  ASSERT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  ASSERT_OK(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   verifyByCompressions(true);
 }
 

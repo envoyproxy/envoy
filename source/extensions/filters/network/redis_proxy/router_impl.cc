@@ -19,9 +19,9 @@ MirrorPolicyImpl::MirrorPolicyImpl(const envoy::extensions::filters::network::re
                                    Runtime::Loader& runtime)
     : runtime_key_(config.runtime_fraction().runtime_key()),
       default_value_(config.has_runtime_fraction()
-                         ? absl::optional<envoy::type::v3::FractionalPercent>(
+                         ? std::optional<envoy::type::v3::FractionalPercent>(
                                config.runtime_fraction().default_value())
-                         : absl::nullopt),
+                         : std::nullopt),
       exclude_read_commands_(config.exclude_read_commands()), upstream_(upstream),
       runtime_(runtime) {}
 
@@ -85,8 +85,8 @@ PrefixRoutes::PrefixRoutes(
       absl::AsciiStrToLower(&copy);
     }
 
-    auto success = prefix_lookup_table_.add(
-        copy.c_str(), std::make_shared<Prefix>(route, upstreams_, runtime), false);
+    auto success =
+        prefix_lookup_table_.add(copy, std::make_shared<Prefix>(route, upstreams_, runtime), false);
     if (!success) {
       throw EnvoyException(fmt::format("prefix `{}` already exists.", route.prefix()));
     }

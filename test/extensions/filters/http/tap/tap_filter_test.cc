@@ -55,6 +55,7 @@ public:
 
     if (has_config) {
       http_per_request_tapper_ = new MockHttpPerRequestTapper();
+      EXPECT_CALL(*http_tap_config_, shouldRecord()).WillRepeatedly(Return(true));
       EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_, _))
           .WillOnce(Return(http_per_request_tapper_));
     }
@@ -127,6 +128,40 @@ TEST_F(TapFilterTest, Config) {
 
   // Workaround InSequence/shared_ptr mock leak.
   EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(http_tap_config_.get()));
+}
+
+// Verify that when shouldRecord() returns false the tapper is not created and
+// the rq_sampled_out counter is incremented.
+TEST_F(TapFilterTest, NoTapperCreatedWhenSampledOut) {
+  http_tap_config_ = std::make_shared<MockHttpTapConfig>();
+  EXPECT_CALL(*filter_config_, currentConfig()).WillRepeatedly(Return(http_tap_config_));
+  EXPECT_CALL(*http_tap_config_, shouldRecord()).WillOnce(Return(false));
+  // The tapper must NOT be created.
+  EXPECT_CALL(*http_tap_config_, createPerRequestTapper_(_, _)).Times(0);
+
+  filter_ = std::make_unique<Filter>(filter_config_);
+  filter_->setDecoderFilterCallbacks(callbacks_);
+
+  // decode/encode paths must no-op: no per-request tapper interactions are set
+  // up, so any unexpected call would fail the test.
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl request_body("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  Buffer::OwnedImpl response_body("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_body, false));
+  Http::TestResponseTrailerMapImpl response_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+
+  filter_->log({&request_headers, &response_headers, &response_trailers}, stream_info_);
+
+  EXPECT_EQ(1UL, filter_config_->stats_.rq_sampled_out_.value());
+  EXPECT_EQ(0UL, filter_config_->stats_.rq_tapped_.value());
 }
 
 TEST(TapFilterConfigTest, InvalidProto) {

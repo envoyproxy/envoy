@@ -197,10 +197,13 @@ Copy validated JWT claims to HTTP request headers example
 If a JWT is valid, you can add some of its claims of type (string, integer, boolean) to a new HTTP header to pass to the upstream. You can specify claims and headers in
 `claim_to_headers` field. Nested claims are also supported.
 
-The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>` is a repeat of message :ref:`JWTClaimToHeader <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JWTClaimToHeader>` which has two fields:
+The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>` is a repeat of message :ref:`JWTClaimToHeader <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JWTClaimToHeader>` which has these fields:
 
-* Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
-* Field ``claim_name`` specifies the claim from the verified JWT.
+* Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value. The filter strips every configured ``forward_payload_header`` and ``claim_to_headers`` header name from the request before applying rules, including on paths that bypass JWT verification (empty ``requires``, per-route ``disabled``, or CORS preflight bypass), so client-supplied values cannot be forwarded as authenticated identity.
+* Field ``claim_name`` specifies the claim from the verified JWT, split on ``.`` to address nested
+  claims: ``nested.claim.key`` resolves to ``key`` inside ``claim`` inside ``nested``.
+* Field ``claim_path`` specifies the same thing as an explicit list of segments, for claims whose
+  own names contain dots. Exactly one of ``claim_name`` and ``claim_path`` must be set.
 
 .. literalinclude:: _include/jwt-authn-claim-filter.yaml
     :language: yaml
@@ -216,3 +219,105 @@ In this example the `tenants` claim is an object, therefore the JWT claim ("sub"
     x-jwt-claim-sub: <JWT Claim>
     x-jwt-claim-nested-key: <JWT Claim>
     x-jwt-tenants: <Base64 encoded JSON JWT Claim>
+
+Claim names which contain dots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Because ``claim_name`` is always split on ``.``, a claim whose own name contains a dot is not
+addressable through it. Use :ref:`claim_path
+<envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtClaimToHeader.claim_path>` instead,
+which takes the path one segment at a time and matches each segment in full. Given the payload:
+
+.. code-block:: json
+
+    {"a.b": {"c.d": "x.y.z"}}
+
+the value ``x.y.z`` is copied to a header by:
+
+.. code-block:: yaml
+
+    claim_to_headers:
+    - header_name: x-jwt-claim-c-d
+      claim_path:
+      - key: a.b
+      - key: c.d
+
+The single-segment case covers the URL-namespaced claims issued by many OIDC providers:
+
+.. code-block:: yaml
+
+    claim_to_headers:
+    - header_name: x-jwt-claim-parent-token
+      claim_path:
+      - key: http://example.org/parent_token
+
+Statistics
+----------
+
+The JWT authentication filter outputs statistics in the ``http.<stat_prefix>.jwt_authn.`` namespace.
+The :ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+comes from the owning HTTP connection manager.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  allowed, Counter, Total requests that passed JWT authentication
+  denied, Counter, Total requests that failed JWT authentication
+  cors_preflight_bypassed, Counter, Total CORS preflight requests that bypassed JWT authentication
+  jwks_fetch_success, Counter, Total successful JWKS (JSON Web Key Set) remote fetches
+  jwks_fetch_failed, Counter, Total failed JWKS remote fetch attempts
+  jwt_cache_hit, Counter, Total JWT cache hits where a previously validated token was reused
+  jwt_cache_miss, Counter, Total JWT cache misses requiring full token validation
+
+
+.. _config_jwt_authn_extract_only_security:
+
+Extract-Only Mode Security Considerations
+------------------------------------------
+
+.. warning::
+
+   **SECURITY WARNING**: The ``extract_only_without_validation``
+   requirement type does **NOT** verify JWT signatures. Any party can craft
+   a JWT with arbitrary claims, and those claims will be extracted and
+   forwarded as HTTP headers.
+
+   **Verification status header (default on):**
+
+   When this mode is active, Envoy sets a verification status header on
+   requests whose JWT is present but fails signature verification:
+
+   .. code-block:: yaml
+
+      x-jwt-signature-verified: false
+
+   The header is NOT set when the JWT is valid or when no JWT is present.
+   This means the header's presence is a meaningful signal: if set, the
+   JWT failed verification and downstream filters should not trust any
+   JWT-derived claim headers.
+
+   **RBAC integration:**
+
+   If RBAC policies match on JWT-derived claim headers (e.g.,
+   ``x-jwt-claim-role``), add a corresponding principal check for the
+   verification status header. Example RBAC policy that only allows
+   verified admin claims:
+
+   .. literalinclude:: _include/jwt-authn-extract-only-rbac.yaml
+       :language: yaml
+       :lines: 58-73
+       :lineno-start: 58
+       :linenos:
+       :caption: :download:`jwt-authn-extract-only-rbac.yaml <_include/jwt-authn-extract-only-rbac.yaml>`
+
+   **Configuration:**
+
+   The header name is configurable via ``verification_status_header`` in
+   ``ExtractOnlyWithoutValidation``. The header is set by default, but this behavior can be
+   disabled via the ``envoy.reloadable_features.jwt_authn_add_verification_status_header``
+   runtime flag.
+
+   **Recommended alternative:** Use ``provider_name`` with ``remote_jwks``
+   or ``local_jwks`` for full signature verification.
+

@@ -1,19 +1,26 @@
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "envoy/common/backoff_strategy.h"
-#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
-#include "envoy/config/custom_config_validators.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/subscription.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/load_stats_reporter.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
+
+#include "absl/base/attributes.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Config {
@@ -48,6 +55,39 @@ public:
    * @param resources set of resource names to watch for
    */
   virtual void update(const absl::flat_hash_set<std::string>& resources) PURE;
+
+  /**
+   * Adds resources to the set the watch is interested in, without disturbing the resources it
+   * already watches (the additive counterpart to update()). This updates BOTH the watch-level
+   * routing and the subscription sent to the management server, so it is how on-demand requests add
+   * a new resource: the watch will route the resource when it arrives, and the server is told to
+   * send it.
+   * @param resources set of resource names to additionally watch for and subscribe to.
+   */
+  virtual void append(const absl::flat_hash_set<std::string>& resources) PURE;
+
+  /**
+   * Declares the resource-name patterns this watch ACCEPTS for routing. This affects routing ONLY
+   * and never changes the subscription sent to the management server (that is driven solely by
+   * update()/append()).
+   *
+   * By default (accept() never called), the watch is routed exactly the resources it watches via
+   * update()/append(); if that set is empty or contains the wildcard "*", the watch is a catch-all
+   * and is routed every resource.
+   *
+   * When accept(patterns) is called, the patterns are evaluated FIRST and SUPPRESS the default
+   * wildcard (catch-all) semantics: the watch is then routed only resources matching 'patterns',
+   * plus any concrete names it explicitly watches. Each pattern must be the wildcard "*" (accept
+   * every resource) or a suffix glob -- a prefix followed by a slash and an asterisk -- which
+   * accepts every resource named with that prefix. This is how a watch can subscribe to the
+   * wildcard on the wire (update({"*"})) while routing only a subset -- e.g. VHDS, which accepts
+   * only virtual hosts under its route configuration. To keep wildcard routing while using
+   * accept(), include "*" in the patterns.
+   *
+   * Calling accept({}) clears any previously registered patterns and restores the default behavior.
+   * @param patterns set of wildcard / suffix-glob patterns to accept.
+   */
+  virtual void accept(const absl::flat_hash_set<std::string>& patterns) PURE;
 };
 
 using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
@@ -108,9 +148,6 @@ public:
                                    OpaqueResourceDecoderSharedPtr resource_decoder,
                                    const SubscriptionOptions& options) PURE;
 
-  virtual void requestOnDemandUpdate(const std::string& type_url,
-                                     const absl::flat_hash_set<std::string>& for_update) PURE;
-
   /**
    * Returns an EdsResourcesCache for this GrpcMux if there is one.
    * @return EdsResourcesCacheOptRef optional eds resources cache for the gRPC-mux.
@@ -120,11 +157,13 @@ public:
   /**
    * Updates the current gRPC-Mux object to use a new gRPC client, and config.
    */
-  virtual absl::Status
-  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
-                  BackOffStrategyPtr&& backoff_strategy,
-                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) PURE;
+  virtual absl::Status updateMuxSource(
+      Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+      Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
+      BackOffStrategyPtr&& backoff_strategy,
+      const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+      std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory =
+          nullptr) PURE;
 
   /**
    * Returns a load-stats-reporter that was created for the gRPC-Mux.
@@ -143,7 +182,7 @@ public:
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
 using GrpcMuxSharedPtr = std::shared_ptr<GrpcMux>;
 
-template <class ResponseProto> using ResponseProtoPtr = std::unique_ptr<ResponseProto>;
+template <class ResponseProto> using ResponseProtoPtr = ArenaWrappedProto<ResponseProto>;
 /**
  * A grouping of callbacks that a GrpcMux should provide to its GrpcStream.
  */

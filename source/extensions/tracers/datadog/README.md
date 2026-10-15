@@ -114,11 +114,11 @@ Each instance of `Tracer` is local to a worker thread.
 
 [1]: ../../../../test/extensions/tracers/datadog/
 [2]: https://github.com/DataDog/dd-trace-cpp
-[3]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/http_client.h
-[4]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/event_scheduler.h
-[5]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/logger.h
-[6]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/span.h
-[7]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/clock.h
-[8]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/tracer.h
+[3]: https://github.com/DataDog/dd-trace-cpp/blob/main/include/datadog/http_client.h
+[4]: https://github.com/DataDog/dd-trace-cpp/blob/main/include/datadog/event_scheduler.h
+[5]: https://github.com/DataDog/dd-trace-cpp/blob/main/include/datadog/logger.h
+[6]: https://github.com/DataDog/dd-trace-cpp/blob/main/include/datadog/span.h
+[7]: https://github.com/DataDog/dd-trace-cpp/blob/main/include/datadog/clock.h
+[8]: https://github.com/DataDog/dd-trace-cpp/blob/main/include/datadog/tracer.h
 [9]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/datadog_agent.h
-[10]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/collector.h
+[10]: https://github.com/DataDog/dd-trace-cpp/blob/main/include/datadog/collector.h

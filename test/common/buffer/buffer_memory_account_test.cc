@@ -7,6 +7,7 @@
 
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/mocks/http/stream_reset_handler.h"
+#include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -38,7 +39,8 @@ static void noAccountsTracked(MemoryClassesToAccountsSet& memory_classes_to_acco
 
 class BufferMemoryAccountTest : public testing::Test {
 protected:
-  TrackedWatermarkBufferFactory factory_{absl::bit_width(kMinimumBalanceToTrack)};
+  TrackedWatermarkBufferFactory factory_{
+      static_cast<uint32_t>(absl::bit_width(kMinimumBalanceToTrack))};
   Http::MockStreamResetHandler mock_reset_handler_;
 };
 
@@ -304,6 +306,27 @@ TEST_F(BufferMemoryAccountTest, ExtractingSliceWithExistingStorageCreditsAccount
   {
     auto slice = buffer.extractMutableFrontSlice();
     EXPECT_EQ(getBalance(buffer_account), 4096);
+  }
+
+  EXPECT_EQ(getBalance(buffer_account), 4096);
+
+  buffer_account->clearDownstream();
+}
+
+TEST_F(BufferMemoryAccountTest, ExtractingImmutableSliceCreditsAccountOnSliceDestruction) {
+  auto buffer_account = factory_.createAccount(mock_reset_handler_);
+  Buffer::OwnedImpl buffer(buffer_account);
+  ASSERT_EQ(getBalance(buffer_account), 0);
+
+  buffer.appendSliceForTest("Slice 1");
+  buffer.appendSliceForTest("Slice 2");
+  EXPECT_EQ(getBalance(buffer_account), 8192);
+
+  // Unlike extractMutableFrontSlice(), the charge stays attached to the extracted
+  // slice and the account is credited only when the slice is destroyed.
+  {
+    auto slice = buffer.extractImmutableFrontSlice();
+    EXPECT_EQ(getBalance(buffer_account), 8192);
   }
 
   EXPECT_EQ(getBalance(buffer_account), 4096);

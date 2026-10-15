@@ -11,9 +11,9 @@
 #include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/router/router_filter_interface.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/tcp/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -129,10 +129,10 @@ TEST_F(TcpUpstreamTest, Basic) {
   // Swallow the request headers and generate response headers.
   EXPECT_CALL(connection(), write(_, false)).Times(0);
   EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(200, _, _, false));
-  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
+  EXPECT_OK(tcp_upstream_->encodeHeaders(request_, false));
 
   // Proxy the data.
-  EXPECT_CALL(connection(), write(BufferStringEqual("foo"), false));
+  EXPECT_CALL(connection(), write(BufferString("foo"), false));
   Buffer::OwnedImpl buffer("foo");
   tcp_upstream_->encodeData(buffer, false);
 
@@ -142,12 +142,12 @@ TEST_F(TcpUpstreamTest, Basic) {
 
   // Forward data.
   Buffer::OwnedImpl response1("bar");
-  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferStringEqual("bar"), _, false));
+  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferString("bar"), _, false));
   tcp_upstream_->onUpstreamData(response1, false);
 
   Buffer::OwnedImpl response2("eep");
   EXPECT_CALL(mock_router_filter_, onUpstreamHeaders(_, _, _, _)).Times(0);
-  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferStringEqual("eep"), _, false));
+  EXPECT_CALL(mock_router_filter_, onUpstreamData(BufferString("eep"), _, false));
   tcp_upstream_->onUpstreamData(response2, false);
 }
 
@@ -167,10 +167,10 @@ TEST_F(TcpUpstreamTest, V1Header) {
 
   // encodeHeaders now results in the proxy proto header being sent.
   EXPECT_CALL(connection(), write(BufferEqual(&expected_data), false));
-  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
+  EXPECT_OK(tcp_upstream_->encodeHeaders(request_, false));
 
   // Data is proxied as usual.
-  EXPECT_CALL(connection(), write(BufferStringEqual("foo"), false));
+  EXPECT_CALL(connection(), write(BufferString("foo"), false));
   Buffer::OwnedImpl buffer("foo");
   tcp_upstream_->encodeData(buffer, false);
 }
@@ -191,26 +191,26 @@ TEST_F(TcpUpstreamTest, V2Header) {
 
   // encodeHeaders now results in the proxy proto header being sent.
   EXPECT_CALL(connection(), write(BufferEqual(&expected_data), false));
-  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
+  EXPECT_OK(tcp_upstream_->encodeHeaders(request_, false));
 
   // Data is proxied as usual.
-  EXPECT_CALL(connection(), write(BufferStringEqual("foo"), false));
+  EXPECT_CALL(connection(), write(BufferString("foo"), false));
   Buffer::OwnedImpl buffer("foo");
   tcp_upstream_->encodeData(buffer, false);
 }
 
 TEST_F(TcpUpstreamTest, TrailersEndStream) {
   // Swallow the headers.
-  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, false).ok());
+  EXPECT_OK(tcp_upstream_->encodeHeaders(request_, false));
 
-  EXPECT_CALL(connection(), write(BufferStringEqual(""), true));
+  EXPECT_CALL(connection(), write(BufferString(""), true));
   Envoy::Http::TestRequestTrailerMapImpl trailers{{"foo", "bar"}};
   tcp_upstream_->encodeTrailers(trailers);
 }
 
 TEST_F(TcpUpstreamTest, HeaderEndStreamHalfClose) {
-  EXPECT_CALL(connection(), write(BufferStringEqual(""), true));
-  EXPECT_TRUE(tcp_upstream_->encodeHeaders(request_, true).ok());
+  EXPECT_CALL(connection(), write(BufferString(""), true));
+  EXPECT_OK(tcp_upstream_->encodeHeaders(request_, true));
 }
 
 TEST_F(TcpUpstreamTest, ReadDisable) {

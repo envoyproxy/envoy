@@ -12,9 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::NiceMock;
-using testing::Return;
 
 namespace Envoy {
 
@@ -146,6 +144,17 @@ TEST_F(CgroupCpuUtilTest, GetCurrentCgroupPath_OnlyNonCpuV1) {
   EXPECT_FALSE(result.has_value()); // No v2 and no v1 CPU = nullopt
 }
 
+TEST_F(CgroupCpuUtilTest, GetCurrentCgroupPath_ControllerNameContainingCpu) {
+  fs_.setFileContents("/proc/self/cgroup", "2:cpuset:/foo\n"
+                                           "3:cpuacct:/bar\n"
+                                           "0::/v2\n");
+
+  auto result = CgroupCpuUtil::TestUtil::getCurrentCgroupPath(fs_);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value().relative_path, "/v2");
+  EXPECT_EQ(result.value().version, "v2");
+}
+
 // =============================================================================
 // Test: unescapePath
 // =============================================================================
@@ -221,8 +230,7 @@ TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V1) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::parseMountInfoLine(line);
   ASSERT_TRUE(mount_opt.has_value());
-  const auto& mount_point = mount_opt.value();
-  EXPECT_EQ(mount_point, "/sys/fs/cgroup/cpu");
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/cpu");
 }
 
 TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V2) {
@@ -230,8 +238,7 @@ TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V2) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::parseMountInfoLine(line);
   ASSERT_TRUE(mount_opt.has_value());
-  const auto& mount_point = mount_opt.value();
-  EXPECT_EQ(mount_point, "/sys/fs/cgroup");
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup");
 }
 
 TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V1NoCPU) {
@@ -239,8 +246,7 @@ TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_V1NoCPU) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::parseMountInfoLine(line);
   ASSERT_TRUE(mount_opt.has_value());
-  const auto& mount_point = mount_opt.value();
-  EXPECT_EQ(mount_point, "/sys/fs/cgroup/memory");
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/memory");
 }
 
 TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_Escaped) {
@@ -249,8 +255,7 @@ TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_Escaped) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::parseMountInfoLine(line);
   ASSERT_TRUE(mount_opt.has_value());
-  const auto& mount_point = mount_opt.value();
-  EXPECT_EQ(mount_point, "/sys/fs/cgroup/tab\ttab"); // Unescaped
+  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/tab\ttab"); // Unescaped
 }
 
 TEST_F(CgroupCpuUtilTest, ParseMountInfoLine_NotCgroup) {
@@ -304,7 +309,9 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V1) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/cpu"); // Should return v1 CPU mount point
+  EXPECT_EQ(mount_opt.value().mount_point,
+            "/sys/fs/cgroup/cpu"); // Should return v1 CPU mount point
+  EXPECT_EQ(mount_opt.value().root, "/");
 }
 
 TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2) {
@@ -318,7 +325,20 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup"); // Should return v2 mount point
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup"); // Should return v2 mount point
+  EXPECT_EQ(mount_opt.value().root, "/");
+}
+
+TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_ControllerNameContainingCpu) {
+  std::string mountinfo = "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n"
+                          "59 22 0:43 / /sys/fs/cgroup/cpuset rw - cgroup cgroup rw,cpuset\n"
+                          "60 22 0:44 / /sys/fs/cgroup/cpuacct rw - cgroup cgroup rw,cpuacct\n";
+  fs_.setFileContents("/proc/self/mountinfo", mountinfo);
+
+  auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
+  ASSERT_TRUE(mount_opt.has_value());
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup");
+  EXPECT_EQ(mount_opt.value().root, "/");
 }
 
 TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_Mixed_V1Wins) {
@@ -337,7 +357,8 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_Mixed_V1Wins) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/cpu"); // v1 CPU takes precedence over v2
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup/cpu"); // v1 CPU takes precedence over v2
+  EXPECT_EQ(mount_opt.value().root, "/");
 }
 
 TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2Escaped) {
@@ -351,7 +372,18 @@ TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_V2Escaped) {
 
   auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
   ASSERT_TRUE(mount_opt.has_value());
-  EXPECT_EQ(mount_opt.value(), "/sys/fs/cgroup/tab\ttab"); // Should be unescaped
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup/tab\ttab"); // Should be unescaped
+  EXPECT_EQ(mount_opt.value().root, "/");
+}
+
+TEST_F(CgroupCpuUtilTest, DiscoverCgroupMount_NonRoot) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 /kubepods.slice/pod123 /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+
+  auto mount_opt = CgroupCpuUtil::TestUtil::discoverCgroupMount(fs_);
+  ASSERT_TRUE(mount_opt.has_value());
+  EXPECT_EQ(mount_opt.value().mount_point, "/sys/fs/cgroup");
+  EXPECT_EQ(mount_opt.value().root, "/kubepods.slice/pod123");
 }
 
 // =============================================================================
@@ -563,10 +595,11 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_QuotaParseError) {
   cpu_files.quota_content = "150000us\n"; // Invalid: contains units
   cpu_files.period_content = "100000\n";
 
-  EXPECT_LOG_CONTAINS("warn", "Failed to parse cgroup v1 values", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Parse error returns nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Parse error returns nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("failed to parse cgroup v1 values"));
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_PeriodParseError) {
@@ -576,10 +609,11 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_PeriodParseError) {
   cpu_files.quota_content = "150000\n";
   cpu_files.period_content = "100000us\n"; // Invalid: contains units
 
-  EXPECT_LOG_CONTAINS("warn", "Failed to parse cgroup v1 values", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Parse error returns nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Parse error returns nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("failed to parse cgroup v1 values"));
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_ZeroQuota) {
@@ -589,10 +623,11 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_ZeroQuota) {
   cpu_files.quota_content = "0\n";
   cpu_files.period_content = "100000\n";
 
-  EXPECT_LOG_CONTAINS("warn", "Invalid cgroup v1 values: quota=0", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Invalid values return nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Invalid values return nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("invalid cgroup v1 values: quota=0"));
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_ZeroPeriod) {
@@ -602,10 +637,11 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_ZeroPeriod) {
   cpu_files.quota_content = "150000\n";
   cpu_files.period_content = "0\n";
 
-  EXPECT_LOG_CONTAINS("warn", "Invalid cgroup v1 values: quota=150000 period=0", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Invalid values return nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Invalid values return nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("invalid cgroup v1 values: quota=150000 period=0"));
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_WhitespaceHandling) {
@@ -657,10 +693,11 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_MalformedFormat) {
   cpu_files.quota_content = "250000\n"; // v1-style format
   cpu_files.period_content = "";
 
-  EXPECT_LOG_CONTAINS("warn", "Malformed cgroup v2 cpu.max", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Malformed returns nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Malformed returns nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("malformed cgroup v2 cpu.max"));
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_QuotaParseError) {
@@ -670,10 +707,11 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_QuotaParseError) {
   cpu_files.quota_content = "250000us 100000\n"; // Invalid: contains units
   cpu_files.period_content = "";
 
-  EXPECT_LOG_CONTAINS("warn", "Failed to parse cgroup v2 values", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Parse error returns nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Parse error returns nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("failed to parse cgroup v2 values"));
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_PeriodParseError) {
@@ -683,10 +721,11 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_PeriodParseError) {
   cpu_files.quota_content = "250000 100000us\n"; // Invalid: contains units
   cpu_files.period_content = "";
 
-  EXPECT_LOG_CONTAINS("warn", "Failed to parse cgroup v2 values", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Parse error returns nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Parse error returns nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("failed to parse cgroup v2 values"));
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_ZeroPeriod) {
@@ -696,10 +735,11 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_ZeroPeriod) {
   cpu_files.quota_content = "250000 0\n";
   cpu_files.period_content = "";
 
-  EXPECT_LOG_CONTAINS("warn", "Invalid cgroup v2 period: cannot be zero", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Invalid values return nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Invalid values return nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("invalid cgroup v2 period: cannot be zero"));
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_WhitespaceHandling) {
@@ -722,10 +762,164 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_EmptyParts) {
   cpu_files.quota_content = "  \n"; // Just whitespace
   cpu_files.period_content = "";
 
-  EXPECT_LOG_CONTAINS("warn", "Malformed cgroup v2 cpu.max", {
-    auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files);
-    EXPECT_FALSE(result.has_value()); // Malformed returns nullopt
-  });
+  CgroupDetectionDiagnostic diag;
+  auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files, &diag);
+  EXPECT_FALSE(result.has_value()); // Malformed returns nullopt
+  EXPECT_TRUE(diag.is_error);
+  EXPECT_THAT(diag.message, testing::HasSubstr("malformed cgroup v2 cpu.max"));
+}
+
+// =============================================================================
+// Test: CgroupDetectorImpl end-to-end detection + deferred logResult()
+// =============================================================================
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_V2DetectedLimitLogged) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/mygroup\n");
+  fs_.setFileContents("/sys/fs/cgroup/mygroup/cpu.max", "250000 100000\n");
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  ASSERT_TRUE(limit.has_value());
+  EXPECT_EQ(limit.value(), 2U); // floor(250000/100000) = 2
+
+  EXPECT_LOG_CONTAINS("debug", "cgroup CPU limit detected: 2", { detector.logResult(); });
+  // Result is consumed; a second logResult() is a no-op.
+  EXPECT_NO_LOGS({ detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_V2DetectedLimitWithNonRootMount) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 /kubepods.slice/pod123 /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod123/containerA\n");
+  fs_.setFileContents("/sys/fs/cgroup/containerA/cpu.max", "250000 100000\n");
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  ASSERT_TRUE(limit.has_value());
+  EXPECT_EQ(limit.value(), 2U);
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_NonRootMountRequiresPathBoundary) {
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod1234/containerA\n");
+  CgroupMount mount;
+  mount.mount_point = "/sys/fs/cgroup";
+  mount.root = "/kubepods.slice/pod123";
+
+  auto cgroup_info = CgroupCpuUtil::TestUtil::constructCgroupPath(mount, fs_);
+  EXPECT_FALSE(cgroup_info.has_value());
+}
+
+TEST_F(CgroupCpuUtilTest, ConstructCgroupPath_NonRootMountRootItself) {
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod123\n");
+  CgroupMount mount;
+  mount.mount_point = "/sys/fs/cgroup";
+  mount.root = "/kubepods.slice/pod123";
+
+  auto cgroup_info = CgroupCpuUtil::TestUtil::constructCgroupPath(mount, fs_);
+  ASSERT_TRUE(cgroup_info.has_value());
+  EXPECT_EQ(cgroup_info.value().full_path, "/sys/fs/cgroup");
+  EXPECT_EQ(cgroup_info.value().version, "v2");
+}
+
+TEST_F(CgroupCpuUtilTest, ConstructCgroupPath_PathOutsideCgroupNamespaceRoot) {
+  fs_.setFileContents("/proc/self/cgroup", "0::/../container_id2\n");
+  CgroupMount mount;
+  mount.mount_point = "/sys/fs/cgroup";
+  mount.root = "/";
+
+  auto cgroup_info = CgroupCpuUtil::TestUtil::constructCgroupPath(mount, fs_);
+  EXPECT_FALSE(cgroup_info.has_value());
+}
+
+// =============================================================================
+// Test: getCurrentCgroupInfo
+// =============================================================================
+
+// In the host cgroup namespace the cgroup2 mount point is the cgroup root, so the process's own
+// cgroup path has to be appended to it.
+TEST_F(CgroupCpuUtilTest, GetCurrentCgroupInfo_HostCgroupNamespace) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw,nosuid,nodev,noexec - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod.slice/container.scope\n");
+
+  auto cgroup_info = CgroupCpuUtil::getCurrentCgroupInfo(fs_);
+  ASSERT_TRUE(cgroup_info.has_value());
+  EXPECT_EQ(cgroup_info->full_path, "/sys/fs/cgroup/kubepods.slice/pod.slice/container.scope");
+  EXPECT_EQ(cgroup_info->version, "v2");
+}
+
+TEST_F(CgroupCpuUtilTest, GetCurrentCgroupInfo_NoCgroupMount) {
+  fs_.setFileContents("/proc/self/mountinfo", "20 22 0:19 / /proc rw - proc proc rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/kubepods.slice/pod.slice/container.scope\n");
+
+  EXPECT_FALSE(CgroupCpuUtil::getCurrentCgroupInfo(fs_).has_value());
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_V1DetectedLimit) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "56 22 0:40 / /sys/fs/cgroup/cpu rw - cgroup cgroup rw,cpu,cpuacct\n");
+  fs_.setFileContents("/proc/self/cgroup", "2:cpu,cpuacct:/mygroup\n");
+  fs_.setFileContents("/sys/fs/cgroup/cpu/mygroup/cpu.cfs_quota_us", "150000\n");
+  fs_.setFileContents("/sys/fs/cgroup/cpu/mygroup/cpu.cfs_period_us", "100000\n");
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  ASSERT_TRUE(limit.has_value());
+  EXPECT_EQ(limit.value(), 1U); // floor(150000/100000) = 1
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_ErrorDiagnosticLogsWarn) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/mygroup\n");
+  fs_.setFileContents("/sys/fs/cgroup/mygroup/cpu.max", "garbage\n"); // Not "quota period"
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  EXPECT_FALSE(limit.has_value());
+
+  EXPECT_LOG_CONTAINS("warn", "no cgroup CPU limit detected: malformed cgroup v2 cpu.max",
+                      { detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_NoMount) {
+  fs_.setFileContents("/proc/self/mountinfo", ""); // No cgroup mounts
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  EXPECT_FALSE(limit.has_value());
+
+  EXPECT_LOG_CONTAINS("debug", "no cgroup CPU limit detected: no cgroup filesystem mounts found",
+                      { detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_NoCgroupPath) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  // /proc/self/cgroup missing -> no valid cgroup path.
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  EXPECT_FALSE(limit.has_value());
+
+  EXPECT_LOG_CONTAINS("debug", "no cgroup CPU limit detected: no valid cgroup path found",
+                      { detector.logResult(); });
+}
+
+TEST_F(CgroupCpuUtilTest, DetectorImpl_FilesNotAccessible) {
+  fs_.setFileContents("/proc/self/mountinfo",
+                      "25 21 0:22 / /sys/fs/cgroup rw - cgroup2 cgroup2 rw\n");
+  fs_.setFileContents("/proc/self/cgroup", "0::/mygroup\n");
+  // cpu.max missing -> CPU files not accessible.
+
+  CgroupDetectorImpl detector;
+  auto limit = detector.getCpuLimit(fs_);
+  EXPECT_FALSE(limit.has_value());
+
+  EXPECT_LOG_CONTAINS("debug", "no cgroup CPU limit detected: cgroup CPU files not accessible",
+                      { detector.logResult(); });
 }
 
 } // namespace Envoy

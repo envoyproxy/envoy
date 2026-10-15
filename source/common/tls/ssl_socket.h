@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/network/connection.h"
@@ -21,7 +22,6 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -59,7 +59,7 @@ public:
   std::string protocol() const override;
   absl::string_view failureReason() const override;
   bool canFlushClose() override { return info_->state() == Ssl::SocketState::HandshakeComplete; }
-  void closeSocket(Network::ConnectionEvent close_type) override;
+  void closeSocket(Network::ConnectionEvent close_type, bool abort_reset) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
@@ -82,6 +82,8 @@ protected:
   SSL* rawSsl() const { return info_->ssl(); }
 
 private:
+  friend class SslSocketPeer;
+
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx,
             const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options);
   absl::Status initialize(InitialState state, Ssl::HandshakerFactoryCb handshaker_factory_cb,
@@ -89,7 +91,7 @@ private:
 
   struct ReadResult {
     uint64_t bytes_read_{0};
-    absl::optional<int> error_;
+    std::optional<int> error_;
   };
   ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
 
@@ -104,6 +106,8 @@ private:
   ContextImplSharedPtr ctx_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
+  std::optional<Api::IoError::IoErrorCode> detected_io_error_;
+  bool read_disabled_{false};
 
   SslHandshakerImplSharedPtr info_;
 };
@@ -114,7 +118,7 @@ public:
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
   std::string protocol() const override { return EMPTY_STRING; }
   bool canFlushClose() override { return true; }
-  void closeSocket(Network::ConnectionEvent) override {}
+  void closeSocket(Network::ConnectionEvent, bool) override {}
   Network::IoResult doRead(Buffer::Instance&) override {
     return {Network::PostIoAction::Close, 0, false};
   }

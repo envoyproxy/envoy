@@ -20,9 +20,9 @@ class ClusterScopeCmdRequest;
  * Enum defining the different response handler types for cluster scope commands
  */
 enum class ClusterScopeResponseHandlerType {
-  allresponses_mustbe_same,
-  aggregate_all_responses,
-  response_handler_none
+  allresponses_mustbe_same, // NOLINT(readability-identifier-naming)
+  aggregate_all_responses,  // NOLINT(readability-identifier-naming)
+  response_handler_none     // NOLINT(readability-identifier-naming)
 };
 
 /**
@@ -50,7 +50,7 @@ protected:
   std::vector<Common::Redis::RespValuePtr> pending_responses_;
 
   explicit BaseClusterScopeResponseHandler(uint32_t shard_count)
-      : num_pending_responses_(shard_count), error_count_(0) {
+      : num_pending_responses_(shard_count) {
     pending_responses_.reserve(shard_count);
   }
 
@@ -129,19 +129,6 @@ class ArrayAppendAggregateResponseHandler : public BaseAggregateResponseHandler 
 public:
   explicit ArrayAppendAggregateResponseHandler(uint32_t shard_count)
       : BaseAggregateResponseHandler(shard_count) {}
-
-private:
-  void processAggregatedResponses(ClusterScopeCmdRequest& request) override;
-};
-
-/**
- * Handler for HELLO command
- * Sends HELLO to all shards to verify cluster-wide protocol consistency.
- * and sanitizes the 'id' field in the response to null.
- */
-class HelloResponseHandler : public BaseAggregateResponseHandler {
-public:
-  explicit HelloResponseHandler(uint32_t shard_count) : BaseAggregateResponseHandler(shard_count) {}
 
 private:
   void processAggregatedResponses(ClusterScopeCmdRequest& request) override;

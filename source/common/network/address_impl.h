@@ -100,33 +100,33 @@ public:
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    */
   explicit Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface = nullptr,
-                        absl::optional<std::string> network_namespace = absl::nullopt);
+                        std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
    */
   explicit Ipv4Instance(const std::string& address, const SocketInterface* sock_interface = nullptr,
-                        absl::optional<std::string> network_namespace = absl::nullopt);
+                        std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4" as well as a port.
    */
   Ipv4Instance(const std::string& address, uint32_t port,
                const SocketInterface* sock_interface = nullptr,
-               absl::optional<std::string> network_namespace = absl::nullopt);
+               std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Construct from a port. The IPv4 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
   explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr,
-                        absl::optional<std::string> network_namespace = absl::nullopt);
+                        std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Copy and override the network namespace.
    */
   explicit Ipv4Instance(const Ipv4Instance& that,
-                        const absl::optional<std::string>& network_namespace);
+                        const std::optional<std::string>& network_namespace);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -138,9 +138,9 @@ public:
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
   absl::string_view addressType() const override { return "default"; }
-  absl::optional<std::string> networkNamespace() const override { return network_namespace_; }
+  std::optional<std::string> networkNamespace() const override { return network_namespace_; }
   InstanceConstSharedPtr withNetworkNamespace(absl::string_view network_namespace) const override {
-    absl::optional<std::string> namespace_override;
+    std::optional<std::string> namespace_override;
     if (!network_namespace.empty()) {
       namespace_override = network_namespace;
     }
@@ -174,7 +174,7 @@ private:
    */
   explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
                         const SocketInterface* sock_interface = nullptr,
-                        absl::optional<std::string> network_namespace = absl::nullopt);
+                        std::optional<std::string> network_namespace = std::nullopt);
 
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
@@ -218,7 +218,7 @@ private:
   void initHelper(const sockaddr_in* address);
 
   IpHelper ip_;
-  const absl::optional<std::string> network_namespace_;
+  const std::optional<std::string> network_namespace_;
   friend class InstanceFactory;
 };
 
@@ -232,33 +232,33 @@ public:
    */
   Ipv6Instance(const sockaddr_in6& address, bool v6only = true,
                const SocketInterface* sock_interface = nullptr,
-               absl::optional<std::string> network_namespace = absl::nullopt);
+               std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
    */
   explicit Ipv6Instance(const std::string& address, const SocketInterface* sock_interface = nullptr,
-                        absl::optional<std::string> network_namespace = absl::nullopt);
+                        std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5" as well as a port.
    */
   Ipv6Instance(const std::string& address, uint32_t port,
                const SocketInterface* sock_interface = nullptr, bool v6only = true,
-               absl::optional<std::string> network_namespace = absl::nullopt);
+               std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
   explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr,
-                        absl::optional<std::string> network_namespace = absl::nullopt);
+                        std::optional<std::string> network_namespace = std::nullopt);
 
   /**
    * Copy and override the network namespace.
    */
   explicit Ipv6Instance(const Ipv6Instance& that,
-                        const absl::optional<std::string>& network_namespace);
+                        const std::optional<std::string>& network_namespace);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -270,9 +270,9 @@ public:
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
   absl::string_view addressType() const override { return "default"; }
-  absl::optional<std::string> networkNamespace() const override { return network_namespace_; }
+  std::optional<std::string> networkNamespace() const override { return network_namespace_; }
   InstanceConstSharedPtr withNetworkNamespace(absl::string_view network_namespace) const override {
-    absl::optional<std::string> namespace_override;
+    std::optional<std::string> namespace_override;
     if (!network_namespace.empty()) {
       namespace_override = network_namespace;
     }
@@ -304,7 +304,7 @@ private:
    */
   Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
                const SocketInterface* sock_interface = nullptr,
-               absl::optional<std::string> network_namespace = absl::nullopt);
+               std::optional<std::string> network_namespace = std::nullopt);
 
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
@@ -368,7 +368,7 @@ private:
   void initHelper(const sockaddr_in6& address, bool v6only);
 
   IpHelper ip_;
-  const absl::optional<std::string> network_namespace_;
+  const std::optional<std::string> network_namespace_;
   friend class InstanceFactory;
 };
 
@@ -409,7 +409,7 @@ public:
     return sizeof(pipe_.address_);
   }
   absl::string_view addressType() const override { return "default"; }
-  absl::optional<std::string> networkNamespace() const override { return {}; }
+  std::optional<std::string> networkNamespace() const override { return {}; }
   InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override { return nullptr; }
 
 private:
@@ -459,7 +459,7 @@ public:
   const sockaddr* sockAddr() const override { return nullptr; }
   socklen_t sockAddrLen() const override { return 0; }
   absl::string_view addressType() const override { return "envoy_internal"; }
-  absl::optional<std::string> networkNamespace() const override { return {}; }
+  std::optional<std::string> networkNamespace() const override { return {}; }
   InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override { return nullptr; }
 
 private:

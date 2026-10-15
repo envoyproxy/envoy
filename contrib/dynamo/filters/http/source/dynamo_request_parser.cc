@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -127,17 +128,17 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
   return table;
 }
 
-absl::optional<std::string>
+std::optional<std::string>
 RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
   for (const std::string& operation : TRANSACT_ITEM_OPERATIONS) {
     Json::ObjectSharedPtr item =
         THROW_OR_RETURN_VALUE(transact_item.getObject(operation, true), Json::ObjectSharedPtr);
     std::string table_name = THROW_OR_RETURN_VALUE(item->getString("TableName", ""), std::string);
     if (!table_name.empty()) {
-      return absl::make_optional(table_name);
+      return std::make_optional(table_name);
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Object& json_data) {

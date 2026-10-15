@@ -500,16 +500,16 @@ public:
 
   int64_t traceId() const { return trace_id_; }
   int64_t spanId() const { return span_id_; }
-  absl::optional<int64_t> parentSpanId() const { return parent_span_id_; }
-  absl::optional<bool> sampled() const { return sampled_; }
-  absl::optional<ClientId> clientId() const { return client_id_; }
-  absl::optional<int64_t> flags() const { return flags_; }
+  std::optional<int64_t> parentSpanId() const { return parent_span_id_; }
+  std::optional<bool> sampled() const { return sampled_; }
+  std::optional<ClientId> clientId() const { return client_id_; }
+  std::optional<int64_t> flags() const { return flags_; }
   const RequestContextList& contexts() const { return contexts_; }
   RequestContextList* contexts() { return &contexts_; }
-  absl::optional<std::string> dest() { return dest_; }
+  std::optional<std::string> dest() { return dest_; }
   const DelegationList& delegations() const { return delegations_; }
   DelegationList* delegations() { return &delegations_; }
-  absl::optional<int64_t> traceIdHigh() const { return trace_id_high_; }
+  std::optional<int64_t> traceIdHigh() const { return trace_id_high_; }
 
 private:
   static constexpr int16_t TraceIdFieldId = 1;
@@ -541,14 +541,14 @@ private:
 
   int64_t trace_id_{0};
   int64_t span_id_{0};
-  absl::optional<int64_t> parent_span_id_;
-  absl::optional<bool> sampled_;
-  absl::optional<ClientId> client_id_;
-  absl::optional<int64_t> flags_;
+  std::optional<int64_t> parent_span_id_;
+  std::optional<bool> sampled_;
+  std::optional<ClientId> client_id_;
+  std::optional<int64_t> flags_;
   std::list<RequestContext> contexts_;
-  absl::optional<std::string> dest_;
+  std::optional<std::string> dest_;
   DelegationList delegations_;
-  absl::optional<int64_t> trace_id_high_;
+  std::optional<int64_t> trace_id_high_;
 };
 
 /**

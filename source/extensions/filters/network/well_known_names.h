@@ -67,6 +67,9 @@ public:
   const std::string NetworkMatchDelegate = "envoy.filters.network.match_delegate";
   // Reverse tunnel filter
   const std::string ReverseTunnel = "envoy.filters.network.reverse_tunnel";
+  // Reverse tunnel-specific drain-aware HTTP connection manager filter
+  const std::string ReverseTunnelDrainAwareHcm =
+      "envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager";
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;

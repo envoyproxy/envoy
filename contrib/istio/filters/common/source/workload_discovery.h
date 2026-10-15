@@ -20,13 +20,16 @@ struct WorkloadDiscoveryStats {
 class WorkloadMetadataProvider {
 public:
   virtual ~WorkloadMetadataProvider() = default;
-  virtual absl::optional<Istio::Common::WorkloadMetadataObject>
-  getMetadata(const Network::Address::InstanceConstSharedPtr& address) PURE;
+  // Returns the workload metadata for the given peer address, or nullptr if unknown.
+  virtual Istio::Common::WorkloadMetadataObjectConstSharedPtr
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  GetMetadata(const Network::Address::InstanceConstSharedPtr& address) PURE;
 };
 
 using WorkloadMetadataProviderSharedPtr = std::shared_ptr<WorkloadMetadataProvider>;
 
-WorkloadMetadataProviderSharedPtr getProvider(Server::Configuration::ServerFactoryContext& context);
+// NOLINTNEXTLINE(readability-identifier-naming)
+WorkloadMetadataProviderSharedPtr GetProvider(Server::Configuration::ServerFactoryContext& context);
 
 } // namespace WorkloadDiscovery
 } // namespace Common

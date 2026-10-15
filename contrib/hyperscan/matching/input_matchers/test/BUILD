@@ -12,10 +12,10 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//contrib/hyperscan/matching/input_matchers/source:config",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 
@@ -26,6 +26,7 @@ envoy_cc_test(
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
     ] + select({
         "//bazel:linux_x86_64": [
@@ -46,12 +47,8 @@ envoy_cc_benchmark_binary(
         "@benchmark",
         "@re2",
     ] + select({
-        "//bazel:linux_x86_64": [
-            "//contrib/hyperscan/matching/input_matchers/source:hyperscan",
-        ],
-        "//bazel:linux_aarch64": [
-            "//contrib/hyperscan/matching/input_matchers/source:vectorscan",
-        ],
+        "//bazel:linux_x86_64": ["//bazel/deps:hyperscan"],
+        "//bazel:linux_aarch64": ["//bazel/deps:vectorscan"],
     }),
 )
 

@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_authz is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <memory>
 
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
@@ -77,7 +80,7 @@ private:
 
   // Set by calling newGrpcClientImpl. Only one of response_ or failure_reason_ will be set.
   std::unique_ptr<envoy::service::auth::v3::CheckResponse> response_;
-  absl::optional<std::string> failure_reason_;
+  std::optional<std::string> failure_reason_;
   Filters::Common::ExtAuthz::GrpcClientImpl* grpc_client_;
 };
 

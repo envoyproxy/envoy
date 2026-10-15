@@ -32,9 +32,8 @@ class AdminResponse;
 // Requests can also be cancelled explicitly by calling cancel(). After
 // cancel() is called, no further callbacks will be called by the response.
 //
-// The lifecycle of an AdminResponse is rendered as a finite state machine
-// bubble diagram:
-// https://docs.google.com/drawings/d/1njUl1twApEMoxmjaG4b7optTh5fcb_YNcfSnkHbdfq0/view
+// Wee admin_response.md to see a finite-state diagram showing the lifecycle of
+// an AdminResponse.
 class AdminResponse : public std::enable_shared_from_this<AdminResponse> {
 public:
   // AdminResponse can outlive MainCommonBase. But AdminResponse needs a

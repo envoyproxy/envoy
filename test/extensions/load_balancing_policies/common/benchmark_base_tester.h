@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
@@ -12,7 +13,6 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "absl/types/optional.h"
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
@@ -49,20 +49,20 @@ public:
 class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+  std::optional<uint64_t> computeHashKey() override { return hash_key_; }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
 };
 
 class TestHashPolicy : public Http::HashPolicy {
 public:
-  absl::optional<uint64_t> generateHash(OptRef<const Http::RequestHeaderMap>,
-                                        OptRef<const StreamInfo::StreamInfo>,
-                                        AddCookieCallback) const override {
+  std::optional<uint64_t> generateHash(OptRef<const Http::RequestHeaderMap>,
+                                       OptRef<const StreamInfo::StreamInfo>,
+                                       AddCookieCallback) const override {
     return hash_key_;
   }
 
-  absl::optional<uint64_t> hash_key_;
+  std::optional<uint64_t> hash_key_;
 };
 
 inline void computeHitStats(::benchmark::State& state,

@@ -8,7 +8,10 @@
 #include "test/mocks/router/mocks.h"
 #include "test/test_common/wasm_base.h"
 
+#include "gmock/gmock.h"
+
 using testing::_;
+using testing::Contains;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
@@ -19,12 +22,14 @@ MATCHER_P(MapEq, rhs, "") {
   const Envoy::Protobuf::Struct& obj = arg;
   EXPECT_TRUE(rhs.size() > 0);
   for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
+    EXPECT_THAT(obj.fields(), Contains(IsStructString(entry.first, entry.second)));
   }
   return true;
 }
 
 using BufferFunction = std::function<void(::Envoy::Buffer::Instance&)>;
+
+#include "test/test_common/struct_matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -794,7 +799,7 @@ TEST_P(WasmHttpFilterTest, AccessLogDisabledForIncompleteStream) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
 
   StreamInfo::MockStreamInfo log_stream_info;
-  EXPECT_CALL(log_stream_info, requestComplete()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_CALL(log_stream_info, requestComplete()).WillRepeatedly(testing::Return(std::nullopt));
   filter().log({&request_headers}, log_stream_info);
   filter().onDestroy();
 }
@@ -1828,7 +1833,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   rootContext().onTick(0);
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
-  absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
+  std::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
   EXPECT_CALL(request_stream_info_, requestComplete()).WillRepeatedly(Return(dur));
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("duration is 15000000"))));
   if (std::get<1>(GetParam()) != "rust") {
@@ -1892,7 +1897,7 @@ TEST_P(WasmHttpFilterTest, Property) {
   EXPECT_CALL(encoder_callbacks_, connection())
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection}));
   std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(request_stream_info_, route()).WillRepeatedly(Return(route));
+  request_stream_info_.route_ = route;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host_description(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
@@ -1933,7 +1938,8 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
   EXPECT_CALL(request_stream_info_, requestComplete)
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
+  request_stream_info_.upstream_cluster_info_ = cluster;
+  EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).Times(testing::AnyNumber());
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
   filter().log({&request_headers}, request_stream_info_);
@@ -2043,10 +2049,9 @@ TEST_P(WasmHttpFilterTest, PanicOnRequestHeaders) {
 
   // In the case of VM failure, failStream is called for both request and response stream types,
   // so we need to make sure that we don't send the local reply twice.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
-                             testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::ServiceUnavailable, Eq(""), _,
+                                                 Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                                                 Eq("wasm_fail_stream")));
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
@@ -2066,10 +2071,9 @@ TEST_P(WasmHttpFilterTest, PanicOnRequestBody) {
   // In the case of VM failure, failStream is called for both request and response stream types,
   // so we need to make sure that we don't send the local reply twice.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&headers), true));
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
-                             testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::ServiceUnavailable, Eq(""), _,
+                                                 Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                                                 Eq("wasm_fail_stream")));
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
@@ -2088,10 +2092,9 @@ TEST_P(WasmHttpFilterTest, PanicOnRequestTrailers) {
 
   // In the case of VM failure, failStream is called for both request and response stream types,
   // so we need to make sure that we don't send the local reply twice.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
-                             testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::ServiceUnavailable, Eq(""), _,
+                                                 Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                                                 Eq("wasm_fail_stream")));
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
@@ -2108,10 +2111,9 @@ TEST_P(WasmHttpFilterTest, PanicOnResponseHeaders) {
 
   // In the case of VM failure, failStream is called for both request and response stream types,
   // so we need to make sure that we don't send the local reply twice.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
-                             testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::ServiceUnavailable, Eq(""), _,
+                                                 Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                                                 Eq("wasm_fail_stream")));
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
@@ -2129,10 +2131,9 @@ TEST_P(WasmHttpFilterTest, PanicOnResponseBody) {
 
   // In the case of VM failure, failStream is called for both request and response stream types,
   // so we need to make sure that we don't send the local reply twice.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
-                             testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::ServiceUnavailable, Eq(""), _,
+                                                 Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                                                 Eq("wasm_fail_stream")));
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
@@ -2149,10 +2150,9 @@ TEST_P(WasmHttpFilterTest, PanicOnResponseTrailers) {
 
   // In the case of VM failure, failStream is called for both request and response stream types,
   // so we need to make sure that we don't send the local reply twice.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
-                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
-                             testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::ServiceUnavailable, Eq(""), _,
+                                                 Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                                                 Eq("wasm_fail_stream")));
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.

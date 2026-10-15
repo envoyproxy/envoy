@@ -1,16 +1,23 @@
 #pragma once
 
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/protobuf/protobuf.h"
+
 #include "absl/container/flat_hash_set.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -82,7 +89,7 @@ public:
    * @param exception The exception that occurred, if any.
    */
   virtual void onResourceLoadFailed(const XdsSourceId& source_id, const std::string& resource_name,
-                                    const absl::optional<EnvoyException>& exception) PURE;
+                                    const std::optional<EnvoyException>& exception) PURE;
 };
 
 using XdsResourcesDelegatePtr = std::unique_ptr<XdsResourcesDelegate>;

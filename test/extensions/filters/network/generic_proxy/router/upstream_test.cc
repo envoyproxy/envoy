@@ -7,13 +7,15 @@
 #include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/route.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/test_common/registry.h"
+#include "test/mocks/network/connection.h"
+#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
+using testing::ByMove;
 using testing::NiceMock;
 using testing::Return;
 
@@ -72,7 +74,7 @@ public:
 
   MOCK_METHOD(void, onConnectionClose, (Network::ConnectionEvent event));
   MOCK_METHOD(void, onDecodingSuccess,
-              (ResponseHeaderFramePtr response_header_frame, absl::optional<StartTime> start_time));
+              (ResponseHeaderFramePtr response_header_frame, std::optional<StartTime> start_time));
   MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr response_common_frame));
   MOCK_METHOD(void, onDecodingFailure, (absl::string_view reason));
 
@@ -163,11 +165,11 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamWillNotBeReused) {
 }
 
 TEST_F(UpstreamTest, NoHealthyUpstream) {
-  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(std::nullopt));
   auto generic_upstream = createBoundGenericUpstream();
   EXPECT_EQ(nullptr, generic_upstream);
 
-  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(std::nullopt));
   auto owned_upstream = createOwnedGenericUpstream();
   EXPECT_EQ(nullptr, owned_upstream);
 }

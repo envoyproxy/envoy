@@ -14,12 +14,13 @@ MockSnapshot::MockSnapshot() {
   ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getDouble(_, _)).WillByDefault(ReturnArg<1>());
   ON_CALL(*this, getBoolean(_, _)).WillByDefault(ReturnArg<1>());
-  ON_CALL(*this, get(_)).WillByDefault(Return(absl::nullopt));
+  ON_CALL(*this, get(_)).WillByDefault(Return(std::nullopt));
 }
 
 MockSnapshot::~MockSnapshot() = default;
 
 MockLoader::MockLoader() {
+  ON_CALL(*this, onWorkerThreadsRegistered()).WillByDefault(Return(absl::OkStatus()));
   ON_CALL(*this, threadsafeSnapshot()).WillByDefault(Return(threadsafe_snapshot_));
   ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_));
   ON_CALL(*this, getRootScope()).WillByDefault(ReturnRef(*store_.rootScope()));

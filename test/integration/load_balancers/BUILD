@@ -21,7 +21,6 @@ envoy_cc_test_library(
         ":config_cc_proto",
         "//envoy/upstream:load_balancer_interface",
         "//source/common/upstream:load_balancer_factory_base_lib",
-        "//test/test_common:registry_lib",
     ],
 )
 

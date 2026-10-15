@@ -12,22 +12,22 @@ namespace Network {
 /**
  * Implementation of ConnectionProvider for HappyEyeballs. It provides client
  * connections to multiple addresses in an specific order complying to
- * HappyEyeballs.
+ * HappyEyeballs. The address list passed to the constructor must already be
+ * sorted with sortAddresses(); the host computes this once when its address
+ * list is created or refreshed rather than on every connection attempt.
  */
 class HappyEyeballsConnectionProvider : public ConnectionProvider,
                                         Logger::Loggable<Logger::Id::happy_eyeballs> {
 public:
   HappyEyeballsConnectionProvider(
       Event::Dispatcher& dispatcher,
-      const std::vector<Address::InstanceConstSharedPtr>& address_list,
+      const Upstream::HostDescription::SharedConstAddressVector& sorted_address_list,
       const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
           upstream_local_address_selector,
       UpstreamTransportSocketFactory& socket_factory,
       TransportSocketOptionsConstSharedPtr transport_socket_options,
       const Upstream::HostDescriptionConstSharedPtr& host,
-      const ConnectionSocket::OptionsSharedPtr options,
-      const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
-          happy_eyeballs_config);
+      const ConnectionSocket::OptionsSharedPtr options);
   bool hasNextConnection() override;
   ClientConnectionPtr createNextConnection(const uint64_t id) override;
   size_t nextConnection() override;
@@ -44,8 +44,8 @@ public:
 
 private:
   Event::Dispatcher& dispatcher_;
-  // List of addresses to attempt to connect to.
-  const std::vector<Address::InstanceConstSharedPtr> address_list_;
+  // List of addresses to attempt to connect to, pre-sorted with sortAddresses().
+  const Upstream::HostDescription::SharedConstAddressVector address_list_;
   const Upstream::UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
   UpstreamTransportSocketFactory& socket_factory_;
   TransportSocketOptionsConstSharedPtr transport_socket_options_;
@@ -69,28 +69,26 @@ private:
  * they are applied to each open connection and applied when creating new ones.
  *
  * See the Happy Eyeballs RFC at https://datatracker.ietf.org/doc/html/rfc6555
- * TODO(RyanTheOptimist): Implement the Happy Eyeballs address sorting algorithm
- * either in the class or in the resolution code.
+ * The address list must already be sorted with
+ * HappyEyeballsConnectionProvider::sortAddresses(), which the host does once
+ * when the address list is created or refreshed.
  */
 class HappyEyeballsConnectionImpl : public MultiConnectionBaseImpl,
                                     Logger::Loggable<Logger::Id::happy_eyeballs> {
 public:
   HappyEyeballsConnectionImpl(
       Event::Dispatcher& dispatcher,
-      const std::vector<Address::InstanceConstSharedPtr>& address_list,
+      const Upstream::HostDescription::SharedConstAddressVector& sorted_address_list,
       const std::shared_ptr<const Upstream::UpstreamLocalAddressSelector>&
           upstream_local_address_selector,
       UpstreamTransportSocketFactory& socket_factory,
       TransportSocketOptionsConstSharedPtr transport_socket_options,
       const Upstream::HostDescriptionConstSharedPtr& host,
-      const ConnectionSocket::OptionsSharedPtr options,
-      const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
-          happy_eyeballs_config)
-      : MultiConnectionBaseImpl(dispatcher,
-                                std::make_unique<Network::HappyEyeballsConnectionProvider>(
-                                    dispatcher, address_list, upstream_local_address_selector,
-                                    socket_factory, transport_socket_options, host, options,
-                                    happy_eyeballs_config)) {}
+      const ConnectionSocket::OptionsSharedPtr options)
+      : MultiConnectionBaseImpl(
+            dispatcher, std::make_unique<Network::HappyEyeballsConnectionProvider>(
+                            dispatcher, sorted_address_list, upstream_local_address_selector,
+                            socket_factory, transport_socket_options, host, options)) {}
 };
 
 } // namespace Network

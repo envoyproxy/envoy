@@ -4,6 +4,7 @@
 #include <set>
 
 #include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
@@ -19,6 +20,7 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/listener_manager/filter_chain_factory_context_callback.h"
@@ -28,14 +30,14 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/listener_manager_factory.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Server {
 
 namespace Configuration {
 using TransportSocketFactoryContextImpl = Server::GenericFactoryContextImpl;
 }
-
-class ListenerFilterChainFactoryBuilder;
 
 /**
  * Prod implementation of ListenerComponentFactory that creates real sockets and attempts to fetch
@@ -45,7 +47,13 @@ class ListenerFilterChainFactoryBuilder;
 class ProdListenerComponentFactory : public ListenerComponentFactory,
                                      Logger::Loggable<Logger::Id::config> {
 public:
-  ProdListenerComponentFactory(Instance& server) : server_(server) {}
+  ProdListenerComponentFactory(Instance& server)
+      : server_(server), network_config_provider_manager_(
+                             std::make_shared<Filter::NetworkFilterConfigProviderManagerImpl>()),
+        tcp_listener_config_provider_manager_(
+            std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()),
+        quic_listener_config_provider_manager_(
+            std::make_shared<Filter::QuicListenerFilterConfigProviderManagerImpl>()) {}
   /**
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
@@ -86,21 +94,21 @@ public:
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                          const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(
-        lds_config, lds_resources_locator, server_.xdsManager(), server_.clusterManager(),
-        server_.initManager(), *server_.stats().rootScope(), server_.listenerManager(),
+        lds_config, lds_resources_locator, server_.clusterManager(), server_.initManager(),
+        *server_.stats().rootScope(), server_.listenerManager(),
         server_.messageValidationContext().dynamicValidationVisitor());
   }
   absl::StatusOr<Filter::NetworkFilterFactoriesList> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
     return createNetworkFilterFactoryListImpl(filters, filter_chain_factory_context,
-                                              network_config_provider_manager_);
+                                              *network_config_provider_manager_);
   }
   absl::StatusOr<Filter::ListenerFilterFactoriesList> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryListImpl(filters, context,
-                                               tcp_listener_config_provider_manager_);
+                                               *tcp_listener_config_provider_manager_);
   }
   absl::StatusOr<std::vector<Network::UdpListenerFilterFactoryCb>>
   createUdpListenerFilterFactoryList(
@@ -112,7 +120,7 @@ public:
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return createQuicListenerFilterFactoryListImpl(filters, context,
-                                                   quic_listener_config_provider_manager_);
+                                                   *quic_listener_config_provider_manager_);
   }
   absl::StatusOr<Network::SocketSharedPtr> createListenSocket(
       Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
@@ -124,21 +132,33 @@ public:
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
   Filter::TcpListenerFilterConfigProviderManagerImpl*
   getTcpListenerConfigProviderManager() override {
-    return &tcp_listener_config_provider_manager_;
+    return tcp_listener_config_provider_manager_.get();
   }
 
 protected:
-  absl::StatusOr<Network::SocketSharedPtr> createListenSocketInternal(
-      Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-      const Network::SocketCreationOptions& creation_options, uint32_t worker_index);
+  // Creates the listen socket in the current network namespace. With `try_parent_socket` the hot
+  // restart parent is first asked for an existing socket for the address.
+  absl::StatusOr<Network::SocketSharedPtr>
+  createListenSocketInternal(Network::Address::InstanceConstSharedPtr address,
+                             Network::Socket::Type socket_type,
+                             const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+                             const Network::SocketCreationOptions& creation_options,
+                             uint32_t worker_index, bool try_parent_socket);
 
 private:
+  // Requests the listen socket for an IP `address` from the hot restart parent. Returns nullptr
+  // when the parent has no socket to hand over.
+  Network::SocketSharedPtr duplicateParentListenSocket(
+      const Network::Address::InstanceConstSharedPtr& address, Network::Socket::Type socket_type,
+      const Network::Socket::OptionsSharedPtr& options, uint32_t worker_index);
+
   Instance& server_;
   uint64_t next_listener_tag_{1};
-  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
-  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
-  Filter::QuicListenerFilterConfigProviderManagerImpl quic_listener_config_provider_manager_;
+  std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
+  std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::QuicListenerFilterConfigProviderManagerImpl>
+      quic_listener_config_provider_manager_;
 };
 
 class ListenerImpl;
@@ -159,7 +179,8 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
   GAUGE(total_listeners_warming, NeverImport)                                                      \
-  GAUGE(workers_started, NeverImport)
+  GAUGE(workers_started, NeverImport)                                                              \
+  GAUGE(workers_pinned, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h
@@ -175,11 +196,16 @@ class DrainingFilterChainsManager {
 public:
   DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
                               uint64_t workers_pending_removal);
-  uint64_t getDrainingListenerTag() const { return draining_listener_->listenerTag(); }
+  DrainingFilterChainsManager(
+      std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains,
+      uint64_t listener_tag, uint64_t workers_pending_removal);
+  uint64_t getDrainingListenerTag() const { return listener_tag_; }
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
   }
-  ListenerImpl& getDrainingListener() const { return *draining_listener_; }
+  OptRef<ListenerImpl> getDrainingListener() const {
+    return makeOptRefFromPtr(draining_listener_.get());
+  }
   uint64_t decWorkersPendingRemoval() { return --workers_pending_removal_; }
 
   // Schedule listener destroy.
@@ -192,6 +218,7 @@ public:
     drain_timer_->enableTimer(drain_time);
   }
 
+  // Used by the in-place LDS update.
   void addFilterChainToDrain(const Network::FilterChain& filter_chain) {
     draining_filter_chains_.push_back(&filter_chain);
   }
@@ -200,7 +227,11 @@ public:
 
 private:
   ListenerImplPtr draining_listener_;
+  const uint64_t listener_tag_;
   std::list<const Network::FilterChain*> draining_filter_chains_;
+
+  // Used by the FCDS to extend the lifetime, assumes draining_listener_ to be nullptr.
+  const std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chain_shared_ptrs_;
 
   uint64_t workers_pending_removal_;
   Event::TimerPtr drain_timer_;
@@ -235,19 +266,43 @@ public:
   absl::Status startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) override;
   void stopListeners(StopListenersType stop_listeners_type,
                      const Network::ExtraShutdownListenerOptions& options) override;
+  void onServerDrainStart(Network::DrainDirection direction,
+                          Network::ConnectionDrainEvent drain_event) override;
   void stopWorkers() override;
   void beginListenerUpdate() override { lds_error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
   bool isWorkerStarted() override { return workers_started_; }
   Http::Context& httpContext() { return server_.httpContext(); }
+  using ListenerManager::apiListener;
   ApiListenerOptRef apiListener() override;
+  ListenerUpdateCallbacksHandlePtr
+  addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override;
+  void
+  drainFilterChains(ListenerImpl& listener,
+                    std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains);
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+
+  // Returns the per-worker CPU assignment used to pin worker threads, mapping worker i to entry i.
+  // The result is computed once and cached. It is empty when worker CPU affinity is disabled or the
+  // worker count exceeds the available CPUs, in which case no worker is pinned.
+  absl::Span<const uint32_t> workerCpus();
+
+  // Returns true when reuse port BPF CPU steering can be used, that is every worker is pinned to a
+  // CPU and the kernel supports the steering program. The result is computed once and cached.
+  bool reusePortBpfCpuSteeringSupported();
 
   Instance& server_;
   std::unique_ptr<ListenerComponentFactory> factory_;
 
 private:
+  struct ListenerUpdateCallbacksHandleImpl : public ListenerUpdateCallbacksHandle,
+                                             RaiiListElement<ListenerUpdateCallbacks*> {
+    ListenerUpdateCallbacksHandleImpl(ListenerUpdateCallbacks& cb,
+                                      std::list<ListenerUpdateCallbacks*>& parent)
+        : RaiiListElement<ListenerUpdateCallbacks*>(parent, &cb) {}
+  };
+
   using ListenerList = std::list<ListenerImplPtr>;
   /**
    * Callback invoked when a listener initialization is completed on worker.
@@ -269,7 +324,7 @@ private:
   };
 
   bool doFinalPreWorkerListenerInit(ListenerImpl& listener);
-  void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overridden_listener,
+  void addListenerToWorker(Worker& worker, std::optional<uint64_t> overridden_listener,
                            ListenerImpl& listener, ListenerCompletionCallback completion_callback);
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
@@ -314,6 +369,8 @@ private:
    */
   void drainFilterChains(ListenerImplPtr&& draining_listener, ListenerImpl& new_listener);
 
+  void drainGroup(std::list<DrainingFilterChainsManager>::iterator draining_group);
+
   /**
    * Stop a listener. The listener will stop accepting new connections and its socket will be
    * closed.
@@ -333,6 +390,11 @@ private:
    * @param name supplies the name to search for.
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
+
+  template <typename F> void notifyListenerCallbacks(F notify_fn);
+  void notifyListenerUpdateCallbacks(absl::string_view listener_name,
+                                     Network::ListenerConfig& listener_config);
+  void notifyListenerRemovalCallbacks(const std::string& listener_name);
 
   absl::Status setNewOrDrainingSocketFactory(const std::string& name, ListenerImpl& listener);
   absl::Status createListenSocketFactory(ListenerImpl& listener);
@@ -356,8 +418,14 @@ private:
   std::list<DrainingFilterChainsManager> draining_filter_chains_manager_;
 
   std::vector<WorkerPtr> workers_;
+  // The per-worker CPU assignment, lazily computed and cached by workerCpus(). worker_cpus_[i] is
+  // the CPU that worker i is pinned to; the vector is empty when no worker is pinned.
+  std::optional<std::vector<uint32_t>> worker_cpus_;
+  // Whether reuse port BPF CPU steering is usable, lazily computed and cached by
+  // reusePortBpfCpuSteeringSupported().
+  std::optional<bool> reuse_port_bpf_cpu_steering_supported_;
   bool workers_started_{};
-  absl::optional<StopListenersType> stop_listeners_type_;
+  std::optional<StopListenersType> stop_listeners_type_;
   Stats::ScopeSharedPtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr listeners_config_tracker_entry_;
@@ -368,36 +436,17 @@ private:
   FailureStates overall_error_state_;
   Quic::QuicStatNames& quic_stat_names_;
   absl::flat_hash_set<uint64_t> stopped_listener_tags_;
-};
-
-class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-public:
-  ListenerFilterChainFactoryBuilder(
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
-
-  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
-  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
-                   FilterChainFactoryContextCreator& context_creator,
-                   bool added_via_api) const override;
-
-private:
-  absl::StatusOr<Network::DrainableFilterChainSharedPtr> buildFilterChainInternal(
-      const envoy::config::listener::v3::FilterChain& filter_chain,
-      Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
-      bool added_via_api) const;
-
-  ListenerImpl& listener_;
-  ProtobufMessage::ValidationVisitor& validator_;
-  ListenerComponentFactory& listener_component_factory_;
-  Configuration::TransportSocketFactoryContextImpl& factory_context_;
+  std::list<ListenerUpdateCallbacks*> update_callbacks_;
 };
 
 class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {
 public:
   std::unique_ptr<ListenerManager>
-  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
+  createListenerManager(const Protobuf::Message& config, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                         Quic::QuicStatNames& quic_stat_names) override {
+    (void)config;
     return std::make_unique<ListenerManagerImpl>(server, std::move(factory), worker_factory,
                                                  enable_dispatcher_stats, quic_stat_names);
   }
@@ -405,7 +454,7 @@ public:
     return Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::listener::v3::ListenerManager>();
+    return std::make_unique<envoy::config::bootstrap::v3::ListenerManager>();
   }
 };
 

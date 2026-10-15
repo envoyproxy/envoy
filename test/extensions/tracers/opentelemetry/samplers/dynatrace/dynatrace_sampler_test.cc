@@ -81,7 +81,7 @@ TEST_F(DynatraceSamplerTest, TestGetDescription) {
 // Verify sampler being invoked with an invalid/empty span context
 TEST_F(DynatraceSamplerTest, TestWithoutParentContext) {
   auto sampling_result =
-      sampler_->shouldSample(stream_info_, absl::nullopt, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, std::nullopt, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes->size(), 2);

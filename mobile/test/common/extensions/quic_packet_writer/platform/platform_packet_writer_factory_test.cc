@@ -59,7 +59,7 @@ public:
   void TearDown() override { injector_.reset(); }
 
   void writePacketAndVerifyResult(quic::WriteStatus expected_status,
-                                  absl::optional<int> expected_error_code = std::nullopt) {
+                                  std::optional<int> expected_error_code = std::nullopt) {
     auto result = packet_writer_->WritePacket(packet_data_.data(), packet_data_.length(), self_ip_,
                                               peer_addr_, nullptr, {});
     EXPECT_EQ(expected_status, result.status);

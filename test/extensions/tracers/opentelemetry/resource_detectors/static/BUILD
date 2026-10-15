@@ -15,12 +15,12 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.static_config"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/resource_detectors/static:config",
         "//source/extensions/tracers/opentelemetry/resource_detectors/static:static_config_resource_detector_lib",
-        "//test/mocks/server:tracer_factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg_cc_proto",
     ],
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     name = "static_config_resource_detector_test",
     srcs = ["static_config_resource_detector_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.static_config"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/opentelemetry/resource_detectors/static:static_config_resource_detector_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -45,7 +45,7 @@ envoy_extension_cc_test(
         "static_config_resource_detector_integration_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.static_config"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry/resource_detectors/static:config",

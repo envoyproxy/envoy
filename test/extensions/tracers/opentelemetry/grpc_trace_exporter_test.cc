@@ -5,6 +5,7 @@
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 
 #include "test/mocks/grpc/mocks.h"
+#include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
 

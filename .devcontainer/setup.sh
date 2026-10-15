@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-echo "build --config=clang" >> user.bazelrc
-
 # Ideally we want this line so bazel doesn't pollute things outside of the devcontainer, but some of
 # API tooling (proto_sync) depends on symlink like bazel-bin.
 # TODO(lizan): Fix API tooling and enable this again

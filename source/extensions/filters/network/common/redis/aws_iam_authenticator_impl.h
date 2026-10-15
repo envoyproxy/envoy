@@ -71,7 +71,7 @@ using AwsIamAuthenticatorSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
 // Factory class for AWS Authenticator
 class AwsIamAuthenticatorFactory : public Logger::Loggable<Logger::Id::aws> {
 public:
-  static absl::optional<AwsIamAuthenticatorSharedPtr> initAwsIamAuthenticator(
+  static std::optional<AwsIamAuthenticatorSharedPtr> initAwsIamAuthenticator(
       Server::Configuration::ServerFactoryContext& context,
       envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config);
 };

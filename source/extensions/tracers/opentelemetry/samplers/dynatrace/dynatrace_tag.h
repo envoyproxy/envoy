@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -10,7 +11,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,11 +31,11 @@ class DynatraceTag {
   static constexpr uint64_t CHECKSUM_SEED = 3782874213;
 
 public:
-  static DynatraceTag createInvalid() { return {false, false, 0, 0, absl::nullopt}; }
+  static DynatraceTag createInvalid() { return {false, false, 0, 0, std::nullopt}; }
 
   // Creates a tag using the given values.
   static DynatraceTag create(bool ignored, uint32_t sampling_exponent, uint32_t path_info,
-                             absl::optional<TraceCaptureReason> tcr_extension = absl::nullopt) {
+                             std::optional<TraceCaptureReason> tcr_extension = std::nullopt) {
     return {true, ignored, sampling_exponent, path_info, tcr_extension};
   }
 
@@ -59,7 +59,7 @@ public:
     }
 
     // Parse optional payload for trace capture reason (id 8h)
-    absl::optional<TraceCaptureReason> tcr_extension = absl::nullopt;
+    std::optional<TraceCaptureReason> tcr_extension = std::nullopt;
 
     if (tracestate_components.size() > 8) {
       // Extensions start at index 8
@@ -106,11 +106,11 @@ public:
   uint32_t getSamplingExponent() const { return sampling_exponent_; };
 
   // Returns the trace capture reason extension if present.
-  const absl::optional<TraceCaptureReason>& getTcrExtension() const { return tcr_extension_; }
+  const std::optional<TraceCaptureReason>& getTcrExtension() const { return tcr_extension_; }
 
 private:
   DynatraceTag(bool valid, bool ignored, uint32_t sampling_exponent, uint32_t path_info,
-               absl::optional<TraceCaptureReason> tcr_extension)
+               std::optional<TraceCaptureReason> tcr_extension)
       : valid_(valid), ignored_(ignored), sampling_exponent_(sampling_exponent),
         path_info_(path_info), tcr_extension_(std::move(tcr_extension)) {}
 
@@ -118,7 +118,7 @@ private:
   const bool ignored_;
   const uint32_t sampling_exponent_;
   const uint32_t path_info_;
-  const absl::optional<TraceCaptureReason> tcr_extension_;
+  const std::optional<TraceCaptureReason> tcr_extension_;
 };
 
 } // namespace OpenTelemetry

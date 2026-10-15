@@ -11,7 +11,7 @@ namespace Envoy {
 namespace StreamInfo {
 
 struct ExtraStreamInfo : public FilterState::Object {
-  absl::optional<envoy_netconf_t> configuration_key_{};
+  std::optional<envoy_netconf_t> configuration_key_{};
   static const std::string& key();
 };
 

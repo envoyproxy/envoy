@@ -9,6 +9,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 
+#include "source/common/common/base_logger.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 
@@ -55,7 +56,13 @@ public:
     parent_shutdown_time_ = parent_shutdown_time;
   }
   void setDrainStrategy(Server::DrainStrategy drain_strategy) { drain_strategy_ = drain_strategy; }
-  void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
+  [[deprecated("Use setLogLevel(Logger::Levels)")]] void
+  setLogLevel(spdlog::level::level_enum log_level) {
+    log_level_ = log_level;
+  }
+  void setLogLevel(Logger::Levels log_level) {
+    log_level_ = static_cast<spdlog::level::level_enum>(log_level);
+  }
   absl::Status setLogLevel(absl::string_view log_level);
   void setLogFormat(const std::string& log_format) {
     log_format_ = log_format;
@@ -97,6 +104,7 @@ public:
   void setSkipDeprecatedLog(bool skip_deprecated_logs) {
     skip_deprecated_logs_ = skip_deprecated_logs;
   }
+  void setLogStacktraceSingleEntry(bool val) { log_stacktrace_single_entry_ = val; }
 
   void setSocketPath(const std::string& socket_path) { socket_path_ = socket_path; }
 
@@ -120,6 +128,7 @@ public:
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
   bool ignoreUnknownDynamicFields() const override { return ignore_unknown_dynamic_fields_; }
   bool skipDeprecatedLogs() const override { return skip_deprecated_logs_; }
+  bool logStacktraceSingleEntry() const override { return log_stacktrace_single_entry_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -194,6 +203,7 @@ private:
   bool reject_unknown_dynamic_fields_{false};
   bool ignore_unknown_dynamic_fields_{false};
   bool skip_deprecated_logs_{false};
+  bool log_stacktrace_single_entry_{false};
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_{Network::Address::IpVersion::v4};
   spdlog::level::level_enum log_level_{spdlog::level::info};

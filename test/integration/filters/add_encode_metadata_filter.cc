@@ -11,6 +11,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -34,8 +35,10 @@ public:
 };
 
 constexpr char AddEncodeMetadataFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<AddEncodeMetadataFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<AddEncodeMetadataFilter,
+                             test::integration::filters::AddMetadataEncodeHeadersFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

@@ -9,7 +9,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "spdlog/spdlog.h"
 
@@ -38,23 +37,21 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       trust_chain_verification_(config.trust_chain_verification()),
       custom_validator_config_(
           config.has_custom_validator_config()
-              ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+              ? std::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
                     config.custom_validator_config())
-              : absl::nullopt),
+              : std::nullopt),
       api_(api), only_verify_leaf_cert_crl_(config.only_verify_leaf_cert_crl()),
       max_verify_depth_(config.has_max_verify_depth()
-                            ? absl::optional<uint32_t>(config.max_verify_depth().value())
-                            : absl::nullopt),
-      auto_sni_san_match_(auto_sni_san_match) {}
+                            ? std::optional<uint32_t>(config.max_verify_depth().value())
+                            : std::nullopt),
+      auto_sni_san_match_(auto_sni_san_match),
+      suppress_client_ca_list_(config.suppress_client_ca_list()) {}
 
 absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
 CertificateValidationContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
     bool auto_sni_san_match, Api::Api& api, const std::string& name) {
-  bool allow_empty_trusted_ca = !context.has_trusted_ca();
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_empty_trusted_ca_file")) {
-    allow_empty_trusted_ca = true;
-  }
+  const bool allow_empty_trusted_ca = !context.has_trusted_ca();
   auto ca_or_error = Config::DataSource::read(context.trusted_ca(), allow_empty_trusted_ca, api);
   RETURN_IF_NOT_OK_REF(ca_or_error.status());
   auto list_or_error = Config::DataSource::read(context.crl(), true, api);
@@ -70,7 +67,7 @@ CertificateValidationContextConfigImpl::create(
 }
 
 absl::Status CertificateValidationContextConfigImpl::initialize() {
-  if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
+  if (ca_cert_.empty() && custom_validator_config_ == std::nullopt) {
     if (!certificate_revocation_list_.empty()) {
       return absl::InvalidArgumentError(fmt::format("Failed to load CRL from {} without trusted CA",
                                                     certificateRevocationListPath()));

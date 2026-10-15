@@ -8,6 +8,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -21,6 +22,8 @@ public:
       cb->addUpstreamCallbacks(*this);
     }
   }
+
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr&) override {}
 
   void onUpstreamConnectionEstablished() override {
     if (latched_end_stream_.has_value()) {
@@ -58,7 +61,7 @@ public:
       header_local_reply_skipped_ = true;
       return Http::FilterHeadersStatus::Continue;
     }
-    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, std::nullopt,
                                        "");
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -66,8 +69,8 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
     ASSERT(header_local_reply_skipped_);
     if (local_reply_during_data_) {
-      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr,
-                                         absl::nullopt, "");
+      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, std::nullopt,
+                                         "");
     }
     return Http::FilterDataStatus::Continue;
   }
@@ -79,17 +82,21 @@ public:
 
 private:
   Http::RequestHeaderMap* request_headers_{};
-  absl::optional<bool> latched_end_stream_;
+  std::optional<bool> latched_end_stream_;
   bool header_local_reply_skipped_ = false;
   bool local_reply_during_data_ = false;
 };
 
 constexpr char LocalReplyDuringDecode::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringDecode>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<LocalReplyDuringDecode,
+                             test::integration::filters::LocalReplyDuringDecodeConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringDecode>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<LocalReplyDuringDecode,
+                             test::integration::filters::LocalReplyDuringDecodeConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 
 } // namespace Envoy

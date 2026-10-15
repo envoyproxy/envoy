@@ -10,6 +10,10 @@ fields:
             max_heap_size_bytes: 1073741824
         actions:
         - name: "envoy.overload_actions.shrink_heap"
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.overload.v3.ShrinkHeapConfig
+            timer_interval: 10s
+            max_unfreed_memory_bytes: 104857600
           triggers:
           - name: "envoy.resource_monitors.fixed_heap"
             threshold:

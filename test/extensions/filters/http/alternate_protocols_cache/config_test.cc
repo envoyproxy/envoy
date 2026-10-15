@@ -31,13 +31,28 @@ TEST(AlternateProtocolsCacheFilterConfigTest, AlternateProtocolsCacheFilterWithS
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AlternateProtocolsCacheFilterFactory factory;
   envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(filter_callback, dispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
   EXPECT_CALL(filter_callback, addStreamEncoderFilter(_));
   cb(filter_callback);
+}
+
+// This test is only for coverage of the deprecated feature check.
+TEST(AlternateProtocolsCacheFilterConfigTest,
+     DEPRECATED_FEATURE_TEST(AlternateProtocolsCacheFilterLogging)) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AlternateProtocolsCacheFilterFactory factory;
+  envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
+  proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
+  EXPECT_LOG_CONTAINS("warn",
+                      "Using deprecated and ignored alternate_protocols_cache_options in "
+                      "alternate_protocols_cache config.",
+                      (void)factory.createFilterFactoryFromProto(proto_config, "stats", context));
 }
 
 } // namespace

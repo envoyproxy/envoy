@@ -5,6 +5,7 @@
 #include <csignal>
 
 #include "source/common/common/assert.h"
+#include "source/common/coroutine/backtrace.h"
 #include "source/common/signal/fatal_action.h"
 #include "source/common/version/version.h"
 
@@ -22,6 +23,9 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
     tracer.capture();
   }
   tracer.logTrace();
+
+  Coroutine::Backtrace co_backtrace;
+  co_backtrace.logTrace();
 
   // Finally after logging the stack trace, call the crash handlers
   // in order from safe to unsafe.

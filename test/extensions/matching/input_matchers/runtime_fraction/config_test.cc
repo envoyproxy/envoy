@@ -1,6 +1,6 @@
 #include "source/extensions/matching/input_matchers/runtime_fraction/config.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gtest/gtest.h"
 

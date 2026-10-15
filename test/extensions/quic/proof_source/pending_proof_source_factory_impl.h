@@ -5,6 +5,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 
+#include "test/extensions/quic/proof_source/pending_proof_source.pb.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -12,8 +14,7 @@ namespace Quic {
 class PendingProofSourceFactoryImpl : public EnvoyQuicProofSourceFactoryInterface {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
+    return std::make_unique<test::extensions::quic::proof_source::PendingProofSourceConfig>();
   }
 
   std::string name() const override { return "envoy.quic.proof_source.pending_signing"; }

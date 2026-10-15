@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_fuzz_base.h"

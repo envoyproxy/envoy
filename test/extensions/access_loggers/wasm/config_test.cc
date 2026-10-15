@@ -110,7 +110,8 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
       code);
   // Test Any configuration.
   Protobuf::Struct some_proto;
-  config.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(some_proto);
+  std::ignore =
+      config.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(some_proto);
 
   AccessLog::FilterPtr filter;
 
@@ -191,8 +192,8 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   }
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/access_loggers/wasm/test_data/test_cpp.wasm"));
-  const std::string sha256 = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string sha256 =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(code));
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:

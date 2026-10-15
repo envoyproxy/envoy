@@ -1,0 +1,152 @@
+goo.gle/debugproto
+config {
+  name: "foo"
+  virtual_hosts {
+    name: "bar"
+    domains: "*"
+    routes {
+      match {
+        safe_regex {
+          regex: "/rege[xy]"
+        }
+      }
+      route {
+        cluster: "ww2"
+      }
+    }
+    routes {
+      match {
+        path: "/exact-path"
+      }
+      route {
+        cluster: "ww2"
+      }
+    }
+    routes {
+      match {
+        path_separated_prefix: "/path/separated"
+      }
+      route {
+        cluster: "ww2"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+      metadata {
+        filter_metadata {
+          key: "baz"
+          value {
+            fields {
+              key: "name"
+              value {
+                string_value: "bluh"
+              }
+            }
+          }
+        }
+        filter_metadata {
+          key: "com.bar.foo"
+          value {
+            fields {
+              key: "baz"
+              value {
+                string_value: "test_value"
+              }
+            }
+          }
+        }
+      }
+    }
+    metadata {
+      filter_metadata {
+        key: "baz"
+        value {
+          fields {
+            key: "name"
+            value {
+              string_value: "vh_bluh"
+            }
+          }
+        }
+      }
+      filter_metadata {
+        key: "com.bar.foo"
+        value {
+          fields {
+            key: "baz"
+            value {
+              string_value: "test_vh_value"
+            }
+          }
+        }
+      }
+    }
+  }
+  metadata {
+    filter_metadata {
+      key: "baz"
+      value {
+        fields {
+          key: "name"
+          value {
+            string_value: "config_bluh"
+          }
+        }
+      }
+    }
+    filter_metadata {
+      key: "com.bar.foo"
+      value {
+        fields {
+          key: "baz"
+          value {
+            string_value: "test_config_value"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.foo.com"
+  }
+  headers {
+    key: ":path"
+    value: "/regex"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

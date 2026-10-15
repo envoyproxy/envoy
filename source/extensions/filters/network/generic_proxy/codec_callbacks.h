@@ -43,7 +43,7 @@ public:
    * NOTE: This method will be called only once for the whole request.
    */
   virtual void onDecodingSuccess(RequestHeaderFramePtr header_frame,
-                                 absl::optional<StartTime> start_time = {}) PURE;
+                                 std::optional<StartTime> start_time = {}) PURE;
 
   /**
    * If request decoding success and additional frames are received for the request then
@@ -102,7 +102,7 @@ public:
    * NOTE: This method will be called only once for the whole response.
    */
   virtual void onDecodingSuccess(ResponseHeaderFramePtr header_frame,
-                                 absl::optional<StartTime> start_time = {}) PURE;
+                                 std::optional<StartTime> start_time = {}) PURE;
 
   /**
    * If response decoding success and additional frames are received for the response then

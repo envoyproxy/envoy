@@ -19,7 +19,7 @@ MAX_RETRIES = 10
 BACKOFF_BASE = 10
 
 
-class NvdDownloaderException(Exception):
+class NvdDownloaderError(Exception):
     pass
 
 
@@ -44,6 +44,8 @@ class NvdDownloader(runner.Runner):
 
     @property
     def end_date(self):
+        if self.args.end.month == 12:
+            return datetime(self.args.end.year + 1, 1, 1)
         return datetime(self.args.end.year, self.args.end.month + 1, 1)
 
     @property
@@ -140,7 +142,7 @@ class NvdDownloader(runner.Runner):
                     continue
                 # Compute the last day of the current month
                 last_day = monthrange(current.year, current.month)[1]
-                chunk_end = datetime(current.year, current.month, last_day)
+                chunk_end = datetime(current.year, current.month, last_day, 23, 59, 59)
 
                 # Make sure we don't go past the overall end_date
                 if chunk_end > end_date:
@@ -156,7 +158,7 @@ class NvdDownloader(runner.Runner):
                     current = datetime(current.year, current.month + 1, 1)
 
     @runner.cleansup
-    @runner.catches(NvdDownloaderException)
+    @runner.catches(NvdDownloaderError)
     async def run(self):
         tempdir = pathlib.Path(self.tempdir.name)
         months = {}
@@ -182,8 +184,8 @@ class NvdDownloader(runner.Runner):
             output_file = self.output_path / f"{month}.json"
             if output_file.exists():
                 if not self.overwrite:
-                    raise NvdDownloaderException(
-                        f"File {output_file} exists and overwrite was not specfied")
+                    raise NvdDownloaderError(
+                        f"File {output_file} exists and overwrite was not specified")
                 output_file.unlink()
 
             with output_file.open("a", encoding="utf-8") as outfile:

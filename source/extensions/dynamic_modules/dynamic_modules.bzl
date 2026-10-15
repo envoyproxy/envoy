@@ -29,31 +29,51 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
     # Generate the --redefine-syms file by extracting all envoy_dynamic_module_on_*
     # hook names from abi.h. Each output line has the form "old_name new_name" as
     # required by llvm-objcopy --redefine-syms.
+    #
+    # On macOS (Mach-O), C symbols are prefixed with "_" in the symbol table, so the
+    # redefine-syms entries must also use the "_" prefix for matching to work.
     native.genrule(
         name = redefine_syms_name,
-        srcs = ["//source/extensions/dynamic_modules/abi:abi.h"],
+        srcs = ["@envoy//source/extensions/dynamic_modules/abi:abi.h"],
         outs = [name + "_redefine_syms.txt"],
-        cmd = (
-            "grep -Eo 'envoy_dynamic_module_on_[a-z_]+' " +
-            "$(location //source/extensions/dynamic_modules/abi:abi.h) | " +
-            "sort -u | " +
-            "sed 's/.*/& " + module_name + "_&/' > $@"
-        ),
+        cmd = select({
+            "@envoy//bazel:apple": (
+                "grep -Eo 'envoy_dynamic_module_on_[a-z_]+' " +
+                "$(location @envoy//source/extensions/dynamic_modules/abi:abi.h) | " +
+                "sort -u | " +
+                "sed 's/.*/_%s _%s_&/' > $@" % ("&", module_name)
+            ),
+            "//conditions:default": (
+                "grep -Eo 'envoy_dynamic_module_on_[a-z_]+' " +
+                "$(location @envoy//source/extensions/dynamic_modules/abi:abi.h) | " +
+                "sort -u | " +
+                "sed 's/.*/& " + module_name + "_&/' > $@"
+            ),
+        }),
         tags = tags,
     )
 
     # Use llvm-objcopy from the Envoy-managed LLVM toolchain to rename symbols in
     # the static archive. The shell command selects the first non-PIC .a file from
     # the archive target's outputs (cc_library may produce both .a and .pic.a);
-    # falls back to any .a if all archives are PIC-suffixed.
+    # falls back to any .a if all archives are PIC-suffixed. On Windows, cc_library
+    # produces a .lib archive instead.
+    #
+    # NOTE: The case statement is kept outside $() command substitution for
+    # compatibility with bash 3.2 (macOS default), which cannot parse case
+    # pattern delimiters inside $().
+    archive_select_cmd = (
+        "ARCH=\"\"; " +
+        "for f in $(SRCS); do case $$f in *.pic.a) continue;; *.a|*.lib) ARCH=$$f; break;; esac; done; " +
+        "[ -z \"$$ARCH\" ] && " +
+        "for f in $(SRCS); do case $$f in *.a|*.lib) ARCH=$$f; break;; esac; done; "
+    )
     native.genrule(
         name = renamed_name,
         srcs = [archive, ":" + redefine_syms_name],
         outs = [name + "_renamed.a"],
         cmd = (
-            "ARCH=$$(for f in $(SRCS); do case $$f in *.pic.a);; *.a) echo $$f; break;; esac; done); " +
-            "[ -z \"$$ARCH\" ] && " +
-            "ARCH=$$(for f in $(SRCS); do case $$f in *.a) echo $$f; break;; esac; done); " +
+            archive_select_cmd +
             "$(location @llvm_toolchain_llvm//:objcopy) " +
             "--redefine-syms=$(location :" + redefine_syms_name + ") $$ARCH $@"
         ),

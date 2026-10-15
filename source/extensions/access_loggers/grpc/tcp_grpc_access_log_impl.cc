@@ -24,7 +24,7 @@ TcpGrpcAccessLog::TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
                                    const Formatter::CommandParserPtrVector& command_parsers)
     : Common::ImplBase(std::move(filter)),
-      config_(std::make_shared<const TcpGrpcAccessLogConfig>(std::move(config))),
+      config_(std::make_shared<const TcpGrpcAccessLogConfig>(config)),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)),
       common_properties_config_(config.common_config(), command_parsers) {
   THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(config_->common_config()));

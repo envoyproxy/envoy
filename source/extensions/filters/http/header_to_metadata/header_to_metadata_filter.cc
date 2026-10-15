@@ -19,13 +19,13 @@ namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
 // Extract the value of the header.
-absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) const {
+std::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) const {
   const auto header_value = Http::HeaderUtility::getAllOfHeaderAsString(map, header_);
   if (!header_value.result().has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   // Catch the value in the header before removing.
-  absl::optional<std::string> value = std::string(header_value.result().value());
+  std::optional<std::string> value = std::string(header_value.result().value());
   if (remove_) {
     map.remove(header_);
   }
@@ -33,12 +33,12 @@ absl::optional<std::string> HeaderValueSelector::extract(Http::HeaderMap& map) c
 }
 
 // Extract the value of the key from the cookie header.
-absl::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) const {
+std::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) const {
   std::string value = Envoy::Http::Utility::parseCookieValue(map, cookie_);
   if (!value.empty()) {
     return {std::move(value)};
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::StatusOr<Rule> Rule::create(const ProtoRule& rule, Regex::Engine& regex_engine) {
@@ -61,9 +61,9 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& cre
   // Initialize the shared pointer.
   if (!rule.header().empty()) {
     selector_ =
-        std::make_shared<HeaderValueSelector>(Http::LowerCaseString(rule.header()), rule.remove());
+        std::make_unique<HeaderValueSelector>(Http::LowerCaseString(rule.header()), rule.remove());
   } else if (!rule.cookie().empty()) {
-    selector_ = std::make_shared<CookieValueSelector>(rule.cookie());
+    selector_ = std::make_unique<CookieValueSelector>(rule.cookie());
   } else {
     creation_status =
         absl::InvalidArgumentError("One of Cookie or Header option needs to be specified");
@@ -102,10 +102,9 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& cre
 
   if (rule.on_header_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
-    auto regex_rewrite_or = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
-    SET_AND_RETURN_IF_NOT_OK(regex_rewrite_or.status(), creation_status);
-    regex_rewrite_ = std::move(regex_rewrite_or.value());
-    regex_rewrite_substitution_ = rewrite_spec.substitution();
+    auto regex_replace_or = Matcher::RegexReplace::create(regex_engine, rewrite_spec);
+    SET_AND_RETURN_IF_NOT_OK(regex_replace_or.status(), creation_status);
+    regex_replace_.emplace(std::move(regex_replace_or).value());
   }
 }
 
@@ -315,10 +314,9 @@ void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule
   if (!keyval.value().empty()) {
     value = keyval.value();
   } else {
-    const auto& matcher = rule.regexRewrite();
-    if (matcher != nullptr) {
+    if (rule.regexReplace().has_value()) {
       const bool was_non_empty = !value.empty();
-      value = matcher->replaceAll(value, rule.regexSubstitution());
+      value = rule.regexReplace()->apply(value);
       // If we had a non-empty input but got an empty result from regex, it could indicate a
       // failure.
       if (was_non_empty && value.empty()) {
@@ -343,7 +341,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 
   for (const auto& rule : rules) {
     const auto& proto_rule = rule.rule();
-    absl::optional<std::string> value = rule.selector_->extract(headers);
+    std::optional<std::string> value = rule.selector_->extract(headers);
 
     // Increment rules_processed stat if stats are enabled.
     config->chargeStat(StatsEvent::RulesProcessed, direction);

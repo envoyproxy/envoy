@@ -34,16 +34,11 @@ fi
 
 TARGET_PATH="$2"
 
-# TODO(mattklein123): WORKSPACE is excluded due to warning about @bazel_tools reference. Fix here
-#                     or in the upstream checker.
-
 FORMAT_ARGS=(
     --config_path ../tools/code_format/config.yaml
     --add-excluded-prefixes
-    ./envoy/ ./envoy_build_config/extensions_build_config.bzl ./WORKSPACE
+    ./envoy/ ./envoy_build_config/extensions_build_config.bzl
     ./Envoy.xcodeproj/ ./dist/
-    ./bazel/envoy_mobile_swift_bazel_support.bzl
-    ./bazel/envoy_mobile_repositories.bzl
     ./examples/swift/swiftpm/Packages/Envoy.xcframework ./tmp
     --skip_envoy_build_rule_check)
 if [[ -n "$TARGET_PATH" ]]; then
@@ -75,18 +70,15 @@ else
   fi
 fi
 
-
-_bazel build //tools:black
-BLACK_BIN=$(_bazel info bazel-bin)/tools/black
 PYTHON_DIRS=(
-  "library/python"
-  "test/python"
-  "examples/python"
+  "${PWD}/library/python"
+  "${PWD}/test/python"
+  "${PWD}/examples/python"
 )
 if [[ "${ENVOY_FORMAT_ACTION}" == "fix" ]]; then
-  "${BLACK_BIN}" --config pyproject.toml "${PYTHON_DIRS[@]}"
+  _bazel run //tools:black -- "${PYTHON_DIRS[@]}"
 else
-  NEEDS_FORMAT=$("${BLACK_BIN}" --config pyproject.toml --check "${PYTHON_DIRS[@]}" 2>&1 || echo "black failed, exit code=$?")
+  NEEDS_FORMAT=$(_bazel run //tools:black -- --check "${PYTHON_DIRS[@]}" 2>&1 || echo "black failed, exit code=$?")
   # If black reports that files need to be reformatted, it will exit with code 1, so "black failed, exit code=1" will be added to NEEDS_FORMAT;
   # otherswise, NEEDS_FORMAT will just contain the black output.
   if [[ -n "${NEEDS_FORMAT}" ]] && [[ "${NEEDS_FORMAT}" == *"black failed, exit code="* ]]; then

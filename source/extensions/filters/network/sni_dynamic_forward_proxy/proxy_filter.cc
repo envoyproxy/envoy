@@ -75,7 +75,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     port = config_->port();
     read_callbacks_->connection().streamInfo().filterState()->setData(
         "envoy.upstream.dynamic_port", std::make_shared<StreamInfo::UInt32AccessorImpl>(port),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   auto result = config_->cache().loadDnsCacheEntry(host, port, false, *this);
@@ -140,7 +140,7 @@ void ProxyFilter::addHostAddressToFilterState(
 
   read_callbacks_->connection().streamInfo().filterState()->setData(
       StreamInfo::UpstreamAddress::key(), std::move(address_obj),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 } // namespace SniDynamicForwardProxy

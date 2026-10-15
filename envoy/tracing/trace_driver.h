@@ -15,6 +15,13 @@ class Span;
 using SpanPtr = std::unique_ptr<Span>;
 
 /**
+ * The desired value type for a typed span tag. Tracers that support typed span
+ * attributes (e.g. OpenTelemetry) may emit the tag as a native attribute of this
+ * type; tracers without such support keep treating the value as a string.
+ */
+enum class TagValueType { String, Int, Double, Bool };
+
+/**
  * The upstream service type.
  */
 enum class ServiceType {
@@ -76,6 +83,30 @@ public:
   virtual void setTag(absl::string_view name, absl::string_view value) PURE;
 
   /**
+   * Attach a typed tag to a Span.
+   *
+   * The value is provided as its string representation together with the desired
+   * type. The default implementation ignores the type and records the original
+   * string via setTag(), so tracers without typed-attribute support keep their
+   * existing behavior and never rewrite the value. Tracers such as OpenTelemetry
+   * override this to emit a native typed span attribute when the value parses,
+   * falling back to a string tag otherwise.
+   * @param name the name of the tag
+   * @param value the string representation of the tag value
+   * @param type the desired value type
+   */
+  virtual void setTypedTag(absl::string_view name, absl::string_view value,
+                           TagValueType /* type */) {
+    setTag(name, value);
+  }
+
+  /**
+   * Reserve capacity for additional tags.
+   * @param size number of tags that will be set
+   */
+  virtual void reserveTags(size_t /* size */) {}
+
+  /**
    * Record an event associated with a span, to be handled in an implementation-dependent fashion.
    * @param timestamp the time of the event.
    * @param event the name of the event.
@@ -114,21 +145,39 @@ public:
   virtual void setSampled(bool sampled) PURE;
 
   /**
+   * @return whether this span will be exported to the tracing backend. The HTTP connection
+   * manager may skip finalize-time tag work for spans that return false, since those tags
+   * would be discarded by the driver anyway.
+   *
+   * If the driver cannot conclusively determine that the span will be dropped, it MUST
+   * return true so that the span is fully populated and suitable for export.
+   */
+  virtual bool exportedSpan() const PURE;
+
+  /**
    * When the startSpan() of tracer is called, the Envoy tracing decision is passed to the
    * tracer to help determine whether the span should be sampled.
    *
    * But note that the tracer may have its own sampling decision logic (e.g. custom sampler,
    * external tracing context, etc.), and it may not use the Envoy tracing decision at all,
-   * then the desicion may be ignored by the tracer.
+   * then the decision may be ignored by the tracer.
    *
    * The method is used to return whether the Envoy tracing decision is used by the tracer
    * or not.
    *
-   * When the Envoy tracing decision is refreshed becase route refresh or other reasons, if
+   * When the Envoy tracing decision is refreshed because route refresh or other reasons, if
    * the Envoy tracing decision is used by the tracer, the sampled value will be updated
    * by the HTTP connection manager based on the new Envoy tracing decision.
    */
   virtual bool useLocalDecision() const PURE;
+
+  /**
+   * Stop using the Envoy local tracing decision for this span. After this is called the connection
+   * manager will not re-derive the sampling decision on a later route refresh, so a decision set
+   * via setSampled is kept. The default implementation is a no-op and is overridden by tracers that
+   * support this.
+   */
+  virtual void disableLocalDecision() {}
 
   /**
    * Retrieve a key's value from the span's baggage.

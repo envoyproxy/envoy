@@ -18,11 +18,8 @@
 #include "source/extensions/tracers/datadog/tracer.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -32,6 +29,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
+#include "datadog/trace_segment.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -68,7 +66,8 @@ public:
     tracer_ = std::make_unique<Tracer>(
         datadog_config.collector_cluster(),
         DatadogTracerFactory::makeCollectorReferenceHost(datadog_config),
-        DatadogTracerFactory::makeConfig(datadog_config), cm_, *stats_.rootScope(), tls_, time_);
+        DatadogTracerFactory::makeConfig(datadog_config), cm_, *stats_.rootScope(), tls_, time_,
+        datadog_config.delegate_sampling());
   }
 
   void setupValidDriver() {
@@ -97,6 +96,7 @@ public:
 TEST_F(DatadogConfigTest, DefaultConfiguration) {
   envoy::config::trace::v3::DatadogConfig datadog_config;
   EXPECT_EQ(datadog_config.has_remote_config(), false);
+  EXPECT_FALSE(datadog_config.delegate_sampling());
 }
 
 TEST_F(DatadogConfigTest, ConfigureTracer) {
@@ -153,6 +153,30 @@ TEST_F(DatadogConfigTest, ConfigureViaFactory) {
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto datadog_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, datadog_tracer);
+}
+
+TEST_F(DatadogConfigTest, SamplingConfigurationViaFactory) {
+  for (bool delegate_sampling : {false, true}) {
+    SCOPED_TRACE(delegate_sampling);
+    NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+    context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+    envoy::config::trace::v3::DatadogConfig proto_config;
+    proto_config.set_collector_cluster("fake_cluster");
+    proto_config.set_service_name("test-service");
+    proto_config.set_delegate_sampling(delegate_sampling);
+    DatadogTracerFactory factory;
+    auto driver = factory.createTracerDriver(proto_config, context);
+    auto span = driver->startSpan(config_, request_headers_, stream_info_, operation_name_,
+                                  {Tracing::Reason::Sampling, true});
+    auto& dd_span = dynamic_cast<Span&>(*span);
+    const auto decision = dd_span.impl()->trace_segment().sampling_decision();
+    if (delegate_sampling) {
+      EXPECT_FALSE(decision);
+    } else {
+      ASSERT_TRUE(decision);
+      EXPECT_EQ(2, decision->priority);
+    }
+  }
 }
 
 TEST_F(DatadogConfigTest, AllowCollectorClusterToBeAddedViaApi) {

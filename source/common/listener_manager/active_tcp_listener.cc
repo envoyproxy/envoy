@@ -109,9 +109,9 @@ void ActiveTcpListener::recordConnectionsAcceptedOnSocketEvent(uint32_t connecti
 void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                                        bool hand_off_restored_destination_connections,
                                        bool rebalanced,
-                                       const absl::optional<std::string>& network_namespace) {
+                                       const std::optional<std::string>& network_namespace) {
   // Get Round Trip Time
-  absl::optional<std::chrono::milliseconds> t = socket->lastRoundTripTime();
+  std::optional<std::chrono::milliseconds> t = socket->lastRoundTripTime();
   if (t.has_value()) {
     socket->connectionInfoProvider().setRoundTripTime(t.value());
   }
@@ -178,8 +178,8 @@ void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
                      handoff = config_->handOffRestoredDestinationConnections()]() {
     auto balanced_handler = tcp_conn_handler.getBalancedHandlerByTag(tag, *address);
     if (balanced_handler.has_value()) {
-      balanced_handler->get().onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true,
-                                             address->networkNamespace());
+      balanced_handler->onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true,
+                                       address->networkNamespace());
       return;
     }
   });

@@ -10,7 +10,9 @@
 
 #include "test/integration/ads_integration.h"
 #include "test/integration/integration.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
+using testing::Ge;
 using testing::Return;
 
 namespace Envoy {
@@ -71,12 +73,11 @@ const std::string& clusterConfig() {
       cluster_type:
         name: envoy.clusters.redis
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
-          value:
-            cluster_refresh_rate: 60s
-            cluster_refresh_timeout: 4s
-            redirect_refresh_interval: 0s
-            redirect_refresh_threshold: 1
+          "@type": type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig
+          cluster_refresh_rate: 60s
+          cluster_refresh_timeout: 4s
+          redirect_refresh_interval: 0s
+          redirect_refresh_threshold: 1
 )EOF");
 }
 
@@ -101,13 +102,12 @@ const std::string& testConfigWithRefresh() {
       cluster_type:
         name: envoy.clusters.redis
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.Struct
-          value:
-            cluster_refresh_rate: 3600s
-            cluster_refresh_timeout: 4s
-            redirect_refresh_interval: 100s
-            redirect_refresh_threshold: 1
-            failure_refresh_threshold: 1
+          "@type": type.googleapis.com/envoy.extensions.clusters.redis.v3.RedisClusterConfig
+          cluster_refresh_rate: 3600s
+          cluster_refresh_timeout: 4s
+          redirect_refresh_interval: 100s
+          redirect_refresh_threshold: 1
+          failure_refresh_threshold: 1
 )EOF");
 }
 
@@ -162,7 +162,7 @@ public:
       typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
       envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
           config;
-      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
+      std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
 
       uint32_t upstream_idx = 0;
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -456,6 +456,10 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplica) {
 // difference being that it has the primary and replica identified
 // by hostname instead of IP address.
 TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplicaHostnames) {
+  OsSysCallsWithMockedDns mock_os_sys_calls;
+  mock_os_sys_calls.setIpVersion(version_);
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&mock_os_sys_calls};
+
   random_index_ = 0;
 
   on_server_init_function_ = [this]() {
@@ -470,6 +474,9 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotPrimaryReplicaHostnames) {
 
   // foo hashes to slot 12182 which is in upstream 0
   simpleRequestAndResponse(0, makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+
+  // Stop worker threads before os_calls restores the process-wide syscall singleton.
+  test_server_.reset();
 }
 
 // This test sends a simple "get foo" command from a fake
@@ -709,7 +716,7 @@ TEST_P(RedisAdsIntegrationTest, RedisClusterRemoval) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
 
   // Validate that redis listener is successfully created.
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Now send a CDS update, removing redis cluster added above.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
@@ -717,7 +724,7 @@ TEST_P(RedisAdsIntegrationTest, RedisClusterRemoval) {
       {"redis_cluster"}, "2");
 
   // Validate that the cluster is removed successfully.
-  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  test_server_->waitForCounter("cluster_manager.cluster_removed", Ge(1));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, RedisAdsIntegrationTest,

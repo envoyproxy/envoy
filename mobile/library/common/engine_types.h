@@ -22,12 +22,13 @@ struct EngineCallbacks {
 
 /** The callbacks for Envoy Logger. */
 struct EnvoyLogger {
-  absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log_ =
-      [](Logger::Logger::Levels, const std::string&) {};
+  absl::AnyInvocable<void(Logger::Levels, const std::string&)> on_log_ = [](Logger::Levels,
+                                                                            const std::string&) {};
   absl::AnyInvocable<void()> on_exit_ = [] {};
 };
 
 inline constexpr absl::string_view ENVOY_EVENT_TRACKER_API_NAME = "event_tracker_api";
+inline constexpr absl::string_view DEFAULT_API_LISTENER_NAME = "base_api_listener";
 
 /** The callbacks for Envoy Event Tracker. */
 struct EnvoyEventTracker {
@@ -40,7 +41,7 @@ struct EnvoyEventTracker {
 struct EnvoyError {
   envoy_error_code_t error_code_;
   std::string message_;
-  absl::optional<int> attempt_count_ = absl::nullopt;
+  std::optional<int> attempt_count_ = std::nullopt;
 };
 
 /** The callbacks for the stream. */

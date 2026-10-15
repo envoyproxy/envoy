@@ -1,7 +1,9 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 
@@ -12,7 +14,6 @@
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,7 +55,7 @@ private:
  * Lambda ARN Example:
  * arn:aws:lambda:us-west-2:987654321:function:hello_envoy
  */
-absl::optional<Arn> parseArn(absl::string_view arn);
+std::optional<Arn> parseArn(absl::string_view arn);
 
 /**
  * All stats for the AWS Lambda filter. @see stats_macros.h
@@ -93,9 +94,12 @@ public:
 class FilterSettingsImpl : public FilterSettings {
 public:
   FilterSettingsImpl(const Arn& arn, InvocationMode mode, bool payload_passthrough,
-                     const std::string& host_rewrite, Extensions::Common::Aws::SignerPtr&& signer)
+                     const std::string& host_rewrite, Extensions::Common::Aws::SignerPtr&& signer,
+                     Event::Dispatcher& main_dispatcher)
       : arn_(arn), invocation_mode_(mode), payload_passthrough_(payload_passthrough),
-        host_rewrite_(host_rewrite), signer_(std::move(signer)) {}
+        host_rewrite_(host_rewrite), main_dispatcher_(main_dispatcher), signer_(std::move(signer)) {
+  }
+  ~FilterSettingsImpl() override;
 
   const Arn& arn() const override { return arn_; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
@@ -108,6 +112,7 @@ private:
   InvocationMode invocation_mode_;
   bool payload_passthrough_;
   const std::string host_rewrite_;
+  Event::Dispatcher& main_dispatcher_;
   Extensions::Common::Aws::SignerPtr signer_;
 };
 

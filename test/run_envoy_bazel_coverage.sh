@@ -17,7 +17,7 @@ fi
 [[ -z "${FUZZ_COVERAGE}" ]] && FUZZ_COVERAGE=false
 COVERAGE_TARGET="${COVERAGE_TARGET:-}"
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
-read -ra BAZEL_GLOBAL_OPTIONS <<< "${BAZEL_GLOBAL_OPTION_LIST:-}"
+read -ra BAZEL_QUERY_OPTIONS <<< "${BAZEL_QUERY_OPTION_LIST:-}"
 
 # This is the target that will be run to generate coverage data. It can be overridden by consumer
 # projects that want to run coverage on a different/combined target.
@@ -39,7 +39,7 @@ fi
 
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     # Filter targets to just fuzz tests.
-    _targets=$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" --noshow_loading_progress --noshow_progress "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
+    _targets=$(bazel query "${BAZEL_QUERY_OPTIONS[@]}" --noshow_loading_progress --noshow_progress "attr('tags', 'fuzz_target', ${COVERAGE_TARGETS[*]})")
     COVERAGE_TARGETS=()
     while read -r line; do COVERAGE_TARGETS+=("$line"); done \
         <<< "$_targets"

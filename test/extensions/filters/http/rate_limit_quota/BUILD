@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
@@ -44,6 +44,7 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
@@ -57,7 +58,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["client_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
@@ -104,7 +105,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
-    rbe_pool = "4core",
+    rbe_pool = "linux_x64_large",
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -118,6 +119,7 @@ envoy_extension_cc_test(
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

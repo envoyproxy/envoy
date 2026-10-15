@@ -7,6 +7,7 @@
 #include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/enum_to_int.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -34,6 +35,7 @@ createRedirectConfig(const envoy::config::route::v3::RedirectAction& redirect_ac
       "",      // prefix_rewrite
       "",      // regex_rewrite_redirect_substitution
       nullptr, // regex_rewrite_redirect
+      nullptr, // path_rewrite_formatter
       redirect_action.path_redirect().find('?') != absl::string_view::npos,
       redirect_action.https_redirect(),
       redirect_action.strip_query()};
@@ -42,6 +44,15 @@ createRedirectConfig(const envoy::config::route::v3::RedirectAction& redirect_ac
   }
   if (redirect_action.has_prefix_rewrite()) {
     throw Envoy::EnvoyException("prefix_rewrite is not supported for Custom Response");
+  }
+  if (!redirect_action.path_rewrite().empty()) {
+    auto formatter_or =
+        Envoy::Formatter::FormatterImpl::create(redirect_action.path_rewrite(), true);
+    if (!formatter_or.ok()) {
+      throw Envoy::EnvoyException(absl::StrCat("Failed to create path_rewrite formatter: ",
+                                               formatter_or.status().message()));
+    }
+    redirect_config.path_rewrite_formatter_ = std::move(formatter_or.value());
   }
   return redirect_config;
 }
@@ -64,9 +75,9 @@ RedirectPolicy::RedirectPolicy(
                                  createRedirectConfig(config.redirect_action()))
                            : nullptr},
       status_code_{config.has_status_code()
-                       ? absl::optional<::Envoy::Http::Code>(
+                       ? std::optional<::Envoy::Http::Code>(
                              static_cast<::Envoy::Http::Code>(config.status_code().value()))
-                       : absl::optional<::Envoy::Http::Code>{}},
+                       : std::optional<::Envoy::Http::Code>{}},
       response_header_parser_(THROW_OR_RETURN_VALUE(
           Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
           Router::HeaderParserPtr)),
@@ -124,11 +135,11 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
     ENVOY_BUG(filter_state->policy.get() == this, "Policy filter state should be this policy.");
     // Apply header mutations.
     response_header_parser_->evaluateHeaders(headers, encoder_callbacks->streamInfo());
-    const absl::optional<::Envoy::Http::Code> status_code_to_use =
+    const std::optional<::Envoy::Http::Code> status_code_to_use =
         status_code_.has_value() ? status_code_
                                  : (filter_state->original_response_code.has_value()
                                         ? filter_state->original_response_code
-                                        : absl::nullopt);
+                                        : std::nullopt);
     // Modify response status code.
     if (status_code_to_use.has_value()) {
       auto const code = *status_code_to_use;
@@ -167,8 +178,15 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
       });
 
   ::Envoy::Http::Utility::Url absolute_url;
-  std::string uri(uri_ ? *uri_
-                       : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers));
+  std::string uri;
+  if (redirect_action_ != nullptr && redirect_action_->path_rewrite_formatter_ != nullptr) {
+    uri = ::Envoy::Http::Utility::newUriWithFormatter(
+        ::Envoy::makeOptRefFromPtr(redirect_action_.get()), *downstream_headers,
+        *redirect_action_->path_rewrite_formatter_, decoder_callbacks->streamInfo());
+  }
+  if (uri.empty()) {
+    uri = uri_ ? *uri_ : ::Envoy::Http::Utility::newUri(*redirect_action_, *downstream_headers);
+  }
   if (!absolute_url.initialize(uri, false)) {
     stats_.custom_response_invalid_uri_.inc();
     // We could potentially get an invalid url only if redirect_action_ was specified instead
@@ -210,8 +228,8 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   downstream_headers->setMethod(::Envoy::Http::Headers::get().MethodValues.Get);
   downstream_headers->remove(::Envoy::Http::Headers::get().ContentLength);
   // Cache the original response code.
-  absl::optional<::Envoy::Http::Code> original_response_code;
-  absl::optional<uint64_t> current_code =
+  std::optional<::Envoy::Http::Code> original_response_code;
+  std::optional<uint64_t> current_code =
       ::Envoy::Http::Utility::getResponseStatusOrNullopt(headers);
   if (current_code.has_value()) {
     original_response_code = static_cast<::Envoy::Http::Code>(*current_code);
@@ -222,7 +240,7 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
       "envoy.filters.http.custom_response",
       std::make_shared<::Envoy::Extensions::HttpFilters::CustomResponse::CustomResponseFilterState>(
           const_cast<RedirectPolicy*>(this)->shared_from_this(), original_response_code),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+      StreamInfo::FilterState::LifeSpan::Request);
   restore_original_headers.cancel();
   decoder_callbacks->recreateStream(nullptr);
 

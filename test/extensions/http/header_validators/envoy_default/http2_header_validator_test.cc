@@ -18,7 +18,6 @@ namespace {
 using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
-using ::Envoy::Http::testCharInTable;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
@@ -260,6 +259,23 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropUnderscoreHeaders) 
           {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapDropDuplicateUnderscoreHeaders) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/"},
+                                                  {":authority", "envoy.com"},
+                                                  {"x_foo", "bar"}};
+  headers.addCopy("x_foo", "baz");
+  auto uhv = createH2ServerUhv(drop_headers_with_underscores_config);
+
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
+  EXPECT_EQ(
+      headers,
+      ::Envoy::Http::TestRequestHeaderMapImpl(
+          {{":scheme", "https"}, {":method", "GET"}, {":path", "/"}, {":authority", "envoy.com"}}));
+}
+
 TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectUnderscoreHeaders) {
   ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
                                                   {":method", "GET"},
@@ -367,7 +383,7 @@ TEST_F(Http2HeaderValidatorTest, UpstreamUpgradeRequestTransformedToExtendedConn
       {":authority", "envoy.com"}, {"upgrade", "websocket"}, {"connection", "upgrade,keep-alive"}};
   auto uhv = createH2ClientUhv(empty_config);
   auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_TRUE(result.status.ok());
+  EXPECT_ACCEPT(result.status);
   // Expect the extended CONNECT request
   EXPECT_EQ(result.new_headers->getMethodValue(), "CONNECT");
   EXPECT_EQ(result.new_headers->getProtocolValue(), "websocket");
@@ -389,7 +405,7 @@ TEST_F(Http2HeaderValidatorTest, UpstreamExtendedConnectResponseTransformedToUpg
       {":authority", "envoy.com"}, {"upgrade", "websocket"}, {"connection", "upgrade,keep-alive"}};
   auto uhv = createH2ClientUhv(empty_config);
   auto result = uhv->transformRequestHeaders(headers);
-  EXPECT_TRUE(result.status.ok());
+  EXPECT_ACCEPT(result.status);
   // Make sure transformation produced valid H/2 extended CONNECT
   EXPECT_ACCEPT(uhv->validateRequestHeaders(*result.new_headers));
 
@@ -490,6 +506,13 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderContentLength) {
   request_headers.setContentLength("100");
   EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
 
+  request_headers.setContentLength("100,100");
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(request_headers));
+
+  request_headers.setContentLength("100,101");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
+
   request_headers.setContentLength("10a2");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateRequestHeaders(request_headers),
                              UhvResponseCodeDetail::get().InvalidContentLength);
@@ -500,6 +523,13 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseHeaderContentLength) {
   TestResponseHeaderMapImpl response_headers = makeGoodResponseHeaders();
   response_headers.setContentLength("100");
   EXPECT_ACCEPT(uhv->validateResponseHeaders(response_headers));
+
+  response_headers.setContentLength("100,100");
+  EXPECT_ACCEPT(uhv->validateResponseHeaders(response_headers));
+
+  response_headers.setContentLength("100,101");
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
+                             UhvResponseCodeDetail::get().InvalidContentLength);
 
   response_headers.setContentLength("10a2");
   EXPECT_REJECT_WITH_DETAILS(uhv->validateResponseHeaders(response_headers),
@@ -621,7 +651,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestGenericHeaderName) {
                                HeaderString(absl::string_view("some value")));
 
     auto result = uhv->validateRequestHeaders(request_headers);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -644,7 +674,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateResponseGenericHeaderName) {
     headers.addViaMove(std::move(header_string), HeaderString(absl::string_view("some value")));
 
     auto result = uhv->validateResponseHeaders(headers);
-    if (testCharInTable(::Envoy::Http::kGenericHeaderNameCharTable, c) && (c < 'A' || c > 'Z')) {
+    if (::Envoy::Http::CharTables::kGenericHeaderName.hasChar(c) && (c < 'A' || c > 'Z')) {
       EXPECT_ACCEPT(result);
     } else if (c != '_') {
       EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
@@ -661,8 +691,8 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
                                                   {":authority", "envoy.com"}};
   auto uhv = createH2ServerUhv(empty_config);
 
-  EXPECT_TRUE(uhv->validateRequestHeaders(headers).ok());
-  EXPECT_TRUE(uhv->transformRequestHeaders(headers).ok());
+  EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
+  EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   EXPECT_EQ(headers.getPathValue(), "/dir2");
 }
 
@@ -747,7 +777,7 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailersRejectUnderscoreHeaders)
 TEST_F(Http2HeaderValidatorTest, ValidateResponseTrailerMap) {
   auto uhv = createH2ClientUhv(empty_config);
   ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
-  EXPECT_TRUE(uhv->validateResponseTrailers(response_trailer_map).ok());
+  EXPECT_ACCEPT(uhv->validateResponseTrailers(response_trailer_map));
 }
 
 TEST_F(Http2HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {

@@ -8,6 +8,7 @@
 #include "absl/strings/str_cat.h"
 
 #if defined(__linux__)
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #elif defined(__APPLE__)
@@ -27,16 +28,11 @@ int64_t getCurrentThreadIdBase() {
   uint64_t tid;
   pthread_threadid_np(nullptr, &tid);
   return tid;
+#elif defined(__EMSCRIPTEN__) || defined(__wasm__)
+  return static_cast<int64_t>(pthread_self());
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
 #endif
-}
-
-int64_t getCurrentThreadId() {
-  // Use the static value rather than the static pointer to suppress ASAN memory leak
-  // errors.
-  static thread_local const int64_t tid = getCurrentThreadIdBase();
-  return tid;
 }
 
 void setThreadPriority(const int64_t tid, const int priority) {
@@ -57,26 +53,58 @@ void setThreadPriority(const int64_t tid, const int priority) {
       reinterpret_cast<void (*)(id, SEL, double)>(objc_msgSend);
   double ns_priority = static_cast<double>(priority) / 100.0;
   setNSThreadPriority(current_thread, sel_registerName("setThreadPriority:"), ns_priority);
+#elif defined(__EMSCRIPTEN__) || defined(__wasm__)
+  UNREFERENCED_PARAMETER(tid);
+  UNREFERENCED_PARAMETER(priority);
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
 #endif
 }
 
+void setThreadAffinity(const uint32_t cpu) {
+#if defined(__linux__)
+  if (cpu >= CPU_SETSIZE) {
+    ENVOY_LOG_MISC(warn, "thread affinity CPU {} exceeds the supported maximum", cpu);
+    return;
+  }
+  cpu_set_t set;
+  CPU_ZERO(&set);
+  CPU_SET(cpu, &set);
+  const int rc = sched_setaffinity(0, sizeof(set), &set);
+  if (rc != 0) {
+    ENVOY_LOG_MISC(warn, "failed to set thread affinity to CPU {}: {}", cpu,
+                   Envoy::errorDetails(errno));
+  }
+#else
+  UNREFERENCED_PARAMETER(cpu);
+#endif
+}
+
 } // namespace
+
+int64_t getCurrentThreadId() {
+  // Use the static value rather than the static pointer to suppress ASAN memory leak
+  // errors.
+  static thread_local const int64_t tid = getCurrentThreadIdBase();
+  return tid;
+}
 
 // See https://www.man7.org/linux/man-pages/man3/pthread_setname_np.3.html.
 // The maximum thread name is 16 bytes including the terminating nul byte,
 // so we need to truncate the string_view to 15 bytes.
 #define PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE 16
 
-ThreadHandle::ThreadHandle(std::function<void()> thread_routine,
-                           absl::optional<int> thread_priority)
-    : thread_routine_(thread_routine), thread_priority_(thread_priority) {}
+ThreadHandle::ThreadHandle(std::function<void()> thread_routine, std::optional<int> thread_priority,
+                           std::optional<uint32_t> thread_cpu_affinity)
+    : thread_routine_(thread_routine), thread_priority_(thread_priority),
+      thread_cpu_affinity_(thread_cpu_affinity) {}
 
 /** Returns the thread routine. */
 std::function<void()>& ThreadHandle::routine() { return thread_routine_; }
 
-absl::optional<int> ThreadHandle::priority() const { return thread_priority_; }
+std::optional<int> ThreadHandle::priority() const { return thread_priority_; }
+
+std::optional<uint32_t> ThreadHandle::cpuAffinity() const { return thread_cpu_affinity_; }
 
 /** Returns the thread handle. */
 pthread_t& ThreadHandle::handle() { return thread_handle_; }
@@ -138,7 +166,7 @@ bool PosixThread::joinable() const { return !joined_; }
 
 ThreadId PosixThread::pthreadId() const {
   ASSERT(!joined_);
-#if defined(__linux__)
+#if defined(__linux__) || defined(__EMSCRIPTEN__) || defined(__wasm__)
   return ThreadId(static_cast<int64_t>(thread_handle_->handle()));
 #elif defined(__APPLE__)
   uint64_t tid;
@@ -175,6 +203,9 @@ int PosixThreadFactory::createPthread(ThreadHandle* thread_handle) {
         if (handle->priority()) {
           setThreadPriority(getCurrentThreadId(), *handle->priority());
         }
+        if (handle->cpuAffinity()) {
+          setThreadAffinity(*handle->cpuAffinity());
+        }
         handle->routine()();
         return nullptr;
       },
@@ -183,8 +214,8 @@ int PosixThreadFactory::createPthread(ThreadHandle* thread_handle) {
 
 PosixThreadPtr PosixThreadFactory::createThread(std::function<void()> thread_routine,
                                                 OptionsOptConstRef options, bool crash_on_failure) {
-  auto thread_handle =
-      new ThreadHandle(thread_routine, options ? options->priority_ : absl::nullopt);
+  auto thread_handle = new ThreadHandle(thread_routine, options ? options->priority_ : std::nullopt,
+                                        options ? options->cpu_affinity_ : std::nullopt);
   const int rc = createPthread(thread_handle);
   if (rc != 0) {
     delete thread_handle;
@@ -210,13 +241,15 @@ int PosixThreadFactory::currentThreadPriority() const {
       reinterpret_cast<double (*)(Class, SEL)>(objc_msgSend);
   double thread_priority = getNSThreadPriority(nsthread, selector);
   return static_cast<int>(std::round(thread_priority * 100.0));
+#elif defined(__EMSCRIPTEN__) || defined(__wasm__)
+  return 0;
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
 #endif
 }
 
 ThreadId PosixThreadFactory::currentPthreadId() const {
-#if defined(__linux__)
+#if defined(__linux__) || defined(__EMSCRIPTEN__) || defined(__wasm__)
   return static_cast<ThreadId>(static_cast<int64_t>(pthread_self()));
 #elif defined(__APPLE__)
   uint64_t tid;

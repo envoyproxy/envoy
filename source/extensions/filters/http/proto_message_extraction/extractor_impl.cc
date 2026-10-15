@@ -42,15 +42,15 @@ ABSL_CONST_INIT const char* const kTypeServiceBaseUrl = "type.googleapis.com";
 void extract(ProtoExtractorInterface& extractor, Protobuf::field_extraction::MessageData& message,
              std::vector<ExtractedMessageMetadata>& vect) {
   ExtractedMessageMetadata data = extractor.ExtractMessage(message);
-  ENVOY_LOG_MISC(debug, "Extracted fields: {}", data.extracted_message.DebugString());
+  ENVOY_LOG_MISC(debug, "Extracted fields: {}", data.extracted_message->DebugString());
 
   // Only need to keep the result from the first and the last.
   // Always overwrite the 2nd result as the last one.
   if (vect.size() < 2) {
-    vect.push_back(data);
+    vect.push_back(std::move(data));
   } else {
     // copy and override the second one as the last one.
-    vect[1] = data;
+    vect[1] = std::move(data);
   }
 }
 
@@ -82,7 +82,9 @@ ExtractedMessageDirective typeMapping(const MethodExtraction::ExtractDirective& 
 absl::Status ExtractorImpl::init() {
   FieldValueExtractorFactory extractor_factory(type_finder_);
   for (const auto& it : method_extraction_.request_extraction_by_field()) {
-    // TODO(adh-goog): Allow repeated field extraction in field_value_extractor.
+    // Allow arbitrary types only for cardinality extraction. Otherwise, the extractor is
+    // constrained to supported types in the proto field extraction library:
+    // https://github.com/grpc-ecosystem/proto-field-extraction/blob/main/proto_field_extraction/field_value_extractor/field_value_extractor_factory.cc#L42-L61
     if (it.second != MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
       auto extractor = extractor_factory.Create(request_type_url_, it.first);
       if (!extractor.ok()) {
@@ -95,7 +97,9 @@ absl::Status ExtractorImpl::init() {
   }
 
   for (const auto& it : method_extraction_.response_extraction_by_field()) {
-    // TODO(adh-goog): Allow repeated field extraction in field_value_extractor.
+    // Allow arbitrary types only for cardinality extraction. Otherwise, the extractor is
+    // constrained to supported types in the proto field extraction library:
+    // https://github.com/grpc-ecosystem/proto-field-extraction/blob/main/proto_field_extraction/field_value_extractor/field_value_extractor_factory.cc#L42-L61
     if (it.second != MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
       auto extractor = extractor_factory.Create(response_type_url_, it.first);
       if (!extractor.ok()) {

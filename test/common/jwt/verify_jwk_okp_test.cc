@@ -87,7 +87,7 @@ const std::string JwtJWKEd25519WrongSignature =
 
 class VerifyJwkOKPTest : public testing::Test {
 protected:
-  void SetUp() {
+  void SetUp() override {
     jwks_ = Jwks::createFrom(PublicKeyJwkOKP, Jwks::Type::JWKS);
     EXPECT_EQ(jwks_->getStatus(), Status::Ok);
   }

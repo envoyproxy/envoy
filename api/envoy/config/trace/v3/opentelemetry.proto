@@ -21,27 +21,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 7]
+// [#next-free-field: 11]
 message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
   // This field can be left empty to disable reporting traces to the gRPC service.
-  // Only one of ``grpc_service``, ``http_service`` may be used.
+  // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
   core.v3.GrpcService grpc_service = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
 
   // The upstream HTTP cluster that will receive OTLP traces.
   // This field can be left empty to disable reporting traces to the HTTP service.
-  // Only one of ``grpc_service``, ``http_service`` may be used.
+  // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
   //
   // .. note::
   //
-  //   Note: The ``request_headers_to_add`` property in the OTLP HTTP exporter service
-  //   does not support the :ref:`format specifier <config_access_log_format>` as used for
-  //   :ref:`HTTP access logging <config_access_log>`.
-  //   The values configured are added as HTTP headers on the OTLP export request
-  //   without any formatting applied.
+  //   The ``request_headers_to_add`` property in the OTLP HTTP exporter service supports
+  //   substitution formatters. The formatters cannot access any HTTP or connection properties, but
+  //   can load content such as environment variables or files or secrets.
   core.v3.HttpService http_service = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
+
+  // Specifies the custom exporter to be used by the OpenTelemetry tracer.
+  // Only one of ``grpc_service``, ``http_service``, ``exporter`` may be used.
+  //
+  // [#extension-category: envoy.tracers.opentelemetry.exporters]
+  // [#not-implemented-hide:]
+  core.v3.TypedExtensionConfig exporter = 10
       [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
 
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
@@ -64,4 +70,22 @@ message OpenTelemetryConfig {
   // This field specifies the maximum number of spans that can be cached. If not specified, the
   // default is 1024.
   google.protobuf.UInt32Value max_cache_size = 6;
+
+  // Specifies whether to set the telemetry SDK resource attributes.
+  // The following attributes will be set:
+  //
+  // - telemetry.sdk.language
+  // - telemetry.sdk.name
+  // - telemetry.sdk.version
+  //
+  // If not specified, the default is to set these attributes.
+  google.protobuf.BoolValue set_telemetry_sdk_resource_attributes = 7;
+
+  // Specifies whether to set the ``service.name`` resource attribute.
+  // If not specified, the default is to set this attribute.
+  google.protobuf.BoolValue set_service_name_resource_attribute = 8;
+
+  // Specifies whether to set the instrumentation scope name ("envoy") and version on emitted traces.
+  // If not specified, the default is to set the instrumentation scope name and version.
+  google.protobuf.BoolValue set_instrumentation_scope = 9;
 }

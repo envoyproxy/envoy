@@ -1,5 +1,8 @@
 #include "contrib/sip_proxy/filters/network/source/router/router_impl.h"
 
+#include <format>
+#include <optional>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
@@ -200,7 +203,7 @@ FilterStatus Router::handleAffinity() {
   if (metadata->pCookieIpMap().has_value()) {
     auto [key, val] = metadata->pCookieIpMap().value();
     ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, absl::nullopt);
+    callbacks_->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, std::nullopt);
   }
 
   const std::shared_ptr<const ProtocolOptionsConfig> options =
@@ -310,7 +313,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
     stats_.unknown_cluster_.inc();
     throw AppException(AppExceptionType::InternalError,
-                       fmt::format("unknown cluster '{}'", cluster_name));
+                       std::format("unknown cluster '{}'", cluster_name));
   }
   thread_local_cluster_ = cluster;
 
@@ -320,7 +323,7 @@ FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   if (cluster_->maintenanceMode()) {
     stats_.upstream_rq_maintenance_mode_.inc();
     throw AppException(AppExceptionType::InternalError,
-                       fmt::format("maintenance mode for cluster '{}'", cluster_name));
+                       std::format("maintenance mode for cluster '{}'", cluster_name));
   }
 
   handleAffinity();
@@ -339,10 +342,10 @@ Router::messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transact
     stats_.no_healthy_upstream_.inc();
     if (dest.empty()) {
       throw AppException(AppExceptionType::InternalError,
-                         fmt::format("envoy no healthy upstream endpoint during load balance"));
+                         std::format("envoy no healthy upstream endpoint during load balance"));
     } else {
       throw AppException(AppExceptionType::InternalError,
-                         fmt::format("envoy no healthy upstream endpoint during affinity"));
+                         std::format("envoy no healthy upstream endpoint during affinity"));
     }
   }
 
@@ -644,7 +647,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     //  callbacks_->sendLocalReply(
     //      AppException(
     //          AppExceptionType::InternalError,
-    //          fmt::format("connection failure '{}'", (upstream_host_ != nullptr)
+    //          std::format("connection failure '{}'", (upstream_host_ != nullptr)
     //                                                     ? upstream_host_->address()->asString()
     //                                                     : "to upstream")),
     //      true);
@@ -724,8 +727,7 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
       if (metadata->pCookieIpMap().has_value()) {
         auto [key, val] = metadata->pCookieIpMap().value();
         ENVOY_LOG(trace, "update p-cookie-ip-map {}={}", key, val);
-        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val,
-                                                                  absl::nullopt);
+        active_trans->traHandler()->updateTrafficRoutingAssistant("lskpmc", key, val, std::nullopt);
       }
 
       active_trans->startUpstreamResponse();

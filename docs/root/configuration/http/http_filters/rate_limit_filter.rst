@@ -21,6 +21,31 @@ set to true.
 If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.failure_mode_deny>` is
 set to true, a 500 response is returned.
 
+Retry-After header
+------------------
+
+When :ref:`enable_retry_after_header
+<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.enable_retry_after_header>` is
+enabled and the filter enforces a 429 response, the response includes ``Retry-After`` using the
+``delay-seconds`` form. The delay is the largest ``duration_until_reset`` among the over-limit
+descriptor statuses returned by the rate limit service, clamped to at least one second. This makes
+the delay long enough for every matched over-limit rule reported by the service to reset.
+If the rate limit service returns a ``Retry-After`` header, the filter does not overwrite it.
+
+The header is not emitted for an upstream-generated 429 response, when rate limiting is not
+enforced, when a custom status other than 429 is configured, or when the service does not return an
+over-limit descriptor status. The option is disabled by default.
+
+.. code-block:: yaml
+
+  domain: foo
+  enable_retry_after_header: true
+  rate_limit_service:
+    transport_api_version: V3
+    grpc_service:
+      envoy_grpc:
+        cluster_name: rate_limit_service
+
 .. _config_http_filters_rate_limit_composing_actions:
 
 Composing Actions
@@ -172,6 +197,10 @@ The ratelimit filter emits dynamic metadata as an opaque ``google.protobuf.Struc
 *only* when the gRPC ratelimit service returns a :ref:`RateLimitResponse
 <envoy_v3_api_msg_service.ratelimit.v3.RateLimitResponse>` with a filled :ref:`dynamic_metadata
 <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.dynamic_metadata>` field.
+
+By default metadata is stored under the ``envoy.filters.http.ratelimit`` namespace. The namespace can be changed by setting the
+:ref:`metadata_namespace <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.metadata_namespace>` in the filter
+configuration.
 
 Runtime
 -------

@@ -122,6 +122,23 @@ are available in some contexts:
 
 * Regex matching using :ref:`Hyperscan matcher <envoy_v3_api_msg_extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan>`.
 
+* URI template matching using the :ref:`URI template matcher <envoy_v3_api_msg_extensions.matching.input_matchers.uri_template.v3.UriTemplate>`.
+  The following predicate matches the request path against a template.
+
+.. validated-code-block:: yaml
+  :type-name: envoy.config.common.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate
+
+  input:
+    name: envoy.matching.inputs.request_headers
+    typed_config:
+      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+      header_name: ":path"
+  custom_match:
+    name: envoy.matching.matchers.uri_template
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.uri_template.v3.UriTemplate
+      path_template: "/api/{version}/items/{id}"
+
 Matching actions
 ################
 
@@ -322,7 +339,7 @@ at the current time, it is not used for all filters.
 For HTTP filters, the restrictions are specified by the filter implementation, so consult the individual
 filter documentation to understand whether there are restrictions in place.
 
-For example, in the example below, the match tree could not be used with a filter that restricts the the
+For example, in the example below, the match tree could not be used with a filter that restricts the
 match tree to only use
 :ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>`.
 

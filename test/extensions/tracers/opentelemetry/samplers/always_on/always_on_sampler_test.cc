@@ -24,7 +24,7 @@ TEST(AlwaysOnSamplerTest, TestWithInvalidParentContext) {
   EXPECT_STREQ(sampler->getDescription().c_str(), "AlwaysOnSampler");
 
   auto sampling_result =
-      sampler->shouldSample(info, absl::nullopt, "operation_name", "12345",
+      sampler->shouldSample(info, std::nullopt, "operation_name", "12345",
                             ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes, nullptr);

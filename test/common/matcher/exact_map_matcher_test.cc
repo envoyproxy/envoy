@@ -15,7 +15,7 @@ using ::testing::ElementsAre;
 
 TEST(ExactMapMatcherTest, NoMatch) {
   std::unique_ptr<ExactMapMatcher<TestData>> matcher =
-      *ExactMapMatcher<TestData>::create(std::make_unique<TestInput>("blah"), absl::nullopt);
+      *ExactMapMatcher<TestData>::create(std::make_unique<TestInput>("blah"), std::nullopt);
 
   TestData data;
   const auto result = matcher->match(data);
@@ -24,7 +24,7 @@ TEST(ExactMapMatcherTest, NoMatch) {
 
 TEST(ExactMapMatcherTest, NoMatchDueToNoData) {
   std::unique_ptr<ExactMapMatcher<TestData>> matcher =
-      *ExactMapMatcher<TestData>::create(std::make_unique<TestInput>(absl::nullopt), absl::nullopt);
+      *ExactMapMatcher<TestData>::create(std::make_unique<TestInput>(std::nullopt), std::nullopt);
 
   TestData data;
   const auto result = matcher->match(data);
@@ -53,7 +53,7 @@ TEST(ExactMapMatcherTest, Match) {
 
 TEST(ExactMapMatcherTest, DataNotAvailable) {
   std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
-      std::make_unique<TestInput>(absl::nullopt, DataAvailability::NotAvailable),
+      std::make_unique<TestInput>(std::nullopt, DataAvailability::NotAvailable),
       stringOnMatch<TestData>("no_match"));
 
   matcher->addChild("match", stringOnMatch<TestData>("match"));

@@ -1,5 +1,7 @@
 #include "contrib/config/source/kv_store_xds_delegate.h"
 
+#include <optional>
+
 #include "envoy/registry/registry.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -9,7 +11,6 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
-#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/config/v3alpha/kv_store_xds_delegate_config.pb.h"
 #include "contrib/envoy/extensions/config/v3alpha/kv_store_xds_delegate_config.pb.validate.h"
 
@@ -85,7 +86,7 @@ KeyValueStoreXdsDelegate::getAllResources(const XdsSourceId& source_id) const {
           // The source id is a prefix of the key, so it should be included in the list of returned
           // resources.
           envoy::service::discovery::v3::Resource r;
-          r.ParseFromString(value);
+          std::ignore = r.ParseFromString(value);
           resources.push_back(std::move(r));
         }
         return KeyValueStore::Iterate::Continue;
@@ -102,8 +103,8 @@ void KeyValueStoreXdsDelegate::onConfigUpdated(
       // TODO(abeyad): Support dynamic parameter constraints.
       r.set_name(decoded_resource.name());
       r.set_version(decoded_resource.version());
-      r.mutable_resource()->PackFrom(decoded_resource.resource());
-      absl::optional<std::chrono::seconds> ttl = absl::nullopt;
+      std::ignore = r.mutable_resource()->PackFrom(decoded_resource.resource());
+      std::optional<std::chrono::seconds> ttl = std::nullopt;
       if (decoded_resource.ttl().has_value()) {
         r.mutable_ttl()->CopyFrom(
             Protobuf::util::TimeUtil::MillisecondsToDuration(decoded_resource.ttl()->count()));
@@ -130,7 +131,7 @@ void KeyValueStoreXdsDelegate::onConfigUpdated(
 
 void KeyValueStoreXdsDelegate::onResourceLoadFailed(
     const XdsSourceId& source_id, const std::string& resource_name,
-    const absl::optional<EnvoyException>& exception) {
+    const std::optional<EnvoyException>& exception) {
   // The resource failed to load, so remove it from the store.
   xds_config_store_->remove(constructKey(source_id, resource_name));
   stats_.xds_load_failed_.inc();

@@ -37,6 +37,7 @@ QatPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
           *message, private_key_provider_context.messageValidationVisitor());
 
 #ifdef QAT_DISABLED
+  static_cast<void>(conf);
   throw EnvoyException("X86_64 architecture is required for QAT.");
 #else
   LibQatCryptoSharedPtr libqat = std::make_shared<LibQatCryptoImpl>();

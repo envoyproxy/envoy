@@ -6,6 +6,7 @@
 #include "source/extensions/resource_monitors/injected_resource/config.h"
 #include "source/server/resource_monitor_config_impl.h"
 
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -29,10 +30,12 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   Server::MockOptions options;
+  testing::NiceMock<Runtime::MockLoader> runtime;
   Server::Configuration::ResourceMonitorFactoryContextImpl context(
-      *dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
-  Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
-  EXPECT_NE(monitor, nullptr);
+      *dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor(), runtime);
+  auto monitor_or_error = factory->createResourceMonitor(config, context);
+  EXPECT_TRUE(monitor_or_error.ok());
+  EXPECT_NE(monitor_or_error.value(), nullptr);
 }
 
 } // namespace

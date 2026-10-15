@@ -54,24 +54,24 @@ void SocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
   }
 }
 
-absl::optional<Socket::Option::Details>
+std::optional<Socket::Option::Details>
 SocketOptionImpl::getOptionDetails(const Socket&,
                                    envoy::config::core::v3::SocketOption::SocketState state) const {
   if ((in_state_.has_value() && state != in_state_) || !isSupported()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   Socket::Option::Details info;
   info.name_ = optname_;
   info.value_ = {value_.begin(), value_.end()};
-  return absl::make_optional(std::move(info));
+  return std::make_optional(std::move(info));
 }
 
 bool SocketOptionImpl::isSupported() const { return optname_.hasValue(); }
 
-absl::optional<Socket::Type> SocketOptionImpl::socketType() const { return socket_type_; }
+std::optional<Socket::Type> SocketOptionImpl::socketType() const { return socket_type_; }
 
-absl::optional<Address::IpVersion> SocketOptionImpl::socketIpVersion() const {
+std::optional<Address::IpVersion> SocketOptionImpl::socketIpVersion() const {
   return socket_ip_version_;
 }
 

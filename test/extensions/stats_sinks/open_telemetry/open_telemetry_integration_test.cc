@@ -17,6 +17,8 @@
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 namespace {
@@ -50,10 +52,7 @@ public:
 
   OpenTelemetryIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {
-    // TODO(ohadvano): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'grpc.otlp_collector.streams_closed_x' and
-    // stat_prefix 'otlp_collector'.
-    skip_tag_extraction_rule_check_ = true;
+    skip_tag_extraction_rule_check_ = false;
     driver_ = (std::get<2>(GetParam()) == ExporterType::GRPC) ? makeGrpcDriver(clientType())
                                                               : makeHttpDriver();
   }
@@ -88,7 +87,7 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       driver_.configureExporter(sink_config, fake_upstreams_.back()->localAddress());
       sink_config.set_prefix(stat_prefix_);
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -104,9 +103,8 @@ public:
   }
 
   ABSL_MUST_USE_RESULT
-  AssertionResult waitForMetricsStream() {
-    return fake_metrics_service_connection_->waitForNewStream(*dispatcher_,
-                                                              otlp_collector_request_);
+  AssertionResult waitForMetricsStream(FakeStreamPtr& otlp_collector_request) {
+    return fake_metrics_service_connection_->waitForNewStream(*dispatcher_, otlp_collector_request);
   }
 
   ABSL_MUST_USE_RESULT
@@ -118,10 +116,11 @@ public:
     VERIFY_ASSERTION(waitForMetricsServiceConnection());
 
     while (!known_counter_exists || !known_gauge_exists || !known_histogram_exists) {
-      VERIFY_ASSERTION(waitForMetricsStream());
+      FakeStreamPtr& otlp_collector_request = otlp_collector_requests_.emplace_back();
+      VERIFY_ASSERTION(waitForMetricsStream(otlp_collector_request));
       opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest export_request;
       VERIFY_ASSERTION(
-          driver_.waitForRequest(otlp_collector_request_, *dispatcher_, export_request));
+          driver_.waitForRequest(otlp_collector_request, *dispatcher_, export_request));
 
       EXPECT_EQ(1, export_request.resource_metrics().size());
       EXPECT_EQ(1, export_request.resource_metrics()[0].scope_metrics().size());
@@ -131,7 +130,23 @@ public:
 
       checker(metrics, known_counter_exists, known_gauge_exists, known_histogram_exists);
 
-      driver_.sendResponse(otlp_collector_request_);
+      driver_.sendResponse(otlp_collector_request);
+    }
+
+    // Drain any metrics-export streams that piled up on the connection while we were
+    // looping above. Each iteration of the loop only handles one stream, but the
+    // stats flush timer keeps firing and queuing more. Leaving them unresponded to
+    // keeps cluster.otlp_collector.upstream_rq_active > 0, which then trips the
+    // subsequent expectUpstreamRequestFinished() wait in the EnvoyGrpc variant.
+    while (true) {
+      FakeStreamPtr pending;
+      if (!fake_metrics_service_connection_->waitForNewStream(*dispatcher_, pending,
+                                                              std::chrono::milliseconds(10))) {
+        break;
+      }
+      VERIFY_ASSERTION(pending->waitForEndStream(*dispatcher_));
+      driver_.sendResponse(pending);
+      otlp_collector_requests_.push_back(std::move(pending));
     }
 
     EXPECT_TRUE(known_counter_exists);
@@ -214,9 +229,9 @@ private:
             // GoogleGrpc uses its own stream tracking; EnvoyGrpc uses Envoy's cluster stats.
             [client_type](IntegrationTestServer& server) {
               if (client_type == Grpc::ClientType::GoogleGrpc) {
-                server.waitForCounterGe("grpc.otlp_collector.streams_closed_0", 1);
+                server.waitForCounter("grpc.otlp_collector.streams_closed_0", Ge(1));
               } else {
-                server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+                server.waitForGauge("cluster.otlp_collector.upstream_rq_active", Eq(0));
               }
             }};
   }
@@ -245,12 +260,12 @@ private:
             },
             // HTTP uses standard cluster request tracking.
             [](IntegrationTestServer& server) {
-              server.waitForGaugeEq("cluster.otlp_collector.upstream_rq_active", 0);
+              server.waitForGauge("cluster.otlp_collector.upstream_rq_active", Eq(0));
             }};
   }
 
   FakeHttpConnectionPtr fake_metrics_service_connection_;
-  FakeStreamPtr otlp_collector_request_;
+  std::vector<FakeStreamPtr> otlp_collector_requests_;
   std::string stat_prefix_;
 };
 
@@ -317,7 +332,7 @@ public:
                      fake_upstreams_.back()->localAddress());
 
       // Add custom conversion rules.
-      Protobuf::TextFormat::ParseFromString(
+      std::ignore = Protobuf::TextFormat::ParseFromString(
           R"pb(matcher_list {
                      matchers {
                        predicate {
@@ -406,7 +421,7 @@ public:
                    })pb",
           sink_config.mutable_custom_metric_conversions());
 
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
 
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(500));
@@ -434,8 +449,20 @@ public:
       }
 
       if (metric.name() == getFullStatName("custom.upstream_rq_time") && metric.has_histogram()) {
+        // Require exactly 1 data point for cluster_0.
+        // otlp_collector's own upstream_rq_time
+        // sample (from stats-export RPCs) may or may
+        // include another data point, which we are not
+        // interested in.
+        const int data_points_with_cluster_0 =
+            std::ranges::count_if(metric.histogram().data_points(), [](const auto& dp) {
+              return std::ranges::any_of(dp.attributes(), [](const auto& attr) {
+                return attr.key() == "envoy.cluster_name" &&
+                       attr.value().string_value() == "cluster_0";
+              });
+            });
+        EXPECT_EQ(1, data_points_with_cluster_0);
         known_histogram_exists = true;
-        EXPECT_EQ(1, metric.histogram().data_points().size());
       }
     }
   }
@@ -469,5 +496,100 @@ TEST_P(OpenTelemetryIntegrationTestCustomConversion, CustomConversionWithAggrega
   driver_.expectUpstreamRequestFinished(*test_server_);
   cleanup();
 }
+
+class OpenTelemetryFormatterHeaderTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                         public HttpIntegrationTest {
+public:
+  OpenTelemetryFormatterHeaderTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    skip_tag_extraction_rule_check_ = false;
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* metrics_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      metrics_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      metrics_cluster->set_name("otlp_collector");
+      ConfigHelper::setHttp2(*metrics_cluster);
+    });
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* sink = bootstrap.add_stats_sinks();
+      sink->set_name("envoy.stat_sinks.open_telemetry");
+      envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig config;
+
+      auto* http = config.mutable_http_service();
+      http->mutable_http_uri()->set_uri(fmt::format(
+          "http://{}:{}/v1/metrics", Network::Test::getLoopbackAddressUrlString(GetParam()),
+          fake_upstreams_.back()->localAddress()->ip()->port()));
+      http->mutable_http_uri()->set_cluster("otlp_collector");
+      http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+
+      auto* header = http->add_request_headers_to_add();
+      header->mutable_header()->set_key("x-custom-formatter");
+      header->mutable_header()->set_value("%HOSTNAME%");
+
+      std::ignore = sink->mutable_typed_config()->PackFrom(config);
+      bootstrap.mutable_stats_flush_interval()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  void cleanup() {
+    if (codec_client_) {
+      codec_client_->close();
+    }
+    if (otlp_stream_) {
+      otlp_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    }
+    if (otlp_connection_) {
+      AssertionResult result = otlp_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = otlp_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+  }
+
+  FakeHttpConnectionPtr otlp_connection_;
+  FakeStreamPtr otlp_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, OpenTelemetryFormatterHeaderTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that request_headers_to_add with a substitution formatter is applied to HTTP exports.
+TEST_P(OpenTelemetryFormatterHeaderTest, HttpExportWithFormatterHeader) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/path"}, {":scheme", "http"}, {":authority", "host"}};
+
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  // Wait for the metrics export HTTP request.
+  ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, otlp_connection_));
+  ASSERT_TRUE(otlp_connection_->waitForNewStream(*dispatcher_, otlp_stream_));
+  ASSERT_TRUE(otlp_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ("POST", otlp_stream_->headers().getMethodValue());
+  EXPECT_EQ("/v1/metrics", otlp_stream_->headers().getPathValue());
+
+  // Verify the custom formatter header was applied.
+  auto values = otlp_stream_->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  ASSERT_FALSE(values.empty());
+  EXPECT_FALSE(values[0]->value().empty());
+  EXPECT_NE(values[0]->value(), "%HOSTNAME%");
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

@@ -36,8 +36,15 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 };
 
-TEST_F(A2aFilterTest, ValidGetRequest) {
-  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}};
+TEST_F(A2aFilterTest, ValidWellKnownGetRequest) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/.well-known/agent-card.json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(A2aFilterTest, ValidWellKnownGetRequestWithQuery) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/.well-known/agent-card.json?version=1"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
@@ -102,6 +109,21 @@ TEST_F(A2aFilterTest, InvalidPostRequestRejectMode) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+TEST_F(A2aFilterTest, RejectsNonDiscoveryGetRequestInRejectMode) {
+  envoy::extensions::filters::http::a2a::v3::A2a proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::a2a::v3::A2a::REJECT);
+  config_ = std::make_shared<A2aFilterConfig>(proto_config, "test_prefix", *scope_.rootScope());
+  filter_ = std::make_unique<A2aFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/internal/admin"}};
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest, "Only A2A traffic is allowed", _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(1, config_->stats().requests_rejected_.value());
+}
+
 TEST_F(A2aFilterTest, DecodeDataValidJson) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -160,7 +182,7 @@ TEST_F(A2aFilterTest, DecodeDataBodyTooLarge) {
   Buffer::OwnedImpl buffer(json);
 
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest, "request body is too large.", _, _, _));
+              sendLocalReply(Http::Code::PayloadTooLarge, "request body is too large.", _, _, _));
   // Should increment body_too_large stat
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
@@ -186,7 +208,7 @@ TEST_F(A2aFilterTest, DecodeDataBodyTooLargePartial) {
   Buffer::OwnedImpl buffer2(part2);
 
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest, "request body is too large.", _, _, _));
+              sendLocalReply(Http::Code::PayloadTooLarge, "request body is too large.", _, _, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer2, true));
   EXPECT_EQ(1, config_->stats().body_too_large_.value());
 }
@@ -314,6 +336,27 @@ TEST_F(A2aFilterTest, RejectInvalidA2aRequest) {
               sendLocalReply(Http::Code::BadRequest,
                              "request must be a valid JSON-RPC 2.0 message for A2A", _, _, _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+TEST_F(A2aFilterTest, DecodeDataSetsDynamicMetadata) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {"content-type", "application/json"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  const std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "message/send",
+    "id": "123",
+    "params": {
+      "taskId": "task-abc"
+    }
+  })";
+  Buffer::OwnedImpl buffer(json);
+
+  // Expectations
+  EXPECT_CALL(decoder_callbacks_, filterConfigName()).WillOnce(Return("a2a_filter"));
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("a2a_filter", _));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
 } // namespace

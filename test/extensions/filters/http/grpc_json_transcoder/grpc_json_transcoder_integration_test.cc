@@ -8,6 +8,7 @@
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -91,7 +92,7 @@ typed_config:
       if (!expected_grpc_request_messages.empty()) {
         Grpc::Decoder grpc_decoder;
         std::vector<Grpc::Frame> frames;
-        ASSERT_TRUE(grpc_decoder.decode(request_body, frames).ok()) << dump;
+        ASSERT_OK(grpc_decoder.decode(request_body, frames)) << dump;
         EXPECT_EQ(expected_grpc_request_messages.size(), frames.size());
 
         for (size_t i = 0; i < expected_grpc_request_messages.size(); ++i) {
@@ -220,7 +221,7 @@ typed_config:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["grpc_json_transcoder"].PackFrom(per_route_config);
+          std::ignore = (*config)["grpc_json_transcoder"].PackFrom(per_route_config);
         };
 
     config_helper_.addConfigModifier(modifier);
@@ -300,7 +301,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EmptyMessageStreamedHttpBodyPost) {
   }
   Grpc::Decoder grpc_decoder;
   std::vector<Grpc::Frame> frames;
-  ASSERT_TRUE(grpc_decoder.decode(request_body, frames).ok()) << dump;
+  ASSERT_OK(grpc_decoder.decode(request_body, frames)) << dump;
   ASSERT_EQ(1, frames.size());
   bookstore::EchoBodyRequest actual_message;
   ASSERT_TRUE(actual_message.ParseFromString(frames[0].data_->toString()));
@@ -1158,7 +1159,7 @@ std::string jsonStrToPbStrucStr(std::string json) {
   Envoy::Protobuf::Struct message;
   std::string structStr;
   TestUtility::loadFromJson(json, message);
-  TextFormat::PrintToString(message, &structStr);
+  std::ignore = TextFormat::PrintToString(message, &structStr);
   return structStr;
 }
 
@@ -1299,7 +1300,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UTF8) {
       false);
 }
 
-TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationGrpcContentType) {
   HttpIntegrationTest::initialize();
 
   // Transcoding does not occur from a request with the gRPC content type.
@@ -1315,7 +1316,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
       Http::TestResponseHeaderMapImpl{
           {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "", true, false, R"({ "theme" : "Children")");
+}
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationUnknownPath) {
+  HttpIntegrationTest::initialize();
   // Transcoding does not occur when unknown path is called.
   // HTTP Request to is passed directly to gRPC backend.
   // gRPC response is passed directly to HTTP client.
@@ -1328,7 +1332,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
       Http::TestResponseHeaderMapImpl{
           {":status", "200"}, {"grpc-status", "5"}, {"grpc-message", "Shelf 9999 Not Found"}},
       "", true, false, R"({ "theme" : "Children")");
+}
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidationUnknownQueryParam) {
+  HttpIntegrationTest::initialize();
   // Transcoding does not occur when unknown query param is included.
   // HTTP Request to is passed directly to gRPC backend.
   // gRPC response is passed directly to HTTP client.

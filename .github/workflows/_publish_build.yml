@@ -1,4 +1,4 @@
-name: Build
+name: Publish (build)
 
 permissions:
   contents: read
@@ -6,14 +6,15 @@ permissions:
 on:
   workflow_call:
     secrets:
-      gpg-key:
-        required: true
-      gpg-key-password:
-        required: true
+      dockerhub-token:
+      gcp-key:
     inputs:
-      arch:
-        type: string
-        required: true
+      docs:
+        type: boolean
+        default: true
+      server:
+        type: boolean
+        default: true
       request:
         type: string
         required: true
@@ -27,94 +28,48 @@ concurrency:
     ${{ github.actor != 'trigger-release-envoy[bot]'
         && github.event.inputs.head_ref
         || github.run_id
-    }}-${{ inputs.arch }}-${{ github.event.workflow.id }}-publish
+    }}-${{ github.event.workflow.id }}-publish-build
   cancel-in-progress: true
 
 
 jobs:
-  binary:
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-    name: Binary
-    uses: ./.github/workflows/_run.yml
-    with:
-      arch: ${{ inputs.arch }}
-      bazel-cache: true
-      bazel-extra: >-
-        --config=rbe
-      target: release.server_only
-      target-suffix: ${{ inputs.arch }}
-      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
-      concurrency-suffix: -${{ inputs.arch }}
-      rbe: true
-      request: ${{ inputs.request }}
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
-      timeout-minutes: 120
-      trusted: ${{ inputs.trusted }}
-      upload-name: release.${{ inputs.arch }}
-      upload-path: container/envoy/${{ inputs.arch }}/bin/
-
-  docker:
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-    name: Docker OCI
-    needs:
-    - binary
-    uses: ./.github/workflows/_run.yml
-    with:
-      arch: ${{ inputs.arch }}
-      target: docker
-      target-suffix: ${{ inputs.arch }}
-      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
-      concurrency-suffix: -${{ inputs.arch }}
-      downloads: |
-        release.${{ inputs.arch }}: container/envoy/${{ inputs.arch }}/bin/
-      request: ${{ inputs.request }}
-      source: |
-        export NO_BUILD_SETUP=1
-        export ENVOY_DOCKER_IN_DOCKER=1
-        export ENVOY_DOCKER_SAVE_IMAGE=true
-        export ENVOY_OCI_DIR=build_images
-      trusted: ${{ inputs.trusted }}
-      upload-name: oci.${{ inputs.arch }}
-      upload-path: container/envoy/${{ inputs.arch }}/build_images
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
-
-  distribution:
-    permissions:
-      actions: read
-      contents: read
-      packages: read
+  server:
+    if: inputs.server
     secrets:
-      gpg-key: ${{ secrets.gpg-key }}
-      gpg-key-password: ${{ secrets.gpg-key-password }}
-    name: Packages
-    needs:
-    - binary
-    uses: ./.github/workflows/_run.yml
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    name: Server
+    uses: ./.github/workflows/_publish_build_server.yml
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+        - x64
+        - arm64
     with:
-      arch: ${{ inputs.arch }}
-      bazel-cache: true
-      bazel-extra: >-
-        --config=remote-cache
-      downloads: |
-        release.${{ inputs.arch }}: container/release/${{ inputs.arch }}/bin/
-      target: distribution
-      target-suffix: ${{ inputs.arch }}
-      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
-      cache-build-image-key-suffix: ${{ inputs.arch == 'arm64' && '-arm64' || '' }}
-      concurrency-suffix: -${{ inputs.arch }}
-      docker-ci: false
-      import-gpg: true
-      rbe: false
+      arch: ${{ matrix.arch }}
       request: ${{ inputs.request }}
-      runs-on: ${{ inputs.arch == 'arm64' && (vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm') || null }}
       trusted: ${{ inputs.trusted }}
-      upload-name: packages.${{ inputs.arch }}
-      upload-path: container/envoy/${{ inputs.arch }}
+
+  docs:
+    if: inputs.docs
+    secrets:
+      dockerhub-token: ${{ secrets.dockerhub-token }}
+      gcp-key: ${{ secrets.gcp-key }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+    name: Docs
+    uses: ./.github/workflows/_publish_build_docs.yml
+    with:
+      docs: ${{ inputs.docs }}
+      request: ${{ inputs.request }}
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      matrix:
+        target:
+        - docs

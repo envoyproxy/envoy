@@ -43,11 +43,11 @@ public:
       if (inner_tls_) {
         envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls;
         inner_socket.set_name("tls");
-        inner_socket.mutable_typed_config()->PackFrom(tls);
+        std::ignore = inner_socket.mutable_typed_config()->PackFrom(tls);
       } else {
         envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
         inner_socket.set_name("raw");
-        inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+        std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       }
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
@@ -55,7 +55,7 @@ public:
           proxy_proto_transport;
       proxy_proto_transport.mutable_transport_socket()->MergeFrom(inner_socket);
       proxy_proto_transport.mutable_config()->MergeFrom(proxy_proto_config);
-      transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
 
       if (health_checks_) {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -268,14 +268,14 @@ public:
       envoy::config::core::v3::TransportSocket inner_socket;
       envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
       inner_socket.set_name("raw");
-      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+      std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
       envoy::config::core::v3::ProxyProtocolConfig proxy_proto_config;
       proxy_proto_config.set_version(version_);
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
           proxy_proto_transport;
       proxy_proto_transport.mutable_transport_socket()->MergeFrom(inner_socket);
       proxy_proto_transport.mutable_config()->MergeFrom(proxy_proto_config);
-      transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
 
       if (health_checks_) {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -448,7 +448,7 @@ public:
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
         auto* ppv_filter = listener->add_listener_filters();
         ppv_filter->set_name("envoy.listener.proxy_protocol");
-        ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
+        std::ignore = ppv_filter->mutable_typed_config()->PackFrom(proxy_protocol);
       });
     }
 
@@ -459,7 +459,7 @@ public:
       envoy::config::core::v3::TransportSocket inner_socket;
       envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
       inner_socket.set_name("raw");
-      inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+      std::ignore = inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
 
       envoy::config::core::v3::ProxyProtocolConfig proxy_protocol;
       proxy_protocol.set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
@@ -491,7 +491,7 @@ public:
           entry->set_value(std::string(tlv.second.begin(), tlv.second.end()));
         }
         Protobuf::Any typed_metadata;
-        typed_metadata.PackFrom(tlvs_metadata);
+        std::ignore = typed_metadata.PackFrom(tlvs_metadata);
         const std::string metadata_key =
             Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
         metadata->mutable_typed_filter_metadata()->emplace(
@@ -505,18 +505,39 @@ public:
           entry->set_value(std::string(tlv.second.begin(), tlv.second.end()));
         }
       }
+      // Add format_string TLVs to proxy protocol config if needed.
+      for (const auto& tlv : format_string_tlvs_from_config_) {
+        auto entry = proxy_protocol.add_added_tlvs();
+        entry->set_type(tlv.first);
+        entry->mutable_format_string()->mutable_text_format_source()->set_inline_string(tlv.second);
+      }
+      // Add TLVs that set both value and format_string to exercise the runtime guard.
+      for (const auto& tlv : value_and_format_string_tlvs_from_config_) {
+        auto entry = proxy_protocol.add_added_tlvs();
+        entry->set_type(std::get<0>(tlv));
+        entry->set_value(std::get<1>(tlv));
+        entry->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+            std::get<2>(tlv));
+      }
 
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
           proxy_proto_transport;
       proxy_proto_transport.mutable_transport_socket()->MergeFrom(inner_socket);
       proxy_proto_transport.mutable_config()->MergeFrom(proxy_protocol);
-      transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
     });
 
     BaseIntegrationTest::initialize();
   }
 
   FakeRawConnectionPtr fake_upstream_connection_;
+
+  // Maps a TLV type to a format string used as its dynamic value in the upstream config.
+  std::vector<std::pair<uint8_t, std::string>> format_string_tlvs_from_config_;
+  // Config TLVs that set both a static value and a format string, keyed as type, value,
+  // format string.
+  std::vector<std::tuple<uint8_t, std::string, std::string>>
+      value_and_format_string_tlvs_from_config_;
 
 private:
   bool disable_listener_filter_ = false;
@@ -932,7 +953,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTcpProxyTLVs
     auto* tlv = tcp_proxy_config.add_proxy_protocol_tlvs();
     tlv->set_type(tlv_type);
     tlv->set_value("tst");
-    config_blob->PackFrom(tcp_proxy_config);
+    std::ignore = config_blob->PackFrom(tcp_proxy_config);
   });
   initialize();
 
@@ -985,6 +1006,127 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTcpProxyTLVs
     EXPECT_EQ(static_cast<uint8_t>(observed_data[55]), 't');
     EXPECT_EQ(static_cast<uint8_t>(observed_data[56]), 's');
     EXPECT_EQ(static_cast<uint8_t>(observed_data[57]), 't');
+  }
+  EXPECT_THAT(observed_data, testing::EndsWith("data"));
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+// Test that a config-level added TLV using a format_string is evaluated per connection and
+// emitted in the upstream proxy protocol v2 header (#45130).
+TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolWithConfigFormatString) {
+  setup(false, {}, {}, {}, {}, true);
+  format_string_tlvs_from_config_ = {{0x96, "podname"}};
+  initialize();
+
+  auto listener_port = lookupPort("listener_0");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(listener_port);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+
+  std::string observed_data;
+  ASSERT_TRUE(tcp_client->write("data"));
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(42, &observed_data));
+    // - signature
+    // - version and command type, address family and protocol, length of addresses
+    // - src address, dest address
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x16, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
+    EXPECT_THAT(observed_data, testing::StartsWith(header_start));
+    // Match destination port.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[26]), listener_port >> 8);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[27]), listener_port & 0xFF);
+
+    // Match tlv: 0x96(type), 0x00, 0x07(length), formatted value.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[28]), 0x96);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[29]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[30]), 0x07);
+    EXPECT_EQ(observed_data.substr(31, 7), "podname");
+  } else if (GetParam() == Envoy::Network::Address::IpVersion::v6) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(66, &observed_data));
+    // - signature
+    // - version and command type, address family and protocol, length of addresses
+    // - src address
+    // - dest address
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x2e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
+    EXPECT_THAT(observed_data, testing::StartsWith(header_start));
+    // Match destination port.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[50]), listener_port >> 8);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[51]), listener_port & 0xFF);
+
+    // Match tlv: 0x96(type), 0x00, 0x07(length), formatted value.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[52]), 0x96);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[53]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[54]), 0x07);
+    EXPECT_EQ(observed_data.substr(55, 7), "podname");
+  }
+  EXPECT_THAT(observed_data, testing::EndsWith("data"));
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+// Test that with the runtime guard disabled, a config-level added TLV reads only the static value
+// and ignores format_string.
+TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolConfigFormatStringDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.proxy_protocol_added_tlvs_format_string", "false");
+  setup(false, {}, {}, {}, {}, true);
+  value_and_format_string_tlvs_from_config_ = {
+      {0x96, "legacy", "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"}};
+  initialize();
+
+  auto listener_port = lookupPort("listener_0");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(listener_port);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+
+  std::string observed_data;
+  ASSERT_TRUE(tcp_client->write("data"));
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(41, &observed_data));
+    // - signature
+    // - version and command type, address family and protocol, length of addresses
+    // - src address, dest address
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x11, 0x00, 0x15, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
+    EXPECT_THAT(observed_data, testing::StartsWith(header_start));
+    // Match destination port.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[26]), listener_port >> 8);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[27]), listener_port & 0xFF);
+
+    // Match tlv: 0x96(type), 0x00, 0x06(length), static value.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[28]), 0x96);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[29]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[30]), 0x06);
+    EXPECT_EQ(observed_data.substr(31, 6), "legacy");
+  } else if (GetParam() == Envoy::Network::Address::IpVersion::v6) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(65, &observed_data));
+    // - signature
+    // - version and command type, address family and protocol, length of addresses
+    // - src address
+    // - dest address
+    const char data[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+                         0x21, 0x21, 0x00, 0x2d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
+    absl::string_view header_start(data, sizeof(data));
+    EXPECT_THAT(observed_data, testing::StartsWith(header_start));
+    // Match destination port.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[50]), listener_port >> 8);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[51]), listener_port & 0xFF);
+
+    // Match tlv: 0x96(type), 0x00, 0x06(length), static value.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[52]), 0x96);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[53]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[54]), 0x06);
+    EXPECT_EQ(observed_data.substr(55, 6), "legacy");
   }
   EXPECT_THAT(observed_data, testing::EndsWith("data"));
 

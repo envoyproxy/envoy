@@ -1,10 +1,8 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <functional>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 
 #include "source/common/common/logger.h"
@@ -86,7 +84,7 @@ public:
   const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
     return nullptr;
   }
-  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  std::optional<std::string> networkNamespace() const override { return std::nullopt; }
   Network::Address::InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override {
     return nullptr;
   }
@@ -113,6 +111,9 @@ private:
   std::string address_string_;
   std::string logical_name_;
   ReverseConnectionIp ip_;
+  // Pre-built loopback sockaddr returned by `sockAddr()`. Holding it per instance avoids
+  // the data race of a function-local static written by every worker that reads the address.
+  sockaddr_in sockaddr_in_{};
 };
 
 } // namespace ReverseConnection

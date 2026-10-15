@@ -43,7 +43,7 @@ public:
 
   absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr> createLocalAddressSelector(
       std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
-      absl::optional<std::string>) const override {
+      std::optional<std::string>) const override {
     return std::make_shared<TestUpstreamLocalAddressSelector>(upstream_local_addresses, num_calls_,
                                                               return_empty_source_address_);
   }

@@ -14,18 +14,20 @@ namespace OpenTelemetry {
 namespace {
 bool isEmptyResource(const Resource& resource) { return resource.attributes_.empty(); }
 
-Resource createInitialResource(absl::string_view service_name) {
+Resource createInitialResource(absl::string_view service_name,
+                               const ResourceProviderOptions& options) {
   Resource resource{};
 
   // Creates initial resource with the static service.name and telemetry.sdk.* attributes.
-  if (!service_name.empty()) {
+  if (options.set_service_name_resource_attribute && !service_name.empty()) {
     resource.attributes_[kServiceNameKey] = service_name;
   }
-  resource.attributes_[kTelemetrySdkLanguageKey] = kDefaultTelemetrySdkLanguage;
 
-  resource.attributes_[kTelemetrySdkNameKey] = kDefaultTelemetrySdkName;
-
-  resource.attributes_[kTelemetrySdkVersionKey] = Envoy::VersionInfo::version();
+  if (options.set_telemetry_sdk_resource_attributes) {
+    resource.attributes_[kTelemetrySdkLanguageKey] = kDefaultTelemetrySdkLanguage;
+    resource.attributes_[kTelemetrySdkNameKey] = kDefaultTelemetrySdkName;
+    resource.attributes_[kTelemetrySdkVersionKey] = Envoy::VersionInfo::version();
+  }
 
   return resource;
 }
@@ -85,10 +87,10 @@ void mergeResource(Resource& old_resource, const Resource& updating_resource) {
 Resource ResourceProviderImpl::getResource(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
         resource_detectors,
-    Envoy::Server::Configuration::ServerFactoryContext& context,
-    absl::string_view service_name) const {
+    Envoy::Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+    const ResourceProviderOptions& options) const {
 
-  Resource resource = createInitialResource(service_name);
+  Resource resource = createInitialResource(service_name, options);
 
   for (const auto& detector_config : resource_detectors) {
     ResourceDetectorPtr detector;

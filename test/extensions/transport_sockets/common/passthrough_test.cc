@@ -64,8 +64,9 @@ TEST_F(PassthroughTest, CanFlushCloseDefersToInnerSocket) {
 
 // Test closeSocket method defers to inner socket
 TEST_F(PassthroughTest, CloseSocketDefersToInnerSocket) {
-  EXPECT_CALL(*inner_socket_, closeSocket(testing::Eq(Network::ConnectionEvent::LocalClose)));
-  passthrough_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
+  EXPECT_CALL(*inner_socket_,
+              closeSocket(testing::Eq(Network::ConnectionEvent::LocalClose), false));
+  passthrough_socket_->closeSocket(Network::ConnectionEvent::LocalClose, false);
 }
 
 // Test doRead method defers to inner socket

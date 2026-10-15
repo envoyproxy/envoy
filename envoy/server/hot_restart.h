@@ -1,13 +1,22 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
+#include <memory>
+#include <optional>
 #include <string>
 
+#include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/allocator.h"
+#include "envoy/network/address.h"
+#include "envoy/network/listener.h"
+#include "envoy/network/socket.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Server {
@@ -38,6 +47,24 @@ public:
    * clear out old connections.
    */
   virtual void drainParentListeners() PURE;
+
+  /**
+   * @return whether this (child) instance has already asked the parent to stop accepting new
+   * connections, i.e. whether drainParentListeners() has sent the drain-listeners request. Returns
+   * true when there is no parent (fresh start) or hot restart is disabled. The drain request is
+   * fire-and-forget, so this reflects that the request was sent, not that the parent's listeners
+   * have stopped accepting. The parent processes the request asynchronously over the domain socket,
+   * so a brief window can remain where the parent still accepts after this returns true.
+   *
+   * This is deliberately distinct from parentDrainedCallbackRegistrar(): that fires only once the
+   * parent is fully drained at the parent-shutdown deadline (potentially minutes later), whereas
+   * this flips as soon as the parent is asked to stop accepting. Callers that must not race the
+   * parent's still-open listeners should combine this with a short propagation delay before acting
+   * (the reverse-tunnel initiator does this).
+   *
+   * Safe to call from any thread.
+   */
+  virtual bool parentStopAcceptingRequested() PURE;
 
   /**
    * Retrieve a listening socket on the specified address from the parent process. The socket will
@@ -87,7 +114,7 @@ public:
    * to start up in the new process.
    * @return response if the parent is alive.
    */
-  virtual absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
+  virtual std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() PURE;
 
   /**
    * Tell our parent process to gracefully terminate itself.

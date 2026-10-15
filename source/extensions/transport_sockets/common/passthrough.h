@@ -72,7 +72,7 @@ public:
   absl::string_view failureReason() const override;
   bool canFlushClose() override;
   Api::SysCallIntResult connect(Network::ConnectionSocket& socket) override;
-  void closeSocket(Network::ConnectionEvent event) override;
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;

@@ -1,6 +1,7 @@
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_http_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
 
@@ -27,8 +28,8 @@ public:
         .WillByDefault(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
     cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
 
-    http_metrics_exporter_ =
-        std::make_unique<OpenTelemetryHttpMetricsExporter>(cluster_manager_, http_service);
+    http_metrics_exporter_ = std::make_unique<OpenTelemetryHttpMetricsExporter>(
+        cluster_manager_, http_service, server_context_);
   }
 
   MetricsExportRequestPtr createTestMetricsRequest() {
@@ -44,6 +45,7 @@ public:
   }
 
 protected:
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   std::unique_ptr<OpenTelemetryHttpMetricsExporter> http_metrics_exporter_;
 };

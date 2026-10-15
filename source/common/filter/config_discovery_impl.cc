@@ -64,7 +64,7 @@ absl::StatusOr<std::unique_ptr<FilterConfigSubscription>> FilterConfigSubscripti
     const std::string& filter_config_name,
     Server::Configuration::ServerFactoryContext& factory_context,
     Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-    FilterConfigProviderManagerImplBase& filter_config_provider_manager,
+    std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
     const std::string& subscription_id) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<FilterConfigSubscription>(new FilterConfigSubscription(
@@ -78,22 +78,23 @@ FilterConfigSubscription::FilterConfigSubscription(
     const std::string& filter_config_name,
     Server::Configuration::ServerFactoryContext& factory_context,
     Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-    FilterConfigProviderManagerImplBase& filter_config_provider_manager,
+    std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
     const std::string& subscription_id, absl::Status& creation_status)
-    : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
-          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      filter_config_name_(filter_config_name),
+    : filter_config_name_(filter_config_name),
       last_(std::make_shared<ConfigVersion>("", factory_context.timeSource().systemTime())),
       factory_context_(factory_context),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
+      resource_type_helper_(factory_context.messageValidationContext().dynamicValidationVisitor(),
+                            "name"),
       scope_(factory_context.scope().createScope(stat_prefix)),
       stats_({ALL_EXTENSION_CONFIG_DISCOVERY_STATS(POOL_COUNTER(*scope_))}),
       filter_config_provider_manager_(filter_config_provider_manager),
       subscription_id_(subscription_id) {
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   auto subscription_or_error = cluster_manager.subscriptionFactory().subscriptionFromConfigSource(
-      config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+      config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+      resource_type_helper_.resourceDecoder(), {});
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
 }
@@ -114,8 +115,9 @@ FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResour
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected number of resources in ExtensionConfigDS response: {}", resources.size()));
   }
-  const auto& filter_config = dynamic_cast<const envoy::config::core::v3::TypedExtensionConfig&>(
-      resources[0].get().resource());
+  const auto& filter_config =
+      Envoy::Protobuf::DynamicCastMessage<envoy::config::core::v3::TypedExtensionConfig>(
+          resources[0].get().resource());
   if (filter_config.name() != filter_config_name_) {
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected resource name in ExtensionConfigDS response: {}", filter_config.name()));
@@ -138,7 +140,7 @@ FilterConfigSubscription::onConfigUpdate(const std::vector<Config::DecodedResour
     }
   }
   std::tie(next->config_, next->factory_name_) =
-      filter_config_provider_manager_.getMessage(filter_config, factory_context_);
+      filter_config_provider_manager_->getMessage(filter_config, factory_context_);
   for (auto* provider : filter_config_providers_) {
     provider->validateMessage(filter_config_name_, *next->config_, next->factory_name_);
   }
@@ -198,7 +200,7 @@ FilterConfigSubscription::~FilterConfigSubscription() {
   // If we get destroyed during initialization, make sure we signal that we "initialized".
   init_target_.ready();
   // Remove the subscription from the provider manager.
-  filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
+  filter_config_provider_manager_->subscriptions_.erase(subscription_id_);
 }
 
 void FilterConfigSubscription::incrementConflictCounter() { stats_.config_conflict_.inc(); }
@@ -218,8 +220,9 @@ FilterConfigProviderManagerImplBase::getSubscription(
   const std::string subscription_id = absl::StrCat(MessageUtil::hash(config_source), ".", name);
   auto it = subscriptions_.find(subscription_id);
   if (it == subscriptions_.end()) {
-    auto subscription_or_error = FilterConfigSubscription::create(
-        config_source, name, server_context, cluster_manager, stat_prefix, *this, subscription_id);
+    auto subscription_or_error =
+        FilterConfigSubscription::create(config_source, name, server_context, cluster_manager,
+                                         stat_prefix, shared_from_this(), subscription_id);
     RETURN_IF_NOT_OK(subscription_or_error.status());
     std::shared_ptr<FilterConfigSubscription> subscription = std::move(*subscription_or_error);
     subscriptions_.insert({subscription_id, std::weak_ptr<FilterConfigSubscription>(subscription)});
@@ -302,7 +305,7 @@ ProtobufTypes::MessagePtr FilterConfigProviderManagerImplBase::dumpEcdsFilterCon
     filter_config.set_name(ecds_filter->name());
     MessageUtil::packFrom(*filter_config.mutable_typed_config(), *ecds_filter->lastConfig());
     auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
-    filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
+    std::ignore = filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
     filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());
     TimestampUtil::systemClockToTimestamp(ecds_filter->lastUpdated(),
                                           *(filter_config_dump.mutable_last_updated()));

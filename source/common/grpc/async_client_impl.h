@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -114,7 +115,7 @@ private:
   void streamError(Status::GrpcStatus grpc_status) { streamError(grpc_status, EMPTY_STRING); }
 
   void cleanup();
-  void trailerResponse(absl::optional<Status::GrpcStatus> grpc_status,
+  void trailerResponse(std::optional<Status::GrpcStatus> grpc_status,
                        const std::string& grpc_message);
 
   // Deliver notification and update span when the connection closes.
@@ -128,7 +129,10 @@ protected:
   std::string method_name_;
   Tracing::SpanPtr current_span_;
 
-  RawAsyncStreamCallbacks& callbacks_;
+  // Optional reference to the stream callbacks. This is reset once the stream is cleaned up or the
+  // owner detaches via waitForRemoteCloseAndDelete(), after which no further callbacks may be
+  // invoked. All call sites must check has_value() before invoking.
+  OptRef<RawAsyncStreamCallbacks> callbacks_;
   Http::AsyncClient::StreamOptions options_;
   bool http_reset_{};
   bool waiting_to_delete_on_remote_close_{};

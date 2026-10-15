@@ -24,8 +24,14 @@ class SpanContextExtractor {
 public:
   SpanContextExtractor(Tracing::TraceContext& trace_context, bool w3c_fallback_enabled = false);
   ~SpanContextExtractor();
-  absl::optional<bool> extractSampled();
+  std::optional<bool> extractSampled();
   std::pair<SpanContext, bool> extractSpanContext(bool is_sampled);
+
+  /**
+   * @return true if the span context was extracted from the B3 single header ("b3"). Only valid
+   * after extractSpanContext() is called.
+   */
+  bool b3SingleFormatUsed() const { return b3_single_format_used_; }
 
 private:
   /*
@@ -45,6 +51,7 @@ private:
   bool tryExtractSampledFromB3SingleFormat();
   const Tracing::TraceContext& trace_context_;
   bool w3c_fallback_enabled_;
+  bool b3_single_format_used_{false};
 };
 
 } // namespace Zipkin

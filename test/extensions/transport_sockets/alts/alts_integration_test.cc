@@ -9,6 +9,7 @@
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 
 #include "source/common/common/thread.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/transport_sockets/alts/config.h"
 #include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
@@ -78,6 +79,7 @@ public:
       if (request.has_client_start()) {
         client_versions = request.client_start().rpc_versions();
         client_max_frame_size = request.client_start().max_frame_size();
+        client_target_name = request.client_start().target_name();
         // Sets response to make first request successful.
         response.set_out_frames(kClientInitFrame);
         response.set_bytes_consumed(0);
@@ -102,6 +104,7 @@ public:
 
   size_t client_max_frame_size{0};
   size_t server_max_frame_size{0};
+  std::string client_target_name;
 };
 
 // FakeHandshakeService implements a fake handshaker service using a fake key
@@ -326,11 +329,13 @@ public:
         alts_config.add_peer_service_accounts(server_peer_identity_);
       }
       alts_config.set_handshaker_service(fakeHandshakerServerAddress(server_connect_handshaker_));
-      transport_socket->mutable_typed_config()->PackFrom(alts_config);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(alts_config);
     });
 
     config_helper_.prependFilter(R"EOF(
     name: decode-dynamic-metadata-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.DecodeDynamicMetadataFilterConfig
     )EOF");
 
     HttpIntegrationTest::initialize();
@@ -401,13 +406,15 @@ public:
     fake_handshaker_server_thread_->join();
   }
 
-  Network::TransportSocketPtr makeAltsTransportSocket() {
-    return client_alts_->createTransportSocket(/*options=*/nullptr,
+  Network::TransportSocketPtr
+  makeAltsTransportSocket(Network::TransportSocketOptionsConstSharedPtr options = nullptr) {
+    return client_alts_->createTransportSocket(options,
                                                /*host=*/nullptr);
   }
 
-  Network::ClientConnectionPtr makeAltsConnection() {
-    auto client_transport_socket = makeAltsTransportSocket();
+  Network::ClientConnectionPtr
+  makeAltsConnection(Network::TransportSocketOptionsConstSharedPtr options = nullptr) {
+    auto client_transport_socket = makeAltsTransportSocket(options);
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                std::move(client_transport_socket), nullptr,
@@ -538,7 +545,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientInvalidPeer,
 // any account in config, the handshake will fail and client closes connection.
 TEST_P(AltsIntegrationTestClientInvalidPeer, ClientValidationFail) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
 }
 
@@ -586,7 +593,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestClientWrongHandshaker,
 // and connection closes.
 TEST_P(AltsIntegrationTestClientWrongHandshaker, ConnectToWrongHandshakerAddress) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
 }
 
@@ -606,7 +613,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsIntegrationTestCapturingHandshaker,
 // Verifies that handshake request should include ALTS version.
 TEST_P(AltsIntegrationTestCapturingHandshaker, CheckAltsVersion) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
   EXPECT_EQ(capturing_handshaker_service_->client_versions.max_rpc_version().major(),
             capturing_handshaker_service_->server_versions.max_rpc_version().major());
@@ -625,10 +632,20 @@ TEST_P(AltsIntegrationTestCapturingHandshaker, CheckAltsVersion) {
 // Verifies that handshake request should include max frame size.
 TEST_P(AltsIntegrationTestCapturingHandshaker, CheckMaxFrameSize) {
   initialize();
-  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), std::nullopt);
   EXPECT_FALSE(codec_client_->connected());
   EXPECT_EQ(capturing_handshaker_service_->client_max_frame_size, 1024 * 1024);
   EXPECT_EQ(capturing_handshaker_service_->server_max_frame_size, 1024 * 1024);
+}
+
+// Verifies that StartClientHandshakeReq includes target_name when serverNameOverride is configured.
+TEST_P(AltsIntegrationTestCapturingHandshaker, CheckTargetNameOverride) {
+  initialize();
+  auto options =
+      std::make_shared<Network::TransportSocketOptionsImpl>("custom.alts.target.googleapis.com");
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(options), std::nullopt);
+  EXPECT_FALSE(codec_client_->connected());
+  EXPECT_EQ("custom.alts.target.googleapis.com", capturing_handshaker_service_->client_target_name);
 }
 
 } // namespace

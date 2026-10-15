@@ -7,7 +7,7 @@
 #include "envoy/config/core/v3/http_service.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
-#include "envoy/local_info/local_info.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -15,7 +15,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/async_client_utility.h"
-#include "source/common/http/headers.h"
+#include "source/common/http/http_service_headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -23,6 +23,7 @@
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/access_loggers/open_telemetry/otlp_log_utils.h"
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -41,12 +42,24 @@ namespace OpenTelemetry {
 class HttpAccessLoggerImpl : public Logger::Loggable<Logger::Id::misc>,
                              public Http::AsyncClient::Callbacks {
 public:
+  // Production constructor that delegates to the overload below with ResourceProviderImpl.
   HttpAccessLoggerImpl(
       Upstream::ClusterManager& cluster_manager,
       const envoy::config::core::v3::HttpService& http_service,
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
-      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+      Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context);
+
+  // Constructor allowing injection of a custom ResourceProvider (e.g. for testing).
+  HttpAccessLoggerImpl(
+      Upstream::ClusterManager& cluster_manager,
+      const envoy::config::core::v3::HttpService& http_service,
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
+      const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+          config,
+      Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context,
+      const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider);
 
   using SharedPtr = std::shared_ptr<HttpAccessLoggerImpl>;
 
@@ -67,7 +80,7 @@ private:
   envoy::config::core::v3::HttpService http_service_;
   // Track active HTTP requests to be able to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
-  std::vector<std::pair<const Http::LowerCaseString, const std::string>> parsed_headers_to_add_;
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator_;
 
   // Message structure: ExportLogsServiceRequest -> ResourceLogs -> ScopeLogs -> LogRecord.
   opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message_;
@@ -88,16 +101,29 @@ private:
  * Cache for HTTP access loggers. Creates one logger per unique configuration.
  */
 class HttpAccessLoggerCacheImpl : public Singleton::Instance,
-                                  public Logger::Loggable<Logger::Id::misc> {
+                                  public Logger::Loggable<Logger::Id::misc>,
+                                  public std::enable_shared_from_this<HttpAccessLoggerCacheImpl> {
 public:
-  HttpAccessLoggerCacheImpl(Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                            ThreadLocal::SlotAllocator& tls,
-                            const LocalInfo::LocalInfo& local_info);
+  HttpAccessLoggerCacheImpl(Server::Configuration::ServerFactoryContext& server_context);
 
+  // Production method that delegates to the overload below with ResourceProviderImpl.
   HttpAccessLoggerImpl::SharedPtr getOrCreateLogger(
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
           config,
-      const envoy::config::core::v3::HttpService& http_service);
+      const envoy::config::core::v3::HttpService& http_service,
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator);
+
+  // Method allowing injection of a custom ResourceProvider (e.g. for testing).
+  HttpAccessLoggerImpl::SharedPtr getOrCreateLogger(
+      const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+          config,
+      const envoy::config::core::v3::HttpService& http_service,
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
+      const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider);
+
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator>
+  getOrCreateApplicator(const envoy::config::core::v3::HttpService& http_service,
+                        Server::Configuration::ServerFactoryContext& server_context);
 
 private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
@@ -106,10 +132,14 @@ private:
     absl::flat_hash_map<std::size_t, HttpAccessLoggerImpl::SharedPtr> access_loggers_;
   };
 
-  Upstream::ClusterManager& cluster_manager_;
-  Stats::Scope& scope_;
-  ThreadLocal::SlotPtr tls_slot_;
-  const LocalInfo::LocalInfo& local_info_;
+  ThreadLocal::SlotSharedPtr tls_slot_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+
+  // Cache of headers applicators, keyed by HttpService config hash. Protected by
+  // applicator_mutex_ because the custom deleter on the shared_ptr may run on any thread.
+  absl::Mutex applicator_mutex_;
+  absl::flat_hash_map<std::size_t, std::weak_ptr<const Http::HttpServiceHeadersApplicator>>
+      applicators_ ABSL_GUARDED_BY(applicator_mutex_);
 };
 
 using HttpAccessLoggerCacheSharedPtr = std::shared_ptr<HttpAccessLoggerCacheImpl>;
@@ -122,7 +152,8 @@ public:
   HttpAccessLog(
       ::Envoy::AccessLog::FilterPtr&& filter,
       envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
-      ThreadLocal::SlotAllocator& tls, HttpAccessLoggerCacheSharedPtr access_logger_cache,
+      HttpAccessLoggerCacheSharedPtr access_logger_cache,
+      Server::Configuration::ServerFactoryContext& server_context,
       const std::vector<Formatter::CommandParserPtr>& commands);
 
 private:
@@ -138,7 +169,7 @@ private:
   // Common::ImplBase
   void emitLog(const Formatter::Context& context, const StreamInfo::StreamInfo& info) override;
 
-  const ThreadLocal::SlotPtr tls_slot_;
+  const ThreadLocal::SlotSharedPtr tls_slot_;
   const HttpAccessLoggerCacheSharedPtr access_logger_cache_;
   const envoy::config::core::v3::HttpService http_service_;
   std::unique_ptr<OpenTelemetryFormatter> body_formatter_;

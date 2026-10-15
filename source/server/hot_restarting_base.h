@@ -74,7 +74,7 @@ private:
   //
   // When filled, the size in bytes that the in-flight HotRestartMessage should be.
   // When empty, we're ready to start receiving a new message (starting with a uint64 'length').
-  absl::optional<uint64_t> expected_proto_length_;
+  std::optional<uint64_t> expected_proto_length_;
   // How much of the current in-flight message (including both the uint64 'length', plus the proto
   // itself) we have received. Once this equals expected_proto_length_ + sizeof(uint64_t), we're
   // ready to parse the HotRestartMessage. Should be set to 0 in between messages, to indicate

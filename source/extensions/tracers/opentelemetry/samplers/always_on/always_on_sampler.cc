@@ -13,7 +13,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 SamplingResult AlwaysOnSampler::shouldSample(const StreamInfo::StreamInfo&,
-                                             const absl::optional<SpanContext> parent_context,
+                                             const std::optional<SpanContext> parent_context,
                                              const std::string& /*trace_id*/,
                                              const std::string& /*name*/, OTelSpanKind /*kind*/,
                                              OptRef<const Tracing::TraceContext> /*trace_context*/,

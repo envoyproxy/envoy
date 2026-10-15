@@ -2,6 +2,7 @@
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "cel/expr/syntax.pb.h"
@@ -15,7 +16,9 @@ namespace Common {
 namespace Expr {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
 using ::testing::NiceMock;
+using ::testing::Not;
 
 class CelConfigTest : public testing::Test {
 protected:
@@ -45,12 +48,12 @@ TEST_F(CelConfigTest, StringConversionEnabled) {
 
   // String conversion should work.
   auto compiled = CompiledExpression::Create(builder, string_conv_expr);
-  ASSERT_TRUE(compiled.ok());
+  ASSERT_OK(compiled);
 
   auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
   auto result = compiled.value().evaluate(*activation, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "123");
 }
@@ -76,12 +79,12 @@ TEST_F(CelConfigTest, StringConcatEnabled) {
 
   // String concatenation should work.
   auto compiled = CompiledExpression::Create(builder, string_concat_expr);
-  ASSERT_TRUE(compiled.ok());
+  ASSERT_OK(compiled);
 
   auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
   auto result = compiled.value().evaluate(*activation, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "foobar");
 }
@@ -109,12 +112,12 @@ TEST_F(CelConfigTest, StringFunctionsEnabled) {
 
   // replace should work.
   auto compiled = CompiledExpression::Create(builder, replace_expr);
-  ASSERT_TRUE(compiled.ok());
+  ASSERT_OK(compiled);
 
   auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
   auto result = compiled.value().evaluate(*activation, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "heLLO");
 }
@@ -140,7 +143,7 @@ TEST_F(CelConfigTest, StringFunctionsDisabled) {
 
   // replace should fail when string functions are disabled.
   auto compiled = CompiledExpression::Create(builder, replace_expr);
-  EXPECT_FALSE(compiled.ok());
+  EXPECT_THAT(compiled, Not(IsOk()));
 }
 
 TEST_F(CelConfigTest, DefaultConfiguration) {
@@ -158,7 +161,7 @@ TEST_F(CelConfigTest, DefaultConfiguration) {
 
   // replace should fail with default configuration (string functions disabled).
   auto compiled = CompiledExpression::Create(builder, replace_expr);
-  EXPECT_FALSE(compiled.ok());
+  EXPECT_THAT(compiled, Not(IsOk()));
 }
 
 // TODO(cel): This test is temporarily disabled because the MockServerFactoryContext
@@ -215,12 +218,12 @@ TEST_F(CelConfigTest, CreateWithConfig) {
 
   // Create expression with configuration.
   auto compiled = CompiledExpression::Create(context_, replace_expr, makeOptRef(config));
-  ASSERT_TRUE(compiled.ok());
+  ASSERT_OK(compiled);
 
   auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
   auto result = compiled.value().evaluate(*activation, &arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "wello");
 }
@@ -257,13 +260,13 @@ TEST_F(CelConfigTest, CreateBuilderForArenaStringFunctions) {
   call_expr->add_args()->mutable_const_expr()->set_string_value("he");
 
   auto compiled = CompiledExpression::Create(builder, replace_expr);
-  ASSERT_TRUE(compiled.ok());
+  ASSERT_OK(compiled);
 
   Protobuf::Arena eval_arena;
   auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
   auto result = compiled.value().evaluate(*activation, &eval_arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "heLLO");
 }
@@ -287,13 +290,13 @@ TEST_F(CelConfigTest, CreateBuilderForArenaAllFeatures) {
   concat_expr.mutable_call_expr()->add_args()->mutable_const_expr()->set_string_value("bar");
 
   auto compiled = CompiledExpression::Create(builder, concat_expr);
-  ASSERT_TRUE(compiled.ok());
+  ASSERT_OK(compiled);
 
   Protobuf::Arena eval_arena;
   auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);
   auto result = compiled.value().evaluate(*activation, &eval_arena);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_TRUE(result.value().IsString());
   EXPECT_EQ(result.value().StringOrDie().value(), "foobar");
 }

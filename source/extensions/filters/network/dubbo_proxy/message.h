@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -8,7 +9,6 @@
 #include "source/common/buffer/buffer_impl.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -116,8 +116,8 @@ public:
 
   virtual const std::string& serviceName() const PURE;
   virtual const std::string& methodName() const PURE;
-  virtual const absl::optional<std::string>& serviceVersion() const PURE;
-  virtual const absl::optional<std::string>& serviceGroup() const PURE;
+  virtual const std::optional<std::string>& serviceVersion() const PURE;
+  virtual const std::optional<std::string>& serviceGroup() const PURE;
 };
 
 using RpcInvocationSharedPtr = std::shared_ptr<RpcInvocation>;

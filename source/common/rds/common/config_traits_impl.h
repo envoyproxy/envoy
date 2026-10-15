@@ -19,10 +19,12 @@ public:
     return std::make_shared<const NullConfigImpl>();
   }
 
+  // The simple route configurations that use this trait have no resources that need to be
+  // warmed up, so the init manager is ignored.
   ConfigConstSharedPtr createConfig(const Protobuf::Message& rc,
                                     Server::Configuration::ServerFactoryContext& context,
-                                    bool validate_clusters_default) const override {
-    ASSERT(dynamic_cast<const RouteConfiguration*>(&rc));
+                                    Init::Manager&, bool validate_clusters_default) const override {
+    ASSERT(Envoy::Protobuf::DynamicCastMessage<RouteConfiguration>(&rc));
     return std::make_shared<const ConfigImpl>(static_cast<const RouteConfiguration&>(rc), context,
                                               validate_clusters_default);
   }

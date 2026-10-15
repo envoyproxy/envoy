@@ -80,7 +80,7 @@ public:
     };
   }
 
-  size_t execute(const char* slice, int len) {
+  size_t execute(const char* slice, size_t len) {
     return http_parser_execute(&parser_, &settings_, slice, len);
   }
 
@@ -97,12 +97,12 @@ public:
 
   bool isHttp11() const { return parser_.http_major == 1 && parser_.http_minor == 1; }
 
-  absl::optional<uint64_t> contentLength() const {
+  std::optional<uint64_t> contentLength() const {
     // An unset content length will be have all bits set.
     // See
     // https://github.com/nodejs/http-parser/blob/ec8b5ee63f0e51191ea43bb0c6eac7bfbff3141d/http_parser.h#L311
     if (parser_.content_length == ULLONG_MAX) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return parser_.content_length;
   }
@@ -138,7 +138,7 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* da
 // same compilation unit so that the destructor has a complete definition of Impl.
 LegacyHttpParserImpl::~LegacyHttpParserImpl() = default;
 
-size_t LegacyHttpParserImpl::execute(const char* slice, int len) {
+size_t LegacyHttpParserImpl::execute(const char* slice, size_t len) {
   return impl_->execute(slice, len);
 }
 
@@ -152,7 +152,7 @@ Http::Code LegacyHttpParserImpl::statusCode() const { return impl_->statusCode()
 
 bool LegacyHttpParserImpl::isHttp11() const { return impl_->isHttp11(); }
 
-absl::optional<uint64_t> LegacyHttpParserImpl::contentLength() const {
+std::optional<uint64_t> LegacyHttpParserImpl::contentLength() const {
   return impl_->contentLength();
 }
 

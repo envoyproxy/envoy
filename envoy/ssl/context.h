@@ -1,16 +1,18 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Ssl {
+
+struct TlsContext;
 
 using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v3::CertificateDetails>;
 
@@ -25,12 +27,12 @@ public:
    * @return the number of days in this context until the next certificate will expire, the value is
    * set when not expired.
    */
-  virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
+  virtual std::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
 
   /**
-   * @return certificate details conforming to proto admin.v2alpha.certs.
+   * @return certificate details for each trusted CA certificate.
    */
-  virtual CertificateDetailsPtr getCaCertInformation() const PURE;
+  virtual std::vector<CertificateDetailsPtr> getCaCertInformation() const PURE;
 
   /**
    * @return certificate details conforming to proto admin.v2alpha.certs.
@@ -39,13 +41,20 @@ public:
 
   /**
    * @return the number of seconds in this context until the next OCSP response will
-   * expire, or `absl::nullopt` if no OCSP responses exist.
+   * expire, or `std::nullopt` if no OCSP responses exist.
    */
-  virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+  virtual std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 
-class ClientContext : public virtual Context {};
+class ClientContext : public virtual Context {
+public:
+  /**
+   * @return the TLS context, which holds the certificate material of this context. Client
+   * contexts always have exactly one TLS context.
+   */
+  virtual const TlsContext& getTlsContext() const PURE;
+};
 using ClientContextSharedPtr = std::shared_ptr<ClientContext>;
 
 class ServerContext : public virtual Context {};

@@ -46,11 +46,23 @@ public:
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
+  Upstream::Host::CreateConnectionData createOrcaReportingConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      Network::UpstreamTransportSocketFactory& factory,
+      Network::Address::InstanceConstSharedPtr orca_address) const override;
 
   // Upstream::HostDescription
   SharedConstAddressVector addressListOrNull() const override;
   Network::Address::InstanceConstSharedPtr address() const override;
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override;
+  absl::string_view observabilityName() const override { return {}; }
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override;
+
+  // Upstream::HostImplBase
+  // Public (protected in the base class) so that tests can verify the sorted list is
+  // kept in sync with the raw list across address refreshes.
+  SharedConstAddressVector sortedAddressListOrNull() const override;
 
 protected:
   LogicalHost(
@@ -67,6 +79,9 @@ private:
   // The first entry in the address_list_ should match the value in address_.
   Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(address_lock_);
   SharedConstAddressVector address_list_or_null_ ABSL_GUARDED_BY(address_lock_);
+  // Happy eyeballs sorted copy of address_list_or_null_, updated together with it so that
+  // the raw and sorted lists stay consistent. nullptr unless there are multiple addresses.
+  SharedConstAddressVector sorted_address_list_or_null_ ABSL_GUARDED_BY(address_lock_);
   Network::Address::InstanceConstSharedPtr health_check_address_ ABSL_GUARDED_BY(address_lock_);
   mutable absl::Mutex address_lock_;
 };
@@ -107,6 +122,7 @@ public:
     return logical_host_->hostnameForHealthChecks();
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
+  absl::string_view observabilityName() const override { return {}; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   SharedConstAddressVector addressListOrNull() const override {
     return logical_host_->addressListOrNull();
@@ -121,7 +137,11 @@ public:
     // Should never be called since real hosts are used only for forwarding.
     return nullptr;
   }
-  absl::optional<MonotonicTime> lastHcPassTime() const override {
+  Network::Address::InstanceConstSharedPtr orcaReportingAddress() const override {
+    // Should never be called since real hosts are used only for forwarding.
+    return nullptr;
+  }
+  std::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
   uint32_t priority() const override { return logical_host_->priority(); }
@@ -133,7 +153,10 @@ public:
     return logical_host_->resolveTransportSocketFactory(dest_address, metadata,
                                                         transport_socket_options);
   }
-  OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
+  size_t lbPolicyDataCount() const override { return logical_host_->lbPolicyDataCount(); }
+  OptRef<HostLbPolicyData> lbPolicyDataAt(size_t index) const override {
+    return logical_host_->lbPolicyDataAt(index);
+  }
 
   // Upstream:HostDescription mutators are all no-ops, because logical_host_ is
   // const. These should never be called except during coverage tests.
@@ -149,7 +172,7 @@ public:
   void canary(bool) override {}
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
-  void setLbPolicyData(HostLbPolicyDataPtr) override {}
+  void addLbPolicyData(HostLbPolicyDataPtr) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

@@ -1,7 +1,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "test/integration/http_protocol_integration.h"
 
+#include "absl/synchronization/notification.h"
+
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -51,15 +56,16 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakersWithOutlierDetection) {
 
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(0));
 
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("503", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_503", Ge(1));
 
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.outlier_detection.ejections_enforced_total")
                 ->value(),
@@ -97,15 +103,16 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntime) {
 
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(0));
 
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("503", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_503", Ge(1));
 
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.outlier_detection.ejections_enforced_total")
                 ->value(),
@@ -165,15 +172,16 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntimeProto) {
 
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
 
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_pending_active", Eq(0));
 
   ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("503", response->headers().getStatusValue());
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_503", Ge(1));
 
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_active_overflow")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_pending_overflow")->value(), 0);
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.outlier_detection.ejections_enforced_total")
                 ->value(),
@@ -199,6 +207,33 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntimeProto) {
 class OutlierDetectionIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override { HttpProtocolIntegrationTest::initialize(); }
+
+  // Wait for worker thread to receive and process cluster membership update after
+  // main thread ejected unhealthy hosts.
+  void waitForLbUpdateOnWorkerThread() {
+    // Wait for main thread to update cluster members. Because update_merge_window == 0
+    // main thread will post updates to worker right after counter reaches 0.
+    test_server_->waitForGauge("cluster.cluster_0.membership_healthy", Eq(0));
+    absl::Notification done_notification;
+    ThreadLocal::TypedSlotPtr<> slot;
+    // After main thread sent LB update to workers, make main thread send a barrier event to worker
+    // thread and wait for notification from worker that it processed LB update. Since there
+    // is only one worker, one notification is enough.
+    test_server_->server().dispatcher().post([&] {
+      slot = ThreadLocal::TypedSlot<>::makeUnique(test_server_->server().threadLocal());
+      slot->set(
+          [](Envoy::Event::Dispatcher&) -> std::shared_ptr<Envoy::ThreadLocal::ThreadLocalObject> {
+            return nullptr;
+          });
+
+      slot->runOnAllThreads([](OptRef<ThreadLocal::ThreadLocalObject>) {},
+                            [&slot, &done_notification] {
+                              slot.reset(nullptr);
+                              done_notification.Notify();
+                            });
+    });
+    done_notification.WaitForNotification();
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -215,6 +250,7 @@ TEST_P(OutlierDetectionIntegrationTest, NoClusterOverwrite) {
     auto* cluster = static_resources->mutable_clusters(0);
 
     cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
+    cluster->mutable_common_lb_config()->mutable_update_merge_window()->set_seconds(0);
 
     auto* outlier_detection = cluster->mutable_outlier_detection();
 
@@ -259,6 +295,10 @@ TEST_P(OutlierDetectionIntegrationTest, NoClusterOverwrite) {
     EXPECT_EQ("500", response->headers().getStatusValue());
   }
 
+  // Wait for the main thread to eject the host
+  test_server_->waitForCounter("cluster.cluster_0.outlier_detection.ejections_enforced_total",
+                               Eq(1));
+  waitForLbUpdateOnWorkerThread();
   // Send another request. It should not reach upstream and should be handled by envoy.
   // The only existing endpoint in the cluster has been marked as unhealthy.
   IntegrationStreamDecoderPtr response =
@@ -267,7 +307,7 @@ TEST_P(OutlierDetectionIntegrationTest, NoClusterOverwrite) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 
 // Test verifies that non-5xx codes defined in cluster's protocol options
@@ -278,6 +318,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
     auto* cluster = static_resources->mutable_clusters(0);
 
     cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
+    cluster->mutable_common_lb_config()->mutable_update_merge_window()->set_seconds(0);
 
     auto* outlier_detection = cluster->mutable_outlier_detection();
 
@@ -350,6 +391,10 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
+  // Wait for the main thread to eject the host
+  test_server_->waitForCounter("cluster.cluster_0.outlier_detection.ejections_enforced_total",
+                               Eq(1));
+  waitForLbUpdateOnWorkerThread();
   // Now send a request. It will be captured by Envoy and 503 will be returned as the only upstream
   // is unhealthy now..
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -357,7 +402,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 // Test verifies that 5xx gateway errors configured in cluster protocol options are
 // forwarded to outlier detection in the original form and are not converted to code 500.
@@ -367,6 +412,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
     auto* cluster = static_resources->mutable_clusters(0);
 
     cluster->mutable_common_lb_config()->mutable_healthy_panic_threshold()->set_value(0);
+    cluster->mutable_common_lb_config()->mutable_update_merge_window()->set_seconds(0);
 
     auto* outlier_detection = cluster->mutable_outlier_detection();
 
@@ -423,6 +469,10 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
     EXPECT_EQ("502", response->headers().getStatusValue());
   }
 
+  // Wait for the main thread to eject the host
+  test_server_->waitForCounter("cluster.cluster_0.outlier_detection.ejections_enforced_total",
+                               Eq(1));
+  waitForLbUpdateOnWorkerThread();
   // Now send a request. It will be captured by Envoy and 503 will be returned as the only upstream
   // is unhealthy now..
   IntegrationStreamDecoderPtr response =
@@ -431,7 +481,7 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
-  codec_client_->close();
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace

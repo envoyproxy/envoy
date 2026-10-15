@@ -1,5 +1,7 @@
 #include "source/common/network/win32_socket_handle_impl.h"
 
+#include <optional>
+
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -8,7 +10,6 @@
 #include "source/common/network/address_impl.h"
 
 #include "absl/container/fixed_array.h"
-#include "absl/types/optional.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
@@ -28,7 +29,7 @@ Api::IoCallUint64Result Win32SocketHandleImpl::readv(uint64_t max_length, Buffer
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::read(Buffer::Instance& buffer,
-                                                    absl::optional<uint64_t> max_length_opt) {
+                                                    std::optional<uint64_t> max_length_opt) {
   if (peek_buffer_.length() != 0) {
     return readFromPeekBuffer(buffer, max_length_opt.value_or(UINT64_MAX));
   }
@@ -47,6 +48,12 @@ Api::IoCallUint64Result Win32SocketHandleImpl::writev(const Buffer::RawSlice* sl
 
 Api::IoCallUint64Result Win32SocketHandleImpl::write(Buffer::Instance& buffer) {
   Api::IoCallUint64Result result = IoSocketHandleImpl::write(buffer);
+  reEnableEventBasedOnIOResult(result, Event::FileReadyType::Write);
+  return result;
+}
+
+Api::IoCallUint64Result Win32SocketHandleImpl::send(const void* buffer, size_t length) {
+  Api::IoCallUint64Result result = IoSocketHandleImpl::send(buffer, length);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Write);
   return result;
 }

@@ -85,7 +85,7 @@ public:
   createQuicConnectionDebugVisitor(Event::Dispatcher& dispatcher, quic::QuicSession& session,
                                    const StreamInfo::StreamInfo& stream_info) override;
 
-  const absl::optional<std::chrono::milliseconds> update_period_;
+  const std::optional<std::chrono::milliseconds> update_period_;
   QuicStats stats_;
 
 private:

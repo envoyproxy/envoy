@@ -9,10 +9,22 @@ namespace Io {
 
 class MockIoUring : public IoUring {
 public:
+  MockIoUring() {
+    // `Multishot` reads are off by default so the readv-based path is exercised unless a test opts
+    // in. These calls are incidental to most tests, so allow any number of them.
+    ON_CALL(*this, isMultishotEnabled()).WillByDefault(::testing::Return(false));
+    ON_CALL(*this, bufferPool()).WillByDefault(::testing::Return(nullptr));
+    ON_CALL(*this, hasReadyCompletions()).WillByDefault(::testing::Return(false));
+    EXPECT_CALL(*this, isMultishotEnabled()).Times(::testing::AnyNumber());
+    EXPECT_CALL(*this, bufferPool()).Times(::testing::AnyNumber());
+    EXPECT_CALL(*this, hasReadyCompletions()).Times(::testing::AnyNumber());
+  }
+
   MOCK_METHOD(os_fd_t, registerEventfd, ());
   MOCK_METHOD(void, unregisterEventfd, ());
   MOCK_METHOD(bool, isEventfdRegistered, (), (const));
   MOCK_METHOD(void, forEveryCompletion, (const CompletionCb& completion_cb));
+  MOCK_METHOD(bool, hasReadyCompletions, (), (const));
   MOCK_METHOD(IoUringResult, prepareAccept,
               (os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
                Request* user_data));
@@ -22,6 +34,9 @@ public:
   MOCK_METHOD(IoUringResult, prepareReadv,
               (os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
                Request* user_data));
+  MOCK_METHOD(bool, isMultishotEnabled, (), (const));
+  MOCK_METHOD(IoUringBufferPoolSharedPtr, bufferPool, ());
+  MOCK_METHOD(IoUringResult, prepareReadMultishot, (os_fd_t fd, Request* user_data));
   MOCK_METHOD(IoUringResult, prepareWritev,
               (os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
                Request* user_data));

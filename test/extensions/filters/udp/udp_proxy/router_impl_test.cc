@@ -5,7 +5,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"

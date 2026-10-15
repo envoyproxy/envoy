@@ -49,6 +49,7 @@ struct NullCommonConfig : public Router::CommonConfig {
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return Router::DefaultRouteMetadataPack::get().typed_metadata_;
   }
+  bool ignorePathParametersInPathMatching() const override { return false; }
 
   static const std::vector<LowerCaseString> internal_only_headers_;
 };
@@ -91,7 +92,7 @@ struct NullPathMatchCriterion : public Router::PathMatchCriterion {
 
 struct RouteEntryImpl : public Router::RouteEntry {
   static absl::StatusOr<std::unique_ptr<RouteEntryImpl>>
-  create(const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
+  create(const std::string& cluster_name, const std::optional<std::chrono::milliseconds>& timeout,
          const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
              hash_policy,
          Router::RetryPolicyConstSharedPtr retry_policy, Regex::Engine& regex_engine,
@@ -106,7 +107,7 @@ struct RouteEntryImpl : public Router::RouteEntry {
 
 protected:
   RouteEntryImpl(
-      const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
+      const std::string& cluster_name, const std::optional<std::chrono::milliseconds>& timeout,
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
           hash_policy,
       Router::RetryPolicyConstSharedPtr retry_policy, Regex::Engine& regex_engine,
@@ -172,22 +173,20 @@ protected:
     }
   }
   bool usingNewTimeouts() const override { return false; }
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
-  absl::optional<std::chrono::milliseconds> flushTimeout() const override { return absl::nullopt; }
-  absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return absl::nullopt;
+  std::optional<std::chrono::milliseconds> idleTimeout() const override { return std::nullopt; }
+  std::optional<std::chrono::milliseconds> flushTimeout() const override { return std::nullopt; }
+  std::optional<std::chrono::milliseconds> maxStreamDuration() const override {
+    return std::nullopt;
   }
-  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-    return absl::nullopt;
+  std::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
+    return std::nullopt;
   }
-  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-    return absl::nullopt;
+  std::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
+    return std::nullopt;
   }
-  absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
-    return absl::nullopt;
-  }
-  absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-    return absl::nullopt;
+  std::optional<std::chrono::milliseconds> maxGrpcTimeout() const override { return std::nullopt; }
+  std::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
+    return std::nullopt;
   }
   const Router::TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
     return nullptr;
@@ -226,7 +225,7 @@ protected:
 
   Router::RouteEntry::UpgradeMap upgrade_map_;
   const std::string cluster_name_;
-  absl::optional<std::chrono::milliseconds> timeout_;
+  std::optional<std::chrono::milliseconds> timeout_;
   static const ConnectConfigOptRef connect_config_nullopt_;
   // Pass early data option config through StreamOptions.
   std::unique_ptr<Router::EarlyDataPolicy> early_data_policy_{
@@ -236,7 +235,7 @@ protected:
 struct NullRouteImpl : public Router::Route {
   static absl::StatusOr<std::unique_ptr<NullRouteImpl>>
   create(const std::string cluster_name, Router::RetryPolicyConstSharedPtr retry_policy,
-         Regex::Engine& regex_engine, const absl::optional<std::chrono::milliseconds>& timeout = {},
+         Regex::Engine& regex_engine, const std::optional<std::chrono::milliseconds>& timeout = {},
          const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
              hash_policy = {},
          const Router::MetadataMatchCriteria* metadata_match = nullptr) {
@@ -266,9 +265,10 @@ struct NullRouteImpl : public Router::Route {
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return Router::DefaultRouteMetadataPack::get().typed_metadata_;
   }
-  absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
+  std::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   const std::string& routeName() const override { return EMPTY_STRING; }
-  const Router::VirtualHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
+  const Router::VirtualHost& virtualHost() const override { return *virtual_host_; }
+  Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const override { return virtual_host_; }
 
   std::unique_ptr<RouteEntryImpl> route_entry_;
   static const Router::VirtualHostConstSharedPtr virtual_host_;
@@ -276,7 +276,7 @@ struct NullRouteImpl : public Router::Route {
 protected:
   NullRouteImpl(const std::string cluster_name, Router::RetryPolicyConstSharedPtr retry_policy,
                 Regex::Engine& regex_engine,
-                const absl::optional<std::chrono::milliseconds>& timeout,
+                const std::optional<std::chrono::milliseconds>& timeout,
                 const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
                     hash_policy,
                 absl::Status& creation_status,

@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -74,7 +77,7 @@ failure_mode_allow: true)EOF";
 
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
@@ -156,7 +159,7 @@ failure_mode_allow: false)EOF";
 
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
@@ -230,7 +233,7 @@ failure_mode_allow: true)EOF";
 
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
@@ -278,7 +281,7 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
                   "gift-from-external-server");
         mock_filter->callbacks_->sendLocalReply(::Envoy::Http::Code::OK,
                                                 "Direct response from mock filter.", nullptr,
-                                                absl::nullopt, "");
+                                                std::nullopt, "");
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, _))

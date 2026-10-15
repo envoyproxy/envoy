@@ -4,14 +4,19 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/stream_info/upstream_address.h"
+#include "source/extensions/filters/network/sni_dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/basic_resource_limit.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/transport_socket_match.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 
 using testing::AtLeast;
 using testing::Eq;
@@ -43,7 +48,7 @@ public:
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     absl::Status status = absl::OkStatus();
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_, status);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
 
@@ -55,13 +60,13 @@ public:
   void setFilterStateHost(const std::string& host) {
     connection_.streamInfo().filterState()->setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   void setFilterStatePort(uint32_t port) {
     connection_.streamInfo().filterState()->setData(
         "envoy.upstream.dynamic_port", std::make_shared<StreamInfo::UInt32AccessorImpl>(port),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   ~SniDynamicProxyFilterTest() override {
@@ -99,7 +104,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCache) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(callbacks_, continueReading());
@@ -120,7 +125,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCacheWithHostFromFilterState) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(callbacks_, continueReading());
@@ -141,7 +146,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCacheWithPortFromFilterState) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 553, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(callbacks_, continueReading());
@@ -163,7 +168,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCacheWithHostAndPortFromFilterState) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 553, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(callbacks_, continueReading());
@@ -184,7 +189,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCacheWithPort0FromFilterState) {
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(callbacks_, continueReading());
@@ -205,7 +210,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsCacheWithPortAboveLimitFromFilterState)
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, std::nullopt}));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(callbacks_, continueReading());
@@ -223,7 +228,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCache) {
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, std::nullopt}));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
@@ -237,7 +242,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCacheWithHostFromFilterState) {
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, std::nullopt}));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
@@ -251,7 +256,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCacheWithPortFromFilterState) {
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 553, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, std::nullopt}));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
@@ -266,7 +271,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCacheWithHostAndPortFromFilterState) 
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 553, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, std::nullopt}));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
@@ -280,7 +285,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCacheWithPort0FromFilterState) {
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, std::nullopt}));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
@@ -294,7 +299,7 @@ TEST_F(SniDynamicProxyFilterTest, LoadDnsInCacheWithPortAboveLimitFromFilterStat
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, std::nullopt}));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
@@ -308,7 +313,7 @@ TEST_F(SniDynamicProxyFilterTest, CacheOverflow) {
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 443, _, _))
       .WillOnce(Return(
-          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt}));
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, std::nullopt}));
   EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
@@ -330,7 +335,7 @@ public:
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     absl::Status status = absl::OkStatus();
     filter_config_ = std::make_shared<ProxyFilterConfig>(proto_config, *this, cm_, status);
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
     filter_ = std::make_unique<ProxyFilter>(filter_config_);
     filter_->initializeReadFilterCallbacks(callbacks_);
 
@@ -349,7 +354,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
       StreamInfo::UpstreamAddress::key(),
       std::make_unique<StreamInfo::UpstreamAddress>(
           Network::Utility::parseInternetAddressNoThrow("1.2.3.3", 443)),
-      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+      StreamInfo::FilterState::LifeSpan::Connection);
 
   InSequence s;
 
@@ -408,6 +413,40 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
 
   // Host was not resolved, still continue filter iteration.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+}
+
+// Regression test for the DNS cache manager use-after-free: the server-wide cache manager
+// singleton used to retain the factory context of the listener that first created it, so a
+// cache miss after that listener was torn down dereferenced the listener's freed stats scope.
+// The filter factories now pass only the server factory context, whose lifetime matches the
+// singleton's. Under the old wiring the second factory call below is a heap-use-after-free
+// (caught by ASAN).
+TEST(SniDynamicForwardProxyConfigFactoryTest, CacheMissAfterFirstListenerDestroyed) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  std::shared_ptr<Network::MockDnsResolver> resolver{std::make_shared<Network::MockDnsResolver>()};
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory{dns_resolver_factory};
+  EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, _)).WillRepeatedly(Return(resolver));
+
+  SniDynamicForwardProxyNetworkFilterConfigFactory factory;
+  FilterConfig proto_config;
+  proto_config.set_port_value(443);
+  proto_config.mutable_dns_cache_config()->set_name("cache_a");
+
+  // The first listener creates the singleton manager. Heap-allocate its context so that a
+  // stale reference to it is caught reliably by ASAN once it is freed.
+  auto context_a = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
+  ON_CALL(*context_a, serverFactoryContext()).WillByDefault(ReturnRef(server_context));
+  auto factory_cb_or = factory.createFilterFactoryFromProto(proto_config, *context_a);
+  EXPECT_OK(factory_cb_or.status());
+  context_a.reset();
+
+  // A second listener with a new cache name forces a cache miss in the surviving singleton.
+  proto_config.mutable_dns_cache_config()->set_name("cache_b");
+  NiceMock<Server::Configuration::MockFactoryContext> context_b;
+  ON_CALL(context_b, serverFactoryContext()).WillByDefault(ReturnRef(server_context));
+  factory_cb_or = factory.createFilterFactoryFromProto(proto_config, context_b);
+  EXPECT_OK(factory_cb_or.status());
 }
 
 } // namespace

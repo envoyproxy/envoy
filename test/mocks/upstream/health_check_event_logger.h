@@ -18,7 +18,7 @@ class MockHealthCheckEventLogger : public HealthCheckEventLogger {
 public:
   MOCK_METHOD(void, logEjectUnhealthy,
               (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
-               envoy::data::core::v3::HealthCheckFailureType));
+               envoy::data::core::v3::HealthCheckFailureType, uint64_t));
   MOCK_METHOD(void, logAddHealthy,
               (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
                bool));
@@ -26,7 +26,7 @@ public:
               (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&));
   MOCK_METHOD(void, logUnhealthy,
               (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
-               envoy::data::core::v3::HealthCheckFailureType, bool));
+               envoy::data::core::v3::HealthCheckFailureType, bool, uint64_t));
   MOCK_METHOD(void, logDegraded,
               (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&));
   MOCK_METHOD(void, logNoLongerDegraded,

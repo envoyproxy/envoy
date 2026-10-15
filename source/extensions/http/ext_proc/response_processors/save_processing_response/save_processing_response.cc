@@ -27,8 +27,7 @@ void SaveProcessingResponse::addToFilterState(
   if (filter_state == nullptr) {
     auto shared_filter_state = std::make_shared<SaveProcessingResponseFilterState>();
     filter_state = shared_filter_state.get();
-    stream_info.filterState()->setData(filter_state_name_, shared_filter_state,
-                                       Envoy::StreamInfo::FilterState::StateType::Mutable);
+    stream_info.filterState()->setData(filter_state_name_, shared_filter_state);
   }
 
   filter_state->response.emplace(SaveProcessingResponseFilterState::Response{

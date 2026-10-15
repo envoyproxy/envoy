@@ -29,7 +29,7 @@ namespace Http {
 /**
  * All stats for the connection manager. @see stats_macros.h
  */
-#define ALL_HTTP_CONN_MAN_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
+#define ALL_HTTP_CONN_MAN_STATS(COUNTER, GAUGE, HISTOGRAM, RESPONSE_CODE_CLASS_COUNTER)            \
   COUNTER(downstream_cx_delayed_close_timeout)                                                     \
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_destroy_active_rq)                                                         \
@@ -53,11 +53,11 @@ namespace Http {
   COUNTER(downstream_cx_upgrades_total)                                                            \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
-  COUNTER(downstream_rq_1xx)                                                                       \
-  COUNTER(downstream_rq_2xx)                                                                       \
-  COUNTER(downstream_rq_3xx)                                                                       \
-  COUNTER(downstream_rq_4xx)                                                                       \
-  COUNTER(downstream_rq_5xx)                                                                       \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_1xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_2xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_3xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_4xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_5xx)                                                   \
   COUNTER(downstream_rq_completed)                                                                 \
   COUNTER(downstream_rq_failed_path_normalization)                                                 \
   COUNTER(downstream_rq_http1_total)                                                               \
@@ -96,20 +96,18 @@ namespace Http {
  * Wrapper struct for connection manager stats. @see stats_macros.h
  */
 struct ConnectionManagerNamedStats {
-  ALL_HTTP_CONN_MAN_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+  ALL_HTTP_CONN_MAN_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,
+                          GENERATE_COUNTER_STRUCT)
 };
 
 struct ConnectionManagerStats {
-  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, const std::string& prefix,
-                         Stats::Scope& scope)
-      : named_(std::move(named_stats)), prefix_(prefix),
-        prefix_stat_name_storage_(prefix, scope.symbolTable()), scope_(scope) {}
-
-  Stats::StatName prefixStatName() const { return prefix_stat_name_storage_.statName(); }
+  // The scope is the connection manager's own 'http.<stat_prefix>.' scope, so the stats it holds
+  // need no additional prefix. The scope is retained for the stats that are created lazily on the
+  // request path, such as the per-user-agent ones.
+  ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, Stats::Scope& scope)
+      : named_(std::move(named_stats)), scope_(scope) {}
 
   ConnectionManagerNamedStats named_;
-  std::string prefix_;
-  Stats::StatNameManagedStorage prefix_stat_name_storage_;
   Stats::Scope& scope_;
 };
 
@@ -136,19 +134,19 @@ using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManag
 /**
  * Connection manager per listener stats. @see stats_macros.h
  */
-#define CONN_MAN_LISTENER_STATS(COUNTER)                                                           \
-  COUNTER(downstream_rq_1xx)                                                                       \
-  COUNTER(downstream_rq_2xx)                                                                       \
-  COUNTER(downstream_rq_3xx)                                                                       \
-  COUNTER(downstream_rq_4xx)                                                                       \
-  COUNTER(downstream_rq_5xx)                                                                       \
+#define CONN_MAN_LISTENER_STATS(COUNTER, RESPONSE_CODE_CLASS_COUNTER)                              \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_1xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_2xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_3xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_4xx)                                                   \
+  RESPONSE_CODE_CLASS_COUNTER(downstream_rq_5xx)                                                   \
   COUNTER(downstream_rq_completed)
 
 /**
  * Wrapper struct for connection manager listener stats. @see stats_macros.h
  */
 struct ConnectionManagerListenerStats {
-  CONN_MAN_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
+  CONN_MAN_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_COUNTER_STRUCT)
 };
 
 /**
@@ -166,7 +164,9 @@ enum class ForwardClientCertType {
  * Configuration for the fields of the client cert, used for populating the current client cert
  * information to the next hop.
  */
-enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS };
+enum class ClientCertDetailsType { Cert, Chain, Subject, URI, DNS, Issuer };
+
+enum class ClientCertFormat { Text, Json };
 
 /**
  * Type that indicates how port should be stripped from Host header.
@@ -218,9 +218,9 @@ public:
   virtual const AccessLog::InstanceSharedPtrVector& accessLogs() PURE;
 
   /**
-   * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
+   * @return const std::optional<std::chrono::milliseconds>& the interval to flush the access logs.
    */
-  virtual const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
+  virtual const std::optional<std::chrono::milliseconds>& accessLogFlushInterval() PURE;
 
   // If set to true, access log will be flushed when a new HTTP request is received, after request
   // headers have been evaluated, and before attempting to establish a connection with the upstream.
@@ -251,7 +251,10 @@ public:
 
   /**
    * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
-   *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
+   *         notice" to the time it will issue a full GOAWAY and not accept any new streams. If
+   *         ``drain_timeout_jitter`` is configured, each call returns the base timeout extended
+   *         by a random amount up to ``drainTimeout * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method.
    */
   virtual std::chrono::milliseconds drainTimeout() const PURE;
 
@@ -280,7 +283,7 @@ public:
   /**
    * @return optional idle timeout for incoming connection manager connections.
    */
-  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+  virtual std::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return if the connection manager does routing base on router config, e.g. a Server::Admin impl
@@ -289,9 +292,14 @@ public:
   virtual bool isRoutable() const PURE;
 
   /**
-   * @return optional maximum connection duration timeout for manager connections.
+   * @return optional maximum connection duration timeout for manager connections. If
+   *         ``max_connection_duration_jitter`` is configured, each call returns the
+   *         base duration extended by a random amount up to
+   *         ``max_connection_duration * jitter / 100``. The jittering is an
+   *         implementation detail and not exposed as a separate interface method;
+   *         callers should arm their timer with whatever value this returns.
    */
-  virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
   /**
    * @return whether maxConnectionDuration allows HTTP1 clients to choose when to close connection
@@ -319,7 +327,7 @@ public:
    * @return per-stream flush timeout for incoming connection manager connections. Zero indicates a
    *         disabled idle timeout.
    */
-  virtual absl::optional<std::chrono::milliseconds> streamFlushTimeout() const PURE;
+  virtual std::optional<std::chrono::milliseconds> streamFlushTimeout() const PURE;
 
   /**
    * @return request timeout for incoming connection manager connections. Zero indicates
@@ -342,7 +350,7 @@ public:
   /**
    * @return maximum duration time to keep alive stream
    */
-  virtual absl::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
+  virtual std::optional<std::chrono::milliseconds> maxStreamDuration() const PURE;
 
   /**
    * @return Router::RouteConfigProvider* the configuration provider used to acquire a route
@@ -376,9 +384,9 @@ public:
   serverHeaderTransformation() const PURE;
 
   /**
-   * @return const absl::optional<std::string> the scheme name to write into requests.
+   * @return const std::optional<std::string> the scheme name to write into requests.
    */
-  virtual const absl::optional<std::string>& schemeToSet() const PURE;
+  virtual const std::optional<std::string>& schemeToSet() const PURE;
 
   /**
    * @return bool whether the scheme should be overwritten to match the upstream transport protocol.
@@ -420,7 +428,7 @@ public:
   virtual bool skipXffAppend() const PURE;
 
   /**
-   * @return const absl::optional<std::string>& value of via header to add to requests and response
+   * @return const std::optional<std::string>& value of via header to add to requests and response
    *                                            headers if set.
    */
   virtual const std::string& via() const PURE;
@@ -429,6 +437,11 @@ public:
    * @return ForwardClientCertType the configuration of how to forward the client cert information.
    */
   virtual ForwardClientCertType forwardClientCert() const PURE;
+
+  /**
+   * @return ClientCertFormat the format to use for the XFCC header value (text or JSON).
+   */
+  virtual ClientCertFormat clientCertFormat() const PURE;
 
   /**
    * @return vector of ClientCertDetailsType the configuration of the current client cert's details
@@ -454,7 +467,7 @@ public:
    *         be enabled. User agent will only overwritten if it doesn't already exist. If enabled,
    *         the same user agent will be written to the x-envoy-downstream-service-cluster header.
    */
-  virtual const absl::optional<std::string>& userAgent() PURE;
+  virtual const std::optional<std::string>& userAgent() PURE;
 
   /**
    *  @return TracerSharedPtr Tracer to use.
@@ -536,6 +549,11 @@ public:
    * header.
    */
   virtual bool shouldStripTrailingHostDot() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should record per stream route resolution histograms.
+   */
+  virtual bool recordRouteResolutionStats() const PURE;
   /**
    * @return maximum requests for downstream.
    */

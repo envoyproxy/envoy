@@ -1,3 +1,6 @@
+#include <atomic>
+#include <thread>
+
 #include "envoy/extensions/load_balancing_policies/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/upstream/upstream_impl.h"
@@ -5,15 +8,17 @@
 #include "source/extensions/load_balancing_policies/dynamic_modules/load_balancer.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -22,7 +27,11 @@ namespace LoadBalancingPolicies {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::NiceMock;
+using ::testing::Not;
 using ::testing::Return;
 using ::testing::ReturnRef;
 
@@ -44,6 +53,9 @@ protected:
 // Config Tests
 // =============================================================================
 
+// Pull the shared dynamic-modules test helper into scope.
+using ::Envoy::Extensions::DynamicModules::failureCounter;
+
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
@@ -52,8 +64,41 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok());
-  EXPECT_NE(lb_config_or_error.value(), nullptr);
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(::testing::NotNull()));
+
+  // The happy path emits no load-failure counters.
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
+}
+
+// Load the module via the ``module.local.filename`` data source instead of by name.
+TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigSuccessWithLocalFile) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("lb_round_robin", "c"));
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  EXPECT_THAT(lb_config_or_error, IsOkAndHolds(::testing::NotNull()));
+}
+
+// Remote module sources are not supported for load balancing policies (no init manager is wired
+// up).
+TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigRemoteSourceRejected) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  auto* remote = config.mutable_dynamic_module_config()->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  EXPECT_THAT(lb_config_or_error, Not(IsOk()));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
@@ -64,8 +109,9 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleNotFound) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_FALSE(lb_config_or_error.ok());
-  EXPECT_THAT(lb_config_or_error.status().message(), testing::HasSubstr("failed to load"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("Failed to load dynamic module")));
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleConfigNewFails) {
@@ -76,9 +122,31 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleConfigNewFails) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_FALSE(lb_config_or_error.ok());
-  EXPECT_THAT(lb_config_or_error.status().message(),
-              testing::HasSubstr("failed to create load balancer config"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("failed to create load balancer config")));
+
+  // The module loads fine but its config creation fails, so this is counted as config_init_error.
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
+}
+
+TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigMalformedLbPolicyConfig) {
+  // The module loads fine but the lb_policy_config Any cannot be unpacked, counted as
+  // config_init_error. A malformed Any must be built programmatically.
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+  auto* any = config.mutable_lb_policy_config();
+  any->set_type_url("type.googleapis.com/google.protobuf.StringValue");
+  any->set_value("invalid_binary_data_that_cannot_be_unpacked_as_string_value");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  EXPECT_THAT(lb_config_or_error, Not(IsOk()));
+
+  EXPECT_EQ(1U, failureCounter(factory_context_.serverScope(), "config_init_error", "test_lb"));
+  EXPECT_EQ(0U, failureCounter(factory_context_.serverScope(), "module_load_error", "test_lb"));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleMissingSymbol) {
@@ -90,9 +158,8 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigModuleMissingSymbol) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_FALSE(lb_config_or_error.ok());
-  EXPECT_THAT(lb_config_or_error.status().message(),
-              testing::HasSubstr("envoy_dynamic_module_on_lb_choose_host"));
+  EXPECT_THAT(lb_config_or_error,
+              HasStatusMessage(testing::HasSubstr("envoy_dynamic_module_on_lb_choose_host")));
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStringValueConfig) {
@@ -104,11 +171,11 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStringValueConfig) {
   // Set up a StringValue config.
   Protobuf::StringValue string_value;
   string_value.set_value("test_config_value");
-  config.mutable_lb_policy_config()->PackFrom(string_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(string_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok());
+  EXPECT_OK(lb_config_or_error);
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithBytesValueConfig) {
@@ -120,11 +187,11 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithBytesValueConfig) {
   // Set up a BytesValue config.
   Protobuf::BytesValue bytes_value;
   bytes_value.set_value("binary_config_data");
-  config.mutable_lb_policy_config()->PackFrom(bytes_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(bytes_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok());
+  EXPECT_OK(lb_config_or_error);
 }
 
 TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStructConfig) {
@@ -136,11 +203,11 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, LoadConfigWithStructConfig) {
   // Set up a Struct config.
   Protobuf::Struct struct_value;
   (*struct_value.mutable_fields())["key"].set_string_value("value");
-  config.mutable_lb_policy_config()->PackFrom(struct_value);
+  std::ignore = config.mutable_lb_policy_config()->PackFrom(struct_value);
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  EXPECT_TRUE(lb_config_or_error.ok());
+  EXPECT_OK(lb_config_or_error);
 }
 
 // =============================================================================
@@ -155,7 +222,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, CreateThreadAwareLoadBalancer) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
@@ -163,7 +230,7 @@ TEST_F(DynamicModulesLoadBalancerConfigTest, CreateThreadAwareLoadBalancer) {
   EXPECT_NE(thread_aware_lb, nullptr);
 
   // Initialize and get the factory.
-  EXPECT_TRUE(thread_aware_lb->initialize().ok());
+  EXPECT_OK(thread_aware_lb->initialize());
   auto lb_factory = thread_aware_lb->factory();
   EXPECT_NE(lb_factory, nullptr);
 }
@@ -217,6 +284,11 @@ protected:
         .WillByDefault(ReturnRef(priority_set_.host_sets_));
   }
 
+  // Re-opens stat creation so tests can call `define_*` from the test thread.
+  static void unfreezeStatCreation(DynamicModuleLbConfig& config) {
+    config.stat_creation_frozen_ = false;
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Upstream::MockClusterInfo> cluster_info_;
   NiceMock<Upstream::MockPrioritySet> priority_set_;
@@ -239,13 +311,13 @@ TEST_F(DynamicModulesLoadBalancerTest, RoundRobinHostSelection) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   // Create a worker LB.
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
@@ -271,13 +343,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostWithContext) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -287,7 +359,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostWithContext) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test-header", "test-value"}};
   ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::optional<uint64_t>(12345)));
 
   auto response = lb->chooseHost(&context);
   EXPECT_NE(response.host, nullptr);
@@ -306,13 +378,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostNoHealthyHosts) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -335,13 +407,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostEmptyHostSets) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -360,13 +432,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LbNewFails) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -386,13 +458,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidIndex) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -413,13 +485,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ChooseHostInvalidPriority) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -439,13 +511,13 @@ TEST_F(DynamicModulesLoadBalancerTest, PeekAnotherHost) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -463,13 +535,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LifetimeCallbacks) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -487,13 +559,13 @@ TEST_F(DynamicModulesLoadBalancerTest, SelectExistingConnection) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -529,8 +601,6 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   // Test new all-hosts callbacks with null lb_envoy_ptr.
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_address(nullptr, 0, 0, &result));
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(nullptr, 0, 0), 0);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(nullptr, 0, 0), 0);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(nullptr, 0, 0), 0);
   EXPECT_FALSE(
       envoy_dynamic_module_callback_lb_get_host_locality(nullptr, 0, 0, nullptr, nullptr, nullptr));
 
@@ -556,9 +626,9 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithNullPointers) {
   EXPECT_FALSE(
       envoy_dynamic_module_callback_lb_get_member_update_host_address(nullptr, 0, true, &result));
 
-  // Test host counter stat callback with null.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                nullptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+  // Test host stat callback with null.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                nullptr, 0, 0, envoy_dynamic_module_type_host_stat_RqTotal),
             0);
 }
 
@@ -570,13 +640,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -599,14 +669,12 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidPriority) {
   // Test new all-hosts callbacks with invalid priority.
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_address(lb_ptr, 999, 0, &result));
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 999, 0), 0);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 999, 0), 0);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 999, 0), 0);
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 999, 0, nullptr, nullptr,
                                                                   nullptr));
 
-  // Test host counter stat with invalid priority.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 999, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+  // Test host stat with invalid priority.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 999, 0, envoy_dynamic_module_type_host_stat_RqTotal),
             0);
 }
 
@@ -618,13 +686,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -642,14 +710,12 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksWithInvalidHostIndex) {
   // Test new all-hosts callbacks with invalid host index.
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_address(lb_ptr, 0, 999, &result));
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 0, 999), 0);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 0, 999), 0);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 999), 0);
   EXPECT_FALSE(envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 999, nullptr, nullptr,
                                                                   nullptr));
 
-  // Test host counter stat with invalid host index.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 0, 999, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+  // Test host stat with invalid host index.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 999, envoy_dynamic_module_type_host_stat_RqTotal),
             0);
 }
 
@@ -661,13 +727,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -716,9 +782,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksSuccessfulCases) {
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 0, 1), 2);
   EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_weight(lb_ptr, 0, 2), 3);
 
-  // Test active requests callback.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 0, 0), 0);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 0), 0);
+  // Test host stat callback (gauges).
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqActive),
+            0);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_CxActive),
+            0);
 
   // Test locality callback.
   envoy_dynamic_module_type_envoy_buffer region_result = {nullptr, 0};
@@ -758,13 +828,13 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -772,13 +842,21 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
 
   auto* lb_ptr = static_cast<DynamicModuleLoadBalancer*>(lb.get());
 
-  // Verify active requests.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 0, 0), 5);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_requests(lb_ptr, 0, 1), 10);
+  // Verify active requests via get_host_stat.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqActive),
+            5);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 1, envoy_dynamic_module_type_host_stat_RqActive),
+            10);
 
-  // Verify active connections.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 0), 3);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_active_connections(lb_ptr, 0, 1), 7);
+  // Verify active connections via get_host_stat.
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_CxActive),
+            3);
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 1, envoy_dynamic_module_type_host_stat_CxActive),
+            7);
 
   // Verify locality.
   envoy_dynamic_module_type_envoy_buffer region = {nullptr, 0};
@@ -795,29 +873,29 @@ TEST_F(DynamicModulesLoadBalancerTest, AbiCallbacksHostStatsAndLocality) {
       envoy_dynamic_module_callback_lb_get_host_locality(lb_ptr, 0, 0, &region, nullptr, nullptr));
   EXPECT_EQ(absl::string_view(region.ptr, region.length), "us-east");
 
-  // Verify host counter stats.
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxConnectFail),
+  // Verify host stats (counters).
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_CxConnectFail),
             2);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_CxTotal),
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_CxTotal),
             100);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqError),
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqError),
             3);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqSuccess),
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqSuccess),
             42);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTimeout),
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqTimeout),
             1);
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 0, 0, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 0, envoy_dynamic_module_type_host_stat_RqTotal),
             46);
 
-  // Verify host2 counter stats are 0 (not set).
-  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_counter_stat(
-                lb_ptr, 0, 1, envoy_dynamic_module_type_host_counter_stat_RqTotal),
+  // Verify host2 stats are 0 (not set).
+  EXPECT_EQ(envoy_dynamic_module_callback_lb_get_host_stat(
+                lb_ptr, 0, 1, envoy_dynamic_module_type_host_stat_RqTotal),
             0);
 }
 
@@ -827,7 +905,8 @@ TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressSuccess) {
   host_map->insert({"10.0.0.1:8080", host1_});
   host_map->insert({"10.0.0.2:8080", host2_});
   host_map->insert({"10.0.0.3:8080", host3_});
-  ON_CALL(priority_set_, crossPriorityHostMap()).WillByDefault(Return(host_map));
+  ON_CALL(priority_set_, crossPriorityHostMap())
+      .WillByDefault(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
@@ -836,13 +915,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -880,13 +959,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressNullInputs) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -922,13 +1001,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -939,7 +1018,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/"}, {"x-custom-header", "custom-value"}};
   ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(42)));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::optional<uint64_t>(42)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -994,7 +1073,7 @@ TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksSuccessfulCases) {
 
 TEST_F(DynamicModulesLoadBalancerTest, ContextCallbacksNoHashKey) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::nullopt));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::nullopt));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1067,13 +1146,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostAccepted) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1098,13 +1177,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostRejected) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1129,13 +1208,13 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostInvalidPriority) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1161,9 +1240,10 @@ TEST_F(DynamicModulesLoadBalancerTest, ShouldSelectAnotherHostInvalidPriority) {
 
 TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresent) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host{"10.0.0.1:8080", true};
   ON_CALL(context, overrideHostToSelect())
-      .WillByDefault(Return(
-          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.1:8080", true})));
+      .WillByDefault(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1177,9 +1257,10 @@ TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresent) {
 
 TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresentNonStrict) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host{"10.0.0.2:9090", false};
   ON_CALL(context, overrideHostToSelect())
-      .WillByDefault(Return(
-          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.2:9090", false})));
+      .WillByDefault(
+          Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1193,7 +1274,8 @@ TEST_F(DynamicModulesLoadBalancerTest, OverrideHostPresentNonStrict) {
 
 TEST_F(DynamicModulesLoadBalancerTest, OverrideHostNotSet) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
-  ON_CALL(context, overrideHostToSelect()).WillByDefault(Return(absl::nullopt));
+  ON_CALL(context, overrideHostToSelect())
+      .WillByDefault(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>()));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1205,9 +1287,10 @@ TEST_F(DynamicModulesLoadBalancerTest, OverrideHostNotSet) {
 
 TEST_F(DynamicModulesLoadBalancerTest, OverrideHostNullOutputs) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
+  Upstream::LoadBalancerContext::OverrideHost override_host_null_test{"10.0.0.1:8080", true};
   ON_CALL(context, overrideHostToSelect())
       .WillByDefault(Return(
-          absl::optional<Upstream::LoadBalancerContext::OverrideHost>({"10.0.0.1:8080", true})));
+          OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_null_test)));
 
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -1234,13 +1317,13 @@ TEST_F(DynamicModulesLoadBalancerTest, PerHostDataSetAndGet) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1301,13 +1384,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMetadataTypedAccessSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1362,13 +1445,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMetadataNotFound) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1442,13 +1525,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksSuccess) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1487,13 +1570,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LocalityCallbacksEdgeCases) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1559,13 +1642,13 @@ TEST_F(DynamicModulesLoadBalancerTest, CallbacksTestModuleExercisesNewCallbacks)
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1575,7 +1658,7 @@ TEST_F(DynamicModulesLoadBalancerTest, CallbacksTestModuleExercisesNewCallbacks)
   NiceMock<Upstream::MockLoadBalancerContext> context;
   Http::TestRequestHeaderMapImpl headers{{":method", "GET"}, {"x-test-header", "test-value"}};
   ON_CALL(context, downstreamHeaders()).WillByDefault(Return(&headers));
-  ON_CALL(context, computeHashKey()).WillByDefault(Return(absl::optional<uint64_t>(12345)));
+  ON_CALL(context, computeHashKey()).WillByDefault(Return(std::optional<uint64_t>(12345)));
 
   auto response = lb->chooseHost(&context);
   EXPECT_NE(response.host, nullptr);
@@ -1593,13 +1676,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMembershipUpdateNotifiesModule) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1628,13 +1711,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMembershipUpdateEmptyVectors) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1658,13 +1741,13 @@ TEST_F(DynamicModulesLoadBalancerTest, HostMembershipUpdateCallbackAddress) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1697,13 +1780,13 @@ TEST_F(DynamicModulesLoadBalancerTest, LbNewFailDoesNotRegisterCallback) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto thread_aware_lb =
       factory.create(OptRef<const Upstream::LoadBalancerConfig>(*lb_config_or_error.value()),
                      cluster_info_, priority_set_, runtime_, random_, time_source_);
   ASSERT_NE(thread_aware_lb, nullptr);
-  ASSERT_TRUE(thread_aware_lb->initialize().ok());
+  ASSERT_OK(thread_aware_lb->initialize());
 
   Upstream::LoadBalancerParams params{priority_set_, nullptr};
   auto lb = thread_aware_lb->factory()->create(params);
@@ -1731,13 +1814,14 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterDefineAndIncrement) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   ASSERT_NE(typed_config, nullptr);
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a counter (no labels).
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_counter", .length = 12};
@@ -1773,12 +1857,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsGaugeDefineAndManipulate) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a gauge (no labels).
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_gauge", .length = 10};
@@ -1817,12 +1902,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramDefineAndRecord) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a histogram (no labels).
   envoy_dynamic_module_type_module_buffer name = {.ptr = "test_histogram", .length = 14};
@@ -1846,12 +1932,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsInvalidId) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Using invalid IDs should return MetricNotFound (no labels).
   EXPECT_EQ(
@@ -1899,12 +1986,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsMultipleCounters) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define two counters.
   envoy_dynamic_module_type_module_buffer name1 = {.ptr = "counter_a", .length = 9};
@@ -1941,12 +2029,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsCounterVecWithLabels) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a counter vec with two labels.
   envoy_dynamic_module_type_module_buffer name = {.ptr = "req_total", .length = 9};
@@ -1987,12 +2076,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsGaugeVecWithLabels) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a gauge vec with one label.
   envoy_dynamic_module_type_module_buffer name = {.ptr = "active_conns", .length = 12};
@@ -2029,12 +2119,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsHistogramVecWithLabels) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a histogram vec with one label.
   envoy_dynamic_module_type_module_buffer name = {.ptr = "latency", .length = 7};
@@ -2072,12 +2163,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecScalarIdConflictErrors) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a counter vec (ID 1 in vec space).
   envoy_dynamic_module_type_module_buffer counter_name = {.ptr = "cv", .length = 2};
@@ -2132,12 +2224,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecWrongLabelCount) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Define a gauge vec with one label.
   envoy_dynamic_module_type_module_buffer gauge_name = {.ptr = "gwl", .length = 3};
@@ -2169,12 +2262,13 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecNotFoundWithLabels) {
 
   Factory factory;
   auto lb_config_or_error = factory.loadConfig(factory_context_, config);
-  ASSERT_TRUE(lb_config_or_error.ok());
+  ASSERT_OK(lb_config_or_error);
 
   auto* typed_config =
       dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
   auto lb_config = typed_config->config();
   auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
 
   // Using non-existent vec IDs with labels should return MetricNotFound.
   envoy_dynamic_module_type_module_buffer label_val = {.ptr = "val", .length = 3};
@@ -2184,6 +2278,127 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsVecNotFoundWithLabels) {
   EXPECT_EQ(
       envoy_dynamic_module_type_metrics_result_MetricNotFound,
       envoy_dynamic_module_callback_lb_config_decrement_gauge(config_ptr, 999, &label_val, 1, 5));
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModulesLoadBalancerTest, MetricsFrozenAfterInit) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_OK(lb_config_or_error);
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  ASSERT_NE(typed_config, nullptr);
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+  EXPECT_TRUE(lb_config->stat_creation_frozen_);
+
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "frozen_counter", .length = 14};
+  envoy_dynamic_module_type_module_buffer label_name = {.ptr = "label", .length = 5};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name, nullptr, 0,
+                                                                   &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name, &label_name, 1,
+                                                                   &out_id));
+  EXPECT_EQ(
+      envoy_dynamic_module_type_metrics_result_Frozen,
+      envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, name, nullptr, 0, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_gauge(config_ptr, name, &label_name, 1,
+                                                                 &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, name, nullptr, 0,
+                                                                     &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_lb_config_define_histogram(config_ptr, name, &label_name,
+                                                                     1, &out_id));
+}
+
+// Drives concurrent labeled increments from multiple threads to verify no data race in the
+// registry's shared stat name pool. Run under `--config=tsan` to verify.
+TEST_F(DynamicModulesLoadBalancerTest, MetricsConcurrentIncrementCounterVecNoRace) {
+  envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
+      config;
+  config.mutable_dynamic_module_config()->set_name("lb_round_robin");
+  config.set_lb_policy_name("test_lb");
+
+  Factory factory;
+  auto lb_config_or_error = factory.loadConfig(factory_context_, config);
+  ASSERT_OK(lb_config_or_error);
+
+  auto* typed_config =
+      dynamic_cast<const TypedDynamicModuleLbConfig*>(lb_config_or_error.value().get());
+  ASSERT_NE(typed_config, nullptr);
+  auto lb_config = typed_config->config();
+  auto* config_ptr = static_cast<void*>(lb_config.get());
+  unfreezeStatCreation(*lb_config);
+
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "race_counter", .length = 12};
+  std::string label_name_str = "status";
+  envoy_dynamic_module_type_module_buffer label_names[1] = {
+      {.ptr = const_cast<char*>(label_name_str.data()), .length = label_name_str.size()}};
+  size_t counter_id = 0;
+  ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+            envoy_dynamic_module_callback_lb_config_define_counter(config_ptr, name, label_names, 1,
+                                                                   &counter_id));
+
+  constexpr int kNumThreads = 8;
+  constexpr int kIncrementsPerThread = 2000;
+
+  // Pre-warm the test scope's counter cache so workers only hit the cache. `TestScope` uses an
+  // unsynchronized map for counter caching that would otherwise race independently of the path
+  // under test.
+  for (int t = 0; t < kNumThreads; ++t) {
+    const std::string label_value_str = absl::StrCat("worker_", t);
+    envoy_dynamic_module_type_module_buffer label_value = {
+        .ptr = const_cast<char*>(label_value_str.data()), .length = label_value_str.size()};
+    ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+              envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                        &label_value, 1, 0));
+  }
+
+  std::vector<std::thread> threads;
+  threads.reserve(kNumThreads);
+  std::atomic<int> ready{0};
+  std::atomic<bool> go{false};
+  for (int t = 0; t < kNumThreads; ++t) {
+    threads.emplace_back([&, t]() {
+      const std::string label_value_str = absl::StrCat("worker_", t);
+      envoy_dynamic_module_type_module_buffer label_value = {
+          .ptr = const_cast<char*>(label_value_str.data()), .length = label_value_str.size()};
+      ready.fetch_add(1, std::memory_order_relaxed);
+      while (!go.load(std::memory_order_acquire)) {
+      }
+      for (int i = 0; i < kIncrementsPerThread; ++i) {
+        ASSERT_EQ(envoy_dynamic_module_type_metrics_result_Success,
+                  envoy_dynamic_module_callback_lb_config_increment_counter(config_ptr, counter_id,
+                                                                            &label_value, 1, 1));
+      }
+    });
+  }
+  while (ready.load(std::memory_order_acquire) < kNumThreads) {
+  }
+  go.store(true, std::memory_order_release);
+  for (auto& th : threads) {
+    th.join();
+  }
+
+  uint64_t total = 0;
+  for (int t = 0; t < kNumThreads; ++t) {
+    auto counter = TestUtility::findCounter(
+        factory_context_.store_,
+        absl::StrCat("dynamicmodulescustom.race_counter.status.worker_", t));
+    ASSERT_NE(nullptr, counter) << "missing counter for worker_" << t;
+    total += counter->value();
+  }
+  EXPECT_EQ(static_cast<uint64_t>(kNumThreads) * kIncrementsPerThread, total);
 }
 
 } // namespace

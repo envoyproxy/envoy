@@ -82,21 +82,33 @@ private:
   // MaybeExpandBufferLimits expands the buffer limits for the request and
   // response if the limits are set in the reverse transcoder config and are
   // greater than the default limits.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void MaybeExpandBufferLimits() const;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool DecoderBufferLimitReached(uint64_t buffer_length) const;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool EncoderBufferLimitReached(uint64_t buffer_length) const;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool CheckAndRejectIfRequestTranscoderFailed() const;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool CheckAndRejectIfResponseTranscoderFailed() const;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   Grpc::Status::GrpcStatus GrpcStatusFromHeaders(Http::ResponseHeaderMap& headers);
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void InitPerRouteConfig();
   // BuildRequestFromHttpBody reads the contents of the data field of the
   // google.api.HttpBody message and builds the request body out of it.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool BuildRequestFromHttpBody(Buffer::Instance& data);
   // SendHttpBodyResponse sends the response returned from the upstream server
   // as a google.api.HttpBody message.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void SendHttpBodyResponse(Buffer::Instance* data);
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void ReplaceAPIVersionInPath();
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool CreateDataBuffer(const nlohmann::json& payload, Buffer::OwnedImpl& buffer) const;
+  // NOLINTNEXTLINE(readability-identifier-naming)
   absl::Status ExtractHttpAnnotationValues(const Protobuf::MethodDescriptor* method_descriptor);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;

@@ -150,8 +150,8 @@ TEST_F(ProxyStatusTest, ToStringAbsentDetails) {
   proxy_status_config_.set_remove_details(false);
   proxy_status_config_.set_remove_connection_termination_details(false);
   proxy_status_config_.set_remove_response_flags(false);
-  stream_info_.response_code_details_ = absl::nullopt;
-  stream_info_.connection_termination_details_ = absl::nullopt;
+  stream_info_.response_code_details_ = std::nullopt;
+  stream_info_.connection_termination_details_ = std::nullopt;
   EXPECT_THAT(ProxyStatusUtils::makeProxyStatusHeader(
                   stream_info_, ProxyStatusError::ProxyConfigurationError,
                   /*proxy_name=*/"UNUSED", proxy_status_config_),
@@ -215,7 +215,7 @@ TEST_F(ProxyStatusTest, ToStringAbsentConnectionTerminationDetails) {
   proxy_status_config_.set_remove_connection_termination_details(false); // Don't remove them,
   proxy_status_config_.set_remove_response_flags(false);
   stream_info_.response_code_details_ = "some_response_code_details";
-  stream_info_.connection_termination_details_ = absl::nullopt; // But they're absent,
+  stream_info_.connection_termination_details_ = std::nullopt; // But they're absent,
   EXPECT_THAT(
       ProxyStatusUtils::makeProxyStatusHeader(stream_info_,
                                               ProxyStatusError::ProxyConfigurationError,
@@ -283,7 +283,7 @@ TEST_F(ProxyStatusTest, ToStringLiteral) {
 
 TEST(ProxyStatusRecommendedHttpStatusCode, TestAll) {
   for (const auto& [proxy_status_error, http_code] :
-       std::vector<std::pair<ProxyStatusError, absl::optional<Http::Code>>>{
+       std::vector<std::pair<ProxyStatusError, std::optional<Http::Code>>>{
            {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
            {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
            {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
@@ -316,8 +316,8 @@ TEST(ProxyStatusRecommendedHttpStatusCode, TestAll) {
            {ProxyStatusError::DestinationUnavailable, Http::Code::ServiceUnavailable},
            {ProxyStatusError::ConnectionLimitReached, Http::Code::ServiceUnavailable},
            {ProxyStatusError::HttpRequestDenied, Http::Code::Forbidden},
-           {ProxyStatusError::ProxyInternalResponse, absl::nullopt},
-           {ProxyStatusError::HttpRequestError, absl::nullopt},
+           {ProxyStatusError::ProxyInternalResponse, std::nullopt},
+           {ProxyStatusError::HttpRequestError, std::nullopt},
        }) {
     EXPECT_THAT(ProxyStatusUtils::recommendedHttpStatusCode(proxy_status_error), http_code);
   }

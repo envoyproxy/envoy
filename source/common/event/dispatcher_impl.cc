@@ -23,6 +23,7 @@
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/event/signal_impl.h"
 #include "source/common/event/timer_impl.h"
+#include "source/common/event/worker_id.h"
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
@@ -68,8 +69,9 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
                                Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
-    : name_(name), thread_factory_(thread_factory), time_source_(time_source),
-      file_system_(file_system), buffer_factory_(watermark_factory),
+    : name_(name), worker_id_(workerIdFromThreadName(name)), thread_factory_(thread_factory),
+      time_source_(time_source), file_system_(file_system), buffer_factory_(watermark_factory),
+      base_scheduler_(time_source),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
@@ -98,8 +100,18 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
       std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
+void DispatcherImpl::registerEvwatchObserver(Evwatch::Observer& observer) {
+  ASSERT(isThreadSafe());
+  base_scheduler_.registerEvwatchObserver(observer);
+}
+
+void DispatcherImpl::unregisterEvwatchObserver(Evwatch::Observer& observer) {
+  ASSERT(isThreadSafe());
+  base_scheduler_.unregisterEvwatchObserver(observer);
+}
+
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
-                                     const absl::optional<std::string>& prefix) {
+                                     const std::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
   post([this, &scope, effective_prefix] {
@@ -386,6 +398,7 @@ void DispatcherImpl::onFatalError(std::ostream& os) const {
   // Dump the state of the tracked objects in the dispatcher if thread safe. This generally
   // results in dumping the active state only for the thread which caused the fatal error.
   if (isThreadSafe()) {
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto iter = tracked_object_stack_.rbegin(); iter != tracked_object_stack_.rend(); ++iter) {
       (*iter)->dumpState(os);
     }

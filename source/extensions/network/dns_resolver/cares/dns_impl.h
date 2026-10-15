@@ -46,12 +46,12 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  static absl::StatusOr<absl::optional<std::string>>
+  static absl::StatusOr<std::optional<std::string>>
   maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
 
   DnsResolverImpl(
       const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
-      Event::Dispatcher& dispatcher, absl::optional<std::string> resolvers_csv,
+      Event::Dispatcher& dispatcher, std::optional<std::string> resolvers_csv,
       Stats::Scope& root_scope);
   ~DnsResolverImpl() override;
 
@@ -111,11 +111,10 @@ private:
       std::string details_{"not_set"};
     };
 
-    // Note: pending_response_ is constructed with ResolutionStatus::Failure by default and
-    // __only__ changed to ResolutionStatus::Completed if there is an `ARES_SUCCESS`
-    // or `ARES_ENODATA` or `ARES_ENOTFOUND`reply. In the dual_resolution case __any__ ARES_SUCCESS
-    // reply will result in a ResolutionStatus::Completed callback.
+    // A successful lookup can supply addresses even if another lookup failed. Without addresses,
+    // however, an empty response must not hide a failure from the other address family.
     PendingResponse pending_response_{ResolutionStatus::Failure, {}};
+    bool had_resolution_failure_{false};
   };
 
   class AddrInfoPendingResolution final : public PendingResolution {
@@ -207,10 +206,11 @@ private:
   const uint32_t edns0_max_payload_size_;
   const std::chrono::milliseconds max_udp_channel_duration_;
   const bool reinit_channel_on_timeout_;
-  const absl::optional<std::string> resolvers_csv_;
+  const std::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;
   CaresDnsResolverStats stats_;
+  const uint32_t max_cache_ttl_; // in seconds
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

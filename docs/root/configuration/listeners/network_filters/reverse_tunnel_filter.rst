@@ -19,3 +19,24 @@ Configuration notes:
   ``<tenant>:<cluster>`` so that the same node or cluster identifier can be reused across tenants.
   To avoid ambiguity, handshake requests that contain the ``:`` delimiter in any of the reverse
   tunnel headers are rejected. This option is disabled by default for backwards compatibility.
+- **Remote JWKS**: with ``jwt_validator.remote_jwks``, each configured filter fetches and refreshes
+  the JWKS on its own background timer. Several reverse tunnel listeners that share one issuer each
+  run a separate fetch loop rather than sharing a single one.
+
+Statistics
+----------
+
+The filter emits the following counters, rooted at ``reverse_tunnel.handshake.``:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 4
+
+  parse_error, Counter, Requests that could not be parsed as a reverse tunnel handshake.
+  accepted, Counter, Handshakes accepted (and the connection registered for reuse).
+  rejected, Counter, Handshakes rejected.
+  validation_failed, Counter, Handshakes rejected because node/cluster/tenant validation failed (HTTP 403).
+  jwt_denied, Counter, Handshakes rejected because required JWT authentication failed (HTTP 401).
+  jwt_would_deny, Counter, Handshakes JWT authentication would have rejected but were allowed because ``allow_missing_or_failed`` is set.
+  jwt_jwks_fetch_success, Counter, Successful ``remote_jwks`` fetches.
+  jwt_jwks_fetch_failed, Counter, Failed ``remote_jwks`` fetches.

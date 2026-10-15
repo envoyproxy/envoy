@@ -13,7 +13,6 @@
 #include "source/common/router/context_impl.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"
@@ -36,7 +35,7 @@ std::string clustersJson(const std::vector<std::string>& clusters);
 
 class HttpPoolDataPeer {
 public:
-  static Http::ConnectionPool::MockInstance* getPool(absl::optional<HttpPoolData> data) {
+  static Http::ConnectionPool::MockInstance* getPool(std::optional<HttpPoolData> data) {
     ASSERT(data.has_value());
     return dynamic_cast<Http::ConnectionPool::MockInstance*>(data.value().pool_);
   }
@@ -44,7 +43,7 @@ public:
 
 class TcpPoolDataPeer {
 public:
-  static Tcp::ConnectionPool::MockInstance* getPool(absl::optional<TcpPoolData> data) {
+  static Tcp::ConnectionPool::MockInstance* getPool(std::optional<TcpPoolData> data) {
     ASSERT(data.has_value());
     return dynamic_cast<Tcp::ConnectionPool::MockInstance*>(data.value().pool_);
   }

@@ -72,7 +72,7 @@ An example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       and_match:
         rules:
           - http_request_headers_match:
@@ -99,7 +99,7 @@ Another example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       or_match:
         rules:
           - http_request_headers_match:
@@ -126,7 +126,7 @@ Another example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       any_match: true
     output_config:
       sinks:
@@ -141,7 +141,7 @@ Another example POST body:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       and_match:
         rules:
           - http_request_headers_match:
@@ -169,9 +169,9 @@ conditions are met, the request will be tapped and streamed out to the admin end
 
 .. attention::
 
-  Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+  Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, HTTP body is scanned byte by byte to find a match.
   If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
-  to scan only part of the http body.
+  to scan only part of the HTTP body.
 
 Output format
 -------------
@@ -192,7 +192,7 @@ An example of a streaming admin tap configuration that uses the :ref:`JSON_BODY_
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       any_match: true
     output_config:
       sinks:
@@ -227,7 +227,7 @@ An example of a buffered admin tap configuration:
 
   config_id: test_config_id
   tap_config:
-    match_config:
+    match:
       any_match: true
     output_config:
       sinks:
@@ -267,7 +267,7 @@ An static filter configuration to enable streaming output looks like:
     "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
     common_config:
       static_config:
-        match_config:
+        match:
           http_response_headers_match:
             headers:
               - name: bar
@@ -304,6 +304,36 @@ might look like this:
 
 Etc.
 
+Sampling
+--------
+
+Configure :ref:`tap_enabled
+<envoy_v3_api_field_config.tap.v3.TapConfig.tap_enabled>` to sample a
+fraction of requests at the tap filter:
+
+.. code-block:: yaml
+
+  tap_enabled:
+    default_value:
+      numerator: 1
+      denominator: TEN_THOUSAND
+    runtime_key: tap.sampling.my_route
+
+When sampling is configured, only the configured fraction of requests
+proceeds to match-predicate evaluation. The remainder is short-circuited
+before any match state is allocated. Sampled-out requests increment the
+``rq_sampled_out`` filter stat. Sampling applies to whichever tap
+configuration is active, whether installed statically or through the
+``/tap`` admin endpoint.
+
+The configured sampling rate is recorded on
+:ref:`configured_sample_rate
+<envoy_v3_api_field_data.tap.v3.TraceWrapper.configured_sample_rate>` of the
+first emitted ``TraceWrapper`` segment of each tap trace. When a
+runtime override of ``runtime_key`` is active, the effective rate may
+differ from the recorded value. The :ref:`tap transport socket
+<operations_traffic_tapping>` supports the same per-connection sampling.
+
 Statistics
 ----------
 
@@ -315,4 +345,5 @@ comes from the owning HTTP connection manager.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  rq_sampled_out, Counter, Total requests short-circuited by ``tap_enabled`` sampling before match evaluation
   rq_tapped, Counter, Total requests that matched and were tapped

@@ -55,7 +55,7 @@ SINGLETON_MANAGER_REGISTRATION(alts_shared_state);
 // returns false and fills out err with an error message.
 bool doValidate(const absl::node_hash_set<std::string>& peers, TsiInfo& tsi_info,
                 std::string& err) {
-  if (peers.find(tsi_info.peer_identity_) != peers.end()) {
+  if (peers.contains(tsi_info.peer_identity_)) {
     return true;
   }
   err =
@@ -95,15 +95,16 @@ TransportSocketFactoryPtr createTransportSocketFactoryHelper(
           SINGLETON_MANAGER_REGISTERED_NAME(alts_shared_state), [handshaker_service_address] {
             return std::make_shared<AltsSharedState>(handshaker_service_address);
           });
-  HandshakerFactory factory =
-      [handshaker_service_address, is_upstream,
-       alts_shared_state](Event::Dispatcher& dispatcher,
-                          const Network::Address::InstanceConstSharedPtr& local_address,
-                          const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
+  HandshakerFactory factory = [handshaker_service_address, is_upstream, alts_shared_state](
+                                  Event::Dispatcher& dispatcher,
+                                  const Network::Address::InstanceConstSharedPtr& local_address,
+                                  const Network::Address::InstanceConstSharedPtr&,
+                                  absl::string_view target_name) -> TsiHandshakerPtr {
     ASSERT(local_address != nullptr);
     std::unique_ptr<AltsTsiHandshaker> tsi_handshaker;
     if (is_upstream) {
-      tsi_handshaker = AltsTsiHandshaker::createForClient(alts_shared_state->getChannel());
+      tsi_handshaker =
+          AltsTsiHandshaker::createForClient(alts_shared_state->getChannel(), target_name);
     } else {
       tsi_handshaker = AltsTsiHandshaker::createForServer(alts_shared_state->getChannel());
     }

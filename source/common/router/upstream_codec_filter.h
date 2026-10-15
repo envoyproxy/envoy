@@ -38,6 +38,7 @@ public:
   void onAboveWriteBufferHighWatermark() override;
 
   // UpstreamCallbacks
+  void onHostSelected(const Upstream::HostDescriptionConstSharedPtr&) override {}
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
@@ -78,6 +79,12 @@ public:
     const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
       return filter_.callbacks_->upstreamCallbacks()->upstreamStreamOptions();
     }
+    // Reaches the downstream stream's WebTransport session (via the upstream filter callbacks,
+    // which delegate to the router's downstream StreamDecoderFilterCallbacks) so the upstream codec
+    // can bridge it to the upstream session.
+    OptRef<Http::WebTransportSession> downstreamWebTransportSession() override {
+      return filter_.callbacks_->upstreamCallbacks()->downstreamWebTransportSession();
+    }
 
   private:
     void maybeEndDecode(bool end_stream);
@@ -89,7 +96,7 @@ public:
   CodecBridge bridge_;
   OptRef<Http::RequestHeaderMap> latched_headers_;
   absl::Status deferred_reset_status_;
-  absl::optional<bool> latched_end_stream_;
+  std::optional<bool> latched_end_stream_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   bool calling_encode_headers_ = false;
 
@@ -100,16 +107,16 @@ private:
 };
 
 class UpstreamCodecFilterFactory
-    : public Extensions::HttpFilters::Common::CommonFactoryBase<
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec>,
-      public Server::Configuration::UpstreamHttpFilterConfigFactory {
+    : public Extensions::HttpFilters::Common::UnifiedFactoryBase<
+          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec> {
 public:
-  UpstreamCodecFilterFactory() : CommonFactoryBase("envoy.filters.http.upstream_codec") {}
+  UpstreamCodecFilterFactory() : UnifiedFactoryBase("envoy.filters.http.upstream_codec") {}
 
   std::string category() const override { return "envoy.filters.http.upstream"; }
-  absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                               Server::Configuration::UpstreamFactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec&,
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
     };

@@ -1,12 +1,13 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/network/address.h"
 
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +38,7 @@ absl::string_view getServiceFromName(const absl::string_view name);
 std::string buildServiceName(const std::string& name, const std::string& proto,
                              const std::string& domain);
 
-absl::optional<uint16_t>
+std::optional<uint16_t>
 getAddressRecordType(const Network::Address::InstanceConstSharedPtr& ipaddr);
 
 /**

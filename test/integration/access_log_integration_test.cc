@@ -3,11 +3,11 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::ContainsRegex;
 using testing::HasSubstr;
 
 namespace Envoy {
@@ -38,6 +38,40 @@ TEST_P(AccessLogIntegrationTest, CoalesceFormatterFirstValueAvailable) {
   std::string log = waitForAccessLog(access_log_name_);
   // The :authority header (sni.lyft.com) should be logged since it's the first available value.
   EXPECT_THAT(log, HasSubstr("host=sni.lyft.com"));
+}
+
+// The LISTENER_NAME formatter logs the name of the listener that accepted the connection.
+TEST_P(AccessLogIntegrationTest, ListenerName) {
+  useAccessLog("LISTENER_NAME=%LISTENER_NAME%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // The default HttpIntegrationTest listener is named "http".
+  EXPECT_THAT(log, HasSubstr("LISTENER_NAME=http"));
+}
+
+// The route resolution formatters report the per stream route resolution count and time.
+TEST_P(AccessLogIntegrationTest, RouteResolutionFormatters) {
+  useAccessLog("RESOLUTIONS=%ROUTE_RESOLUTION_COUNT%;TIME=%ROUTE_RESOLUTION_TIME_US%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // The request resolves its route once, so the count is 1 and the time is a numeric microsecond
+  // value rather than the unset "-".
+  EXPECT_THAT(log, HasSubstr("RESOLUTIONS=1"));
+  EXPECT_THAT(log, ContainsRegex("TIME=[0-9]+"));
 }
 
 // Test COALESCE formatter with fallback when first operator returns null.
@@ -107,6 +141,34 @@ TEST_P(AccessLogIntegrationTest, DownstreamDetectedCloseType) {
   EXPECT_THAT(log, HasSubstr("CLOSE_TYPE=Normal"));
 }
 
+// COMMON_DURATION populates the downstream connection time points for HTTP. When the connection
+// closes with an active stream, DS_CX_END is recorded so the connection duration renders as a
+// number instead of "-".
+TEST_P(AccessLogIntegrationTest, CommonDurationDownstreamConnectionActiveAtClose) {
+  useAccessLog("cx=%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)%");
+  testRouterDownstreamDisconnectBeforeRequestComplete();
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, ContainsRegex("cx=[0-9]+"));
+}
+
+// COMMON_DURATION DS_CX_BEG is populated for completed HTTP requests, while DS_CX_END renders as
+// "-" until the downstream connection closes.
+TEST_P(AccessLogIntegrationTest, CommonDurationDownstreamConnectionCompletedRequest) {
+  useAccessLog("rq=%COMMON_DURATION(DS_CX_BEG:DS_RX_END:us)% "
+               "cx=%COMMON_DURATION(DS_CX_BEG:DS_CX_END:us)%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, ContainsRegex("rq=[0-9]+"));
+  EXPECT_THAT(log, HasSubstr("cx=-"));
+}
+
 TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
   // Add incomplete UTF-8 strings.
   default_request_headers_.setForwardedFor("\xec");
@@ -127,7 +189,8 @@ TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
         v.set_string_value("%REQ(X-FORWARDED-FOR)%");
         auto fields = json->mutable_fields();
         (*fields)["x_forwarded_for"] = v;
-        access_log_config_to_clobber->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore =
+            access_log_config_to_clobber->mutable_typed_config()->PackFrom(access_log_config);
       });
   testRouterDownstreamDisconnectBeforeRequestComplete();
   const std::string log = waitForAccessLog(access_log_name_);

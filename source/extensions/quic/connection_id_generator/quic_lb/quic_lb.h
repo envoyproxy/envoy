@@ -45,14 +45,16 @@ public:
   QuicLbConnectionIdGenerator(ThreadLocal::TypedSlot<ThreadLocalData>& tls, uint32_t worker_id);
 
   // quic::ConnectionIdGeneratorInterface
-  absl::optional<quic::QuicConnectionId>
+  std::optional<quic::QuicConnectionId>
   GenerateNextConnectionId(const quic::QuicConnectionId& original) override;
-  absl::optional<quic::QuicConnectionId>
+  std::optional<quic::QuicConnectionId>
   MaybeReplaceConnectionId(const quic::QuicConnectionId& original,
                            const quic::ParsedQuicVersion& version) override;
   uint8_t ConnectionIdLength(uint8_t first_byte) const override;
 
-  absl::optional<quic::QuicConnectionId> appendRoutingId(quic::QuicConnectionId& new_connection_id);
+  bool IsEncrypted() const override { return false; }
+
+  std::optional<quic::QuicConnectionId> appendRoutingId(quic::QuicConnectionId& new_connection_id);
 
 private:
   ThreadLocal::TypedSlot<ThreadLocalData>& tls_slot_;

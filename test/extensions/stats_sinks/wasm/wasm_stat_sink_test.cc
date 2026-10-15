@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/server/lifecycle_notifier.h"
 
 #include "source/extensions/common/wasm/wasm.h"
@@ -6,7 +8,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/wasm_base.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

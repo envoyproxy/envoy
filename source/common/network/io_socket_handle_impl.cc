@@ -1,6 +1,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 
 #include <memory>
+#include <optional>
 
 #include "envoy/buffer/buffer.h"
 
@@ -13,7 +14,6 @@
 #include "source/common/network/socket_interface_impl.h"
 
 #include "absl/container/fixed_array.h"
-#include "absl/types/optional.h"
 
 using Envoy::Api::SysCallIntResult;
 using Envoy::Api::SysCallSizeResult;
@@ -59,6 +59,19 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
   }
 }
 
+void IoSocketHandleImpl::setAbortiveClose() {
+#if ENVOY_PLATFORM_ENABLE_SEND_RST
+  // Enabling SO_LINGER with a timeout of zero results in an abortive close.
+  struct linger l;
+  l.l_onoff = 1;
+  l.l_linger = 0;
+  auto res = setOption(SOL_SOCKET, SO_LINGER, &l, sizeof(l));
+  if (res.return_value_ < 0) {
+    ENVOY_LOG_EVERY_POW_2(error, "rst setting so_linger=0 failed on fd {}", fd_);
+  }
+#endif
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::close() {
   if (file_event_) {
     file_event_.reset();
@@ -96,7 +109,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer,
-                                                 absl::optional<uint64_t> max_length_opt) {
+                                                 std::optional<uint64_t> max_length_opt) {
   const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
@@ -146,6 +159,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
   return result;
 }
 
+Api::IoCallUint64Result IoSocketHandleImpl::send(const void* buffer, size_t length) {
+  return sysCallResultToIoCallResult(
+      Api::OsSysCallsSingleton::get().send(fd_, const_cast<void*>(buffer), length, 0));
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
                                                     const Address::Ip* self_ip,
@@ -165,15 +183,15 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       num_slices_to_write++;
     }
   }
-  if (num_slices_to_write == 0) {
-    return Api::ioCallUint64ResultNoError();
-  }
+
+  uint8_t empty_payload = 0;
+  iovec empty_iov{&empty_payload, 0};
 
   msghdr message;
   message.msg_name = reinterpret_cast<void*>(sock_addr);
   message.msg_namelen = address_base->sockAddrLen();
-  message.msg_iov = iov.begin();
-  message.msg_iovlen = num_slices_to_write;
+  message.msg_iov = num_slices_to_write == 0 ? &empty_iov : iov.begin();
+  message.msg_iovlen = num_slices_to_write == 0 ? 1 : num_slices_to_write;
   message.msg_flags = 0;
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   if (self_ip == nullptr) {
@@ -281,13 +299,13 @@ IoSocketHandleImpl::maybeGetDstAddressFromHeader(const cmsghdr& cmsg, uint32_t s
   return nullptr;
 }
 
-absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const cmsghdr& cmsg) {
+std::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const cmsghdr& cmsg) {
 #ifdef SO_RXQ_OVFL
   if (cmsg.cmsg_type == SO_RXQ_OVFL) {
     return *reinterpret_cast<const uint32_t*>(CMSG_DATA(&cmsg));
   }
 #endif
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 template <typename T> T getUnsignedIntFromHeader(const cmsghdr& cmsg) {
@@ -297,7 +315,7 @@ template <typename T> T getUnsignedIntFromHeader(const cmsghdr& cmsg) {
   return value;
 }
 
-template <typename T> absl::optional<T> maybeGetUnsignedIntFromHeader(const cmsghdr& cmsg) {
+template <typename T> std::optional<T> maybeGetUnsignedIntFromHeader(const cmsghdr& cmsg) {
   static_assert(std::is_unsigned_v<T>, "return type must be unsigned integral");
   switch (cmsg.cmsg_len) {
   case CMSG_LEN(sizeof(uint8_t)):
@@ -312,10 +330,10 @@ template <typename T> absl::optional<T> maybeGetUnsignedIntFromHeader(const cmsg
   }
   IS_ENVOY_BUG(
       fmt::format("unexpected cmsg_len value for unsigned integer payload: {}", cmsg.cmsg_len));
-  return absl::nullopt;
+  return std::nullopt;
 }
 
-absl::optional<uint8_t> maybeGetTosFromHeader(const cmsghdr& cmsg) {
+std::optional<uint8_t> maybeGetTosFromHeader(const cmsghdr& cmsg) {
   if (
 #ifdef __APPLE__
       (cmsg.cmsg_level == IPPROTO_IP && cmsg.cmsg_type == IP_RECVTOS) ||
@@ -325,7 +343,7 @@ absl::optional<uint8_t> maybeGetTosFromHeader(const cmsghdr& cmsg) {
       (cmsg.cmsg_level == IPPROTO_IPV6 && cmsg.cmsg_type == IPV6_TCLASS)) {
     return maybeGetUnsignedIntFromHeader<uint8_t>(cmsg);
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
@@ -399,7 +417,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
         }
       }
       if (output.dropped_packets_ != nullptr) {
-        absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
+        std::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
           *output.dropped_packets_ = *maybe_dropped;
           continue;
@@ -407,13 +425,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       }
 #ifdef UDP_GRO
       if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
-        absl::optional<uint16_t> maybe_gso = maybeGetUnsignedIntFromHeader<uint16_t>(*cmsg);
+        std::optional<uint16_t> maybe_gso = maybeGetUnsignedIntFromHeader<uint16_t>(*cmsg);
         if (maybe_gso) {
           output.msg_[0].gso_size_ = *maybe_gso;
         }
       }
 #endif
-      absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+      std::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
       if (maybe_tos) {
         output.msg_[0].tos_ = *maybe_tos;
       }
@@ -501,7 +519,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
           output.msg_[i].saved_cmsg_ = std::move(cmsg_slice);
         }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-        absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+        std::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
         if (maybe_tos) {
           output.msg_[0].tos_ = *maybe_tos;
           continue;
@@ -520,7 +538,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
-        absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
+        std::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
           *output.dropped_packets_ = *maybe_dropped;
         }

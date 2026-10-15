@@ -18,7 +18,7 @@ static void fineGrainLogSlowPath(benchmark::State& state) {
     UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
       std::string key = "k" + std::to_string(i + (state.thread_index() << 8));
-      getFineGrainLogContext().initFineGrainLogger(key, logger);
+      getFineGrainLogContext().initFineGrainLogger(key, "", logger);
     }
   }
 }

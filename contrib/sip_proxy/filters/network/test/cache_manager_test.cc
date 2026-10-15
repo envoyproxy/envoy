@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "contrib/sip_proxy/filters/network/source/utility.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -10,7 +12,7 @@ namespace SipProxy {
 TEST(CacheManagerTest, FindTypeNotExist) {
   auto cache_manager = CacheManager<std::string, std::string, std::string>();
   auto result = cache_manager.at("empty", "empty");
-  EXPECT_EQ(absl::nullopt, result);
+  EXPECT_EQ(std::nullopt, result);
   EXPECT_EQ(false, cache_manager.contains("empty", "empty"));
 }
 
@@ -19,7 +21,7 @@ TEST(CacheManagerTest, FindKeyNotExist) {
   cache_manager.initCache("lskpmc", 12);
   cache_manager.insertCache("lskpmc", "S3F2", "192.168.0.1");
   auto result = cache_manager.at("lskpmc", "fake");
-  EXPECT_EQ(absl::nullopt, result);
+  EXPECT_EQ(std::nullopt, result);
   EXPECT_EQ(true, cache_manager.contains("lskpmc", "S3F2"));
   EXPECT_EQ(false, cache_manager.contains("lskpmc", "fake"));
 }

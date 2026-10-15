@@ -17,27 +17,16 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
+#include "source/server/synchronous_feedback_trigger.h"
+#include "source/server/trigger.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/container/node_hash_set.h"
 
 namespace Envoy {
 namespace Server {
 
-/**
- * Trigger encapsulates translating resource pressure into the corresponding
- * OverloadActionState.
- */
-class Trigger {
-public:
-  virtual ~Trigger() = default;
-
-  // Updates the current value of the metric and returns whether the trigger has changed state.
-  virtual bool updateValue(double value) PURE;
-
-  // Returns the action state for the trigger.
-  virtual OverloadActionState actionState() const PURE;
-};
+absl::StatusOr<TriggerPtr>
+createTriggerFromConfig(const envoy::config::overload::v3::Trigger& trigger_config);
 
 class OverloadAction {
 public:
@@ -55,12 +44,14 @@ private:
   OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
                  Stats::Scope& stats_scope, absl::Status& creation_status);
 
-  using TriggerPtr = std::unique_ptr<Trigger>;
   absl::node_hash_map<std::string, TriggerPtr> triggers_;
   OverloadActionState state_;
   Stats::Gauge& active_gauge_;
   Stats::Gauge& scale_percent_gauge_;
 };
+
+using SynchronousFeedbackResourceMonitorMap =
+    absl::flat_hash_map<std::string, SynchronousFeedbackResourceMonitorSharedPtr>;
 
 /**
  * Implement a LoadShedPoint which is a particular point in the connection /
@@ -70,7 +61,8 @@ class LoadShedPointImpl : public LoadShedPoint {
 public:
   static absl::StatusOr<std::unique_ptr<LoadShedPointImpl>>
   create(const envoy::config::overload::v3::LoadShedPoint& config, Stats::Scope& stats_scope,
-         Random::RandomGenerator& random_generator);
+         Random::RandomGenerator& random_generator,
+         const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources);
   LoadShedPointImpl(const LoadShedPointImpl&) = delete;
   LoadShedPointImpl& operator=(const LoadShedPointImpl&) = delete;
 
@@ -88,14 +80,16 @@ public:
 private:
   LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
                     Stats::Scope& stats_scope, Random::RandomGenerator& random_generator,
+                    const SynchronousFeedbackResourceMonitorMap& synchronous_feedback_resources,
                     absl::Status& creation_status);
-  using TriggerPtr = std::unique_ptr<Trigger>;
 
   // Helper to handle updating the probability to shed load given the triggers.
   void updateProbabilityShedLoad();
 
-  absl::flat_hash_map<std::string, TriggerPtr> triggers_;
-  std::atomic<float> probability_shed_load_{0};
+  const std::string name_;
+  absl::flat_hash_map<std::string, TriggerPtr> periodic_triggers_;
+  std::atomic<float> periodic_shed_probability_{0};
+  std::vector<SynchronousFeedbackTrigger> synchronous_feedback_triggers_;
   Stats::Gauge& scale_percent_;
   Stats::Counter& shed_load_counter_;
   Random::RandomGenerator& random_generator_;
@@ -134,7 +128,7 @@ public:
   Symbol get(absl::string_view name);
 
   // Returns the symbol for the name if there is one, otherwise nullopt.
-  absl::optional<Symbol> lookup(absl::string_view string) const;
+  std::optional<Symbol> lookup(absl::string_view string) const;
 
   // Translates a symbol back into a name.
   const absl::string_view name(Symbol symbol) const;
@@ -157,7 +151,7 @@ public:
          ThreadLocal::SlotAllocator& slot_allocator,
          const envoy::config::overload::v3::OverloadManager& config,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-         const Server::Options& options);
+         const Server::Options& options, Runtime::Loader& runtime);
 
   // Server::OverloadManager
   void start() override;
@@ -167,13 +161,18 @@ public:
   LoadShedPoint* getLoadShedPoint(absl::string_view point_name) override;
   Event::ScaledRangeTimerManagerFactory scaledTimerFactory() override;
   void stop() override;
+  std::optional<envoy::config::overload::v3::ShrinkHeapConfig>
+  getShrinkHeapConfig() const override {
+    return shrink_heap_config_;
+  }
 
 protected:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                      const Server::Options& options, absl::Status& creation_status);
+                      const Server::Options& options, Runtime::Loader& runtime,
+                      absl::Status& creation_status);
 
   // Factory for timer managers. This allows test-only subclasses to inject a mock implementation.
   virtual Event::ScaledRangeTimerManagerPtr createScaledRangeTimerManager(
@@ -184,18 +183,18 @@ private:
   using FlushEpochId = uint64_t;
   class Resource : public ResourceUpdateCallbacks {
   public:
-    Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager,
-             Stats::Scope& stats_scope);
+    Resource(const std::string& name, ResourceMonitorSharedPtr monitor,
+             OverloadManagerImpl& manager, Stats::Scope& stats_scope);
 
     // ResourceMonitor::ResourceUpdateCallbacks
     void onSuccess(const ResourceUsage& usage) override;
-    void onFailure(const EnvoyException& error) override;
+    void onFailure(const absl::Status& error) override;
 
     void update(FlushEpochId flush_epoch);
 
   private:
     const std::string name_;
-    ResourceMonitorPtr monitor_;
+    ResourceMonitorSharedPtr monitor_;
     OverloadManagerImpl& manager_;
     bool pending_update_{false};
     FlushEpochId flush_epoch_;
@@ -238,6 +237,8 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<LoadShedPointImpl>> loadshed_points_;
 
   Event::ScaledTimerTypeMapConstSharedPtr timer_minimums_;
+  absl::flat_hash_map<std::string, Event::ScaledTimerTypeMapConstSharedPtr>
+      timer_minimums_by_action_;
 
   absl::flat_hash_map<NamedOverloadActionSymbolTable::Symbol, OverloadActionState>
       state_updates_to_flush_;
@@ -253,6 +254,8 @@ private:
       std::unordered_multimap<NamedOverloadActionSymbolTable::Symbol, ActionCallback,
                               absl::Hash<NamedOverloadActionSymbolTable::Symbol>>;
   ActionToCallbackMap action_to_callbacks_;
+
+  std::optional<envoy::config::overload::v3::ShrinkHeapConfig> shrink_heap_config_;
 };
 
 } // namespace Server

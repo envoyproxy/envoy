@@ -2,15 +2,20 @@
 #include <string>
 
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "test/integration/filters/add_body_filter.pb.h"
 #include "test/integration/filters/repick_cluster_filter.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/socket_interface_swap.h"
 #include "test/test_common/test_runtime.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -44,15 +49,15 @@ public:
             MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
                 (*cluster->mutable_typed_extension_protocol_options())
                     ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-        protocol_options.add_http_filters()->set_name(filter_name_);
+        addUpstreamFilter(protocol_options, filter_name_);
         auto* upstream_codec = protocol_options.add_http_filters();
         upstream_codec->set_name("envoy.filters.http.upstream_codec");
-        upstream_codec->mutable_typed_config()->PackFrom(
+        std::ignore = upstream_codec->mutable_typed_config()->PackFrom(
             envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
                 default_instance());
-        (*cluster->mutable_typed_extension_protocol_options())
-            ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-                .PackFrom(protocol_options);
+        std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                              .PackFrom(protocol_options);
       }
     });
 
@@ -73,6 +78,78 @@ public:
         });
   }
 
+  // Two cluster_1 endpoints in distinct ``version`` subsets make the chosen subset observable by
+  // upstream index. Requires setUpstreamCount(3): cluster_0(1) + cluster_1(2).
+  //   - cluster_1 endpoint[0] (``version: v1``) -> fake_upstreams_[1]
+  //   - cluster_1 endpoint[1] (``version: v2``) -> fake_upstreams_[2]
+  void setupDynamicMetadataSubsetConfig() {
+    config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.header_to_metadata
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+  request_rules:
+    - header: x-version
+      on_header_present:
+        metadata_namespace: envoy.lb
+        key: version
+        type: STRING
+)EOF");
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) -> void {
+          auto* metadata_match = hcm.mutable_route_config()
+                                     ->mutable_virtual_hosts(0)
+                                     ->mutable_routes(0)
+                                     ->mutable_route()
+                                     ->mutable_metadata_match();
+          TestUtility::loadFromYaml(R"EOF(
+            filterMetadata:
+              envoy.lb:
+                version: "v1"
+        )EOF",
+                                    *metadata_match);
+        });
+    config_helper_.addConfigModifier(
+        [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto* clusters = bootstrap.mutable_static_resources()->mutable_clusters();
+          for (auto& cluster : *clusters) {
+            // Only the shadow target uses subset LB; cluster_0 stays a plain single-endpoint
+            // cluster so the main request is unaffected by subset selection.
+            if (cluster.name() != "cluster_1") {
+              continue;
+            }
+            TestUtility::loadFromYaml(R"EOF(
+            fallback_policy: NO_FALLBACK
+            subsetSelectors:
+              - keys:
+                - "version"
+          )EOF",
+                                      *cluster.mutable_lb_subset_config());
+
+            auto* locality = cluster.mutable_load_assignment()->mutable_endpoints(0);
+            auto* endpoint_v1 = locality->mutable_lb_endpoints(0);
+            // Second endpoint reuses the same loopback address (port 0) so setPorts() assigns it
+            // the next fake upstream. Copy the address before setting metadata.
+            auto* endpoint_v2 = locality->add_lb_endpoints();
+            endpoint_v2->mutable_endpoint()->mutable_address()->CopyFrom(
+                endpoint_v1->endpoint().address());
+
+            TestUtility::loadFromYaml(R"EOF(
+                filterMetadata:
+                  envoy.lb:
+                    version: "v1"
+                )EOF",
+                                      *endpoint_v1->mutable_metadata());
+            TestUtility::loadFromYaml(R"EOF(
+                filterMetadata:
+                  envoy.lb:
+                    version: "v2"
+                )EOF",
+                                      *endpoint_v2->mutable_metadata());
+          }
+        });
+  }
+
   void sendRequestAndValidateResponse(int times_called = 1) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -84,8 +161,8 @@ public:
     if (filter_name_ != "add-body-filter") {
       EXPECT_EQ(10U, response->body().size());
     }
-    test_server_->waitForCounterGe("cluster.cluster_1.internal.upstream_rq_completed",
-                                   times_called);
+    test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed",
+                                 Ge(times_called));
 
     upstream_headers_ =
         reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
@@ -97,8 +174,26 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
+  void addUpstreamFilter(ConfigHelper::HttpProtocolOptions& protocol_options,
+                         const std::string& name) {
+    auto* filter = protocol_options.add_http_filters();
+    filter->set_name(name);
+    if (name == "on-local-reply-filter") {
+      test::integration::filters::OnLocalReplyFilterConfig config;
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
+    } else if (name == "encoder-decoder-buffer-filter") {
+      test::integration::filters::EncoderDecoderBufferFilterConfig config;
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
+    } else if (name == "add-body-filter") {
+      test::integration::filters::AddBodyFilterConfig config;
+      std::ignore = filter->mutable_typed_config()->PackFrom(config);
+    } else {
+      RELEASE_ASSERT(false, fmt::format("Unknown dynamic upstream filter: {}", name));
+    }
+  }
+
   const bool streaming_shadow_ = std::get<1>(GetParam());
-  absl::optional<int> cluster_with_custom_filter_;
+  std::optional<int> cluster_with_custom_filter_;
   std::string filter_name_ = "on-local-reply-filter";
   std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers_;
   std::unique_ptr<Http::TestRequestHeaderMapImpl> mirror_headers_;
@@ -121,7 +216,7 @@ TEST_P(ShadowPolicyIntegrationTest, Basic) {
   sendRequestAndValidateResponse(1);
   sendRequestAndValidateResponse(2);
 
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_200", Eq(2));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
 }
@@ -141,7 +236,7 @@ TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
   sendRequestAndValidateResponse(1);
   sendRequestAndValidateResponse(2);
 
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_200", 2);
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_200", Eq(2));
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
   // https://github.com/envoyproxy/envoy/issues/26820
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
@@ -291,8 +386,7 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowUpstreamReset) 
 
   // Send upstream reset on shadow request.
   upstream_request_shadow->encodeResetStream();
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_rx_reset", 1,
-                                 std::chrono::milliseconds(1000));
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_rx_reset", Eq(1));
 
   codec_client_->sendData(encoder, 20, true);
   ASSERT_TRUE(upstream_request_main->waitForData(*dispatcher_, 20));
@@ -544,7 +638,7 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   // The encoder-decoder-buffer-filter will buffer too much data triggering a local reply.
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
+  test_server_->waitForCounter("http.config_test.downstream_rq_4xx", Eq(1));
 }
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
@@ -683,8 +777,8 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
   auto main_response = std::move(result.second);
 
   // Connecting to the shadow stream should cause backpressure due to connection backup.
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total", 1,
-                                 std::chrono::milliseconds(500));
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Eq(1));
 
   codec_client_->sendData(encoder, 1023, false);
 
@@ -703,7 +797,7 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
   EXPECT_EQ(shadow_direct_response->headers().getStatusValue(), "200");
 
   // Two requests were sent over a single connection to cluster_1.
-  test_server_->waitForCounterGe("cluster.cluster_1.upstream_rq_completed", 2);
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_completed", Ge(2));
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
                 ->value(),
@@ -748,8 +842,8 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
   // This will result in one call of high watermark on the shadow stream, as
   // end_stream will not trigger watermark calls.
   codec_client_->sendData(encoder, 2048, false);
-  test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
-                                 1);
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Ge(1));
   codec_client_->sendData(encoder, 2048, true);
   ASSERT_TRUE(upstream_request_main->waitForData(*dispatcher_, 2048 * 2));
   ASSERT_TRUE(upstream_request_shadow->waitForData(*dispatcher_, 2048 * 2));
@@ -769,13 +863,13 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
 
   cleanupUpstreamAndDownstream();
 
-  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total",
-                                 1);
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_total", 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_cx_total", 1);
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_1.upstream_cx_total", Eq(1));
   // Main cluster saw no reset; shadow cluster saw remote reset.
-  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_completed", 1);
-  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_completed", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_completed", Eq(1));
 }
 
 // Test request mirroring / shadowing with the cluster name in policy.
@@ -796,13 +890,16 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithRouterUpstreamFilters
                                           v3::HttpConnectionManager& hcm) -> void {
     auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
     envoy::extensions::filters::http::router::v3::Router router_filter;
-    router_filter_config->typed_config().UnpackTo(&router_filter);
-    router_filter.add_upstream_http_filters()->set_name("add-body-filter");
+    std::ignore = router_filter_config->typed_config().UnpackTo(&router_filter);
+    auto* upstream_filter = router_filter.add_upstream_http_filters();
+    upstream_filter->set_name("add-body-filter");
+    test::integration::filters::AddBodyFilterConfig add_body_config;
+    std::ignore = upstream_filter->mutable_typed_config()->PackFrom(add_body_config);
     auto* upstream_codec = router_filter.add_upstream_http_filters();
     upstream_codec->set_name("envoy.filters.http.upstream_codec");
-    upstream_codec->mutable_typed_config()->PackFrom(
+    std::ignore = upstream_codec->mutable_typed_config()->PackFrom(
         envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-    router_filter_config->mutable_typed_config()->PackFrom(router_filter);
+    std::ignore = router_filter_config->mutable_typed_config()->PackFrom(router_filter);
   });
   filter_name_ = "add-body-filter";
   initialize();
@@ -820,16 +917,21 @@ TEST_P(ShadowPolicyIntegrationTest, ClusterFilterOverridesRouterFilter) {
   filter_name_ = "add-body-filter";
 
   // router filter upstream HTTP filter adds header:
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) -> void {
-        auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
-        envoy::extensions::filters::http::router::v3::Router router_filter;
-        router_filter_config->typed_config().UnpackTo(&router_filter);
-        router_filter.add_upstream_http_filters()->set_name("add-header-filter");
-        router_filter.add_upstream_http_filters()->set_name("envoy.filters.http.upstream_codec");
-        router_filter_config->mutable_typed_config()->PackFrom(router_filter);
-      });
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
+    envoy::extensions::filters::http::router::v3::Router router_filter;
+    std::ignore = router_filter_config->typed_config().UnpackTo(&router_filter);
+    auto* upstream_filter = router_filter.add_upstream_http_filters();
+    upstream_filter->set_name("add-header-filter");
+    test::integration::filters::AddHeaderEmptyFilterConfig add_header_config;
+    std::ignore = upstream_filter->mutable_typed_config()->PackFrom(add_header_config);
+    auto* upstream_codec = router_filter.add_upstream_http_filters();
+    upstream_codec->set_name("envoy.filters.http.upstream_codec");
+    std::ignore = upstream_codec->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
+    std::ignore = router_filter_config->mutable_typed_config()->PackFrom(router_filter);
+  });
 
   initialize();
   sendRequestAndValidateResponse();
@@ -846,7 +948,11 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithClusterHeaderWithFilt
   initialConfigSetup("", "cluster_header_1");
 
   // Add a filter to set cluster_header in headers.
-  config_helper_.addFilter("name: repick-cluster-filter");
+  config_helper_.addFilter(R"EOF(
+    name: repick-cluster-filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.RepickClusterFilterConfig
+  )EOF");
 
   initialize();
   sendRequestAndValidateResponse();
@@ -902,8 +1008,8 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
         access_log_config.set_path(log_file);
         access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
             "%REQ(CONTENT-LENGTH)%\n");
-        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
-        typed_config->PackFrom(router_config);
+        std::ignore = upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        std::ignore = typed_config->PackFrom(router_config);
       });
 
   initialConfigSetup("cluster_1", "");
@@ -1033,6 +1139,74 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestMetadataLoadbalancing) {
   sendRequestAndValidateResponse();
 }
 
+// Dynamic ``envoy.lb`` metadata (``version: v2``) overrides the static route ``version: v1`` for
+// shadowed requests, so the shadow lands on cluster_1's ``v2`` endpoint (fake_upstreams_[2]) rather
+// than its ``v1`` endpoint (fake_upstreams_[1]).
+TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancing) {
+  setUpstreamCount(3);
+  initialConfigSetup("cluster_1", "");
+  setupDynamicMetadataSubsetConfig();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy("x-version", "v2");
+
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", 1);
+
+  // Main request lands on cluster_0's upstream.
+  EXPECT_NE(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders());
+  // Shadow selected the ``v2`` subset: fake_upstreams_[2] receives it, fake_upstreams_[1] does not.
+  EXPECT_NE(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[2].get())->lastRequestHeaders());
+  EXPECT_EQ(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())->lastRequestHeaders());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// With the guard off, the shadow inherits only the static ``version: v1`` and lands on
+// fake_upstreams_[1] rather than the dynamic ``v2`` endpoint (fake_upstreams_[2]).
+TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestDynamicMetadataLoadbalancingDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.shadow_policy_inherit_dynamic_metadata", "false");
+  setUpstreamCount(3);
+  initialConfigSetup("cluster_1", "");
+  setupDynamicMetadataSubsetConfig();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy("x-version", "v2");
+
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  // The main request still resolves the dynamic subset selector and succeeds.
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_200", 1);
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", 1);
+
+  // Main request lands on cluster_0's upstream.
+  EXPECT_NE(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders());
+  // Shadow inherited only the static ``v1`` selector: fake_upstreams_[1] receives it,
+  // fake_upstreams_[2] (the dynamic ``v2`` subset) does not.
+  EXPECT_NE(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())->lastRequestHeaders());
+  EXPECT_EQ(nullptr,
+            reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[2].get())->lastRequestHeaders());
+
+  cleanupUpstreamAndDownstream();
+}
+
 TEST_P(ShadowPolicyIntegrationTest, ShadowWithHeaderManipulation) {
   initialConfigSetup("cluster_1", "");
 
@@ -1088,6 +1262,8 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowWithHeaderManipulation) {
   upstream_headers_ =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[0].get())->lastRequestHeaders();
   EXPECT_TRUE(upstream_headers_ != nullptr);
+  // Wait for the shadow upstream to actually process the request before accessing the headers.
+  test_server_->waitForCounter("cluster.cluster_1.internal.upstream_rq_completed", Ge(1));
   mirror_headers_ =
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())->lastRequestHeaders();
   EXPECT_TRUE(mirror_headers_ != nullptr);

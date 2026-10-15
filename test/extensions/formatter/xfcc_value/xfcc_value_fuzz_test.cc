@@ -1,4 +1,3 @@
-#include "source/common/common/logger.h"
 #include "source/common/formatter/http_formatter_context.h"
 #include "source/extensions/formatter/xfcc_value/xfcc_value.h"
 
@@ -17,7 +16,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
 
   // We just want to make sure that the parser doesn't crash with any input.
   XfccValueFormatterCommandParser parser;
-  auto formatter = parser.parse("XFCC_VALUE", "uri", absl::nullopt);
+  auto formatter = parser.parse("XFCC_VALUE", "uri", std::nullopt).value();
 
   Http::TestRequestHeaderMapImpl request_headers{};
   request_headers.setForwardedClientCert(sv);

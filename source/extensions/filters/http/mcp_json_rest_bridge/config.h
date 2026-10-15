@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.validate.h" // IWYU pragma: keep
 
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/mcp_json_rest_bridge/mcp_json_rest_bridge_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,22 +15,25 @@ namespace McpJsonRestBridge {
  * Config factory for MCP JSON REST bridge filter.
  */
 class McpJsonRestBridgeFilterConfigFactory
-    : public Common::FactoryBase<
-          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge> {
+    : public Common::UnifiedFactoryBase<
+          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge,
+          envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute> {
 public:
-  McpJsonRestBridgeFilterConfigFactory() : FactoryBase("envoy.filters.http.mcp_json_rest_bridge") {}
+  McpJsonRestBridgeFilterConfigFactory() : UnifiedFactoryBase(FilterName) {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
           proto_config,
-      const std::string&, Server::Configuration::FactoryContext&) override;
+      Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
-      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+      const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
           proto_config,
-      Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace McpJsonRestBridge

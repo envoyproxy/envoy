@@ -3,24 +3,64 @@
 #include <array>
 #include <cstdint>
 
+#include "absl/strings/string_view.h"
+
 // A set of tables for validating that a character is in a specific
 // character set. Used to validate RFC compliance for various HTTP protocol elements.
 
 namespace Envoy {
 namespace Http {
 
-inline constexpr bool testCharInTable(const std::array<uint32_t, 8>& table, char c) {
-  // CPU cache friendly version of a lookup in a bit table of size 256.
-  // The table is organized as 8 32 bit words.
-  // This function looks up a bit from the `table` at the index `c`.
-  // This function is used to test whether a character `c` is allowed
-  // or not based on the value of a bit at index `c`.
-  uint8_t tmp = static_cast<uint8_t>(c);
-  // The `tmp >> 5` determines which of the 8 uint32_t words has the bit at index `uc`.
-  // The `0x80000000 >> (tmp & 0x1f)` determines the index of the bit within the 32 bit word.
-  return (table[tmp >> 5] & (0x80000000 >> (tmp & 0x1f))) != 0;
-}
+struct CharTable {
+  const std::array<uint32_t, 8> table;
 
+  static constexpr uint32_t row(char c) { return static_cast<uint8_t>(c) >> 5; }
+  static constexpr uint32_t mask(char c) { return 0x80000000 >> (static_cast<uint8_t>(c) & 0x1f); }
+  constexpr bool hasChar(char c) const { return (table[row(c)] & mask(c)) != 0; }
+  static constexpr void set(std::array<uint32_t, 8>& table, char c) { table[row(c)] |= mask(c); }
+  static constexpr CharTable fromChars(absl::string_view chars) {
+    std::array<uint32_t, 8> table{};
+    for (char c : chars) {
+      set(table, c);
+    }
+    return {table};
+  }
+  constexpr CharTable operator|(const CharTable& o) const {
+    std::array<uint32_t, 8> result;
+    for (int i = 0; i < 8; i++) {
+      result[i] = table[i] | o.table[i];
+    }
+    return {result};
+  }
+  constexpr CharTable operator&(const CharTable& o) const {
+    std::array<uint32_t, 8> result;
+    for (int i = 0; i < 8; i++) {
+      result[i] = table[i] & o.table[i];
+    }
+    return {result};
+  }
+  constexpr CharTable operator~() const {
+    std::array<uint32_t, 8> result;
+    for (int i = 0; i < 8; i++) {
+      result[i] = ~table[i];
+    }
+    return {result};
+  }
+};
+
+namespace CharTables {
+// Bits 65 (A) to 90 (Z)
+inline constexpr CharTable kUppercase{{0, 0, 0b01111111111111111111111111100000, 0, 0, 0, 0, 0}};
+// Bits 97 (a) to 122 (z)
+inline constexpr CharTable kLowercase{{0, 0, 0, 0b01111111111111111111111111100000, 0, 0, 0, 0}};
+// Bits 33 (!) to 127 (~).
+inline constexpr CharTable kPrintable{{0, 0x7fffffff, 0xffffffff, 0xfffffffe, 0, 0, 0, 0}};
+// Bits 129 to 255.
+inline constexpr CharTable kExtendedAscii{
+    {0, 0, 0, 0, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff}};
+// Bits 48 ('0') to 57 ('9')
+inline constexpr CharTable kDigits{{0, 0b00000000000000001111111111000000, 0, 0, 0, 0, 0, 0}};
+inline constexpr CharTable kAlphanumeric = kUppercase | kLowercase | kDigits;
 // Header name character table.
 // From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
 //
@@ -33,21 +73,8 @@ inline constexpr bool testCharInTable(const std::array<uint32_t, 8>& table, char
 //                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
 //                / DIGIT / ALPHA
 // SPELLCHECKER(on)
-inline constexpr std::array<uint32_t, 8> kGenericHeaderNameCharTable = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b01011111001101101111111111000000,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b01111111111111111111111111100011,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b11111111111111111111111111101010,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
+inline constexpr CharTable kGenericHeaderName =
+    kAlphanumeric | CharTable::fromChars("!#$%&'*+-.^_`|~");
 
 // A URI query and fragment character table. From RFC 3986:
 // https://datatracker.ietf.org/doc/html/rfc3986#section-3.4
@@ -55,22 +82,19 @@ inline constexpr std::array<uint32_t, 8> kGenericHeaderNameCharTable = {
 // SPELLCHECKER(off)
 // query       = *( pchar / "/" / "?" )
 // fragment    = *( pchar / "/" / "?" )
+//
+// pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
+// unreserved    = ALPHA / DIGIT / "-" / "." / "_" / "~"
+// pct-encoded   = "%" HEXDIG HEXDIG
+// sub-delims    = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
 // SPELLCHECKER(on)
-inline constexpr std::array<uint32_t, 8> kUriQueryAndFragmentCharTable = {
-    // control characters
-    0b00000000000000000000000000000000,
-    // !"#$%&'()*+,-./0123456789:;<=>?
-    0b01001111111111111111111111110101,
-    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
-    0b11111111111111111111111111100001,
-    //`abcdefghijklmnopqrstuvwxyz{|}~
-    0b01111111111111111111111111100010,
-    // extended ascii
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-    0b00000000000000000000000000000000,
-};
+inline constexpr CharTable kUriQueryAndFragment =
+    kAlphanumeric | CharTable::fromChars("/?"
+                                         ":@"
+                                         "-._~"
+                                         "%"
+                                         "!$&'()*+,;=");
+} // namespace CharTables
 
 } // namespace Http
 } // namespace Envoy

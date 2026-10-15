@@ -33,11 +33,38 @@ message ProxyProtocol {
   }
 
   message KeyValuePair {
+    // Specifies the encoding scheme that is used to encode the TLV value before it is
+    // stored in dynamic metadata or filter state.
+    enum ValueStringEncoding {
+      // Unspecified encoding scheme. Defaults to ``SANITIZED_UTF8``.
+      UNSPECIFIED = 0;
+
+      // The TLV value will be sanitized to a valid UTF-8 string before being stored:
+      // any invalid UTF-8 sequences will be replaced with the ``!`` character.
+      SANITIZED_UTF8 = 1;
+
+      // The raw TLV value will be encoded as a `Base64 <https://datatracker.ietf.org/doc/html/rfc4648#section-4>`_
+      // string (with padding) before being stored. This is useful for binary TLV values that
+      // are not valid UTF-8 strings.
+      BASE64 = 2;
+    }
+
     // The namespace — if this is empty, the filter's namespace will be used.
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
     string key = 2 [(validate.rules).string = {min_len: 1}];
+
+    // The value encoding scheme that is used to encode the TLV value before it is stored in
+    // dynamic metadata or filter state. If not set, defaults to ``SANITIZED_UTF8``, which
+    // sanitizes the TLV value to a valid UTF-8 string.
+    //
+    // .. note::
+    //
+    //   This option only applies to the legacy untyped dynamic metadata and filter state.
+    //   For the new typed dynamic metadata, the raw TLV value bytes are stored as is and
+    //   no encoding is applied.
+    ValueStringEncoding value_string_encoding = 3;
   }
 
   // A Rule defines what metadata to apply when a header is present or missing.

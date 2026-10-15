@@ -63,6 +63,22 @@ TEST(MongoFilterConfigTest, ValidProtoConfigurationNoFaults) {
   cb(connection);
 }
 
+TEST(MongoFilterConfigTest, CorrectConfigurationWithMaxBsonDepth) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: my_stat_prefix
+  max_bson_depth: 256
+  )EOF";
+
+  envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  MongoProxyFilterConfigFactory factory;
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addFilter(_));
+  cb(connection);
+}
+
 TEST(MongoFilterConfigTest, MongoFilterWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   MongoProxyFilterConfigFactory factory;

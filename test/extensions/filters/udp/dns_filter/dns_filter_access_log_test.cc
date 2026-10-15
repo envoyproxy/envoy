@@ -1,30 +1,23 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_access_log.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
+#include "test/common/formatter/formatter_test_utility.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "dns_filter_test_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-using testing::_;
-using testing::AtLeast;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -32,10 +25,20 @@ namespace UdpFilters {
 namespace DnsFilter {
 namespace {
 
+using Envoy::StatusHelpers::HasStatus;
+using Envoy::StatusHelpers::IsOkAndHolds;
 using ResponseValidator = Utils::DnsResponseValidator;
+using testing::_;
+using testing::AtLeast;
+using testing::Invoke;
+using testing::IsNull;
+using testing::NiceMock;
+using testing::NotNull;
+using testing::Return;
+using testing::ReturnRef;
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
-  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+  return {rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})};
 }
 
 // Test access logger that captures formatted output using DNS custom commands
@@ -43,24 +46,25 @@ class TestAccessLog : public AccessLog::Instance {
 public:
   TestAccessLog() {
     auto parser = createDnsFilterCommandParser();
-    query_name_formatter_ = parser->parse("QUERY_NAME", "", absl::nullopt);
-    query_type_formatter_ = parser->parse("QUERY_TYPE", "", absl::nullopt);
-    query_class_formatter_ = parser->parse("QUERY_CLASS", "", absl::nullopt);
-    answer_count_formatter_ = parser->parse("ANSWER_COUNT", "", absl::nullopt);
-    response_code_formatter_ = parser->parse("RESPONSE_CODE", "", absl::nullopt);
-    parse_status_formatter_ = parser->parse("PARSE_STATUS", "", absl::nullopt);
+    query_name_formatter_ = parser->parse("QUERY_NAME", "", std::nullopt).value();
+    query_type_formatter_ = parser->parse("QUERY_TYPE", "", std::nullopt).value();
+    query_class_formatter_ = parser->parse("QUERY_CLASS", "", std::nullopt).value();
+    answer_count_formatter_ = parser->parse("ANSWER_COUNT", "", std::nullopt).value();
+    response_code_formatter_ = parser->parse("RESPONSE_CODE", "", std::nullopt).value();
+    parse_status_formatter_ = parser->parse("PARSE_STATUS", "", std::nullopt).value();
   }
 
   void log(const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) override {
     log_count_++;
 
     // Use custom formatters to extract DNS information
-    query_name_ = query_name_formatter_->format(context, stream_info);
-    query_type_ = query_type_formatter_->format(context, stream_info);
-    query_class_ = query_class_formatter_->format(context, stream_info);
-    answer_count_ = answer_count_formatter_->format(context, stream_info);
-    response_code_ = response_code_formatter_->format(context, stream_info);
-    parse_status_ = parse_status_formatter_->format(context, stream_info);
+    query_name_ = Envoy::Formatter::formatForTest(*query_name_formatter_, context, stream_info);
+    query_type_ = Envoy::Formatter::formatForTest(*query_type_formatter_, context, stream_info);
+    query_class_ = Envoy::Formatter::formatForTest(*query_class_formatter_, context, stream_info);
+    answer_count_ = Envoy::Formatter::formatForTest(*answer_count_formatter_, context, stream_info);
+    response_code_ =
+        Envoy::Formatter::formatForTest(*response_code_formatter_, context, stream_info);
+    parse_status_ = Envoy::Formatter::formatForTest(*parse_status_formatter_, context, stream_info);
 
     // Store address information for testing
     remote_address_ = stream_info.downstreamAddressProvider().remoteAddress()->asString();
@@ -69,12 +73,12 @@ public:
 
   void reset() {
     log_count_ = 0;
-    query_name_ = absl::nullopt;
-    query_type_ = absl::nullopt;
-    query_class_ = absl::nullopt;
-    answer_count_ = absl::nullopt;
-    response_code_ = absl::nullopt;
-    parse_status_ = absl::nullopt;
+    query_name_ = std::nullopt;
+    query_type_ = std::nullopt;
+    query_class_ = std::nullopt;
+    answer_count_ = std::nullopt;
+    response_code_ = std::nullopt;
+    parse_status_ = std::nullopt;
     remote_address_.clear();
     local_address_.clear();
   }
@@ -90,12 +94,12 @@ public:
   Formatter::FormatterProviderPtr parse_status_formatter_;
 
   // Formatted values
-  absl::optional<std::string> query_name_;
-  absl::optional<std::string> query_type_;
-  absl::optional<std::string> query_class_;
-  absl::optional<std::string> answer_count_;
-  absl::optional<std::string> response_code_;
-  absl::optional<std::string> parse_status_;
+  std::optional<std::string> query_name_;
+  std::optional<std::string> query_type_;
+  std::optional<std::string> query_class_;
+  std::optional<std::string> answer_count_;
+  std::optional<std::string> response_code_;
+  std::optional<std::string> parse_status_;
 
   // Address information
   std::string remote_address_;
@@ -413,7 +417,7 @@ server_config:
 // Test custom DNS command parser formatters
 TEST(DnsFilterCommandParserTest, QueryNameFormatter) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  auto formatter = parser->parse("QUERY_NAME", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   // Create StreamInfo
@@ -434,17 +438,17 @@ TEST(DnsFilterCommandParserTest, QueryNameFormatter) {
   formatter_context.setExtension(*dns_context);
 
   // Test format string
-  auto result = formatter->format(formatter_context, stream_info);
+  auto result = Envoy::Formatter::formatForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(result.value(), "example.com");
 
   // Test format value
-  auto value = formatter->formatValue(formatter_context, stream_info);
+  auto value = Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "example.com");
 }
 
 TEST(DnsFilterCommandParserTest, QueryTypeFormatter) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_TYPE", "", absl::nullopt);
+  auto formatter = parser->parse("QUERY_TYPE", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   Event::SimulatedTimeSystem test_time;
@@ -461,16 +465,16 @@ TEST(DnsFilterCommandParserTest, QueryTypeFormatter) {
   Formatter::Context formatter_context;
   formatter_context.setExtension(*dns_context);
 
-  auto result = formatter->format(formatter_context, stream_info);
+  auto result = Envoy::Formatter::formatForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(result.value(), "1"); // A record type
 
-  auto value = formatter->formatValue(formatter_context, stream_info);
+  auto value = Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "1");
 }
 
 TEST(DnsFilterCommandParserTest, AnswerCountFormatter) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("ANSWER_COUNT", "", absl::nullopt);
+  auto formatter = parser->parse("ANSWER_COUNT", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   Event::SimulatedTimeSystem test_time;
@@ -489,16 +493,16 @@ TEST(DnsFilterCommandParserTest, AnswerCountFormatter) {
   Formatter::Context formatter_context;
   formatter_context.setExtension(*dns_context);
 
-  auto result = formatter->format(formatter_context, stream_info);
+  auto result = Envoy::Formatter::formatForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(result.value(), "5");
 
-  auto value = formatter->formatValue(formatter_context, stream_info);
+  auto value = Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "5");
 }
 
 TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("RESPONSE_CODE", "", absl::nullopt);
+  auto formatter = parser->parse("RESPONSE_CODE", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   Event::SimulatedTimeSystem test_time;
@@ -514,16 +518,16 @@ TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
   Formatter::Context formatter_context;
   formatter_context.setExtension(*dns_context);
 
-  auto result = formatter->format(formatter_context, stream_info);
+  auto result = Envoy::Formatter::formatForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(result.value(), "0"); // NO_ERROR
 
-  auto value = formatter->formatValue(formatter_context, stream_info);
+  auto value = Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "0");
 }
 
 TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("PARSE_STATUS", "", absl::nullopt);
+  auto formatter = parser->parse("PARSE_STATUS", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   Event::SimulatedTimeSystem test_time;
@@ -539,16 +543,16 @@ TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
   Formatter::Context formatter_context;
   formatter_context.setExtension(*dns_context);
 
-  auto result = formatter->format(formatter_context, stream_info);
+  auto result = Envoy::Formatter::formatForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(result.value(), "true");
 
-  auto value = formatter->formatValue(formatter_context, stream_info);
+  auto value = Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "true");
 }
 
 TEST(DnsFilterCommandParserTest, MissingMetadata) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  auto formatter = parser->parse("QUERY_NAME", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   // StreamInfo without DNS context extension
@@ -557,13 +561,13 @@ TEST(DnsFilterCommandParserTest, MissingMetadata) {
   StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  auto result = formatter->format(Formatter::Context(), stream_info);
+  auto result = Envoy::Formatter::formatForTest(*formatter, Formatter::Context(), stream_info);
   EXPECT_FALSE(result.has_value());
 }
 
 TEST(DnsFilterCommandParserTest, QueryClassFormatter) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_CLASS", "", absl::nullopt);
+  auto formatter = parser->parse("QUERY_CLASS", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   Event::SimulatedTimeSystem test_time;
@@ -580,44 +584,51 @@ TEST(DnsFilterCommandParserTest, QueryClassFormatter) {
   Formatter::Context formatter_context;
   formatter_context.setExtension(*dns_context);
 
-  auto result = formatter->format(formatter_context, stream_info);
+  auto result = Envoy::Formatter::formatForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(result.value(), "1"); // IN class
 
-  auto value = formatter->formatValue(formatter_context, stream_info);
+  auto value = Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(value.string_value(), "1");
 }
 
 TEST(DnsFilterCommandParserTest, UnknownCommand) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("UNKNOWN_COMMAND", "", absl::nullopt);
-  EXPECT_EQ(formatter, nullptr);
+  EXPECT_THAT(parser->parse("UNKNOWN_COMMAND", "", std::nullopt),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "Invalid format substitution: UNKNOWN_COMMAND"));
 }
 
 TEST(DnsFilterCommandParserTest, EmptyCommandArg) {
   auto parser = createDnsFilterCommandParser();
 
   // All DNS commands should work without command args
-  EXPECT_NE(parser->parse("QUERY_NAME", "", absl::nullopt), nullptr);
-  EXPECT_NE(parser->parse("QUERY_TYPE", "", absl::nullopt), nullptr);
-  EXPECT_NE(parser->parse("QUERY_CLASS", "", absl::nullopt), nullptr);
-  EXPECT_NE(parser->parse("ANSWER_COUNT", "", absl::nullopt), nullptr);
-  EXPECT_NE(parser->parse("RESPONSE_CODE", "", absl::nullopt), nullptr);
-  EXPECT_NE(parser->parse("PARSE_STATUS", "", absl::nullopt), nullptr);
+  ASSERT_THAT(parser->parse("QUERY_NAME", "", std::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("QUERY_TYPE", "", std::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("QUERY_CLASS", "", std::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("ANSWER_COUNT", "", std::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("RESPONSE_CODE", "", std::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(parser->parse("PARSE_STATUS", "", std::nullopt), IsOkAndHolds(NotNull()));
 }
 
 TEST(DnsFilterCommandParserTest, CaseSensitiveCommands) {
   auto parser = createDnsFilterCommandParser();
 
   // Commands should be case-sensitive
-  EXPECT_NE(parser->parse("QUERY_NAME", "", absl::nullopt), nullptr);
-  EXPECT_EQ(parser->parse("query_name", "", absl::nullopt), nullptr);
-  EXPECT_EQ(parser->parse("Query_Name", "", absl::nullopt), nullptr);
-  EXPECT_EQ(parser->parse("QUERYNAME", "", absl::nullopt), nullptr);
+  ASSERT_THAT(parser->parse("QUERY_NAME", "", std::nullopt), IsOkAndHolds(NotNull()));
+  ASSERT_THAT(
+      parser->parse("query_name", "", std::nullopt),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Invalid format substitution: query_name"));
+  ASSERT_THAT(
+      parser->parse("Query_Name", "", std::nullopt),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Invalid format substitution: Query_Name"));
+  ASSERT_THAT(
+      parser->parse("QUERYNAME", "", std::nullopt),
+      HasStatus(absl::StatusCode::kInvalidArgument, "Invalid format substitution: QUERYNAME"));
 }
 
 TEST(DnsFilterCommandParserTest, FormatValueStringType) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  auto formatter = parser->parse("QUERY_NAME", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   Event::SimulatedTimeSystem test_time;
@@ -635,14 +646,14 @@ TEST(DnsFilterCommandParserTest, FormatValueStringType) {
   formatter_context.setExtension(*dns_context);
 
   // Test formatValue returns correct Protobuf value type
-  auto value = formatter->formatValue(formatter_context, stream_info);
+  auto value = Envoy::Formatter::formatValueForTest(*formatter, formatter_context, stream_info);
   EXPECT_EQ(value.kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(value.string_value(), "format.test.com");
 }
 
 TEST(DnsFilterCommandParserTest, FormatValueNullWhenMissing) {
   auto parser = createDnsFilterCommandParser();
-  auto formatter = parser->parse("QUERY_NAME", "", absl::nullopt);
+  auto formatter = parser->parse("QUERY_NAME", "", std::nullopt).value();
   ASSERT_NE(formatter, nullptr);
 
   Event::SimulatedTimeSystem test_time;
@@ -653,7 +664,7 @@ TEST(DnsFilterCommandParserTest, FormatValueNullWhenMissing) {
   // No DNS context set
 
   // Test formatValue returns null value
-  auto value = formatter->formatValue(Formatter::Context(), stream_info);
+  auto value = Envoy::Formatter::formatValueForTest(*formatter, Formatter::Context(), stream_info);
   EXPECT_EQ(value.kind_case(), Protobuf::Value::kNullValue);
 }
 
@@ -674,24 +685,30 @@ TEST(DnsFilterCommandParserTest, EmptyQueriesInContext) {
   formatter_context.setExtension(*dns_context);
 
   // Test all formatters that depend on queries return nullopt when queries are empty
-  auto query_name_fmt = parser->parse("QUERY_NAME", "", absl::nullopt);
-  EXPECT_FALSE(query_name_fmt->format(formatter_context, stream_info).has_value());
+  auto query_name_fmt = parser->parse("QUERY_NAME", "", std::nullopt).value();
+  EXPECT_FALSE(
+      Envoy::Formatter::formatForTest(*query_name_fmt, formatter_context, stream_info).has_value());
 
-  auto query_type_fmt = parser->parse("QUERY_TYPE", "", absl::nullopt);
-  EXPECT_FALSE(query_type_fmt->format(formatter_context, stream_info).has_value());
+  auto query_type_fmt = parser->parse("QUERY_TYPE", "", std::nullopt).value();
+  EXPECT_FALSE(
+      Envoy::Formatter::formatForTest(*query_type_fmt, formatter_context, stream_info).has_value());
 
-  auto query_class_fmt = parser->parse("QUERY_CLASS", "", absl::nullopt);
-  EXPECT_FALSE(query_class_fmt->format(formatter_context, stream_info).has_value());
+  auto query_class_fmt = parser->parse("QUERY_CLASS", "", std::nullopt).value();
+  EXPECT_FALSE(Envoy::Formatter::formatForTest(*query_class_fmt, formatter_context, stream_info)
+                   .has_value());
 
   // These should still work even without queries
-  auto answer_count_fmt = parser->parse("ANSWER_COUNT", "", absl::nullopt);
-  EXPECT_TRUE(answer_count_fmt->format(formatter_context, stream_info).has_value());
+  auto answer_count_fmt = parser->parse("ANSWER_COUNT", "", std::nullopt).value();
+  EXPECT_TRUE(Envoy::Formatter::formatForTest(*answer_count_fmt, formatter_context, stream_info)
+                  .has_value());
 
-  auto response_code_fmt = parser->parse("RESPONSE_CODE", "", absl::nullopt);
-  EXPECT_TRUE(response_code_fmt->format(formatter_context, stream_info).has_value());
+  auto response_code_fmt = parser->parse("RESPONSE_CODE", "", std::nullopt).value();
+  EXPECT_TRUE(Envoy::Formatter::formatForTest(*response_code_fmt, formatter_context, stream_info)
+                  .has_value());
 
-  auto parse_status_fmt = parser->parse("PARSE_STATUS", "", absl::nullopt);
-  EXPECT_TRUE(parse_status_fmt->format(formatter_context, stream_info).has_value());
+  auto parse_status_fmt = parser->parse("PARSE_STATUS", "", std::nullopt).value();
+  EXPECT_TRUE(Envoy::Formatter::formatForTest(*parse_status_fmt, formatter_context, stream_info)
+                  .has_value());
 }
 
 } // namespace

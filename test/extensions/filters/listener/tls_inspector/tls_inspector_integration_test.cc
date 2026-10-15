@@ -9,6 +9,7 @@
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
@@ -25,7 +26,9 @@ namespace {
 
 class LargeBufferListenerFilter : public Network::ListenerFilter {
 public:
-  static constexpr int BUFFER_SIZE = 512;
+  // Set BUFFER_SIZE to 300, which is larger than tls_inspector's initial read buffer size
+  // 256 bytes but smaller than the client hello message which is at least 350 bytes.
+  static constexpr int BUFFER_SIZE = 300;
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks&) override {
     ENVOY_LOG_MISC(debug, "LargeBufferListenerFilter::onAccept");
@@ -101,7 +104,7 @@ filter_disabled:
   }
 
   void initializeWithTlsInspector(bool ssl_client, const std::string& log_format,
-                                  absl::optional<bool> listener_filter_disabled = absl::nullopt,
+                                  std::optional<bool> listener_filter_disabled = std::nullopt,
                                   bool enable_ja3_fingerprinting = false,
                                   bool enable_ja4_fingerprinting = false) {
     std::string tls_inspector_config =
@@ -187,7 +190,8 @@ typed_config:
     // Set up the SSL client.
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("echo"));
-    context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
     Network::TransportSocketPtr transport_socket;
     if (ssl_client) {
       transport_socket =
@@ -268,8 +272,8 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
       false, false, false);
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
-  context_ =
-      Ssl::createClientSslTransportSocketFactory(/*ssl_options=*/{}, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(
+      /*ssl_options=*/{}, *context_manager_, *api_, &server_factory_context_.serverScope());
   auto transport_socket_factory = std::make_unique<Network::RawBufferSocketFactory>();
   Network::TransportSocketPtr transport_socket =
       transport_socket_factory->createTransportSocket(nullptr, nullptr);
@@ -295,9 +299,15 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
 TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   // These TLS options will create a client hello message with
   // `JA3` fingerprint:
-  //   `771,49199,27-23-65281-10-11-35-16-13,23,0`
+  //   `771,49199,23-65281-10-11-35-16-13,23,0` (BoringSSL)
+  //   `771,49199-255,11-10-35-16-22-23-13,23,0-1-2` (OpenSSL)
   // MD5 hash:
-  //   `c68cd85633d6847f599328eb2df750b7`
+  //   `c68cd85633d6847f599328eb2df750b7` (BoringSSL)
+  //   `bcab080434778b813a3903a51fdc90fc` (OpenSSL)
+  // The fingerprint includes the certificate compression extension, which is opt-in, so enable
+  // the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -308,7 +318,8 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::Eq("c68cd85633d6847f599328eb2df750b7"));
+              testing::Eq(SSL_SELECT("c68cd85633d6847f599328eb2df750b7",
+                                     "bcab080434778b813a3903a51fdc90fc")));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
@@ -317,14 +328,19 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
       1);
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            124);
+            SSL_SELECT(124, 154));
 }
 
 // The `JA4` fingerprint is correct in the access log.
 TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
   // These TLS options will create a client hello message with
   // `JA4` fingerprint:
-  //   `t12i0108en_f06271c2b022_91d8455748bc`
+  //   `t12i0108en_f06271c2b022_91d8455748bc` (BoringSSL)
+  //   `t12i0108en_f06271c2b022_322a62d02564` (OpenSSL)
+  // The fingerprint includes the certificate compression extension, which is opt-in, so enable
+  // the runtime guard explicitly to keep the client hello deterministic.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -335,7 +351,8 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
   client_->close(Network::ConnectionCloseType::NoFlush);
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::Eq("t12i0108en_f06271c2b022_91d8455748bc"));
+              testing::Eq(SSL_SELECT("t12i0108en_f06271c2b022_91d8455748bc",
+                                     "t12i0108en_f06271c2b022_322a62d02564")));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
@@ -344,7 +361,7 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
       1);
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            124);
+            SSL_SELECT(124, 154));
 }
 
 TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
@@ -365,7 +382,8 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   const std::string really_long_sni(absl::StrCat(std::string(240, 'a'), ".foo.com"));
   ssl_options.setSni(really_long_sni);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::TransportSocketPtr transport_socket = context_->createTransportSocket(
       std::make_shared<Network::TransportSocketOptionsImpl>(
           absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{"envoyalpn"}),
@@ -388,9 +406,9 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
   EXPECT_EQ(
       TestUtility::readSampleCount(test_server_->server().dispatcher(), *bytes_processed_histogram),
       1);
-  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+  EXPECT_GT(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
-            514);
+            256);
 }
 
 TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
@@ -404,7 +422,8 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   const std::string really_long_sni(absl::StrCat(std::string(240, 'a'), ".foo.com"));
   ssl_options.setSni(really_long_sni);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::TransportSocketPtr transport_socket = context_->createTransportSocket(
       std::make_shared<Network::TransportSocketOptionsImpl>(
           absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{}),
@@ -428,7 +447,6 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
       1);
   auto bytes_processed = static_cast<int>(
       TestUtility::readSampleSum(test_server_->server().dispatcher(), *bytes_processed_histogram));
-  EXPECT_EQ(bytes_processed, 514);
   // Double check that the test is effective by ensuring that the
   // LargeBufferListenerFilter::BUFFER_SIZE is smaller than the client hello.
   EXPECT_GT(bytes_processed, LargeBufferListenerFilter::BUFFER_SIZE);
@@ -464,7 +482,8 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintWithMalformedClientHello) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   ssl_options.setSni("example.com");
 
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
 
@@ -527,7 +546,8 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintWithSpecialALPN) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   ssl_options.setSni("example.com");
 
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
 
@@ -582,7 +602,8 @@ TEST_P(TlsInspectorIntegrationTest, JA4FingerprintWithMinimalExtensions) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   // No SNI set
 
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
 
@@ -611,7 +632,7 @@ TEST_P(TlsInspectorIntegrationTest, SniCapturedOnFilterChainNotFound) {
   const std::string test_sni = "test.example.com";
   initializeWithTlsInspector(/*ssl_client=*/true,
                              /*log_format=*/"%REQUESTED_SERVER_NAME%|%RESPONSE_CODE_DETAILS%",
-                             /*listener_filter_disabled=*/absl::nullopt);
+                             /*listener_filter_disabled=*/std::nullopt);
 
   // Set up the SSL client with an SNI that won't match any filter chain.
   Network::Address::InstanceConstSharedPtr address =
@@ -619,7 +640,8 @@ TEST_P(TlsInspectorIntegrationTest, SniCapturedOnFilterChainNotFound) {
 
   Ssl::ClientSslTransportOptions ssl_options;
   ssl_options.setSni(test_sni);
-  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_,
+                                                        &server_factory_context_.serverScope());
 
   // Use ALPN that doesn't match the filter chain.
   Network::TransportSocketPtr transport_socket = context_->createTransportSocket(

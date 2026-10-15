@@ -26,11 +26,21 @@ public:
   MOCK_METHOD(void, stopListeners,
               (StopListenersType listeners_type,
                const Network::ExtraShutdownListenerOptions& options));
+  MOCK_METHOD(void, onServerDrainStart,
+              (Network::DrainDirection direction, Network::ConnectionDrainEvent drain_event));
   MOCK_METHOD(void, stopWorkers, ());
   MOCK_METHOD(void, beginListenerUpdate, ());
   MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates&&));
+  using ListenerManager::apiListener;
   MOCK_METHOD(ApiListenerOptRef, apiListener, ());
   MOCK_METHOD(bool, isWorkerStarted, ());
+
+  ListenerUpdateCallbacksHandlePtr
+  addListenerUpdateCallbacks(ListenerUpdateCallbacks& callbacks) override {
+    return ListenerUpdateCallbacksHandlePtr{addListenerUpdateCallbacks_(callbacks)};
+  }
+  MOCK_METHOD(ListenerUpdateCallbacksHandle*, addListenerUpdateCallbacks_,
+              (ListenerUpdateCallbacks & callbacks));
 };
 } // namespace Server
 } // namespace Envoy

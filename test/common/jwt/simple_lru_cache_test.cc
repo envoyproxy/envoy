@@ -5,7 +5,6 @@
 //
 // Tests fo SimpleLRUCache
 
-#include <math.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -58,7 +57,7 @@ protected:
   // Make sure that TestCache can delete TestValue when declared as friend.
   friend class SimpleLRUCache<int, TestValue>;
   friend class TestCache;
-  ~TestValue() {}
+  ~TestValue() = default;
 };
 
 class TestCache : public SimpleLRUCache<int, TestValue> {
@@ -67,7 +66,7 @@ public:
       : SimpleLRUCache<int, TestValue>(size), check_in_cache_(check_in_cache) {}
 
 protected:
-  virtual void removeElement(TestValue* v) {
+  void removeElement(TestValue* v) override {
     if (v && check_in_cache_) {
       assert(in_cache[v->label]);
       std::cout << " Evict:" << v->label;
@@ -81,19 +80,22 @@ protected:
 
 class SimpleLRUCacheTest : public ::testing::Test {
 protected:
-  SimpleLRUCacheTest() {}
-  virtual ~SimpleLRUCacheTest() {}
+  SimpleLRUCacheTest() = default;
+  ~SimpleLRUCacheTest() override = default;
 
-  virtual void SetUp() {
-    for (int i = 0; i < kElems; ++i)
-      in_cache[i] = false;
+  void SetUp() override {
+    for (bool& i : in_cache) {
+      i = false;
+    }
   }
 
-  virtual void TearDown() {
-    if (cache_)
+  void TearDown() override {
+    if (cache_) {
       cache_->clear();
-    for (int i = 0; i < kElems; i++) {
-      assert(!in_cache[i]);
+    }
+    for (bool i : in_cache) {
+      (void)(i);
+      assert(!i);
     }
   }
 
@@ -111,7 +113,7 @@ TEST_F(SimpleLRUCacheTest, IteratorDefaultConstruct) { TestCache::const_iterator
 
 TEST_F(SimpleLRUCacheTest, Iteration) {
   int count = 0;
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
 
   // fill the cache, evict some items, ensure i can iterate over all remaining
   for (int i = 0; i < kElems; ++i) {
@@ -147,7 +149,7 @@ TEST_F(SimpleLRUCacheTest, Iteration) {
 }
 
 TEST_F(SimpleLRUCacheTest, StdCopy) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   for (int i = 0; i < kElems; ++i) {
     in_cache[i] = true;
     cache_->insertPinned(i, new TestValue(i), 1);
@@ -184,18 +186,18 @@ void SimpleLRUCacheTest::testInOrderEvictions(int cache_size) {
 }
 
 TEST_F(SimpleLRUCacheTest, InOrderEvictions) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   testInOrderEvictions(kCacheSize);
 }
 
 TEST_F(SimpleLRUCacheTest, InOrderEvictionsWithIdleEvictionEnabled) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   cache_->setMaxIdleSeconds(2000);
   testInOrderEvictions(kCacheSize);
 }
 
 TEST_F(SimpleLRUCacheTest, InOrderEvictionsWithAgeBasedEvictionEnabled) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   cache_->setAgeBasedEviction(2000);
   testInOrderEvictions(kCacheSize);
 }
@@ -258,18 +260,18 @@ void SimpleLRUCacheTest::testSetMaxSize() {
 }
 
 TEST_F(SimpleLRUCacheTest, SetMaxSize) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   testSetMaxSize();
 }
 
 TEST_F(SimpleLRUCacheTest, SetMaxSizeWithIdleEvictionEnabled) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   cache_->setMaxIdleSeconds(2000);
   testSetMaxSize();
 }
 
 TEST_F(SimpleLRUCacheTest, SetMaxSizeWithAgeBasedEvictionEnabled) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   cache_->setAgeBasedEviction(2000);
   testSetMaxSize();
 }
@@ -291,12 +293,12 @@ TEST_F(SimpleLRUCacheTest, VoidValues) {
   // return value from Lookup(), so let's do it with StillInUse().
   //
 
-  cache_.reset(new TestCache(1));
+  cache_ = std::make_unique<TestCache>(1);
 
-  cache_->insertPinned(5, 0, 1);
-  cache_->release(5, 0);
+  cache_->insertPinned(5, nullptr, 1);
+  cache_->release(5, nullptr);
 
-  if (cache_->stillInUse(5, 0)) {
+  if (cache_->stillInUse(5, nullptr)) {
     // Released, but still in there
     // This path is executed given Dec 2007 implementation
 
@@ -305,11 +307,11 @@ TEST_F(SimpleLRUCacheTest, VoidValues) {
   } else {
     // Not in there, let's insert it
     // This path is not executed given Dec 2007 implementation
-    cache_->insertPinned(5, 0, 1);
+    cache_->insertPinned(5, nullptr, 1);
   }
 
   ASSERT_EQ(1, cache_->pinnedSize());
-  cache_->release(5, 0);
+  cache_->release(5, nullptr);
   ASSERT_EQ(0, cache_->pinnedSize());
 
   cache_->clear();
@@ -345,12 +347,12 @@ void SimpleLRUCacheTest::testOverfullEvictionPolicy() {
 }
 
 TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicy) {
-  cache_.reset(new TestCache(kCacheSize + 1));
+  cache_ = std::make_unique<TestCache>(kCacheSize + 1);
   testOverfullEvictionPolicy();
 }
 
 TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithIdleEvictionEnabled) {
-  cache_.reset(new TestCache(kCacheSize + 1));
+  cache_ = std::make_unique<TestCache>(kCacheSize + 1);
   // Here we are not testing idle eviction, just that LRU eviction
   // still works correctly when the cache is overfull.
   cache_->setMaxIdleSeconds(2000);
@@ -358,7 +360,7 @@ TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithIdleEvictionEnabled) {
 }
 
 TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithAgeBasedEvictionEnabled) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   // With age-based eviction usage is ignored and instead the oldest inserted
   // element is evicted when cache becomes overfull.
   cache_->setAgeBasedEviction(2000);
@@ -387,7 +389,7 @@ TEST_F(SimpleLRUCacheTest, OverfullEvictionPolicyWithAgeBasedEvictionEnabled) {
 }
 
 TEST_F(SimpleLRUCacheTest, Update) {
-  cache_.reset(new TestCache(kCacheSize, false)); // Don't check in_cache.
+  cache_ = std::make_unique<TestCache>(kCacheSize, false); // Don't check in_cache.
   // Insert some values.
   for (int i = 0; i < kCacheSize; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
@@ -423,7 +425,7 @@ TEST_F(SimpleLRUCacheTest, Update) {
 
 TEST_F(SimpleLRUCacheTest, Pinning) {
   static const int kPinned = kCacheSize + 4;
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   for (int i = 0; i < kElems; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
     TestValue* v = new TestValue(i);
@@ -444,7 +446,7 @@ TEST_F(SimpleLRUCacheTest, Pinning) {
 }
 
 TEST_F(SimpleLRUCacheTest, Remove) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   for (int i = 0; i < kElems; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
     TestValue* v = new TestValue(i);
@@ -502,12 +504,12 @@ void SimpleLRUCacheTest::testRemoveUnpinned() {
 }
 
 TEST_F(SimpleLRUCacheTest, RemoveUnpinned) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   testRemoveUnpinned();
 }
 
 TEST_F(SimpleLRUCacheTest, RemoveUnpinnedWithIdleEvictionEnabled) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   // Here we are not testing idle eviction, just that removeUnpinned
   // works correctly with it enabled.
   cache_->setMaxIdleSeconds(2000);
@@ -515,7 +517,7 @@ TEST_F(SimpleLRUCacheTest, RemoveUnpinnedWithIdleEvictionEnabled) {
 }
 
 TEST_F(SimpleLRUCacheTest, RemoveUnpinnedWithAgeBasedEvictionEnabled) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   // Here we are not testing age-based eviction, just that removeUnpinned
   // works correctly with it enabled.
   cache_->setAgeBasedEviction(2000);
@@ -523,7 +525,7 @@ TEST_F(SimpleLRUCacheTest, RemoveUnpinnedWithAgeBasedEvictionEnabled) {
 }
 
 TEST_F(SimpleLRUCacheTest, MultiInsert) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   for (int i = 0; i < kElems; i++) {
     TestValue* v = new TestValue(i);
     in_cache[i] = true;
@@ -535,7 +537,7 @@ TEST_F(SimpleLRUCacheTest, MultiInsert) {
 }
 
 TEST_F(SimpleLRUCacheTest, MultiInsertPinned) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   TestValue* list[kElems];
   for (int i = 0; i < kElems; i++) {
     TestValue* v = new TestValue(i);
@@ -547,13 +549,13 @@ TEST_F(SimpleLRUCacheTest, MultiInsertPinned) {
     ASSERT_TRUE(in_cache[i]);
     ASSERT_TRUE(cache_->stillInUse(0, list[i]));
   }
-  for (int i = 0; i < kElems; i++) {
-    cache_->release(0, list[i]);
+  for (auto& i : list) {
+    cache_->release(0, i);
   }
 }
 
 void SimpleLRUCacheTest::testExpiration(bool lru, bool release_quickly) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   if (lru) {
     cache_->setMaxIdleSeconds(0.2); // 200 milliseconds
   } else {
@@ -564,8 +566,9 @@ void SimpleLRUCacheTest::testExpiration(bool lru, bool release_quickly) {
     in_cache[i] = true;
     cache_->insert(i, v, 1);
   }
-  for (int i = 0; i < kCacheSize; i++)
+  for (int i = 0; i < kCacheSize; i++) {
     ASSERT_TRUE(in_cache[i]);
+  }
 
   usleep(110 * 1000);
 
@@ -575,16 +578,18 @@ void SimpleLRUCacheTest::testExpiration(bool lru, bool release_quickly) {
     cache_->release(0, v1);
     v1 = nullptr;
   }
-  for (int i = 0; i < kCacheSize; i++)
+  for (int i = 0; i < kCacheSize; i++) {
     ASSERT_TRUE(in_cache[i]);
+  }
 
   // Sleep more: should cause expiration of everything we
   // haven't touched, and the one we touched if age-based.
   usleep(110 * 1000);
 
   // Nothing gets expired until we call one of the cache methods.
-  for (int i = 0; i < kCacheSize; i++)
+  for (int i = 0; i < kCacheSize; i++) {
     ASSERT_TRUE(in_cache[i]);
+  }
 
   // It's now 220 ms since element 0 was created, and
   // 110 ms since we last looked at it. If we configured
@@ -599,8 +604,9 @@ void SimpleLRUCacheTest::testExpiration(bool lru, bool release_quickly) {
   ASSERT_EQ(v2 == nullptr, !lru);
 
   // In either case all the other elements should now be gone.
-  for (int i = 1; i < kCacheSize; i++)
+  for (int i = 1; i < kCacheSize; i++) {
     ASSERT_TRUE(!in_cache[i]);
+  }
 
   // Clean up
   bool cleaned_up = false;
@@ -633,7 +639,7 @@ TEST_F(SimpleLRUCacheTest, ExpirationAgeBasedLongHeldPins) {
 void SimpleLRUCacheTest::testLargeExpiration(bool lru, double timeout) {
   // Make sure that setting a large timeout doesn't result in overflow and
   // cache entries expiring immediately.
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   if (lru) {
     cache_->setMaxIdleSeconds(timeout);
   } else {
@@ -690,7 +696,7 @@ TEST_F(SimpleLRUCacheTest, UpdateSize) {
   // Create a cache larger than kCacheSize, to give us some overhead to
   // change the objects' sizes. We don't want an UpdateSize operation
   // to force a GC and throw off our ASSERT_TRUE()s down below.
-  cache_.reset(new TestCache(kCacheSize * 2));
+  cache_ = std::make_unique<TestCache>(kCacheSize * 2);
   for (int i = 0; i < kCacheSize; i++) {
     TestValue* v = new TestValue(i);
     in_cache[i] = true;
@@ -810,7 +816,7 @@ TEST_F(SimpleLRUCacheTest, UpdateSize) {
 }
 
 TEST_F(SimpleLRUCacheTest, DontUpdateEvictionOrder) {
-  cache_.reset(new TestCache(kCacheSize));
+  cache_ = std::make_unique<TestCache>(kCacheSize);
   int64_t original_start, original_end;
 
   SimpleLRUCacheOptions options;
@@ -868,7 +874,7 @@ TEST_F(SimpleLRUCacheTest, DontUpdateEvictionOrder) {
 }
 
 TEST_F(SimpleLRUCacheTest, ScopedLookup) {
-  cache_.reset(new TestCache(kElems));
+  cache_ = std::make_unique<TestCache>(kElems);
   for (int i = 0; i < kElems; i++) {
     ASSERT_TRUE(!cache_->lookup(i));
     TestValue* v = new TestValue(i);
@@ -898,7 +904,7 @@ TEST_F(SimpleLRUCacheTest, ScopedLookup) {
 
 TEST_F(SimpleLRUCacheTest, AgeOfLRUItemInMicroseconds) {
   // Make sure empty cache returns zero.
-  cache_.reset(new TestCache(kElems));
+  cache_ = std::make_unique<TestCache>(kElems);
   ASSERT_EQ(cache_->ageOfLRUItemInMicroseconds(), 0);
 
   // Make sure non-empty cache doesn't return zero.
@@ -933,7 +939,7 @@ TEST_F(SimpleLRUCacheTest, AgeOfLRUItemInMicroseconds) {
 }
 
 TEST_F(SimpleLRUCacheTest, GetLastUseTime) {
-  cache_.reset(new TestCache(kElems));
+  cache_ = std::make_unique<TestCache>(kElems);
   int64_t now, last;
 
   // Make sure nonexistent key returns -1
@@ -992,7 +998,7 @@ TEST_F(SimpleLRUCacheTest, GetLastUseTime) {
 }
 
 TEST_F(SimpleLRUCacheTest, GetInsertionTime) {
-  cache_.reset(new TestCache(kElems));
+  cache_ = std::make_unique<TestCache>(kElems);
   int64_t now, last;
 
   cache_->setAgeBasedEviction(-1);
@@ -1049,7 +1055,7 @@ TEST_F(SimpleLRUCacheTest, GetInsertionTime) {
   ASSERT_EQ(cache_->getInsertionTime(2), -1);
 }
 
-std::string StringPrintf(void* p, int pin, int defer) {
+std::string stringPrintf(void* p, int pin, int defer) {
   std::stringstream ss;
   ss << std::hex << p << std::dec << ": pin: " << pin;
   ss << ", is_deferred: " << defer;
@@ -1057,7 +1063,7 @@ std::string StringPrintf(void* p, int pin, int defer) {
 }
 
 TEST_F(SimpleLRUCacheTest, DebugOutput) {
-  cache_.reset(new TestCache(kCacheSize, false /* check_in_cache */));
+  cache_ = std::make_unique<TestCache>(kCacheSize, false /* check_in_cache */);
   TestValue* v1 = new TestValue(0);
   cache_->insertPinned(0, v1, 1);
   TestValue* v2 = new TestValue(0);
@@ -1067,16 +1073,16 @@ TEST_F(SimpleLRUCacheTest, DebugOutput) {
 
   std::string s;
   cache_->debugOutput(&s);
-  EXPECT_THAT(s, HasSubstr(StringPrintf(v1, 1, 1)));
-  EXPECT_THAT(s, HasSubstr(StringPrintf(v2, 1, 1)));
-  EXPECT_THAT(s, HasSubstr(StringPrintf(v3, 0, 0)));
+  EXPECT_THAT(s, HasSubstr(stringPrintf(v1, 1, 1)));
+  EXPECT_THAT(s, HasSubstr(stringPrintf(v2, 1, 1)));
+  EXPECT_THAT(s, HasSubstr(stringPrintf(v3, 0, 0)));
 
   cache_->release(0, v1);
   cache_->release(0, v2);
 }
 
 TEST_F(SimpleLRUCacheTest, LookupWithoutEvictionOrderUpdateAndRemove) {
-  cache_.reset(new TestCache(kCacheSize, false /* check_in_cache */));
+  cache_ = std::make_unique<TestCache>(kCacheSize, false /* check_in_cache */);
 
   for (int i = 0; i < 3; ++i) {
     cache_->insert(i, new TestValue(0), 1);

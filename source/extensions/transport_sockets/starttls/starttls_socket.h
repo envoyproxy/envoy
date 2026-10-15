@@ -36,8 +36,8 @@ public:
   bool canFlushClose() override { return active_socket_->canFlushClose(); }
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return active_socket_->ssl(); }
 
-  void closeSocket(Network::ConnectionEvent event) override {
-    return active_socket_->closeSocket(event);
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override {
+    return active_socket_->closeSocket(event, abort_reset);
   }
 
   Network::IoResult doRead(Buffer::Instance& buffer) override {

@@ -1,13 +1,12 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/common/time.h"
 #include "envoy/rds/config.h"
 
 #include "source/common/protobuf/protobuf.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Rds {
@@ -41,7 +40,7 @@ public:
    * if the provider has not yet performed an initial configuration load, no information will be
    * returned.
    */
-  virtual const absl::optional<ConfigInfo>& configInfo() const PURE;
+  virtual const std::optional<ConfigInfo>& configInfo() const PURE;
 
   /**
    * @return the last time this RouteConfigProvider was updated. Used for config dumps.
@@ -51,6 +50,12 @@ public:
   /**
    * Callback used to notify RouteConfigProvider about configuration changes.
    * @return Status indicating if the call was successful or had graceful error handling.
+   *
+   * NOTE: a non-OK status does NOT affect xDS configuration loading. This runs after the route
+   * configuration has been warmed up, which publishes it regardless of the result, and it is not
+   * necessarily called on the xDS update call stack - an update that warms up asynchronously
+   * completes long after the xDS response was accepted - so there is nothing left to reject. A
+   * failure is only logged as a warning.
    */
   virtual absl::Status onConfigUpdate() PURE;
 };

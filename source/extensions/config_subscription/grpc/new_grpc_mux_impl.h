@@ -45,16 +45,16 @@ public:
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   static void shutdownAll();
 
-  void shutdown() { shutdown_ = true; }
+  void shutdown() {
+    shutdown_ = true;
+    xds_config_tracker_.reset();
+  }
 
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
                            OpaqueResourceDecoderSharedPtr resource_decoder,
                            const SubscriptionOptions& options) override;
-
-  void requestOnDemandUpdate(const std::string& type_url,
-                             const absl::flat_hash_set<std::string>& for_update) override;
 
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());
@@ -64,7 +64,7 @@ public:
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
   void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+      ResponseProtoPtr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
       ControlPlaneStats& control_plane_stats) override;
 
   void onStreamEstablished() override;
@@ -78,11 +78,12 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
-  absl::Status
-  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
-                  BackOffStrategyPtr&& backoff_strategy,
-                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+  absl::Status updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                               Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                               Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
+                               const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+                               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>
+                                   load_stats_reporter_factory = nullptr) override;
 
   // TODO(adisuissa): finish implementation.
   Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
@@ -99,15 +100,15 @@ public:
                  grpc_stream_.get())
           ->currentStreamForTest();
     }
-    return *grpc_stream_.get();
+    return *grpc_stream_;
   }
 
   struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, const bool use_namespace_matching,
-                      Event::Dispatcher& dispatcher, CustomConfigValidators* config_validators,
+    SubscriptionStuff(const std::string& type_url, Event::Dispatcher& dispatcher,
+                      CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
                       EdsResourcesCacheOptRef eds_resources_cache)
-        : watch_map_(use_namespace_matching, type_url, config_validators, eds_resources_cache),
+        : watch_map_(type_url, config_validators, eds_resources_cache),
           sub_state_(type_url, watch_map_, dispatcher, xds_config_tracker) {
       // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
       ASSERT(
@@ -117,7 +118,7 @@ public:
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
-    std::string control_plane_identifier_{};
+    std::string control_plane_identifier_;
 
     SubscriptionStuff(const SubscriptionStuff&) = delete;
     SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
@@ -150,6 +151,14 @@ private:
       parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
+    void append(const absl::flat_hash_set<std::string>& resources) override {
+      parent_.appendWatch(type_url_, watch_, resources, options_);
+    }
+
+    void accept(const absl::flat_hash_set<std::string>& patterns) override {
+      parent_.accept(type_url_, watch_, patterns);
+    }
+
   private:
     const std::string type_url_;
     Watch* watch_;
@@ -177,9 +186,23 @@ private:
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
 
+  // Additionally adds resources to the given watch's interest, updating both the watch-map routing
+  // and the subscription (see GrpcMuxWatch::append).
+  void appendWatch(const std::string& type_url, Watch* watch,
+                   const absl::flat_hash_set<std::string>& resources,
+                   const SubscriptionOptions& options);
+  // Registers glob interest for the given watch; routing only, never affects the subscription
+  // (see GrpcMuxWatch::accept).
+  void accept(const std::string& type_url, Watch* watch,
+              const absl::flat_hash_set<std::string>& patterns);
+
+  // Normalizes xdstp:// resource names for the transport; non-xdstp names are returned unchanged.
+  absl::flat_hash_set<std::string>
+  effectiveResources(const absl::flat_hash_set<std::string>& resources,
+                     const SubscriptionOptions& options);
+
   // Adds a subscription for the type_url to the subscriptions map and order list.
-  SubscriptionsMap::iterator addSubscription(const std::string& type_url,
-                                             bool use_namespace_matching);
+  SubscriptionsMap::iterator addSubscription(const std::string& type_url);
 
   void trySendDiscoveryRequests();
 
@@ -193,7 +216,7 @@ private:
   // First, prioritizes ACKs over non-ACK subscription interest updates.
   // Then, prioritizes non-ACK updates in the order the various types
   // of subscriptions were activated.
-  absl::optional<std::string> whoWantsToSendDiscoveryRequest();
+  std::optional<std::string> whoWantsToSendDiscoveryRequest();
 
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);

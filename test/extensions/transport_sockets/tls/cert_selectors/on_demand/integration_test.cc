@@ -9,10 +9,13 @@
 #include "envoy/extensions/transport_sockets/tls/cert_mappers/static_name/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/server2cert_hash.h"
+#include "test/config/integration/certs/servercert_hash.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
@@ -20,8 +23,11 @@
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -81,7 +87,7 @@ public:
         transport_socket->set_name("envoy.transport_sockets.tls");
         envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
         configToUseSds(*tls_context.mutable_common_tls_context(), on_demand_config);
-        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+        std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
         if (!filter_state_value_.empty()) {
           const std::string set_filter_state = fmt::format(R"EOF(
           name: envoy.filters.network.set_filter_state
@@ -113,7 +119,7 @@ public:
         tls_context.set_disable_stateless_session_resumption(true);
         tls_context.set_disable_stateful_session_resumption(true);
         tls_context.mutable_require_client_certificate()->set_value(mtls_);
-        transport_socket->mutable_typed_config()->PackFrom(tls_context);
+        std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
       }
     });
     BaseTcpProxySslIntegrationTest::initialize();
@@ -159,8 +165,9 @@ public:
     // Configure config source
     setConfigSource(on_demand.mutable_config_source());
     common_tls_context.mutable_custom_tls_certificate_selector()->set_name("on-demand-config");
-    common_tls_context.mutable_custom_tls_certificate_selector()->mutable_typed_config()->PackFrom(
-        on_demand);
+    std::ignore = common_tls_context.mutable_custom_tls_certificate_selector()
+                      ->mutable_typed_config()
+                      ->PackFrom(on_demand);
   }
 
   void setConfigSource(envoy::config::core::v3::ConfigSource* config_source) {
@@ -200,6 +207,8 @@ protected:
   bool mtls_{false};
   bool validation_sds_{false};
   std::string filter_state_value_;
+  // Certificate-level TLS parameters to attach to every certificate secret sent over SDS.
+  std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters> cert_tls_params_;
 
   envoy::extensions::transport_sockets::tls::v3::Secret makeSecret(absl::string_view name,
                                                                    absl::string_view cert) {
@@ -215,6 +224,9 @@ protected:
           absl::StrCat("test/config/integration/certs/", cert, "cert.pem")));
       tls_certificate->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
           absl::StrCat("test/config/integration/certs/", cert, "key.pem")));
+      if (cert_tls_params_.has_value()) {
+        *tls_certificate->mutable_tls_params() = *cert_tls_params_;
+      }
     }
     return secret;
   }
@@ -247,7 +259,7 @@ protected:
     discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     auto* resource = discovery_response.add_resources();
     resource->set_name(name);
-    resource->mutable_resource()->PackFrom(makeSecret(name, cert));
+    std::ignore = resource->mutable_resource()->PackFrom(makeSecret(name, cert));
     xds_stream.sendGrpcMessage(discovery_response);
   }
 
@@ -260,8 +272,8 @@ protected:
   }
 
   void waitCertsRequested(uint32_t count) {
-    test_server_->waitForCounterEq(onDemandStat("cert_requested"), count,
-                                   TestUtility::DefaultTimeout, dispatcher_.get());
+    test_server_->waitForCounter(onDemandStat("cert_requested"), Eq(count),
+                                 TestUtility::DefaultTimeout, dispatcher_.get());
   }
 
   std::string onDemandStat(absl::string_view stat) {
@@ -295,8 +307,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithPrefetch) {
   }
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
-  test_server_->waitForCounterEq("sds.server.update_success", 1);
-  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  test_server_->waitForCounter("sds.server.update_success", Eq(1));
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
@@ -332,8 +344,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessWithoutPrefetch) {
   }
   EXPECT_EQ(1, test_server_->counter(onDemandStat("cert_requested"))->value());
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
-  test_server_->waitForCounterEq("sds.server.update_success", 1);
-  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  test_server_->waitForCounter("sds.server.update_success", Eq(1));
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
@@ -357,7 +369,7 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessSNI) {
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
   EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
-  test_server_->waitForCounterEq("sds.server.update_success", 1);
+  test_server_->waitForCounter("sds.server.update_success", Eq(1));
   EXPECT_EQ(0, test_server_->counter("sds.server.update_rejected")->value());
 }
 
@@ -385,8 +397,8 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessMixed) {
   }
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
-  test_server_->waitForCounterEq("sds.server.update_success", 1);
-  test_server_->waitForCounterEq("sds.server2.update_success", 1);
+  test_server_->waitForCounter("sds.server.update_success", Eq(1));
+  test_server_->waitForCounter("sds.server2.update_success", Eq(1));
   EXPECT_EQ(2, test_server_->gauge(onDemandStat("cert_active"))->value());
 }
 
@@ -400,7 +412,7 @@ TEST_P(OnDemandIntegrationTest, BasicFail) {
   createXdsConnection();
   waitSendSdsResponse("server", "", true);
   conn->waitForDisconnect();
-  test_server_->waitForGaugeEq(onDemandStat("cert_active"), 0);
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(0));
 }
 
 TEST_P(OnDemandIntegrationTest, TwoPendingConnections) {
@@ -458,9 +470,8 @@ TEST_P(OnDemandIntegrationTest, ListenerConnectTimeout) {
   });
   setup();
   auto conn = createClientConnection();
-  test_server_->waitForCounterEq(
-      listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"), 1,
-      TestUtility::DefaultTimeout, dispatcher_.get());
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"),
+                               Eq(1), TestUtility::DefaultTimeout, dispatcher_.get());
   conn->close();
   conn.reset();
   // SDS request is still outstanding, so we can respond to it, and it will be used later.
@@ -487,7 +498,7 @@ TEST_P(OnDemandIntegrationTest, SecretAddRemove) {
 
   // Remove.
   removeSecret(stream, "server");
-  test_server_->waitForGaugeEq(onDemandStat("cert_active"), 0);
+  test_server_->waitForGauge(onDemandStat("cert_active"), Eq(0));
 
   // Request again.
   auto conn2 = createClientConnection();
@@ -519,7 +530,7 @@ TEST_P(OnDemandIntegrationTest, SecretUpdate) {
 
   // Update with another valid secret.
   sendSecret(stream, "server", "server2");
-  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 2);
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
 
   auto conn2 = createClientConnection();
   conn2->waitForUpstreamConnection();
@@ -589,12 +600,12 @@ TEST_P(OnDemandIntegrationTest, ValidationContextUpdate) {
     conn->sendAndReceiveTlsData("hello", "world");
     conn.reset();
   }
-  test_server_->waitForCounterEq(onDemandStat("cert_updated"), 1);
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(1));
 
   // Send a wrong CA via validation SDS and open a new connection that fails.
   {
     sendSecret(*ca_stream, cacert(), upstream_selector_ ? "cacert" : "upstreamcacert");
-    test_server_->waitForCounterEq(onDemandStat("cert_updated"), 2);
+    test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
     auto conn = createClientConnection();
     if (upstream_selector_) {
       conn->waitForUpstreamConnection();
@@ -649,6 +660,102 @@ TEST_P(OnDemandIntegrationTest, BasicSuccessFilterStateOverride) {
   waitSendSdsResponse("server");
   conn->sendAndReceiveTlsData("hello", "world");
   conn.reset();
+}
+
+// Exercises the RFC 8879 compressed-certificate cache together with the on-demand selector,
+// verifying the correct certificate is served as the certificate behind a name changes.
+//
+// Each certificate gets its own SSL_CTX (the on-demand selector switches to it via
+// SSL_set_SSL_CTX during the handshake) with its own compressed-cert cache, keyed by
+// (algorithm, certificate chain). Two sequential connections per certificate exercise a
+// cache miss then a cache hit; after the secret is updated to a different chain, the selector
+// serves it from a new SSL_CTX. Each connection validates that the certificate presented to
+// the client is the one currently configured -- never a stale cached chain.
+TEST_P(OnDemandIntegrationTest, CertCompressionCacheAcrossContexts) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "Certificate compression applies to the downstream server certificate path";
+  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.tls_certificate_compression_brotli",
+                                    "true");
+  setup();
+
+  // sha256PeerCertificateDigest() is lowercase, separator-free hex; the cert hash headers are
+  // uppercase and colon-separated.
+  const auto normalize = [](absl::string_view hash) {
+    return absl::AsciiStrToLower(absl::StrReplaceAll(hash, {{":", ""}}));
+  };
+  const std::string server_digest = normalize(TEST_SERVER_CERT_HASH);
+  const std::string server2_digest = normalize(TEST_SERVER2_CERT_HASH);
+
+  // First connection: cache miss compresses and stores the chain for "server".
+  auto conn1 = createClientConnection();
+  waitCertsRequested(1);
+  createXdsConnection();
+  auto& stream = waitSendSdsResponse("server");
+  conn1->waitForUpstreamConnection();
+  conn1->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ(server_digest, conn1->peerCertificateSha256Digest().value_or(""));
+  conn1.reset();
+
+  // Second connection on the same, unchanged certificate: cache hit on the same SSL_CTX.
+  auto conn1b = createClientConnection();
+  conn1b->waitForUpstreamConnection();
+  conn1b->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ(server_digest, conn1b->peerCertificateSha256Digest().value_or(""));
+  conn1b.reset();
+
+  // Update "server" to a different certificate chain. The on-demand selector builds a new
+  // SSL_CTX (with a fresh, empty compressed-cert cache) for it.
+  sendSecret(stream, "server", "server2");
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
+
+  // Two more connections now serve the new chain: miss then hit on the new SSL_CTX. Each must
+  // present the new certificate, proving no stale chain is served from a cache.
+  for (int i = 0; i < 2; i++) {
+    auto conn = createClientConnection();
+    conn->waitForUpstreamConnection();
+    conn->sendAndReceiveTlsData("hello", "world");
+    EXPECT_EQ(server2_digest, conn->peerCertificateSha256Digest().value_or(""));
+    conn.reset();
+  }
+  EXPECT_EQ(1, test_server_->gauge(onDemandStat("cert_active"))->value());
+}
+
+// Certificate-level tls_params delivered over SDS take effect on the on-demand path. The parameters
+// travel with the certificate config, so the context built for the secret carries them and the
+// handshaker applies them to the connection once the pending selection completes.
+//
+// The certificate restricts the ciphers to AES256 while the client offers the default suites, which
+// prefer AES128. The second connection repeats the handshake with the same certificate and no
+// tls_params, confirming that AES256 came from the certificate and not from the client's offer.
+TEST_P(OnDemandIntegrationTest, PerCertTlsParamsAppliedAfterAsyncSelection) {
+  if (upstream_selector_) {
+    GTEST_SKIP() << "Certificate-level tls_params are ignored on client certificates";
+  }
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters params;
+  params.add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
+  cert_tls_params_ = params;
+  setup();
+
+  auto conn = createClientConnection();
+  // The certificate is not available yet, so selection goes through the asynchronous path.
+  waitCertsRequested(1);
+  createXdsConnection();
+  auto& stream = waitSendSdsResponse("server");
+  conn->waitForUpstreamConnection();
+  conn->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ("ECDHE-RSA-AES256-GCM-SHA384", conn->ciphersuite().value_or(""));
+  conn.reset();
+
+  cert_tls_params_.reset();
+  sendSecret(stream, "server", "server");
+  test_server_->waitForCounter(onDemandStat("cert_updated"), Eq(2));
+
+  auto conn2 = createClientConnection();
+  conn2->waitForUpstreamConnection();
+  conn2->sendAndReceiveTlsData("hello", "world");
+  EXPECT_EQ("ECDHE-RSA-AES128-GCM-SHA256", conn2->ciphersuite().value_or(""));
+  conn2.reset();
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, OnDemandIntegrationTest,

@@ -11,9 +11,8 @@ routing PRs, questions, etc. to the right place.
 * Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
-* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
-  * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
-    (metadata, etc.), and macOS build.
+* Harvey Tuch ([htuch](https://github.com/htuch)) (h@tuch.id.au)
+  * xDS APIs, configuration and control plane, extensibility and security.
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
   * TLS, TCP proxy, listeners, and HTTP proxy/connection pooling.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
@@ -26,12 +25,14 @@ routing PRs, questions, etc. to the right place.
   * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
   * Overload manager, security, logging, wasm, data plane.
+* Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
+  * Dynamic Modules, Reverse Tunnels, Performance, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
+* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
+  * Load balancing, data plane, overload manager.
 
 # Maintainers
 <!--- If you modify maintainers list, please update the core-maintainers section of SECURITY-INSIGHTS.yml -->
 
-* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
-  * xDS APIs, configuration, control plane, fuzzing.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
   * Data plane, overload management, flow control.
 * Keith Smiley ([keith](https://github.com/keith)) (keithbsmiley@gmail.com)
@@ -40,16 +41,12 @@ routing PRs, questions, etc. to the right place.
   * Listeners, RBAC, CEL, matching, Istio.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
   * Caches, file filters, and file I/O.
-* Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
-  * Load balancing, GeoIP, overload manager, security.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
   * Load balancing, data plane.
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (t.y.mathetake@gmail.com)
   * Dynamic modules, API gateway, WASM, Istio.
-* Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
-  * Dynamic Modules, Reverse Tunnels, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 * Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
   * Request mirroring, data plane
 * Mike Krinkin ([krinkinmu](https://github.com/krinkinmu)) (krinkin.m.u@gmail.com)
@@ -65,10 +62,10 @@ The following Envoy maintainers have final say over any changes only affecting /
 
 * Ali Beyad ([abeyad](https://github.com/abeyad)) (abeyad@google.com)
   * xDS, C++ integration tests.
-* Fredy Wijaya ([fredyw](https://github.com/fredyw)) (fredyw@google.com)
-  * Android, Java, Kotlin, JNI.
 * Dan Zhang ([danzh2010](https://github.com/danzh2010)) (danzh@google.com)
   * Envoy Mobile, QUIC, HTTP/3.
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
+  * Language APIs, xDS.
 
 # Senior extension maintainers
 
@@ -101,6 +98,12 @@ without further review.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
 * Antonio Leonti ([antoniovleonti](https://github.com/antoniovleonti)) (leonti@google.com)
 * Takeshi Yoneda ([mathetake](https://github.com/mathetake)) (tyoneda@netflix.com)
+* Reuben Tanner ([reubent-goog](https://github.com/reubent-goog)) (reubent@google.com)
+* Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
+* Peng Gao ([penguingao](https://github.com/penguingao)) (pengg@google.com)
+* Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
+* Adi (Suissa) Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
+* Ignasi Barrera ([nacx](https://github.com/nacx)) (nacx@apache.org)
 
 # Emeritus maintainers
 
@@ -122,10 +125,11 @@ without further review.
 * Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
-* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
 * Alex Xu ([soulxu](https://github.com/soulxu)) (hejie.xu@intel.com)
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
+* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
+* Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
 
 # Friends of Envoy
 

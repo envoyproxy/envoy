@@ -28,8 +28,8 @@ Api::SysCallIntResult PassthroughSocket::connect(Network::ConnectionSocket& sock
   return transport_socket_->connect(socket);
 }
 
-void PassthroughSocket::closeSocket(Network::ConnectionEvent event) {
-  transport_socket_->closeSocket(event);
+void PassthroughSocket::closeSocket(Network::ConnectionEvent event, bool abort_reset) {
+  transport_socket_->closeSocket(event, abort_reset);
 }
 
 Network::IoResult PassthroughSocket::doRead(Buffer::Instance& buffer) {

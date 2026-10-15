@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -9,7 +10,6 @@
 
 #include "source/common/common/logger.h"
 
-#include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.h"
 #include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.validate.h"
 
@@ -63,7 +63,7 @@ public:
 
   // Provides cluster for given Kafka topic, according to the rules contained within this
   // configuration object.
-  virtual absl::optional<ClusterConfig>
+  virtual std::optional<ClusterConfig>
   computeClusterConfigForTopic(const std::string& topic) const PURE;
 };
 
@@ -78,7 +78,7 @@ public:
   UpstreamKafkaConfigurationImpl(const KafkaMeshProtoConfig& config);
 
   // UpstreamKafkaConfiguration
-  absl::optional<ClusterConfig>
+  std::optional<ClusterConfig>
   computeClusterConfigForTopic(const std::string& topic) const override;
 
   // UpstreamKafkaConfiguration

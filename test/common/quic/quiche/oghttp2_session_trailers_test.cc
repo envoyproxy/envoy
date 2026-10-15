@@ -1,0 +1,194 @@
+#include <string>
+
+#include "quiche/common/platform/api/quiche_test.h"
+#include "quiche/http2/adapter/http2_protocol.h"
+#include "quiche/http2/adapter/http2_visitor_interface.h"
+#include "quiche/http2/adapter/mock_http2_visitor.h"
+#include "quiche/http2/adapter/oghttp2_session.h"
+#include "quiche/http2/adapter/test_frame_sequence.h"
+#include "quiche/http2/adapter/test_utils.h"
+
+namespace Envoy {
+namespace {
+
+using http2::adapter::Http2ErrorCode;
+using http2::adapter::Http2VisitorInterface;
+using http2::adapter::OgHttp2Session;
+using http2::adapter::Perspective;
+using http2::adapter::test::TestFrameSequence;
+using http2::adapter::test::TestVisitor;
+using http2::adapter::test::ToHeaders;
+using testing::_;
+
+// Mirrors the anonymous-namespace enum in quiche's own adapter tests. The
+// visitor callbacks take the frame type as a uint8_t, so these must match the
+// HTTP/2 wire values.
+enum FrameType {
+  DATA,
+  HEADERS,
+  PRIORITY,
+  RST_STREAM,
+  SETTINGS,
+  PUSH_PROMISE,
+  PING,
+  GOAWAY,
+  WINDOW_UPDATE,
+  CONTINUATION,
+};
+
+TEST(OgHttp2SessionTest, ClientReceivesTrailersWithoutEndStream) {
+  TestVisitor visitor;
+  OgHttp2Session::Options options;
+  options.perspective = Perspective::kClient;
+  OgHttp2Session session(visitor, options);
+
+  // Send client preface.
+  EXPECT_CALL(visitor, OnBeforeFrameSent(SETTINGS, 0, _, 0x0));
+  EXPECT_CALL(visitor, OnFrameSent(SETTINGS, 0, _, 0x0, 0));
+  int send_result = session.Send();
+  EXPECT_EQ(0, send_result);
+  visitor.Clear();
+
+  // Submit a request.
+  int stream_id = session.SubmitRequest(
+      ToHeaders(
+          {{":method", "GET"}, {":scheme", "http"}, {":authority", "example.com"}, {":path", "/"}}),
+      true, nullptr);
+  ASSERT_EQ(stream_id, 1);
+
+  // Send the request HEADERS.
+  // 0x5 is END_STREAM | END_HEADERS.
+  EXPECT_CALL(visitor, OnBeforeFrameSent(HEADERS, stream_id, _, 0x5));
+  EXPECT_CALL(visitor, OnFrameSent(HEADERS, stream_id, _, 0x5, 0));
+  send_result = session.Send();
+  EXPECT_EQ(0, send_result);
+  visitor.Clear();
+
+  // Server sends preface, response headers, and then invalid trailers.
+  const std::string frames = TestFrameSequence()
+                                 .ServerPreface()
+                                 .Headers(1, {{":status", "200"}},
+                                          /*fin=*/false)
+                                 // Trailers without END_STREAM (fin=false)
+                                 .Headers(1, {{"final-status", "a-ok"}},
+                                          /*fin=*/false)
+                                 .Serialize();
+
+  testing::InSequence s;
+
+  // Server preface (empty SETTINGS)
+  EXPECT_CALL(visitor, OnFrameHeader(0, 0, SETTINGS, 0));
+  EXPECT_CALL(visitor, OnSettingsStart());
+  EXPECT_CALL(visitor, OnSettingsEnd());
+
+  // Response headers (4 is END_HEADERS)
+  EXPECT_CALL(visitor, OnFrameHeader(stream_id, _, HEADERS, 4));
+  EXPECT_CALL(visitor, OnBeginHeadersForStream(stream_id));
+  EXPECT_CALL(visitor, OnHeaderForStream(stream_id, ":status", "200"));
+  EXPECT_CALL(visitor, OnEndHeadersForStream(stream_id));
+
+  // Trailers (4 is END_HEADERS)
+  EXPECT_CALL(visitor, OnFrameHeader(stream_id, _, HEADERS, 4));
+  EXPECT_CALL(visitor, OnBeginHeadersForStream(stream_id));
+  EXPECT_CALL(visitor, OnHeaderForStream(stream_id, "final-status", "a-ok"));
+
+  // The fix should trigger OnInvalidFrame because of the missing END_STREAM.
+  EXPECT_CALL(visitor,
+              OnInvalidFrame(stream_id, Http2VisitorInterface::InvalidFrameError::kHttpMessaging));
+
+  const int64_t result = session.ProcessBytes(frames);
+  EXPECT_EQ(frames.size(), static_cast<size_t>(result));
+
+  // Session should want to write SETTINGS ACK and RST_STREAM.
+  EXPECT_TRUE(session.want_write());
+
+  // We expect SETTINGS ACK.
+  EXPECT_CALL(visitor, OnBeforeFrameSent(SETTINGS, 0, 0, 0x1));
+  EXPECT_CALL(visitor, OnFrameSent(SETTINGS, 0, 0, 0x1, 0));
+
+  // We expect RST_STREAM due to the invalid trailers.
+  EXPECT_CALL(visitor, OnBeforeFrameSent(RST_STREAM, stream_id, _, 0x0));
+  EXPECT_CALL(visitor, OnFrameSent(RST_STREAM, stream_id, _, 0x0,
+                                   static_cast<int>(Http2ErrorCode::PROTOCOL_ERROR)));
+  EXPECT_CALL(visitor, OnCloseStream(stream_id, Http2ErrorCode::HTTP2_NO_ERROR));
+
+  send_result = session.Send();
+  EXPECT_EQ(0, send_result);
+}
+
+// Regression test for receiving a second HEADERS frame without
+// END_STREAM on an existing stream on server side.
+// In current implementation, it is misinterpreted by
+// `OgHttp2Session::OnHeaders` as an attempt to open a new stream. Since the
+// stream ID has already been processed, it immediately triggers a
+// ConnectionError::kInvalidNewStreamId (connection error) before our
+// validation logic in OnHeaderBlockEnd can run. This still safely prevents
+// the UAF/crash, albeit via a connection teardown instead of a stream reset.
+TEST(OgHttp2SessionTest, ServerReceivesTrailersWithoutEndStream) {
+  TestVisitor visitor;
+  OgHttp2Session::Options options;
+  options.perspective = Perspective::kServer;
+  OgHttp2Session session(visitor, options);
+
+  // Send server preface (initial settings).
+  EXPECT_CALL(visitor, OnBeforeFrameSent(SETTINGS, 0, _, 0x0));
+  EXPECT_CALL(visitor, OnFrameSent(SETTINGS, 0, _, 0x0, 0));
+  int send_result = session.Send();
+  EXPECT_EQ(0, send_result);
+  visitor.Clear();
+
+  // Client sends preface, request headers, and then invalid trailers.
+  const std::string frames = TestFrameSequence()
+                                 .ClientPreface()
+                                 .Headers(1,
+                                          {{":method", "POST"},
+                                           {":scheme", "https"},
+                                           {":authority", "example.com"},
+                                           {":path", "/"}},
+                                          /*fin=*/false)
+                                 // Trailers without END_STREAM (fin=false)
+                                 .Headers(1, {{"customer-header", "value"}},
+                                          /*fin=*/false)
+                                 .Serialize();
+
+  testing::InSequence s;
+
+  // Client preface (empty SETTINGS)
+  EXPECT_CALL(visitor, OnFrameHeader(0, 0, SETTINGS, 0));
+  EXPECT_CALL(visitor, OnSettingsStart());
+  EXPECT_CALL(visitor, OnSettingsEnd());
+
+  // Request headers (4 is END_HEADERS)
+  EXPECT_CALL(visitor, OnFrameHeader(1, _, HEADERS, 4));
+  EXPECT_CALL(visitor, OnBeginHeadersForStream(1));
+  EXPECT_CALL(visitor, OnHeaderForStream(1, ":method", "POST"));
+  EXPECT_CALL(visitor, OnHeaderForStream(1, ":scheme", "https"));
+  EXPECT_CALL(visitor, OnHeaderForStream(1, ":authority", "example.com"));
+  EXPECT_CALL(visitor, OnHeaderForStream(1, ":path", "/"));
+  EXPECT_CALL(visitor, OnEndHeadersForStream(1));
+
+  // Trailers (4 is END_HEADERS)
+  EXPECT_CALL(visitor, OnFrameHeader(1, _, HEADERS, 4));
+
+  // It fails immediately in OnHeaders because fin is false on an existing
+  // stream, which is interpreted as a new stream with an invalid (already used)
+  // ID.
+  EXPECT_CALL(visitor,
+              OnConnectionError(Http2VisitorInterface::ConnectionError::kInvalidNewStreamId));
+
+  const int64_t result = session.ProcessBytes(frames);
+  EXPECT_GT(result, 0);
+
+  // Session should want to write GOAWAY.
+  EXPECT_TRUE(session.want_write());
+
+  // We expect GOAWAY.
+  EXPECT_CALL(visitor, OnBeforeFrameSent(GOAWAY, 0, _, 0x0));
+  EXPECT_CALL(visitor, OnFrameSent(GOAWAY, 0, _, 0x0, 1)); // 1 is PROTOCOL_ERROR
+
+  send_result = session.Send();
+  EXPECT_EQ(0, send_result);
+}
+
+} // namespace
+} // namespace Envoy

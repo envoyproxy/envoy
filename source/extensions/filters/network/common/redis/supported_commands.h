@@ -26,15 +26,17 @@ struct SupportedCommands {
     CONSTRUCT_ON_FIRST_USE(
         absl::flat_hash_set<std::string>, "append", "bf.add", "bf.card", "bf.exists", "bf.info",
         "bf.insert", "bf.loadchunk", "bf.madd", "bf.mexists", "bf.reserve", "bf.scandump",
-        "bitcount", "bitfield", "bitpos", "decr", "decrby", "dump", "expire", "expireat", "geoadd",
-        "geodist", "geohash", "geopos", "georadius_ro", "georadiusbymember_ro", "geosearch", "get",
-        "getbit", "getdel", "getex", "getrange", "getset", "hdel", "hexists", "hget", "hgetall",
-        "hincrby", "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hscan", "hset", "hsetnx",
-        "hstrlen", "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lmove",
-        "lpop", "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire",
-        "pexpireat", "pfadd", "pfcount", "psetex", "pttl", "publish", "restore", "rpop", "rpush",
-        "rpushx", "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember",
-        "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd",
+        "bitcount", "bitfield", "bitfield_ro", "bitpos", "decr", "decrby", "dump", "expire",
+        "expireat", "geoadd", "geodist", "geohash", "geopos", "georadius_ro",
+        "georadiusbymember_ro", "geosearch", "get", "getbit", "getdel", "getex", "getrange",
+        "getset", "hdel", "hexists", "hexpire", "hexpireat", "hexpiretime", "hget", "hgetall",
+        "hincrby", "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hpersist", "hpexpire",
+        "hpexpireat", "hpexpiretime", "hpttl", "hscan", "hset", "hsetnx", "hstrlen", "httl",
+        "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lmove", "lpop",
+        "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat",
+        "pfadd", "pfcount", "psetex", "pttl", "publish", "restore", "rpop", "rpush", "rpushx",
+        "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember", "smembers",
+        "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd",
         "xautoclaim", "xclaim", "xdel", "xlen", "xpending", "xrange", "xrevrange", "xtrim", "zadd",
         "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
         "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
@@ -80,9 +82,10 @@ struct SupportedCommands {
    * @return commands without keys which are sent to all redis shards and the responses are handled
    * using special response handler according  to its response type
    */
+  // NOLINTNEXTLINE(readability-identifier-naming)
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
-                           "slowlog", "config", "info", "keys", "select", "role", "hello");
+                           "slowlog", "config", "info", "keys", "select", "role");
   }
 
   /**
@@ -100,7 +103,7 @@ struct SupportedCommands {
   static const CommandSubcommandMap& commandSubcommandValidationMap() {
     CONSTRUCT_ON_FIRST_USE(CommandSubcommandMap,
                            // Command name - Sub commands that are allowed
-                           {{"cluster", {"info", "slots", "keyslot", "nodes"}}});
+                           {{"cluster", {"info", "slots", "keyslot", "nodes", "shards"}}});
     // Add other commands with restricted subcommands here:
   }
 
@@ -116,6 +119,15 @@ struct SupportedCommands {
    * @return hello command
    */
   static const std::string& hello() { CONSTRUCT_ON_FIRST_USE(std::string, "hello"); }
+
+  /**
+   * @return client command. The proxy supports a narrow subset of subcommands
+   * (``SETINFO`` / ``SETNAME``) used by RESP3 clients for connection identity setup;
+   * other CLIENT subcommands are rejected at the splitter to avoid exposing
+   * upstream-side state (CLIENT LIST, CLIENT KILL, etc.) through a multiplexed
+   * connection.
+   */
+  static const std::string& client() { CONSTRUCT_ON_FIRST_USE(std::string, "client"); }
 
   /**
    * @return auth command
@@ -168,15 +180,16 @@ struct SupportedCommands {
   static const absl::flat_hash_set<std::string>& writeCommands() {
     CONSTRUCT_ON_FIRST_USE(
         absl::flat_hash_set<std::string>, "append", "bitfield", "decr", "decrby", "del", "discard",
-        "exec", "expire", "expireat", "eval", "evalsha", "geoadd", "getdel", "hdel", "hincrby",
-        "hincrbyfloat", "hmset", "hset", "hsetnx", "incr", "incrby", "incrbyfloat", "linsert",
-        "lmove", "lpop", "lpush", "lpushx", "lrem", "lset", "ltrim", "mset", "multi", "persist",
-        "pexpire", "pexpireat", "pfadd", "psetex", "restore", "rpop", "rpush", "rpushx", "sadd",
-        "set", "setbit", "setex", "setnx", "setrange", "spop", "srem", "zadd", "zincrby", "touch",
-        "zpopmin", "zpopmax", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
-        "unlink", "copy", "rpoplpush", "smove", "sinterstore", "zunionstore", "zinterstore",
-        "pfmerge", "georadius", "georadiusbymember", "rename", "sort", "sdiffstore", "msetnx",
-        "zrangestore", "sunionstore", "geosearchstore", "zdiffstore", "bitop", "renamenx");
+        "exec", "expire", "expireat", "eval", "evalsha", "geoadd", "getdel", "hdel", "hexpire",
+        "hexpireat", "hincrby", "hincrbyfloat", "hmset", "hpersist", "hpexpire", "hpexpireat",
+        "hset", "hsetnx", "incr", "incrby", "incrbyfloat", "linsert", "lmove", "lpop", "lpush",
+        "lpushx", "lrem", "lset", "ltrim", "mset", "multi", "persist", "pexpire", "pexpireat",
+        "pfadd", "psetex", "restore", "rpop", "rpush", "rpushx", "sadd", "set", "setbit", "setex",
+        "setnx", "setrange", "spop", "srem", "zadd", "zincrby", "touch", "zpopmin", "zpopmax",
+        "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore", "unlink", "copy",
+        "rpoplpush", "smove", "sinterstore", "zunionstore", "zinterstore", "pfmerge", "georadius",
+        "georadiusbymember", "rename", "sort", "sdiffstore", "msetnx", "zrangestore", "sunionstore",
+        "geosearchstore", "zdiffstore", "bitop", "renamenx");
   }
 
   static bool isReadCommand(const std::string& command) {

@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "internal_upstream_test",
     srcs = ["internal_upstream_test.cc"],
     extension_names = ["envoy.transport_sockets.internal_upstream"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:hashable_interface",
         "//source/common/stream_info:filter_state_lib",
@@ -42,7 +42,7 @@ envoy_extension_cc_test(
         "envoy.bootstrap.internal_listener",
         "envoy.filters.http.set_filter_state",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
@@ -55,6 +55,7 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/internal_upstream:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",

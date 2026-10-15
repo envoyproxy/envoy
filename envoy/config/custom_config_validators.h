@@ -1,6 +1,15 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
+
+#include "source/common/protobuf/protobuf.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Config {

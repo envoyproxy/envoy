@@ -58,7 +58,7 @@ void HttpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
 void HttpConnPool::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                StreamInfo::StreamInfo& info,
-                               absl::optional<Envoy::Http::Protocol> protocol) {
+                               std::optional<Envoy::Http::Protocol> protocol) {
   conn_pool_stream_handle_ = nullptr;
   auto upstream =
       std::make_unique<HttpUpstream>(callbacks_->upstreamToDownstream(), &request_encoder);

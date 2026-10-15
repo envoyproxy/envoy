@@ -119,6 +119,14 @@ Alternatively the trace context can be manually propagated by the service:
   :ref:`config_http_conn_man_headers_x-datadog-parent-id`,
   :ref:`config_http_conn_man_headers_x-datadog-sampling-priority`).
 
+  When incoming context does not contain a sampling decision, Envoy's sampling decision
+  is applied as a manual keep or drop by default. To allow the Datadog sampler to apply
+  its own rules and agent-provided sampling rates when Envoy samples a trace, enable
+  :ref:`delegate_sampling <envoy_v3_api_field_config.trace.v3.DatadogConfig.delegate_sampling>`.
+  Envoy's drop decisions are still honored. In this mode, route cache refreshes can revise
+  the decision until trace context is first injected upstream or the span finishes.
+  Incoming sampling decisions are preserved in either mode.
+
 * When using the SkyWalking tracer, Envoy relies on the service to propagate the
   SkyWalking-specific HTTP headers (
   :ref:`config_http_conn_man_headers_sw8`).

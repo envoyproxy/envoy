@@ -1,3 +1,5 @@
+#include <format>
+
 #include "source/common/network/connection_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/server_context_config_impl.h"
@@ -7,7 +9,9 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/network/connection.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
@@ -19,6 +23,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::NiceMock;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -41,18 +47,20 @@ public:
 
   std::string postgresConfig(SSLConfig downstream_ssl_config, UpstreamSSLConfig upstream_ssl_config,
                              std::string additional_filters) {
-    std::string main_config = fmt::format(
-        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template"))),
-        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getLoopbackAddressString(GetParam()),
-        std::get<1>(upstream_ssl_config), // upstream SSL transport socket
-        Network::Test::getAnyAddressString(GetParam()),
-        std::get<0>(downstream_ssl_config),  // downstream SSL termination
-        std::get<0>(upstream_ssl_config),    // upstream_SSL option
-        std::get<2>(downstream_ssl_config),  // require downstream SSL
-        additional_filters,                  // additional filters to insert after postgres
-        std::get<1>(downstream_ssl_config)); // downstream SSL transport socket
+    std::string loopback_address = Network::Test::getLoopbackAddressString(GetParam());
+    std::string any_address = Network::Test::getAnyAddressString(GetParam());
+    std::string main_config = std::vformat(
+        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/postgres_proxy/filters/network/test/postgres_test_config.yaml-template")),
+        std::make_format_args(
+            Platform::null_device_path, loopback_address, loopback_address,
+            std::get<1>(upstream_ssl_config), // upstream SSL transport socket
+            any_address,
+            std::get<0>(downstream_ssl_config),   // downstream SSL termination
+            std::get<0>(upstream_ssl_config),     // upstream_SSL option
+            std::get<2>(downstream_ssl_config),   // require downstream SSL
+            additional_filters,                   // additional filters to insert after postgres
+            std::get<1>(downstream_ssl_config))); // downstream SSL transport socket
 
     return main_config;
   }
@@ -121,7 +129,7 @@ TEST_P(BasicPostgresIntegrationTest, Login) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Make sure that the successful login bumped up the number of sessions.
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions", 1);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions", Eq(1));
 }
 INSTANTIATE_TEST_SUITE_P(IpVersions, BasicPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
@@ -133,7 +141,7 @@ public:
       : PostgresBaseIntegrationTest(
             std::make_tuple(
                 "terminate_ssl: true",
-                fmt::format(
+                std::format(
                     R"EOF(transport_socket:
         name: "starttls"
         typed_config:
@@ -180,7 +188,7 @@ TEST_P(DownstreamSSLPostgresIntegrationTest, TerminateSSL) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Make sure that the successful login bumped up the number of sessions.
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_terminated_ssl", Eq(1));
 }
 
 // Test verifies that Postgres filter replies with error code upon
@@ -244,7 +252,7 @@ TEST_P(DownstreamSSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTr
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 0);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_terminated_ssl", Eq(0));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLWrongConfigPostgresIntegrationTest,
@@ -353,11 +361,10 @@ public:
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         downstream_tls_context, mock_factory_ctx, {}, false);
-    static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::DownstreamTransportSocketFactoryPtr tls_context =
         Network::DownstreamTransportSocketFactoryPtr{
             *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))};
+                std::move(cfg), *tls_context_manager, server_factory_context_.serverScope())};
 
     Network::TransportSocketPtr ts = tls_context->createDownstreamTransportSocket();
     // Synchronization object used to suspend execution
@@ -414,8 +421,8 @@ TEST_P(UpstreamSSLDisabledPostgresIntegrationTest, BasicConnectivityTest) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 0);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(0));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(0));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLDisabledPostgresIntegrationTest,
@@ -477,8 +484,8 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerAgreesForSSLTest) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 1);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(1));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(0));
 }
 
 // Test verifies that postgres filter will not continue when upstream SSL
@@ -513,8 +520,8 @@ TEST_P(UpstreamSSLRequirePostgresIntegrationTest, ServerDeniesSSLTest) {
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 0);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 1);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(0));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(1));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLRequirePostgresIntegrationTest,
@@ -537,7 +544,7 @@ public:
             // configure downstream SSL
             std::make_tuple(
                 "terminate_ssl: true",
-                fmt::format(
+                std::format(
                     R"EOF(transport_socket:
         name: "starttls"
         typed_config:
@@ -572,11 +579,10 @@ public:
     ON_CALL(mock_factory_ctx.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     auto cfg = *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(
         upstream_tls_context, mock_factory_ctx);
-    static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
     Network::UpstreamTransportSocketFactoryPtr tls_context =
         Network::UpstreamTransportSocketFactoryPtr{
             *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()))};
+                std::move(cfg), *tls_context_manager, server_factory_context_.serverScope())};
 
     Network::TransportSocketOptionsConstSharedPtr options;
 
@@ -663,9 +669,9 @@ TEST_P(UpstreamAndDownstreamSSLIntegrationTest, ServerAgreesForSSL) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 1);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 0);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_terminated_ssl", Eq(1));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(1));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(0));
 }
 
 // Integration test when both downstream and upstream SSL is enabled.
@@ -733,9 +739,9 @@ TEST_P(UpstreamAndDownstreamSSLIntegrationTest, ServerRejectsSSL) {
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_success", 0);
-  test_server_->waitForCounterEq("postgres.postgres_stats.sessions_upstream_ssl_failed", 1);
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_terminated_ssl", Eq(1));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_success", Eq(0));
+  test_server_->waitForCounter("postgres.postgres_stats.sessions_upstream_ssl_failed", Eq(1));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamAndDownstreamSSLIntegrationTest,

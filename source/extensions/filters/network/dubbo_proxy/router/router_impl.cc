@@ -267,10 +267,8 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Upstream::TcpPoolData& 
                                          SerializationType serialization_type,
                                          ProtocolType protocol_type)
     : parent_(parent), conn_pool_data_(pool_data), metadata_(metadata),
-      protocol_(
-          NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol(serialization_type)),
-      request_complete_(false), response_started_(false), response_complete_(false),
-      stream_reset_(false) {}
+      protocol_(NamedProtocolConfigFactory::getFactory(protocol_type)
+                    .createProtocol(serialization_type)) {}
 
 Router::UpstreamRequest::~UpstreamRequest() = default;
 

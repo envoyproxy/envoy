@@ -70,6 +70,7 @@ protected:
     void injectReadDataToFilterChain(Buffer::Instance&, bool) override {
       IS_ENVOY_BUG("Unexpected call to injectReadDataToFilterChain");
     }
+    OptRef<Buffer::Instance> readBuffer() override { return {}; }
     void disableClose(bool) override { IS_ENVOY_BUG("Unexpected call to disableClose"); }
     bool startUpstreamSecureTransport() override {
       IS_ENVOY_BUG("Unexpected call to startUpstreamSecureTransport");
@@ -134,6 +135,7 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
+      void onDrain(Network::ConnectionDrainEvent) override {}
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
       StreamInfo::DetectedCloseType detectedCloseType() const override {
@@ -158,9 +160,9 @@ protected:
       Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
         return connection_info_provider_;
       }
-      absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
+      std::optional<Network::Connection::UnixDomainSocketPeerCredentials>
       unixSocketPeerCredentials() const override {
-        return absl::nullopt;
+        return std::nullopt;
       }
       void setConnectionStats(const Network::Connection::ConnectionStats&) override {}
       Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
@@ -169,6 +171,9 @@ protected:
       bool connecting() const override { return false; }
       void write(Buffer::Instance&, bool) override { IS_ENVOY_BUG("Unexpected function call"); }
       void setBufferLimits(uint32_t) override { IS_ENVOY_BUG("Unexpected function call"); }
+      void setBufferHighWatermarkTimeout(std::chrono::milliseconds) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       uint32_t bufferLimit() const override { return 65000; }
       bool aboveHighWatermark() const override { return false; }
       const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
@@ -183,9 +188,9 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
-      absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
+      std::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
       void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
-      absl::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
+      std::optional<uint64_t> congestionWindowInBytes() const override { return {}; }
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 

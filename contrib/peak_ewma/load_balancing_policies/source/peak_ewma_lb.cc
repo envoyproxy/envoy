@@ -90,18 +90,14 @@ PeakEwmaLoadBalancer::PeakEwmaLoadBalancer(
 // Host management.
 void PeakEwmaLoadBalancer::addPeakEwmaLbPolicyDataToHosts(const Upstream::HostVector& hosts) {
   for (const auto& host_ptr : hosts) {
-    if (!host_ptr->lbPolicyData().has_value()) {
-      host_ptr->setLbPolicyData(std::make_unique<PeakEwmaHostLbPolicyData>(max_samples_));
+    if (!host_ptr->typedLbPolicyData<PeakEwmaHostLbPolicyData>().has_value()) {
+      host_ptr->addLbPolicyData(std::make_unique<PeakEwmaHostLbPolicyData>(max_samples_));
     }
   }
 }
 
 PeakEwmaHostLbPolicyData* PeakEwmaLoadBalancer::getPeakEwmaData(Upstream::HostConstSharedPtr host) {
-  auto lb_data = host->lbPolicyData();
-  if (!lb_data.has_value()) {
-    return nullptr;
-  }
-  return dynamic_cast<PeakEwmaHostLbPolicyData*>(lb_data.ptr());
+  return host->typedLbPolicyData<PeakEwmaHostLbPolicyData>().ptr();
 }
 
 void PeakEwmaLoadBalancer::maybeAggregate() {
@@ -274,13 +270,15 @@ double PeakEwmaLoadBalancer::updateEwmaWithSample(double current_ewma, double ne
 
 void PeakEwmaLoadBalancer::processHostSamples(Upstream::HostConstSharedPtr /* host */,
                                               PeakEwmaHostLbPolicyData* data) {
-  if (!data)
+  if (!data) {
     return;
+  }
 
   // Get the range of new samples to process (atomic ring buffer).
   auto [last_processed, current_write] = data->getNewSampleRange();
-  if (last_processed == current_write)
+  if (last_processed == current_write) {
     return;
+  }
 
   // If ring buffer was fully overwritten, skip to oldest valid slot.
   // Uses unsigned arithmetic (always correct since write_index_ only increments).

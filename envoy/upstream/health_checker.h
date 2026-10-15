@@ -28,6 +28,33 @@ enum class HealthTransition {
 };
 
 /**
+ * Callbacks for reading/writing health flags on a host. This allows indirection required
+ * when multiple health checks are configured.
+ */
+class HealthFlagCallbacks {
+public:
+  virtual ~HealthFlagCallbacks() = default;
+  virtual bool get(const Host& host, Host::HealthFlag flag) PURE;
+  virtual void set(Host& host, Host::HealthFlag flag) PURE;
+  virtual void clear(Host& host, Host::HealthFlag flag) PURE;
+};
+
+/**
+ * Default implementation that delegates directly to the host's health flag methods.
+ */
+class DefaultHealthFlagCallbacks : public HealthFlagCallbacks {
+public:
+  bool get(const Host& host, Host::HealthFlag flag) override { return host.healthFlagGet(flag); }
+  void set(Host& host, Host::HealthFlag flag) override { host.healthFlagSet(flag); }
+  void clear(Host& host, Host::HealthFlag flag) override { host.healthFlagClear(flag); }
+
+  static DefaultHealthFlagCallbacks& instance() {
+    static DefaultHealthFlagCallbacks instance;
+    return instance;
+  }
+};
+
+/**
  * Wraps active health checking of an upstream cluster.
  */
 class HealthChecker {
@@ -74,10 +101,13 @@ public:
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    * @param failure_type supplies the type of health check failure.
+   * @param http_status_code the HTTP status code of the response that triggered the ejection,
+   *        or 0 if not applicable (e.g., non-HTTP checkers or network-level failures).
    */
   virtual void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                                  const HostDescriptionConstSharedPtr& host,
-                                 envoy::data::core::v3::HealthCheckFailureType failure_type) PURE;
+                                 envoy::data::core::v3::HealthCheckFailureType failure_type,
+                                 uint64_t http_status_code) PURE;
 
   /**
    * Log an unhealthy host event.
@@ -85,11 +115,13 @@ public:
    * @param host supplies the host that generated the event.
    * @param failure_type supplies the type of health check failure.
    * @param first_check whether this is a failure on the first health check for this host.
+   * @param http_status_code the HTTP status code of the response that caused this failure,
+   *        or 0 if not applicable (e.g., non-HTTP checkers or network-level failures).
    */
   virtual void logUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                             const HostDescriptionConstSharedPtr& host,
                             envoy::data::core::v3::HealthCheckFailureType failure_type,
-                            bool first_check) PURE;
+                            bool first_check, uint64_t http_status_code) PURE;
 
   /**
    * Log a healthy host addition event.

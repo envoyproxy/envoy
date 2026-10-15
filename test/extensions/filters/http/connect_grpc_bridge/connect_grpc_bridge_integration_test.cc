@@ -82,7 +82,7 @@ TEST_P(ConnectIntegrationTest, ConnectFilterUnaryRequestE2E) {
   connect_request.set_name("test");
 
   std::string connect_request_pb;
-  connect_request.SerializeToString(&connect_request_pb);
+  std::ignore = connect_request.SerializeToString(&connect_request_pb);
 
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},

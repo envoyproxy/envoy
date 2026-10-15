@@ -5,7 +5,7 @@
 #include "envoy/server/hot_restart.h"
 
 #include "source/common/common/thread.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 
 namespace Envoy {
 namespace Server {
@@ -17,17 +17,19 @@ class HotRestartNopImpl : public Server::HotRestart {
 public:
   // Server::HotRestart
   void drainParentListeners() override {}
+  // No parent when hot restart is disabled, so there is nothing to wait for.
+  bool parentStopAcceptingRequested() override { return true; }
   int duplicateParentListenSocket(const std::string&, uint32_t, absl::string_view) override {
     return -1;
   }
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr,
                                      std::shared_ptr<Network::UdpListenerConfig>) override {}
   OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override {
-    return absl::nullopt;
+    return std::nullopt;
   }
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
-  absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override {
-    return absl::nullopt;
+  std::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override {
+    return std::nullopt;
   }
   void sendParentTerminateRequest() override {}
   ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override { return {}; }

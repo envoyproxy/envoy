@@ -10,15 +10,17 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/config/utility.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -117,7 +119,7 @@ public:
   }
 
   absl::Status onConfigRemoved(Config::ConfigAppliedCb applied_on_all_threads) override {
-    absl::optional<FactoryCb> cb;
+    std::optional<FactoryCb> cb;
     if (default_configuration_) {
       auto cb_or_error = instantiateFilterFactory(*default_configuration_);
       RETURN_IF_NOT_OK_REF(cb_or_error.status());
@@ -145,7 +147,7 @@ private:
   virtual absl::StatusOr<FactoryCb>
   instantiateFilterFactory(const Protobuf::Message& message) const PURE;
 
-  void update(absl::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
+  void update(std::optional<FactoryCb> config, Config::ConfigAppliedCb applied_on_all_threads) {
     // This call must not capture 'this' as it is invoked on all workers asynchronously.
     main_config_->tls_->runOnAllThreads(
         [config](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
@@ -161,8 +163,8 @@ private:
   }
 
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig() : config_{absl::nullopt} {}
-    absl::optional<FactoryCb> config_{};
+    ThreadLocalConfig() : config_{std::nullopt} {}
+    std::optional<FactoryCb> config_{};
   };
 
   // Currently applied configuration to ensure that the main thread deletes the last reference to
@@ -173,7 +175,7 @@ private:
         : tls_(std::make_unique<ThreadLocal::TypedSlot<ThreadLocalConfig>>(tls)) {
       tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
     }
-    absl::optional<FactoryCb> current_config_{absl::nullopt};
+    std::optional<FactoryCb> current_config_{std::nullopt};
     ThreadLocal::TypedSlotPtr<ThreadLocalConfig> tls_;
   };
   const std::string stat_prefix_;
@@ -217,7 +219,8 @@ private:
   instantiateFilterFactory(const Protobuf::Message& message) const override {
     auto* factory = Registry::FactoryRegistry<NeutralHttpFilterConfigFactory>::getFactoryByType(
         message.GetTypeName());
-    return factory->createFilterFactoryFromProto(message, getStatPrefix(), factory_context_);
+    return Server::Configuration::createHttpFilterFactory(*factory, message, getStatPrefix(),
+                                                          factory_context_);
   }
 
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -418,17 +421,16 @@ struct ExtensionConfigDiscoveryStats {
  * Subscriptions are shared between the filter config providers. The filter config providers are
  * notified when a new config is accepted.
  */
-class FilterConfigSubscription
-    : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>,
-      Logger::Loggable<Logger::Id::filter>,
-      public std::enable_shared_from_this<FilterConfigSubscription> {
+class FilterConfigSubscription : public Config::SubscriptionCallbacks,
+                                 Logger::Loggable<Logger::Id::filter>,
+                                 public std::enable_shared_from_this<FilterConfigSubscription> {
 public:
   static absl::StatusOr<std::unique_ptr<FilterConfigSubscription>>
   create(const envoy::config::core::v3::ConfigSource& config_source,
          const std::string& filter_config_name,
          Server::Configuration::ServerFactoryContext& factory_context,
          Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-         FilterConfigProviderManagerImplBase& filter_config_provider_manager,
+         std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
          const std::string& subscription_id);
   ~FilterConfigSubscription() override;
 
@@ -443,13 +445,13 @@ public:
   void incrementConflictCounter();
 
 protected:
-  FilterConfigSubscription(const envoy::config::core::v3::ConfigSource& config_source,
-                           const std::string& filter_config_name,
-                           Server::Configuration::ServerFactoryContext& factory_context,
-                           Upstream::ClusterManager& cluster_manager,
-                           const std::string& stat_prefix,
-                           FilterConfigProviderManagerImplBase& filter_config_provider_manager,
-                           const std::string& subscription_id, absl::Status& creation_status);
+  FilterConfigSubscription(
+      const envoy::config::core::v3::ConfigSource& config_source,
+      const std::string& filter_config_name,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
+      std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager,
+      const std::string& subscription_id, absl::Status& creation_status);
 
 private:
   struct ConfigVersion {
@@ -483,13 +485,16 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;
+  const Config::ResourceTypeHelper<envoy::config::core::v3::TypedExtensionConfig>
+      resource_type_helper_;
+
   bool started_{false};
 
   Stats::ScopeSharedPtr scope_;
   ExtensionConfigDiscoveryStats stats_;
 
   // FilterConfigProviderManagerImplBase maintains active subscriptions in a map.
-  FilterConfigProviderManagerImplBase& filter_config_provider_manager_;
+  std::shared_ptr<FilterConfigProviderManagerImplBase> filter_config_provider_manager_;
   const std::string subscription_id_;
   absl::flat_hash_set<DynamicFilterConfigProviderImplBase*> filter_config_providers_;
   friend class DynamicFilterConfigProviderImplBase;
@@ -520,7 +525,9 @@ private:
 /**
  * Base class for a FilterConfigProviderManager.
  */
-class FilterConfigProviderManagerImplBase : Logger::Loggable<Logger::Id::filter> {
+class FilterConfigProviderManagerImplBase
+    : public std::enable_shared_from_this<FilterConfigProviderManagerImplBase>,
+      Logger::Loggable<Logger::Id::filter> {
 public:
   virtual ~FilterConfigProviderManagerImplBase() = default;
 
@@ -579,12 +586,18 @@ public:
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
       Upstream::ClusterManager& cluster_manager, bool last_filter_in_filter_chain,
       const std::string& filter_chain_type,
-      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
-    std::string subscription_stat_prefix;
-    absl::string_view provider_stat_prefix;
-    subscription_stat_prefix =
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      absl::string_view stat_prefix) override {
+    const std::string subscription_stat_prefix =
         absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
-    provider_stat_prefix = subscription_stat_prefix;
+    // The subscription always uses the ECDS stats prefix. The filter factory uses the stats
+    // prefix of the parent so that the filter emits the same stats as a statically configured
+    // one.
+    const absl::string_view provider_stat_prefix =
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ecds_filter_use_parent_stats_prefix")
+            ? stat_prefix
+            : absl::string_view(subscription_stat_prefix);
 
     auto subscription = THROW_OR_RETURN_VALUE(
         getSubscription(config_source.config_source(), filter_config_name, server_context,

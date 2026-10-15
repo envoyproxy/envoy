@@ -1,27 +1,48 @@
 #include "source/extensions/filters/http/wasm/wasm_filter.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Wasm {
 
-FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
-                           Server::Configuration::FactoryContext& context)
-    : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
-          context.listenerInfo().direction(), &context.listenerInfo().metadata(), false) {}
+namespace {
+
+Stats::Scope& statsScope(Server::Configuration::ServerFactoryContext& context,
+                         Server::Configuration::ExtraFactoryContext& extra_context) {
+  // Server scope for filters without a specified scope.
+  if (!extra_context.scope.has_value()) {
+    return context.scope();
+  }
+
+  // Downstream filters.
+  if (!extra_context.is_upstream) {
+    return *extra_context.scope;
+  }
+
+  // Upstream filters.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.upstream_wasm_filter_uses_root_scope")) {
+    return context.serverScope();
+  }
+  return *extra_context.scope;
+}
+
+Init::Manager& initManager(Server::Configuration::ServerFactoryContext& context,
+                           Server::Configuration::ExtraFactoryContext& extra_context) {
+  return extra_context.init_manager.has_value() ? *extra_context.init_manager
+                                                : context.initManager();
+}
+
+} // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
-                           Server::Configuration::UpstreamFactoryContext& context)
-    : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
-          envoy::config::core::v3::TrafficDirection::OUTBOUND, nullptr, false) {}
-
-FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
-                           Server::Configuration::ServerFactoryContext& context)
-    : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context, context.scope(), context.initManager(),
-          envoy::config::core::v3::TrafficDirection::OUTBOUND, nullptr, false) {}
+                           Server::Configuration::ServerFactoryContext& context,
+                           Server::Configuration::ExtraFactoryContext& extra_context)
+    : Extensions::Common::Wasm::PluginConfig(config.config(), context,
+                                             statsScope(context, extra_context),
+                                             initManager(context, extra_context), false) {}
 
 } // namespace Wasm
 } // namespace HttpFilters

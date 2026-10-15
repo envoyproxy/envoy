@@ -18,6 +18,10 @@ AccessLog::InstanceSharedPtr AccessLogFactory::createAccessLogInstance(
       MessageUtil::downcastAndValidate<const envoy::extensions::access_loggers::stats::v3::Config&>(
           config, context.messageValidationVisitor());
 
+  if (proto_config.stat_prefix().empty() == !proto_config.has_stats_scope()) {
+    throw EnvoyException("Either 'stat_prefix' or 'stats_scope' must be configured, but not both.");
+  }
+
   return std::make_shared<StatsAccessLog>(proto_config, context, std::move(filter),
                                           command_parsers);
 }

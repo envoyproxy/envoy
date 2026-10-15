@@ -45,7 +45,7 @@ public:
     config.set_platform_filter_name(name);
     Api::External::registerApi(std::string(config.platform_filter_name()), platform_filter);
 
-    config_ = std::make_shared<PlatformBridgeFilterConfig>(context_, config);
+    config_ = std::make_shared<PlatformBridgeFilterConfig>(context_.scope(), config);
     filter_ = std::make_shared<PlatformBridgeFilter>(config_, dispatcher_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);

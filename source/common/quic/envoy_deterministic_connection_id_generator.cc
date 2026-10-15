@@ -23,24 +23,24 @@ void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
 }
 } // namespace
 
-absl::optional<quic::QuicConnectionId>
+std::optional<quic::QuicConnectionId>
 EnvoyDeterministicConnectionIdGenerator::GenerateNextConnectionId(
     const quic::QuicConnectionId& original) {
   auto new_cid = DeterministicConnectionIdGenerator::GenerateNextConnectionId(original);
   if (new_cid.has_value()) {
     adjustNewConnectionIdForRouting(new_cid.value(), original);
   }
-  return (new_cid.has_value() && new_cid.value() == original) ? absl::nullopt : new_cid;
+  return (new_cid.has_value() && new_cid.value() == original) ? std::nullopt : new_cid;
 }
 
-absl::optional<quic::QuicConnectionId>
+std::optional<quic::QuicConnectionId>
 EnvoyDeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
     const quic::QuicConnectionId& original, const quic::ParsedQuicVersion& version) {
   auto new_cid = DeterministicConnectionIdGenerator::MaybeReplaceConnectionId(original, version);
   if (new_cid.has_value()) {
     adjustNewConnectionIdForRouting(new_cid.value(), original);
   }
-  return (new_cid.has_value() && new_cid.value() == original) ? absl::nullopt : new_cid;
+  return (new_cid.has_value() && new_cid.value() == original) ? std::nullopt : new_cid;
 }
 
 QuicConnectionIdGeneratorPtr

@@ -57,12 +57,12 @@ public:
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             Upstream::ThreadLocalClusterCommand& get_cluster) override;
-  void onClusterRemoval(const std::string& cluster_name) override;
+  void onClusterRemoval(absl::string_view cluster_name) override;
 
   // Upstream::LoadBalancer
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext* context) override;
-  absl::optional<Upstream::SelectedPoolAndConnection>
+  std::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                            std::vector<uint8_t>& hash_key) override;
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
@@ -72,12 +72,18 @@ public:
 
   // Map attempt count to cluster index.
   // Returns nullopt when attempt count exceeds the number of available clusters.
-  absl::optional<size_t> mapAttemptToClusterIndex(uint32_t attempt_count) const;
+  std::optional<size_t> mapAttemptToClusterIndex(uint32_t attempt_count) const;
 
   // Get cluster by index.
   Upstream::ThreadLocalCluster* getClusterByIndex(size_t cluster_index) const;
 
 private:
+  // Select a host from the cluster at `start_index`, advancing to the subsequent clusters when a
+  // cluster is not available or has no host to offer. `attempt_count` is only used for logging.
+  Upstream::HostSelectionResponse selectHostWithFailover(Upstream::LoadBalancerContext* context,
+                                                         size_t start_index,
+                                                         uint32_t attempt_count);
+
   Upstream::ClusterInfoConstSharedPtr parent_info_;
   Upstream::ClusterManager& cluster_manager_;
   const ClusterSetConstSharedPtr clusters_;
@@ -95,6 +101,7 @@ public:
     return std::make_unique<CompositeClusterLoadBalancer>(
         cluster_.info(), cluster_.cluster_manager_, cluster_.clusters_);
   }
+  bool recreateOnHostChangeDeprecated() const override { return false; }
 
   const Cluster& cluster_;
 };
@@ -116,7 +123,6 @@ class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
 public:
   ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.composite") {}
 
-private:
   absl::StatusOr<
       std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(

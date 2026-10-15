@@ -1,13 +1,19 @@
 //! Integration test module for access logger dynamic modules.
 //!
-//! This module implements a simple access logger that records log events and flush calls.
+//! This module exercises the unified `declare_all_init_functions!` registration: a single
+//! `.so` registers both an HTTP filter factory and an access-logger factory that dispatches
+//! to different implementations by `logger_name`. The C++ side rejects unknown logger names
+//! at config load time when the factory returns `None`.
 
 use envoy_proxy_dynamic_modules_rust_sdk::access_log::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-declare_init_functions!(init, new_nop_http_filter_config_fn);
-declare_access_logger!(TestAccessLoggerConfig);
+declare_all_init_functions!(
+  init,
+  http: new_nop_http_filter_config_fn,
+  access_logger: new_access_logger_config_fn,
+);
 
 /// Global counter for log events.
 static LOG_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -21,7 +27,7 @@ fn init() -> bool {
   true
 }
 
-/// Dummy HTTP filter config function (required by declare_init_functions).
+/// Dummy HTTP filter config function (required by declare_all_init_functions).
 fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _envoy_filter_config: &mut EC,
   _name: &str,
@@ -30,10 +36,28 @@ fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter
   None
 }
 
+/// Access logger factory function: dispatches to the correct config implementation based on
+/// `logger_name`. Returning `None` for an unknown name causes Envoy to reject the access-log
+/// configuration at config load time.
+fn new_access_logger_config_fn(
+  ctx: &ConfigContext,
+  name: &str,
+  config: &[u8],
+) -> Option<Box<dyn AccessLoggerConfig>> {
+  match name {
+    "test_logger" => TestAccessLoggerConfig::new(ctx, name, config)
+      .ok()
+      .map(|c| Box::new(c) as Box<dyn AccessLoggerConfig>),
+    _ => None,
+  }
+}
+
 /// Access logger configuration.
 struct TestAccessLoggerConfig {
   _name: String,
   log_counter: CounterHandle,
+  downstream_bytes_received: CounterHandle,
+  downstream_bytes_sent: CounterHandle,
 }
 
 impl AccessLoggerConfig for TestAccessLoggerConfig {
@@ -42,9 +66,23 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     let log_counter = ctx
       .define_counter("test_log_count")
       .ok_or("Failed to define counter")?;
+    let downstream_bytes_received = ctx
+      .define_counter("test_downstream_wire_bytes_received")
+      .ok_or("Failed to define downstream received counter")?;
+    let downstream_bytes_sent = ctx
+      .define_counter("test_downstream_wire_bytes_sent")
+      .ok_or("Failed to define downstream sent counter")?;
+    // Emit a metric directly from the config context (no log event), exercising the config-scoped
+    // emission path. This would typically be done from a scheduled background task.
+    let config_total = ctx
+      .define_counter("config_total")
+      .ok_or("Failed to define config counter")?;
+    ctx.increment_counter(config_total, 1);
     Ok(Self {
       _name: name.to_string(),
       log_counter,
+      downstream_bytes_received,
+      downstream_bytes_sent,
     })
   }
 
@@ -59,6 +97,8 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
     Box::new(TestAccessLogger {
       pending_logs: 0,
       log_counter: self.log_counter,
+      downstream_bytes_received: self.downstream_bytes_received,
+      downstream_bytes_sent: self.downstream_bytes_sent,
       metrics,
     })
   }
@@ -68,6 +108,8 @@ impl AccessLoggerConfig for TestAccessLoggerConfig {
 struct TestAccessLogger {
   pending_logs: u32,
   log_counter: CounterHandle,
+  downstream_bytes_received: CounterHandle,
+  downstream_bytes_sent: CounterHandle,
   metrics: MetricsContext,
 }
 
@@ -84,9 +126,39 @@ impl AccessLogger for TestAccessLogger {
     let _response_code = ctx.response_code();
     let _protocol = ctx.protocol();
     let _route_name = ctx.route_name();
+    assert_eq!(
+      ctx
+        .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsVirtualHostName)
+        .unwrap()
+        .as_slice(),
+      b"test_vhost"
+    );
+    if ctx.response_code() == Some(400) {
+      // The direct response is generated before the router selects a virtual cluster.
+      assert!(ctx.virtual_cluster_name().is_none());
+    } else {
+      assert_eq!(
+        ctx.virtual_cluster_name().unwrap().as_slice(),
+        b"test_vcluster"
+      );
+    }
     let _is_health_check = ctx.is_health_check();
     let _timing = ctx.timing_info();
-    let _bytes = ctx.bytes_info();
+    let bytes = ctx.bytes_info();
+    let downstream = ctx.downstream_wire_bytes();
+    // These header-only requests still have downstream wire bytes, including local replies.
+    assert!(downstream.bytes_received > bytes.bytes_received);
+    assert!(downstream.bytes_sent > bytes.bytes_sent);
+    if ctx.response_code() == Some(400) {
+      assert_eq!(bytes.wire_bytes_received, 0);
+      assert_eq!(bytes.wire_bytes_sent, 0);
+    }
+    self
+      .metrics
+      .increment_counter(self.downstream_bytes_received, downstream.bytes_received);
+    self
+      .metrics
+      .increment_counter(self.downstream_bytes_sent, downstream.bytes_sent);
 
     // Test worker id.
     let worker_id = ctx.get_worker_index();
@@ -117,6 +189,11 @@ impl AccessLogger for TestAccessLogger {
     // Test request ID and metadata.
     let _request_id = ctx.request_id();
     let _filter_state = ctx.get_filter_state("test_key");
+
+    // Test typed dynamic metadata accessors.
+    let _dm_string = ctx.get_dynamic_metadata("test_filter", "string_key");
+    let _dm_number = ctx.get_dynamic_metadata_number("test_filter", "handshake_state");
+    let _dm_bool = ctx.get_dynamic_metadata_bool("test_filter", "tls_enabled");
 
     // Test tracing (stubs that always return None).
     let _trace_id = ctx.get_trace_id();
@@ -180,6 +257,18 @@ impl AccessLogger for TestAccessLogger {
       ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseHeader);
     let _response_trailers =
       ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::ResponseTrailer);
+
+    // Test generic attribute accessors.
+    let _attr_protocol =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol);
+    let _attr_route =
+      ctx.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::XdsRouteName);
+    let _attr_resp_code =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ResponseCode);
+    let _attr_conn_id =
+      ctx.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId);
+    let _attr_mtls =
+      ctx.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
 
     // Test access log type.
     let log_type = ctx.log_type();

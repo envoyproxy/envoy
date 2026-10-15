@@ -1,7 +1,5 @@
 #include "source/common/stream_info/stream_info_impl.h"
 
-#include "test/test_common/simulated_time_system.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "library/common/stream_info/extra_stream_info.h"

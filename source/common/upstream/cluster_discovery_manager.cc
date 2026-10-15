@@ -19,7 +19,7 @@ public:
     cb_(cluster_name);
   };
 
-  void onClusterRemoval(const std::string&) override {}
+  void onClusterRemoval(absl::string_view) override {}
 
 private:
   ClusterAddedCb cb_;

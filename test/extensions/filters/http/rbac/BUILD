@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
 )
@@ -18,12 +18,11 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/server:instance_mocks",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
@@ -33,7 +32,7 @@ envoy_extension_cc_test(
     name = "rbac_filter_test",
     srcs = ["rbac_filter_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/matcher:ip_range_matcher_lib",
@@ -48,7 +47,9 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/rbac:route_config_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
@@ -62,7 +63,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["rbac_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
@@ -94,7 +95,7 @@ envoy_extension_cc_test(
         "envoy.filters.http.rbac",
         "envoy.bootstrap.cel",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/bootstrap/cel:config",
@@ -127,18 +128,18 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "rbac_filter_fuzz_test",
     srcs = ["rbac_filter_fuzz_test.cc"],
     corpus = "rbac_filter_corpus",
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":rbac_filter_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],

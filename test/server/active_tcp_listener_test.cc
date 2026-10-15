@@ -14,7 +14,9 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -154,6 +156,108 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithoutInspectData) {
   tcp_socket->continueFilterChain(true);
 }
 
+// A listener filter that calls continueFilterChain synchronously from inside its own onAccept hook
+// must not re-enter and destroy itself. The re-entrant continue is deferred and applied after the
+// hook returns, so the chain completes once and the filter is destroyed only afterwards.
+TEST_F(ActiveTcpListenerTest, ListenerFilterReentrantContinueSuccessFromOnAccept) {
+  initializeWithFilter();
+
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce(Invoke([](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.continueFilterChain(true);
+        return Network::FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
+
+  EXPECT_LOG_CONTAINS("debug", "deferring re-entrant listener filter continueFilterChain call", {
+    generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
+  });
+}
+
+// A re-entrant continueFilterChain with success false from onAccept stops the chain without
+// creating a connection, and still tears down safely after the hook returns.
+TEST_F(ActiveTcpListenerTest, ListenerFilterReentrantContinueFailureFromOnAccept) {
+  initializeWithFilter();
+
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce(Invoke([](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+        cb.continueFilterChain(false);
+        return Network::FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
+
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
+}
+
+// A listener filter that calls continueFilterChain synchronously from inside its own onData hook is
+// deferred the same way, so it is not re-entered while the data callback is on the stack.
+TEST_F(ActiveTcpListenerTest, ListenerFilterReentrantContinueFromOnData) {
+  initializeWithInspectFilter();
+
+  Network::ListenerFilterCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce(
+          Invoke([&captured_cb](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+            captured_cb = &cb;
+            return Network::FilterStatus::StopIteration;
+          }));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  Event::FileReadyCb file_event_callback;
+  EXPECT_CALL(io_handle_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
+
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(inspect_size_, Api::IoError::none()))));
+  EXPECT_CALL(*filter_, onData(_))
+      .WillOnce(Invoke([&captured_cb](Network::ListenerFilterBuffer&) -> Network::FilterStatus {
+        captured_cb->continueFilterChain(true);
+        return Network::FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(io_handle_, resetFileEvents());
+  EXPECT_LOG_CONTAINS("debug", "deferring re-entrant listener filter continueFilterChain call",
+                      { EXPECT_OK(file_event_callback(Event::FileReadyType::Read)); });
+}
+
+// A re-entrant continue from onClose is deferred and then dropped, because the socket is already
+// closing when the close hook runs.
+TEST_F(ActiveTcpListenerTest, ListenerFilterReentrantContinueFromOnClose) {
+  initializeWithInspectFilter();
+
+  Network::ListenerFilterCallbacks* captured_cb = nullptr;
+  EXPECT_CALL(*filter_, onAccept(_))
+      .WillOnce(
+          Invoke([&captured_cb](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+            captured_cb = &cb;
+            return Network::FilterStatus::StopIteration;
+          }));
+  EXPECT_CALL(io_handle_, isOpen()).WillRepeatedly(Return(true));
+  Event::FileReadyCb file_event_callback;
+  EXPECT_CALL(io_handle_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<1>(&file_event_callback));
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
+
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_CALL(io_handle_, close)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_CALL(*filter_, onClose()).WillOnce(Invoke([&captured_cb]() {
+    captured_cb->continueFilterChain(true);
+  }));
+  EXPECT_LOG_CONTAINS("debug", "deferring re-entrant listener filter continueFilterChain call",
+                      { EXPECT_OK(file_event_callback(Event::FileReadyType::Read)); });
+  EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_remote_close_.value(), 1);
+}
+
 /**
  * Execute peek data two times, then filter return successful.
  */
@@ -177,14 +281,14 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(inspect_size_ / 2, Api::IoError::none()))));
   // the filter is looking for more data.
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(inspect_size_, Api::IoError::none()))));
   // the filter get enough data, then return Network::FilterStatus::Continue
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
   EXPECT_CALL(io_handle_, resetFileEvents());
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 }
 
 /**
@@ -215,7 +319,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataFailedWithPeek) {
       .WillOnce(Return(
           ByMove(Api::IoCallUint64Result(0, Network::IoSocketError::create(SOCKET_ERROR_INTR)))));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
   EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_error_.value(), 1);
 }
 
@@ -299,19 +403,19 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters) {
   EXPECT_CALL(*inspect_data_filter2, onAccept(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(*inspect_data_filter2, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
   EXPECT_CALL(*inspect_data_filter3, onAccept(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(*inspect_data_filter3, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 }
 
 /**
@@ -392,19 +496,19 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters2) {
       .WillOnce(Return(Network::FilterStatus::StopIteration));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(*inspect_data_filter2, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(*inspect_data_filter3, onAccept(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(*inspect_data_filter3, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 }
 
 /**
@@ -492,13 +596,13 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters3) {
       .WillOnce(Return(Network::FilterStatus::StopIteration));
   EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Read));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(*inspect_data_filter2, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(*no_inspect_data_filter2, onAccept(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(*inspect_data_filter3, onAccept(_))
       .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -509,7 +613,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectDataMultipleFilters3) {
   EXPECT_CALL(*inspect_data_filter3, onData(_)).WillOnce(Return(Network::FilterStatus::Continue));
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 }
 
 /**
@@ -536,14 +640,14 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose1) {
   // the filter is looking for more data
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
   EXPECT_CALL(io_handle_, close)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
   // emit the read event
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
   EXPECT_EQ(generic_active_listener_->stats_.downstream_listener_filter_remote_close_.value(), 1);
 }
 
@@ -568,13 +672,13 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose2) {
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(1, Api::IoError::none()))));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
   EXPECT_CALL(io_handle_, close)
       .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 }
 
 TEST_F(ActiveTcpListenerTest, ListenerFilterCloseSockets) {
@@ -602,7 +706,7 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterCloseSockets) {
 
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true, {});
   // emit the read event
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
   EXPECT_EQ(0, generic_active_listener_->sockets().size());
 }
 
@@ -631,7 +735,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   // the filter is looking for more data.
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
 
-  EXPECT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback(Event::FileReadyType::Read));
 
   // get the ActiveTcpSocket pointer before unlink() removed from the link-list.
   ActiveTcpSocket* tcp_socket = generic_active_listener_->sockets().front().get();
@@ -653,7 +757,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(balancer1, registerHandler(_));
   EXPECT_CALL(balancer1, unregisterHandler(_));
 
-  const absl::optional<std::string> netns = "/var/run/netns";
+  const std::optional<std::string> netns = "/var/run/netns";
   Network::Address::InstanceConstSharedPtr normal_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 10001, nullptr, netns));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
@@ -701,9 +805,11 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
 
   // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
   EXPECT_CALL(balancer1, pickTargetHandler(_))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
-          ReturnRef(*active_listener1)));
+      .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([](auto& target) {
+                                 target.preIncNumConnections();
+                                 target.postIncNumConnections();
+                               })),
+                               ReturnRef(*active_listener1)));
 
   EXPECT_CALL(listener_config1, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
@@ -732,9 +838,11 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
 
   // 3. Listener2 re-balance. Set the balance target to the the active listener itself.
   EXPECT_CALL(balancer2, pickTargetHandler(_))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
-          ReturnRef(*active_listener2)));
+      .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([](auto& target) {
+                                 target.preIncNumConnections();
+                                 target.postIncNumConnections();
+                               })),
+                               ReturnRef(*active_listener2)));
 
   EXPECT_CALL(listener_config2, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
@@ -810,9 +918,11 @@ TEST_F(ActiveTcpListenerTest, SkipRedirection) {
 
   // 1. Listener1 re-balance. Set the balance target to the the active listener itself.
   EXPECT_CALL(balancer1, pickTargetHandler(_))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
-          ReturnRef(*active_listener1)));
+      .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([](auto& target) {
+                                 target.preIncNumConnections();
+                                 target.postIncNumConnections();
+                               })),
+                               ReturnRef(*active_listener1)));
 
   EXPECT_CALL(listener_config1, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
@@ -901,7 +1011,8 @@ TEST_F(ActiveTcpListenerTest, Rebalance) {
   // active_listener1 re-balance. Set the balance target to the the active_listener2.
   EXPECT_CALL(balancer1, pickTargetHandler(_))
       .WillOnce(testing::DoAll(testing::WithArg<0>(Invoke([&active_listener2](auto&) {
-                                 active_listener2->incNumConnections();
+                                 active_listener2->preIncNumConnections();
+                                 active_listener2->postIncNumConnections();
                                })),
                                ReturnRef(*active_listener2)));
 

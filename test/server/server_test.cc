@@ -1,19 +1,29 @@
+#ifndef WIN32
+#include <sys/resource.h>
+#endif
 #include <algorithm>
 #include <memory>
 #include <vector>
 
+#include "envoy/common/logger.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/fatal_action_config.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/notification.h"
+#include "source/common/http/codes.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/instance_impl.h"
@@ -24,6 +34,7 @@
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
@@ -33,20 +44,24 @@
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/crypto.h"
 
 using testing::_;
 using testing::Assign;
+using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -163,58 +178,29 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
   InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
 
+#ifndef WIN32
 TEST(ServerInstanceUtil, RaiseFileLimits) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 512;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
-  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, const struct rlimit* rlim) {
-        EXPECT_EQ(1024, rlim->rlim_cur);
-        EXPECT_EQ(1024, rlim->rlim_max);
-        return Api::SysCallIntResult{0, 0};
-      }));
+  struct rlimit rlim;
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  ASSERT_GT(rlim.rlim_max, 1);
+  // Set the soft limit lower than the hard limit.
+  rlim.rlim_cur = rlim.rlim_max / 2;
   InstanceUtil::raiseFileLimits();
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  EXPECT_EQ(rlim.rlim_cur, rlim.rlim_max);
 }
 
 TEST(ServerInstanceUtil, RaiseFileLimitsAlreadyMaxed) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 1024;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
+  struct rlimit rlim;
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  rlim.rlim_cur = rlim.rlim_max;
+  EXPECT_EQ(::setrlimit(RLIMIT_NOFILE, &rlim), 0);
+  // Verify that limits remain unchanged when they are the same.
   InstanceUtil::raiseFileLimits();
+  EXPECT_EQ(::getrlimit(RLIMIT_NOFILE, &rlim), 0);
+  EXPECT_EQ(rlim.rlim_cur, rlim.rlim_max);
 }
-
-TEST(ServerInstanceUtil, RaiseFileLimitsReadError) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _)).WillOnce(Invoke([&](int, struct rlimit*) {
-    return Api::SysCallIntResult{-1, 0};
-  }));
-  InstanceUtil::raiseFileLimits();
-}
-
-TEST(ServerInstanceUtil, RaiseFileLimitsWriteError) {
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
-  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
-        rlim->rlim_cur = 512;
-        rlim->rlim_max = 1024;
-        return Api::SysCallIntResult{0, 0};
-      }));
-  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
-      .WillOnce(Invoke([&](int, const struct rlimit*) { return Api::SysCallIntResult{-1, 0}; }));
-  InstanceUtil::raiseFileLimits();
-}
+#endif
 
 class RunHelperTest : public testing::Test {
 public:
@@ -545,6 +531,68 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
   }
 }
 
+// Boots a server backed by a real ThreadLocalStoreImpl (the production store type, unlike the base
+// fixture's TestIsolatedStoreImpl) and verifies the explicit-tags decision made during
+// initialization, observed via ThreadLocalStoreImpl::useExplicitTags(). These live in the
+// ServerInstanceImplTest suite, after WithCustomInlineHeaders, because booting a server finalizes
+// the process-global custom-inline-header registry that the inline-header tests must populate
+// first.
+//
+// With the runtime guard enabled and a default stats config (no custom tags), server initialization
+// turns on the explicit-tags logic on the real stats store, and hands the http context the matching
+// CodeStats implementation. Guards against a regression where an early scope creation would
+// silently cause setUseExplicitTags() to be ignored.
+TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
+  Stats::SymbolTableImpl symbol_table;
+  Stats::AllocatorImpl allocator(symbol_table);
+  auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
+
+  options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+      "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+  server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                      component_factory_);
+  EXPECT_TRUE(real_store->useExplicitTags());
+  EXPECT_NE(nullptr, dynamic_cast<Http::TaggedCodeStatsImpl*>(&server_->httpContext().codeStats()));
+
+  // Tear down the server (which shuts down threading on real_store) before real_store is destroyed,
+  // and restore the process-global runtime flag so it does not leak into other tests.
+  server_.reset();
+  real_store.reset();
+  thread_local_.reset();
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
+}
+
+// With the runtime guard at its default (false), the explicit-tags logic stays off after init.
+TEST_P(ServerInstanceImplTest, ExplicitTagsDisabledByDefault) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
+  Stats::SymbolTableImpl symbol_table;
+  Stats::AllocatorImpl allocator(symbol_table);
+  auto real_store = std::make_unique<Stats::ThreadLocalStoreImpl>(allocator);
+
+  options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
+      "test/server/test_data/server/empty_bootstrap.yaml", {}, version_);
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, *real_store, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+  server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                      component_factory_);
+  EXPECT_FALSE(real_store->useExplicitTags());
+
+  server_.reset();
+  real_store.reset();
+  thread_local_.reset();
+}
+
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   CustomStatsSinkFactory factory;
@@ -554,7 +602,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(1), time_system_));
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
@@ -1023,12 +1071,12 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
     server_->flushStats();
   });
 
-  EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "server.dropped_stat_flushes", Eq(2),
+                                          time_system_));
 
   server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
 
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(1), time_system_));
 
   // Trigger another flush after the first one finished. This should go through an no drops should
   // be recorded.
@@ -1036,10 +1084,10 @@ TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
 
   server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
 
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "stats.flushed", Eq(2), time_system_));
 
-  EXPECT_TRUE(
-      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+  EXPECT_TRUE(TestUtility::waitForCounter(stats_store_, "server.dropped_stat_flushes", Eq(2),
+                                          time_system_));
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
@@ -1054,8 +1102,7 @@ TEST_P(ServerInstanceImplTest, ValidationDefault) {
       server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").message(),
       "Protobuf message (foo) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_TRUE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
+  EXPECT_OK(server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -1065,11 +1112,9 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
   options_.service_node_name_ = "some_node_name";
   options_.allow_unknown_static_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_TRUE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
+  EXPECT_OK(server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_TRUE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
+  EXPECT_OK(server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -1099,8 +1144,7 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
   options_.allow_unknown_static_fields_ = true;
   options_.reject_unknown_dynamic_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_TRUE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
+  EXPECT_OK(server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
   EXPECT_EQ(server_->messageValidationContext()
                 .dynamicValidationVisitor()
@@ -1253,6 +1297,19 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
   options_.service_node_name_ = "some_node_name";
   EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
                           EnvoyException, "Unknown gRPC client cluster");
+}
+
+// Verify that RTDS over ADS initializes successfully and doesn't crash on shutdown.
+TEST_P(ServerInstanceImplTest, RtdsOverAdsShutdown) {
+  Config::MockXdsConfigTrackerFactory factory;
+  Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
+
+  options_.service_cluster_name_ = "some_service";
+  options_.service_node_name_ = "some_node_name";
+  auto server_thread =
+      startTestServer("test/server/test_data/server/runtime_bootstrap_rtds_ads.yaml", false);
+  server_->shutdown();
+  server_thread->join();
 }
 
 // Validate invalid runtime in bootstrap is rejected.
@@ -1408,12 +1465,12 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   Logger::Registry::getSink()->flush();
   std::string log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_GT(log.size(), 0);
-  EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
+  EXPECT_THAT(log, HasSubstr("LogToFile test string"));
 
   // Test that critical messages get immediately flushed
   ENVOY_LOG_MISC(critical, "LogToFile second test string");
   log = server_->api().fileSystem().fileReadToEnd(path).value();
-  EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
+  EXPECT_THAT(log, HasSubstr("LogToFile second test string"));
 }
 
 TEST_P(ServerInstanceImplTest, LogToFileError) {
@@ -1531,7 +1588,7 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
 
   auto context = server_->processContext();
-  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get());
   EXPECT_EQ(&object_from_context, &object);
   EXPECT_TRUE(object_from_context.boolean_flag_);
 
@@ -1551,7 +1608,8 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce(
           Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
-            const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
+            const auto* proto =
+                Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
             EXPECT_NE(nullptr, proto);
             EXPECT_EQ(proto->a(), "foo");
             auto mock_extension = std::make_unique<MockBootstrapExtension>();
@@ -1736,7 +1794,7 @@ public:
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override {}
-  void onClusterRemoval(const std::string&) override {}
+  void onClusterRemoval(absl::string_view) override {}
 
 private:
   Upstream::ClusterUpdateCallbacksHandlePtr cluster_removal_cb_handle_;
@@ -1818,10 +1876,10 @@ TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
 TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
-    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+    EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
     EXPECT_EQ(log.logger_name, "misc");
   }));
@@ -1846,7 +1904,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore
 TEST_P(ServerInstanceImplTest, TextApplicationLog) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/text_application_log.yaml"));
 
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));

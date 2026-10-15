@@ -15,8 +15,10 @@ The following lists the filter state object keys used by the Envoy extensions to
   Accepts a comma-separated list of protocols as a constructor, e.g. "h2,http/1.1".
 
 ``envoy.network.upstream_subject_alt_names``
-  Enables additional verification of the upstream peer certificate SAN names. Accepts a comma-separated list of SAN
-  names as a constructor.
+  Enables additional verification of the upstream peer certificate SAN names. Both the
+  :ref:`default certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`
+  and the :ref:`SPIFFE certificate validator <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`
+  support this. Accepts a comma-separated list of SAN names as a constructor.
 
 ``envoy.tcp_proxy.cluster``
   :ref:`TCP proxy <config_network_filters_tcp_proxy>` dynamic cluster name selection on a per-connection basis. Accepts
@@ -102,6 +104,40 @@ The following lists the filter state object keys used by the Envoy extensions to
   request attributes when ``request_storage_mode`` is set to ``FILTER_STATE`` or
   ``DYNAMIC_METADATA_AND_FILTER_STATE``. The object stores extracted fields from the parsed request.
 
+``envoy.ai.llm_protocol.request``
+  Names the request's wire API to the :ref:`AI Protocol Manager <config_http_filters_ai_protocol_manager>`,
+  ahead of the route's declaration. Accepts an :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>`
+  enum-value name as a constructor, e.g. "ANTHROPIC_MESSAGES". Supports field access with
+  ``llm_protocol``.
+
+``envoy.ai.model.request``
+  The model the request names, as the :ref:`request info AI filter
+  <envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>` read it from the
+  payload or, for Gemini, the request path. Accepts a non-empty model name as a constructor, e.g.
+  "gpt-4o".
+
+``envoy.ai.llm_protocol.response``
+  Names the backend's wire API to the :ref:`transcoder AI filter
+  <config_http_filters_ai_protocol_manager_transcoder_instructions>` and to response token-usage
+  extraction, ahead of the route's ``response`` declaration. Accepts an :ref:`LLMProtocol
+  <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name as a constructor, e.g.
+  "GEMINI_GENERATE_CONTENT". Supports field access with ``llm_protocol``.
+
+``envoy.ai.uri_pattern.request``
+  The :ref:`URI pattern <config_http_filters_ai_protocol_manager_transcoder_instructions>` the
+  client's request path follows, from which the transcoder's ``TO_IR`` leg reads the model and
+  the streaming mode. Accepts a non-empty pattern as a constructor.
+
+``envoy.ai.uri_pattern.response``
+  The :ref:`URI pattern <config_http_filters_ai_protocol_manager_transcoder_instructions>` of the
+  path the backend expects, which the transcoder's ``FROM_IR`` leg renders into the request's
+  ``:path``. Accepts a non-empty pattern as a constructor.
+
+``envoy.ai.model.resolved``
+  The model the transcoder sends upstream in place of the one the request names, in the body and
+  in the rendered path alike. Accepts a non-empty model name as a constructor, e.g.
+  "gemini-2.5-flash".
+
 ``envoy.network.network_namespace``
   Contains the value of the downstream connection's Linux network namespace if it differs from the default.
 
@@ -116,6 +152,10 @@ The following lists the filter state object keys used by the Envoy extensions to
 ``envoy.tls.certificate_mappers.on_demand_secret``
   Allows overriding the certificate to use per-connection using the :ref:`filter state certificate mapper
   <envoy_v3_api_msg_extensions.transport_sockets.tls.cert_mappers.filter_state_override.v3.Config>`.
+
+``envoy.tls.cert_validator.spiffe.workload_trust_domain``
+  Specifies per-connection workload trust domain to be used in the :ref:`SPIFFE certificate validator
+  <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>`.
 
 Filter state object factories
 -----------------------------
@@ -147,6 +187,22 @@ configuration with a :ref:`factory lookup key
   Same as ``envoy.string`` but supports connection pool hashing when :ref:`shared with the upstream
   <arch_overview_advanced_filter_state_sharing>`. Please use with care as it can lead to significant
   increase in the number of upstream connections when used with HTTP upstreams.
+
+``envoy.bool``
+  A generic boolean object factory for creating filter state entries with boolean values.
+  Accepts the following case-insensitive values: ``true``, ``t``, ``yes``, ``y``, ``1`` for true;
+  ``false``, ``f``, ``no``, ``n``, ``0`` for false. Invalid values are rejected and do not create
+  a filter state object.
+
+  Example configuration:
+
+  .. code-block:: yaml
+
+    object_key: my.custom.gate
+    factory_key: envoy.bool
+    format_string:
+      text_format_source:
+        inline_string: "true"
 
 ``envoy.network.ip``
   A factory to create IP addresses from ``IPv4`` and ``IPv6`` address strings.

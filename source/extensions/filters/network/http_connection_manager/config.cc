@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -40,6 +41,7 @@
 #include "source/common/quic/server_connection_factory.h"
 #endif
 #include "source/common/router/route_provider_manager.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
@@ -169,7 +171,7 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
     uhv_config.set_strip_fragment_from_path(!Runtime::runtimeFeatureEnabled(
         "envoy.reloadable_features.http_reject_path_with_fragment"));
     legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
-    legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
+    std::ignore = legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
   }
 
   const ::envoy::config::core::v3::TypedExtensionConfig& header_validator_config =
@@ -315,14 +317,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
     auto& server_context = context.serverFactoryContext();
-    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+    Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
+        server_context.mainThreadDispatcher().timeSource(), context.direction(), server_context);
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -365,9 +367,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Tracing::TracerManager& tracer_manager,
     FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
-      stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
-      tracing_stats_(
-          Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
+      // http.(<stat_prefix>.)*
+      http_scope_(
+          Http::ConnectionManagerImpl::createStatsScope(context.scope(), config.stat_prefix())),
+      // The HTTP filters only get the prefixed scope when the runtime feature is enabled. Note the
+      // scope itself is always created because this connection manager's own stats live in it.
+      http_filter_factory_context_(
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter")
+              ? std::make_unique<Http::HttpFilterFactoryContext>(context, http_scope_,
+                                                                 stats_prefix_)
+              : nullptr),
+      stats_(Http::ConnectionManagerImpl::generateStats(*http_scope_)),
+      tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats(*http_scope_)),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
@@ -378,9 +390,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
-          config.http_protocol_options(), context.serverFactoryContext(),
-          context.messageValidationVisitor(), config.stream_error_on_invalid_http_message(),
-          xff_num_trusted_hops_ == 0 && use_remote_address_)),
+          config.http_protocol_options(), context, config.stream_error_on_invalid_http_message(),
+          xff_num_trusted_hops_ == 0 && use_remote_address_, creation_status)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb,
           context.serverFactoryContext().runtime().snapshot().getInteger(
@@ -392,6 +403,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
+      max_connection_duration_jitter_percentage_(
+          config.common_http_protocol_options().has_max_connection_duration_jitter()
+              ? std::optional<double>(
+                    config.common_http_protocol_options().max_connection_duration_jitter().value())
+              : std::nullopt),
       http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
@@ -403,12 +419,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_headers_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, request_headers_timeout, RequestHeaderTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
+      drain_timeout_jitter_percentage_(
+          config.has_drain_timeout_jitter()
+              ? std::optional<double>(config.drain_timeout_jitter().value())
+              : std::nullopt),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
       always_set_request_id_in_response_(config.always_set_request_id_in_response()),
       date_provider_(date_provider),
-      listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
-                                                                         context_.listenerScope())),
+      listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(config.stat_prefix(),
+                                                                         context_.prefixedScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       stream_error_on_invalid_http_messaging_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stream_error_on_invalid_http_message, false)),
@@ -431,6 +451,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.common_http_protocol_options().headers_with_underscores_action()),
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
+      record_route_resolution_stats_(config.record_route_resolution_stats()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_requests_per_connection, 0)),
       proxy_status_config_(config.has_proxy_status_config()
@@ -478,7 +499,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
-    idle_timeout_ = absl::nullopt;
+    idle_timeout_ = std::nullopt;
   }
 
   if (config.common_http_protocol_options().has_max_response_headers_kb()) {
@@ -508,7 +529,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!final_rid_config.has_typed_config()) {
     // This creates a default version of the UUID extension which is a required extension in the
     // build.
-    final_rid_config.mutable_typed_config()->PackFrom(
+    std::ignore = final_rid_config.mutable_typed_config()->PackFrom(
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
   auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
@@ -523,7 +544,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     auto* extension = ip_detection_extensions.Add();
     extension->set_name("envoy.http.original_ip_detection.xff");
-    extension->mutable_typed_config()->PackFrom(xff_config);
+    std::ignore = extension->mutable_typed_config()->PackFrom(xff_config);
   } else {
     if (use_remote_address_) {
       creation_status = absl::InvalidArgumentError(
@@ -594,7 +615,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context_.serverFactoryContext(),
+        // The inline route configuration inherits the init manager of this HTTP connection
+        // manager, so that any resource it owns can be warmed up together with the listener.
+        config.route_config(), context_.serverFactoryContext(), context_.initManager(),
         context_.messageValidationVisitor());
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
@@ -614,6 +637,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   forward_client_cert_ = convertForwardClientCertDetailsType(config.forward_client_cert_details());
+  forward_client_cert_format_ =
+      convertForwardClientCertFormat(config.set_current_client_cert_details().format());
   set_current_client_cert_details_ =
       convertSetCurrentClientCertDetails(config.set_current_client_cert_details());
 
@@ -629,8 +654,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (config.has_tracing()) {
     tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
-    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
-        context.listenerInfo().direction(), config.tracing());
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(context.direction(),
+                                                                             config.tracing());
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -707,7 +732,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
-    if (!context_.listenerInfo().isQuic()) {
+    if (!context_.isQuic()) {
       creation_status = absl::InvalidArgumentError("HTTP/3 codec configured on non-QUIC listener.");
       return;
     }
@@ -717,15 +742,24 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 #endif
     break;
   }
-  if (codec_type_ != CodecType::HTTP3 && context_.listenerInfo().isQuic()) {
+  if (codec_type_ != CodecType::HTTP3 && context_.isQuic()) {
     creation_status = absl::InvalidArgumentError("Non-HTTP/3 codec configured on QUIC listener.");
     return;
   }
 
+  // The filters see the 'http.<stat_prefix>.' scope of this connection manager as the prefixed
+  // scope of their factory context. The stats prefix is propagated unchanged either way: the extra
+  // factory context of a filter reports it as empty when that scope is used, see
+  // Server::Configuration::ExtraFactoryContext::statsPrefixOr().
+  Server::Configuration::FactoryContext& filter_factory_context =
+      http_filter_factory_context_ != nullptr
+          ? static_cast<Server::Configuration::FactoryContext&>(*http_filter_factory_context_)
+          : context_;
   Http::FilterChainHelper<Server::Configuration::FactoryContext,
                           Server::Configuration::NamedHttpFilterConfigFactory>
       helper(filter_config_provider_manager_, context_.serverFactoryContext(),
-             context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
+             context_.serverFactoryContext().clusterManager(), filter_factory_context,
+             stats_prefix_);
 
   SET_AND_RETURN_IF_NOT_OK(
       helper.processFilters(config.http_filters(), "http", "http", filter_factories_),
@@ -760,6 +794,51 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 }
 
+std::optional<std::chrono::milliseconds>
+HttpConnectionManagerConfig::maxConnectionDuration() const {
+  if (!max_connection_duration_.has_value()) {
+    return std::nullopt;
+  }
+  std::chrono::milliseconds duration = max_connection_duration_.value();
+  // Apply jitter: extend the base duration by a random amount up to
+  // base_duration * jitter_percentage / 100. The jittering is an internal
+  // implementation detail of the HttpConnectionManagerConfig and not exposed
+  // as a separate interface method: callers receive a freshly jittered value
+  // on every call and arm the timer with it directly.
+  if (max_connection_duration_jitter_percentage_.has_value() &&
+      max_connection_duration_jitter_percentage_.value() > 0) {
+    const uint64_t max_jitter_ms = static_cast<uint64_t>(
+        std::ceil(duration.count() * (max_connection_duration_jitter_percentage_.value() / 100.0)));
+    if (max_jitter_ms > 0) {
+      const uint64_t jitter_ms =
+          context_.serverFactoryContext().api().randomGenerator().random() % max_jitter_ms;
+      duration = std::chrono::milliseconds(static_cast<uint64_t>(duration.count()) + jitter_ms);
+    }
+  }
+  return duration;
+}
+
+std::chrono::milliseconds HttpConnectionManagerConfig::drainTimeout() const {
+  std::chrono::milliseconds timeout = drain_timeout_;
+  // Apply jitter: extend the drain grace period (between the shutdown notice
+  // GOAWAY and the final GOAWAY) by a random amount up to
+  // drain_timeout * jitter_percentage / 100. The jittering is an internal
+  // implementation detail of the HttpConnectionManagerConfig and not exposed
+  // as a separate interface method: callers receive a freshly jittered value
+  // on every call and arm the timer with it directly.
+  if (drain_timeout_jitter_percentage_.has_value() &&
+      drain_timeout_jitter_percentage_.value() > 0) {
+    const uint64_t max_jitter_ms = static_cast<uint64_t>(
+        std::ceil(timeout.count() * (drain_timeout_jitter_percentage_.value() / 100.0)));
+    if (max_jitter_ms > 0) {
+      const uint64_t jitter_ms =
+          context_.serverFactoryContext().api().randomGenerator().random() % max_jitter_ms;
+      timeout = std::chrono::milliseconds(static_cast<uint64_t>(timeout.count()) + jitter_ms);
+    }
+  }
+  return timeout;
+}
+
 Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
     Network::Connection& connection, const Buffer::Instance& data,
     Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
@@ -775,7 +854,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.serverFactoryContext().api().randomGenerator(), http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-        overload_manager);
+        overload_manager, context_.serverFactoryContext().runtime());
   case CodecType::HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
@@ -795,7 +874,8 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         connection, data, callbacks, context_.scope(),
         context_.serverFactoryContext().api().randomGenerator(), http1_codec_stats_,
         http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager,
+        context_.serverFactoryContext().runtime());
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
@@ -899,7 +979,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   return [singletons, filter_config, &context, clear_hop_by_hop_headers](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
     auto& server_context = context.serverFactoryContext();
-    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+    Server::OverloadManager& overload_manager = context.shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();
 
@@ -907,7 +987,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
+        server_context.mainThreadDispatcher().timeSource(), context.direction(), server_context);
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

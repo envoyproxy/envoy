@@ -26,6 +26,10 @@ MockEncoder::MockEncoder() {
           Invoke([this](const Common::Redis::RespValue& value, Buffer::Instance& out) -> void {
             real_encoder_.encode(value, out);
           }));
+  ON_CALL(*this, setProtocolVersion(_))
+      .WillByDefault(Invoke([this](Common::Redis::RespProtocolVersion version) -> void {
+        real_encoder_.setProtocolVersion(version);
+      }));
 }
 
 MockEncoder::~MockEncoder() = default;

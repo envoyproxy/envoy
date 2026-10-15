@@ -11,28 +11,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AlternateProtocolsCache {
 
-Http::FilterFactoryCb AlternateProtocolsCacheFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+AlternateProtocolsCacheFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
         proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-
-  auto& server_context = context.serverFactoryContext();
-
-  FilterConfigSharedPtr filter_config(std::make_shared<FilterConfig>(
-      proto_config, context.serverFactoryContext().httpServerPropertiesCacheManager(),
-      server_context.mainThreadDispatcher().timeSource()));
-
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamEncoderFilter(
-        std::make_shared<Filter>(filter_config, callbacks.dispatcher()));
-  };
-}
-
-Http::FilterFactoryCb
-AlternateProtocolsCacheFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
-    const envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig&
-        proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
 
   FilterConfigSharedPtr filter_config(
       std::make_shared<FilterConfig>(proto_config, context.httpServerPropertiesCacheManager(),

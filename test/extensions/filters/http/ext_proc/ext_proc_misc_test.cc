@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include <algorithm>
 #include <iostream>
 
@@ -82,7 +85,7 @@ protected:
       std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
       ext_proc_filter.set_name(ext_proc_filter_name);
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+      std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
     });
 
@@ -91,7 +94,7 @@ protected:
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
+      std::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
@@ -104,7 +107,7 @@ protected:
 
   void processRequestHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -125,7 +128,7 @@ protected:
 
   void processResponseHeadersMessage(
       FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
+      std::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -144,9 +147,9 @@ protected:
     }
   }
 
-  void processRequestBodyMessage(
-      FakeUpstream& grpc_upstream, bool first_message,
-      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
+  void
+  processRequestBodyMessage(FakeUpstream& grpc_upstream, bool first_message,
+                            std::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
     ProcessingRequest request;
     if (first_message) {
       ASSERT_TRUE(grpc_upstream.waitForHttpConnection(*dispatcher_, processor_connection_));
@@ -173,10 +176,10 @@ protected:
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
 
-  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
+  bool isEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void websocketExtProcTest() {
-    if (!IsEnvoyGrpc()) {
+    if (!isEnvoyGrpc()) {
       return;
     }
 
@@ -209,16 +212,16 @@ body_format:
       headers.addCopy(LowerCaseString("connection"), "Upgrade");
     });
 
-    processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+    processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+    processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
     verifyDownstreamResponse(*response, 200);
   }
 
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
@@ -232,7 +235,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcMiscInte
 
 // Test sending empty last body chunk with end_of_stream = true.
 TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
-  if (IsEnvoyGrpc()) {
+  if (isEnvoyGrpc()) {
     return;
   }
 
@@ -263,7 +266,7 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
   const uint32_t init_body_size = 1000;
   std::string init_body(init_body_size, 'a');
   codec_client_->sendData(*request_encoder_, init_body, false);
-  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
 
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(20));
   const uint32_t body_size = 2000;
@@ -292,5 +295,68 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
 
 // Test Ext_Proc filter and WebSocket configuration combination.
 TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcCombo) { websocketExtProcTest(); }
+
+// Regression test: with a STREAMED request body mode, a WebSocket upgrade must not deadlock.
+// handleHeaderContinue() leaves header iteration paused in streamed mode and normally relies on a
+// subsequent body chunk to resume it, but on an upgrade the client will not send any frame until
+// it has seen the 101 response, so iteration must be resumed on the header response itself or the
+// handshake never reaches the upstream.
+TEST_P(ExtProcMiscIntegrationTest, WebSocketExtProcStreamedRequestBody) {
+  if (!isEnvoyGrpc()) {
+    return;
+  }
+
+  http_codec_type_ = Http::CodecType::HTTP1;
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+
+  auto* allowed_headers = proto_config_.mutable_forward_rules()->mutable_allowed_headers();
+  allowed_headers->add_patterns()->set_exact("upgrade");
+  allowed_headers->add_patterns()->set_exact("connection");
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.addCopy(LowerCaseString("upgrade"), "websocket");
+  headers.addCopy(LowerCaseString("connection"), "Upgrade");
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // ext_proc server processes the upgrade request headers.
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
+
+  // The handshake must reach the upstream even though no request body has been sent yet.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "101"},
+                                                                   {"connection", "upgrade"},
+                                                                   {"upgrade", "websocket"}},
+                                   false);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, std::nullopt);
+
+  response->waitForHeaders();
+  EXPECT_EQ("101", response->headers().getStatusValue());
+
+  // Tunnel data from the client is streamed through ext_proc and reaches the upstream.
+  codec_client_->sendData(*request_encoder_, "client-frame", false);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 12));
+
+  // Tunnel data from the upstream reaches the client.
+  upstream_request_->encodeData("server-frame", false);
+  response->waitForBodyData(12);
+  EXPECT_EQ("server-frame", response->body());
+
+  cleanupUpstreamAndDownstream();
+}
 
 } // namespace Envoy

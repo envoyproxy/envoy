@@ -70,11 +70,11 @@ void CacheFilter::onDestroy() {
   lookup_result_.reset();
 }
 
-absl::optional<absl::string_view> CacheFilter::clusterName() {
-  Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  const Router::RouteEntry* route_entry = (route == nullptr) ? nullptr : route->routeEntry();
+std::optional<absl::string_view> CacheFilter::clusterName() {
+  const auto route = decoder_callbacks_->route();
+  const Router::RouteEntry* route_entry = route ? route->routeEntry() : nullptr;
   if (route_entry == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return route_entry->clusterName();
 }
@@ -83,20 +83,20 @@ OptRef<Http::AsyncClient> CacheFilter::asyncClient(absl::string_view cluster_nam
   Upstream::ThreadLocalCluster* thread_local_cluster =
       config_->clusterManager().getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return thread_local_cluster->httpAsyncClient();
 }
 
 void CacheFilter::sendNoRouteResponse() {
-  decoder_callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, std::nullopt,
                                      "cache_no_route");
 }
 
 void CacheFilter::sendNoClusterResponse(absl::string_view cluster_name) {
   ENVOY_STREAM_LOG(debug, "upstream cluster '{}' was not available to cache", *decoder_callbacks_,
                    cluster_name);
-  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, std::nullopt,
                                      "cache_no_cluster");
 }
 
@@ -124,7 +124,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders: {}", *decoder_callbacks_, headers);
 
-  absl::optional<absl::string_view> original_cluster_name = clusterName();
+  std::optional<absl::string_view> original_cluster_name = clusterName();
   absl::string_view cluster_name;
   if (config_->overrideUpstreamCluster().empty()) {
     if (!original_cluster_name) {
@@ -288,43 +288,6 @@ void CacheFilter::getTrailers() {
       &cancel_in_flight_callback_));
 }
 
-static AdjustedByteRange rangeFromHeaders(Http::ResponseHeaderMap& response_headers) {
-  if (Http::Utility::getResponseStatus(response_headers) !=
-      static_cast<uint64_t>(Envoy::Http::Code::PartialContent)) {
-    // Don't use content-length; we can just request *all the body* from
-    // the source and it will tell us when it gets to the end.
-    return {0, std::numeric_limits<uint64_t>::max()};
-  }
-  Http::HeaderMap::GetResult content_range_result =
-      response_headers.get(Envoy::Http::Headers::get().ContentRange);
-  if (content_range_result.empty()) {
-    return {0, std::numeric_limits<uint64_t>::max()};
-  }
-  absl::string_view content_range = content_range_result[0]->value().getStringView();
-  if (!absl::ConsumePrefix(&content_range, "bytes ")) {
-    return {0, std::numeric_limits<uint64_t>::max()};
-  }
-  if (absl::ConsumePrefix(&content_range, "*/")) {
-    uint64_t len;
-    if (absl::SimpleAtoi(content_range, &len)) {
-      return {0, len};
-    }
-    return {0, std::numeric_limits<uint64_t>::max()};
-  }
-  std::pair<absl::string_view, absl::string_view> range_of = absl::StrSplit(content_range, '/');
-  std::pair<absl::string_view, absl::string_view> range = absl::StrSplit(range_of.first, '-');
-  uint64_t begin, end;
-  if (!absl::SimpleAtoi(range.first, &begin)) {
-    begin = 0;
-  }
-  if (!absl::SimpleAtoi(range.second, &end)) {
-    end = std::numeric_limits<uint64_t>::max();
-  } else {
-    end++;
-  }
-  return {begin, end};
-}
-
 void CacheFilter::onHeaders(Http::ResponseHeaderMapPtr response_headers,
                             EndStream end_stream_enum) {
   ASSERT(lookup_result_, "onHeaders should not be called with no LookupResult");
@@ -355,7 +318,7 @@ void CacheFilter::onHeaders(Http::ResponseHeaderMapPtr response_headers,
   bool end_stream = ((end_stream_enum == EndStream::End) || is_head_request_);
 
   if (!end_stream) {
-    remaining_ranges_ = {rangeFromHeaders(*response_headers)};
+    remaining_ranges_ = {RangeUtils::rangeFromHeaders(*response_headers)};
     ENVOY_STREAM_LOG(debug, "CacheFilter requesting range {}-{} {}", *decoder_callbacks_,
                      remaining_ranges_[0].begin(), remaining_ranges_[0].end(), *response_headers);
   }

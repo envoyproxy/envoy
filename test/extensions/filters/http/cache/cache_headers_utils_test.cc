@@ -14,7 +14,11 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::Contains;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -61,77 +65,77 @@ public:
         {
           "",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
+          {false, false, false, false, std::nullopt, std::nullopt, std::nullopt}
         },
         // Valid cache-control headers
         {
           "max-age=3600, min-fresh=10, no-transform, only-if-cached, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, true, true, Seconds(3600), Seconds(10), absl::nullopt}
+          {false, true, true, true, Seconds(3600), Seconds(10), std::nullopt}
         },
         {
           "min-fresh=100, max-stale, no-cache",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, false, false, false, absl::nullopt, Seconds(100), SystemTime::duration::max()}
+          {true, false, false, false, std::nullopt, Seconds(100), SystemTime::duration::max()}
         },
         {
           "max-age=10, max-stale=50",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         // Quoted arguments are interpreted correctly
         {
           "max-age=\"3600\", min-fresh=\"10\", no-transform, only-if-cached, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, true, true, Seconds(3600), Seconds(10), absl::nullopt}
+          {false, true, true, true, Seconds(3600), Seconds(10), std::nullopt}
         },
         {
           "max-age=\"10\", max-stale=\"50\", only-if-cached",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, true, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, true, Seconds(10), std::nullopt, Seconds(50)}
         },
         // Unknown directives are ignored
         {
           "max-age=10, max-stale=50, unknown-directive",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive-with-arg=arg1",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive-with-quoted-arg=\"arg1\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         {
           "max-age=10, max-stale=50, unknown-directive, unknown-directive-with-quoted-arg=\"arg1\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, Seconds(10), absl::nullopt, Seconds(50)}
+          {false, false, false, false, Seconds(10), std::nullopt, Seconds(50)}
         },
         // Invalid durations are ignored
         {
           "max-age=five, min-fresh=30, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, true, false, false, absl::nullopt, Seconds(30), absl::nullopt}
+          {false, true, false, false, std::nullopt, Seconds(30), std::nullopt}
         },
         {
           "max-age=five, min-fresh=30s, max-stale=-2",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
+          {false, false, false, false, std::nullopt, std::nullopt, std::nullopt}
         },
         {
           "max-age=\"",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {false, false, false, false, absl::nullopt, absl::nullopt, absl::nullopt}
+          {false, false, false, false, std::nullopt, std::nullopt, std::nullopt}
         },
         // Invalid parts of the header are ignored
         {
           "no-cache, ,,,fjfwioen3298, max-age=20, min-fresh=30=40",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, false, false, false, Seconds(20), absl::nullopt, absl::nullopt}
+          {true, false, false, false, Seconds(20), std::nullopt, std::nullopt}
         },
         // If a directive argument contains a comma by mistake
         // the part before the comma will be interpreted as the argument
@@ -139,7 +143,7 @@ public:
         {
           "no-cache, max-age=10,0, no-store",
           // {must_validate_, no_store_, no_transform_, only_if_cached_, max_age_, min_fresh_, max_stale_}
-          {true, true, false, false, Seconds(10), absl::nullopt, absl::nullopt}
+          {true, true, false, false, Seconds(10), std::nullopt, std::nullopt}
         },
     );
     // clang-format on
@@ -176,6 +180,39 @@ TEST(ResponseCacheControl, StreamingTest) {
   EXPECT_EQ(os.str(), "{must_validate, no_store, no_transform, no_stale, max-age=0}");
 }
 
+TEST(ResponseCacheControl, SMaxageImpliesNoStale) {
+  ResponseCacheControl cc("s-maxage=100");
+  EXPECT_TRUE(cc.max_age_.has_value());
+  EXPECT_EQ(cc.max_age_.value(), Seconds(100));
+  EXPECT_TRUE(cc.no_stale_);
+}
+
+TEST(RequestCacheControl, DirectiveNamesAreCaseInsensitive) {
+  EXPECT_EQ(RequestCacheControl("no-cache, no-store, no-transform, only-if-cached, max-age=600, "
+                                "min-fresh=10, max-stale=20"),
+            RequestCacheControl("No-Cache, No-Store, No-Transform, Only-If-Cached, Max-Age=600, "
+                                "Min-Fresh=10, Max-Stale=20"));
+}
+
+TEST(ResponseCacheControl, DirectiveNamesAreCaseInsensitive) {
+  EXPECT_EQ(ResponseCacheControl("no-cache, no-store, no-transform, must-revalidate, public, "
+                                 "max-age=600, s-maxage=300"),
+            ResponseCacheControl("No-Cache, No-Store, No-Transform, Must-Revalidate, Public, "
+                                 "Max-Age=600, S-Maxage=300"));
+  EXPECT_EQ(ResponseCacheControl("proxy-revalidate, max-age=600"),
+            ResponseCacheControl("Proxy-Revalidate, Max-Age=600"));
+}
+
+TEST(ResponseCacheControl, StorageDirectivesAreCaseInsensitive) {
+  for (const absl::string_view directive : {"private", "Private", "PRIVATE", "pRiVaTe", "no-store",
+                                            "No-Store", "NO-STORE", "nO-sToRe"}) {
+    SCOPED_TRACE(directive);
+    const ResponseCacheControl cache_control(absl::StrCat("max-age=600, ", directive));
+    EXPECT_EQ(cache_control.max_age_, Seconds(600));
+    EXPECT_TRUE(cache_control.no_store_);
+  }
+}
+
 struct TestResponseCacheControl : public ResponseCacheControl {
   TestResponseCacheControl(bool must_validate, bool no_store, bool no_transform, bool no_stale,
                            bool is_public, OptionalDuration max_age) {
@@ -202,7 +239,7 @@ public:
         {
           "",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, absl::nullopt}
+          {false, false, false, false, false, std::nullopt}
         },
         // Valid cache-control headers
         {
@@ -218,12 +255,12 @@ public:
         {
           "s-maxage=10, private=content-length, no-cache=content-encoding",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, true, false, false, false, Seconds(10)}
+          {true, true, false, true, false, Seconds(10)}
         },
         {
           "private",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, true, false, false, false, absl::nullopt}
+          {false, true, false, false, false, std::nullopt}
         },
         {
           "public, max-age=0",
@@ -234,7 +271,7 @@ public:
         {
           "s-maxage=\"20\", max-age=\"10\", public",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, true, Seconds(20)}
+          {false, false, false, true, true, Seconds(20)}
         },
         {
           "max-age=\"50\", private",
@@ -244,7 +281,7 @@ public:
         {
           "s-maxage=\"0\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, Seconds(0)}
+          {false, false, false, true, false, Seconds(0)}
         },
         // Unknown directives are ignored
         {
@@ -271,17 +308,17 @@ public:
         {
           "max-age=five",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, absl::nullopt}
+          {false, false, false, false, false, std::nullopt}
         },
         {
           "max-age=10s, private",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, true, false, false, false, absl::nullopt}
+          {false, true, false, false, false, std::nullopt}
         },
         {
           "s-maxage=\"50s\", max-age=\"zero\", no-cache",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {true, false, false, false, false, absl::nullopt}
+          {true, false, false, false, false, std::nullopt}
         },
         {
           "s-maxage=five, max-age=10, no-transform",
@@ -291,7 +328,7 @@ public:
         {
           "max-age=\"",
           // {must_validate_, no_store_, no_transform_, no_stale_, is_public_, max_age_}
-          {false, false, false, false, false, absl::nullopt}
+          {false, false, false, false, false, std::nullopt}
         },
         // Invalid parts of the header are ignored
         {
@@ -515,8 +552,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchSingleValue) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 1);
-  EXPECT_TRUE(result.contains("accept"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept"));
 }
 
 TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
@@ -531,8 +567,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 1);
-  EXPECT_TRUE(result.contains("accept"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept"));
 }
 
 TEST(GetAllMatchingHeaderNames, MultipleMatches) {
@@ -549,9 +584,7 @@ TEST(GetAllMatchingHeaderNames, MultipleMatches) {
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
-  ASSERT_EQ(result.size(), 2);
-  EXPECT_TRUE(result.contains("accept"));
-  EXPECT_TRUE(result.contains("accept-language"));
+  EXPECT_THAT(result, UnorderedElementsAre("accept", "accept-language"));
 }
 
 struct ParseCommaDelimitedHeaderTestCase {
@@ -656,9 +689,9 @@ TEST(CreateVaryIdentifier, IsStableForAllowListOrder) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
 
-  absl::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
+  std::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
       vary_allow_list1, {"accept", "accept-language", "", "width"}, request_headers);
-  absl::optional<std::string> vary_identifier2 = VaryHeaderUtils::createVaryIdentifier(
+  std::optional<std::string> vary_identifier2 = VaryHeaderUtils::createVaryIdentifier(
       vary_allow_list2, {"accept", "accept-language", "width"}, request_headers);
 
   ASSERT_TRUE(vary_identifier1.has_value());
@@ -798,11 +831,11 @@ TEST(CreateVaryIdentifier, DifferentHeadersSameValue) {
                                 factory_context);
 
   Http::TestRequestHeaderMapImpl request_headers1{{"accept", "foo"}};
-  absl::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
+  std::optional<std::string> vary_identifier1 = VaryHeaderUtils::createVaryIdentifier(
       vary_allow_list, {"accept", "accept-language"}, request_headers1);
 
   Http::TestRequestHeaderMapImpl request_headers2{{"accept-language", "foo"}};
-  absl::optional<std::string> vary_identifier2 = VaryHeaderUtils::createVaryIdentifier(
+  std::optional<std::string> vary_identifier2 = VaryHeaderUtils::createVaryIdentifier(
       vary_allow_list, {"accept", "accept-language", "width"}, request_headers2);
 
   ASSERT_TRUE(vary_identifier1.has_value());
@@ -829,7 +862,7 @@ TEST(CreateVaryIdentifier, DisallowedHeader) {
                                 factory_context);
 
   EXPECT_EQ(VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"disallowed"}, request_headers),
-            absl::nullopt);
+            std::nullopt);
 }
 
 TEST(CreateVaryIdentifier, DisallowedHeaderWithAllowedHeader) {
@@ -840,7 +873,7 @@ TEST(CreateVaryIdentifier, DisallowedHeaderWithAllowedHeader) {
 
   EXPECT_EQ(
       VaryHeaderUtils::createVaryIdentifier(vary_allow_list, {"disallowed,width"}, request_headers),
-      absl::nullopt);
+      std::nullopt);
 }
 
 envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {

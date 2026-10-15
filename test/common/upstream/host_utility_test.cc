@@ -6,6 +6,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/stats_utility.h"
 #include "test/test_common/test_runtime.h"
 
@@ -148,10 +149,13 @@ TEST(HostUtilityTest, CreateOverrideHostStatus) {
 }
 
 TEST(HostUtilityTest, SelectOverrideHostTest) {
-  constexpr auto expect_helper = [](std::pair<HostConstSharedPtr, bool> expected_result,
-                                    HostConstSharedPtr host, bool strict_mode) {
-    EXPECT_EQ(expected_result.first, host);
-    EXPECT_EQ(expected_result.second, strict_mode);
+  using Status = HostUtility::OverrideHostSelectionStatus;
+
+  constexpr auto expect_result = [](HostUtility::OverrideHostSelectionResult result,
+                                    HostConstSharedPtr host, bool strict_mode, Status status) {
+    EXPECT_EQ(result.host, host);
+    EXPECT_EQ(result.strict, strict_mode);
+    EXPECT_EQ(result.status, status);
   };
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -163,16 +167,19 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
   {
     // No valid load balancer context.
     auto host_map = std::make_shared<HostMap>();
-    expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, nullptr), nullptr,
-                  false);
+    auto host_lookup = std::make_shared<FlatHostLookupMap>(host_map);
+    expect_result(HostUtility::selectOverrideHost(host_lookup.get(), AllStatuses, nullptr), nullptr,
+                  false, Status::Success);
   }
 
   {
     // No expected host.
-    EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+    EXPECT_CALL(context, overrideHostToSelect())
+        .WillOnce(Return(OptRef<const LoadBalancerContext::OverrideHost>()));
     auto host_map = std::make_shared<HostMap>();
-    expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context), nullptr,
-                  false);
+    auto host_lookup = std::make_shared<FlatHostLookupMap>(host_map);
+    expect_result(HostUtility::selectOverrideHost(host_lookup.get(), AllStatuses, &context),
+                  nullptr, false, Status::Success);
   }
 
   // Test overriding host in strict and non-strict mode.
@@ -181,19 +188,20 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
       // No host map.
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
-          .WillOnce(Return(absl::make_optional(override_host)));
-      expect_helper(HostUtility::selectOverrideHost(nullptr, AllStatuses, &context), nullptr,
-                    strict_mode);
+          .WillOnce(Return(OptRef<const LoadBalancerContext::OverrideHost>(override_host)));
+      expect_result(HostUtility::selectOverrideHost(nullptr, AllStatuses, &context), nullptr,
+                    strict_mode, Status::NotFound);
     }
 
     {
       // The host map does not contain the expected host.
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
-          .WillOnce(Return(absl::make_optional(override_host)));
+          .WillOnce(Return(OptRef<const LoadBalancerContext::OverrideHost>(override_host)));
       auto host_map = std::make_shared<HostMap>();
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context), nullptr,
-                    strict_mode);
+      auto host_lookup = std::make_shared<FlatHostLookupMap>(host_map);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), AllStatuses, &context),
+                    nullptr, strict_mode, Status::NotFound);
     }
     {
       auto mock_host = std::make_shared<NiceMock<MockHost>>();
@@ -202,26 +210,27 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
 
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
-          .WillRepeatedly(Return(absl::make_optional(override_host)));
+          .WillRepeatedly(Return(OptRef<const LoadBalancerContext::OverrideHost>(override_host)));
 
       auto host_map = std::make_shared<HostMap>();
       host_map->insert({"1.2.3.4", mock_host});
+      auto host_lookup = std::make_shared<FlatHostLookupMap>(host_map);
 
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context),
-                    mock_host, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context),
-                    mock_host, strict_mode);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), UnhealthyStatus, &context),
+                    mock_host, strict_mode, Status::Success);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), AllStatuses, &context),
+                    mock_host, strict_mode, Status::Success);
 
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context),
-                    nullptr, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context),
-                    nullptr, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context),
-                    nullptr, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context),
-                    nullptr, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context),
-                    nullptr, strict_mode);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), HealthyStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), DegradedStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), TimeoutStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), DrainingStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), UnknownStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
     }
     {
       auto mock_host = std::make_shared<NiceMock<MockHost>>();
@@ -230,26 +239,27 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
 
       LoadBalancerContext::OverrideHost override_host{"1.2.3.4", strict_mode};
       EXPECT_CALL(context, overrideHostToSelect())
-          .WillRepeatedly(Return(absl::make_optional(override_host)));
+          .WillRepeatedly(Return(OptRef<const LoadBalancerContext::OverrideHost>(override_host)));
 
       auto host_map = std::make_shared<HostMap>();
       host_map->insert({"1.2.3.4", mock_host});
+      auto host_lookup = std::make_shared<FlatHostLookupMap>(host_map);
 
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context),
-                    mock_host, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), AllStatuses, &context),
-                    mock_host, strict_mode);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), DegradedStatus, &context),
+                    mock_host, strict_mode, Status::Success);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), AllStatuses, &context),
+                    mock_host, strict_mode, Status::Success);
 
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context),
-                    nullptr, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context),
-                    nullptr, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context),
-                    nullptr, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context),
-                    nullptr, strict_mode);
-      expect_helper(HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context),
-                    nullptr, strict_mode);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), HealthyStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), UnhealthyStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), TimeoutStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), DrainingStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
+      expect_result(HostUtility::selectOverrideHost(host_lookup.get(), UnknownStatus, &context),
+                    nullptr, strict_mode, Status::Unhealthy);
     }
   }
 }
@@ -434,6 +444,32 @@ TEST_F(PerEndpointMetricsTest, Tags) {
               UnorderedElementsAreArray({
                   Stats::Tag{"envoy.cluster_name", "cluster1"},
                   Stats::Tag{"envoy.endpoint_address", "127.0.0.2:80"},
+              }));
+}
+
+TEST_F(PerEndpointMetricsTest, CustomEndpointStatName) {
+  auto& cluster = makeCluster("cluster1", 0);
+  auto& host = addHost(cluster);
+  host.observability_name_ = "shared.backend/a";
+
+  auto [counters, gauges] = run();
+
+  EXPECT_THAT(metricNamesAndValues(counters),
+              UnorderedElementsAreArray({
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.c1", 11),
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.c2", 12),
+              }));
+  EXPECT_THAT(metricNamesAndValues(gauges),
+              UnorderedElementsAreArray({
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.g1", 13),
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.g2", 14),
+                  std::make_pair("cluster.cluster1.endpoint.shared.backend/a.healthy", 1),
+              }));
+
+  EXPECT_THAT(getMetric("cluster.cluster1.endpoint.shared.backend/a.c1", counters).tags(),
+              UnorderedElementsAreArray({
+                  Stats::Tag{"envoy.cluster_name", "cluster1"},
+                  Stats::Tag{"envoy.endpoint_address", "shared.backend/a"},
               }));
 }
 

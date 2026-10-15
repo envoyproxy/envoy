@@ -77,10 +77,10 @@ public:
    * implementation it is a fixed time window.
    * @param success_rate_request_volume the threshold of requests an accumulator has to have in
    *                                    order to be able to return a significant success rate value.
-   * @return a valid absl::optional<double> with the success rate. If there were not enough
-   * requests, an invalid absl::optional<double> is returned.
+   * @return a valid std::optional<double> with the success rate. If there were not enough
+   * requests, an invalid std::optional<double> is returned.
    */
-  absl::optional<std::pair<double, uint64_t>> getSuccessRateAndVolume();
+  std::optional<std::pair<double, uint64_t>> getSuccessRateAndVolume();
 
 private:
   std::unique_ptr<SuccessRateAccumulatorBucket> current_success_rate_bucket_;
@@ -134,18 +134,18 @@ public:
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
   void resetConsecutiveLocalOriginFailure() { consecutive_local_origin_failure_ = 0; }
-  static absl::optional<Http::Code> resultToHttpCode(Result result);
+  static std::optional<Http::Code> resultToHttpCode(Result result);
 
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
-  void putResult(Result result, absl::optional<uint64_t> code) override;
+  void putResult(Result result, std::optional<uint64_t> code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
-  const absl::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
-  const absl::optional<MonotonicTime>& lastUnejectionTime() override {
+  const std::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
+  const std::optional<MonotonicTime>& lastUnejectionTime() override {
     return last_unejection_time_;
   }
-  const absl::optional<MonotonicTime>& lastDegradedTime() const { return last_degraded_time_; }
-  const absl::optional<MonotonicTime>& lastUndegradedTime() const { return last_undegraded_time_; }
+  const std::optional<MonotonicTime>& lastDegradedTime() const { return last_degraded_time_; }
+  const std::optional<MonotonicTime>& lastUndegradedTime() const { return last_undegraded_time_; }
   uint32_t numDegradations() const { return num_degradations_; }
 
   void putHttpResponseCode(uint64_t response_code);
@@ -182,8 +182,8 @@ public:
 private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
-  absl::optional<MonotonicTime> last_ejection_time_;
-  absl::optional<MonotonicTime> last_unejection_time_;
+  std::optional<MonotonicTime> last_ejection_time_;
+  std::optional<MonotonicTime> last_unejection_time_;
   uint32_t num_ejections_{};
   // Determines ejection time. Each time a node is ejected,
   // the eject_time_backoff is incremented. The value is decremented
@@ -191,8 +191,8 @@ private:
   uint32_t eject_time_backoff_{};
 
   // Degradation tracking (similar to ejection)
-  absl::optional<MonotonicTime> last_degraded_time_;
-  absl::optional<MonotonicTime> last_undegraded_time_;
+  std::optional<MonotonicTime> last_degraded_time_;
+  std::optional<MonotonicTime> last_undegraded_time_;
   uint32_t num_degradations_{};
   // Determines degradation time. Each time a node is degraded,
   // the degrade_time_backoff is incremented. The value is decremented
@@ -217,9 +217,9 @@ private:
   SuccessRateMonitor external_origin_sr_monitor_;
   SuccessRateMonitor local_origin_sr_monitor_;
 
-  void putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code);
-  void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
-  std::function<void(DetectorHostMonitorImpl*, Result, absl::optional<uint64_t> code)>
+  void putResultNoLocalExternalSplit(Result result, std::optional<uint64_t> code);
+  void putResultWithLocalExternalSplit(Result result, std::optional<uint64_t> code);
+  std::function<void(DetectorHostMonitorImpl*, Result, std::optional<uint64_t> code)>
       put_result_func_;
 };
 
@@ -539,7 +539,7 @@ protected:
 private:
   void setCommonEventParams(envoy::data::cluster::v3::OutlierDetectionEvent& event,
                             const HostDescriptionConstSharedPtr& host,
-                            absl::optional<MonotonicTime> time);
+                            std::optional<MonotonicTime> time);
 
   AccessLog::AccessLogFileSharedPtr file_;
   TimeSource& time_source_;

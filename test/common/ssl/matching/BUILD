@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/network:address_lib",
@@ -25,14 +25,14 @@ envoy_cc_test(
 envoy_cc_test(
     name = "inputs_integration_test",
     srcs = ["inputs_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/network/matching:data_impl_lib",
         "//source/common/ssl/matching:inputs_lib",
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/matcher:matcher_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:test_time_lib",
     ],
 )

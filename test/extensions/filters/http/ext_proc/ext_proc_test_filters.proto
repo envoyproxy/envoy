@@ -1,0 +1,8 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you generally should not change or remove existing tests.
+
+syntax = "proto3";
+
+package test.extensions.filters.http.ext_proc;
+
+message DynamicMetadataToHeadersFilterConfig {
+}

@@ -1,3 +1,5 @@
+#include <format>
+
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
@@ -31,7 +33,7 @@ envoy::config::core::v3::TypedExtensionConfig kvStoreDelegateConfig() {
   const std::string filename = TestEnvironment::temporaryPath("xds_kv_store.txt");
   Api::OsSysCallsSingleton().get().unlink(filename.c_str());
 
-  const std::string config_str = fmt::format(R"EOF(
+  const std::string config_str = std::format(R"EOF(
     name: envoy.config.config.KeyValueStoreXdsDelegate
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.config.v3alpha.KeyValueStoreXdsDelegateConfig
@@ -295,14 +297,14 @@ TEST_F(KeyValueStoreXdsDelegateTest, ResourcesWithTTL) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
   resource->set_name("some_resource_1");
-  resource->mutable_resource()->PackFrom(runtime_resource_1);
+  std::ignore = resource->mutable_resource()->PackFrom(runtime_resource_1);
   resource = resources.Add();
   resource->set_name("some_resource_2");
-  resource->mutable_resource()->PackFrom(runtime_resource_2);
+  std::ignore = resource->mutable_resource()->PackFrom(runtime_resource_2);
   resource->mutable_ttl()->set_seconds(30);
   resource = resources.Add();
   resource->set_name("some_resource_3");
-  resource->mutable_resource()->PackFrom(runtime_resource_3);
+  std::ignore = resource->mutable_resource()->PackFrom(runtime_resource_3);
   resource->mutable_ttl()->set_seconds(60);
 
   auto decoded_resources = TestUtility::decodeResources<envoy::service::runtime::v3::Runtime>(

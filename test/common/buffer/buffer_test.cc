@@ -1192,6 +1192,7 @@ TEST(BufferHelperTest, AddFragmentsOptimization) {
     unoptimized_buffer.add(prefill);
 
     std::vector<absl::string_view> fragments;
+    fragments.reserve(50);
     for (int i = 0; i < 50; i++) {
       fragments.push_back("fragment");
     }

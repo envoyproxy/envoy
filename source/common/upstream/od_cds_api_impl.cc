@@ -1,6 +1,7 @@
 #include "source/common/upstream/od_cds_api_impl.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
 #include "source/common/grpc/common.h"
 
 #include "absl/strings/str_join.h"
@@ -11,38 +12,39 @@ namespace Upstream {
 absl::StatusOr<OdCdsApiSharedPtr>
 OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                     Config::XdsManager& xds_manager, ClusterManager& cm,
+                     Config::XdsManager& /*xds_manager*/, ClusterManager& cm,
                      MissingClusterNotifier& notifier, Stats::Scope& scope,
                      ProtobufMessage::ValidationVisitor& validation_visitor,
                      Server::Configuration::ServerFactoryContext&) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret =
-      OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, xds_manager, cm,
-                                         notifier, scope, validation_visitor, creation_status));
+  auto ret = OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, notifier,
+                                                scope, validation_visitor, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                            OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                           Config::XdsManager& xds_manager, ClusterManager& cm,
-                           MissingClusterNotifier& notifier, Stats::Scope& scope,
+                           ClusterManager& cm, MissingClusterNotifier& notifier,
+                           Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            absl::Status& creation_status)
-    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
-                                                                           "name"),
-      helper_(cm, xds_manager, "odcds"), notifier_(notifier),
-      scope_(scope.createScope("cluster_manager.odcds.")) {
+    : helper_(cm, "odcds"), notifier_(notifier),
+      scope_(scope.createScope("cluster_manager.odcds.")),
+      stats_({ALL_ODCDS_STATS(POOL_COUNTER(*scope_))}),
+      resource_type_helper_(validation_visitor, "name") {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
-  const auto resource_name = getResourceName();
+  const auto resource_name = resource_type_helper_.getResourceName();
   absl::StatusOr<Config::SubscriptionPtr> subscription_or_error;
   if (!odcds_resources_locator.has_value()) {
     subscription_or_error = cm.subscriptionFactory().subscriptionFromConfigSource(
-        odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+        odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this,
+        resource_type_helper_.resourceDecoder(), {});
   } else {
     subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
-        *odcds_resources_locator, odcds_config, resource_name, *scope_, *this, resource_decoder_);
+        *odcds_resources_locator, odcds_config, resource_name, *scope_, *this,
+        resource_type_helper_.resourceDecoder());
   }
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
@@ -64,11 +66,23 @@ OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   sendAwaiting();
   status_ = StartStatus::InitialFetchDone;
+  for (const auto& resource : added_resources) {
+    // The cluster exists now, so an earlier "doesn't exist" answer no longer holds. A rejected
+    // (NACKed) add erases the remembered answer too, which errs in the safe direction: the next
+    // request falls back to a full rediscovery instead of being answered locally.
+    missing_names_.erase(resource.get().name());
+  }
   // According to the XDS specification, the server can send a reply with names in the
   // removed_resources field for requested resources that do not exist. That way we can notify the
   // interested parties about the missing resource immediately without waiting for some timeout to
   // be triggered.
   for (const auto& resource_name : removed_resources) {
+    if (requested_names_.contains(resource_name)) {
+      // Remember the answer for a name requested through this instance, so that a repeated
+      // request for it can be answered immediately. The subscription interest in the name
+      // persists, so the server pushes the cluster on its own if it comes into existence later.
+      missing_names_.insert(resource_name);
+    }
     ENVOY_LOG(debug, "odcds: notifying about potential missing cluster {}", resource_name);
     notifier_.notifyMissingCluster(resource_name);
   }
@@ -94,12 +108,13 @@ void OdCdsApiImpl::sendAwaiting() {
   // InitialFetchDone (which happens on the first received response), the awaiting names list is not
   // used any more.
   ENVOY_LOG(debug, "odcds: sending request for awaiting cluster names {}",
-            fmt::join(awaiting_names_, ", "));
+            absl::StrJoin(awaiting_names_, ", "));
   subscription_->requestOnDemandUpdate(awaiting_names_);
   awaiting_names_.clear();
 }
 
 void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
+  requested_names_.insert(cluster_name);
   switch (status_) {
   case StartStatus::NotStarted:
     ENVOY_LOG(trace, "odcds: starting a subscription with cluster name {}", cluster_name);
@@ -131,9 +146,9 @@ public:
   XdstpOdcdsSubscriptionsManager(Config::XdsManager& xds_manager, ClusterManager& cm,
                                  MissingClusterNotifier& notifier, Stats::Scope& scope,
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
-      : xds_manager_(xds_manager), helper_(cm, xds_manager, "odcds-xdstp"), notifier_(notifier),
+      : xds_manager_(xds_manager), helper_(cm, "odcds-xdstp"), notifier_(notifier),
         scope_(scope.createScope("cluster_manager.odcds.")),
-        validation_visitor_(validation_visitor) {}
+        stats_({ALL_ODCDS_STATS(POOL_COUNTER(*scope_))}), validation_visitor_(validation_visitor) {}
 
   absl::Status onResourceUpdate(absl::string_view resource_name,
                                 const Config::DecodedResourceRef& resource,
@@ -168,6 +183,16 @@ public:
     notifier_.notifyMissingCluster(resource_name);
   }
 
+  bool isKnownMissing(absl::string_view resource_name) const {
+    const auto it = subscriptions_.find(resource_name);
+    if (it == subscriptions_.end()) {
+      return false;
+    }
+    return it->second->isKnownMissing();
+  }
+
+  void recordKnownMissingAnswer() { stats_.known_missing_answers_.inc(); }
+
   void addSubscription(absl::string_view resource_name, bool old_ads) {
     if (subscriptions_.contains(resource_name)) {
       ENVOY_LOG(debug, "ODCDS-manager: resource {} is already subscribed to, skipping",
@@ -195,16 +220,15 @@ public:
 
 private:
   // A singleton subscription handler.
-  class PerSubscriptionData : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster> {
+  class PerSubscriptionData : public Config::SubscriptionCallbacks {
   public:
     PerSubscriptionData(XdstpOdcdsSubscriptionsManager& parent, absl::string_view resource_name,
                         ProtobufMessage::ValidationVisitor& validation_visitor)
-        : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
-                                                                               "name"),
-          parent_(parent), resource_name_(resource_name) {}
+        : parent_(parent), resource_name_(resource_name),
+          resource_type_helper_(validation_visitor, "name") {}
 
     absl::Status initializeSubscription(bool old_ads) {
-      const auto resource_type = getResourceName();
+      const auto resource_type = resource_type_helper_.getResourceName();
       // If old_ads is set, creates a subscription using the staticAdsConfigSource.
       // Otherwise, the subscribeToSingletonResource will take care of
       // subscription via the ADS source.
@@ -213,13 +237,18 @@ private:
               resource_name_,
               old_ads
                   ? makeOptRef<const envoy::config::core::v3::ConfigSource>(staticAdsConfigSource())
-                  : absl::nullopt,
-              Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this, resource_decoder_, {});
+                  : std::nullopt,
+              Grpc::Common::typeUrl(resource_type), *parent_.scope_, *this,
+              resource_type_helper_.resourceDecoder(), {});
       RETURN_IF_NOT_OK_REF(subscription_or_error.status());
       subscription_ = std::move(subscription_or_error.value());
       subscription_->start({resource_name_});
       return absl::OkStatus();
     }
+
+    // Whether the server answered the resource with "doesn't exist" and no later update has
+    // delivered it.
+    bool isKnownMissing() const { return known_missing_; }
 
   private:
     const envoy::config::core::v3::ConfigSource& staticAdsConfigSource() {
@@ -241,10 +270,12 @@ private:
       resource_was_updated_ = true;
       if (resources.empty()) {
         ENVOY_LOG(trace, "ODCDS-manager: removing a single resource: {}", resource_name_);
+        known_missing_ = true;
         return parent_.onResourceRemoved(resource_name_, version_info);
       }
       // A single cluster update.
       ENVOY_LOG(trace, "ODCDS-manager: updating a single resource: {}", resource_name_);
+      known_missing_ = false;
       return parent_.onResourceUpdate(resource_name_, resources[0], version_info);
     }
     absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
@@ -256,17 +287,22 @@ private:
       resource_was_updated_ = true;
       if (!removed_resources.empty()) {
         ENVOY_LOG(trace, "ODCDS-manager: removing a single resource: {}", resource_name_);
+        known_missing_ = true;
         return parent_.onResourceRemoved(resource_name_, system_version_info);
       }
       // A single cluster update.
       ENVOY_LOG(trace, "ODCDS-manager: updating a single resource: {}", resource_name_);
+      known_missing_ = false;
       return parent_.onResourceUpdate(resource_name_, added_resources[0], system_version_info);
     }
     void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                               const EnvoyException* e) override {
-      ASSERT(reason != Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure);
-      ENVOY_LOG(trace, "ODCDS-manager: error while fetching a single resource {}: {}",
-                resource_name_, e->what());
+      // The passed exception object is null iff the error reason is
+      // Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure or
+      // Envoy::Config::ConfigUpdateFailureReason::FetchTimedout.
+      ENVOY_LOG(
+          trace, "ODCDS-manager: error while fetching a single resource {}: (reason = {}), {}",
+          resource_name_, enumToInt(reason), e == nullptr ? "exception not provided" : e->what());
       // If the resource wasn't previously updated, this sends a notification that it was removed,
       // so if there are any resources waiting for this one, they can proceed.
       if (!resource_was_updated_) {
@@ -279,8 +315,10 @@ private:
     // TODO(adisuissa): this can be converted to an absl::string_view and point to the
     // subscriptions_ map key.
     const std::string resource_name_;
+    const Config::ResourceTypeHelper<envoy::config::cluster::v3::Cluster> resource_type_helper_;
     Config::SubscriptionPtr subscription_;
     bool resource_was_updated_{false};
+    bool known_missing_{false};
   };
   using PerSubscriptionDataPtr = std::unique_ptr<PerSubscriptionData>;
 
@@ -288,6 +326,7 @@ private:
   CdsApiHelper helper_;
   MissingClusterNotifier& notifier_;
   Stats::ScopeSharedPtr scope_;
+  OdCdsStats stats_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   // Maps a resource name to its subscription data.
   absl::flat_hash_map<std::string, PerSubscriptionDataPtr> subscriptions_;
@@ -347,6 +386,14 @@ XdstpOdCdsApiImpl::subscriptionsManager(Server::Configuration::ServerFactoryCont
 
 void XdstpOdCdsApiImpl::updateOnDemand(std::string cluster_name) {
   subscriptions_manager_->addSubscription(cluster_name, old_ads_);
+}
+
+bool XdstpOdCdsApiImpl::isKnownMissing(absl::string_view cluster_name) const {
+  return subscriptions_manager_->isKnownMissing(cluster_name);
+}
+
+void XdstpOdCdsApiImpl::recordKnownMissingAnswer() {
+  subscriptions_manager_->recordKnownMissingAnswer();
 }
 } // namespace Upstream
 } // namespace Envoy

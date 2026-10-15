@@ -17,7 +17,6 @@ envoy_cc_mock(
         "//envoy/upstream:cluster_manager_interface",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

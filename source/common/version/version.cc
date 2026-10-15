@@ -7,6 +7,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/version/version_string.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
@@ -26,11 +27,7 @@ const std::string& VersionInfo::revisionStatus() {
   CONSTRUCT_ON_FIRST_USE(std::string, build_scm_status);
 }
 
-const std::string& VersionInfo::version() {
-  CONSTRUCT_ON_FIRST_USE(std::string, fmt::format("{}/{}{}/{}/{}/{}", revision(),
-                                                  BUILD_VERSION_NUMBER, build_version_suffix,
-                                                  revisionStatus(), buildType(), sslVersion()));
-}
+const std::string& VersionInfo::version() { return envoyVersionString(); }
 
 const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
   static const auto* result = new envoy::config::core::v3::BuildVersion(
@@ -40,23 +37,9 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
 
 bool VersionInfo::sslFipsCompliant() { return FIPS_mode() == 1; }
 
-const std::string& VersionInfo::buildType() {
-#ifdef NDEBUG
-  static const std::string release_type = "RELEASE";
-#else
-  static const std::string release_type = "DEBUG";
-#endif
-  return release_type;
-}
+const std::string& VersionInfo::buildType() { return envoyBuildType(); }
 
-const std::string& VersionInfo::sslVersion() {
-#ifdef ENVOY_SSL_VERSION
-  static const std::string ssl_version = ENVOY_SSL_VERSION;
-#else
-  static const std::string ssl_version = "no-ssl";
-#endif
-  return ssl_version;
-}
+const std::string& VersionInfo::sslVersion() { return envoySSLVersion(); }
 
 envoy::config::core::v3::BuildVersion VersionInfo::makeBuildVersion(const char* version) {
   envoy::config::core::v3::BuildVersion result;

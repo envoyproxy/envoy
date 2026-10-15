@@ -5,9 +5,9 @@
 namespace Envoy {
 namespace Network {
 
-absl::optional<uint64_t> AddressObject::hash() const {
+std::optional<uint64_t> AddressObject::hash() const {
   if (!getAddress()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return HashUtil::xxHash64(getAddress()->asStringView());
 }

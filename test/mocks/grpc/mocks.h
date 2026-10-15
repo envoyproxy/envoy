@@ -48,12 +48,10 @@ public:
   MOCK_METHOD(void, removeWatermarkCallbacks, ());
 };
 
-template <class ResponseType> using ResponseTypePtr = std::unique_ptr<ResponseType>;
-
 template <class ResponseType>
 class MockAsyncRequestCallbacks : public AsyncRequestCallbacks<ResponseType> {
 public:
-  void onSuccess(ResponseTypePtr<ResponseType>&& response, Tracing::Span& span) override {
+  void onSuccess(ResponsePtr<ResponseType>&& response, Tracing::Span& span) override {
     onSuccess_(*response, span);
   }
 
@@ -70,7 +68,7 @@ public:
     onReceiveInitialMetadata_(*metadata);
   }
 
-  void onReceiveMessage(ResponseTypePtr<ResponseType>&& message) override {
+  void onReceiveMessage(ResponsePtr<ResponseType>&& message) override {
     onReceiveMessage_(*message);
   }
 

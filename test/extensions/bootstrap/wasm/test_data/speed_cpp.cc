@@ -83,7 +83,7 @@ bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* ou
     return false;
   }
   size_t padding = 0;
-  if (input.length()) {
+  if (!input.empty()) {
     if (input[input.length() - 1] == padCharacter) {
       padding++;
     }
@@ -207,7 +207,7 @@ void grpcServiceTest() {
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name(value);
   std::string grpc_service_string;
-  grpc_service.SerializeToString(&grpc_service_string);
+  std::ignore = grpc_service.SerializeToString(&grpc_service_string);
 }
 
 void grpcService1000Test() {
@@ -216,7 +216,7 @@ void grpcService1000Test() {
     GrpcService grpc_service;
     grpc_service.mutable_envoy_grpc()->set_cluster_name(value);
     std::string grpc_service_string;
-    grpc_service.SerializeToString(&grpc_service_string);
+    std::ignore = grpc_service.SerializeToString(&grpc_service_string);
   }
 }
 

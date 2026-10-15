@@ -1,12 +1,13 @@
 #pragma once
 
 #include "envoy/config/core/v3/http_service.pb.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/async_client_utility.h"
-#include "source/common/http/headers.h"
+#include "source/common/http/http_service_headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/tracers/opentelemetry/trace_exporter.h"
@@ -24,8 +25,10 @@ namespace OpenTelemetry {
 class OpenTelemetryHttpTraceExporter : public OpenTelemetryTraceExporter,
                                        public Http::AsyncClient::Callbacks {
 public:
-  OpenTelemetryHttpTraceExporter(Upstream::ClusterManager& cluster_manager,
-                                 const envoy::config::core::v3::HttpService& http_service);
+  OpenTelemetryHttpTraceExporter(
+      Upstream::ClusterManager& cluster_manager,
+      const envoy::config::core::v3::HttpService& http_service,
+      std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator);
 
   bool log(const ExportTraceServiceRequest& request) override;
 
@@ -39,7 +42,7 @@ private:
   envoy::config::core::v3::HttpService http_service_;
   // Track active HTTP requests to be able to cancel them on destruction.
   Http::AsyncClientRequestTracker active_requests_;
-  std::vector<std::pair<const Http::LowerCaseString, const std::string>> parsed_headers_to_add_;
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator_;
 };
 
 } // namespace OpenTelemetry

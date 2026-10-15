@@ -3,24 +3,34 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Server {
 
 using HotRestartMessage = envoy::HotRestartMessage;
 
+std::string HotRestartingChild::UdpForwardingContext::key(absl::string_view network_namespace,
+                                                          absl::string_view address) {
+  return absl::StrCat(network_namespace, "|", address);
+}
+
 void HotRestartingChild::UdpForwardingContext::registerListener(
     Network::Address::InstanceConstSharedPtr address,
     std::shared_ptr<Network::UdpListenerConfig> listener_config) {
   const bool inserted =
-      listener_map_.try_emplace(address->asString(), ForwardEntry{address, listener_config}).second;
+      listener_map_
+          .try_emplace(key(address->networkNamespace().value_or(""), address->asString()),
+                       ForwardEntry{address, listener_config})
+          .second;
   ASSERT(inserted, "Two udp listeners on the same address shouldn't be possible");
 }
 
-absl::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
+std::optional<HotRestartingChild::UdpForwardingContext::ForwardEntry>
 HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     const Network::Address::Instance& address) {
-  auto it = listener_map_.find(address.asString());
+  const std::string ns = address.networkNamespace().value_or("");
+  auto it = listener_map_.find(key(ns, address.asString()));
   if (it == listener_map_.end()) {
     // If no listener on the specific address was found, check for a default route.
     // If the address is IPv6, check default route IPv6 only, otherwise check default
@@ -28,11 +38,11 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     // packet.
     uint32_t port = address.ip()->port();
     if (address.ip()->version() == Network::Address::IpVersion::v6) {
-      it = listener_map_.find(absl::StrCat("[::]:", port));
+      it = listener_map_.find(key(ns, absl::StrCat("[::]:", port)));
     } else {
-      it = listener_map_.find(absl::StrCat("0.0.0.0:", port));
+      it = listener_map_.find(key(ns, absl::StrCat("0.0.0.0:", port)));
       if (it == listener_map_.end()) {
-        it = listener_map_.find(absl::StrCat("[::]:", port));
+        it = listener_map_.find(key(ns, absl::StrCat("[::]:", port)));
         if (it != listener_map_.end() && it->second.first->ip()->ipv6()->v6only()) {
           // If there is a default IPv6 route but it's set v6only, don't use it.
           it = listener_map_.end();
@@ -41,7 +51,7 @@ HotRestartingChild::UdpForwardingContext::getListenerForDestination(
     }
   }
   if (it == listener_map_.end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   return it->second;
 }
@@ -54,7 +64,7 @@ HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch,
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch),
       parent_terminated_(restart_epoch == 0), parent_drained_(restart_epoch == 0),
       skip_hot_restart_on_no_parent_(skip_hot_restart_on_no_parent),
-      skip_parent_stats_(skip_parent_stats) {
+      skip_parent_stats_(skip_parent_stats), parent_stop_accepting_requested_(restart_epoch == 0) {
   main_rpc_stream_.initDomainSocketAddress(&parent_address_);
   std::string socket_path_udp = socket_path + "_udp";
   udp_forwarding_rpc_stream_.initDomainSocketAddress(&parent_address_udp_forwarding_);
@@ -99,9 +109,10 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
 
 void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
 
-void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data) {
-  auto addr_and_listener =
-      udp_forwarding_context_.getListenerForDestination(*data.addresses_.local_);
+void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index,
+                                              const Network::Address::Instance& listener_address,
+                                              Network::UdpRecvData&& data) {
+  auto addr_and_listener = udp_forwarding_context_.getListenerForDestination(listener_address);
   if (addr_and_listener.has_value()) {
     auto [addr, listener_config] = *addr_and_listener;
     // We send to the worker index from the parent instance.
@@ -165,13 +176,17 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 }
 
 void HotRestartingChild::drainParentListeners() {
-  if (parent_terminated_) {
-    return;
+  if (!parent_terminated_) {
+    // No reply expected.
+    HotRestartMessage wrapped_request;
+    wrapped_request.mutable_request()->mutable_drain_listeners();
+    main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
   }
-  // No reply expected.
-  HotRestartMessage wrapped_request;
-  wrapped_request.mutable_request()->mutable_drain_listeners();
-  main_rpc_stream_.sendHotRestartMessage(parent_address_, wrapped_request);
+
+  // Latch that the drain-listeners request was sent. The parent stops its listeners synchronously
+  // when it processes the RPC, but delivery is asynchronous, so callers that must not race the
+  // parent's accept queue should wait briefly after this flips before dialing (see reverse_tunnel).
+  parent_stop_accepting_requested_.store(true);
 }
 
 void HotRestartingChild::registerUdpForwardingListener(
@@ -201,10 +216,10 @@ void HotRestartingChild::allDrainsImplicitlyComplete() {
   parent_drained_ = true;
 }
 
-absl::optional<HotRestart::AdminShutdownResponse>
+std::optional<HotRestart::AdminShutdownResponse>
 HotRestartingChild::sendParentAdminShutdownRequest() {
   if (parent_terminated_) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   HotRestartMessage wrapped_request;
@@ -265,7 +280,35 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
       spans.push_back(Stats::DynamicSpan(span_proto.first(), span_proto.last()));
     }
   }
-  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics);
+
+  // Convert the protobuf tag metadata into the store-neutral structure StatMerger consumes, so the
+  // programmatic tags the parent recorded are re-applied to the merged stats. Gated by a runtime
+  // flag so the prior name-derived behavior can be restored; when disabled the maps stay empty and
+  // StatMerger falls back to deriving tags from the name.
+  const auto convert_tags =
+      [](const Protobuf::Map<std::string, HotRestartMessage::Reply::Stats::MetricTags>&
+             proto_tags) {
+        Stats::StatMerger::TagsMap tags_map;
+        tags_map.reserve(proto_tags.size());
+        for (const auto& iter : proto_tags) {
+          Stats::StatMerger::ParentTags& parent_tags = tags_map[iter.first];
+          parent_tags.base_name_ = iter.second.base_name();
+          parent_tags.tags_.reserve(iter.second.tags_size());
+          for (const auto& tag : iter.second.tags()) {
+            parent_tags.tags_.emplace_back(tag.name(), tag.value());
+          }
+        }
+        return tags_map;
+      };
+  Stats::StatMerger::TagsMap counter_tags;
+  Stats::StatMerger::TagsMap gauge_tags;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.hot_restart_propagate_stat_tags")) {
+    counter_tags = convert_tags(stats_proto.counter_tags());
+    gauge_tags = convert_tags(stats_proto.gauge_tags());
+  }
+
+  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges(), dynamics,
+                           counter_tags, gauge_tags);
 }
 
 absl::Status HotRestartingChild::onSocketEventUdpForwarding() {
@@ -294,7 +337,17 @@ absl::Status HotRestartingChild::onSocketEventUdpForwarding() {
       packet.receive_time_ =
           MonotonicTime(std::chrono::microseconds{req.receive_time_epoch_microseconds()});
       packet.buffer_ = std::make_unique<Buffer::OwnedImpl>(req.payload());
-      onForwardedUdpPacket(req.worker_index(), std::move(packet));
+      // Parents that predate the listener address fields only send the packet's destination.
+      Network::Address::InstanceConstSharedPtr listener_address = packet.addresses_.local_;
+      if (!req.listener_addr().empty()) {
+        auto listener_or_error = Network::Utility::resolveUrl(req.listener_addr());
+        RETURN_IF_NOT_OK(listener_or_error.status());
+        listener_address = *listener_or_error;
+        if (!req.network_namespace().empty() && listener_address->ip() != nullptr) {
+          listener_address = listener_address->withNetworkNamespace(req.network_namespace());
+        }
+      }
+      onForwardedUdpPacket(req.worker_index(), *listener_address, std::move(packet));
       break;
     }
     default: {

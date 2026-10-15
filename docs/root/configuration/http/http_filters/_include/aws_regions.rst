@@ -15,7 +15,7 @@ If :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_reque
    are respected if they are set, else the file ``~/.aws/credentials`` and profile ``default`` are used. The field ``region`` defined
    for the profile in the credentials file is used.
 
-4. The AWS config file. The environment variables ``AWS_CONFIG_FILE``, ``AWS_PROFILE``and ``DEFAULT_AWS_PROFILE`` are
+4. The AWS config file. The environment variables ``AWS_CONFIG_FILE``, ``AWS_PROFILE`` and ``DEFAULT_AWS_PROFILE`` are
    respected if they are set, else the file ``~/.aws/config`` and profile ``default`` are used. The field ``region`` defined for the
    profile in the config file is used.
 
@@ -30,6 +30,6 @@ If :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_reque
    are respected if they are set, else the file ``~/.aws/credentials`` and profile ``default`` are used. The field
    ``sigv4a_signing_region_set`` defined for the profile in the credentials file is used.
 
-4. The AWS config file. The environment variables ``AWS_CONFIG_FILE``, ``AWS_PROFILE``and ``DEFAULT_AWS_PROFILE`` are
+4. The AWS config file. The environment variables ``AWS_CONFIG_FILE``, ``AWS_PROFILE`` and ``DEFAULT_AWS_PROFILE`` are
    respected if they are set, else the file ``~/.aws/config`` and profile ``default`` are used. The field ``sigv4a_signing_region_set``
    defined for the profile in the config file is used.

@@ -44,12 +44,13 @@
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
 #endif
+#include <optional>
+
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/worker_impl.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Server {
@@ -320,12 +321,11 @@ public:
     return validation_context_;
   }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    // Server has two message validation visitors, one for static and
-    // other for dynamic configuration. Choose the dynamic validation
-    // visitor if server main dispatch loop started, as if all configuration
-    // after main dispatch loop started should be dynamic.
-    return main_dispatch_loop_started_.load() ? validation_context_.dynamicValidationVisitor()
-                                              : validation_context_.staticValidationVisitor();
+    // Server has two message validation visitors, one for static and other for dynamic
+    // configuration. The bootstrap (static) resources are all loaded during initialization, so
+    // anything validated after that point was delivered by xDS and is dynamic.
+    return bootstrap_config_loaded_.load() ? validation_context_.dynamicValidationVisitor()
+                                           : validation_context_.staticValidationVisitor();
   }
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
@@ -348,13 +348,14 @@ private:
   Network::DnsResolverSharedPtr getOrCreateDnsResolver();
 
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
+  void flushStatsImpl();
   void flushStatsInternal();
   void updateServerStats();
   // This does most of the work of initialization, but can throw or return errors caught
   // by initialize().
   absl::Status initializeOrThrow(Network::Address::InstanceConstSharedPtr local_address,
                                  ComponentFactory& component_factory);
-  void loadServerFlags(const absl::optional<std::string>& flags_path);
+  void loadServerFlags(const std::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
   void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
@@ -378,7 +379,9 @@ private:
   bool shutdown_{false};
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
-  std::atomic<bool> main_dispatch_loop_started_{false};
+  // Set once all the bootstrap (static) configuration has been loaded, which is the boundary
+  // between static and dynamic configuration. See messageValidationVisitor().
+  std::atomic<bool> bootstrap_config_loaded_{false};
   TimeSource& time_source_;
   // Delete local_info_ as late as possible as some members below may reference it during their
   // destruction.
@@ -439,9 +442,9 @@ private:
   ListenerHooks& hooks_;
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
-  bool enable_reuse_port_default_{false};
+  bool enable_reuse_port_default_ = true;
   Regex::EnginePtr regex_engine_;
-  bool stats_flush_in_progress_ : 1;
+  bool stats_flush_in_progress_ = false;
   std::unique_ptr<Memory::AllocatorManager> memory_allocator_manager_;
 
   template <class T>

@@ -1,12 +1,12 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/common/thread.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +31,7 @@ constexpr std::chrono::seconds MAX_CACHE_JITTER{30};
  * AWS credentials containers
  *
  * If a credential component was not found in the execution environment, it's getter method will
- * return absl::nullopt. Credential components with the empty string value are treated as not found.
+ * return std::nullopt. Credential components with the empty string value are treated as not found.
  */
 class Credentials {
 public:
@@ -51,11 +51,11 @@ public:
     }
   }
 
-  const absl::optional<std::string>& accessKeyId() const { return access_key_id_; }
+  const std::optional<std::string>& accessKeyId() const { return access_key_id_; }
 
-  const absl::optional<std::string>& secretAccessKey() const { return secret_access_key_; }
+  const std::optional<std::string>& secretAccessKey() const { return secret_access_key_; }
 
-  const absl::optional<std::string>& sessionToken() const { return session_token_; }
+  const std::optional<std::string>& sessionToken() const { return session_token_; }
 
   bool hasCredentials() const {
     return access_key_id_.has_value() && secret_access_key_.has_value();
@@ -67,9 +67,9 @@ public:
   }
 
 private:
-  absl::optional<std::string> access_key_id_;
-  absl::optional<std::string> secret_access_key_;
-  absl::optional<std::string> session_token_;
+  std::optional<std::string> access_key_id_;
+  std::optional<std::string> secret_access_key_;
+  std::optional<std::string> session_token_;
 };
 
 using CredentialsPendingCallback = std::function<void()>;
@@ -89,7 +89,7 @@ public:
   X509Credentials(absl::string_view certificate_b64,
                   PublicKeySignatureAlgorithm certificate_signature_algorithm,
                   absl::string_view certificate_serial,
-                  absl::optional<absl::string_view> certificate_chain_b64,
+                  std::optional<absl::string_view> certificate_chain_b64,
                   absl::string_view certificate_private_key_pem,
                   SystemTime certificate_expiration_time)
       : certificate_b64_(certificate_b64),
@@ -104,34 +104,32 @@ public:
 
   X509Credentials() = default;
 
-  const absl::optional<std::string>& certificateDerB64() const { return certificate_b64_; }
+  const std::optional<std::string>& certificateDerB64() const { return certificate_b64_; }
 
-  const absl::optional<std::string>& certificateSerial() const { return certificate_serial_; }
+  const std::optional<std::string>& certificateSerial() const { return certificate_serial_; }
 
-  const absl::optional<SystemTime>& certificateExpiration() const {
-    return certificate_expiration_;
-  }
+  const std::optional<SystemTime>& certificateExpiration() const { return certificate_expiration_; }
 
-  const absl::optional<std::string>& certificateChainDerB64() const {
+  const std::optional<std::string>& certificateChainDerB64() const {
     return certificate_chain_b64_;
   }
 
-  const absl::optional<PublicKeySignatureAlgorithm>& publicKeySignatureAlgorithm() const {
+  const std::optional<PublicKeySignatureAlgorithm>& publicKeySignatureAlgorithm() const {
     return certificate_signature_algorithm_;
   }
 
-  const absl::optional<std::string> certificatePrivateKey() const {
+  const std::optional<std::string> certificatePrivateKey() const {
     return certificate_private_key_pem_;
   }
 
 private:
   // RolesAnywhere certificate based credentials
-  absl::optional<std::string> certificate_b64_ = absl::nullopt;
-  absl::optional<std::string> certificate_chain_b64_ = absl::nullopt;
-  absl::optional<std::string> certificate_private_key_pem_ = absl::nullopt;
-  absl::optional<std::string> certificate_serial_ = absl::nullopt;
-  absl::optional<SystemTime> certificate_expiration_ = absl::nullopt;
-  absl::optional<PublicKeySignatureAlgorithm> certificate_signature_algorithm_ = absl::nullopt;
+  std::optional<std::string> certificate_b64_ = std::nullopt;
+  std::optional<std::string> certificate_chain_b64_ = std::nullopt;
+  std::optional<std::string> certificate_private_key_pem_ = std::nullopt;
+  std::optional<std::string> certificate_serial_ = std::nullopt;
+  std::optional<SystemTime> certificate_expiration_ = std::nullopt;
+  std::optional<PublicKeySignatureAlgorithm> certificate_signature_algorithm_ = std::nullopt;
 };
 
 /*
@@ -170,8 +168,11 @@ using CredentialSubscriberCallbacksSharedPtr = std::shared_ptr<CredentialSubscri
 // Subscription model allowing CredentialsProviderChains to be notified of credential provider
 // updates. A credential provider chain will call credential_provider->subscribeToCredentialUpdates
 // to register itself for updates via onCredentialUpdate callback. When a credential provider has
-// successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
-// it will notify all subscribers that credentials have been retrieved.
+// posted new credentials to all threads, via the setCredentialsToAllThreads method it will notify
+// all subscribers that credentials have been retrieved.
+//
+// Notification happens as soon as the update has been posted, not once every thread has applied it,
+// because the main thread may need credentials before worker threads are running at all.
 //
 // Subscription is only relevant for metadata credentials providers, as these are the only
 // credential providers that implement async credential retrieval functionality.

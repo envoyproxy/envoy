@@ -1,17 +1,21 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "alternate_protocols_cache_impl_test",
     srcs = ["alternate_protocols_cache_impl_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.key_value.file_based"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:key_value_store_lib",
         "//source/common/http:http_server_properties_cache",
@@ -27,15 +31,17 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "key_value_store_test",
     srcs = ["key_value_store_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.key_value.file_based"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:key_value_store_lib",
         "//source/extensions/key_value/file_based:config_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:file_system_for_test_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
 )

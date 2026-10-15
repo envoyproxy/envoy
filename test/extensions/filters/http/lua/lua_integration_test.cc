@@ -3,16 +3,33 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 
+#include "test/extensions/filters/http/lua/lua_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
+
+// Test factory for ``filterState():set()`` integration tests.
+class LuaTestStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "lua.test.string"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    return std::make_unique<Router::StringAccessorImpl>(data);
+  }
+};
+
+REGISTER_FACTORY(LuaTestStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 class LuaIntegrationTest : public UpstreamDownstreamIntegrationTest {
 public:
@@ -159,9 +176,9 @@ public:
           (*cluster->mutable_typed_extension_protocol_options())
               ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
       old_protocol_options.clear_http_filters();
-      (*cluster->mutable_typed_extension_protocol_options())
-          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-              .PackFrom(old_protocol_options);
+      std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                            .PackFrom(old_protocol_options);
     }
   }
 
@@ -708,6 +725,64 @@ typed_config:
                                               ->value()
                                               .getStringView());
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("foo")).empty());
+
+  cleanup();
+}
+
+// requestHeaders() returns the stream's request headers on both paths: the same map headers()
+// returns during envoy_on_request, and the request's headers during envoy_on_response, where they
+// are otherwise unreachable. The request-path arm is what pins the "same map" claim -- it writes
+// through requestHeaders() and reads the value back through headers().
+TEST_P(LuaIntegrationTest, RequestHeadersAccessibleOnBothPaths) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        request_handle:requestHeaders():add("x-added-via-request-headers", "1")
+        request_handle:headers():add("x-same-map",
+          tostring(request_handle:headers():get("x-added-via-request-headers")))
+      end
+      function envoy_on_response(response_handle)
+        local req_headers = response_handle:requestHeaders()
+        response_handle:headers():add("x-echoed-path", req_headers:get(":path"))
+        response_handle:headers():add("x-echoed-authority", req_headers:get(":authority"))
+        response_handle:headers():add("x-echoed-same-map", req_headers:get("x-same-map"))
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ(
+      "/test/long/url",
+      response->headers().get(Http::LowerCaseString("x-echoed-path"))[0]->value().getStringView());
+  EXPECT_EQ("foo.lyft.com", response->headers()
+                                .get(Http::LowerCaseString("x-echoed-authority"))[0]
+                                ->value()
+                                .getStringView());
+  // "1" rather than "nil" proves requestHeaders() and headers() are the same map on the request
+  // path, and the round trip through the response proves the write persisted for the whole stream.
+  EXPECT_EQ("1", response->headers()
+                     .get(Http::LowerCaseString("x-echoed-same-map"))[0]
+                     ->value()
+                     .getStringView());
 
   cleanup();
 }
@@ -1284,6 +1359,142 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   cleanup();
 }
 
+// The scripts below emit whichever filter context the request resolved to, as a header, so that
+// the precedence between the filter-level and the per-route context is observable end to end.
+// `tostring()` is used so that an empty context is reported as "nil" rather than as a missing
+// header, which is what a disabled filter would look like.
+const std::string FILTER_AND_CODE_WITH_FILTER_CONTEXT =
+    R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  filter_context:
+    key: from_filter
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local value = request_handle:filterContext():get("key")
+        request_handle:headers():add("context", tostring(value))
+      end
+  source_codes:
+    named.lua:
+      inline_string: |
+        function envoy_on_request(request_handle)
+          local value = request_handle:filterContext():get("key")
+          request_handle:headers():add("context", tostring(value))
+        end
+)EOF";
+
+const std::string FILTER_CONTEXT_ROUTE_CONFIG =
+    R"EOF(
+name: filter_context_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["foo.lyft.com"]
+  routes:
+  - match:
+      prefix: "/lua/context/no-per-route"
+    route:
+      cluster: cluster_0
+  - match:
+      prefix: "/lua/context/route-without-context"
+    route:
+      cluster: cluster_0
+    typed_per_filter_config:
+      lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        name: named.lua
+  - match:
+      prefix: "/lua/context/route-with-context"
+    route:
+      cluster: cluster_0
+    typed_per_filter_config:
+      lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        filter_context:
+          key: from_route
+  - match:
+      prefix: "/lua/context/route-empty-context"
+    route:
+      cluster: cluster_0
+    typed_per_filter_config:
+      lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        filter_context: {}
+- name: rds_vhost_2
+  domains: ["bar.lyft.com"]
+  typed_per_filter_config:
+    lua:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+      filter_context:
+        key: from_vhost
+  routes:
+  - match:
+      prefix: "/lua/context/vhost"
+    route:
+      cluster: cluster_0
+  - match:
+      prefix: "/lua/context/route-shadows-vhost"
+    route:
+      cluster: cluster_0
+    typed_per_filter_config:
+      lua:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
+        name: named.lua
+)EOF";
+
+// Where handle:filterContext() resolves from, with a context configured on the filter, on a route
+// and on a virtual host. The last case is the one a unit test cannot reach, since it mocks
+// mostSpecificPerFilterConfig() rather than running real route resolution.
+TEST_P(LuaIntegrationTest, FilterContextPrecedence) {
+  initializeWithYaml(FILTER_AND_CODE_WITH_FILTER_CONTEXT, FILTER_CONTEXT_ROUTE_CONFIG);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto check_request = [this](absl::string_view authority, absl::string_view path,
+                              absl::string_view expected_context) {
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", std::string(path)},
+                                                   {":scheme", "http"},
+                                                   {":authority", std::string(authority)},
+                                                   {"x-forwarded-for", "10.0.0.1"}};
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    waitForNextUpstreamRequest(0);
+
+    auto entry = upstream_request_->headers().get(Http::LowerCaseString("context"));
+    ASSERT_FALSE(entry.empty()) << "no context header found for " << path;
+    EXPECT_EQ(expected_context, entry[0]->value().getStringView()) << "path: " << path;
+
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  };
+
+  // No per route configuration at all: the filter-level context.
+  check_request("foo.lyft.com", "/lua/context/no-per-route", "from_filter");
+
+  // A per route configuration which selects a script but sets no context: still the filter-level
+  // one.
+  check_request("foo.lyft.com", "/lua/context/route-without-context", "from_filter");
+
+  // A per route context replaces the filter-level one.
+  check_request("foo.lyft.com", "/lua/context/route-with-context", "from_route");
+
+  // An explicitly empty per route context hides the filter-level one rather than falling back.
+  check_request("foo.lyft.com", "/lua/context/route-empty-context", "nil");
+
+  // A context on the virtual host applies to a route which has no configuration of its own.
+  check_request("bar.lyft.com", "/lua/context/vhost", "from_vhost");
+
+  // Only the most specific LuaPerRoute is consulted, so the route's shadows the virtual host's
+  // entirely: with no context of its own, the fallback is the filter-level one, not the virtual
+  // host's.
+  check_request("bar.lyft.com", "/lua/context/route-shadows-vhost", "from_filter");
+
+  cleanup();
+}
+
 TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata) {
   if (!testing_downstream_filter_) {
     GTEST_SKIP() << "Direct response only works with downstream filters";
@@ -1399,7 +1610,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
       Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(UPDATE_ROUTE_CONFIG)},
       "2");
-  test_server_->waitForCounterGe("http.config_test.rds.basic_lua_routes.update_success", 2);
+  test_server_->waitForCounter("http.config_test.rds.basic_lua_routes.update_success", Ge(2));
 
   check_request(hello_headers, "inline_code_from_hello");
   check_request(inline_headers, "new_inline_code_from_inline");
@@ -1664,7 +1875,7 @@ public:
 
     // Pack metadata into Any
     Protobuf::Any typed_config;
-    typed_config.PackFrom(metadata);
+    std::ignore = typed_config.PackFrom(metadata);
     typed_filter_metadata.insert({metadata_key, typed_config});
 
     return Network::FilterStatus::Continue;
@@ -1691,11 +1902,13 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::Any>();
+    return std::make_unique<test::extensions::filters::http::lua::TestTypedMetadataFilterConfig>();
   }
 
   std::string name() const override { return "envoy.test.typed_metadata"; }
-  std::set<std::string> configTypes() override { return {}; };
+  std::set<std::string> configTypes() override {
+    return {"test.extensions.filters.http.lua.TestTypedMetadataFilterConfig"};
+  }
 };
 
 // ``PPV2`` typed metadata filter that mimics the real proxy protocol behavior
@@ -1740,7 +1953,7 @@ public:
 
     // Pack metadata into Any
     Protobuf::Any typed_config;
-    typed_config.PackFrom(metadata);
+    std::ignore = typed_config.PackFrom(metadata);
     typed_filter_metadata.insert({metadata_key, typed_config});
 
     return Network::FilterStatus::Continue;
@@ -1767,11 +1980,13 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::Any>();
+    return std::make_unique<test::extensions::filters::http::lua::PPV2TypedMetadataFilterConfig>();
   }
 
   std::string name() const override { return "envoy.test.ppv2.typed_metadata"; }
-  std::set<std::string> configTypes() override { return {}; };
+  std::set<std::string> configTypes() override {
+    return {"test.extensions.filters.http.lua.PPV2TypedMetadataFilterConfig"};
+  }
 };
 
 TEST_P(LuaIntegrationTest, ConnectionTypedMetadata) {
@@ -1783,7 +1998,7 @@ TEST_P(LuaIntegrationTest, ConnectionTypedMetadata) {
   const std::string FILTER_CONFIG = R"EOF(
 name: envoy.test.typed_metadata
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Any
+  "@type": type.googleapis.com/test.extensions.filters.http.lua.TestTypedMetadataFilterConfig
 )EOF";
 
   config_helper_.addNetworkFilter(FILTER_CONFIG);
@@ -1898,7 +2113,7 @@ TEST_P(LuaIntegrationTest, ProxyProtocolTypedMetadata) {
   const std::string FILTER_CONFIG = R"EOF(
 name: envoy.test.ppv2.typed_metadata
 typed_config:
-  "@type": type.googleapis.com/google.protobuf.Any
+  "@type": type.googleapis.com/test.extensions.filters.http.lua.PPV2TypedMetadataFilterConfig
 )EOF";
 
   config_helper_.addNetworkFilter(FILTER_CONFIG);
@@ -2260,6 +2475,53 @@ typed_config:
                        .get(Http::LowerCaseString("another_missing"))[0]
                        ->value()
                        .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test ``filterState():set()`` functionality to set filter state from Lua.
+TEST_P(LuaIntegrationTest, FilterStateSet) {
+  const std::string FILTER_AND_CODE = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local stream_info = request_handle:streamInfo()
+
+        -- Set a filter state value using the factory.
+        stream_info:filterState():set("my_key", "lua.test.string", "my_value")
+
+        -- Read back the filter state value.
+        local result = stream_info:filterState():get("my_key")
+        if result then
+          request_handle:headers():add("filter_state_result", result)
+        else
+          request_handle:headers():add("filter_state_result", "not_found")
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify the filter state was set and read back successfully.
+  EXPECT_EQ("my_value", upstream_request_->headers()
+                            .get(Http::LowerCaseString("filter_state_result"))[0]
+                            ->value()
+                            .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -2653,14 +2915,84 @@ typed_config:
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  test_server_->waitForCounterEq("http.config_test.lua.config1.executions", 2);
-  test_server_->waitForCounterEq("http.config_test.lua.config1.errors", 0);
-  test_server_->waitForCounterEq("http.config_test.lua.config2.executions", 2);
-  test_server_->waitForCounterEq("http.config_test.lua.config2.errors", 0);
-  test_server_->waitForCounterEq("http.config_test.lua.config3.executions", 1);
-  test_server_->waitForCounterEq("http.config_test.lua.config3.errors", 1);
-  test_server_->waitForCounterEq("http.config_test.lua.config4.executions", 0);
-  test_server_->waitForCounterEq("http.config_test.lua.config4.errors", 0);
+  test_server_->waitForCounter("http.config_test.lua.config1.executions", Eq(2));
+  test_server_->waitForCounter("http.config_test.lua.config1.errors", Eq(0));
+  test_server_->waitForCounter("http.config_test.lua.config2.executions", Eq(2));
+  test_server_->waitForCounter("http.config_test.lua.config2.errors", Eq(0));
+  test_server_->waitForCounter("http.config_test.lua.config3.executions", Eq(1));
+  test_server_->waitForCounter("http.config_test.lua.config3.errors", Eq(1));
+  test_server_->waitForCounter("http.config_test.lua.config4.executions", Eq(0));
+  test_server_->waitForCounter("http.config_test.lua.config4.errors", Eq(0));
+
+  cleanup();
+}
+
+// Test the stats() API for creating counters, gauges, and histograms from Lua.
+TEST_P(LuaIntegrationTest, StatsApi) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "Stats API test only runs for downstream filter";
+  }
+
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  stat_prefix: stats_test
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local stats = request_handle:stats()
+
+        -- Create and increment a counter.
+        local counter = stats:counter("requests")
+        counter:inc()
+        counter:add(2)
+
+        -- Create and set a gauge.
+        local gauge = stats:gauge("active_requests")
+        gauge:set(10)
+        gauge:inc()
+        gauge:dec()
+
+        -- Create and record histogram values.
+        local histogram = stats:histogram("request_latency", "ms")
+        histogram:recordValue(50)
+        histogram:recordValue(100)
+      end
+
+      function envoy_on_response(response_handle)
+        local stats = response_handle:stats()
+
+        -- Increment the same counter (should accumulate).
+        local counter = stats:counter("requests")
+        counter:inc()
+
+        -- Update the gauge.
+        local gauge = stats:gauge("active_requests")
+        gauge:sub(5)
+      end
+)EOF";
+
+  initializeFilter(filter_config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the counter was incremented correctly (inc + add(2) + inc = 4).
+  test_server_->waitForCounter("http.config_test.lua.stats_test.requests", Eq(4));
+
+  // Verify the gauge value (set(10) + inc - dec - sub(5) = 5).
+  test_server_->waitForGauge("http.config_test.lua.stats_test.active_requests", Eq(5));
+
+  // Verify histogram exists (we can't easily check recorded values in integration tests,
+  // but we can verify the histogram was created by checking it appears in stats).
+  test_server_->waitForCounter("http.config_test.lua.stats_test.executions", Eq(2));
+  test_server_->waitForCounter("http.config_test.lua.stats_test.errors", Eq(0));
 
   cleanup();
 }

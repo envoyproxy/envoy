@@ -1,17 +1,15 @@
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
 
 #include "test/common/http/common.h"
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -36,8 +34,7 @@ public:
 
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
-                                 const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 RouteStatsContextOptRef,
+                                 const Upstream::ClusterInfo&,
                                  Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -53,6 +50,38 @@ public:
   MockRetryState* retry_state_{};
 };
 
+// An upstream HTTP filter that tracks its own lifecycle. It is used to detect the router
+// driving decode callbacks on a filter that has already been destroyed.
+class LifecycleTrackingFilter : public Http::StreamDecoderFilter {
+public:
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    ++decode_headers_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    ++decode_data_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    ++decode_trailers_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterTrailersStatus::Continue;
+  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
+  void onDestroy() override { destroyed_ = true; }
+
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  bool destroyed_{false};
+  int decode_headers_{0};
+  int decode_data_{0};
+  int decode_trailers_{0};
+};
+
 class RouterUpstreamFilterTest : public testing::Test {
 public:
   void init(std::vector<HttpFilter> upstream_filters) {
@@ -62,7 +91,7 @@ public:
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
-    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
+    callbacks_.stream_info_.upstream_cluster_info_ = cluster_info_;
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
     for (const auto& filter : upstream_filters) {
       *router_proto.add_upstream_http_filters() = filter;
@@ -130,7 +159,7 @@ public:
 
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                     .host_->outlier_detector_,
-                putResult(_, absl::optional<uint64_t>(200)));
+                putResult(_, std::optional<uint64_t>(200)));
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), true);
     return headers;
@@ -154,16 +183,127 @@ public:
 };
 
 TEST_F(RouterUpstreamFilterTest, UpstreamFilter) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
-
   HttpFilter add_header_filter;
   add_header_filter.set_name("add-header-filter");
+  test::integration::filters::AddHeaderEmptyFilterConfig add_header_config;
+  std::ignore = add_header_filter.mutable_typed_config()->PackFrom(add_header_config);
+
   HttpFilter codec_filter;
   codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
   init({add_header_filter, codec_filter});
   auto headers = run();
   EXPECT_FALSE(headers.get(Http::LowerCaseString("x-header-to-add")).empty());
+}
+
+// Regression test for decode-after-destroy of the upstream HTTP filter chain.
+//
+// A circuit breaker overflow surfacing synchronously inside
+// ConnPoolImplBase::newStream() (pending requests overflow, connection limit
+// load shedding, or max requests overflow when a ready client exists) resets
+// the upstream request and deferred-deletes it before newStream() returns.
+// Deferred deletion runs UpstreamRequest::deleteIsPending() -> cleanUp() ->
+// destroyFilters() synchronously, so every upstream HTTP filter has already
+// seen onDestroy() when UpstreamRequest::acceptHeadersFromRouter() resumes and
+// drives decodeHeaders() on the destroyed filter chain. Native C++ filters
+// tolerate decode-after-destroy; the dynamic modules HTTP filter does not: it
+// releases its in-module filter in onDestroy() and dereferences stale state
+// when decode headers run afterwards. acceptHeadersFromRouter() must not
+// continue filter chain processing when the request was reset inside
+// newStream().
+TEST_F(RouterUpstreamFilterTest, SyncPoolFailureDoesNotDecodeAfterDestroy) {
+  auto filter = std::make_shared<LifecycleTrackingFilter>();
+
+  HttpFilter codec_filter;
+  codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+  init({codec_filter});
+
+  // The upstream request resolves the cluster through the thread-local cluster, so point its
+  // cluster info at our instrumented mock.
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, info())
+      .WillByDefault(Return(cluster_info_));
+
+  // Install the tracking filter ahead of the codec filter via the cluster's filter chain
+  // factory, which takes precedence over the router-specified chain.
+  EXPECT_CALL(*cluster_info_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(filter);
+        // Fall through to the router-specified chain, which provides the codec filter.
+        return false;
+      }));
+
+  // Fail the pool synchronously inside newStream(), the way pending requests circuit
+  // breaker overflow does in ConnPoolImplBase::newStreamImpl().
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+              newStream(_, _, _))
+      .WillOnce(Invoke([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                           const Http::ConnectionPool::Instance::StreamOptions&)
+                           -> Http::ConnectionPool::Cancellable* {
+        callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::Overflow,
+                                "max pending streams overflow",
+                                context_.server_factory_context_.cluster_manager_
+                                    .thread_local_cluster_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  // The request should shed cleanly with a 503.
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // The synchronous overflow reset the upstream request, which ran cleanUp() and
+  // onDestroy() on the upstream HTTP filters before newStream() returned.
+  EXPECT_TRUE(filter->destroyed_);
+  // The destroyed filter chain must not be driven any further.
+  EXPECT_EQ(0, filter->decode_headers_);
+  EXPECT_EQ(0, filter->decode_data_);
+  EXPECT_EQ(0, filter->decode_trailers_);
+}
+
+// Regression test for a use-after-free at teardown. A dynamic (ECDS) upstream HTTP filter causes
+// FilterConfig to create a Filter::FilterConfigSubscription, which holds a raw reference to the
+// filter config provider manager and dereferences it from its destructor. That manager is an
+// *unpinned* singleton, so it survives only as long as something holds a strong reference to it:
+// FilterConfig must be that holder for the providers it owns.
+TEST_F(RouterUpstreamFilterTest, DynamicFilterKeepsConfigProviderManagerAlive) {
+  HttpFilter dynamic_filter;
+  dynamic_filter.set_name("dynamic-filter");
+  auto* config_discovery = dynamic_filter.mutable_config_discovery();
+  config_discovery->mutable_config_source()->mutable_ads();
+  config_discovery->add_type_urls(
+      "type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig");
+
+  HttpFilter codec_filter;
+  codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+  init({dynamic_filter, codec_filter});
+  ASSERT_NE(nullptr, config_);
+
+  // Looking the singleton up again returns the live instance if one exists and creates a fresh one
+  // otherwise. Binding it to a weak_ptr and letting the returned strong reference expire at the end
+  // of the statement therefore reports whether `config_` is keeping the manager alive: without that
+  // reference, the manager created during init() is already gone and every subscription it owns is
+  // left holding a dangling reference.
+  std::weak_ptr<Http::UpstreamFilterConfigProviderManager> manager =
+      Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+          context_.server_factory_context_);
+  EXPECT_FALSE(manager.expired());
+
+  // Destroying the router config destroys the providers and their subscription, which writes
+  // through that reference. The manager must still be alive at that point (this is where ASAN
+  // reports the use-after-free without the fix) and may be released only afterwards.
+  router_.reset();
+  config_.reset();
+  EXPECT_TRUE(manager.expired());
 }
 } // namespace
 } // namespace Router

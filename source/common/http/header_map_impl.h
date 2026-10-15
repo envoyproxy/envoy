@@ -174,13 +174,13 @@ protected:
       return ConstSingleton<StaticLookupTable>::get().size_;
     }
 
-    static absl::optional<StaticLookupResponse> lookup(HeaderMapImpl& header_map,
-                                                       absl::string_view key) {
+    static std::optional<StaticLookupResponse> lookup(HeaderMapImpl& header_map,
+                                                      absl::string_view key) {
       const auto& entry = ConstSingleton<StaticLookupTable>::get().find(key);
       if (entry != nullptr) {
         return entry(header_map);
       } else {
-        return absl::nullopt;
+        return std::nullopt;
       }
     }
 
@@ -245,23 +245,19 @@ protected:
         for (auto map_it = lazy_map_.begin(); map_it != lazy_map_.end();) {
           auto& values_vec = map_it->second;
           ASSERT(!values_vec.empty());
-          // The following call to std::remove_if removes the elements that satisfy the
-          // UnaryPredicate and shifts the vector elements, but does not resize the vector.
-          // The call to erase that follows erases the unneeded cells (from remove_pos to the
-          // end) and modifies the vector's size.
-          const auto remove_pos =
-              std::remove_if(values_vec.begin(), values_vec.end(), [&](HeaderNode it) {
-                if (p(*(it->entry_))) {
-                  // Remove the element from the list.
-                  if (pseudo_headers_end_ == it->entry_) {
-                    pseudo_headers_end_++;
-                  }
-                  headers_.erase(it);
-                  return true;
-                }
-                return false;
-              });
-          values_vec.erase(remove_pos, values_vec.end());
+          // The following call to absl::erase_if removes the elements that satisfy the
+          // UnaryPredicate and resizes the vector.
+          absl::erase_if(values_vec, [&](HeaderNode it) {
+            if (p(*(it->entry_))) {
+              // Remove the element from the list.
+              if (pseudo_headers_end_ == it->entry_) {
+                pseudo_headers_end_++;
+              }
+              headers_.erase(it);
+              return true;
+            }
+            return false;
+          });
 
           // If all elements were removed from the map entry, erase it.
           if (values_vec.empty()) {
@@ -335,7 +331,7 @@ protected:
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
   void subtractSize(uint64_t size);
-  virtual absl::optional<StaticLookupResponse> staticLookup(absl::string_view) PURE;
+  virtual std::optional<StaticLookupResponse> staticLookup(absl::string_view) PURE;
   virtual void clearInline() PURE;
   virtual HeaderEntryImpl** inlineHeaders() PURE;
 
@@ -472,7 +468,7 @@ public:
   }
 
 protected:
-  absl::optional<StaticLookupResponse> staticLookup(absl::string_view key) override {
+  std::optional<StaticLookupResponse> staticLookup(absl::string_view key) override {
     return StaticLookupTable<Interface>::lookup(*this, key);
   }
   virtual const HeaderEntryImpl* const* constInlineHeaders() const PURE;

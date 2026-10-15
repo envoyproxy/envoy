@@ -50,7 +50,7 @@ public:
 
   absl::StatusOr<std::shared_ptr<CacheSessions>>
   get(std::shared_ptr<CacheSingleton> singleton, const ConfigProto& non_normalized_config,
-      Server::Configuration::FactoryContext& context) {
+      Server::Configuration::ServerFactoryContext& context) {
     std::shared_ptr<CacheSessions> cache;
     ConfigProto config = normalizeConfig(non_normalized_config);
     auto key = config.cache_path();
@@ -104,17 +104,15 @@ public:
   // From HttpCacheFactory
   absl::StatusOr<std::shared_ptr<CacheSessions>>
   getCache(const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& filter_config,
-           Server::Configuration::FactoryContext& context) override {
+           Server::Configuration::ServerFactoryContext& context) override {
     ConfigProto config;
     RETURN_IF_NOT_OK(MessageUtil::unpackTo(filter_config.typed_config(), config));
-    std::shared_ptr<CacheSingleton> caches =
-        context.serverFactoryContext().singletonManager().getTyped<CacheSingleton>(
-            SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_v2_singleton), [&context] {
-              return std::make_shared<CacheSingleton>(
-                  Common::AsyncFiles::AsyncFileManagerFactory::singleton(
-                      &context.serverFactoryContext().singletonManager()),
-                  context.serverFactoryContext().api().threadFactory());
-            });
+    std::shared_ptr<CacheSingleton> caches = context.singletonManager().getTyped<CacheSingleton>(
+        SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_v2_singleton), [&context] {
+          return std::make_shared<CacheSingleton>(
+              Common::AsyncFiles::AsyncFileManagerFactory::singleton(&context.singletonManager()),
+              context.api().threadFactory());
+        });
     return caches->get(caches, config, context);
   }
 };

@@ -13,17 +13,21 @@ namespace Formatter {
 class TestFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string> format(const Context& context,
-                                     const StreamInfo::StreamInfo& stream_info) const override;
-
+  std::optional<std::string> format(const Context& context,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class TestCommandParser : public CommandParser {
 public:
-  FormatterProviderPtr parse(absl::string_view command, absl::string_view subcommand,
-                             absl::optional<size_t> max_length) const override;
+  absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
+                                             absl::string_view subcommand,
+                                             std::optional<size_t> max_length) const override;
 };
 
 class TestCommandFactory : public CommandParserFactory {
@@ -39,17 +43,21 @@ public:
 class AdditionalFormatter : public FormatterProvider {
 public:
   // FormatterProvider
-  absl::optional<std::string> format(const Context& context,
-                                     const StreamInfo::StreamInfo& stream_info) const override;
-
+  std::optional<std::string> format(const Context& context,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(ValueSink& sink, const Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class AdditionalCommandParser : public CommandParser {
 public:
-  FormatterProviderPtr parse(absl::string_view command, absl::string_view subcommand,
-                             absl::optional<size_t> max_length) const override;
+  absl::StatusOr<FormatterProviderPtr> parse(absl::string_view command,
+                                             absl::string_view subcommand,
+                                             std::optional<size_t> max_length) const override;
 };
 
 class AdditionalCommandFactory : public CommandParserFactory {

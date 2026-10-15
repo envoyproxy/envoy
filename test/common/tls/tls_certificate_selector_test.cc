@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -26,31 +27,28 @@
 
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/init/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/ssl/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Ref;
 using testing::ReturnRef;
 using testing::WithArg;
@@ -260,8 +258,10 @@ protected:
     const std::string server_ctx_yaml = upstream ? ctx_yaml : absl::StrCat(ctx_yaml, selector_yaml);
     const std::string client_ctx_yaml = upstream ? absl::StrCat(ctx_yaml, selector_yaml) : ctx_yaml;
 
+    NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Event::SimulatedTimeSystem time_system;
-    Stats::TestUtil::TestStore server_stats_store;
+    Stats::TestUtil::TestStore server_stats_store(
+        server_factory_context.serverScope().symbolTable());
     Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
     NiceMock<Runtime::MockLoader> runtime;
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
@@ -289,7 +289,6 @@ protected:
     Event::DispatcherPtr dispatcher = server_api->allocateDispatcher("test_thread");
     provider_factory_.mod_ = mod;
 
-    NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
     Tls::ContextManagerImpl manager(server_factory_context);
     auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
         std::move(server_cfg), manager, *server_stats_store.rootScope());
@@ -306,7 +305,8 @@ protected:
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
 
-    Stats::TestUtil::TestStore client_stats_store;
+    Stats::TestUtil::TestStore client_stats_store(
+        server_factory_context.serverScope().symbolTable());
     Api::ApiPtr client_api = Api::createApiForTest(client_stats_store, time_system);
     testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
         client_factory_context;
@@ -423,7 +423,7 @@ TEST(TlsCertificateSelectorFactoryQuicTest, QUICFactory) {
   auto server_cfg = ServerContextConfigImpl::create(server_tls_context,
                                                     transport_socket_factory_context, {}, true);
 
-  EXPECT_FALSE(server_cfg.ok());
+  EXPECT_THAT(server_cfg, Not(IsOk()));
 }
 
 } // namespace

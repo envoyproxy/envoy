@@ -201,7 +201,7 @@ public:
 
 private:
   const DownstreamTransportSocketFactoryPtr transport_socket_factory_;
-  const NetworkFilterFactoriesList empty_network_filter_factory_{};
+  const NetworkFilterFactoriesList empty_network_filter_factory_;
   const FilterChainInfoSharedPtr filter_chain_info_;
 };
 

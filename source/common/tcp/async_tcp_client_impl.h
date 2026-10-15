@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <optional>
 #include <string>
 
 #include "envoy/common/optref.h"
@@ -16,7 +17,6 @@
 #include "source/common/network/filter_impl.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -63,7 +63,7 @@ public:
     if (connection_) {
       return connection_->streamInfo();
     } else {
-      return absl::nullopt;
+      return std::nullopt;
     }
   }
 

@@ -34,7 +34,10 @@ namespace Tls {
 using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
 struct SpiffeData {
-  absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>> trust_bundle_stores_;
+  // Mapping for "peer trust domain" -> "local trust domain" -> certificate.
+  absl::flat_hash_map<std::string,
+                      absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>>>
+      trust_bundle_stores_;
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
 };
 
@@ -65,12 +68,12 @@ public:
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
-  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_name_; }
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const override;
 
   // Utility functions
-  X509_STORE* getTrustBundleStore(X509* leaf_cert);
+  X509_STORE* getTrustBundleStore(X509* leaf_cert, absl::string_view workload_trust_domain);
   static std::string extractTrustDomain(const std::string& san);
   static bool certificatePrecheck(X509* leaf_cert);
   OptRef<SpiffeData> getSpiffeData() const {
@@ -84,15 +87,19 @@ public:
 private:
   bool verifyCertChainUsingTrustBundleStore(X509& leaf_cert, STACK_OF(X509)* cert_chain,
                                             X509_VERIFY_PARAM* verify_param,
-                                            std::string& error_details);
+                                            absl::string_view workload_trust_domain,
+                                            absl::Span<const std::string> verify_san_list,
+                                            std::string& error_details,
+                                            std::vector<bssl::UniquePtr<X509>>& validated_chain);
 
   void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);
 
   bool allow_expired_certificate_{false};
+  bool suppress_client_ca_list_{false};
 
   std::string ca_file_name_;
   std::shared_ptr<SpiffeData> spiffe_data_;
-  std::vector<SanMatcherPtr> subject_alt_name_matchers_{};
+  std::vector<SanMatcherPtr> subject_alt_name_matchers_;
   SslStats& stats_;
   TimeSource& time_source_;
   using SpiffeTrustBundles = Config::DataSource::ProviderSingleton<SpiffeData>;

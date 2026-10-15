@@ -17,6 +17,8 @@
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -32,7 +34,8 @@ const int UpstreamIndex2 = 2;
 #define ALL_TEST_XDS_TRACKER_STATS(COUNTER)                                                        \
   COUNTER(on_config_accepted)                                                                      \
   COUNTER(on_config_rejected)                                                                      \
-  COUNTER(on_config_metadata_read)
+  COUNTER(on_config_metadata_read)                                                                 \
+  COUNTER(on_resource_unsubscribed)
 
 /**
  * Struct definition for stats. @see stats_macros.h
@@ -98,6 +101,10 @@ public:
     stats_.on_config_rejected_.inc();
   }
 
+  void onResourceUnsubscribed(const absl::string_view, absl::string_view) override {
+    stats_.on_resource_unsubscribed_.inc();
+  }
+
 private:
   TestXdsTrackerStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return {ALL_TEST_XDS_TRACKER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
@@ -144,7 +151,7 @@ public:
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* tracer_extension = bootstrap.mutable_xds_config_tracker_extension();
       tracer_extension->set_name("envoy.config.xds.test_xds_tracer");
-      tracer_extension->mutable_typed_config()->PackFrom(
+      std::ignore = tracer_extension->mutable_typed_config()->PackFrom(
           test::envoy::config::xds::TestXdsConfigTracker());
     });
   }
@@ -203,11 +210,11 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1");
 
   // 3 because the statically specified CDS server itself counts as a cluster.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // onConfigAccepted is called when all the resources are accepted.
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_read", 0);
+  test_server_->waitForCounter("test_xds_tracker.on_config_accepted", Eq(1));
+  test_server_->waitForCounter("test_xds_tracker.on_config_metadata_read", Eq(0));
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
@@ -222,17 +229,17 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
   // Add a typed metadata to the Resource wrapper.
   test::envoy::config::xds::TestTrackerMetadata test_metadata;
   Protobuf::Any packed_value;
-  packed_value.PackFrom(test_metadata);
+  std::ignore = packed_value.PackFrom(test_metadata);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1",
       {{kTestKey, packed_value}});
 
   // 3 because the statically specified CDS server itself counts as a cluster.
-  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+  test_server_->waitForGauge("cluster_manager.active_clusters", Ge(3));
 
   // onConfigAccepted is called when all the resources are accepted.
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_metadata_read", 2);
+  test_server_->waitForCounter("test_xds_tracker.on_config_accepted", Eq(1));
+  test_server_->waitForCounter("test_xds_tracker.on_config_metadata_read", Eq(2));
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
@@ -259,7 +266,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
       Config::TestTypeUrl::get().Cluster, {route_config}, {route_config}, {}, "3");
 
   // Resources are rejected because Message's TypeUrl != Resource's
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
+  test_server_->waitForCounter("test_xds_tracker.on_config_rejected", Eq(1));
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
 }
 
@@ -279,17 +286,93 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerPartialUpdate) {
   // For SotW, both clusters are accepted, but the internal exception is not empty.
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
-    test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Ge(1));
   } else {
-    test_server_->waitForCounterGe("cluster_manager.cluster_added", 3);
+    test_server_->waitForCounter("cluster_manager.cluster_added", Ge(3));
   }
 
   // onConfigRejected is called if there is any exception even some resources are accepted.
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
+  test_server_->waitForCounter("test_xds_tracker.on_config_rejected", Eq(1));
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
 
   // onConfigAccepted is called only when all the resources in a response are successfully ingested.
   EXPECT_EQ(0, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
+}
+
+TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerUnsubscription) {
+  // Add ADS config to support EDS clusters using ADS, and make CDS use ADS.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto api_type = bootstrap.dynamic_resources().cds_config().api_config_source().api_type();
+
+    // Make CDS use ADS.
+    bootstrap.mutable_dynamic_resources()->mutable_cds_config()->mutable_ads();
+
+    // Set up ADS config.
+    auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_api_type(api_type);
+    auto* grpc_service = ads_config->add_grpc_services();
+    grpc_service->mutable_envoy_grpc()->set_cluster_name("my_cds_cluster");
+  });
+
+  TestXdsConfigTrackerFactory factory;
+  Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
+
+  initialize();
+
+  // 1. Initial CDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+
+  // 2. Send CDS response with an EDS cluster.
+  auto eds_cluster = ConfigHelper::buildCluster("eds_cluster");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                             {eds_cluster}, {eds_cluster}, {}, "1");
+
+  // Envoy should process CDS and then request EDS for "eds_cluster".
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
+                                      {"eds_cluster"}, {"eds_cluster"}, {}, true));
+
+  // 3. Send EDS response.
+  auto eds_assignment = ConfigHelper::buildClusterLoadAssignment(
+      "eds_cluster", Network::Test::getLoopbackAddressString(ipVersion()),
+      fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port());
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {eds_assignment}, {eds_assignment}, {},
+      "1");
+
+  // 4. Consume ACKs.
+  // Envoy should ACK CDS version 1.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}, true));
+  // Envoy should ACK EDS version 1.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
+                                      {"eds_cluster"}, {}, {}, true));
+
+  // 5. Remove the cluster by sending an empty CDS response (SotW) or a removal (Delta).
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {}, {}, {}, "2");
+
+    // Envoy should unsubscribe from EDS for "eds_cluster".
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1", {},
+                                        {}, {}, true));
+
+    // Consume CDS ACK version 2.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}, true));
+  } else {
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {}, {}, {"eds_cluster"}, "2");
+
+    // Envoy should unsubscribe from EDS for "eds_cluster".
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1", {},
+                                        {}, {"eds_cluster"}, true));
+
+    // Consume CDS ACK version 2.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}, true));
+  }
+
+  // 6. Verify tracker callback was called.
+  test_server_->waitForCounter("test_xds_tracker.on_resource_unsubscribed", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_resource_unsubscribed")->value());
 }
 
 } // namespace

@@ -38,7 +38,7 @@ struct OriginalIPDetectionResult {
   bool allow_trusted_address_checks;
   // If set, these parameters will be used to signal that detection failed and the request should
   // be rejected.
-  absl::optional<OriginalIPRejectRequestOptions> reject_options;
+  std::optional<OriginalIPRejectRequestOptions> reject_options;
   // Whether to skip appending the detected remote address to ``x-forwarded-for``.
   bool skip_xff_append;
 };

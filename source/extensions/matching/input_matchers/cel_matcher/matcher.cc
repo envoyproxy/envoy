@@ -9,8 +9,6 @@ namespace InputMatchers {
 namespace CelMatcher {
 
 using ::Envoy::Extensions::Matching::Http::CelInput::CelMatchData;
-using ::xds::type::v3::CelExpression;
-
 CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
                                  Filters::Common::Expr::BuilderInstanceSharedConstPtr builder)
     : compiled_expr_([&]() {

@@ -7,9 +7,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/compression/decompressor/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -168,8 +166,8 @@ decompressor_library:
   }
 
   void decompressionActive(const Http::HeaderMap& headers_before_filter, bool end_with_data,
-                           const absl::optional<std::string> expected_content_encoding,
-                           const absl::optional<std::string> expected_accept_encoding = "mock") {
+                           const std::optional<std::string> expected_content_encoding,
+                           const std::optional<std::string> expected_accept_encoding = "mock") {
     // Keep the decompressor to set expectations about it
     auto decompressor = std::make_unique<Compression::Decompressor::MockDecompressor>();
     auto* decompressor_ptr = decompressor.get();
@@ -219,7 +217,7 @@ request_direction_config:
     if (isRequestDirection()) {
       headers_before_filter.addCopy("accept-encoding", original_accept_encoding);
     }
-    decompressionActive(headers_before_filter, true /* end_with_data */, absl::nullopt,
+    decompressionActive(headers_before_filter, true /* end_with_data */, std::nullopt,
                         final_accept_encoding);
   }
 
@@ -239,14 +237,14 @@ TEST_P(DecompressorFilterTest, DecompressionActive) {
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                        {"content-length", "256"}};
   decompressionActive(headers_before_filter, true /* end_with_data */,
-                      absl::nullopt /* expected_content_encoding */);
+                      std::nullopt /* expected_content_encoding */);
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveEndWithTrailers) {
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                        {"content-length", "256"}};
   decompressionActive(headers_before_filter, false /* end_with_data */,
-                      absl::nullopt /* expected_content_encoding */);
+                      std::nullopt /* expected_content_encoding */);
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveContentEncodingSpacing) {
@@ -254,7 +252,7 @@ TEST_P(DecompressorFilterTest, DecompressionActiveContentEncodingSpacing) {
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", " mock "},
                                                        {"content-length", "256"}};
   decompressionActive(headers_before_filter, true /* end_with_data */,
-                      absl::nullopt /* expected_content_encoding */);
+                      std::nullopt /* expected_content_encoding */);
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveContentEncodingCasing) {
@@ -262,7 +260,7 @@ TEST_P(DecompressorFilterTest, DecompressionActiveContentEncodingCasing) {
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "MOCK"},
                                                        {"content-length", "256"}};
   decompressionActive(headers_before_filter, true /* end_with_data */,
-                      absl::nullopt /* expected_content_encoding */);
+                      std::nullopt /* expected_content_encoding */);
 }
 
 TEST_P(DecompressorFilterTest, DecompressionActiveMultipleEncodings) {
@@ -293,8 +291,8 @@ request_direction_config:
   Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
                                                        {"content-length", "256"}};
   decompressionActive(headers_before_filter, true /* end_with_data */,
-                      absl::nullopt /* expected_content_encoding*/,
-                      absl::nullopt /* expected_accept_encoding */);
+                      std::nullopt /* expected_content_encoding*/,
+                      std::nullopt /* expected_accept_encoding */);
 }
 
 TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncoding) {
@@ -313,7 +311,7 @@ request_direction_config:
     headers_before_filter.addCopy("accept-encoding", "br");
   }
   decompressionActive(headers_before_filter, true /* end_with_data */,
-                      absl::nullopt /* expected_content_encoding*/,
+                      std::nullopt /* expected_content_encoding*/,
                       "br,mock" /* expected_accept_encoding */);
 }
 
@@ -384,7 +382,7 @@ request_direction_config:
     expectNoDecompression();
   } else {
     decompressionActive(headers_before_filter, true /* end_with_data */,
-                        absl::nullopt /* expected_content_encoding*/,
+                        std::nullopt /* expected_content_encoding*/,
                         "mock" /* expected_accept_encoding */);
   }
 }
@@ -408,8 +406,8 @@ response_direction_config:
     // Accept-Encoding is not advertised in the request headers when response decompression is
     // disabled.
     decompressionActive(headers_before_filter, true /* end_with_data */,
-                        absl::nullopt /* expected_content_encoding*/,
-                        absl::nullopt /* expected_accept_encoding */);
+                        std::nullopt /* expected_content_encoding*/,
+                        std::nullopt /* expected_accept_encoding */);
   } else {
     EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
     std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
@@ -469,7 +467,7 @@ response_direction_config:
     expectNoDecompression();
   } else {
     decompressionActive(headers_before_filter, true /* end_with_data */,
-                        absl::nullopt /* expected_content_encoding*/,
+                        std::nullopt /* expected_content_encoding*/,
                         "mock" /* expected_accept_encoding */);
   }
 }

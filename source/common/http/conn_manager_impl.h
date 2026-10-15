@@ -15,6 +15,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
@@ -28,6 +29,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/router/scopes.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
@@ -46,6 +48,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
@@ -69,15 +72,21 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager& overload_manager, TimeSource& time_system,
-                        envoy::config::core::v3::TrafficDirection direction);
+                        envoy::config::core::v3::TrafficDirection direction,
+                        Server::Configuration::ServerFactoryContext& server_context);
   ~ConnectionManagerImpl() override;
 
-  static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
-  static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
-                                                            Stats::Scope& scope);
+  // The scope is expected to be one created by createStatsScope() below, which already carries the
+  // 'http.<stat_prefix>.' prefix, so no prefix is prepended to the stat names.
+  static ConnectionManagerStats generateStats(Stats::Scope& scope);
+  static ConnectionManagerTracingStats generateTracingStats(Stats::Scope& scope);
   static void chargeTracingStats(const Tracing::Reason& tracing_reason,
                                  ConnectionManagerTracingStats& tracing_stats);
-  static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
+  // Creates the 'http.<stat_prefix>.' scope in which an HTTP connection manager creates the stats.
+  static Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view stat_prefix);
+  // Creates the listener stats of an HTTP connection manager, which live in the specified
+  // listener's scope.
+  static ConnectionManagerListenerStats generateListenerStats(absl::string_view stat_prefix,
                                                               Stats::Scope& scope);
   static const ResponseHeaderMap& continueHeader();
 
@@ -118,6 +127,7 @@ public:
       codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
     }
   }
+  void onDrain(Network::ConnectionDrainEvent drain_event) override;
 
   TimeSource& timeSource() { return time_source_; }
 
@@ -190,7 +200,7 @@ private:
     StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
@@ -242,6 +252,12 @@ private:
     }
 
     // FilterManagerCallbacks
+    OptRef<WebTransportSession> webTransportSession() override {
+      if (response_encoder_ == nullptr) {
+        return {};
+      }
+      return response_encoder_->getStream().webTransportSession();
+    }
     void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
     void encode1xxHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -298,7 +314,8 @@ private:
     void resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
                      absl::string_view transport_failure_reason = "") override;
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
-    Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
+    OptRef<const Upstream::ClusterInfo> clusterInfo() override;
+    Upstream::ClusterInfoConstSharedPtr clusterInfoSharedPtr() override;
     Tracing::Span& activeSpan() override;
     void onResponseDataTooLarge() override;
     void onRequestDataTooLarge() override;
@@ -311,16 +328,19 @@ private:
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
-    Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    OptRef<const Router::Route> route(const Router::RouteCallback& cb) override;
+    Router::RouteConstSharedPtr routeSharedPtr(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
+    void refreshRouteConfigSnapshot() override;
     void refreshRouteCluster() override;
+    void recreateClusterInfo() override;
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
     void setVirtualHostRoute(Router::VirtualHostRoute route);
     // Set cached route. This method should never be called directly. This is only called in the
     // setRoute(), clearRouteCache(), and refreshCachedRoute() methods.
-    void setCachedRoute(absl::optional<Router::RouteConstSharedPtr>&& route);
+    void setCachedRoute(std::optional<Router::RouteConstSharedPtr>&& route);
     // Block the route cache and clear the snapped route config. By doing this the route cache will
     // not be updated. And if the route config is updated by the RDS, the snapped route config may
     // be freed before the stream is destroyed.
@@ -333,7 +353,7 @@ private:
       return route_cache_blocked_;
     }
 
-    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
+    std::optional<Router::ConfigConstSharedPtr> routeConfig();
     void traceRequest();
 
     // Updates the snapped_route_config_ (by reselecting scoped route configuration), if a scope is
@@ -507,7 +527,7 @@ private:
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     // This is used to track the route that has been cached in the request. And we will keep this
     // route alive until the request is finished.
-    absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    std::optional<Router::RouteConstSharedPtr> cached_route_;
     // This is used to track whether the route has been blocked. If the route is blocked, we can not
     // clear it or refresh it.
     bool route_cache_blocked_{false};
@@ -526,8 +546,8 @@ private:
     // the lifetime of the route config by itself easily, we could remove this hack.
     absl::InlinedVector<Router::RouteConstSharedPtr, 3> cleared_cached_routes_;
 
-    absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    absl::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
+    std::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
+    std::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
     Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;
@@ -549,7 +569,6 @@ private:
     RequestTrailerMapPtr deferred_request_trailers_;
     const Router::Decorator* route_decorator_{nullptr};
     const Router::RouteTracing* route_tracing_{nullptr};
-    const bool trace_refresh_after_route_refresh_{true};
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -578,8 +597,8 @@ private:
     HttpStreamIdProviderImpl(ActiveStream& parent) : parent_(parent) {}
 
     // StreamInfo::StreamIdProvider
-    absl::optional<absl::string_view> toStringView() const override;
-    absl::optional<uint64_t> toInteger() const override;
+    std::optional<absl::string_view> toStringView() const override;
+    std::optional<uint64_t> toInteger() const override;
 
     ActiveStream& parent_;
   };
@@ -603,19 +622,25 @@ private:
    */
   void doEndStream(ActiveStream& stream, bool check_for_deferred_close = true);
 
-  void resetAllStreams(absl::optional<StreamInfo::CoreResponseFlag> response_flag,
+  void resetAllStreams(std::optional<StreamInfo::CoreResponseFlag> response_flag,
                        absl::string_view details);
   void onIdleTimeout();
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
+  // Called when the drain sequence the connection was notified of (see onDrain()) is about to end
+  // and the connection has to be drained without waiting for a response to decide on.
+  void onProactiveDrainTimeout();
+  // Resets the upgraded and CONNECT streams of a drained connection. Unlike ordinary requests they
+  // are not expected to complete on their own before the end of the drain sequence.
+  void resetTunnelingStreams();
   Tracing::Tracer& tracer() { return *config_->tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
                             StreamInfo::CoreResponseFlag response_flag);
   void handleCodecError(absl::string_view error);
   void handleCodecOverloadError(absl::string_view error);
-  void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
-                         absl::optional<StreamInfo::CoreResponseFlag> response_flag,
+  void doConnectionClose(std::optional<Network::ConnectionCloseType> close_type,
+                         std::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
   void sendGoAwayAndClose(bool graceful = false);
 
@@ -632,15 +657,26 @@ private:
   bool shouldDeferRequestProxyingToNextIoCycle();
   void onDeferredRequestProcessing();
 
+  // Returns true if the connection should now be drain-closed.
+  bool shouldDrainClose(Network::DrainDirection scope);
+
   enum class DrainState { NotDraining, Draining, Closing };
 
   ConnectionManagerConfigSharedPtr config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
                                   // the config in the hot path.
+  // Route resolution histograms, created only when recordRouteResolutionStats is enabled so the
+  // default stat set is unchanged.
+  OptRef<Stats::Histogram> route_resolution_time_us_histogram_;
+  OptRef<Stats::Histogram> route_resolutions_histogram_;
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
   Stats::TimespanPtr conn_length_;
   const Network::DrainDecision& drain_close_;
+  // Set when the connection is notified of a drain sequence via onDrain(). Carries the drain start
+  // time and strategy so the drain-close decision can be computed at the connection level (see
+  // shouldDrainClose()). Only set when use_connection_event_drain_ is enabled.
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
   // An idle timer for the connection. This is only armed when there are no streams on the
@@ -650,6 +686,12 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
+  // Armed in onDrain() to fire at a random point near the end of the drain sequence, so that a
+  // connection that sent no response in the meantime is still drained before it is torn down.
+  Event::TimerPtr proactive_drain_timer_;
+  // Set once proactive_drain_timer_ has fired. From then on tunneling streams are reset as soon as
+  // the connection is closing, see resetTunnelingStreams().
+  bool proactive_drain_{false};
   // When set to true, add Connection:close response header to nudge downstream client to reconnect.
   bool soft_drain_http1_{false};
   Random::RandomGenerator& random_generator_;
@@ -663,6 +705,8 @@ private:
   Server::ThreadLocalOverloadState& overload_state_;
   Server::LoadShedPoint* accept_new_http_stream_{nullptr};
   Server::LoadShedPoint* hcm_ondata_creating_codec_{nullptr};
+  Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
+  Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
   // References into the overload manager thread local state map. Using these lets us avoid a
   // map lookup in the hot path of processing each request.
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
@@ -686,6 +730,14 @@ private:
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
   const envoy::config::core::v3::TrafficDirection direction_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+  // The drain type of the listener owning this connection, used to decide whether
+  // /healthcheck/fail should drain-close it.
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Latched when the connection manager is created so it is not re-read on every response. See
+  // shouldDrainClose().
+  const bool use_connection_event_drain_ = false;
 
   // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
   // protocols the stream is destroyed after both request and response are complete i.e. reach their
@@ -698,10 +750,6 @@ private:
   // request was incomplete at response completion, the stream is reset.
 
   const bool allow_upstream_half_close_{};
-  // Whether to call checkForDeferredClose() when zombie streams complete.
-  // This fixes a potential FD leak where connections with zombie streams in draining state
-  // would not be properly closed.
-  const bool close_connection_on_zombie_stream_complete_{};
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};

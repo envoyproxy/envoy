@@ -101,10 +101,11 @@ will be forwarded to.
 
 In addition to updating the route ``setRoute()`` and ``clearRouteCache()``, downstream HTTP filters could also refresh the
 cluster by invoking ``refreshRouteCluster()`` if the cluster specifier of route supports it. At this point only
-the :ref:`matcher based cluster specifier <config_http_cluster_specifier_matcher>` support the
+the :ref:`matcher based cluster specifier <config_http_cluster_specifier_matcher>` and the
+:ref:`dynamic modules cluster specifier <config_http_cluster_specifier_dynamic_modules>` support the
 ``refreshRouteCluster()`` callback.
 
-This callabck will not update the cached route but only refresh the target cluster name. This is
+This callback will not update the cached route but only refresh the cluster selection. This is
 suggested to replace ``clearRouteCache()`` if you only want to determine the target cluster based on
 the latest request attributes that have been updated by the filters and do not want to configure
 multiple similar routes at the route table.
@@ -114,17 +115,17 @@ Security Considerations
 
 .. attention::
 
-   **Route Cache Clearing and Authorization Bypass Risk**: When using per-route authorization filters
-   (such as :ref:`ExtAuthZ <config_http_filters_ext_authz>`, :ref:`RBAC <config_http_filters_rbac>`,
-   or :ref:`JWT <config_http_filters_jwt_authn>`), be aware that subsequent filters in the filter
-   chain may clear the route cache, potentially leading to privilege escalation vulnerabilities.
+   **Route cache clearing and route-dependent authorization**: Clearing the route cache can cause
+   Envoy to recompute route matching after earlier HTTP filters have already processed the request.
+   This can be security-sensitive when filters that make route-dependent authorization decisions
+   run before filters that mutate route-matching inputs.
 
-   **The Problem**: If a request initially matches **Route A** with certain authorization settings,
-   gets authorized, but then a subsequent filter clears the route cache causing the request
-   to match **Route B** with different authorization requirements, the request will bypass Route B's
-   authorization since the authorization filter has already executed.
+   Route matching may depend on request headers, dynamic metadata, filter state, the request path,
+   or other request attributes. If one of these inputs is modified by a later filter and that filter
+   clears the route cache, subsequent filters and the router may observe a different route than the
+   one seen by earlier filters.
 
-   **Filters That Can Clear Route Cache**:
+   Filters that may clear the route cache include:
 
    * :ref:`Lua filter <config_http_filters_lua>` - via ``clearRouteCache()`` method
    * :ref:`ext_proc filter <config_http_filters_ext_proc>` - when configured with ``CLEAR`` route cache action or when response contains ``clear_route_cache`` directive
@@ -134,12 +135,11 @@ Security Considerations
    * :ref:`IP tagging filter <config_http_filters_ip_tagging>` - when sanitizing headers
    * Custom filters that call ``clearRouteCache()`` on the decoder callbacks
 
-   **Mitigation Strategies**:
-
-   * Carefully review the order of filters in your HTTP filter chain when using per-route authorization filters.
-   * Avoid placing filters that clear route cache after authorization filters unless absolutely necessary.
-   * Consider using global authorization configuration at the HTTP connection manager level instead of per-route configs whenever possible.
-   * If route cache clearing is required after authorization, consider re-running authorization checks or using alternative authorization mechanisms.
+   Operators should carefully review HTTP filter ordering when using route-dependent authorization
+   filters such as :ref:`RBAC <config_http_filters_rbac>`, :ref:`ExtAuthZ <config_http_filters_ext_authz>`,
+   or :ref:`JWT <config_http_filters_jwt_authn>`. Avoid enabling route cache clearing for untrusted
+   mutation sources, and consider placing route-dependent authorization filters after filters that
+   mutate route-matching inputs when possible.
 
 .. _arch_overview_http_filters_per_filter_config:
 
@@ -150,14 +150,14 @@ The per filter config map can be used to provide
 :ref:`route <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
 :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
 :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.typed_per_filter_config>`
-specific config for http filters.
+specific config for HTTP filters.
 
 
 The key of the per filter config map should match the :ref:`filter config name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
 
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 
@@ -179,7 +179,48 @@ for if and how it is utilized for every filter.
 Route based filter chain
 ------------------------
 
-There is support for having different filter chains for different routes. There are two different modes for this:
+There is support for having different filter chains for different routes. There are currently two
+different ways to achieve this:
+
+* Configuring complete route level filter chains by using the
+  :ref:`filter chain filter <config_http_filters_filter_chain>`.
+* Simulating route level filter chains by disabling filters in the ``http_filters`` chain for
+  specific routes, or enabling filters that are disabled by default for specific routes.
+
+.. _arch_overview_http_filters_filter_chain_filter:
+
+Filter chain filter based route filter chain
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The :ref:`filter chain filter <config_http_filters_filter_chain>` is a general solution for route
+level filter chains. It inserts a placeholder entry in ``http_filters`` and then lets every route
+configure a complete filter chain of its own through the per filter config map.
+
+The filter chain filter:
+
+* does not require the filters used in the route level chain to provide any route level
+  configuration support — any HTTP filter can be used as is, and different routes can use
+  different configurations of the same filter naturally.
+* can compose global filters and route level filter chains easily: the route level chain runs
+  exactly where the ``filter_chain`` filter sits in the ``http_filters`` list, so global filters
+  before and after it keep their positions.
+* supports multiple route level chains by configuring multiple ``filter_chain`` filter entries in
+  ``http_filters``, for example one before the global authentication filter and another one after
+  it.
+* allows adding a new filter to the chain for a specific route by only updating the route
+  configuration, without touching ``http_filters`` and draining downstream connections.
+
+See the :ref:`filter chain filter <config_http_filters_filter_chain>` documentation for more
+details and example configurations.
+
+.. _arch_overview_http_filters_disabled_flag_based_filter_chain:
+
+Disabled flag based route filter chain
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before the filter chain filter was introduced, route based filter chains could be simulated by
+disabling or enabling filters in the ``http_filters`` chain for specific routes. This still works
+and is fine if it meets your requirements. There are two different modes for this:
 
 * Disabling a filter in the filter chain for specific routes.
 * Overriding a filter in the filter chain that is disabled by default and enabling it for specific
@@ -191,7 +232,7 @@ and setting the :ref:`disabled field <envoy_v3_api_field_config.route.v3.FilterC
 per filter config map in the route configuration. See the
 :ref:`Route specific config <arch_overview_http_filters_per_filter_config>` section for more details.
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 
@@ -215,7 +256,7 @@ In addition, we can set a filter to be disabled by default by setting the :ref:`
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`
 in the HttpFilter configuration and then enable it for specific routes if needed.
 
-For example, given following http filter config:
+For example, given following HTTP filter config:
 
 .. code-block:: yaml
 
@@ -240,3 +281,13 @@ for a specific route, we can set per filter config map in the route configuratio
 
 Legitimate route-specific configuration for filter (like the above ``lua`` filter) is valid way to
 enable the filter for the route.
+
+Note that this approach has the following limitations:
+
+* It requires the filters to support route level filter configuration to override the filter
+  configuration in ``http_filters``, or all routes will share the same configuration.
+* If we want to add a new filter to the chain for a specific route, we still need to update
+  ``http_filters`` and drain downstream connections.
+
+The :ref:`filter chain filter <config_http_filters_filter_chain>` has no such limitations and is
+the suggested way to configure route based filter chains.

@@ -1,19 +1,18 @@
+#include <optional>
+
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.h"
 #include "envoy/extensions/filters/network/geoip/v3/geoip.pb.validate.h"
 
 #include "source/extensions/filters/network/geoip/config.h"
 
-#include "test/extensions/filters/http/geoip/mocks.h"
+#include "test/mocks/geoip/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-// Import the shared geoip mocks from the HTTP filter tests.
-using Envoy::Extensions::HttpFilters::Geoip::DummyGeoipProviderFactory;
 
 namespace Envoy {
 namespace Extensions {
@@ -25,9 +24,9 @@ class GeoipConfigTest : public testing::Test {
 public:
   void initializeProviderFactory() { registration_.emplace(dummy_factory_); }
 
-  DummyGeoipProviderFactory dummy_factory_;
+  Geolocation::DummyGeoipProviderFactory dummy_factory_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  absl::optional<Registry::InjectFactory<Geolocation::GeoipProviderFactory>> registration_;
+  std::optional<Registry::InjectFactory<Geolocation::GeoipProviderFactory>> registration_;
 };
 
 TEST_F(GeoipConfigTest, CreateFilterFactory) {
@@ -36,7 +35,7 @@ TEST_F(GeoipConfigTest, CreateFilterFactory) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
 
   envoy::extensions::filters::network::geoip::v3::Geoip proto_config;
@@ -44,7 +43,7 @@ TEST_F(GeoipConfigTest, CreateFilterFactory) {
 
   GeoipFilterFactory factory;
   auto status_or_cb = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_TRUE(status_or_cb.ok());
+  ASSERT_OK(status_or_cb);
   Network::FilterFactoryCb cb = status_or_cb.value();
   EXPECT_NE(nullptr, cb);
 
@@ -66,7 +65,7 @@ TEST_F(GeoipConfigTest, FilterIsNotTerminal) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
 
   GeoipFilterFactory factory;
@@ -82,7 +81,7 @@ TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIp) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
     client_ip: "192.168.1.100"
 )EOF";
 
@@ -91,7 +90,7 @@ TEST_F(GeoipConfigTest, CreateFilterFactoryWithClientIp) {
 
   GeoipFilterFactory factory;
   auto status_or_cb = factory.createFilterFactoryFromProto(proto_config, context_);
-  ASSERT_TRUE(status_or_cb.ok());
+  ASSERT_OK(status_or_cb);
   Network::FilterFactoryCb cb = status_or_cb.value();
   EXPECT_NE(nullptr, cb);
 

@@ -99,13 +99,13 @@ bool Common::isConnectStreamingResponseHeaders(const Http::ResponseHeaderMap& he
   return hasConnectStreamingContentType(headers);
 }
 
-absl::optional<Status::GrpcStatus>
+std::optional<Status::GrpcStatus>
 Common::getGrpcStatus(const Http::ResponseHeaderOrTrailerMap& trailers, bool allow_user_defined) {
   const absl::string_view grpc_status_header = trailers.getGrpcStatusValue();
   uint64_t grpc_status_code;
 
   if (grpc_status_header.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (!absl::SimpleAtoi(grpc_status_header, &grpc_status_code) ||
       (grpc_status_code > Status::WellKnownGrpcStatus::MaximumKnown && !allow_user_defined)) {
@@ -114,10 +114,10 @@ Common::getGrpcStatus(const Http::ResponseHeaderOrTrailerMap& trailers, bool all
   return {static_cast<Status::GrpcStatus>(grpc_status_code)};
 }
 
-absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTrailerMap& trailers,
-                                                         const Http::ResponseHeaderMap& headers,
-                                                         const StreamInfo::StreamInfo& info,
-                                                         bool allow_user_defined) {
+std::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTrailerMap& trailers,
+                                                        const Http::ResponseHeaderMap& headers,
+                                                        const StreamInfo::StreamInfo& info,
+                                                        bool allow_user_defined) {
   // The gRPC specification does not guarantee a gRPC status code will be returned from a gRPC
   // request. When it is returned, it will be in the response trailers. With that said, Envoy will
   // treat a trailers-only response as a headers-only response, so we have to check the following
@@ -125,7 +125,7 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTra
   //   1. trailers gRPC status, if it exists.
   //   2. headers gRPC status, if it exists.
   //   3. Inferred from info HTTP status, if it exists.
-  absl::optional<Grpc::Status::GrpcStatus> optional_status;
+  std::optional<Grpc::Status::GrpcStatus> optional_status;
   optional_status = Grpc::Common::getGrpcStatus(trailers, allow_user_defined);
   if (optional_status.has_value()) {
     return optional_status;
@@ -134,9 +134,9 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::ResponseTra
   if (optional_status.has_value()) {
     return optional_status;
   }
-  return info.responseCode() ? absl::optional<Grpc::Status::GrpcStatus>(
+  return info.responseCode() ? std::optional<Grpc::Status::GrpcStatus>(
                                    Grpc::Utility::httpToGrpcStatus(info.responseCode().value()))
-                             : absl::nullopt;
+                             : std::nullopt;
 }
 
 std::string Common::getGrpcMessage(const Http::ResponseHeaderOrTrailerMap& trailers) {
@@ -144,23 +144,23 @@ std::string Common::getGrpcMessage(const Http::ResponseHeaderOrTrailerMap& trail
   return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
 }
 
-absl::optional<google::rpc::Status>
+std::optional<google::rpc::Status>
 Common::getGrpcStatusDetailsBin(const Http::HeaderMap& trailers) {
   const auto details_header = trailers.get(Http::Headers::get().GrpcStatusDetailsBin);
   if (details_header.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // Some implementations use non-padded base64 encoding for grpc-status-details-bin.
   // This is effectively a trusted header so using the first value is fine.
   auto decoded_value = Base64::decodeWithoutPadding(details_header[0]->value().getStringView());
   if (decoded_value.empty()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   google::rpc::Status status;
   if (!status.ParseFromString(decoded_value)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return {std::move(status)};
@@ -201,7 +201,7 @@ Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
   return body;
 }
 
-absl::optional<std::chrono::milliseconds>
+std::optional<std::chrono::milliseconds>
 Common::getGrpcTimeout(const Http::RequestHeaderMap& request_headers) {
   const Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   std::chrono::milliseconds timeout;
@@ -211,7 +211,7 @@ Common::getGrpcTimeout(const Http::RequestHeaderMap& request_headers) {
     if (timeout_entry.empty()) {
       // Must be of the form TimeoutValue TimeoutUnit. See
       // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests.
-      return absl::nullopt;
+      return std::nullopt;
     }
     // TimeoutValue must be a positive integer of at most 8 digits.
     if (absl::SimpleAtoi(timeout_entry.substr(0, timeout_entry.size() - 1), &grpc_timeout) &&
@@ -244,7 +244,7 @@ Common::getGrpcTimeout(const Http::RequestHeaderMap& request_headers) {
       }
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout,
@@ -270,7 +270,7 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout,
 Http::RequestMessagePtr
 Common::prepareHeaders(absl::string_view host_name, absl::string_view service_full_name,
                        absl::string_view method_name,
-                       const absl::optional<std::chrono::milliseconds>& timeout) {
+                       const std::optional<std::chrono::milliseconds>& timeout) {
   Http::RequestMessagePtr message(new Http::RequestMessageImpl());
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   message->headers().setPath(absl::StrCat("/", service_full_name, "/", method_name));
@@ -307,9 +307,8 @@ bool Common::parseBufferInstance(Buffer::InstancePtr&& buffer, Protobuf::Message
   return proto.ParseFromZeroCopyStream(&stream);
 }
 
-absl::optional<Common::RequestNames>
-Common::resolveServiceAndMethod(const Http::HeaderEntry* path) {
-  absl::optional<RequestNames> request_names;
+std::optional<Common::RequestNames> Common::resolveServiceAndMethod(const Http::HeaderEntry* path) {
+  std::optional<RequestNames> request_names;
   if (path == nullptr) {
     return request_names;
   }

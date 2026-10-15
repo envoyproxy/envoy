@@ -47,7 +47,7 @@ public class QuicTestServerTest {
 
     CountDownLatch latch = new CountDownLatch(1);
     engine = new AndroidEngineBuilder(appContext)
-                 .setLogLevel(LogLevel.TRACE)
+                 .setLogLevel(LogLevel.INFO)
                  .setLogger((level, message) -> {
                    System.out.print(message);
                    return null;

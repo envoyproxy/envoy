@@ -13,6 +13,7 @@
 
 using testing::_;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -135,6 +136,12 @@ TEST_F(LocalRateLimiterImplTest, TooFastFillRate) {
   EXPECT_THROW_WITH_MESSAGE(
       LocalRateLimiterImpl(std::chrono::milliseconds(49), 100, 1, dispatcher_, descriptors_),
       EnvoyException, "local rate limit token bucket fill timer must be >= 50ms");
+}
+
+// Verify that max_tokens=0 skips the 50ms fill interval validation since fill is irrelevant.
+TEST_F(LocalRateLimiterImplTest, ZeroMaxTokensSkipsFillIntervalCheck) {
+  VERBOSE_EXPECT_NO_THROW(
+      LocalRateLimiterImpl(std::chrono::milliseconds(10), 0, 1, dispatcher_, descriptors_));
 }
 
 class LocalRateLimiterDescriptorImplTest : public LocalRateLimiterImplTest {
@@ -323,6 +330,51 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitSmallFillInterval)
   EXPECT_THROW_WITH_MESSAGE(
       LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_),
       EnvoyException, "local rate limit descriptor token bucket fill timer must be >= 50ms");
+}
+
+// Verify that max_tokens=0 always rejects for both default and per-descriptor token buckets.
+TEST_F(LocalRateLimiterDescriptorImplTest, AlwaysRejectWithZeroMaxTokens) {
+  // Default bucket: max_tokens=0 always rejects regardless of time advancing.
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 0, 1);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // Per-descriptor bucket: max_tokens=0 always rejects regardless of time advancing.
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 0, 1, "0.1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
+}
+
+// Verify that a descriptor with max_tokens=0 skips the 50ms fill interval validation.
+TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorZeroMaxTokensSkipsFillIntervalCheck) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 0, 1, "0.010s"),
+                            *descriptors_.Add());
+  VERBOSE_EXPECT_NO_THROW(
+      LocalRateLimiterImpl(std::chrono::milliseconds(50), 1, 1, dispatcher_, descriptors_));
+}
+
+// Verify that a dynamic (wildcard) descriptor with max_tokens=0 always rejects.
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicDescriptorAlwaysRejectWithZeroMaxTokens) {
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 0, 1, "0.1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
+
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+
+  // A different wildcard value also always rejects.
+  std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "B"}}}};
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors2).allowed);
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
@@ -704,6 +756,208 @@ TEST_F(LocalRateLimiterDescriptorImplTest, NullDefaultTokenBucket) {
   auto no_match_result = rate_limiter_->requestAllowed(no_match_descriptor_);
   EXPECT_TRUE(no_match_result.allowed);
   EXPECT_FALSE(no_match_result.token_bucket_context);
+}
+
+// Verify is_negative refunds tokens back to the descriptor bucket, capped at max.
+TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeRefundsTokens) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 5, 5, "2s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8);
+
+  // First consume 2 tokens normally.
+  std::vector<RateLimit::Descriptor> descriptors;
+  descriptors.push_back(descriptor_[0]);
+  descriptors[0].hits_addend_ = 2;
+
+  auto result = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(result.allowed);
+  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 3);
+
+  // Now refund 1 token using is_negative.
+  descriptors[0].hits_addend_ = 1;
+  descriptors[0].is_negative_hits_ = true;
+
+  result = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(result.allowed);
+  // 3 + 1 (refund) = 4 tokens remaining. No tokens consumed when is_negative_hits is set.
+  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 4);
+}
+
+// Verify is_negative refund is capped at max bucket size.
+TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeCappedAtMax) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 3, 3, "2s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8);
+
+  // Start with 3 tokens in the descriptor bucket.
+  // Refill 10 with is_negative => should cap at max (3), so 3 tokens remaining.
+  std::vector<RateLimit::Descriptor> descriptors;
+  descriptors.push_back(descriptor_[0]);
+  descriptors[0].hits_addend_ = 10;
+  descriptors[0].is_negative_hits_ = true;
+
+  auto result = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(result.allowed);
+  // Refill is capped at max bucket size (3), so tokens remain at 3.
+  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 3);
+}
+
+// Verify is_negative with hits_addend refills tokens without consuming.
+TEST_F(LocalRateLimiterDescriptorImplTest, IsNegativeRefillsTokens) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 3, 3, "2s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8);
+
+  // First consume 2 tokens normally to bring bucket to 1.
+  std::vector<RateLimit::Descriptor> consume_descriptors;
+  consume_descriptors.push_back(descriptor_[0]);
+  consume_descriptors[0].hits_addend_ = 2;
+
+  auto result = rate_limiter_->requestAllowed(consume_descriptors);
+  EXPECT_TRUE(result.allowed);
+  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 1);
+
+  // Now refill 1 token using is_negative. No tokens consumed.
+  std::vector<RateLimit::Descriptor> refill_descriptors;
+  refill_descriptors.push_back(descriptor_[0]);
+  refill_descriptors[0].hits_addend_ = 1;
+  refill_descriptors[0].is_negative_hits_ = true;
+
+  result = rate_limiter_->requestAllowed(refill_descriptors);
+  EXPECT_TRUE(result.allowed);
+  // 1 + 1 (refill) = 2 tokens remaining.
+  EXPECT_EQ(result.token_bucket_context->remainingTokens(), 2);
+}
+
+// Verify shadow mode descriptor failure does not short-circuit enforced descriptor check.
+TEST_F(LocalRateLimiterDescriptorImplTest, ShadowDescriptorDoesNotShortCircuitEnforcedDescriptor) {
+  static constexpr absl::string_view shadow_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: shadow
+  token_bucket:
+    max_tokens: 1
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  shadow_mode: true
+  )";
+  static constexpr absl::string_view enforced_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: enforced
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 2
+    fill_interval: 100s
+  )";
+
+  TestUtility::loadFromYaml(std::string(shadow_descriptor_yaml), *descriptors_.Add());
+  TestUtility::loadFromYaml(std::string(enforced_descriptor_yaml), *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(100000), 1000, 1000);
+
+  std::vector<RateLimit::Descriptor> descriptors{
+      {{{"gate", "shadow"}}},
+      {{{"gate", "enforced"}}},
+  };
+
+  // Request 1: shadow (1 -> 0), enforced (2 -> 1). Allowed.
+  auto res1 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(res1.allowed);
+
+  // Request 2: shadow bucket exhausted (0 tokens), but enforced bucket still has tokens (1 -> 0).
+  // Request should return not allowed (so shadow stats get captured), but enforced bucket must be
+  // consumed!
+  auto res2 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_FALSE(res2.allowed);
+  EXPECT_TRUE(res2.token_bucket_context->shadowMode());
+
+  // Request 3: shadow bucket empty (0 tokens), enforced bucket empty (0 tokens).
+  // Because enforced bucket is empty, requestAllowed must report allowed = false with enforced
+  // (non-shadow) bucket!
+  auto res3 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_FALSE(res3.allowed);
+  EXPECT_FALSE(res3.token_bucket_context->shadowMode());
+}
+
+TEST_F(LocalRateLimiterDescriptorImplTest, ShadowDescriptorShortCircuitWithRuntimeGuardDisabled) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_ratelimit_shadow_mode_no_short_circuit", "false"}});
+
+  static constexpr absl::string_view shadow_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: shadow
+  token_bucket:
+    max_tokens: 1
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  shadow_mode: true
+  )";
+  static constexpr absl::string_view enforced_descriptor_yaml = R"(
+  entries:
+  - key: gate
+    value: enforced
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 2
+    fill_interval: 100s
+  )";
+
+  TestUtility::loadFromYaml(std::string(shadow_descriptor_yaml), *descriptors_.Add());
+  TestUtility::loadFromYaml(std::string(enforced_descriptor_yaml), *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(100000), 1000, 1000);
+
+  std::vector<RateLimit::Descriptor> descriptors{
+      {{{"gate", "shadow"}}},
+      {{{"gate", "enforced"}}},
+  };
+
+  // Request 1: shadow (1 -> 0), enforced (2 -> 1). Allowed.
+  auto res1 = rate_limiter_->requestAllowed(descriptors);
+  EXPECT_TRUE(res1.allowed);
+
+  // Request 2 and 3: the exhausted shadow descriptor short-circuits the evaluation, so the
+  // enforced descriptor is never consumed and the shadow bucket is always returned.
+  for (int i = 0; i < 2; i++) {
+    auto res = rate_limiter_->requestAllowed(descriptors);
+    EXPECT_FALSE(res.allowed);
+    EXPECT_TRUE(res.token_bucket_context->shadowMode());
+  }
+}
+
+// The share provider manager releases its cluster membership callback handle inline when it is
+// destroyed on the main thread, which also covers destruction during main dispatcher teardown where
+// a post would never run, and posts the handle to the main thread otherwise.
+TEST(ShareProviderManagerTest, ReleasesCallbackHandleOnMainThread) {
+  NiceMock<Upstream::MockClusterManager> cm;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  Singleton::ManagerImpl manager;
+
+  NiceMock<Upstream::MockPrioritySet> priority_set;
+  cm.local_cluster_name_ = "local_cluster";
+  cm.initializeClusters({"local_cluster"}, {});
+
+  const auto* mock_local_cluster = cm.active_clusters_.at("local_cluster").get();
+  EXPECT_CALL(*mock_local_cluster, prioritySet()).WillRepeatedly(ReturnRef(priority_set));
+
+  // Destroyed on the main thread: nothing is posted.
+  {
+    ShareProviderManagerSharedPtr share_provider_manager =
+        ShareProviderManager::singleton(dispatcher, cm, manager);
+    ASSERT_NE(share_provider_manager, nullptr);
+    EXPECT_CALL(dispatcher, post(_)).Times(0);
+  }
+  testing::Mock::VerifyAndClearExpectations(&dispatcher);
+
+  // Destroyed off the main thread: the handle is posted to the main dispatcher.
+  {
+    ShareProviderManagerSharedPtr share_provider_manager =
+        ShareProviderManager::singleton(dispatcher, cm, manager);
+    ASSERT_NE(share_provider_manager, nullptr);
+    EXPECT_CALL(dispatcher, isThreadSafe()).WillOnce(Return(false));
+    EXPECT_CALL(dispatcher, post(_)).WillOnce([](Event::PostCb callback) { callback(); });
+  }
 }
 
 } // Namespace LocalRateLimit

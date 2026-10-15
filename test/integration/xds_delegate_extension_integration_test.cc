@@ -15,6 +15,7 @@
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
+using testing::Ge;
 namespace Envoy {
 namespace {
 
@@ -38,7 +39,7 @@ public:
         envoy::service::discovery::v3::Resource r;
         r.set_name(decoded_resource.name());
         r.set_version(decoded_resource.version());
-        r.mutable_resource()->PackFrom(decoded_resource.resource());
+        std::ignore = r.mutable_resource()->PackFrom(decoded_resource.resource());
         ResourcesMap[makeKey(source_id, decoded_resource.name())] = std::move(r);
       }
     }
@@ -59,7 +60,7 @@ public:
 
   void onResourceLoadFailed(const Config::XdsSourceId& /*source_id*/,
                             const std::string& /*resource_name*/,
-                            const absl::optional<EnvoyException>& /*exception*/) override {}
+                            const std::optional<EnvoyException>& /*exception*/) override {}
 
   static std::atomic<int> OnConfigUpdatedCount;
   static std::map<std::string, envoy::service::discovery::v3::Resource> ResourcesMap;
@@ -142,7 +143,7 @@ public:
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* delegate_extension = bootstrap.mutable_xds_delegate_extension();
       delegate_extension->set_name("envoy.config.xds.test_delegate");
-      delegate_extension->mutable_typed_config()->PackFrom(
+      std::ignore = delegate_extension->mutable_typed_config()->PackFrom(
           test::envoy::config::xds::TestXdsResourcesDelegateConfig());
     });
   }
@@ -219,7 +220,7 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+  test_server_->waitForCounter("runtime.load_success", Ge(initial_load_success_ + 1));
   int expected_on_config_updated_count = ++current_on_config_updated_count;
   waitforOnConfigUpdatedCount(expected_on_config_updated_count);
 
@@ -236,7 +237,7 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
-  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 2);
+  test_server_->waitForCounter("runtime.load_success", Ge(initial_load_success_ + 2));
   expected_on_config_updated_count = ++current_on_config_updated_count;
   waitforOnConfigUpdatedCount(expected_on_config_updated_count);
 
@@ -244,10 +245,11 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   EXPECT_EQ("saz", getRuntimeKey("baz"));
   ASSERT_EQ(TestXdsResourcesDelegate::ResourcesMap.size(), 1);
   envoy::service::runtime::v3::Runtime retrieved_rtds_layer;
-  TestXdsResourcesDelegate::ResourcesMap
-      ["xds_cluster+type.googleapis.com/envoy.service.runtime.v3.Runtime+some_rtds_layer"]
-          .resource()
-          .UnpackTo(&retrieved_rtds_layer);
+  std::ignore =
+      TestXdsResourcesDelegate::ResourcesMap
+          ["xds_cluster+type.googleapis.com/envoy.service.runtime.v3.Runtime+some_rtds_layer"]
+              .resource()
+              .UnpackTo(&retrieved_rtds_layer);
   EXPECT_TRUE(TestUtility::protoEqual(retrieved_rtds_layer, some_rtds_layer));
 }
 

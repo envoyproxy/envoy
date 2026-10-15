@@ -22,6 +22,12 @@ class FastMockClusterManager : public testing::StrictMock<Upstream::MockClusterM
 public:
   ClusterInfoMaps clusters() const override { return clusters_; }
 
+  void forEachActiveCluster(std::function<void(const Upstream::Cluster&)> cb) const override {
+    for (const auto& [unused_name, cluster_ref] : clusters_.active_clusters_) {
+      cb(cluster_ref.get());
+    }
+  }
+
   ClusterInfoMaps clusters_;
   std::vector<std::unique_ptr<FastMockCluster>> clusters_storage_;
   Stats::TestUtil::TestStore store_;
@@ -71,6 +77,7 @@ class FastMockHost : public testing::StrictMock<Upstream::MockHostLight> {
 public:
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string& hostname() const override { return hostname_; }
+  absl::string_view observabilityName() const override { return address_->asStringView(); }
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>
   counters() const override {
@@ -88,9 +95,7 @@ public:
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr&,
                                 const envoy::config::core::v3::Metadata*,
                                 Network::TransportSocketOptionsConstSharedPtr) const override {
-    IS_ENVOY_BUG("unexpected call to resolveTransportSocketFactory");
-    Network::UpstreamTransportSocketFactory* ptr = nullptr;
-    return *ptr;
+    PANIC("unexpected call to resolveTransportSocketFactory");
   }
 
   Network::Address::InstanceConstSharedPtr address_;
@@ -430,6 +435,31 @@ BENCHMARK_CAPTURE(BM_FilteredCountersPrometheus, per_endpoint_stats_enabled, tru
     ->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_PrometheusFull(benchmark::State& state, bool per_endpoint_stats) {
+  Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
+  Envoy::Server::StatsParams params;
+  Envoy::Buffer::OwnedImpl response;
+  params.parse("?format=prometheus", response);
+  // per_endpoint_stats: 418M for true, 261M for false
+  const uint64_t lower_limit = per_endpoint_stats ? 400 * 1000 * 1000 : 200 * 1000 * 1000;
+  const uint64_t upper_limit = per_endpoint_stats ? 420 * 1000 * 1000 : 300 * 1000 * 1000;
+
+  uint64_t count;
+  for (auto _ : state) { // NOLINT
+    count = test_context.handlerStats(params);
+    RELEASE_ASSERT(count > lower_limit, "expected count > lower_limit");
+    RELEASE_ASSERT(count < upper_limit, "expected count < upper_limit");
+  }
+
+  auto label = absl::StrCat("output per iteration: ", count);
+  state.SetLabel(label);
+}
+BENCHMARK_CAPTURE(BM_PrometheusFull, per_endpoint_stats_disabled, false)
+    ->Unit(benchmark::kMillisecond);
+BENCHMARK_CAPTURE(BM_PrometheusFull, per_endpoint_stats_enabled, true)
+    ->Unit(benchmark::kMillisecond);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HistogramsJson(benchmark::State& state, bool per_endpoint_stats) {
   Envoy::Server::StatsHandlerTest& test_context = testContext(per_endpoint_stats);
   Envoy::Server::StatsParams params;
@@ -469,7 +499,7 @@ static void BM_TraditionalHistogramsPrometheusProtobuf(benchmark::State& state) 
 }
 BENCHMARK(BM_TraditionalHistogramsPrometheusProtobuf)->Unit(benchmark::kMillisecond);
 
-static void BM_TraditionalHistogramsPrometheusText(benchmark::State& state) {
+static void bmTraditionalHistogramsPrometheusText(benchmark::State& state) {
   Envoy::Server::StatsHandlerTest& test_context = testContext(false);
   Envoy::Server::StatsParams params;
   Envoy::Buffer::OwnedImpl response;
@@ -484,7 +514,7 @@ static void BM_TraditionalHistogramsPrometheusText(benchmark::State& state) {
   auto label = absl::StrCat("output per iteration: ", count, " (19 buckets/histogram)");
   state.SetLabel(label);
 }
-BENCHMARK(BM_TraditionalHistogramsPrometheusText)->Unit(benchmark::kMillisecond);
+BENCHMARK(bmTraditionalHistogramsPrometheusText)->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_NativeHistogramsPrometheusProtobuf(benchmark::State& state) {

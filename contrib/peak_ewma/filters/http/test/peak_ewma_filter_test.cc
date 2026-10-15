@@ -8,10 +8,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -173,7 +171,7 @@ TEST_F(PeakEwmaRttFilterTest, EncodeHeadersWithPeakEwmaStats) {
   auto peak_data = std::make_unique<LoadBalancingPolicies::PeakEwma::PeakEwmaHostLbPolicyData>(100);
 
   // Set the LB policy data on the mock host
-  mock_host->setLbPolicyData(std::move(peak_data));
+  mock_host->addLbPolicyData(std::move(peak_data));
 
   // Start the request
   filter_->decodeHeaders(request_headers, false);

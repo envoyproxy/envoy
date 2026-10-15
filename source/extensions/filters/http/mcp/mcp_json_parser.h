@@ -53,14 +53,28 @@ public:
   // Get extraction policy for a specific method
   const std::vector<AttributeExtractionRule>& getFieldsForMethod(const std::string& method) const;
 
+  // Get the attribute path corresponding to Mcp-Name for a method.
+  // Returns empty when the method has no name-like attribute.
+  std::string getNameAttributePath(const std::string& method) const;
+
   // Get merged requirements for a specific method (global + method-specific).
   const FieldRequirements& getFieldRequirementsForMethod(const std::string& method) const;
 
   // Add method configuration
   void addMethodConfig(absl::string_view method, std::vector<AttributeExtractionRule> fields);
 
-  // Get all global fields to always extract
+  // Global fields to always extract
   const absl::flat_hash_set<std::string>& getAlwaysExtract() const { return always_extract_; }
+
+  // Get all registered method fields for all methods
+  const absl::flat_hash_map<std::string, std::vector<AttributeExtractionRule>>&
+  getAllMethodFields() const {
+    return method_fields_;
+  }
+
+  // Security configuration
+  bool rejectDuplicateKeys() const { return reject_duplicate_keys_; }
+  void setRejectDuplicateKeys(bool v) { reject_duplicate_keys_ = v; }
 
   // Get the group metadata key (empty if disabled)
   const std::string& groupMetadataKey() const { return group_metadata_key_; }
@@ -91,12 +105,15 @@ private:
   // Global fields to always extract
   absl::flat_hash_set<std::string> always_extract_;
 
+  // Security settings
+  bool reject_duplicate_keys_{false};
+
   FieldRequirements default_requirements_;
   absl::flat_hash_map<std::string, FieldRequirements> method_requirements_;
 };
 
 /**
- * MCP JSON field extractor with early stopping optimization
+ * MCP JSON field extractor for streaming JSON parsing.
  */
 class McpFieldExtractor : public ProtobufUtil::converter::ObjectWriter,
                           public Logger::Loggable<Logger::Id::mcp> {
@@ -119,8 +136,11 @@ public:
   McpFieldExtractor* RenderNull(absl::string_view name) override;
   McpFieldExtractor* RenderBytes(absl::string_view name, absl::string_view value) override;
 
-  // Check if we can stop parsing early
+  // Check if parsing is complete (root object has closed)
   bool shouldStopParsing() const { return can_stop_parsing_; }
+
+  // Check if duplicate keys were detected
+  bool hasDuplicateKeys() const { return has_duplicate_keys_; }
 
   // Finalize extraction after parsing complete
   void finalizeExtraction();
@@ -133,11 +153,12 @@ public:
 
   // MCP validation getters
   bool isValidMcp() const { return is_valid_mcp_; }
+  bool isResponse() const { return has_result_ || has_error_; }
   const std::string& getMethod() const { return method_; }
 
 private:
-  // Check if we have all fields we need for early stop
-  void checkEarlyStop();
+  // Check for duplicate key in current scope. Returns true if key was a duplicate.
+  bool checkDuplicateKey(absl::string_view name);
 
   // Update required/optional field lists once method is known
   void updateFieldRequirements();
@@ -146,17 +167,27 @@ private:
   bool requiredFieldsCollected() const;
 
   // Store field in temp storage
-  void storeField(const std::string& path, const Protobuf::Value& value);
+  void storeField(const std::string& path, absl::string_view name, const Protobuf::Value& value);
 
   // Copy selected fields from temp to final
   void copySelectedFields();
-  void copyFieldByPath(const std::string& path);
+  void copyFieldByPath(absl::string_view path);
 
   // Validate required fields
   void validateRequiredFields();
 
   // Helper to build full path from cache
   std::string buildFullPath(absl::string_view name) const;
+
+  // Selective extraction filtering helpers
+  bool isPathInteresting(absl::string_view path) const;
+  void updateActiveTargetPaths();
+
+  struct TargetPathInfo {
+    std::string path;
+    std::string path_dot;
+  };
+  std::vector<TargetPathInfo> active_target_paths_;
 
   Protobuf::Struct temp_storage_;   // Store all fields temporarily
   Protobuf::Struct& root_metadata_; // Final filtered metadata
@@ -181,9 +212,15 @@ private:
   bool is_valid_mcp_{false};
   bool has_jsonrpc_{false};
   bool has_method_{false};
+  bool has_result_{false};
+  bool has_error_{false};
 
-  // Early stop optimization
+  // Parsing completion state
   bool can_stop_parsing_{false};
+
+  // Duplicate key detection
+  bool has_duplicate_keys_{false};
+  std::vector<absl::flat_hash_set<std::string>> scope_key_sets_;
 
   // Validation
   std::vector<std::string> missing_required_fields_;
@@ -222,13 +259,20 @@ public:
   // Check if this is a valid MCP request
   bool isValidMcpRequest() const;
 
-  bool isAllFieldsCollected() const { return all_fields_collected_; }
+  // Check if parsing is complete (root JSON object has closed)
+  bool isParsingComplete() const { return extractor_ && extractor_->shouldStopParsing(); }
 
   // Check if optional fields are configured for the current method
   bool hasOptionalFields();
 
+  // Check if duplicate keys were detected
+  bool hasDuplicateKeys() const;
+
   // Check if all required fields have been collected
   bool hasAllRequiredFields();
+
+  // Check if this is a JSON-RPC response (has result/error, no method).
+  bool isResponse() const;
 
   // Get the method string
   const std::string& getMethod() const;
@@ -237,7 +281,7 @@ public:
   const Protobuf::Struct& metadata() const { return metadata_; }
 
   // Helper to get nested value from metadata
-  const Protobuf::Value* getNestedValue(const std::string& dotted_path) const;
+  const Protobuf::Value* getNestedValue(absl::string_view dotted_path) const;
 
   // Reset parser for reuse
   void reset();
@@ -248,7 +292,6 @@ private:
   std::unique_ptr<McpFieldExtractor> extractor_;
   std::unique_ptr<ProtobufUtil::converter::JsonStreamParser> stream_parser_;
   bool parsing_started_{false};
-  bool all_fields_collected_{false};
 };
 
 // Compatibility aliases

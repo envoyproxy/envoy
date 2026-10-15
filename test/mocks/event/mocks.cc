@@ -1,5 +1,8 @@
 #include "mocks.h"
 
+#include "source/common/event/worker_id.h"
+
+#include "absl/functional/any_invocable.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -18,7 +21,8 @@ namespace Event {
 
 MockDispatcher::MockDispatcher() : MockDispatcher("test_thread") {}
 
-MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
+MockDispatcher::MockDispatcher(const std::string& name)
+    : worker_id_(workerIdFromThreadName(name)), name_(name) {
   time_system_ = std::make_unique<GlobalTimeSystem>();
   auto thread_factory = &Api::createApiForTest()->threadFactory();
   Envoy::Thread::ThreadId thread_id = thread_factory->currentThreadId();
@@ -38,10 +42,12 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   });
 
   ON_CALL(buffer_factory_, createBuffer_(_, _, _))
-      .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
-                               std::function<void()> above_overflow) -> Buffer::Instance* {
-        return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
-      }));
+      .WillByDefault(
+          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                               std::move(above_overflow));
+          }));
   ON_CALL(*this, isThreadSafe()).WillByDefault([thread_factory, thread_id]() {
     return thread_factory->currentThreadId() == thread_id;
   });
@@ -115,6 +121,9 @@ MockSignalEvent::MockSignalEvent(MockDispatcher* dispatcher) {
 }
 
 MockSignalEvent::~MockSignalEvent() = default;
+
+MockEvwatchObserverManager::MockEvwatchObserverManager() = default;
+MockEvwatchObserverManager::~MockEvwatchObserverManager() = default;
 
 MockFileEvent::MockFileEvent() = default;
 MockFileEvent::~MockFileEvent() = default;

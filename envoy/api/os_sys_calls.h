@@ -1,9 +1,10 @@
 #pragma once
 
-#include <sys/resource.h>
 #include <sys/stat.h>
 
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,6 +13,8 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Api {
@@ -128,6 +131,12 @@ public:
    * return true if the OS supports multi-path TCP
    */
   virtual bool supportsMptcp() const PURE;
+
+  /**
+   * return true if the OS supports attaching a reuse port BPF program for CPU-based connection
+   * steering.
+   */
+  virtual bool supportsReusePortBpfCpuSteering() const PURE;
 
   /**
    * Release all resources allocated for fd.
@@ -291,14 +300,9 @@ public:
   virtual void freeaddrinfo(addrinfo* res) PURE;
 
   /**
-   * @see man getrlimit
+   * @see Increase soft file descriptor limit to match hard limit.
    */
-  virtual SysCallIntResult getrlimit(int resource, struct rlimit* rlim) PURE;
-
-  /**
-   * @see man setrlimit
-   */
-  virtual SysCallIntResult setrlimit(int resource, const struct rlimit* rlim) PURE;
+  virtual SysCallIntResult raiseFileLimits() PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

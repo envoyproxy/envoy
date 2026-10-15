@@ -130,7 +130,7 @@ TEST_P(StaticConfigResourceDetectorIntegrationTest, TestResourceAttributeSet) {
   absl::flat_hash_map<std::string, std::string> expected_attributes = {{"key1", "value1"},
                                                                        {"key2", "value2"}};
   int matched_attributes_count = 0;
-  ASSERT_TRUE(message.resource_spans().size() > 0);
+  ASSERT_TRUE(!message.resource_spans().empty());
   for (auto& actual : message.resource_spans()[0].resource().attributes()) {
     auto expected = expected_attributes.find(actual.key());
     if (expected != expected_attributes.end()) {

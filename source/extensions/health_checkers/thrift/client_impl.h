@@ -45,7 +45,7 @@ private:
   ProtocolPtr protocol_;
   DecoderPtr decoder_;
   Buffer::OwnedImpl buffer_;
-  absl::optional<bool> success_;
+  std::optional<bool> success_;
   bool complete_{};
 };
 
@@ -88,7 +88,7 @@ public:
   void onData(Buffer::Instance& data);
 
   // Client
-  void start() override;
+  bool start() override;
   bool sendRequest() override;
   void close() override;
 

@@ -13,12 +13,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 
+std::shared_ptr<TokenBucket> StreamRateLimiter::simpleTokenBucket(uint64_t limit_kbps,
+                                                                  TimeSource& time_source) {
+  uint64_t max_tokens = kiloBytesToBytes(limit_kbps);
+  auto token_bucket = std::make_shared<TokenBucketImpl>(max_tokens, time_source, max_tokens);
+  token_bucket->maybeReset(max_tokens * StreamRateLimiter::DefaultFillInterval.count() / 1000);
+  return token_bucket;
+}
+
 StreamRateLimiter::StreamRateLimiter(
-    uint64_t max_kbps, uint64_t max_buffered_data, std::function<void()> pause_data_cb,
+    uint64_t max_buffered_data, std::function<void()> pause_data_cb,
     std::function<void()> resume_data_cb,
     std::function<void(Buffer::Instance&, bool)> write_data_cb, std::function<void()> continue_cb,
-    std::function<void(uint64_t, bool, std::chrono::milliseconds)> write_stats_cb,
-    TimeSource& time_source, Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
+    std::function<void(uint64_t, uint64_t, std::chrono::milliseconds)> write_stats_cb,
+    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope,
     std::shared_ptr<TokenBucket> token_bucket, std::chrono::milliseconds fill_interval)
     : fill_interval_(std::move(fill_interval)), write_data_cb_(write_data_cb),
       continue_cb_(continue_cb), write_stats_cb_(std::move(write_stats_cb)), scope_(scope),
@@ -29,22 +37,8 @@ StreamRateLimiter::StreamRateLimiter(
   ASSERT(max_buffered_data > 0);
   ASSERT(fill_interval_.count() > 0);
   ASSERT(fill_interval_.count() <= 1000);
-  auto max_tokens = kiloBytesToBytes(max_kbps);
-  if (!token_bucket_) {
-    // Initialize a  new token bucket if caller didn't provide one.
-    // The token bucket is configured with a max token count of the number of bytes per second,
-    // and refills at the same rate, so that we have a per second limit which refills gradually
-    // in one fill_interval_ at a time.
-    token_bucket_ = std::make_shared<TokenBucketImpl>(max_tokens, time_source, max_tokens);
-  }
-  // Reset the bucket to contain only one fill_interval worth of tokens.
-  // If the token bucket is shared, only first reset call will work.
-  auto initial_tokens = max_tokens * fill_interval_.count() / 1000;
-  token_bucket_->maybeReset(initial_tokens);
-  ENVOY_LOG(debug,
-            "StreamRateLimiter <Ctor>: fill_interval={}ms "
-            "initial_tokens={} max_tokens={}",
-            fill_interval_.count(), initial_tokens, max_tokens);
+  ASSERT(token_bucket_);
+  ENVOY_LOG(debug, "StreamRateLimiter <Ctor>: fill_interval={}ms", fill_interval_.count());
   buffer_.setWatermarks(max_buffered_data);
 }
 
@@ -63,7 +57,7 @@ void StreamRateLimiter::onTokenTimer() {
   // Move the data to write into the output buffer with as little copying as possible.
   // NOTE: This might be moving zero bytes, but that should work fine.
   data_to_write.move(buffer_, bytes_to_write);
-  write_stats_cb_(bytes_to_write, buffer_.length() > 0, fill_interval_);
+  write_stats_cb_(bytes_to_write, buffer_.length(), fill_interval_);
 
   // If the buffer still contains data in it, we couldn't get enough tokens, so schedule the next
   // token available time.

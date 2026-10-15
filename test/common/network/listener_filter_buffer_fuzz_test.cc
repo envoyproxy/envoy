@@ -1,5 +1,4 @@
 #include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
 
 #include "test/common/network/listener_filter_buffer_fuzz.pb.h"
@@ -7,6 +6,7 @@
 #include "test/fuzz/utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/io_handle.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -75,7 +75,7 @@ public:
           drained_size_ = 0;
         }
         // Trigger the peek by event.
-        EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+        EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
         break;
       }
       case test::common::network::Action::kDrain: {

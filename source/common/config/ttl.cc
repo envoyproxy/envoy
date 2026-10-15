@@ -1,5 +1,7 @@
 #include "source/common/config/ttl.h"
 
+#include <algorithm>
+
 namespace Envoy {
 namespace Config {
 
@@ -10,7 +12,7 @@ TtlManager::TtlManager(std::function<void(const std::vector<std::string>&)> call
     ScopedTtlUpdate scoped_update(*this);
 
     std::vector<std::string> expired;
-    last_scheduled_time_ = absl::nullopt;
+    last_scheduled_time_ = std::nullopt;
 
     const auto now = time_source_.monotonicTime();
     auto itr = ttls_.begin();
@@ -67,7 +69,7 @@ void TtlManager::refreshTimer() {
 
   // The time until the next TTL changed, so reset the timer to match the new value.
   last_scheduled_time_ = next_ttl_expiry;
-  timer_->enableTimer(timer_duration, nullptr);
+  timer_->enableTimer(std::max(std::chrono::milliseconds::zero(), timer_duration), nullptr);
 }
 } // namespace Config
 } // namespace Envoy

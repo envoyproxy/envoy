@@ -1,18 +1,22 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "http_subscription_impl_test",
     srcs = ["http_subscription_impl_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.config_subscription.rest"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":http_subscription_test_harness",
     ],
@@ -32,7 +36,6 @@ envoy_cc_test_library(
         "//test/mocks/event:event_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

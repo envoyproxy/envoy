@@ -22,6 +22,9 @@ interface Engine {
    */
   fun dumpStats(): String
 
+  /** Drains connections matching the given socket tag. */
+  fun drainConnectionsBySocketTag(tag: Int)
+
   /** Refresh DNS, and drain connections owned by this Engine. */
   fun resetConnectivityState()
 }

@@ -10,17 +10,59 @@ import (
 
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
-		"stats_callbacks":            &statsCallbacksConfigFactory{},
-		"header_callbacks":           &headerCallbacksConfigFactory{},
-		"send_response":              &sendResponseConfigFactory{},
-		"dynamic_metadata_callbacks": &dynamicMetadataCallbacksConfigFactory{},
-		"filter_state_callbacks":     &filterStateCallbacksConfigFactory{},
-		"body_callbacks":             &bodyCallbacksConfigFactory{},
-		"config_init_failure":        &configInitFailureConfigFactory{},
+		"downstream_direct_remote_address": &downstreamDirectRemoteAddressConfigFactory{},
+		"stats_callbacks":                  &statsCallbacksConfigFactory{},
+		"header_callbacks":                 &headerCallbacksConfigFactory{},
+		"local_reply_callbacks":            &localReplyCallbacksConfigFactory{},
+		"reset_stream":                     &resetStreamConfigFactory{},
+		"send_go_away_and_close":           &sendGoAwayAndCloseConfigFactory{},
+		"recreate_stream":                  &recreateStreamConfigFactory{},
+		"socket_option_callbacks":          &socketOptionCallbacksConfigFactory{},
+		"span_callbacks":                   &spanCallbacksConfigFactory{},
+		"span_across_callbacks":            &spanAcrossCallbacksConfigFactory{},
+		"cluster_callbacks":                &clusterCallbacksConfigFactory{},
+		"send_response":                    &sendResponseConfigFactory{},
+		"dynamic_metadata_callbacks":       &dynamicMetadataCallbacksConfigFactory{},
+		"filter_state_callbacks":           &filterStateCallbacksConfigFactory{},
+		"body_callbacks":                   &bodyCallbacksConfigFactory{},
+		"config_init_failure":              &configInitFailureConfigFactory{},
 	})
 }
 
 func main() {}
+
+type downstreamDirectRemoteAddressConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *downstreamDirectRemoteAddressConfigFactory) Create(shared.HttpFilterConfigHandle,
+	[]byte) (shared.HttpFilterFactory, error) {
+	return &downstreamDirectRemoteAddressFilterFactory{}, nil
+}
+
+type downstreamDirectRemoteAddressFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *downstreamDirectRemoteAddressFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &downstreamDirectRemoteAddressFilter{handle: h}
+}
+
+type downstreamDirectRemoteAddressFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *downstreamDirectRemoteAddressFilter) OnRequestHeaders(headers shared.HeaderMap,
+	_ bool) shared.HeadersStatus {
+	address, ok := f.handle.GetDownstreamDirectRemoteAddress()
+	if ok {
+		headers.Set("x-downstream-peer", address.ToUnsafeString())
+	} else {
+		headers.Set("x-downstream-peer", "unavailable")
+	}
+	return shared.HeadersStatusContinue
+}
 
 // --- config_init_failure ---
 type configInitFailureConfigFactory struct {
@@ -122,6 +164,7 @@ func (f *headerCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.H
 func (p *headerCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.handle.ClearRouteCache()
+	p.handle.RefreshRouteCluster()
 
 	testHeaders(headers)
 
@@ -131,6 +174,9 @@ func (p *headerCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	}
 	if _, ok := p.handle.GetAttributeString(shared.AttributeIDSourceAddress); !ok {
 		panic("source address not found")
+	}
+	if workerIndex := p.handle.GetWorkerIndex(); workerIndex != 0 {
+		panic(fmt.Sprintf("worker index mismatch: %d", workerIndex))
 	}
 
 	return shared.HeadersStatusContinue
@@ -227,6 +273,297 @@ func (p *sendResponseFilter) OnRequestHeaders(headers shared.HeaderMap,
 	return shared.HeadersStatusStop
 }
 
+// --- local_reply_callbacks ---
+type localReplyCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type localReplyCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *localReplyCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &localReplyCallbacksFactory{}, nil
+}
+
+type localReplyCallbacksFilter struct {
+	handle shared.HttpFilterHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *localReplyCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &localReplyCallbacksFilter{handle: handle}
+}
+
+func (p *localReplyCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	return shared.HeadersStatusContinue
+}
+
+func (p *localReplyCallbacksFilter) OnLocalReply(responseCode uint32, details shared.UnsafeEnvoyBuffer, resetImminent bool) shared.LocalReplyStatus {
+	return shared.LocalReplyStatusContinueAndResetStream
+}
+
+// --- reset_stream ---
+type resetStreamConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type resetStreamFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *resetStreamConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &resetStreamFactory{}, nil
+}
+
+type resetStreamFilter struct {
+	handle shared.HttpFilterHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *resetStreamFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &resetStreamFilter{handle: handle}
+}
+
+func (p *resetStreamFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	_ = shared.HttpFilterStreamResetReasonLocalRefusedStreamReset
+	p.handle.ResetStream(shared.HttpFilterStreamResetReasonLocalReset, "details")
+	return shared.HeadersStatusContinue
+}
+
+// --- send_go_away_and_close ---
+type sendGoAwayAndCloseConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type sendGoAwayAndCloseFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *sendGoAwayAndCloseConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &sendGoAwayAndCloseFactory{}, nil
+}
+
+type sendGoAwayAndCloseFilter struct {
+	handle shared.HttpFilterHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *sendGoAwayAndCloseFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &sendGoAwayAndCloseFilter{handle: handle}
+}
+
+func (p *sendGoAwayAndCloseFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	p.handle.SendGoAwayAndClose(true)
+	return shared.HeadersStatusContinue
+}
+
+// --- recreate_stream ---
+type recreateStreamConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type recreateStreamFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *recreateStreamConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &recreateStreamFactory{}, nil
+}
+
+type recreateStreamFilter struct {
+	handle shared.HttpFilterHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *recreateStreamFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &recreateStreamFilter{handle: handle}
+}
+
+func (p *recreateStreamFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if !p.handle.RecreateStream([][2]string{{":status", "302"}, {"location", "/recreated"}}) {
+		panic("failed to recreate stream")
+	}
+	return shared.HeadersStatusContinue
+}
+
+// --- socket_option_callbacks ---
+type socketOptionCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type socketOptionCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *socketOptionCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &socketOptionCallbacksFactory{}, nil
+}
+
+type socketOptionCallbacksFilter struct {
+	handle shared.HttpFilterHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *socketOptionCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &socketOptionCallbacksFilter{handle: handle}
+}
+
+func (p *socketOptionCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if !p.handle.SetSocketOptionInt(1, 2, shared.SocketOptionStatePrebind, shared.SocketDirectionUpstream, 123) {
+		panic("failed to set int socket option")
+	}
+	if !p.handle.SetSocketOptionBytes(3, 4, shared.SocketOptionStateBound, shared.SocketDirectionUpstream, []byte("socket-bytes")) {
+		panic("failed to set bytes socket option")
+	}
+	if value, ok := p.handle.GetSocketOptionInt(1, 2, shared.SocketOptionStatePrebind, shared.SocketDirectionUpstream); !ok || value != 123 {
+		panic(fmt.Sprintf("socket option int mismatch: ok=%v value=%d", ok, value))
+	}
+	if value, ok := p.handle.GetSocketOptionBytes(3, 4, shared.SocketOptionStateBound, shared.SocketDirectionUpstream); !ok ||
+		value.ToUnsafeString() != "socket-bytes" {
+		panic(fmt.Sprintf("socket option bytes mismatch: ok=%v value=%q", ok, value.ToUnsafeString()))
+	}
+	headers.Set("x-socket-option-callbacks", "true")
+	return shared.HeadersStatusContinue
+}
+
+// --- span_callbacks ---
+type spanCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type spanCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *spanCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &spanCallbacksFactory{}, nil
+}
+
+type spanCallbacksFilter struct {
+	handle shared.HttpFilterHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *spanCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &spanCallbacksFilter{handle: handle}
+}
+
+func (p *spanCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if span := p.handle.GetActiveSpan(); span != nil {
+		span.SetTag("key", "value")
+		span.SetTags([][2]string{{"batch.key1", "batch.value1"}, {"batch.key2", "batch.value2"}})
+		span.SetOperation("operation")
+		span.Log("event")
+		span.SetSampled(true)
+		_, _ = span.GetBaggage("key")
+		span.SetBaggage("key", "value")
+		_, _ = span.GetTraceID()
+		_, _ = span.GetSpanID()
+		if child := span.SpawnChild("child"); child != nil {
+			child.SetTag("child-key", "child-value")
+			child.Finish()
+		}
+	}
+	headers.Set("x-span-callbacks", "true")
+	return shared.HeadersStatusContinue
+}
+
+// --- span_across_callbacks ---
+type spanAcrossCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type spanAcrossCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *spanAcrossCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &spanAcrossCallbacksFactory{}, nil
+}
+
+// spanAcrossCallbacksFilter spawns a child span in OnRequestHeaders, keeps it, and finishes it in
+// OnRequestTrailers to show that a span can outlive the event hook that created it.
+type spanAcrossCallbacksFilter struct {
+	handle    shared.HttpFilterHandle
+	childSpan shared.ChildSpan
+	shared.EmptyHttpFilter
+}
+
+func (f *spanAcrossCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &spanAcrossCallbacksFilter{handle: handle}
+}
+
+func (p *spanAcrossCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if span := p.handle.GetActiveSpan(); span != nil {
+		p.childSpan = span.SpawnChild("child")
+	}
+	headers.Set("x-span-stored", "true")
+	return shared.HeadersStatusContinue
+}
+
+func (p *spanAcrossCallbacksFilter) OnRequestTrailers(
+	trailers shared.HeaderMap) shared.TrailersStatus {
+	if p.childSpan != nil {
+		p.childSpan.SetTag("child-key", "child-value")
+		p.childSpan.Finish()
+		p.childSpan = nil
+	}
+	return shared.TrailersStatusContinue
+}
+
+// --- cluster_callbacks ---
+type clusterCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+type clusterCallbacksFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *clusterCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &clusterCallbacksFactory{}, nil
+}
+
+type clusterCallbacksFilter struct {
+	handle shared.HttpFilterHandle
+	shared.EmptyHttpFilter
+}
+
+func (f *clusterCallbacksFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &clusterCallbacksFilter{handle: handle}
+}
+
+func (p *clusterCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if clusterName, ok := p.handle.GetClusterName(); !ok || clusterName.ToUnsafeString() != "fake_cluster" {
+		panic(fmt.Sprintf("cluster name mismatch: ok=%v name=%q", ok, clusterName.ToUnsafeString()))
+	}
+	if counts, ok := p.handle.GetClusterHostCounts(0); !ok || counts.Total != 3 || counts.Healthy != 2 || counts.Degraded != 1 {
+		panic(fmt.Sprintf("cluster host counts mismatch: ok=%v counts=%+v", ok, counts))
+	}
+	if !p.handle.SetUpstreamOverrideHost("127.0.0.1:1", false) {
+		panic("failed to set upstream override host")
+	}
+	headers.Set("x-cluster-callbacks", "true")
+	return shared.HeadersStatusContinue
+}
+
 // --- dynamic_metadata_callbacks ---
 type dynamicMetadataCallbacksConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
@@ -267,6 +604,29 @@ func (p *dynamicMetadataCallbacksFilter) OnRequestHeaders(headers shared.HeaderM
 	if _, ok := p.handle.GetMetadataString(shared.MetadataSourceTypeDynamic,
 		"ns_req_header", "key"); ok {
 		panic("metadata type mismatch not detected")
+	}
+
+	// Set a whole namespace from a serialized google.protobuf.Struct { "k": "v" }, asserted
+	// end-to-end by the C++ integration test in filter_test.cc. The bytes are hand-encoded because
+	// the test module has no protobuf dependency:
+	//   0a 08              field 1 (fields), LEN 8
+	//     0a 01 6b           entry.key   = "k"
+	//     12 03 1a 01 76     entry.value = Value { string_value = "v" }
+	p.handle.SetMetadataStruct("ns_req_header_struct",
+		[]byte{0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76})
+
+	// Set a whole typed namespace from a serialized google.protobuf.Any, asserted end-to-end by
+	// the C++ integration test in filter_test.cc. The bytes are hand-encoded because the test
+	// module has no protobuf dependency:
+	//   0a 03 74 2f 78     field 1 (type_url) = "t/x"
+	//   12 02 01 02        field 2 (value)    = 0x01 0x02
+	p.handle.SetTypedMetadata("ns_req_header_typed",
+		[]byte{0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02})
+	if typeURL, value, ok := p.handle.GetTypedMetadata(shared.MetadataSourceTypeDynamic, "ns_req_header_typed"); !ok || typeURL.ToUnsafeString() != "t/x" || value.ToUnsafeString() != "\x01\x02" {
+		panic("typed metadata mismatch")
+	}
+	if _, _, ok := p.handle.GetTypedMetadata(shared.MetadataSourceTypeDynamic, "missing"); ok {
+		panic("unexpected typed metadata")
 	}
 
 	// Try getting metadata from router, cluster, and host.
@@ -392,6 +752,15 @@ func (p *dynamicMetadataCallbacksFilter) OnResponseBody(body shared.BodyBuffer, 
 		panic(fmt.Sprintf("missing ns_res_body_bool in namespaces: %v", namespaces))
 	}
 
+	// Test list metadata.
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 1.0)
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 2.0)
+	p.handle.AddMetadataListNumber("ns_list", "list_key", 3.0)
+	p.handle.AddMetadataListString("ns_list", "str_list_key", "hello")
+	p.handle.AddMetadataListString("ns_list", "str_list_key", "world")
+	p.handle.AddMetadataListBool("ns_list", "bool_list_key", true)
+	p.handle.AddMetadataListBool("ns_list", "bool_list_key", false)
+
 	return shared.BodyStatusContinue
 }
 
@@ -420,6 +789,30 @@ func (f *filterStateCallbacksFactory) Create(handle shared.HttpFilterHandle) sha
 func (p *filterStateCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.testFilterState("req_header_key", "req_header_value")
+	if val, ok := p.handle.GetFilterStateTyped("envoy.test.http_typed_object_for_rust"); ok {
+		panic(fmt.Sprintf("unexpected typed filter state: %s", val.ToUnsafeString()))
+	}
+	if !p.handle.SetFilterStateTyped("envoy.test.http_typed_object_for_rust", []byte("typed_value")) {
+		panic("failed to set typed filter state")
+	}
+	if val, ok := p.handle.GetFilterStateTyped("envoy.test.http_typed_object_for_rust"); !ok ||
+		val.ToUnsafeString() != "typed_value" {
+		panic(fmt.Sprintf("typed filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
+	}
+	if !p.handle.SetFilterStateValue("shared_filter_state_key", []byte("shared_filter_state_value"),
+		shared.FilterStateLifeSpanConnection, shared.FilterStateStreamSharingSharedWithUpstreamConnection) {
+		panic("failed to set filter state value")
+	}
+	if val, ok := p.handle.GetFilterState("shared_filter_state_key"); !ok ||
+		val.ToUnsafeString() != "shared_filter_state_value" {
+		panic(fmt.Sprintf("shared filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
+	}
+	if !p.handle.HasFilterState("envoy.test.http_typed_object_for_rust") {
+		panic("expected HasFilterState to return true for existing key")
+	}
+	if p.handle.HasFilterState("nonexistent_key") {
+		panic("expected HasFilterState to return false for missing key")
+	}
 	return shared.HeadersStatusContinue
 }
 

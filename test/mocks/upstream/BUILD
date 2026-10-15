@@ -2,11 +2,17 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_proto_library(
+    name = "upstream_mocks_proto",
+    srcs = ["upstream_mocks.proto"],
+)
 
 envoy_cc_mock(
     name = "cluster_info_mocks",
@@ -27,6 +33,7 @@ envoy_cc_mock(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/load_balancing_policies/round_robin:config",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -38,7 +45,7 @@ envoy_cc_mock(
     name = "host_mocks",
     srcs = ["host.cc"],
     hdrs = ["host.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_info_mocks",
         "//envoy/upstream:upstream_interface",
@@ -127,7 +134,6 @@ envoy_cc_mock(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -154,6 +160,7 @@ envoy_cc_mock(
     hdrs = ["priority_set.h"],
     deps = [
         "//envoy/upstream:upstream_interface",
+        "//source/common/upstream:host_lookup_map_lib",
         "//test/mocks/upstream:host_set_mocks",
     ],
 )
@@ -172,6 +179,7 @@ envoy_cc_mock(
     name = "retry_priority_factory_mocks",
     hdrs = ["retry_priority_factory.h"],
     deps = [
+        ":upstream_mocks_proto_cc_proto",
         "//envoy/upstream:retry_interface",
         "//test/mocks/upstream:retry_priority_mocks",
     ],
@@ -210,7 +218,7 @@ envoy_cc_mock(
     name = "load_balancer_mocks",
     srcs = ["load_balancer.cc"],
     hdrs = ["load_balancer.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:load_balancer_interface",
         "//test/mocks/upstream:host_mocks",
@@ -240,7 +248,7 @@ envoy_cc_mock(
     name = "thread_local_cluster_mocks",
     srcs = ["thread_local_cluster.cc"],
     hdrs = ["thread_local_cluster.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:thread_local_cluster_interface",
         "//test/mocks/http:conn_pool_mocks",
@@ -259,7 +267,6 @@ envoy_cc_mock(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
         "//source/common/singleton:manager_impl_lib",
-        "//test/mocks/secret:secret_mocks",
         "//test/test_common:thread_factory_for_test_lib",
     ],
 )
@@ -277,7 +284,7 @@ envoy_cc_mock(
     name = "cluster_manager_mocks",
     srcs = ["cluster_manager.cc"],
     hdrs = ["cluster_manager.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//test/mocks/config:config_mocks",

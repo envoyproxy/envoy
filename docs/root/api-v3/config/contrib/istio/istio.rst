@@ -9,5 +9,6 @@ Istio Contrib Extensions
   ../../../extensions/filters/http/istio_stats/v3/istio_stats.proto
   ../../../extensions/filters/http/peer_metadata/v3/peer_metadata.proto
   ../../../extensions/filters/network/metadata_exchange/v3/metadata_exchange.proto
+  ../../../extensions/filters/network/peer_metadata/v3/peer_metadata.proto
   ../../../extensions/filters/common/workload_discovery/v3/discovery.proto
   ../../../extensions/filters/common/workload_discovery/v3/extension.proto

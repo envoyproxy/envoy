@@ -10,6 +10,8 @@
 #include "envoy/ssl/handshaker.h"
 
 #include "absl/strings/string_view.h"
+#include "openssl/ssl.h"
+#include "openssl/x509.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -131,6 +133,12 @@ public:
    * @return the detailed certificate validation error message, or empty if none.
    */
   virtual absl::string_view certificateValidationError() const PURE;
+
+  /**
+   * Store the validated certificate chain built by the cert validator.
+   * @param chain the validated chain where chain[0] = leaf, chain[1] = direct issuer, etc.
+   */
+  virtual void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) PURE;
 };
 
 } // namespace Ssl

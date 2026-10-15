@@ -98,7 +98,7 @@ public:
   }
 
   // FilterState::Object
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return absl::StrCat(packet_count_, ",", packet_length_, ",", packet_headers_length_);
   }
 
@@ -131,11 +131,10 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
     cb.filterState().setData(TestStringFilterState::key(),
                              std::make_unique<TestStringFilterState>(added_value_),
-                             StreamInfo::FilterState::StateType::ReadOnly,
                              StreamInfo::FilterState::LifeSpan::Connection);
-    cb.filterState().setData(
-        TestFirstPacketReceivedFilterState::key(), test_first_packet_received_filter_state_,
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
+    cb.filterState().setData(TestFirstPacketReceivedFilterState::key(),
+                             test_first_packet_received_filter_state_,
+                             StreamInfo::FilterState::LifeSpan::Connection);
     dispatcher_ = &cb.dispatcher();
     return Network::FilterStatus::Continue;
   }

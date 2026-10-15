@@ -23,7 +23,7 @@ class QatzstdCompressorImpl : public Envoy::Compression::Zstd::Compressor::ZstdC
 public:
   QatzstdCompressorImpl(uint32_t compression_level, bool enable_checksum, uint32_t strategy,
                         uint32_t chunk_size, bool enable_qat_zstd,
-                        uint32_t qat_zstd_fallback_threshold, void* sequenceProducerState);
+                        uint32_t qat_zstd_fallback_threshold, void* sequence_producer_state);
 
 private:
   void compressPreprocess(Buffer::Instance& buffer,
@@ -38,9 +38,9 @@ private:
 
   bool enable_qat_zstd_;
   const uint32_t qat_zstd_fallback_threshold_;
-  void* sequenceProducerState_;
+  void* sequence_producer_state_;
   std::unique_ptr<uint8_t[]> input_ptr_;
-  uint64_t input_len_;
+  uint64_t input_len_{0};
   uint64_t chunk_size_;
 };
 

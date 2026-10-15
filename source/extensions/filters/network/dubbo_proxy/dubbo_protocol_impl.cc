@@ -56,6 +56,7 @@ void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageMetadataSharedPtr
   ASSERT(data.length() >= DubboProtocolImpl::MessageSize);
   uint8_t flag = data.peekInt<uint8_t>(FlagOffset);
   bool is_two_way = (flag & TwoWayMask) == TwoWayMask ? true : false;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   SerializationType type = static_cast<SerializationType>(flag & SerializationTypeMask);
   if (!isValidSerializationType(type)) {
     throw EnvoyException(
@@ -72,6 +73,7 @@ void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageMetadataSharedPtr
 
 void parseResponseInfoFromBuffer(Buffer::Instance& buffer, MessageMetadataSharedPtr metadata) {
   ASSERT(buffer.length() >= DubboProtocolImpl::MessageSize);
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   ResponseStatus status = static_cast<ResponseStatus>(buffer.peekInt<uint8_t>(StatusOffset));
   if (!isValidResponseStatus(status)) {
     throw EnvoyException(

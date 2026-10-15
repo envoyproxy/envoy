@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/key_value_store.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/stats/scope.h"
@@ -53,7 +55,7 @@ public:
 
   void onResourceLoadFailed(const Envoy::Config::XdsSourceId& source_id,
                             const std::string& resource_name,
-                            const absl::optional<EnvoyException>& exception) override;
+                            const std::optional<EnvoyException>& exception) override;
 
 private:
   // Gets all the resources present in the KeyValueStore for the given source_id. This is the

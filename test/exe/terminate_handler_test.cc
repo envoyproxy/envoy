@@ -1,5 +1,6 @@
 #include "source/exe/terminate_handler.h"
 
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

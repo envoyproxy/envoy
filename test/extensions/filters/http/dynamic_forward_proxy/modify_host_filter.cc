@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/dynamic_forward_proxy/modify_host_filter.pb.h"
 #include "test/integration/filters/common.h"
 
 namespace Envoy {
@@ -18,9 +19,11 @@ public:
   }
 };
 
-class ModifyHostFilterFactory : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class ModifyHostFilterFactory
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<
+          test::extensions::filters::http::dynamic_forward_proxy::ModifyHostFilterConfig> {
 public:
-  ModifyHostFilterFactory() : EmptyHttpDualFilterConfig("modify-host-filter") {}
+  ModifyHostFilterFactory() : UniqueEmptyHttpDualFilterConfig("modify-host-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {

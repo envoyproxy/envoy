@@ -45,17 +45,7 @@ constexpr absl::string_view kLiteral = "a-zA-Z0-9-._~" // Unreserved
                                        "%"             // pct-encoded
                                        "!$&'()+,;"     // sub-delims excluding *=
                                        ":@"
-                                       "="; // user included "=" allowed
-
-// Additional literal that allows "*" in the pattern.
-// This should replace "kLiteral" after removal of
-// "reloadable_features.uri_template_match_on_asterisk" runtime guard.
-// Valid pchar from https://datatracker.ietf.org/doc/html/rfc3986#appendix-A
-constexpr absl::string_view kLiteralWithAsterisk = "a-zA-Z0-9-._~" // Unreserved
-                                                   "%"             // pct-encoded
-                                                   "!$&'()+,;"     // sub-delims excluding *=
-                                                   ":@"
-                                                   "=*"; // reserved characters
+                                       "=*"; // user included "=" and "*" allowed
 
 // Default operator used for the variable when none specified.
 constexpr Operator kDefaultVariableOperator = Operator::PathGlob;
@@ -97,12 +87,17 @@ std::string toString(const Operator val) {
 }
 
 std::string toString(const Variable val) {
+  std::string result = std::string(val.prefix_);
+
   if (val.match_.empty()) {
-    return absl::StrCat("{", val.name_, "}");
+    absl::StrAppend(&result, "{", val.name_, "}");
+  } else {
+    absl::StrAppend(&result, "{", val.name_, "=",
+                    absl::StrJoin(val.match_, "/", ToStringFormatter()), "}");
   }
 
-  return absl::StrCat("{", val.name_, "=", absl::StrJoin(val.match_, "/", ToStringFormatter()),
-                      "}");
+  absl::StrAppend(&result, val.suffix_);
+  return result;
 }
 
 template <typename T> std::string ToStringVisitor::operator()(const T& val) const {
@@ -133,30 +128,19 @@ std::string ParsedPathPattern::debugString() const {
 }
 
 bool isValidLiteral(absl::string_view literal) {
-  static const std::string* kValidLiteralRegexAsterisk =
-      new std::string(absl::StrCat("^[", kLiteralWithAsterisk, "]+$"));
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "]+$"));
-  static const LazyRE2 literal_regex_asterisk = {kValidLiteralRegexAsterisk->data()};
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
 
-  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")
-             ? RE2::FullMatch(literal, *literal_regex_asterisk)
-             : RE2::FullMatch(literal, *literal_regex);
+  return RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidRewriteLiteral(absl::string_view literal) {
   static const std::string* kValidLiteralRegex =
       new std::string(absl::StrCat("^[", kLiteral, "/]+$"));
-  static const std::string* kValidLiteralRegexAsterisk =
-      new std::string(absl::StrCat("^[", kLiteralWithAsterisk, "/]+$"));
-
   static const LazyRE2 literal_regex = {kValidLiteralRegex->data()};
-  static const LazyRE2 literal_regex_asterisk = {kValidLiteralRegexAsterisk->data()};
 
-  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")
-             ? RE2::FullMatch(literal, *literal_regex_asterisk)
-             : RE2::FullMatch(literal, *literal_regex);
+  return RE2::FullMatch(literal, *literal_regex);
 }
 
 bool isValidVariableName(absl::string_view variable) {
@@ -165,8 +149,7 @@ bool isValidVariableName(absl::string_view variable) {
 }
 
 absl::StatusOr<ParsedResult<Literal>> parseLiteral(absl::string_view pattern) {
-  absl::string_view literal =
-      std::vector<absl::string_view>(absl::StrSplit(pattern, absl::MaxSplits('/', 1)))[0];
+  absl::string_view literal = pattern.substr(0, pattern.find('/'));
   absl::string_view unparsed_pattern = pattern.substr(literal.size());
   if (!isValidLiteral(literal)) {
     return absl::InvalidArgumentError(fmt::format("Invalid literal: \"{}\"", literal));
@@ -241,6 +224,54 @@ absl::StatusOr<ParsedResult<Variable>> parseVariable(absl::string_view pattern) 
   return ParsedResult<Variable>(var, unparsed_pattern);
 }
 
+absl::StatusOr<ParsedResult<Variable>> parseMixedVariableLiteral(absl::string_view pattern) {
+  size_t start_brace = pattern.find('{');
+  if (start_brace == absl::string_view::npos) {
+    return absl::InvalidArgumentError(
+        fmt::format("No variable found in mixed pattern: \"{}\"", pattern));
+  }
+
+  size_t end_brace = pattern.find('}', start_brace);
+  if (end_brace == absl::string_view::npos) {
+    return absl::InvalidArgumentError(
+        fmt::format("Unmatched variable bracket in mixed pattern: \"{}\"", pattern));
+  }
+
+  absl::string_view prefix = pattern.substr(0, start_brace);
+  absl::string_view variable_portion = pattern.substr(start_brace, end_brace - start_brace + 1);
+
+  // Suffix belongs to this segment only; stop at the next '/' or end of input.
+  size_t suffix_start = end_brace + 1;
+  absl::string_view suffix;
+  absl::string_view unparsed_pattern;
+
+  if (suffix_start < pattern.size()) {
+    size_t next_slash = pattern.find('/', suffix_start);
+    if (next_slash != absl::string_view::npos) {
+      suffix = pattern.substr(suffix_start, next_slash - suffix_start);
+      unparsed_pattern = pattern.substr(next_slash);
+    } else {
+      suffix = pattern.substr(suffix_start);
+    }
+  }
+
+  if (!prefix.empty() && !isValidLiteral(prefix)) {
+    return absl::InvalidArgumentError(fmt::format("Invalid prefix literal: \"{}\"", prefix));
+  }
+  if (!suffix.empty() && !isValidLiteral(suffix)) {
+    return absl::InvalidArgumentError(fmt::format("Invalid suffix literal: \"{}\"", suffix));
+  }
+
+  absl::StatusOr<ParsedResult<Variable>> var_result = parseVariable(variable_portion);
+  if (!var_result.ok()) {
+    return var_result.status();
+  }
+
+  Variable mixed_var(var_result->parsed_value_.name_, std::move(var_result->parsed_value_.match_),
+                     prefix, suffix);
+  return ParsedResult<Variable>(mixed_var, unparsed_pattern);
+}
+
 absl::StatusOr<absl::flat_hash_set<absl::string_view>>
 gatherCaptureNames(const struct ParsedPathPattern& pattern) {
   absl::flat_hash_set<absl::string_view> captured_variables;
@@ -313,6 +344,9 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
   // Parse the leading '/'
   path = path.substr(1);
 
+  const bool mixed_vars_enabled = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.uri_template_mixed_variable_literals");
+
   // Do the initial lexical parsing.
   while (!path.empty()) {
     ParsedSegment segment;
@@ -323,17 +357,32 @@ absl::StatusOr<ParsedPathPattern> parsePathPatternSyntax(absl::string_view path)
       }
       segment = *std::move(status);
     } else if (path[0] == '{') {
-      absl::StatusOr<Variable> status = alsoUpdatePattern<Variable>(parseVariable, &path);
+      absl::FunctionRef<absl::StatusOr<ParsedResult<Variable>>(absl::string_view)> parse_func =
+          mixed_vars_enabled ? parseMixedVariableLiteral : parseVariable;
+      absl::StatusOr<Variable> status = alsoUpdatePattern<Variable>(parse_func, &path);
       if (!status.ok()) {
         return status.status();
       }
       segment = *std::move(status);
     } else {
-      absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(parseLiteral, &path);
-      if (!status.ok()) {
-        return status.status();
+      absl::string_view segment_until_slash = path.substr(0, path.find('/'));
+
+      // Detect mixed variable/literal segments (e.g., "v{version}" or "{id}.json").
+      if (mixed_vars_enabled && segment_until_slash.find('{') != absl::string_view::npos &&
+          segment_until_slash.find('}') != absl::string_view::npos) {
+        absl::StatusOr<Variable> status =
+            alsoUpdatePattern<Variable>(parseMixedVariableLiteral, &path);
+        if (!status.ok()) {
+          return status.status();
+        }
+        segment = *std::move(status);
+      } else {
+        absl::StatusOr<Literal> status = alsoUpdatePattern<Literal>(parseLiteral, &path);
+        if (!status.ok()) {
+          return status.status();
+        }
+        segment = *std::move(status);
       }
-      segment = *std::move(status);
     }
     parsed_pattern.parsed_segments_.push_back(segment);
 
@@ -385,35 +434,27 @@ std::string toRegexPattern(Operator pattern) {
   static const std::string* kPathGlobRegex = new std::string(absl::StrCat("[", kLiteral, "]+"));
   static const std::string* kTextGlobRegex = new std::string(absl::StrCat("[", kLiteral, "/]*"));
 
-  static const std::string* kPathGlobRegexAsterisk =
-      new std::string(absl::StrCat("[", kLiteralWithAsterisk, "]+"));
-  static const std::string* kTextGlobRegexAsterisk =
-      new std::string(absl::StrCat("[", kLiteralWithAsterisk, "/]*"));
-
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.uri_template_match_on_asterisk")) {
-    switch (pattern) {
-    case Operator::PathGlob: // "*"
-      return *kPathGlobRegexAsterisk;
-    case Operator::TextGlob: // "**"
-      return *kTextGlobRegexAsterisk;
-    }
-  } else {
-    switch (pattern) {
-    case Operator::PathGlob: // "*"
-      return *kPathGlobRegex;
-    case Operator::TextGlob: // "**"
-      return *kTextGlobRegex;
-    }
+  switch (pattern) {
+  case Operator::PathGlob: // "*"
+    return *kPathGlobRegex;
+  case Operator::TextGlob: // "**"
+    return *kTextGlobRegex;
   }
   return "";
 }
 
 std::string toRegexPattern(const Variable& pattern) {
-  return absl::StrCat("(?P<", pattern.name_, ">",
-                      pattern.match_.empty()
-                          ? toRegexPattern(kDefaultVariableOperator)
-                          : absl::StrJoin(pattern.match_, "/", ToRegexPatternFormatter()),
-                      ")");
+  std::string variable_regex = absl::StrCat(
+      "(?P<", pattern.name_, ">",
+      pattern.match_.empty() ? toRegexPattern(kDefaultVariableOperator)
+                             : absl::StrJoin(pattern.match_, "/", ToRegexPatternFormatter()),
+      ")");
+  if (pattern.prefix_.empty() && pattern.suffix_.empty()) {
+    return variable_regex;
+  }
+
+  return absl::StrCat(toRegexPattern(pattern.prefix_), variable_regex,
+                      toRegexPattern(pattern.suffix_));
 }
 
 std::string toRegexPattern(const struct ParsedPathPattern& pattern) {

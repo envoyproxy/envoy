@@ -18,6 +18,8 @@ import (
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
 		"passthrough":                  &PassthroughConfigFactory{},
+		"filter_new_panic":             &FilterNewPanicConfigFactory{},
+		"local_reply_response_headers": &LocalReplyResponseHeadersConfigFactory{},
 		"header_callbacks_on_creation": &HeaderCallbacksOnCreationConfigFactory{},
 		"header_callbacks":             &HeaderCallbacksConfigFactory{},
 		"per_route_config":             &PerRouteConfigFactory{},
@@ -25,9 +27,13 @@ func init() {
 		"http_callouts":                &HttpCalloutsConfigFactory{},
 		"send_response":                &SendResponseConfigFactory{},
 		"http_filter_scheduler":        &HttpFilterSchedulerConfigFactory{},
+		"span_across_callbacks":        &SpanAcrossCallbacksConfigFactory{},
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
+		"stream_timing":                &StreamTimingConfigFactory{},
+		"upstream_connection_attempts": &UpstreamConnectionAttemptsConfigFactory{},
 		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
+		"buffer_limit_filter":          &BufferLimitConfigFactory{},
 		"http_stream_basic":            &HttpStreamBasicConfigFactory{},
 		"http_stream_bidirectional":    &HttpStreamBidirectionalConfigFactory{},
 		"upstream_reset":               &UpstreamResetConfigFactory{},
@@ -35,6 +41,10 @@ func init() {
 		"http_config_callout":          &HttpConfigCalloutConfigFactory{},
 		"http_config_stream":           &HttpConfigStreamConfigFactory{},
 		"http_struct_config":           &HttpStructConfigFactory{},
+		"list_metadata_callbacks":      &ListMetadataCallbacksConfigFactory{},
+		"log_level":                    &LogLevelConfigFactory{},
+		"runtime_values":               &RuntimeValuesConfigFactory{},
+		"generic_secret_callbacks":     &GenericSecretCallbacksConfigFactory{},
 	})
 }
 
@@ -97,6 +107,36 @@ func (p *ConfigSchedulerFilter) OnRequestHeaders(headers shared.HeaderMap,
 // Passthrough
 // -----------------------------------------------------------------------------
 
+// LocalReplyResponseHeadersConfigFactory builds a filter that only records that its
+// response-headers callback ran. Used to check that the callback still fires when the response is a
+// local reply the module did not send, such as a `direct_response` route.
+type LocalReplyResponseHeadersConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *LocalReplyResponseHeadersConfigFactory) Create(_ shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	return &LocalReplyResponseHeadersFilterFactory{}, nil
+}
+
+type LocalReplyResponseHeadersFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *LocalReplyResponseHeadersFilterFactory) Create(shared.HttpFilterHandle) shared.HttpFilter {
+	return &LocalReplyResponseHeadersFilter{}
+}
+
+type LocalReplyResponseHeadersFilter struct {
+	shared.EmptyHttpFilter
+}
+
+func (f *LocalReplyResponseHeadersFilter) OnResponseHeaders(headers shared.HeaderMap,
+	_ bool) shared.HeadersStatus {
+	headers.Set("on-response-headers", "called")
+	return shared.HeadersStatusContinue
+}
+
 type PassthroughConfigFactory struct {
 	shared.EmptyHttpFilterConfigFactory
 }
@@ -135,6 +175,30 @@ func (p *PassthroughFilter) OnRequestHeaders(headers shared.HeaderMap,
 	p.handle.Log(shared.LogLevelError, "on_request_headers called")
 	p.handle.Log(shared.LogLevelCritical, "on_request_headers called")
 	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// FilterNewPanic
+// -----------------------------------------------------------------------------
+
+// FilterNewPanicConfigFactory exercises the Go SDK panic barrier. Its filter constructor panics, so
+// on_http_filter_new recovers the panic, returns a null filter, and Envoy fails the request closed
+// with a 500 instead of aborting the process.
+type FilterNewPanicConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *FilterNewPanicConfigFactory) Create(shared.HttpFilterConfigHandle,
+	[]byte) (shared.HttpFilterFactory, error) {
+	return &FilterNewPanicFilterFactory{}, nil
+}
+
+type FilterNewPanicFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *FilterNewPanicFilterFactory) Create(shared.HttpFilterHandle) shared.HttpFilter {
+	panic("filter constructor failed on purpose")
 }
 
 // -----------------------------------------------------------------------------
@@ -695,6 +759,54 @@ func (p *HttpFilterSchedulerFilter) OnStreamComplete() {
 }
 
 // -----------------------------------------------------------------------------
+// SpanAcrossCallbacks
+// -----------------------------------------------------------------------------
+
+type SpanAcrossCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *SpanAcrossCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	c []byte) (shared.HttpFilterFactory, error) {
+	return &SpanAcrossCallbacksFilterFactory{}, nil
+}
+
+type SpanAcrossCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *SpanAcrossCallbacksFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &SpanAcrossCallbacksFilter{handle: h}
+}
+
+// SpanAcrossCallbacksFilter spawns a child span in OnRequestHeaders, starts off-thread work, and
+// finishes the span from the scheduled callback to show a span can cover work between event hooks.
+type SpanAcrossCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle    shared.HttpFilterHandle
+	childSpan shared.ChildSpan
+}
+
+func (p *SpanAcrossCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	if span := p.handle.GetActiveSpan(); span != nil {
+		p.childSpan = span.SpawnChild("off_thread_work")
+	}
+	sched := p.handle.GetScheduler()
+	go func() {
+		sched.Schedule(func() {
+			if p.childSpan != nil {
+				p.childSpan.SetTag("completed", "true")
+				p.childSpan.Finish()
+				p.childSpan = nil
+			}
+			p.handle.ContinueRequest()
+		})
+	}()
+	return shared.HeadersStatusStop
+}
+
+// -----------------------------------------------------------------------------
 // FakeExternalCache
 // -----------------------------------------------------------------------------
 
@@ -802,6 +914,12 @@ func (f *StatsCallbacksConfigFactory) Create(h shared.HttpFilterConfigHandle, c 
 	ids.epVals, err = h.DefineHistogram("entrypoint_header_values", "entrypoint", "method")
 	assertEq(err, shared.MetricsSuccess, "h2")
 
+	// Emit a metric directly from the config context (no per-stream filter), exercising the
+	// config-scoped emission path. This would typically be done from a scheduled background task.
+	configTotal, err := h.DefineCounter("config_total")
+	assertEq(err, shared.MetricsSuccess, "c3")
+	assertEq(h.IncrementCounterValue(configTotal, 1), shared.MetricsSuccess, "c3i")
+
 	ids.headerToCount = parts[0]
 	ids.headerToSet = parts[1]
 
@@ -868,6 +986,124 @@ func (p *StatsCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, endOf
 
 func (p *StatsCallbacksFilter) OnStreamComplete() {
 	p.handle.DecrementGaugeValue(p.ids.epPending, 1, "on_response_headers", p.method)
+}
+
+// -----------------------------------------------------------------------------
+// StreamTiming
+// -----------------------------------------------------------------------------
+
+type StreamTimingConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *StreamTimingConfigFactory) Create(h shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	timingObservedTotal, result := h.DefineCounter("stream_timing_observed_total")
+	assertEq(result, shared.MetricsSuccess, "timing counter definition")
+	return &StreamTimingFilterFactory{timingObservedTotal: timingObservedTotal}, nil
+}
+
+type StreamTimingFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	timingObservedTotal shared.MetricID
+}
+
+func (f *StreamTimingFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &StreamTimingFilter{handle: h, timingObservedTotal: f.timingObservedTotal}
+}
+
+type StreamTimingFilter struct {
+	shared.EmptyHttpFilter
+	handle              shared.HttpFilterHandle
+	timingObservedTotal shared.MetricID
+}
+
+func (f *StreamTimingFilter) OnStreamComplete() {
+	timing := f.handle.GetTimingInfo()
+	assert(timing.StartTimeUnixNs > 0, "start time")
+	assert(timing.HasStartTime, "start time available")
+	assert(timing.DownstreamConnectionBeginNs != -1, "downstream connection accepted")
+	assert(timing.HasDownstreamConnectionBegin, "downstream connection marker available")
+	assert(timing.DownstreamHandshakeStartNs == -1, "no downstream TLS handshake start")
+	assert(!timing.HasDownstreamHandshakeStart, "no downstream TLS start marker")
+	assert(timing.DownstreamHandshakeCompleteNs == -1, "no downstream TLS handshake completion")
+	assert(!timing.HasDownstreamHandshakeComplete, "no downstream TLS completion marker")
+	assert(timing.LastDownstreamHeaderRxByteReceivedNs >= 0, "request headers received")
+	assert(timing.HasLastDownstreamHeaderRxByteReceived, "request headers marker available")
+	assert(timing.LastDownstreamRxByteReceivedNs >= timing.LastDownstreamHeaderRxByteReceivedNs,
+		"request received")
+	assert(timing.HasLastDownstreamRxByteReceived, "request received marker available")
+	assert(timing.UpstreamConnectStartNs >= 0, "upstream connect start")
+	assert(timing.HasUpstreamConnectStart, "upstream connect start marker available")
+	assert(timing.UpstreamConnectCompleteNs >= timing.UpstreamConnectStartNs, "upstream connect complete")
+	assert(timing.HasUpstreamConnectComplete, "upstream connect end marker available")
+	assert(timing.UpstreamHandshakeCompleteNs == -1, "no upstream TLS handshake")
+	assert(!timing.HasUpstreamHandshakeComplete, "no upstream TLS completion marker")
+	assert(timing.FirstUpstreamTxByteSentNs >= 0, "upstream request start")
+	assert(timing.HasFirstUpstreamTxByteSent, "upstream request start marker available")
+	assert(timing.LastUpstreamTxByteSentNs >= timing.FirstUpstreamTxByteSentNs, "upstream request complete")
+	assert(timing.HasLastUpstreamTxByteSent, "upstream request end marker available")
+	assert(timing.FirstUpstreamRxByteReceivedNs >= 0, "upstream response start")
+	assert(timing.HasFirstUpstreamRxByteReceived, "upstream response start marker available")
+	assert(timing.FirstUpstreamRxBodyByteReceivedNs >= timing.FirstUpstreamRxByteReceivedNs,
+		"upstream response body start")
+	assert(timing.HasFirstUpstreamRxBodyByteReceived, "upstream body start marker available")
+	assert(timing.LastUpstreamRxByteReceivedNs >= timing.FirstUpstreamRxBodyByteReceivedNs,
+		"upstream response complete")
+	assert(timing.HasLastUpstreamRxByteReceived, "upstream response end marker available")
+	assert(timing.FirstDownstreamTxByteSentNs >= 0, "downstream response start")
+	assert(timing.HasFirstDownstreamTxByteSent, "downstream response start marker available")
+	assert(timing.LastDownstreamTxByteSentNs >= timing.FirstDownstreamTxByteSentNs,
+		"downstream response complete")
+	assert(timing.HasLastDownstreamTxByteSent, "downstream response end marker available")
+	assert(timing.LastDownstreamAckReceivedNs == -1, "no TCP final ACK marker")
+	assert(!timing.HasLastDownstreamAckReceived, "no TCP final ACK marker available")
+	assert(timing.RequestCompleteDurationNs >= 0, "request complete duration")
+	assert(timing.HasRequestComplete, "request complete marker available")
+	assert(timing.DownstreamConnectionEndNs == -1, "connection remains open")
+	assert(!timing.HasDownstreamConnectionEnd, "connection close marker unavailable")
+	assertEq(f.handle.IncrementCounterValue(f.timingObservedTotal, 1), shared.MetricsSuccess,
+		"timing counter")
+}
+
+// -----------------------------------------------------------------------------
+// UpstreamConnectionAttempts
+// -----------------------------------------------------------------------------
+
+type UpstreamConnectionAttemptsConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *UpstreamConnectionAttemptsConfigFactory) Create(h shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	observedTotal, result := h.DefineCounter("upstream_connection_attempts_observed_total")
+	assertEq(result, shared.MetricsSuccess, "upstream attempts counter definition")
+	return &UpstreamConnectionAttemptsFilterFactory{observedTotal: observedTotal}, nil
+}
+
+type UpstreamConnectionAttemptsFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	observedTotal shared.MetricID
+}
+
+func (f *UpstreamConnectionAttemptsFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &UpstreamConnectionAttemptsFilter{handle: h, observedTotal: f.observedTotal}
+}
+
+type UpstreamConnectionAttemptsFilter struct {
+	shared.EmptyHttpFilter
+	handle        shared.HttpFilterHandle
+	observedTotal shared.MetricID
+}
+
+func (f *UpstreamConnectionAttemptsFilter) OnStreamComplete() {
+	remoteAddress, ok := f.handle.GetUpstreamRemoteAddress()
+	assert(ok && remoteAddress.Len > 0, "upstream remote address")
+	assertEq(len(f.handle.GetUpstreamHostsAttempted()), 1, "upstream hosts attempted")
+	assertEq(len(f.handle.GetUpstreamConnectionIDsAttempted()), 1,
+		"upstream connection IDs attempted")
+	assertEq(f.handle.IncrementCounterValue(f.observedTotal, 1), shared.MetricsSuccess,
+		"upstream attempts counter")
 }
 
 // -----------------------------------------------------------------------------
@@ -962,6 +1198,61 @@ func (p *StreamingTerminalFilter) OnBelowWriteBufferLowWatermark() {
 func (p *StreamingTerminalFilter) OnStreamComplete() {
 	// Force the GC to release the scheduler and related C resources.
 	runtime.GC()
+}
+
+// -----------------------------------------------------------------------------
+// BufferLimit
+// -----------------------------------------------------------------------------
+
+type BufferLimitConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *BufferLimitConfigFactory) Create(h shared.HttpFilterConfigHandle, c []byte) (shared.HttpFilterFactory, error) {
+	return &BufferLimitFilterFactory{}, nil
+}
+
+type BufferLimitFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *BufferLimitFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	p := &BufferLimitFilter{handle: h}
+	h.SetDownstreamWatermarkCallbacks(p)
+	return p
+}
+
+type BufferLimitFilter struct {
+	shared.EmptyHttpFilter
+	handle             shared.HttpFilterHandle
+	initialBufferLimit uint64
+	aboveW             int
+	belowW             int
+}
+
+func (p *BufferLimitFilter) OnRequestHeaders(headers shared.HeaderMap, endOfStream bool) shared.HeadersStatus {
+	p.initialBufferLimit = p.handle.GetBufferLimit()
+	const desiredLimit uint64 = 65536
+	if p.initialBufferLimit < desiredLimit {
+		p.handle.SetBufferLimit(desiredLimit)
+	}
+	return shared.HeadersStatusContinue
+}
+
+func (p *BufferLimitFilter) OnResponseHeaders(headers shared.HeaderMap, endOfStream bool) shared.HeadersStatus {
+	headers.Set("x-initial-buffer-limit", strconv.FormatUint(p.initialBufferLimit, 10))
+	headers.Set("x-current-buffer-limit", strconv.FormatUint(p.handle.GetBufferLimit(), 10))
+	headers.Set("x-above-watermark-count", strconv.Itoa(p.aboveW))
+	headers.Set("x-below-watermark-count", strconv.Itoa(p.belowW))
+	return shared.HeadersStatusContinue
+}
+
+func (p *BufferLimitFilter) OnAboveWriteBufferHighWatermark() {
+	p.aboveW++
+}
+
+func (p *BufferLimitFilter) OnBelowWriteBufferLowWatermark() {
+	p.belowW++
 }
 
 // -----------------------------------------------------------------------------
@@ -1328,4 +1619,267 @@ func (f *HttpStructFilterFactory) Create(handle shared.HttpFilterHandle) shared.
 		handle.RequestHeaders().Set(k, v)
 	}
 	return &shared.EmptyHttpFilter{}
+}
+
+// -----------------------------------------------------------------------------
+// ListMetadataCallbacks
+// -----------------------------------------------------------------------------
+
+type ListMetadataCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *ListMetadataCallbacksConfigFactory) Create(_ shared.HttpFilterConfigHandle, _ []byte) (shared.HttpFilterFactory, error) {
+	return &ListMetadataCallbacksFilterFactory{}, nil
+}
+
+type ListMetadataCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *ListMetadataCallbacksFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &ListMetadataCallbacksFilter{handle: handle}
+}
+
+type ListMetadataCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *ListMetadataCallbacksFilter) OnRequestHeaders(_ shared.HeaderMap, _ bool) shared.HeadersStatus {
+	// Build a number list: [10.0, 20.0, 30.0]
+	f.handle.AddMetadataListNumber("ns", "numbers", 10.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 20.0)
+	f.handle.AddMetadataListNumber("ns", "numbers", 30.0)
+	// Build a string list: ["hello", "world"]
+	f.handle.AddMetadataListString("ns", "strings", "hello")
+	f.handle.AddMetadataListString("ns", "strings", "world")
+	// Build a bool list: [true, false]
+	f.handle.AddMetadataListBool("ns", "bools", true)
+	f.handle.AddMetadataListBool("ns", "bools", false)
+	return shared.HeadersStatusContinue
+}
+
+func (f *ListMetadataCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap, _ bool) shared.HeadersStatus {
+	source := shared.MetadataSourceTypeDynamic
+
+	// Expose number list via response headers.
+	numSize, ok := f.handle.GetMetadataListSize(source, "ns", "numbers")
+	if ok {
+		headers.Set("x-list-num-size", strconv.Itoa(numSize))
+		for i := 0; i < numSize; i++ {
+			val, ok := f.handle.GetMetadataListNumber(source, "ns", "numbers", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-num-%d", i), strconv.Itoa(int(val)))
+			}
+		}
+	}
+
+	// Expose string list via response headers.
+	strSize, ok := f.handle.GetMetadataListSize(source, "ns", "strings")
+	if ok {
+		headers.Set("x-list-str-size", strconv.Itoa(strSize))
+		for i := 0; i < strSize; i++ {
+			val, ok := f.handle.GetMetadataListString(source, "ns", "strings", i)
+			if ok {
+				headers.Set(fmt.Sprintf("x-list-str-%d", i), string(val.ToBytes()))
+			}
+		}
+	}
+
+	// Expose bool list via response headers.
+	boolSize, ok := f.handle.GetMetadataListSize(source, "ns", "bools")
+	if ok {
+		headers.Set("x-list-bool-size", strconv.Itoa(boolSize))
+		for i := 0; i < boolSize; i++ {
+			val, ok := f.handle.GetMetadataListBool(source, "ns", "bools", i)
+			if ok {
+				if val {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "true")
+				} else {
+					headers.Set(fmt.Sprintf("x-list-bool-%d", i), "false")
+				}
+			}
+		}
+	}
+
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// LogLevel
+// -----------------------------------------------------------------------------
+
+type LogLevelConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *LogLevelConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &LogLevelFilterFactory{
+		configLogLevel:     handle.GetLogLevel(),
+		configInfoEnabled:  handle.IsLogLevelEnabled(shared.LogLevelInfo),
+		configErrorEnabled: handle.IsLogLevelEnabled(shared.LogLevelError),
+	}, nil
+}
+
+type LogLevelFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	configLogLevel     shared.LogLevel
+	configInfoEnabled  bool
+	configErrorEnabled bool
+}
+
+func (f *LogLevelFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &LogLevelFilter{
+		handle:             handle,
+		configLogLevel:     f.configLogLevel,
+		configInfoEnabled:  f.configInfoEnabled,
+		configErrorEnabled: f.configErrorEnabled,
+	}
+}
+
+type LogLevelFilter struct {
+	shared.EmptyHttpFilter
+	handle             shared.HttpFilterHandle
+	configLogLevel     shared.LogLevel
+	configInfoEnabled  bool
+	configErrorEnabled bool
+}
+
+func (p *LogLevelFilter) OnResponseHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	// tests http filter handle
+	headers.Set("x-log-level", strconv.FormatUint(uint64(p.handle.GetLogLevel()), 10))
+	headers.Set("x-log-info-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelInfo)))
+	headers.Set("x-log-error-enabled", strconv.FormatBool(p.handle.IsLogLevelEnabled(shared.LogLevelError)))
+	// tests filter config handle
+	headers.Set("x-config-log-level", strconv.FormatUint(uint64(p.configLogLevel), 10))
+	headers.Set("x-config-log-info-enabled", strconv.FormatBool(p.configInfoEnabled))
+	headers.Set("x-config-log-error-enabled", strconv.FormatBool(p.configErrorEnabled))
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// GenericSecretCallbacks
+// -----------------------------------------------------------------------------
+
+// GenericSecretCallbacksConfigFactory subscribes to a generic secret at config load and exposes the
+// value on the response, both as read per-stream and as read from the config context during
+// initialization.
+type GenericSecretCallbacksConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *GenericSecretCallbacksConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	// A secret that is not configured anywhere cannot be subscribed to.
+	if id := handle.SubscribeGenericSecret("not_configured", ""); id != 0 {
+		return nil, fmt.Errorf("subscribing to an unconfigured secret unexpectedly succeeded: %d", id)
+	}
+
+	secret := handle.SubscribeGenericSecret(string(config), "")
+	if secret == 0 {
+		return nil, fmt.Errorf("failed to subscribe to the secret %q", string(config))
+	}
+
+	// The value is readable right away from the config context, since a static secret is available
+	// before any request is served.
+	value, ok := handle.GetGenericSecret(secret)
+	if !ok {
+		return nil, fmt.Errorf("failed to read the secret %q", string(config))
+	}
+	return &GenericSecretCallbacksFilterFactory{
+		secret: secret,
+		// The buffer aliases Envoy memory that is only valid for this callback, so copy it.
+		valueAtConfig: string(value.ToBytes()),
+	}, nil
+}
+
+type GenericSecretCallbacksFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	secret        shared.GenericSecretID
+	valueAtConfig string
+}
+
+func (f *GenericSecretCallbacksFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &GenericSecretCallbacksFilter{
+		handle:        handle,
+		secret:        f.secret,
+		valueAtConfig: f.valueAtConfig,
+	}
+}
+
+type GenericSecretCallbacksFilter struct {
+	shared.EmptyHttpFilter
+	handle        shared.HttpFilterHandle
+	secret        shared.GenericSecretID
+	valueAtConfig string
+}
+
+func (p *GenericSecretCallbacksFilter) OnResponseHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	value, ok := p.handle.GetGenericSecret(p.secret)
+	assertEq(ok, true, "reading the subscribed secret")
+	headers.Set("x-secret-value", value.ToUnsafeString())
+	headers.Set("x-secret-value-at-config", p.valueAtConfig)
+
+	// An ID that was never returned by a subscription is not readable.
+	_, ok = p.handle.GetGenericSecret(shared.GenericSecretID(12345))
+	assertEq(ok, false, "reading an unknown secret ID")
+
+	return shared.HeadersStatusContinue
+}
+
+// -----------------------------------------------------------------------------
+// RuntimeValues
+// -----------------------------------------------------------------------------
+
+// RuntimeValuesConfigFactory reads every runtime type at config creation, which is where the
+// runtime is reachable, and caches the values so the filter can echo them back on the response.
+type RuntimeValuesConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *RuntimeValuesConfigFactory) Create(handle shared.HttpFilterConfigHandle,
+	config []byte) (shared.HttpFilterFactory, error) {
+	return &RuntimeValuesFilterFactory{
+		boolValue:     handle.GetRuntimeBool("test.runtime_bool", false),
+		intValue:      handle.GetRuntimeInt("test.runtime_int", 7),
+		numberValue:   handle.GetRuntimeNumber("test.runtime_number", 0.5),
+		missingBool:   handle.GetRuntimeBool("test.runtime_missing_bool", true),
+		missingInt:    handle.GetRuntimeInt("test.runtime_missing_int", 1234),
+		missingNumber: handle.GetRuntimeNumber("test.runtime_missing_number", 2.5),
+	}, nil
+}
+
+type RuntimeValuesFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	boolValue     bool
+	intValue      uint64
+	numberValue   float64
+	missingBool   bool
+	missingInt    uint64
+	missingNumber float64
+}
+
+func (f *RuntimeValuesFilterFactory) Create(handle shared.HttpFilterHandle) shared.HttpFilter {
+	return &RuntimeValuesFilter{factory: f}
+}
+
+type RuntimeValuesFilter struct {
+	shared.EmptyHttpFilter
+	factory *RuntimeValuesFilterFactory
+}
+
+func (p *RuntimeValuesFilter) OnResponseHeaders(headers shared.HeaderMap,
+	endOfStream bool) shared.HeadersStatus {
+	f := p.factory
+	headers.Set("x-runtime-bool", strconv.FormatBool(f.boolValue))
+	headers.Set("x-runtime-int", strconv.FormatUint(f.intValue, 10))
+	headers.Set("x-runtime-number", strconv.FormatFloat(f.numberValue, 'g', -1, 64))
+	headers.Set("x-runtime-missing-bool", strconv.FormatBool(f.missingBool))
+	headers.Set("x-runtime-missing-int", strconv.FormatUint(f.missingInt, 10))
+	headers.Set("x-runtime-missing-number", strconv.FormatFloat(f.missingNumber, 'g', -1, 64))
+	return shared.HeadersStatusContinue
 }

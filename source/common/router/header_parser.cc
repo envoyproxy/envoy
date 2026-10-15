@@ -23,6 +23,9 @@ namespace Router {
 
 namespace {
 
+// Returns the formatter for the given header value, or nullptr if the value contains no
+// substitution command. Such a value formats to itself for every request, so callers use it
+// directly and no formatter is built for it.
 absl::StatusOr<Formatter::FormatterPtr>
 parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_value,
                          const Formatter::CommandParserPtrVector& command_parsers) {
@@ -38,6 +41,13 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   // HTTP/1 and HTTP/2. It could arguably be allowed on the response path.
   if (!Http::HeaderUtility::isModifiableHeader(key)) {
     return absl::InvalidArgumentError(":-prefixed or host headers may not be modified");
+  }
+
+  // Substitution commands are always introduced by a '%'. Without one the value is a constant,
+  // and the translations below only rewrite '%'-delimited commands, so they would leave it
+  // unchanged too. Skip building a formatter that would only ever echo the configured value.
+  if (header_value.value().find('%') == std::string::npos) {
+    return nullptr;
   }
 
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_route_formatter")) {
@@ -94,10 +104,16 @@ HeadersToAddEntry::HeadersToAddEntry(const HeaderValue& header_value,
 
 absl::StatusOr<HeaderParserPtr>
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
+  return configure(headers_to_add, Formatter::CommandParserPtrVector{});
+}
+
+absl::StatusOr<HeaderParserPtr>
+HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
+                        const Formatter::CommandParserPtrVector& command_parsers) {
   HeaderParserPtr header_parser(new HeaderParser());
   header_parser->headers_to_add_.reserve(headers_to_add.size());
   for (const auto& header_value_option : headers_to_add) {
-    auto entry_or_error = HeadersToAddEntry::create(header_value_option);
+    auto entry_or_error = HeadersToAddEntry::create(header_value_option, command_parsers);
     RETURN_IF_NOT_OK_REF(entry_or_error.status());
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
@@ -171,17 +187,22 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers, const Formatter::Co
   // value_buffer is used only when stream_info is a valid pointer and stores header value
   // created by a formatter. It is declared outside of 'for' loop for performance reason to avoid
   // stack allocation and unnecessary std::string's memory adjustments for each iteration. The
-  // actual value of the header is accessed via 'value' variable which is initialized differently
+  // formatter appends into it via formatTo() rather than returning a new string, so once the
+  // buffer has grown to fit the widest header value no further allocation happens. The actual
+  // value of the header is accessed via 'value' variable which is initialized differently
   // depending whether stream_info and valid or nullptr. Based on performance tests implemented in
   // header_formatter_speed_test.cc this approach strikes the best balance between performance and
   // readability.
   std::string value_buffer;
   for (const auto& [key, entry] : headers_to_add_) {
     absl::string_view value;
-    if (stream_info != nullptr) {
-      value_buffer = entry->formatter_->format(context, *stream_info);
+    if (stream_info != nullptr && entry->formatter_ != nullptr) {
+      value_buffer.clear();
+      entry->formatter_->formatTo(value_buffer, context, *stream_info);
       value = value_buffer;
     } else {
+      // Either there is no stream to evaluate against, or the configured value is a constant and
+      // no formatter was built for it.
       value = entry->original_value_;
     }
     if (!value.empty() || entry->add_if_empty_) {
@@ -224,7 +245,9 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
 
   for (const auto& [key, entry] : headers_to_add_) {
     if (do_formatting) {
-      const std::string value = entry->formatter_->format({}, stream_info);
+      const std::string value = entry->formatter_ != nullptr
+                                    ? entry->formatter_->format({}, stream_info)
+                                    : entry->original_value_;
       if (!value.empty() || entry->add_if_empty_) {
         switch (entry->append_action_) {
         case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:

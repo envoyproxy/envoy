@@ -6,7 +6,7 @@
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -232,7 +232,7 @@ TEST_F(SseToMetadataFilterTest, BadContentTypeSkipsProcessing) {
   on_error->set_key("tokens");
   on_error->mutable_value()->set_number_value(-1);
 
-  content_parser->mutable_typed_config()->PackFrom(json_config);
+  std::ignore = content_parser->mutable_typed_config()->PackFrom(json_config);
 
   config_ = std::make_shared<FilterConfig>(proto_config, context_);
   filter_ = std::make_unique<Filter>(config_);
@@ -826,7 +826,7 @@ TEST_F(SseToMetadataFilterTest, NoDataFieldSkipsEvent) {
   on_error->set_key("tokens");
   on_error->mutable_value()->set_string_value("error");
 
-  content_parser->mutable_typed_config()->PackFrom(json_config);
+  std::ignore = content_parser->mutable_typed_config()->PackFrom(json_config);
 
   config_ = std::make_shared<FilterConfig>(proto_config, context_);
   filter_ = std::make_unique<Filter>(config_);
@@ -947,7 +947,7 @@ TEST_F(SseToMetadataFilterTest, TrailersFinalizesRules) {
   on_missing->set_key("tokens");
   on_missing->mutable_value()->set_number_value(-1);
 
-  content_parser->mutable_typed_config()->PackFrom(json_config);
+  std::ignore = content_parser->mutable_typed_config()->PackFrom(json_config);
 
   config_ = std::make_shared<FilterConfig>(proto_config, context_);
   filter_ = std::make_unique<Filter>(config_);
@@ -1026,7 +1026,7 @@ TEST_F(SseToMetadataFilterTest, OnMissingWithoutValueDoesNotWriteMetadata) {
   on_missing->set_metadata_namespace("envoy.lb");
   on_missing->set_key("tokens");
 
-  content_parser->mutable_typed_config()->PackFrom(json_config);
+  std::ignore = content_parser->mutable_typed_config()->PackFrom(json_config);
 
   config_ = std::make_shared<FilterConfig>(proto_config, context_);
   filter_ = std::make_unique<Filter>(config_);

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unistd.h>
-
 #include <atomic>
 #include <cstdint>
 
@@ -43,7 +41,7 @@ public:
    */
   ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context);
 
-  ReverseTunnelAcceptor() : extension_(nullptr), context_(nullptr) {}
+  ReverseTunnelAcceptor() = default;
 
   // SocketInterface overrides
   /**
@@ -113,7 +111,7 @@ public:
   ReverseTunnelAcceptorExtension* extension_{nullptr};
 
 private:
-  Server::Configuration::ServerFactoryContext* context_;
+  Server::Configuration::ServerFactoryContext* context_{nullptr};
 };
 
 DECLARE_FACTORY(ReverseTunnelAcceptor);

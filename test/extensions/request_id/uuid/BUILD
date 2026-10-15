@@ -12,11 +12,10 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/extensions/request_id/uuid:config",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )

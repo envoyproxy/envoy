@@ -1,7 +1,8 @@
+#include <optional>
+
 #include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -13,7 +14,7 @@ namespace {
 
 TEST(AwsArn, ValidArn) {
   constexpr auto input_arn = "arn:aws:lambda:us-west-2:1337:function:fun";
-  const absl::optional<Arn> arn = parseArn(input_arn);
+  const std::optional<Arn> arn = parseArn(input_arn);
   ASSERT_TRUE(arn.has_value());
   EXPECT_STREQ("aws", arn->partition().c_str());
   EXPECT_STREQ("lambda", arn->service().c_str());
@@ -25,7 +26,7 @@ TEST(AwsArn, ValidArn) {
 
 TEST(AwsArn, ValidArnWithVersion) {
   constexpr auto input_arn = "arn:aws:lambda:us-west-2:1337:function:fun:v2";
-  const absl::optional<Arn> arn = parseArn(input_arn);
+  const std::optional<Arn> arn = parseArn(input_arn);
   ASSERT_TRUE(arn.has_value());
   EXPECT_STREQ("aws", arn->partition().c_str());
   EXPECT_STREQ("lambda", arn->service().c_str());
@@ -37,8 +38,8 @@ TEST(AwsArn, ValidArnWithVersion) {
 
 TEST(AwsArn, InvalidArn) {
   constexpr auto input_arn = "arn:aws:lambda:us-west-2:1337:function";
-  const absl::optional<Arn> arn = parseArn(input_arn);
-  EXPECT_EQ(absl::nullopt, arn);
+  const std::optional<Arn> arn = parseArn(input_arn);
+  EXPECT_EQ(std::nullopt, arn);
 }
 
 } // namespace

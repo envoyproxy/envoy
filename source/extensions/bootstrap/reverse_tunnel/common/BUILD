@@ -10,17 +10,26 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "reverse_connection_utility_lib",
-    srcs = ["reverse_connection_utility.cc"],
+    name = "reverse_connection_utility_includes",
     hdrs = ["reverse_connection_utility.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/buffer:buffer_interface",
+        "//envoy/common:random_generator_interface",
         "//envoy/network:connection_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/tls:ssl_handshaker_lib",
+    ],
+)
+
+envoy_cc_extension(
+    name = "reverse_connection_utility_lib",
+    srcs = ["reverse_connection_utility.cc"],
+    deps = [
+        ":reverse_connection_utility_includes",
     ],
 )
 
@@ -29,7 +38,8 @@ envoy_cc_library(
     srcs = ["rping_interceptor.cc"],
     hdrs = ["rping_interceptor.h"],
     deps = [
-        ":reverse_connection_utility_lib",
+        ":reverse_connection_utility_includes",
         "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:io_socket_error_lib",
     ],
 )

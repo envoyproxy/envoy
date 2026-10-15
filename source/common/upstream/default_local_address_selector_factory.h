@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -8,8 +9,6 @@
 #include "envoy/network/socket.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/upstream.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -20,7 +19,7 @@ public:
 
   absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr> createLocalAddressSelector(
       std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
-      absl::optional<std::string> cluster_name) const override;
+      std::optional<std::string> cluster_name) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<

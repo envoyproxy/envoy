@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iomanip>
+#include <optional>
 #include <sstream>
 #include <vector>
 
@@ -10,7 +11,6 @@
 #include "source/common/common/assert.h"
 
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "absl/types/variant.h"
 #include "openssl/bn.h"
 #include "openssl/bytestring.h"
@@ -80,12 +80,12 @@ public:
    *
    * @param cbs a CBS& that refers to the current document position
    * @param parse_data an `Asn1ParsingFunc<T>` used to parse the data if present
-   * @return absl::StatusOr<absl::optional<T>> with a `T` if `cbs` is of the specified tag,
+   * @return absl::StatusOr<std::optional<T>> with a `T` if `cbs` is of the specified tag,
    * nullopt if the element has a different tag, or an error string if parsing fails.
    */
   template <typename T>
-  static absl::StatusOr<absl::optional<T>> parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
-                                                         unsigned tag);
+  static absl::StatusOr<std::optional<T>> parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
+                                                        unsigned tag);
 
   /**
    * Returns whether or not an element explicitly tagged with `tag` is present
@@ -99,7 +99,7 @@ public:
    * @returns absl::StatusOr<bool> whether `cbs` points to an element tagged with `tag` or
    * an error string if parsing fails.
    */
-  static absl::StatusOr<absl::optional<CBS>> getOptional(CBS& cbs, unsigned tag);
+  static absl::StatusOr<std::optional<CBS>> getOptional(CBS& cbs, unsigned tag);
 
   /**
    * @param cbs a CBS& that refers to an `ASN.1` OBJECT IDENTIFIER element
@@ -184,8 +184,8 @@ absl::StatusOr<std::vector<T>> Asn1Utility::parseSequenceOf(CBS& cbs,
 }
 
 template <typename T>
-absl::StatusOr<absl::optional<T>>
-Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag) {
+absl::StatusOr<std::optional<T>> Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data,
+                                                            unsigned tag) {
   auto maybe_data_res = getOptional(cbs, tag);
 
   if (!maybe_data_res.status().ok()) {
@@ -197,7 +197,7 @@ Asn1Utility::parseOptional(CBS& cbs, Asn1ParsingFunc<T> parse_data, unsigned tag
     return parse_data(maybe_data.value());
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 } // namespace Ocsp

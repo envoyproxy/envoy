@@ -9,6 +9,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -24,7 +25,7 @@ public:
     is_active_ = true;
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                        "AssertNonReentrantFilter local reply during decodeHeaders.",
-                                       nullptr, absl::nullopt, "");
+                                       nullptr, std::nullopt, "");
     is_active_ = false;
     return Http::FilterHeadersStatus::Continue;
   }
@@ -41,10 +42,14 @@ private:
 
 constexpr char AssertNonReentrantFilter::name[];
 
-static Registry::RegisterFactory<SimpleFilterConfig<AssertNonReentrantFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<AssertNonReentrantFilter,
+                             test::integration::filters::AssertNonReentrantFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     encoder_register_;
-static Registry::RegisterFactory<SimpleFilterConfig<AssertNonReentrantFilter>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<AssertNonReentrantFilter,
+                             test::integration::filters::AssertNonReentrantFilterConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     encoder_register_upstream_;
 } // namespace Envoy

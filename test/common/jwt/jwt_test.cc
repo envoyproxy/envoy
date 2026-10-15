@@ -71,8 +71,8 @@ TEST(JwtParseTest, Copy) {
 
   std::vector<std::reference_wrapper<Jwt>> jwts{constructed, copied};
 
-  for (auto jwt = jwts.begin(); jwt != jwts.end(); ++jwt) {
-    Jwt& ref = (*jwt);
+  for (auto& jwt : jwts) {
+    Jwt& ref = jwt;
     EXPECT_EQ(ref.alg_, original.alg_);
     EXPECT_EQ(ref.kid_, original.kid_);
     EXPECT_EQ(ref.iss_, original.iss_);

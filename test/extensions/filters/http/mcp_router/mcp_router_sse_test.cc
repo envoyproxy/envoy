@@ -284,6 +284,13 @@ TEST_F(BackendStreamCallbacksSseTest, SetsBackendName) {
   EXPECT_EQ(received_response.backend_name, "my_backend");
 }
 
+// Verifies elicitation/create is classified as ServerRequest.
+TEST_F(ClassifyMessageTest, ClassifiesElicitationCreate) {
+  std::string data =
+      R"({"jsonrpc":"2.0","id":123,"method":"elicitation/create","params":{"message":"Enter credentials"}})";
+  EXPECT_EQ(classifyMessage(data, 1), SseMessageType::ServerRequest);
+}
+
 } // namespace
 } // namespace McpRouter
 } // namespace HttpFilters

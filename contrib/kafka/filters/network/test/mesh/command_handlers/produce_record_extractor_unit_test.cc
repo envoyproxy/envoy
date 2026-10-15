@@ -1,3 +1,4 @@
+#include <optional>
 #include <set>
 
 #include "test/test_common/utility.h"
@@ -95,7 +96,7 @@ TEST(RecordExtractorImpl, shouldProcessRecordBytes) {
   const TopicProduceData tpd1 = {"topic1", {t1_ppd1, t1_ppd2, t1_ppd3}};
 
   // Weird input from client, protocol allows sending null value as bytes array.
-  const PartitionProduceData t2_ppd = {20, absl::nullopt};
+  const PartitionProduceData t2_ppd = {20, std::nullopt};
   const TopicProduceData tpd2 = {"topic2", {t2_ppd}};
 
   const std::vector<TopicProduceData> input = {tpd1, tpd2};

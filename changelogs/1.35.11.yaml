@@ -1,0 +1,43 @@
+date: June 3, 2026
+
+bug_fixes:
+- area: http2
+  change: |
+    Apply nghttp2 CVE-2026-27135 patch.
+- area: http2
+  change: |
+    Fix: `CVE-2026-47774 <https://github.com/envoyproxy/envoy/security/advisories/GHSA-22m2-hvr2-xqc8>`_
+
+    HTTP/2 streams will now be reset if the stream violates the maximum header list size configured via
+    ``mutable_max_request_headers_kb``. Note that this is different than the per header size specified
+    by ``max_header_field_size_kb``. Uncompressed cookies now count towards this limit to
+    protect Envoys against large uncompressed cookies causing excessive memory usage. Additionally, cookies
+    now also count towards ``max_headers_count`` limits.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.http2_include_cookies_in_limits`` to false.
+- area: load_report
+  change: |
+    Fixed an issue upon load-report shutdown race with ADS stream. Introduced proper cleanup of the gRPC stream.
+- area: oauth2
+  change: |
+    Fixed a bug where HMAC verification may exposure a timing side channel that leaks information of
+    HMAC secret validity.
+- area: oauth2
+  change: |
+    Fixed a crash in the OAuth2 filter where AES-CBC decryption of token cookies could spuriously
+    succeed (~1/256) when the configured HMAC secret did not match the secret used to encrypt the
+    cookie (for example after secret rotation, or when receiving legacy unencrypted tokens). The
+    resulting binary "plaintext" was written back into the ``Cookie:`` request header and tripped a
+    ``HeaderString`` validation assert. Such plaintexts are now rejected and the original cookie value
+    is preserved, matching the behavior already documented for the explicit decryption-failure case.
+
+new_features:
+- area: stats
+  change: |
+    Added support to remove unused metrics from memory for extensions that
+    support evictable metrics. This is done :ref:`periodically
+    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>`
+    during the metric flush.
+- area: stats
+  change: |
+    Added support to limit the number of stats stored in each stats scope in the stats library.

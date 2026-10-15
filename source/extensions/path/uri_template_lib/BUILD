@@ -16,6 +16,8 @@ envoy_cc_library(
     hdrs = ["uri_template.h"],
     visibility = [
         "//source/common/router:__subpackages__",
+        "//source/extensions/filters/http/ai_protocol_manager:__subpackages__",
+        "//source/extensions/matching/input_matchers/uri_template:__subpackages__",
         "//source/extensions/path:__subpackages__",
         "//test/extensions/path:__subpackages__",
     ],
@@ -42,7 +44,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
         "@abseil-cpp//absl/types:variant",
         "@re2",
     ],

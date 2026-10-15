@@ -14,7 +14,6 @@ envoy_cc_library(
     deps = [
         "//envoy/common:pure_lib",
         "@abseil-cpp//absl/strings",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 

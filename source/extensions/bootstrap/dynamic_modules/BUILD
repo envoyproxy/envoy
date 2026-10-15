@@ -17,6 +17,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/server:listener_manager_interface",
         "//envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
@@ -25,6 +26,7 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
     ],
 )
 

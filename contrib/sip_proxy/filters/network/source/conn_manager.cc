@@ -1,5 +1,8 @@
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 
+#include <format>
+#include <optional>
+
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 
@@ -30,7 +33,7 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
 
 void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const std::string& val,
-    const absl::optional<TraContextMap> context) {
+    const std::optional<TraContextMap> context) {
 
   bool should_update_tra = true;
 
@@ -50,7 +53,7 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
 }
 
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
-    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
+    const std::string& type, const std::string& key, const std::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
 
   host = {};
@@ -74,7 +77,7 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
 }
 
 void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(
-    const std::string& type, const std::string& key, const absl::optional<TraContextMap> context) {
+    const std::string& type, const std::string& key, const std::optional<TraContextMap> context) {
   cache_manager_.erase(type, key);
   if (traClient()) {
     traClient()->deleteTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),
@@ -217,7 +220,7 @@ void ConnectionManager::continueHandling(const std::string& key, bool try_next_a
             // When onPoolFailure, continueHandling with try_next_affinity, but there is no next
             // affinity, need throw exception and response with 503.
             auto ex = AppException(AppExceptionType::InternalError,
-                                   fmt::format("envoy can't establish connection to {}", key));
+                                   std::format("envoy can't establish connection to {}", key));
             sendLocalReply(*(metadata), ex, false);
             setLocalResponseSent(metadata->transactionId().value());
 
@@ -305,7 +308,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
 }
 
 void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
-  if (transactions_.find(transaction_id) != transactions_.end()) {
+  if (transactions_.contains(transaction_id)) {
     transactions_[transaction_id]->setLocalResponseSent(true);
   }
 }
@@ -355,7 +358,7 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSh
 
   std::string&& k = std::string(metadata->transactionId().value());
   // if (metadata->methodType() == MethodType::Ack) {
-  if (transactions_.find(k) != transactions_.end()) {
+  if (transactions_.contains(k)) {
     // ACK_4XX metadata will updated later.
     return *transactions_.at(k);
   }

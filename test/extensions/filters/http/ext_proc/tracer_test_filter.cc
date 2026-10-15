@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "envoy/registry/registry.h"
 #include "envoy/tracing/trace_context.h"
 
@@ -74,6 +77,7 @@ public:
     ENVOY_LOG_MISC(trace, "TestTracer setSampled: {}", do_sample);
     sampled_ = do_sample;
   }
+  bool exportedSpan() const override { return true; }
   bool useLocalDecision() const override {
     // NOTE: the trace decision from Envoy will be ignored in the startSpan() method
     // of this test implementation. So, the useLocalDecision() method is only for logging

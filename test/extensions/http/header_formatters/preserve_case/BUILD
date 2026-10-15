@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -11,13 +12,18 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_proto_library(
+    name = "preserve_case_filter_proto",
+    srcs = ["preserve_case_filter.proto"],
+)
+
 envoy_extension_cc_test(
     name = "preserve_case_formatter_test",
     srcs = [
         "preserve_case_formatter_test.cc",
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/test_common:utility_lib",
@@ -31,13 +37,15 @@ envoy_extension_cc_test(
         "preserve_case_formatter_integration_test.cc",
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
+        ":preserve_case_filter_proto_cc_proto",
         "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
         "//test/integration:http_integration_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
     ],
@@ -50,7 +58,7 @@ envoy_extension_cc_test(
         "preserve_case_formatter_reason_phrase_integration_test.cc",
     ],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
@@ -66,12 +74,13 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/common:utility_lib",
         "//source/extensions/http/header_formatters/preserve_case:config",
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
     ],
 )

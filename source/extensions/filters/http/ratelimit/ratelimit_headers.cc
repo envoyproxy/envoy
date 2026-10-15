@@ -1,6 +1,8 @@
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
@@ -8,6 +10,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
 
 namespace Envoy {
@@ -29,7 +32,7 @@ bool enableXRateLimitHeaders(const std::vector<Envoy::RateLimit::Descriptor>& de
   return descriptors[index].x_ratelimit_option_ == RateLimit::RateLimitProto::DRAFT_VERSION_03;
 }
 
-void appendQuotaPolicy(std::string& out, size_t unit, size_t w, absl::string_view name) {
+void appendQuotaPolicy(std::string& out, uint64_t unit, uint64_t w, absl::string_view name) {
   // Constructing the quota-policy per RFC
   // https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html#name-ratelimit-limit
   // Example of the result: `, 10;w=1;name="per-ip", 1000;w=3600`
@@ -46,7 +49,7 @@ void XRateLimitHeaderUtils::populateHeaders(
     const Filters::Common::RateLimit::DescriptorStatusList& statuses,
     Http::ResponseHeaderMap& headers) {
   using LimitStatus = envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus;
-  absl::optional<size_t> min_remaining_limit_status_index;
+  std::optional<size_t> min_remaining_limit_status_index;
   OptRef<const LimitStatus> min_remaining_limit_status;
 
   // Get the descriptor status with the minimum remaining limit.
@@ -81,7 +84,11 @@ void XRateLimitHeaderUtils::populateHeaders(
     if (!status.has_current_limit() || !enableXRateLimitHeaders(descriptors, i, enabled)) {
       continue;
     }
-    const uint32_t window = convertRateLimitUnit(status.current_limit().unit());
+    const auto& current_limit = status.current_limit();
+    const uint32_t unit_multiplier =
+        current_limit.has_unit_multiplier() ? current_limit.unit_multiplier().value() : 1;
+    const uint64_t window =
+        convertRateLimitUnit(current_limit.unit()) * std::max(unit_multiplier, 1U);
     if (window == 0) {
       continue;
     }
@@ -100,7 +107,41 @@ void XRateLimitHeaderUtils::populateHeaders(
                           min_remaining_limit_status->duration_until_reset().seconds());
 }
 
-uint32_t XRateLimitHeaderUtils::convertRateLimitUnit(
+void populateRetryAfterHeader(const Filters::Common::RateLimit::DescriptorStatusList& statuses,
+                              Http::ResponseHeaderMap& headers, bool enabled) {
+  if (!enabled) {
+    return;
+  }
+
+  const auto& retry_after_header =
+      HttpFilters::Common::RateLimit::RetryAfterHeaders::get().RetryAfter;
+  // Do not overwrite a Retry-After header returned by the rate limit service.
+  if (!headers.get(retry_after_header).empty()) {
+    return;
+  }
+
+  using Response = envoy::service::ratelimit::v3::RateLimitResponse;
+  std::optional<int64_t> max_reset_seconds;
+
+  for (const auto& status : statuses) {
+    if (status.code() != Response::OVER_LIMIT) {
+      continue;
+    }
+
+    const int64_t reset_seconds = status.duration_until_reset().seconds();
+    if (!max_reset_seconds.has_value() || reset_seconds > *max_reset_seconds) {
+      max_reset_seconds = reset_seconds;
+    }
+  }
+
+  if (max_reset_seconds.has_value()) {
+    // Avoid telling clients to retry immediately, which could cause a tight loop of 429 responses.
+    const int64_t retry_after_seconds = std::max<int64_t>(1, *max_reset_seconds);
+    headers.setCopy(retry_after_header, absl::StrCat(retry_after_seconds));
+  }
+}
+
+uint64_t XRateLimitHeaderUtils::convertRateLimitUnit(
     const envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit) {
   switch (unit) {
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::SECOND:

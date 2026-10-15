@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -16,9 +17,9 @@ namespace ProtoMessageExtraction {
 
 // All valid field extraction directives.
 enum class ExtractedMessageDirective {
-  EXTRACT_REDACT,
+  EXTRACT_REDACT, // NOLINT(readability-identifier-naming)
   EXTRACT,
-  EXTRACT_REPEATED_CARDINALITY,
+  EXTRACT_REPEATED_CARDINALITY, // NOLINT(readability-identifier-naming)
 };
 
 using FieldPathToExtractType =
@@ -26,11 +27,11 @@ using FieldPathToExtractType =
 
 // Metadata that can be captured during message extraction.
 struct ExtractedMessageMetadata {
-  absl::optional<int> num_response_items;
-  absl::optional<std::string> target_resource;
-  absl::optional<std::string> target_resource_callback;
-  absl::optional<std::string> resource_location;
-  Protobuf::Struct extracted_message;
+  std::optional<int> num_response_items;
+  std::optional<std::string> target_resource;
+  std::optional<std::string> target_resource_callback;
+  std::optional<std::string> resource_location;
+  ArenaWrappedProto<Protobuf::Struct> extracted_message;
 };
 
 // A proto-extraction interface for extracting that converts a source message
@@ -41,6 +42,7 @@ public:
   // that contains the extracted message and other extracted message metadata obtained during
   // extraction.
   virtual ExtractedMessageMetadata
+  // NOLINTNEXTLINE(readability-identifier-naming)
   ExtractMessage(const Protobuf::field_extraction::MessageData& message) const = 0;
 
   virtual ~ProtoExtractorInterface() = default;

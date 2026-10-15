@@ -73,14 +73,13 @@ message UpstreamTlsContext {
   // Defaults to 1, setting this to 0 disables session resumption.
   google.protobuf.UInt32Value max_session_keys = 4;
 
-  // Controls enforcement of the ``keyUsage`` extension in peer certificates. If set to ``true``, the handshake will fail if
-  // the ``keyUsage`` is incompatible with TLS usage.
+  // Controls enforcement of the ``keyUsage`` extension in peer certificates. If set to ``true``,
+  // the handshake will fail if the ``keyUsage`` is incompatible with TLS usage.
   //
-  // .. note::
-  //   The default value is ``true`` (i.e., enforcement on).
+  // .. attention::
   //
-  // The ``ssl.was_key_usage_invalid`` in :ref:`listener metrics <config_listener_stats>` metric will be incremented
-  // for configurations that would fail if this option were enabled.
+  //   This field is deprecated and ignored. Envoy now always enforces the ``keyUsage`` extension
+  //   in peer certificates, making this option unconfigurable.
   google.protobuf.BoolValue enforce_rsa_key_usage = 5
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
@@ -271,7 +270,8 @@ message CommonTlsContext {
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
-  // Only a single TLS certificate is supported in client contexts. In server contexts,
+  // Only a single TLS certificate is supported in client contexts unless
+  // ``custom_tls_certificate_selector`` is explicitly defined with ``max_session_keys`` set to 0. In server contexts,
   // :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>` can be associated with the
   // same context to allow both RSA and ECDSA certificates and support SNI-based selection.
   //
@@ -363,6 +363,7 @@ message CommonTlsContext {
 
   // Custom TLS handshaker. If empty, defaults to native TLS handshaking
   // behavior.
+  // [#extension-category: envoy.tls_handshakers]
   config.core.v3.TypedExtensionConfig custom_handshaker = 13;
 
   // TLS key log configuration

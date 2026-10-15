@@ -39,7 +39,7 @@ public:
   pathMapping(absl::string_view path) const;
   // Returns nullopt if the resulting path is not lexically normalized,
   // e.g. foo/./bar rather than foo/bar, or foo/../bar rather than bar.
-  static absl::optional<std::filesystem::path>
+  static std::optional<std::filesystem::path>
   applyPathMapping(absl::string_view path, const ProtoFileServerConfig::PathMapping& mapping);
 
   absl::string_view contentTypeForPath(const std::filesystem::path& path) const;

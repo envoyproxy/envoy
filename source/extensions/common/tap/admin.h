@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "envoy/server/admin.h"
@@ -8,7 +9,6 @@
 #include "source/extensions/common/tap/tap.h"
 
 #include "absl/container/node_hash_set.h"
-#include "absl/types/optional.h"
 
 namespace envoy {
 namespace admin {
@@ -106,7 +106,7 @@ private:
 
   private:
     const size_t max_buf_size_; // Number of traces to buffer
-    absl::optional<std::vector<TraceWrapper>> buffer_;
+    std::optional<std::vector<TraceWrapper>> buffer_;
   };
 
   /**

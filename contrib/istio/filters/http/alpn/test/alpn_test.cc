@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "source/common/network/application_protocol.h"
 
 #include "test/mocks/http/mocks.h"
@@ -72,7 +74,7 @@ TEST_F(AlpnFilterTest, OverrideAlpnUseDownstreamProtocol) {
   ON_CALL(cluster_manager_, getThreadLocalCluster(_)).WillByDefault(Return(fake_cluster_.get()));
   ON_CALL(*fake_cluster_, info()).WillByDefault(Return(cluster_info_));
   ON_CALL(*cluster_info_, upstreamHttpProtocol(_))
-      .WillByDefault([](absl::optional<Http::Protocol> protocol) -> std::vector<Http::Protocol> {
+      .WillByDefault([](std::optional<Http::Protocol> protocol) -> std::vector<Http::Protocol> {
         return {protocol.value()};
       });
 
@@ -106,7 +108,7 @@ TEST_F(AlpnFilterTest, OverrideAlpn) {
   ON_CALL(cluster_manager_, getThreadLocalCluster(_)).WillByDefault(Return(fake_cluster_.get()));
   ON_CALL(*fake_cluster_, info()).WillByDefault(Return(cluster_info_));
   ON_CALL(*cluster_info_, upstreamHttpProtocol(_))
-      .WillByDefault([](absl::optional<Http::Protocol>) -> std::vector<Http::Protocol> {
+      .WillByDefault([](std::optional<Http::Protocol>) -> std::vector<Http::Protocol> {
         return {Http::Protocol::Http2};
       });
 
@@ -139,7 +141,7 @@ TEST_F(AlpnFilterTest, EmptyOverrideAlpn) {
   ON_CALL(cluster_manager_, getThreadLocalCluster(_)).WillByDefault(Return(fake_cluster_.get()));
   ON_CALL(*fake_cluster_, info()).WillByDefault(Return(cluster_info_));
   ON_CALL(*cluster_info_, upstreamHttpProtocol(_))
-      .WillByDefault([](absl::optional<Http::Protocol>) -> std::vector<Http::Protocol> {
+      .WillByDefault([](std::optional<Http::Protocol>) -> std::vector<Http::Protocol> {
         return {Http::Protocol::Http2};
       });
 

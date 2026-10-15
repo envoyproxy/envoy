@@ -76,11 +76,11 @@ public:
   }
   absl::string_view ja4Hash() const override { return connectionInfoProvider().ja4Hash(); }
 
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
   }
 
-  absl::optional<uint64_t> congestionWindowInBytes() const override {
+  std::optional<uint64_t> congestionWindowInBytes() const override {
     return ioHandle().congestionWindowInBytes();
   }
 

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/core/v3/extension.pb.h"
@@ -105,7 +106,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  absl::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
+  std::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
   Envoy::Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;

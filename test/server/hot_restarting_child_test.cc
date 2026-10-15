@@ -5,8 +5,8 @@
 #include "source/server/hot_restarting_child.h"
 #include "source/server/hot_restarting_parent.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/server/hot_restart_udp_forwarding_test_helper.h"
 #include "test/server/utility.h"
@@ -15,6 +15,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::DoAll;
 using testing::Eq;
 using testing::Return;
@@ -174,6 +175,15 @@ TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlr
                                                        callback2.AsStdFunction());
 }
 
+TEST_F(HotRestartingChildTest, ParentStopAcceptingLatchesOnDrainRequest) {
+  // With a parent (restart_epoch != 0), the child has not yet asked it to stop accepting.
+  EXPECT_FALSE(hot_restarting_child_->parentStopAcceptingRequested());
+  // drainParentListeners() sends the (fire-and-forget) drain-listeners request; expect one send.
+  fake_parent_->expectParentTerminateMessages();
+  hot_restarting_child_->drainParentListeners();
+  EXPECT_TRUE(hot_restarting_child_->parentStopAcceptingRequested());
+}
+
 TEST_F(HotRestartingChildTest, LogsErrorOnReplyMessageInUdpStream) {
   envoy::HotRestartMessage msg;
   msg.mutable_reply();
@@ -274,6 +284,98 @@ TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
   EXPECT_CALL(mock_worker_router,
               deliver(worker_index, IsUdpWith(test_listener_addr, test_remote_addr, udp_contents,
                                               packet_timestamp)));
+  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+}
+
+// A parent that does not send the listener address is matched on the packet's destination,
+// falling back to the any-address listener on the port.
+TEST_F(HotRestartingChildTest, ForwardsPacketToAnyAddressListenerByDestination) {
+  uint32_t worker_index = 1;
+  envoy::HotRestartMessage msg;
+  auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
+  auto mock_udp_listener_config = std::make_shared<Network::MockUdpListenerConfig>();
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://0.0.0.0:1234");
+  auto test_local_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  auto test_remote_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:4321");
+  HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
+      .registerUdpForwardingListener(
+          test_listener_addr,
+          std::dynamic_pointer_cast<Network::UdpListenerConfig>(mock_udp_listener_config));
+  packet->set_local_addr(Network::Utility::urlFromDatagramAddress(*test_local_addr));
+  packet->set_peer_addr(Network::Utility::urlFromDatagramAddress(*test_remote_addr));
+  packet->set_worker_index(worker_index);
+  packet->set_payload("x");
+  Network::MockUdpListenerWorkerRouter mock_worker_router;
+  EXPECT_CALL(*mock_udp_listener_config,
+              listenerWorkerRouter(WhenDynamicCastTo<const Network::Address::Ipv4Instance&>(
+                  Eq(dynamic_cast<const Network::Address::Ipv4Instance&>(*test_listener_addr)))))
+      .WillOnce(ReturnRef(mock_worker_router));
+  EXPECT_CALL(mock_worker_router, deliver(worker_index, IsUdpWith(test_local_addr, test_remote_addr,
+                                                                  "x", uint64_t(0))));
+  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+}
+
+// Listeners bound to the same address in different network namespaces are distinct, and a
+// forwarded packet is delivered to the listener the parent names, not to whichever registered
+// first and not to the one matching the packet's (transparent) destination.
+TEST_F(HotRestartingChildTest, ForwardsPacketToListenerInNamedNetworkNamespace) {
+  uint32_t worker_index = 2;
+  envoy::HotRestartMessage msg;
+  auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
+  auto listener_config_a = std::make_shared<Network::MockUdpListenerConfig>();
+  auto listener_config_b = std::make_shared<Network::MockUdpListenerConfig>();
+  auto listener_addr_a =
+      Network::Utility::resolveUrl("udp://0.0.0.0:1234").value()->withNetworkNamespace("/ns/a");
+  auto listener_addr_b =
+      Network::Utility::resolveUrl("udp://0.0.0.0:1234").value()->withNetworkNamespace("/ns/b");
+  // Destination of a transparent socket: not the bind address of either listener.
+  auto test_local_addr = *Network::Utility::resolveUrl("udp://10.0.0.5:1234");
+  auto test_remote_addr = *Network::Utility::resolveUrl("udp://10.0.0.9:4321");
+  HotRestartUdpForwardingTestHelper helper(*hot_restarting_child_);
+  helper.registerUdpForwardingListener(
+      listener_addr_a, std::dynamic_pointer_cast<Network::UdpListenerConfig>(listener_config_a));
+  helper.registerUdpForwardingListener(
+      listener_addr_b, std::dynamic_pointer_cast<Network::UdpListenerConfig>(listener_config_b));
+  packet->set_local_addr(Network::Utility::urlFromDatagramAddress(*test_local_addr));
+  packet->set_peer_addr(Network::Utility::urlFromDatagramAddress(*test_remote_addr));
+  packet->set_worker_index(worker_index);
+  packet->set_payload("y");
+  packet->set_listener_addr("udp://0.0.0.0:1234");
+  packet->set_network_namespace("/ns/b");
+  Network::MockUdpListenerWorkerRouter mock_worker_router;
+  EXPECT_CALL(*listener_config_a, listenerWorkerRouter(_)).Times(0);
+  EXPECT_CALL(*listener_config_b,
+              listenerWorkerRouter(WhenDynamicCastTo<const Network::Address::Ipv4Instance&>(
+                  Eq(dynamic_cast<const Network::Address::Ipv4Instance&>(*listener_addr_b)))))
+      .WillOnce(ReturnRef(mock_worker_router));
+  EXPECT_CALL(mock_worker_router, deliver(worker_index, IsUdpWith(test_local_addr, test_remote_addr,
+                                                                  "y", uint64_t(0))));
+  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+}
+
+// A listener is not matched across network namespaces, nor by a namespace-less lookup.
+TEST_F(HotRestartingChildTest, DoesNotForwardAcrossNetworkNamespaces) {
+  envoy::HotRestartMessage msg;
+  auto* packet = msg.mutable_request()->mutable_forwarded_udp_packet();
+  auto listener_config = std::make_shared<Network::MockUdpListenerConfig>();
+  auto listener_addr =
+      Network::Utility::resolveUrl("udp://0.0.0.0:1234").value()->withNetworkNamespace("/ns/a");
+  HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
+      .registerUdpForwardingListener(
+          listener_addr, std::dynamic_pointer_cast<Network::UdpListenerConfig>(listener_config));
+  packet->set_local_addr("udp://10.0.0.5:1234");
+  packet->set_peer_addr("udp://10.0.0.9:4321");
+  packet->set_payload("z");
+  EXPECT_CALL(*listener_config, listenerWorkerRouter(_)).Times(0);
+
+  // Another namespace.
+  packet->set_listener_addr("udp://0.0.0.0:1234");
+  packet->set_network_namespace("/ns/c");
+  EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+
+  // No namespace (older parent): the destination lookup must not reach a namespaced listener.
+  packet->clear_listener_addr();
+  packet->clear_network_namespace();
   EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
 }
 

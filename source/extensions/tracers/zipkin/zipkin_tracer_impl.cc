@@ -9,6 +9,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/tracers/zipkin/span_context_extractor.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
@@ -70,11 +71,9 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       collector_->endpoint_ = path;
     }
 
-    // Parse headers from HttpService
-    for (const auto& header_option : http_service.request_headers_to_add()) {
-      const auto& header_value = header_option.header();
-      collector_->request_headers_.emplace_back(header_value.key(), header_value.value());
-    }
+    // Parse headers from HttpService using the applicator.
+    collector_->headers_applicator_ =
+        Http::HttpServiceHeadersApplicator::createOrThrow(http_service, context);
   } else {
     if (zipkin_config.collector_cluster().empty() || zipkin_config.collector_endpoint().empty()) {
       throw EnvoyException(
@@ -88,8 +87,10 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                                 : zipkin_config.collector_cluster();
     collector_->endpoint_ = zipkin_config.collector_endpoint();
 
-    // Legacy configuration has no custom headers support
-    // Custom headers are only available through HttpService.
+    // Legacy configuration: create an empty applicator (no custom headers).
+    envoy::config::core::v3::HttpService empty_http_service;
+    collector_->headers_applicator_ =
+        Http::HttpServiceHeadersApplicator::createOrThrow(empty_http_service, context);
   }
 
   // Validate cluster exists
@@ -136,7 +137,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
 
   // W3C fallback extraction is only enabled when USE_B3_WITH_W3C_PROPAGATION is configured
   SpanContextExtractor extractor(trace_context, w3cFallbackEnabled());
-  const absl::optional<bool> sampled = extractor.extractSampled();
+  const std::optional<bool> sampled = extractor.extractSampled();
   bool use_local_decision = !sampled.has_value();
   TRY_NEEDS_AUDIT {
     auto ret_span_context = extractor.extractSpanContext(sampled.value_or(tracing_decision.traced));
@@ -154,6 +155,12 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   END_TRY catch (const ExtractorException& e) { return std::make_unique<Tracing::NullSpan>(); }
 
   new_zipkin_span->setUseLocalDecision(use_local_decision);
+  // Propagate the context in the same B3 format that the downstream used.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.zipkin_preserve_b3_single_header_format") &&
+      extractor.b3SingleFormatUsed()) {
+    new_zipkin_span->setUseB3SingleFormat(true);
+  }
   // Return the active Zipkin span.
   return new_zipkin_span;
 }
@@ -211,10 +218,7 @@ void ReporterImpl::flushSpans() {
             : Http::Headers::get().ContentTypeValues.Json);
 
     // Add custom headers from collector configuration
-    for (const auto& header : collector_->request_headers_) {
-      // Replace any existing header with the configured value
-      message->headers().setCopy(header.first, header.second);
-    }
+    collector_->headers_applicator_->apply(message->headers());
 
     message->body().add(request_body);
 
@@ -223,7 +227,7 @@ void ReporterImpl::flushSpans() {
 
     if (collector_cluster_.threadLocalCluster().has_value()) {
       Http::AsyncClient::Request* request =
-          collector_cluster_.threadLocalCluster()->get().httpAsyncClient().send(
+          collector_cluster_.threadLocalCluster()->httpAsyncClient().send(
               std::move(message), *this,
               Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
       if (request) {

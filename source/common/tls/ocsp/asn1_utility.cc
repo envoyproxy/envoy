@@ -27,14 +27,14 @@ absl::string_view Asn1Utility::cbsToString(CBS& cbs) {
   return {str_head, CBS_len(&cbs)};
 }
 
-absl::StatusOr<absl::optional<CBS>> Asn1Utility::getOptional(CBS& cbs, unsigned tag) {
+absl::StatusOr<std::optional<CBS>> Asn1Utility::getOptional(CBS& cbs, unsigned tag) {
   int is_present;
   CBS data;
   if (!CBS_get_optional_asn1(&cbs, &data, &is_present, tag)) {
     return absl::InvalidArgumentError("Failed to parse ASN.1 element tag");
   }
 
-  return is_present ? absl::optional<CBS>(data) : absl::nullopt;
+  return is_present ? std::optional<CBS>(data) : std::nullopt;
 }
 
 absl::StatusOr<std::string> Asn1Utility::parseOid(CBS& cbs) {
@@ -63,7 +63,7 @@ absl::StatusOr<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   // Local time or time differential, though a part of the `ASN.1`
   // `GENERALIZEDTIME` spec, are not supported.
   // Reference: https://tools.ietf.org/html/rfc5280#section-4.1.2.5.2
-  if (time_str.length() > 0 && absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
+  if (!time_str.empty() && absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
     return absl::InvalidArgumentError("GENERALIZEDTIME must be in UTC");
   }
 

@@ -13,6 +13,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -86,7 +87,7 @@ public:
     EXPECT_CALL(cert_validation_ctx_config_, autoSniSanMatch()).WillRepeatedly(Return(false));
     auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
-    THROW_IF_NOT_OK(context_or_error.status());
+    THROW_IF_NOT_OK_REF(context_or_error.status());
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(*context_or_error));
   }
 
@@ -102,10 +103,10 @@ protected:
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
   std::string root_ca_cert_;
   const std::string leaf_cert_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
-      absl::nullopt};
+  std::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
+      std::nullopt};
   NiceMock<Stats::MockStore> store_;
-  Server::Configuration::MockServerFactoryContext factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
   Ssl::MockCertificateValidationContextConfig cert_validation_ctx_config_;
   std::unique_ptr<EnvoyQuicProofVerifier> verifier_;
@@ -129,9 +130,14 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccess) {
                                        &error_details, &verify_details, nullptr, nullptr))
       << error_details;
   EXPECT_NE(verify_details, nullptr);
-  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+  auto& result = static_cast<CertVerifyResult&>(*verify_details);
+  EXPECT_TRUE(result.isValid());
+  // The verifier-built chain (leaf + issuing CA) is captured so the connection info can report the
+  // validated issuer, and it survives cloning.
+  EXPECT_GE(result.validatedChain().size(), 2);
   std::unique_ptr<CertVerifyResult> cloned(static_cast<CertVerifyResult*>(verify_details->Clone()));
   EXPECT_TRUE(cloned->isValid());
+  EXPECT_EQ(cloned->validatedChain().size(), result.validatedChain().size());
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, AsyncVerifyCertChainSuccess) {
@@ -201,12 +207,11 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
-  const std::vector<std::string> certs{"invalid leaf cert"};
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("www.google.com", 54321, certs, ocsp_response, cert_sct,
-                                       &verify_context_, &error_details, &verify_details, nullptr,
-                                       nullptr));
+            verifier_->VerifyCertChain("www.google.com", 54321, {"invalid leaf cert"},
+                                       ocsp_response, cert_sct, &verify_context_, &error_details,
+                                       &verify_details, nullptr, nullptr));
   EXPECT_EQ("d2i_X509: fail to parse DER", error_details);
 }
 
@@ -277,38 +282,82 @@ typed_config:
   verify_timer->invokeCallback();
 }
 
-TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureUnsupportedECKey) {
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainSuccessP384ECKey) {
+  const std::string certs{R"(-----BEGIN CERTIFICATE-----
+MIIC0jCCAlegAwIBAgIUUv13YuIFYMJxp1t4z8Z7H0cFdHowCgYIKoZIzj0EAwIw
+ejELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDVNh
+biBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQgRW5naW5l
+ZXJpbmcxFDASBgNVBAMMC1Rlc3QgU2VydmVyMB4XDTI0MDgyMTE5MTQxMFoXDTI2
+MDgyMTE5MTQxMFowejELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx
+FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsM
+EEx5ZnQgRW5naW5lZXJpbmcxFDASBgNVBAMMC1Rlc3QgU2VydmVyMHYwEAYHKoZI
+zj0CAQYFK4EEACIDYgAEtFQWaGrCFUT70YVGv9IA0H1d/fUGdoATjqAQlgOnzWf4
+FcJIqRQ8dGJ0wom/p8b/3MrKpy8wpWBnAo2C9+9owGdOqcqSIFLVV0iaGogKhIAx
+7KAjWoMEpal4uNnaYLlCo4GdMIGaMAwGA1UdEwEB/wQCMAAwCwYDVR0PBAQDAgXg
+MB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDATAeBgNVHREEFzAVghNzZXJ2
+ZXIxLmV4YW1wbGUuY29tMB0GA1UdDgQWBBQ23kFgk8ELq1P0xW3R8SYRwJRcyjAf
+BgNVHSMEGDAWgBQ23kFgk8ELq1P0xW3R8SYRwJRcyjAKBggqhkjOPQQDAgNpADBm
+AjEA6FC5eEaKcV7i9AUuVsIJruDKqLVmSLKzHX+DVxOvaxQcTuKMwtg8AuTq1qq+
+MZ8EAjEA3JKxxjQAp2hi2gvSUGXQqk3seETImDNmUdWXmYcohDRM36KKJORqXoui
+jD+/8ipt
+-----END CERTIFICATE-----)"};
+  root_ca_cert_ = certs;
   configCertVerificationDetails(true);
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
-  // This is a EC cert with secp384r1 curve which is not supported by Envoy.
-  const std::string certs{R"(-----BEGIN CERTIFICATE-----
-MIICkDCCAhagAwIBAgIUTZbykU9eQL3GdrNlodxrOJDecIQwCgYIKoZIzj0EAwIw
-fzELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAk1BMRIwEAYDVQQHDAlDYW1icmlkZ2Ux
-DzANBgNVBAoMBkdvb2dsZTEOMAwGA1UECwwFZW52b3kxDTALBgNVBAMMBHRlc3Qx
-HzAdBgkqhkiG9w0BCQEWEGRhbnpoQGdvb2dsZS5jb20wHhcNMjAwODA1MjAyMDI0
-WhcNMjIwODA1MjAyMDI0WjB/MQswCQYDVQQGEwJVUzELMAkGA1UECAwCTUExEjAQ
-BgNVBAcMCUNhbWJyaWRnZTEPMA0GA1UECgwGR29vZ2xlMQ4wDAYDVQQLDAVlbnZv
-eTENMAsGA1UEAwwEdGVzdDEfMB0GCSqGSIb3DQEJARYQZGFuemhAZ29vZ2xlLmNv
-bTB2MBAGByqGSM49AgEGBSuBBAAiA2IABGRaEAtVq+xHXfsF4R/j+mqVN2E29ZYL
-oFlvnelKeeT2B51bSfUv+X+Ci1BSa2OxPCVS6o0vpcF6YOlz4CS7QcXZIoRfhsv7
-O2Hz/IdxAPhX/gdK/70T1x+V/6nvIHiiw6NTMFEwHQYDVR0OBBYEFF75rDce6xNJ
-GfpKbUg4emG2KWRMMB8GA1UdIwQYMBaAFF75rDce6xNJGfpKbUg4emG2KWRMMA8G
-A1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDaAAwZQIxAIyZghTK3cmyrRWkxfQ7
-xEc11gujcT8nbytYbM6jodKwcbtR6SOmLx2ychXrCMm2ZAIwXqmrTYBtrbqb3mBx
-VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
------END CERTIFICATE-----)"};
   std::stringstream pem_stream(certs);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  std::vector<absl::string_view> chain_view(chain.begin(), chain.end());
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(chain[0]);
   ASSERT(cert_view);
+  EXPECT_EQ("server1.example.com", std::string(cert_view->subject_alt_name_domains()[0]));
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_SUCCESS,
+            verifier_->VerifyCertChain("server1.example.com", 54321, chain_view, ocsp_response,
+                                       cert_sct, &verify_context_, &error_details, &verify_details,
+                                       nullptr, nullptr))
+      << error_details;
+  EXPECT_NE(verify_details, nullptr);
+  EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureP384ECKeyWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_support_additional_ecdsa_curves", "false"}});
+  const std::string certs{R"(-----BEGIN CERTIFICATE-----
+MIIC0jCCAlegAwIBAgIUUv13YuIFYMJxp1t4z8Z7H0cFdHowCgYIKoZIzj0EAwIw
+ejELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcMDVNh
+biBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQgRW5naW5l
+ZXJpbmcxFDASBgNVBAMMC1Rlc3QgU2VydmVyMB4XDTI0MDgyMTE5MTQxMFoXDTI2
+MDgyMTE5MTQxMFowejELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx
+FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsM
+EEx5ZnQgRW5naW5lZXJpbmcxFDASBgNVBAMMC1Rlc3QgU2VydmVyMHYwEAYHKoZI
+zj0CAQYFK4EEACIDYgAEtFQWaGrCFUT70YVGv9IA0H1d/fUGdoATjqAQlgOnzWf4
+FcJIqRQ8dGJ0wom/p8b/3MrKpy8wpWBnAo2C9+9owGdOqcqSIFLVV0iaGogKhIAx
+7KAjWoMEpal4uNnaYLlCo4GdMIGaMAwGA1UdEwEB/wQCMAAwCwYDVR0PBAQDAgXg
+MB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcDATAeBgNVHREEFzAVghNzZXJ2
+ZXIxLmV4YW1wbGUuY29tMB0GA1UdDgQWBBQ23kFgk8ELq1P0xW3R8SYRwJRcyjAf
+BgNVHSMEGDAWgBQ23kFgk8ELq1P0xW3R8SYRwJRcyjAKBggqhkjOPQQDAgNpADBm
+AjEA6FC5eEaKcV7i9AUuVsIJruDKqLVmSLKzHX+DVxOvaxQcTuKMwtg8AuTq1qq+
+MZ8EAjEA3JKxxjQAp2hi2gvSUGXQqk3seETImDNmUdWXmYcohDRM36KKJORqXoui
+jD+/8ipt
+-----END CERTIFICATE-----)"};
+  root_ca_cert_ = certs;
+  configCertVerificationDetails(true);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  std::stringstream pem_stream(certs);
+  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  std::vector<absl::string_view> chain_view(chain.begin(), chain.end());
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("www.google.com", 54321, chain, ocsp_response, cert_sct,
-                                       &verify_context_, &error_details, &verify_details, nullptr,
-                                       nullptr));
+            verifier_->VerifyCertChain("server1.example.com", 54321, chain_view, ocsp_response,
+                                       cert_sct, &verify_context_, &error_details, &verify_details,
+                                       nullptr, nullptr));
   EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
 }
 
@@ -341,7 +390,7 @@ ie3qKR3an4KC20CtFbpZfv540BVuTTOCtQ5xqZ/LTE78
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
-  // This is a cert generated with the test/config/integration/certs/certs.sh. And the config that
+  // This is a cert generated from test/config/integration/certs/certs.spec. And the config that
   // used to generate this cert is same as test/config/integration/certs/servercert.cfg but with
   // 'extKeyUsage: clientAuth'.
   const std::string certs{R"(-----BEGIN CERTIFICATE-----
@@ -374,10 +423,11 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(chain[0]);
+  std::vector<absl::string_view> chain_view(chain.begin(), chain.end());
   ASSERT(cert_view);
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("lyft.com", 54321, chain, ocsp_response, cert_sct,
+            verifier_->VerifyCertChain("lyft.com", 54321, chain_view, ocsp_response, cert_sct,
                                        &verify_context_, &error_details, &verify_details, nullptr,
                                        nullptr));
   EXPECT_EQ("verify cert failed: X509_verify_cert: certificate verification error at depth 0: "
@@ -438,8 +488,9 @@ wYsML58R3P8=
   std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   std::stringstream pem_stream(cert_v1);
   std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  std::vector<absl::string_view> chain_view(chain.begin(), chain.end());
   EXPECT_EQ(quic::QUIC_FAILURE,
-            verifier_->VerifyCertChain("localhost", 54321, chain, ocsp_response, cert_sct,
+            verifier_->VerifyCertChain("localhost", 54321, chain_view, ocsp_response, cert_sct,
                                        &verify_context_, &error_details, &verify_details, nullptr,
                                        nullptr))
       << error_details;

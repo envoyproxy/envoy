@@ -69,7 +69,7 @@ public class AndroidEngineSocketTagTest {
       @Override
       public MockResponse dispatch(RecordedRequest recordedRequest) {
         assertThat(recordedRequest.getMethod()).isEqualTo(RequestMethod.GET.name());
-        assertThat(recordedRequest.getHeader("x-envoy-mobile-socket-tag")).isEqualTo(null);
+        assertThat(recordedRequest.getHeader("x-envoy-mobile-socket-tag")).isNull();
         return new MockResponse().setBody("This is my response Body");
       }
     });
@@ -84,6 +84,8 @@ public class AndroidEngineSocketTagTest {
     assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
     assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
     assertThat(response.getEnvoyError()).isNull();
+
+    engine.drainConnectionsBySocketTag(2);
   }
 
   private Response sendRequest(RequestScenario requestScenario) throws Exception {

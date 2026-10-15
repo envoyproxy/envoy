@@ -43,8 +43,9 @@ AccessLog::InstanceSharedPtr FileAccessLogFactory::createAccessLogInstance(
     }
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
-    formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
-        fal_config.json_format(), false, command_parsers);
+    formatter = THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::createJsonFormatter(
+                                          fal_config.json_format(), false, command_parsers),
+                                      Formatter::FormatterPtr);
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       kTypedJsonFormat: {

@@ -45,27 +45,6 @@ trap_errors () {
 trap trap_errors ERR
 trap exit 1 INT
 
-# TODO(phlax): Remove this once migration to bzlmod is complete
-CURRENT=dep-names
-
-check_legacy_dep_names () {
-    local legacy="$1"
-    local new="$2"
-    local matches
-    matches="$(git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh' || :)"
-    if [[ -n "$matches" ]]; then
-        echo "ERROR: Found references to '$legacy' that should use '@${new}' instead:"
-        echo ""
-        git grep -l "$legacy" -- ':!*.patch' ':!*repositories.bzl' ':!ci/format_pre.sh'
-        echo ""
-        echo "Please replace '@${legacy}//' with '@${new}//' in the above files."
-        return 1
-    fi
-}
-
-check_legacy_dep_names com_google_absl abseil-cpp
-check_legacy_dep_names com_github_cncf_xds xds
-
 CURRENT=check
 # This test runs code check with:
 #   bazel run //tools/code:check -- --fix -v warn -x mobile/dist/envoy-pom.xml
@@ -75,6 +54,19 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" //tools/cod
 CURRENT=spelling
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/spelling:check_spelling_pedantic -- --mark check --target_root="$PWD"
 
+CURRENT=rustfmt
+CURRENT=rustfmt
+# rustfmt_aspect only attaches to rust rules - scope to them so we don't analyze the whole tree
+RUST_TARGETS="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" query "${BAZEL_GLOBAL_OPTIONS[@]}" \
+    'kind("rust_(binary|library|test|shared_library|static_library|proc_macro)", //...)')"
+if [[ -n "$RUST_TARGETS" ]]; then
+    # shellcheck disable=SC2086
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" \
+        --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect \
+        --output_groups=rustfmt_checks \
+        -- $RUST_TARGETS
+fi
+
 CURRENT=check_format
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:check_format -- fix --fail_on_diff
 
@@ -83,8 +75,8 @@ if [[ "${#FAILED[@]}" -ne "0" ]]; then
     for failed in "${FAILED[@]}"; do
         echo "${BASH_ERR_PREFIX} $failed" >&2
     done
-    if [[ $(git status --porcelain) ]]; then
-        git diff > "$DIFF_OUTPUT"
+    if [[ $(git status --porcelain -- . ":(exclude,glob)**/MODULE.bazel.lock") ]]; then
+        git diff -- . ":(exclude,glob)**/MODULE.bazel.lock" > "$DIFF_OUTPUT"
         echo >&2
         echo "Applying the following diff should fix (some) problems" >&2
         echo >&2

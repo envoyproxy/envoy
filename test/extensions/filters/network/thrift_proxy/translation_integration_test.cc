@@ -56,7 +56,7 @@ public:
       auto* opts = bootstrap.mutable_static_resources()
                        ->mutable_clusters(0)
                        ->mutable_typed_extension_protocol_options();
-      (*opts)[NetworkFilterNames::get().ThriftProxy].PackFrom(proto_opts);
+      std::ignore = (*opts)[NetworkFilterNames::get().ThriftProxy].PackFrom(proto_opts);
     });
 
     if (passthrough_) {

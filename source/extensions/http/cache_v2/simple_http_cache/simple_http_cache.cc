@@ -85,7 +85,7 @@ void InsertContext::onBody(AdjustedByteRange range, Buffer::InstancePtr buffer,
   } else {
     range = AdjustedByteRange(0, entry_->bodySize());
   }
-  progress_receiver_->onBodyInserted(std::move(range), end_stream == EndStream::End);
+  progress_receiver_->onBodyInserted(range, end_stream == EndStream::End);
   if (end_stream != EndStream::End) {
     AdjustedByteRange next_range(range.end(), range.end() + InsertReadChunkSize);
     return source_->getBody(next_range,
@@ -230,8 +230,8 @@ public:
   // From HttpCacheFactory
   absl::StatusOr<std::shared_ptr<CacheSessions>>
   getCache(const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config&,
-           Server::Configuration::FactoryContext& context) override {
-    return context.serverFactoryContext().singletonManager().getTyped<CacheSessions>(
+           Server::Configuration::ServerFactoryContext& context) override {
+    return context.singletonManager().getTyped<CacheSessions>(
         SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_v2_singleton), [&context]() {
           return CacheSessions::create(context, std::make_unique<SimpleHttpCache>());
         });

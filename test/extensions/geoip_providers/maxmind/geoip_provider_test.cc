@@ -3,12 +3,14 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/geoip_providers/maxmind/config.h"
 #include "source/extensions/geoip_providers/maxmind/geoip_provider.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -32,14 +34,28 @@ public:
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
     return provider->config_->getStatsScopeForTest();
   }
+  // The stats of the database file the provider looks the given type up in.
+  static const DbFileStats& dbFileStats(const DriverSharedPtr& driver, absl::string_view db_type) {
+    auto provider = std::static_pointer_cast<GeoipProvider>(driver);
+    const DbFileProviders& db_file_providers = provider->db_file_providers_;
+    for (const DbFileProviderSharedPtr& db_file_provider :
+         {db_file_providers.city_db_, db_file_providers.isp_db_, db_file_providers.anon_db_,
+          db_file_providers.asn_db_, db_file_providers.country_db_}) {
+      if (db_file_provider != nullptr && dbTypeName(db_file_provider->dbType()) == db_type) {
+        return db_file_provider->stats_;
+      }
+    }
+    PANIC(absl::StrCat("no Maxmind database file configured for ", db_type));
+  }
   static Thread::ThreadSynchronizer& synchronizer(const DriverSharedPtr& driver) {
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
     return provider->synchronizer_;
   }
   static void setCountryDbToNull(const DriverSharedPtr& driver) {
     auto provider = std::static_pointer_cast<GeoipProvider>(driver);
-    absl::MutexLock lock(provider->mmdb_mutex_);
-    provider->country_db_.reset();
+    auto& db_file_provider = *provider->db_file_providers_.country_db_;
+    absl::MutexLock lock(db_file_provider.mmdb_mutex_);
+    db_file_provider.db_.reset();
   }
 };
 
@@ -145,11 +161,8 @@ public:
   };
 
   void initializeProvider(const std::string& yaml,
-                          absl::optional<ConditionalInitializer>& conditional) {
-    EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*scope_));
-    EXPECT_CALL(context_, serverFactoryContext())
-        .WillRepeatedly(ReturnRef(server_factory_context_));
-    EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
+                          std::optional<ConditionalInitializer>& conditional) {
+    EXPECT_CALL(server_factory_context_, scope()).WillRepeatedly(ReturnRef(*scope_));
     EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
         .WillRepeatedly(Invoke([this, &conditional] {
           Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
@@ -172,7 +185,8 @@ public:
         .WillRepeatedly(ReturnRef(dispatcher_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
-    provider_ = provider_factory_->createGeoipProviderDriver(config, "prefix.", context_);
+    provider_ =
+        provider_factory_->createGeoipProviderDriver(config, "prefix.", server_factory_context_);
   }
 
   void expectStats(const absl::string_view& db_type, const uint32_t total_count = 1,
@@ -186,21 +200,18 @@ public:
               error_count);
 
     if (build_epoch > 0) {
-      EXPECT_EQ(provider_scope
-                    .gaugeFromString(absl::StrCat(db_type, ".db_build_epoch"),
-                                     Stats::Gauge::ImportMode::Accumulate)
-                    .value(),
+      // Database file level stats belong to the shared database file rather than to this
+      // provider. See DbFileStatsLiveInTheProviderScopeAndNameTheFile for their naming.
+      EXPECT_EQ(GeoipProviderPeer::dbFileStats(provider_, db_type).db_build_epoch_.value(),
                 build_epoch);
     }
   }
 
   void expectReloadStats(const absl::string_view& db_type, const uint32_t reload_success_count = 0,
                          const uint32_t reload_error_count = 0) {
-    auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
-    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_success")).value(),
-              reload_success_count);
-    EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".db_reload_error")).value(),
-              reload_error_count);
+    const DbFileStats& stats = GeoipProviderPeer::dbFileStats(provider_, db_type);
+    EXPECT_EQ(stats.db_reload_success_.value(), reload_success_count);
+    EXPECT_EQ(stats.db_reload_error_.value(), reload_error_count);
   }
 
   Event::MockDispatcher dispatcher_;
@@ -214,7 +225,7 @@ public:
   absl::flat_hash_map<std::string, std::string> captured_lookup_response_;
   absl::Mutex mutex_;
   std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_ ABSL_GUARDED_BY(mutex_);
-  absl::optional<ConditionalInitializer> cb_added_nullopt = absl::nullopt;
+  std::optional<ConditionalInitializer> cb_added_nullopt = std::nullopt;
   DriverSharedPtr provider_;
 };
 
@@ -399,7 +410,7 @@ TEST_F(GeoipProviderTest, AsnDbAndIspDbNotSetCausesEnvoyBug) {
   // Configuration that exposes the logical bug:
   // 1. ASN header is requested (triggers lookupInAsnDb call)
   // 2. No ASN database path configured (asn_db_ptr will be null)
-  // 3. No ISP database path configured (isIspDbPathSet() returns false)
+  // 3. No ISP database path configured (isIspDbSet() returns false)
   // This should trigger IS_ENVOY_BUG.
   const std::string config_yaml = R"EOF(
     common_provider_config:
@@ -575,6 +586,25 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
   expectStats("anon_db");
 }
 
+TEST_F(GeoipProviderTest, ValidConfigAnonHostingOnlySuccessfulLookup) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        anon_hosting: "x-geo-anon-hosting"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("71.160.223.45");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), lookup_cb.AsStdFunction());
+  EXPECT_THAT(captured_lookup_response_,
+              testing::UnorderedElementsAre(testing::Pair("x-geo-anon-hosting", "true")));
+  expectStats("anon_db");
+}
+
 TEST_F(GeoipProviderTest, ValidConfigUsingCityDbNoHeadersAddedWhenIpIsNotInDb) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
@@ -695,7 +725,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
       "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Updated.mmdb");
   const std::string formatted_config =
       fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(formatted_config, cb_added_opt);
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
@@ -712,7 +742,7 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   expectReloadStats("city_db", 1, 0);
   captured_lookup_response_.clear();
@@ -746,7 +776,7 @@ TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
       "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Updated.mmdb");
   const std::string formatted_config =
       fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(formatted_config, cb_added_opt);
   expectStats("city_db", 0, 0, 0, 1671567063);
   TestEnvironment::renameFile(city_db_path, city_db_path + "1");
@@ -754,7 +784,7 @@ TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   expectReloadStats("city_db", 1, 0);
   expectStats("city_db", 0, 0, 0, 1753263760);
@@ -888,7 +918,7 @@ TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndCityFallback) {
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
 
   // Country header should be missing because the country DB is null and the city DB
-  // skipped the country lookup because isCountryDbPathSet() is true.
+  // skipped the country lookup because isCountryDbSet() is true.
   const auto& country_it = captured_lookup_response_.find("x-geo-country");
   EXPECT_EQ(captured_lookup_response_.end(), country_it);
 
@@ -923,17 +953,16 @@ TEST_F(GeoipProviderTest, CountryDbLookupWithNullDbAndNoFallback) {
       "Maxmind country database must be initialised for performing lookups");
 }
 
-using GeoipProviderDeathTest = GeoipProviderTest;
-
-TEST_F(GeoipProviderDeathTest, GeoDbPathDoesNotExist) {
+// A database that cannot be opened at startup rejects the configuration rather than crashing.
+TEST_F(GeoipProviderTest, GeoDbPathDoesNotExist) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_field_keys:
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data_atc/GeoLite2-City-Test.mmdb"
   )EOF";
-  EXPECT_DEATH(initializeProvider(config_yaml, cb_added_nullopt),
-               ".*Unable to open Maxmind database file.*");
+  EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
+                          "Unable to open Maxmind database file");
 }
 
 struct GeoipProviderGeoDbNotSetTestCase {
@@ -1038,7 +1067,7 @@ class MmdbReloadImplTest : public ::testing::TestWithParam<MmdbReloadTestCase>,
 
 TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   MmdbReloadTestCase test_case = GetParam();
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(test_case.yaml_config_, cb_added_opt);
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow(test_case.ip_);
@@ -1057,7 +1086,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   expectReloadStats(test_case.db_type_, 1, 0);
   captured_lookup_response_.clear();
@@ -1076,7 +1105,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloaded) {
 
 TEST_P(MmdbReloadImplTest, MmdbReloadedInFlightReadsNotAffected) {
   MmdbReloadTestCase test_case = GetParam();
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(test_case.yaml_config_, cb_added_opt);
   GeoipProviderPeer::synchronizer(provider_).enable();
   const auto lookup_sync_point_name = test_case.db_type_.append("_lookup_pre_complete");
@@ -1113,7 +1142,7 @@ TEST_P(MmdbReloadImplTest, MmdbReloadedInFlightReadsNotAffected) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
   }
   GeoipProviderPeer::synchronizer(provider_).signal(lookup_sync_point_name);
   t0.join();
@@ -1166,7 +1195,7 @@ class MmdbReloadErrorImplTest : public ::testing::TestWithParam<MmdbReloadErrorT
 
 TEST_P(MmdbReloadErrorImplTest, MmdbReloadErrorUsesPreviousDb) {
   MmdbReloadErrorTestCase test_case = GetParam();
-  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  auto cb_added_opt = std::make_optional<ConditionalInitializer>();
   initializeProvider(test_case.yaml_config_, cb_added_opt);
   std::string source_db_file_path = TestEnvironment::substitute(test_case.source_db_file_path_);
   std::string invalid_db_file_path = TestEnvironment::substitute(invalid_db_path);
@@ -1189,7 +1218,11 @@ TEST_P(MmdbReloadErrorImplTest, MmdbReloadErrorUsesPreviousDb) {
   cb_added_opt.value().waitReady();
   {
     absl::ReaderMutexLock guard(mutex_);
-    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+    // The reload failure is reported back to the filesystem watcher.
+    EXPECT_THAT(
+        on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo),
+        StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                 testing::HasSubstr("Unable to open Maxmind database file")));
   }
   // On reload error the old db instance should be used for subsequent lookup requests.
   expectReloadStats(test_case.db_type_, 0, 1);
@@ -1426,6 +1459,58 @@ TEST_F(GeoipProviderTest,
   const auto& apple_it = captured_lookup_response_.find("x-geo-apple-private-relay");
   EXPECT_EQ("false", apple_it->second);
   expectStats("isp_db");
+}
+
+#if !defined(NDEBUG)
+class GeoipProviderNonIpAddressDeathTest : public testing::Test, public GeoipProviderTestBase {
+protected:
+  void expectLookupAsserts(Network::Address::InstanceConstSharedPtr remote_address) {
+    initializeProvider(default_city_config_yaml, cb_added_nullopt);
+    Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+    testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+    auto lookup_cb_std = lookup_cb.AsStdFunction();
+    EXPECT_CALL(lookup_cb, Call(_)).Times(0);
+    EXPECT_DEBUG_DEATH(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
+                       "geolocation lookup requires an IP address");
+  }
+};
+
+TEST_F(GeoipProviderNonIpAddressDeathTest, PipeAddress) {
+  auto pipe_or_error = Network::Address::PipeInstance::create("/tmp/envoy_geoip_test.sock");
+  ASSERT_TRUE(pipe_or_error.ok());
+  expectLookupAsserts(std::move(*pipe_or_error));
+}
+
+TEST_F(GeoipProviderNonIpAddressDeathTest, EnvoyInternalAddress) {
+  expectLookupAsserts(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_address_for_test"));
+}
+
+TEST_F(GeoipProviderNonIpAddressDeathTest, NullAddress) { expectLookupAsserts(nullptr); }
+#endif
+
+TEST_F(GeoipProviderTest, DbFileStatsLiveInTheProviderScopeAndNameTheFile) {
+  initializeProvider(default_city_config_yaml, cb_added_nullopt);
+
+  // A database file is shared between listeners, so the stats describing it are rooted at the
+  // provider singleton's "maxmind." scope rather than at this provider's "prefix.maxmind."
+  // namespace, and the file's path is part of the stat name so that two files of the same type
+  // stay distinguishable. The path is supplied as a db_name tag too, which this store honors;
+  // a store running in legacy (non explicit-tags) mode keeps the name but drops the tag.
+  const std::string db_name =
+      Stats::Utility::sanitizeStatsName(TestEnvironment::substitute(default_city_db_path));
+  const Stats::GaugeSharedPtr build_epoch = TestUtility::findGauge(
+      stats_store_, absl::StrCat("maxmind.city_db.", db_name, ".db_build_epoch"));
+  ASSERT_NE(build_epoch, nullptr);
+  EXPECT_EQ(build_epoch->value(), 1671567063);
+  EXPECT_EQ(build_epoch->tagExtractedName(), "maxmind.city_db.db_build_epoch");
+  const Stats::TagVector tags = build_epoch->tags();
+  ASSERT_EQ(tags.size(), 1);
+  EXPECT_EQ(tags[0].name_, "db_name");
+  EXPECT_EQ(tags[0].value_, db_name);
+
+  // The provider's own namespace carries the lookup stats only.
+  EXPECT_EQ(TestUtility::findGauge(stats_store_, "prefix.maxmind.city_db.db_build_epoch"), nullptr);
 }
 
 } // namespace Maxmind

@@ -4,6 +4,7 @@
 #include "api.h"
 
 #ifdef __cplusplus
+// NOLINTNEXTLINE(readability-identifier-naming)
 struct httpDestroyableConfig : httpConfig {
   int destroyed;
 };
@@ -12,6 +13,7 @@ extern "C" {
 typedef struct {
   httpConfig c;
   int destroyed;
+  // NOLINTNEXTLINE(readability-identifier-naming)
 } httpDestroyableConfig;
 #endif
 

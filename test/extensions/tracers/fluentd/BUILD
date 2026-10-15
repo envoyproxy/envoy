@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "tracer_impl_test",
     srcs = ["tracer_impl_test.cc"],
     extension_names = ["envoy.tracers.fluentd"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     name = "tracer_integration_test",
     srcs = ["tracer_integration_test.cc"],
     extension_names = ["envoy.tracers.fluentd"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -45,13 +45,10 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/fluentd:config",
         "//source/extensions/tracers/fluentd:fluentd_tracer_lib",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
@@ -63,7 +60,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.fluentd"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [

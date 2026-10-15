@@ -154,6 +154,10 @@ typedef struct {
   //       of bytes received before decompression. consumed_bytes_from_response omits the number
   //       number of bytes related to the Status Line, and is after decompression.
   uint64_t consumed_bytes_from_response;
+  // The latest SCONE maximum bitrate received from the network, in kbps.
+  int64_t scone_max_kbps;
+  // Time since epoch when SCONE value was received, -1 if no new value
+  int64_t scone_timestamp_ms;
 } envoy_stream_intel;
 
 /**

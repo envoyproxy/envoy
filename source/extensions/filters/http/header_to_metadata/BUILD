@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
+        "//source/common/matcher:regex_replace_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],
@@ -31,6 +32,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",

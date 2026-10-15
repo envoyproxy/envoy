@@ -26,6 +26,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Network {
@@ -135,6 +136,93 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(UdpListenerImplTest, SendEmptyDatagramUnconnected) {
+  setup();
+
+  bool timed_out = false;
+  Event::TimerPtr timeout_timer = dispatcher_->createTimer([&]() {
+    timed_out = true;
+    dispatcher_->exit();
+  });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
+  const std::string follow_up("follow-up");
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        ASSERT_NE(nullptr, data.addresses_.local_);
+        EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
+        ASSERT_NE(nullptr, data.addresses_.peer_);
+        EXPECT_EQ(client_.localAddress()->asString(), data.addresses_.peer_->asString());
+        EXPECT_EQ(0, data.buffer_->length());
+      }))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        ASSERT_NE(nullptr, data.addresses_.local_);
+        EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
+        ASSERT_NE(nullptr, data.addresses_.peer_);
+        EXPECT_EQ(client_.localAddress()->asString(), data.addresses_.peer_->asString());
+        EXPECT_EQ(follow_up, data.buffer_->toString());
+        timeout_timer->disableTimer();
+        dispatcher_->exit();
+      }));
+
+  client_.write("", *send_to_addr_);
+  client_.write(follow_up, *send_to_addr_);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(timed_out);
+}
+
+TEST_P(UdpListenerImplTest, SendEmptyDatagramConnected) {
+  setup();
+
+  SocketSharedPtr connected_client = createServerSocket(true);
+  ASSERT_EQ(0, connected_client->ioHandle().connect(send_to_addr_).return_value_);
+  const Address::InstanceConstSharedPtr connected_client_address =
+      connected_client->connectionInfoProvider().localAddress();
+
+  bool timed_out = false;
+  Event::TimerPtr timeout_timer = dispatcher_->createTimer([&]() {
+    timed_out = true;
+    dispatcher_->exit();
+  });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
+  const std::string follow_up("follow-up");
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        ASSERT_NE(nullptr, data.addresses_.local_);
+        EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
+        ASSERT_NE(nullptr, data.addresses_.peer_);
+        EXPECT_EQ(connected_client_address->asString(), data.addresses_.peer_->asString());
+        EXPECT_EQ(0, data.buffer_->length());
+      }))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        ASSERT_NE(nullptr, data.addresses_.local_);
+        EXPECT_EQ(send_to_addr_->asString(), data.addresses_.local_->asString());
+        ASSERT_NE(nullptr, data.addresses_.peer_);
+        EXPECT_EQ(connected_client_address->asString(), data.addresses_.peer_->asString());
+        EXPECT_EQ(follow_up, data.buffer_->toString());
+        timeout_timer->disableTimer();
+        dispatcher_->exit();
+      }));
+
+  Buffer::OwnedImpl empty_buffer;
+  Api::IoCallUint64Result send_result =
+      Utility::writeToSocket(connected_client->ioHandle(), empty_buffer, nullptr, *send_to_addr_);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+
+  Buffer::OwnedImpl follow_up_buffer(follow_up);
+  send_result = Utility::writeToSocket(connected_client->ioHandle(), follow_up_buffer, nullptr,
+                                       *send_to_addr_);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(follow_up.length(), send_result.return_value_);
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(timed_out);
 }
 
 // Test a large datagram that gets dropped using recvmsg or recvmmsg if supported.
@@ -370,8 +458,9 @@ public:
   }
   void setup() {
     io_handle_ = &useHotRestartSocket(registrar_);
-    // File event should be created listening to no events (i.e. disabled).
-    EXPECT_CALL(*io_handle_, createFileEvent_(_, _, _, 0));
+    // File event should be created listening to no events (i.e. disabled). Keep its callback so a
+    // test can inject an event on the paused listener.
+    EXPECT_CALL(*io_handle_, createFileEvent_(_, _, _, 0)).WillOnce(SaveArg<1>(&file_event_cb_));
     // Parent drained callback should be registered when the listener is created.
     // We capture the callback so we can simulate "drain complete".
     EXPECT_CALL(registrar_, registerParentDrainedCallback(_, _))
@@ -387,6 +476,7 @@ protected:
   MockParentDrainedCallbackRegistrar registrar_;
   MockIoHandle* io_handle_;
   absl::AnyInvocable<void()> parent_drained_callback_;
+  Event::FileReadyCb file_event_cb_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, HotRestartedUdpListenerImplTest,
@@ -448,6 +538,31 @@ TEST_P(HotRestartedUdpListenerImplTest, EndingParentDrainedWhileDisabledShouldNo
               enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
   listener_->enable();
   testing::Mock::VerifyAndClearExpectations(io_handle_);
+}
+
+/**
+ * A read event injected on the paused listener (activateRead(), which the QUIC listener uses to
+ * process the handshakes it buffered from packets the parent forwarded) runs the read-ready
+ * callback but must not read the socket: the socket is the parent's to read until the parent is
+ * gone, and anything dequeued here would belong to the parent's connections.
+ */
+TEST_P(HotRestartedUdpListenerImplTest, InjectedReadWhilePausedDoesNotReadTheSocket) {
+  setup();
+  ASSERT_TRUE(file_event_cb_ != nullptr);
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  // No read of any kind, and no re-arming of the read event.
+  EXPECT_CALL(*io_handle_, supportsMmsg()).Times(0);
+  EXPECT_CALL(*io_handle_, activateFileEvents(_)).Times(0);
+  EXPECT_TRUE(file_event_cb_(Event::FileReadyType::Read).ok());
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  testing::Mock::VerifyAndClearExpectations(&listener_callbacks_);
+
+  // Once the parent is gone the listener starts reading as usual.
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  EXPECT_CALL(*io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_P(HotRestartedUdpListenerImplTest,
@@ -746,7 +861,7 @@ TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
     std::string payload(1024, (i % 2 == 0 ? 'a' : 'b'));
     client_data.push_back(payload);
     // The concatenated payload received from kernel supporting udp_gro
-    stacked_message = absl::StrCat(stacked_message, payload);
+    absl::StrAppend(&stacked_message, payload);
     // Actually send the packets to trigger I/O events on the listener.
     client_.write(payload, *send_to_addr_);
   }

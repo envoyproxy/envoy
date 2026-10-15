@@ -15,6 +15,7 @@ namespace UdpFilters {
 namespace DnsFilter {
 namespace {
 
+using testing::NiceMock;
 using ResponseValidator = Utils::DnsResponseValidator;
 
 // Mock OS getaddrinfo.
@@ -249,7 +250,7 @@ listener_filters:
       envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
           config;
       config.mutable_num_retries()->set_value(1);
-      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
+      std::ignore = typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
     });
     if (upstream_count > 1) {
       setDeterministicValue();
@@ -278,10 +279,10 @@ listener_filters:
       if (cluster_lookup_test_) {
         auto* listener_filter = listener0->mutable_listener_filters(0);
         envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig dns_filter_config;
-        listener_filter->typed_config().UnpackTo(&dns_filter_config);
+        std::ignore = listener_filter->typed_config().UnpackTo(&dns_filter_config);
 
         dns_filter_config.clear_client_config();
-        listener_filter->mutable_typed_config()->PackFrom(dns_filter_config);
+        std::ignore = listener_filter->mutable_typed_config()->PackFrom(dns_filter_config);
       }
       auto listener_1 = getListener1(addr_port);
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(listener_1);

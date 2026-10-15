@@ -13,10 +13,10 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",
-        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/network:connection_mocks",
     ],
 )

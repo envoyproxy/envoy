@@ -157,6 +157,9 @@ func getRequest(r *C.httpRequest) *httpRequest {
 func getState(s *C.processState) *processState {
 	r := s.req
 	req := getRequest(r)
+	if req == nil {
+		return nil
+	}
 	if s.is_encoding == 0 {
 		return &req.decodingState.processState
 	}
@@ -237,6 +240,10 @@ func envoyGoFilterOnHttpHeader(s *C.processState, endStream, headerNum, headerBy
 //export envoyGoFilterOnHttpData
 func envoyGoFilterOnHttpData(s *C.processState, endStream, buffer, length uint64) uint64 {
 	state := getState(s)
+	if state == nil {
+		// safe to do as the C++ side hasDestroyed() check prevents acting on the returned value
+		return uint64(api.Continue)
+	}
 
 	req := state.request
 	if req.pInfo.paniced {
@@ -389,6 +396,9 @@ func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 //export envoyGoRequestSemaDec
 func envoyGoRequestSemaDec(r *C.httpRequest) {
 	req := getRequest(r)
+	if req == nil {
+		return
+	}
 	defer req.recoverPanic()
 	req.resumeWaitCallback()
 }

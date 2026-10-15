@@ -51,9 +51,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
                 return absl::OkStatus();
               })),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
-      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_ &&
-                            Runtime::runtimeFeatureEnabled(
-                                "envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node")),
+      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
   AllMuxes::get().insert(this);
 }
@@ -85,7 +83,7 @@ NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_cli
         },
         /*failover_stream_creator=*/
         failover_async_client
-            ? absl::make_optional(
+            ? std::make_optional(
                   [&failover_async_client, &service_method, &dispatcher = dispatcher_, &scope,
                    &rate_limit_settings](
                       GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse>*
@@ -109,7 +107,7 @@ NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_cli
                                    envoy::service::discovery::v3::DeltaDiscoveryResponse>::
                             ConnectedStateValue::SecondEntry);
                   })
-            : absl::nullopt,
+            : std::nullopt,
         /*grpc_mux_callbacks=*/*this,
         /*dispatch=*/dispatcher_);
   }
@@ -155,7 +153,7 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
+    ResponseProtoPtr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
@@ -246,7 +244,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    entry = addSubscription(type_url, options.use_namespace_matching_);
+    entry = addSubscription(type_url);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, *resource_decoder);
@@ -259,7 +257,8 @@ absl::Status
 NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
                                 Grpc::RawAsyncClientSharedPtr&& failover_async_client,
                                 Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
-                                const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
+                                const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+                                std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(ads_config_source);
@@ -292,13 +291,9 @@ NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_cl
 // Updates the list of resource names watched by the given watch. If an added name is new across
 // the whole subscription, or if a removed name has no other watch interested in it, then the
 // subscription will enqueue and attempt to send an appropriate discovery request.
-void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
-                                 const absl::flat_hash_set<std::string>& resources,
-                                 const SubscriptionOptions& options) {
-  ASSERT(watch != nullptr);
-  auto sub = subscriptions_.find(type_url);
-  RELEASE_ASSERT(sub != subscriptions_.end(),
-                 fmt::format("Watch of {} has no subscription to update.", type_url));
+absl::flat_hash_set<std::string>
+NewGrpcMuxImpl::effectiveResources(const absl::flat_hash_set<std::string>& resources,
+                                   const SubscriptionOptions& options) {
   // We need to prepare xdstp:// resources for the transport, by normalizing and adding any extra
   // context parameters.
   absl::flat_hash_set<std::string> effective_resources;
@@ -319,27 +314,43 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
       effective_resources.insert(resource);
     }
   }
+  return effective_resources;
+}
+
+void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
+                                 const absl::flat_hash_set<std::string>& resources,
+                                 const SubscriptionOptions& options) {
+  ASSERT(watch != nullptr);
+  auto sub = subscriptions_.find(type_url);
+  RELEASE_ASSERT(sub != subscriptions_.end(),
+                 fmt::format("Watch of {} has no subscription to update.", type_url));
+  const absl::flat_hash_set<std::string> effective_resources =
+      effectiveResources(resources, options);
   auto added_removed = sub->second->watch_map_.updateWatchInterest(watch, effective_resources);
-  if (options.use_namespace_matching_) {
-    // This is to prevent sending out of requests that contain prefixes instead of resource names
-    sub->second->sub_state_.updateSubscriptionInterest({}, {});
-  } else {
-    sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_,
-                                                       added_removed.removed_);
+  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
+    for (absl::string_view resource : added_removed.removed_) {
+      xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
+    }
   }
+  sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
   // Tell the server about our change in interest, if any.
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
 }
 
-void NewGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
-                                           const absl::flat_hash_set<std::string>& for_update) {
+void NewGrpcMuxImpl::appendWatch(const std::string& type_url, Watch* watch,
+                                 const absl::flat_hash_set<std::string>& resources,
+                                 const SubscriptionOptions& options) {
+  ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
-  sub->second->sub_state_.updateSubscriptionInterest(for_update, {});
-  // Tell the server about our change in interest, if any.
+  // Additionally update the watch-map routing, then subscribe to whatever became newly interesting
+  // across the whole subscription. This keeps watch_interest_ and the subscription consistent.
+  auto added_removed =
+      sub->second->watch_map_.appendWatchInterest(watch, effectiveResources(resources, options));
+  sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, {});
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
@@ -353,18 +364,27 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
+void NewGrpcMuxImpl::accept(const std::string& type_url, Watch* watch,
+                            const absl::flat_hash_set<std::string>& patterns) {
+  ASSERT(watch != nullptr);
+  auto sub = subscriptions_.find(type_url);
+  RELEASE_ASSERT(sub != subscriptions_.end(),
+                 fmt::format("Watch of {} has no subscription to update.", type_url));
+  // Glob interest affects routing only; the subscription sent to the server is left untouched.
+  sub->second->watch_map_.accept(watch, patterns);
+}
+
 NewGrpcMuxImpl::SubscriptionsMap::iterator
-NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching) {
+NewGrpcMuxImpl::addSubscription(const std::string& type_url) {
   // Resource cache is only used for EDS resources.
-  EdsResourcesCacheOptRef resources_cache{absl::nullopt};
+  EdsResourcesCacheOptRef resources_cache{std::nullopt};
   if (eds_resources_cache_ &&
       (type_url == Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>())) {
     resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());
   }
   auto [it, success] = subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, use_namespace_matching, dispatcher_,
-                                                    config_validators_.get(), xds_config_tracker_,
-                                                    resources_cache));
+      type_url, std::make_unique<SubscriptionStuff>(type_url, dispatcher_, config_validators_.get(),
+                                                    xds_config_tracker_, resources_cache));
   // Insertion must succeed, as the addSubscription method is only called if
   // the map doesn't have the type_url.
   ASSERT(success);
@@ -379,7 +399,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
 
   while (true) {
     // Do any of our subscriptions even want to send a request?
-    absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
+    std::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();
     if (!maybe_request_type.has_value()) {
       break;
     }
@@ -441,7 +461,7 @@ bool NewGrpcMuxImpl::canSendDiscoveryRequest(const std::string& type_url) {
 // First, prioritizes ACKs over non-ACK subscription interest updates.
 // Then, prioritizes non-ACK updates in the order the various types
 // of subscriptions were activated.
-absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
+std::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   // All ACKs are sent before plain updates. trySendDiscoveryRequests() relies on this. So, choose
   // type_url from pausable_ack_queue_ if possible, before looking at pending updates.
   if (!pausable_ack_queue_.empty()) {
@@ -456,7 +476,7 @@ absl::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
       return sub->first;
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 // A factory class for creating NewGrpcMuxImpl so it does not have to be
@@ -489,7 +509,7 @@ public:
         /*rate_limit_settings_=*/rate_limit_settings_or_error.value(),
         /*scope_=*/scope,
         /*config_validators_=*/std::move(config_validators),
-        /*xds_resources_delegate_=*/absl::nullopt,
+        /*xds_resources_delegate_=*/std::nullopt,
         /*xds_config_tracker_=*/xds_config_tracker,
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",

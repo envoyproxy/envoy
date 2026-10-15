@@ -21,7 +21,7 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
                            ? std::string(DefaultMetricsNamespace)
                            : config.dynamic_module_config().metrics_namespace(),
                        ".", config.filter_name(), "."))),
-      stat_name_pool_(stats_scope_->symbolTable()) {
+      metrics_(*stats_scope_) {
 
   auto config_new_or_error = dynamic_module_->getFunctionPointer<decltype(on_filter_config_new_)>(
       "envoy_dynamic_module_on_udp_listener_filter_config_new");
@@ -67,6 +67,12 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
   in_module_config_ =
       on_filter_config_new_(static_cast<void*>(this), {filter_name_.c_str(), filter_name_.size()},
                             {filter_config_.data(), filter_config_.size()});
+  // A null config means the module reported a configuration error. Reject at load so no later hook
+  // runs against a null config and dereferences it.
+  if (in_module_config_ == nullptr) {
+    throw EnvoyException("Failed to initialize dynamic module UDP listener filter");
+  }
+  stat_creation_frozen_ = true;
 }
 
 DynamicModuleUdpListenerFilterConfig::~DynamicModuleUdpListenerFilterConfig() {

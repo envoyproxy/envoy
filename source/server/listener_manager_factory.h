@@ -13,7 +13,8 @@ namespace Server {
 class ListenerManagerFactory : public Config::TypedFactory {
 public:
   virtual std::unique_ptr<ListenerManager>
-  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
+  createListenerManager(const Protobuf::Message& config, Instance& server,
+                        std::unique_ptr<ListenerComponentFactory>&& factory,
                         WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                         Quic::QuicStatNames& quic_stat_names) PURE;
 
@@ -27,10 +28,9 @@ class ConnectionHandler : public Network::TcpConnectionHandler,
 class ConnectionHandlerFactory : public Config::UntypedFactory {
 public:
   virtual std::unique_ptr<ConnectionHandler>
-  createConnectionHandler(Event::Dispatcher& dispatcher,
-                          absl::optional<uint32_t> worker_index) PURE;
+  createConnectionHandler(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index) PURE;
   virtual std::unique_ptr<ConnectionHandler>
-  createConnectionHandler(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
+  createConnectionHandler(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index,
                           OverloadManager& overload_manager,
                           OverloadManager& null_overload_manager) PURE;
 

@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <ostream>
 #include <string>
 
@@ -26,6 +27,23 @@ namespace CacheV2 {
 
 // Utility functions used in RequestCacheControl & ResponseCacheControl.
 namespace {
+constexpr unsigned int caseInsensitiveHash(absl::string_view directive) {
+  constexpr unsigned int kOffsetBasis = 2166136261u;
+  constexpr unsigned int kPrime = 16777619u;
+
+  unsigned int hash = kOffsetBasis;
+  for (const char c : directive) {
+    const char lowercase_c = c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c;
+    hash ^= static_cast<unsigned char>(lowercase_c);
+    hash *= kPrime;
+  }
+  return hash;
+}
+
+constexpr unsigned int operator""_case_insensitive_hash(const char* directive, std::size_t length) {
+  return caseInsensitiveHash(absl::string_view(directive, length));
+}
+
 // A directive with an invalid duration is ignored, the RFC does not specify a behavior:
 // https://httpwg.org/specs/rfc7234.html#delta-seconds
 OptionalDuration parseDuration(absl::string_view s) {
@@ -69,21 +87,32 @@ RequestCacheControl::RequestCacheControl(absl::string_view cache_control_header)
   for (auto full_directive : directives) {
     absl::string_view directive, argument;
     std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
-
-    if (directive == "no-cache") {
+    // Directive names are case-insensitive per RFC 9111 section 5.2:
+    // https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2
+    // The hashes are constexpr, so a collision between recognized directives is a compile-time
+    // error caused by duplicate case values.
+    switch (caseInsensitiveHash(directive)) {
+    case "no-cache"_case_insensitive_hash:
       must_validate_ = true;
-    } else if (directive == "no-store") {
+      break;
+    case "no-store"_case_insensitive_hash:
       no_store_ = true;
-    } else if (directive == "no-transform") {
+      break;
+    case "no-transform"_case_insensitive_hash:
       no_transform_ = true;
-    } else if (directive == "only-if-cached") {
+      break;
+    case "only-if-cached"_case_insensitive_hash:
       only_if_cached_ = true;
-    } else if (directive == "max-age") {
+      break;
+    case "max-age"_case_insensitive_hash:
       max_age_ = parseDuration(argument);
-    } else if (directive == "min-fresh") {
+      break;
+    case "min-fresh"_case_insensitive_hash:
       min_fresh_ = parseDuration(argument);
-    } else if (directive == "max-stale") {
+      break;
+    case "max-stale"_case_insensitive_hash:
       max_stale_ = argument.empty() ? SystemTime::duration::max() : parseDuration(argument);
+      break;
     }
   }
 }
@@ -94,23 +123,43 @@ ResponseCacheControl::ResponseCacheControl(absl::string_view cache_control_heade
   for (auto full_directive : directives) {
     absl::string_view directive, argument;
     std::tie(directive, argument) = separateDirectiveAndArgument(full_directive);
-
-    if (directive == "no-cache") {
+    // Directive names are case-insensitive per RFC 9111 section 5.2:
+    // https://www.rfc-editor.org/rfc/rfc9111.html#section-5.2
+    // The hashes are constexpr, so a collision between recognized directives is a compile-time
+    // error caused by duplicate case values.
+    switch (caseInsensitiveHash(directive)) {
+    case "no-cache"_case_insensitive_hash:
       // If no-cache directive has arguments they are ignored - not handled.
       must_validate_ = true;
-    } else if (directive == "must-revalidate" || directive == "proxy-revalidate") {
+      break;
+    case "must-revalidate"_case_insensitive_hash:
+    case "proxy-revalidate"_case_insensitive_hash:
       no_stale_ = true;
-    } else if (directive == "no-store" || directive == "private") {
+      break;
+    case "no-store"_case_insensitive_hash:
+    case "private"_case_insensitive_hash:
       // If private directive has arguments they are ignored - not handled.
       no_store_ = true;
-    } else if (directive == "no-transform") {
+      break;
+    case "no-transform"_case_insensitive_hash:
       no_transform_ = true;
-    } else if (directive == "public") {
+      break;
+    case "public"_case_insensitive_hash:
       is_public_ = true;
-    } else if (directive == "s-maxage") {
+      break;
+    case "s-maxage"_case_insensitive_hash:
       max_age_ = parseDuration(argument);
-    } else if (!max_age_.has_value() && directive == "max-age") {
-      max_age_ = parseDuration(argument);
+      // RFC 9111: s-maxage also implies the semantics of proxy-revalidate.
+      // See: https://httpwg.org/specs/rfc9111.html#rfc.section.5.2.2.10
+      if (max_age_.has_value()) {
+        no_stale_ = true;
+      }
+      break;
+    case "max-age"_case_insensitive_hash:
+      if (!max_age_.has_value()) {
+        max_age_ = parseDuration(argument);
+      }
+      break;
     }
   }
 }
@@ -295,7 +344,7 @@ Key CacheHeadersUtils::makeKey(const Http::RequestHeaderMap& request_headers,
   return key;
 }
 
-absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::string_view& str) {
+std::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::string_view& str) {
   uint64_t val = 0;
   uint32_t bytes_consumed = 0;
 
@@ -306,7 +355,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
     uint64_t new_val = (val * 10) + (cur - '0');
     if (new_val / 8 < val) {
       // Overflow occurred
-      return absl::nullopt;
+      return std::nullopt;
     }
     val = new_val;
     ++bytes_consumed;
@@ -317,7 +366,7 @@ absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::str
     str.remove_prefix(bytes_consumed);
     return val;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 void CacheHeadersUtils::getAllMatchingHeaderNames(
@@ -422,7 +471,7 @@ constexpr absl::string_view headerSeparator = "\n";
 constexpr absl::string_view inValueSeparator = "\r";
 }; // namespace
 
-absl::optional<std::string>
+std::optional<std::string>
 VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
                                       const absl::btree_set<absl::string_view>& vary_header_values,
                                       const Http::RequestHeaderMap& request_headers) {
@@ -438,10 +487,10 @@ VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
     }
     if (!allow_list.allowsValue(value)) {
       // The backend tried to vary on a header that we don't allow, so return
-      // absl::nullopt to indicate we are unable to cache this request. This
+      // std::nullopt to indicate we are unable to cache this request. This
       // also may occur if the allow list has changed since an item was cached,
       // rendering the cached vary value invalid.
-      return absl::nullopt;
+      return std::nullopt;
     }
     // TODO(cbdm): Can add some bucketing logic here based on header. For
     // example, we could normalize the values for accept-language by making all

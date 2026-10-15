@@ -3,7 +3,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/socket.h"
 
-#include "absl/types/optional.h"
+#include <optional>
 
 namespace Envoy {
 namespace Network {
@@ -21,7 +21,7 @@ public:
   bool setOption(Network::Socket& socket,
                  envoy::config::core::v3::SocketOption::SocketState state) const override;
   void hashKey(std::vector<uint8_t>& hash_key) const override;
-  absl::optional<Details>
+  std::optional<Details>
   getOptionDetails(const Network::Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;
   bool isSupported() const override;

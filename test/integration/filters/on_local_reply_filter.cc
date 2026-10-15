@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -20,20 +21,25 @@ public:
       dual_reply_ = true;
     }
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "original_reply", nullptr,
-                                       absl::nullopt, "original_reply");
+                                       std::nullopt, "original_reply");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& response_headers,
+                                          bool) override {
     if (dual_reply_) {
       decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "second_reply", nullptr,
-                                         absl::nullopt, "second_reply");
+                                         std::nullopt, "second_reply");
       return Http::FilterHeadersStatus::StopIteration;
+    }
+    if (saw_on_local_reply_) {
+      response_headers.addCopy(Http::LowerCaseString{"saw-on-local-reply"}, "yes");
     }
     return Http::FilterHeadersStatus::Continue;
   }
 
   Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+    saw_on_local_reply_ = true;
     if (reset_) {
       return Http::LocalErrorStatus::ContinueAndResetStream;
     }
@@ -42,11 +48,16 @@ public:
 
   bool reset_{};
   bool dual_reply_{};
+  bool saw_on_local_reply_{};
 };
 
-class OnLocalReplyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+class OnLocalReplyFilterConfig
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<
+          test::integration::filters::OnLocalReplyFilterConfig> {
 public:
-  OnLocalReplyFilterConfig() : EmptyHttpDualFilterConfig("on-local-reply-filter") {}
+  OnLocalReplyFilterConfig()
+      : UniqueEmptyHttpDualFilterConfig<test::integration::filters::OnLocalReplyFilterConfig>(
+            "on-local-reply-filter") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {

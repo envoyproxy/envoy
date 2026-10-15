@@ -62,7 +62,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
   }
 
   auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(
-      std::move(io_handle_server), address, source_address, absl::nullopt, false);
+      std::move(io_handle_server), address, source_address, std::nullopt, false);
   internal_listener->onAccept(std::move(accepted_socket));
   return client_conn;
 }

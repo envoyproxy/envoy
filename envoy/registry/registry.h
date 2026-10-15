@@ -37,7 +37,7 @@ public:
   virtual std::vector<absl::string_view> registeredNames() const PURE;
   // Return all registered factory names, including disabled factories.
   virtual std::vector<absl::string_view> allRegisteredNames() const PURE;
-  virtual absl::optional<envoy::config::core::v3::BuildVersion>
+  virtual std::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) const PURE;
   virtual bool disableFactory(absl::string_view) PURE;
   virtual bool isFactoryDisabled(absl::string_view) const PURE;
@@ -57,7 +57,7 @@ public:
     return FactoryRegistry::registeredNames(true);
   }
 
-  absl::optional<envoy::config::core::v3::BuildVersion>
+  std::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) const override {
     return FactoryRegistry::getFactoryVersion(name);
   }
@@ -328,11 +328,11 @@ public:
   /**
    * @return vendor specific version of a factory.
    */
-  static absl::optional<envoy::config::core::v3::BuildVersion>
+  static std::optional<envoy::config::core::v3::BuildVersion>
   getFactoryVersion(absl::string_view name) {
     auto it = versionedFactories().find(name);
     if (it == versionedFactories().end()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     return it->second;
   }
@@ -410,12 +410,13 @@ private:
       prev_by_name = it->second;
       factories().erase(it);
 
-      ENVOY_LOG(
-          info, "Factory '{}' (type '{}') displaced-by-name with test factory '{}' (type '{}')",
-          prev_by_name->name(), prev_by_name->configTypes(), factory.name(), factory.configTypes());
+      ENVOY_LOG(info,
+                "Factory '{}' (type '{}') displaced-by-name with test factory '{}' (type '{}')",
+                prev_by_name->name(), absl::StrJoin(prev_by_name->configTypes(), ", "),
+                factory.name(), absl::StrJoin(factory.configTypes(), ", "));
     } else {
       ENVOY_LOG(info, "Factory '{}' (type '{}') registered for tests", factory.name(),
-                factory.configTypes());
+                absl::StrJoin(factory.configTypes(), ", "));
     }
 
     factories().emplace(factory.name(), &factory);
@@ -433,7 +434,7 @@ private:
           ENVOY_LOG(
               info,
               "Deprecated name '{}' (mapped to '{}') displaced with test factory '{}' (type '{}')",
-              it->first, it->second, factory.name(), factory.configTypes());
+              it->first, it->second, factory.name(), absl::StrJoin(factory.configTypes(), ", "));
         } else {
           // Name not previously mapped, remember to remove it.
           prev_deprecated_names.emplace_back(std::make_pair(deprecated_name, ""));
@@ -458,14 +459,14 @@ private:
       factories().erase(replacement->name());
 
       ENVOY_LOG(info, "Removed test factory '{}' (type '{}')", replacement->name(),
-                replacement->configTypes());
+                absl::StrJoin(replacement->configTypes(), ", "));
 
       if (prev_by_name) {
         // Restore any factory displaced by name, but only register the type if it's non-empty.
         factories().emplace(prev_by_name->name(), prev_by_name);
 
         ENVOY_LOG(info, "Restored factory '{}' (type '{}'), formerly displaced-by-name",
-                  prev_by_name->name(), prev_by_name->configTypes());
+                  prev_by_name->name(), absl::StrJoin(prev_by_name->configTypes(), ", "));
       }
 
       for (auto [prev_deprecated_name, mapped_canonical_name] : prev_deprecated_names) {

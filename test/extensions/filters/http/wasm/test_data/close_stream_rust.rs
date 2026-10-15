@@ -10,13 +10,13 @@ struct TestStream;
 impl Context for TestStream {}
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
-        self.reset_http_request();
-        Action::Continue
-    }
+  fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
+    self.reset_http_request();
+    Action::Continue
+  }
 
-    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
-        self.reset_http_response();
-        Action::Continue
-    }
+  fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
+    self.reset_http_response();
+    Action::Continue
+  }
 }

@@ -61,6 +61,7 @@ absl::StatusOr<StreamMessagePtr> MessageConverter::accumulateMessage(Envoy::Buff
 
   ENVOY_LOG_MISC(info, "len(parsing_buffer_)={}", parsing_buffer_.length());
   if (parsed_output->owned_bytes != nullptr) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     ABSL_DCHECK(!parsed_output->needs_more_data);
     ENVOY_LOG_MISC(info, "len(parsed owned_bytes)={}", parsed_output->owned_bytes->length());
   }
@@ -87,6 +88,7 @@ MessageConverter::accumulateMessages(Envoy::Buffer::Instance& data, bool end_str
 
 absl::StatusOr<Envoy::Buffer::InstancePtr>
 MessageConverter::convertBackToBuffer(StreamMessagePtr message) {
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   ABSL_DCHECK(message != nullptr);
   conversions_to_envoy_buffer_++;
   if (conversions_to_envoy_buffer_ > conversions_to_message_data_) {

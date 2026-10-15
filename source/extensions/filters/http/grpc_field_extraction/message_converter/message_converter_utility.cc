@@ -78,6 +78,7 @@ absl::StatusOr<ParsedGrpcMessage> parseGrpcMessage(CreateMessageDataFunc& factor
     bytes_needed -= slice_length;
   }
 
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   ABSL_DCHECK(bytes_needed == 0) << "Tried reading past the array of slices during "
                                     "parsing. This should never happen as "
                                     "caller already did size checks.";

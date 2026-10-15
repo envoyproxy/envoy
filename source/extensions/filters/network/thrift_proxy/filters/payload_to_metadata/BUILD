@@ -41,6 +41,7 @@ envoy_cc_library(
         "payload_extractor_lib",
         "//envoy/server:filter_config_interface",
         "//source/common/common:matchers_lib",
+        "//source/common/matcher:regex_replace_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/filters/network/thrift_proxy:auto_protocol_lib",
         "//source/extensions/filters/network/thrift_proxy:auto_transport_lib",

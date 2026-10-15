@@ -46,3 +46,30 @@ HTTP filter configuration example:
    :lineno-start: 8
    :caption: :download:`gcp-authn-filter-configuration.yaml <_include/gcp-authn-filter-configuration.yaml>`
 
+Statistics
+----------
+
+The GCP authentication filter outputs statistics in the ``http.<stat_prefix>.gcp_authn.`` namespace.
+The :ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+comes from the owning HTTP connection manager.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  token_fetch_success, Counter, Total tokens successfully fetched from the authentication server
+  token_fetch_failed, Counter, Total failed token fetches. The request is forwarded upstream without a token
+  token_cache_hit, Counter, Total token cache lookups served from the cache
+  token_cache_miss, Counter, Total token cache lookups that required fetching a token
+  retrieve_audience_failed, Counter, Total requests for which no audience could be retrieved. The request is forwarded upstream without a token
+  empty_audience, Counter, Total requests with an audience that specifies no token. The request is forwarded upstream without a token
+  client_cert_fingerprint_calculated, Counter, Total client certificate fingerprints calculated for bound tokens
+  iam_token_config_error, Counter, Total requests rejected because an IAM access token was requested without an audience in the filter configuration
+  iam_token_resolution_failed, Counter, Total requests rejected because the IAM access token account or authorization could not be resolved
+  bound_token_fingerprint_unavailable, Counter, Total requests rejected because a bound token was requested but no client certificate fingerprint was available
+
+The cache counters are only incremented when :ref:`cache_config
+<envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.cache_config>` is
+configured, so their sum is the number of cache lookups performed.
+
+

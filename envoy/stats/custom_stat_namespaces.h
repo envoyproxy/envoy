@@ -1,9 +1,10 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -44,7 +45,7 @@ public:
    * @return the stripped string if stat_name has a registered custom stat namespace. Otherwise,
    * return nullopt.
    */
-  virtual absl::optional<absl::string_view>
+  virtual std::optional<absl::string_view>
   stripRegisteredPrefix(const absl::string_view stat_name) const PURE;
 };
 

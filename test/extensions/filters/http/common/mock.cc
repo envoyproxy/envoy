@@ -17,7 +17,7 @@ MockUpstream::MockUpstream(Upstream::MockClusterManager& mock_cm, const std::str
             Http::ResponseMessagePtr response_message(
                 new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                     new Http::TestResponseHeaderMapImpl{{":status", status_}}}));
-            if (response_body_.length()) {
+            if (!response_body_.empty()) {
               response_message->body().add(response_body_);
             } else {
               response_message->body().drain(response_message->body().length());

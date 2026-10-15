@@ -1,8 +1,9 @@
+#include <optional>
+
 #include "envoy/extensions/resource_monitors/downstream_connections/v3/downstream_connections.pb.h"
 
 #include "source/extensions/resource_monitors/downstream_connections/downstream_connections_monitor.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

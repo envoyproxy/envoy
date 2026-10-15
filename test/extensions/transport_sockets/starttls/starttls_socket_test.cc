@@ -58,9 +58,9 @@ TEST(StartTlsTest, BasicSwitch) {
   EXPECT_CALL(*ssl_socket, ssl()).Times(0);
   socket->ssl();
 
-  EXPECT_CALL(*raw_socket, closeSocket(Network::ConnectionEvent::RemoteClose));
-  EXPECT_CALL(*ssl_socket, closeSocket(Network::ConnectionEvent::RemoteClose)).Times(0);
-  socket->closeSocket(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*raw_socket, closeSocket(Network::ConnectionEvent::RemoteClose, false));
+  EXPECT_CALL(*ssl_socket, closeSocket(Network::ConnectionEvent::RemoteClose, false)).Times(0);
+  socket->closeSocket(Network::ConnectionEvent::RemoteClose, false);
 
   EXPECT_CALL(*raw_socket, doRead(_));
   EXPECT_CALL(*ssl_socket, doRead(_)).Times(0);
@@ -101,8 +101,8 @@ TEST(StartTlsTest, BasicSwitch) {
   EXPECT_CALL(*ssl_socket, ssl());
   socket->ssl();
 
-  EXPECT_CALL(*ssl_socket, closeSocket(Network::ConnectionEvent::RemoteClose));
-  socket->closeSocket(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*ssl_socket, closeSocket(Network::ConnectionEvent::RemoteClose, false));
+  socket->closeSocket(Network::ConnectionEvent::RemoteClose, false);
 
   EXPECT_CALL(*ssl_socket, doRead(_));
   socket->doRead(buf);

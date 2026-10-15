@@ -169,7 +169,7 @@ public:
           last_cluster_names_.end()) {
         envoy::config::endpoint::v3::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
-        response->add_resources()->PackFrom(*load_assignment);
+        std::ignore = response->add_resources()->PackFrom(*load_assignment);
       }
     }
     const auto decoded_resources =
@@ -203,7 +203,7 @@ public:
       // is no longer internally used by GrpcSubscriptionImpl.
       std::set<std::string> both;
       for (const auto& n : cluster_names) {
-        if (last_cluster_names_.find(n) != last_cluster_names_.end()) {
+        if (last_cluster_names_.contains(n)) {
           both.insert(n);
         }
       }

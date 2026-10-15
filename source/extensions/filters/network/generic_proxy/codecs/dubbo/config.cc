@@ -38,14 +38,14 @@ void DubboRequest::forEach(IterateCallback callback) const {
   }
 }
 
-absl::optional<absl::string_view> DubboRequest::get(absl::string_view key) const {
+std::optional<absl::string_view> DubboRequest::get(absl::string_view key) const {
   if (key == VERSION_KEY) {
     return inner_metadata_->request().serviceVersion();
   }
 
   auto it = inner_metadata_->request().content().attachments().find(key);
   if (it == inner_metadata_->request().content().attachments().end()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return absl::string_view{it->second};
@@ -95,7 +95,7 @@ ResponsePtr DubboServerCodec::respond(Status status, absl::string_view data,
 
   Common::Dubbo::ResponseStatus response_status = genericStatusToStatus(status.code());
 
-  absl::optional<Common::Dubbo::RpcResponseType> optional_type;
+  std::optional<Common::Dubbo::RpcResponseType> optional_type;
 
   if (response_status == Common::Dubbo::ResponseStatus::Ok) {
     optional_type.emplace(Common::Dubbo::RpcResponseType::ResponseWithException);

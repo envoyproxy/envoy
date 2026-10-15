@@ -19,14 +19,15 @@
 #include "test/integration/clusters/cluster_factory_config.pb.validate.h"
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/common.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/options.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -211,10 +212,9 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterName) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_FALSE(create_result.ok());
-  EXPECT_EQ(create_result.status().message(),
-            "Didn't find a registered cluster factory implementation for name: "
-            "'envoy.clusters.bad_cluster_name'");
+  EXPECT_THAT(create_result,
+              HasStatusMessage("Didn't find a registered cluster factory implementation for name: "
+                               "'envoy.clusters.bad_cluster_name'"));
 }
 
 TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
@@ -239,10 +239,9 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_FALSE(create_result.ok());
-  EXPECT_EQ(create_result.status().message(),
-            "Didn't find a registered cluster factory implementation for type: "
-            "'envoy.config.cluster.v3.Cluster'");
+  EXPECT_THAT(create_result,
+              HasStatusMessage("Didn't find a registered cluster factory implementation for type: "
+                               "'envoy.config.cluster.v3.Cluster'"));
 }
 
 TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
@@ -268,10 +267,10 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
-  EXPECT_FALSE(create_result.ok());
-  EXPECT_EQ(create_result.status().message(),
-            "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
-            "'envoy.clusters.custom_static'");
+  EXPECT_THAT(create_result,
+              HasStatusMessage(
+                  "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
+                  "'envoy.clusters.custom_static'"));
 }
 
 } // namespace

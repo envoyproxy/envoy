@@ -19,13 +19,15 @@ using ::Envoy::Extensions::Filters::Common::Expr::CelStatePrototype;
 using ::Envoy::Extensions::Filters::Common::Expr::CelStateType;
 
 struct HeaderValues {
+  const Http::LowerCaseString Baggage{"baggage"};
   const Http::LowerCaseString ExchangeMetadataHeader{"x-envoy-peer-metadata"};
   const Http::LowerCaseString ExchangeMetadataHeaderId{"x-envoy-peer-metadata-id"};
+  const Http::LowerCaseString ExchangeMetadataOriginNetwork{"x-forwarded-network"};
 };
 
 using Headers = ConstSingleton<HeaderValues>;
 
-using PeerInfo = Istio::Common::WorkloadMetadataObject;
+using PeerInfo = Istio::Common::WorkloadMetadataObjectConstSharedPtr;
 
 struct Context {
   bool request_peer_id_received_{false};
@@ -36,8 +38,8 @@ struct Context {
 class DiscoveryMethod {
 public:
   virtual ~DiscoveryMethod() = default;
-  virtual absl::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                                                  Context&) const PURE;
+  virtual PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
+                                  Context&) const PURE;
   virtual void remove(Http::HeaderMap&) const {}
 };
 
@@ -47,12 +49,11 @@ class MXMethod : public DiscoveryMethod {
 public:
   MXMethod(bool downstream, const absl::flat_hash_set<std::string> additional_labels,
            Server::Configuration::ServerFactoryContext& factory_context);
-  absl::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                                          Context&) const override;
+  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
   void remove(Http::HeaderMap&) const override;
 
 private:
-  absl::optional<PeerInfo> lookup(absl::string_view id, absl::string_view value) const;
+  PeerInfo lookup(absl::string_view id, absl::string_view value) const;
   const bool downstream_;
   struct MXCache : public ThreadLocal::ThreadLocalObject {
     absl::flat_hash_map<std::string, PeerInfo> cache_;
@@ -88,10 +89,27 @@ private:
   bool skipMXHeaders(const bool, const StreamInfo::StreamInfo&) const;
 };
 
+class BaggagePropagationMethod : public PropagationMethod {
+public:
+  BaggagePropagationMethod(Server::Configuration::ServerFactoryContext& factory_context,
+                           const io::istio::http::peer_metadata::Config_Baggage&);
+  void inject(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
+
+private:
+  std::string computeBaggageValue(Server::Configuration::ServerFactoryContext&) const;
+  const std::string value_;
+};
+
+class BaggageDiscoveryMethod : public DiscoveryMethod, public Logger::Loggable<Logger::Id::filter> {
+public:
+  BaggageDiscoveryMethod();
+  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
+};
+
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   FilterConfig(const io::istio::http::peer_metadata::Config&,
-               Server::Configuration::FactoryContext&);
+               Server::Configuration::ServerFactoryContext&);
   void discoverDownstream(StreamInfo::StreamInfo&, Http::RequestHeaderMap&, Context&) const;
   void discoverUpstream(StreamInfo::StreamInfo&, Http::ResponseHeaderMap&, Context&) const;
   void injectDownstream(const StreamInfo::StreamInfo&, Http::ResponseHeaderMap&, Context&) const;
@@ -108,11 +126,11 @@ private:
   std::vector<DiscoveryMethodPtr> buildDiscoveryMethods(
       const Protobuf::RepeatedPtrField<io::istio::http::peer_metadata::Config::DiscoveryMethod>&,
       const absl::flat_hash_set<std::string>& additional_labels, bool downstream,
-      Server::Configuration::FactoryContext&) const;
+      Server::Configuration::ServerFactoryContext&) const;
   std::vector<PropagationMethodPtr> buildPropagationMethods(
       const Protobuf::RepeatedPtrField<io::istio::http::peer_metadata::Config::PropagationMethod>&,
       const absl::flat_hash_set<std::string>& additional_labels, bool downstream,
-      Server::Configuration::FactoryContext&) const;
+      Server::Configuration::ServerFactoryContext&) const;
   absl::flat_hash_set<std::string>
   buildAdditionalLabels(const Protobuf::RepeatedPtrField<std::string>&) const;
   StreamInfo::StreamSharingMayImpactPooling sharedWithUpstream() const {
@@ -131,7 +149,7 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-class Filter : public Http::PassThroughFilter {
+class Filter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const FilterConfigSharedPtr& config) : config_(config) {}
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
@@ -142,17 +160,16 @@ private:
   Context ctx_;
 };
 
-class FilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+class FilterConfigFactory
+    : public Common::UnifiedFactoryBase<io::istio::http::peer_metadata::Config> {
 public:
-  std::string name() const override { return "envoy.filters.http.peer_metadata"; }
+  FilterConfigFactory() : UnifiedFactoryBase("envoy.filters.http.peer_metadata") {}
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<io::istio::http::peer_metadata::Config>();
-  }
-
+private:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config, const std::string&,
-                               Server::Configuration::FactoryContext&) override;
+  createHttpFilterFactoryFromProtoTyped(const io::istio::http::peer_metadata::Config& proto_config,
+                                        Server::Configuration::ServerFactoryContext&,
+                                        Server::Configuration::ExtraFactoryContext&) override;
 };
 
 } // namespace PeerMetadata

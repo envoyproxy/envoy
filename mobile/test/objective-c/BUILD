@@ -14,6 +14,7 @@ envoy_mobile_objc_test(
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_objc_bridge_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
     ],
 )
 
@@ -27,6 +28,7 @@ envoy_mobile_objc_test(
     deps = [
         "//library/objective-c:envoy_key_value_store_bridge_impl_lib",
         "//library/objective-c:envoy_objc_bridge_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
     ],
 )
 

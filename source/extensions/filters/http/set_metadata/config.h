@@ -13,20 +13,22 @@ namespace SetMetadataFilter {
 /**
  * Config registration for the header-to-metadata filter. @see NamedHttpFilterConfigFactory.
  */
-class SetMetadataConfig
-    : public Common::FactoryBase<envoy::extensions::filters::http::set_metadata::v3::Config> {
+class SetMetadataConfig : public Common::UnifiedFactoryBase<
+                              envoy::extensions::filters::http::set_metadata::v3::Config> {
 public:
-  SetMetadataConfig() : FactoryBase("envoy.filters.http.set_metadata") {}
+  SetMetadataConfig() : UnifiedFactoryBase("envoy.filters.http.set_metadata") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& server_context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace SetMetadataFilter

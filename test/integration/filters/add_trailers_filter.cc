@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -32,9 +33,12 @@ public:
 };
 
 class AddTrailersStreamFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
+    : public Extensions::HttpFilters::Common::UniqueEmptyHttpDualFilterConfig<
+          test::integration::filters::AddTrailersFilterConfig> {
 public:
-  AddTrailersStreamFilterConfig() : EmptyHttpDualFilterConfig("add-trailers-filter") {}
+  AddTrailersStreamFilterConfig()
+      : UniqueEmptyHttpDualFilterConfig<test::integration::filters::AddTrailersFilterConfig>(
+            "add-trailers-filter") {}
 
   absl::StatusOr<Http::FilterFactoryCb>
   createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {

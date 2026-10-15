@@ -4,11 +4,13 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <optional>
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/evwatch_observer_manager.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/signal.h"
@@ -37,6 +39,7 @@ public:
 
   // Dispatcher
   const std::string& name() override { return name_; }
+  std::optional<uint32_t> workerId() const override { return worker_id_; }
   TimeSource& timeSource() override { return *time_system_; }
   GlobalTimeSystem& globalTimeSystem() {
     return *(dynamic_cast<GlobalTimeSystem*>(time_system_.get()));
@@ -117,7 +120,9 @@ public:
   // Event::Dispatcher
   MOCK_METHOD(void, registerWatchdog,
               (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
-  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const absl::optional<std::string>&));
+  MOCK_METHOD(void, registerEvwatchObserver, (Evwatch::Observer & observer));
+  MOCK_METHOD(void, unregisterEvwatchObserver, (Evwatch::Observer & observer));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const std::optional<std::string>&));
   MOCK_METHOD(void, clearDeferredDeleteList, ());
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
@@ -152,6 +157,8 @@ public:
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};
+  // Parsed from the name like DispatcherImpl does; tests may override it.
+  std::optional<uint32_t> worker_id_;
 
 private:
   const std::string name_;
@@ -193,6 +200,15 @@ public:
 
   // If not nullptr, will be set on dtor. This can help to verify that the timer was destroyed.
   bool* timer_destroyed_{};
+};
+
+class MockEvwatchObserverManager : public EvwatchObserverManager {
+public:
+  MockEvwatchObserverManager();
+  ~MockEvwatchObserverManager() override;
+
+  MOCK_METHOD(void, registerObserver, (Evwatch::Observer & observer), (override));
+  MOCK_METHOD(void, unregisterObserver, (Evwatch::Observer & observer), (override));
 };
 
 class MockScaledRangeTimerManager : public ScaledRangeTimerManager {

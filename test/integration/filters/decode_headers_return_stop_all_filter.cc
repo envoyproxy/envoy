@@ -11,6 +11,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -112,11 +113,15 @@ private:
 };
 
 constexpr char DecodeHeadersReturnStopAllFilter::name[];
-static Registry::RegisterFactory<SimpleFilterConfig<DecodeHeadersReturnStopAllFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<DecodeHeadersReturnStopAllFilter,
+                             test::integration::filters::DecodeHeadersReturnStopAllFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-static Registry::RegisterFactory<SimpleFilterConfig<DecodeHeadersReturnStopAllFilter>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<DecodeHeadersReturnStopAllFilter,
+                             test::integration::filters::DecodeHeadersReturnStopAllFilterConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     register_upstream_;
 
 } // namespace Envoy

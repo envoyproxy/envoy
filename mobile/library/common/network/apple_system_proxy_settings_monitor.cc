@@ -27,7 +27,7 @@ void AppleSystemProxySettingsMonitor::start() {
   queue_ = dispatch_queue_create("io.envoyproxy.envoymobile.AppleSystemProxySettingsMonitor",
                                  attributes);
 
-  __block absl::optional<SystemProxySettings> proxy_settings;
+  __block std::optional<SystemProxySettings> proxy_settings;
   dispatch_sync(queue_, ^{
     proxy_settings = readSystemProxySettings();
     proxy_settings_read_callback_(std::move(proxy_settings));
@@ -59,11 +59,11 @@ CFDictionaryRef AppleSystemProxySettingsMonitor::getSystemProxySettings() const 
   return CFNetworkCopySystemProxySettings();
 }
 
-absl::optional<SystemProxySettings>
+std::optional<SystemProxySettings>
 AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
   CFDictionaryRef proxy_settings = getSystemProxySettings();
   if (proxy_settings == nullptr) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   // iOS system settings allow users to enter an arbitrary big integer number i.e. 88888888 as a
@@ -76,7 +76,7 @@ AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
   const bool is_http_proxy_enabled = Apple::toInt(cf_is_http_proxy_enabled) > 0;
   const bool is_auto_config_proxy_enabled = Apple::toInt(cf_is_auto_config_proxy_enabled) > 0;
 
-  absl::optional<SystemProxySettings> settings;
+  std::optional<SystemProxySettings> settings;
   if (is_http_proxy_enabled) {
     CFStringRef cf_hostname =
         static_cast<CFStringRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPProxy));
@@ -85,14 +85,14 @@ AppleSystemProxySettingsMonitor::readSystemProxySettings() const {
         static_cast<CFNumberRef>(CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesHTTPPort));
     int port = Apple::toInt(cf_port);
     if (!hostname.empty() && port > 0) {
-      settings = absl::make_optional<SystemProxySettings>(std::move(hostname), port);
+      settings = std::make_optional<SystemProxySettings>(std::move(hostname), port);
     }
   } else if (is_auto_config_proxy_enabled) {
     CFStringRef cf_pac_file_url_string = static_cast<CFStringRef>(
         CFDictionaryGetValue(proxy_settings, kCFNetworkProxiesProxyAutoConfigURLString));
     std::string pac_file_url_str = Apple::toString(cf_pac_file_url_string);
     if (!pac_file_url_str.empty()) {
-      settings = absl::make_optional<SystemProxySettings>(std::move(pac_file_url_str));
+      settings = std::make_optional<SystemProxySettings>(std::move(pac_file_url_str));
     }
   }
 

@@ -86,7 +86,7 @@ public:
   }
   void onAccept(Network::ConnectionSocketPtr&& socket) override;
 
-  // Network::BalancedConnectionHandler
+  // ActiveStreamListenerBase
   void incNumConnections() override { config_->openConnections().inc(); }
   void decNumConnections() override { config_->openConnections().dec(); }
 

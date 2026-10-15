@@ -1,10 +1,10 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Tools {
@@ -33,8 +33,8 @@ struct TypeInformation {
 // libtool binaries).
 class ApiTypeDb {
 public:
-  static absl::optional<TypeInformation> getExistingTypeInformation(const std::string& type_name);
-  static absl::optional<TypeInformation> getLatestTypeInformation(const std::string& type_name);
+  static std::optional<TypeInformation> getExistingTypeInformation(const std::string& type_name);
+  static std::optional<TypeInformation> getLatestTypeInformation(const std::string& type_name);
 };
 
 } // namespace TypeWhisperer

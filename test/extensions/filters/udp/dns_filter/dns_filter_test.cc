@@ -1,13 +1,11 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
-#include "source/common/common/logger.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
@@ -95,7 +93,7 @@ public:
     EXPECT_EQ(typed_dns_resolver_config_.typed_config().type_url(),
               "type.googleapis.com/"
               "envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
-    typed_dns_resolver_config_.typed_config().UnpackTo(&cares_);
+    std::ignore = typed_dns_resolver_config_.typed_config().UnpackTo(&cares_);
     dns_resolver_options_.MergeFrom(cares_.dns_resolver_options());
   }
 
@@ -189,6 +187,11 @@ server_config:
           - "2001:8a:c1::2801:0006"
           - "2001:8a:c1::2801:0007"
           - "2001:8a:c1::2801:0008"
+    - name: www.supercalifragilisticexpialidocious.thisismydomainforafivehundredandtwelvebytetest.a01234567890123456789012345678901234567890123456789.b01234567890123456789012345678901234567890123456789.c01234567890123456789012345678901234567890123456789.d01234567.com
+      endpoint:
+        address_list:
+          address:
+          - "2001:8a:c1::2801:0009"
 )EOF";
 
   const std::string forward_query_on_config = R"EOF(
@@ -541,6 +544,41 @@ TEST_F(DnsFilterTest, InvalidQueryNameTooLongTest) {
 
   EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
   EXPECT_EQ(0, response_ctx_->answers_.size());
+}
+
+TEST_F(DnsFilterTest, QueryNameOf255Octets) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+  std::string domain(
+      "www.supercalifragilisticexpialidocious.thisismydomainforafivehundredandtwelvebytetest."
+      "a01234567890123456789012345678901234567890123456789."
+      "b01234567890123456789012345678901234567890123456789."
+      "c01234567890123456789012345678901234567890123456789.d01234567.com");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+  EXPECT_LT(udp_response_.buffer_->length(), Utils::MAX_UDP_DNS_SIZE);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+
+  // The UDP filter limits response size to 512 bytes. Since the query is included in the
+  // response, and the query name is 255 octets, the filter cannot return any answers,
+  // since together with the answer name, they would exceed the 512 byte limit.
+  // In this case the test response parser sets the response code to NAME_ERROR.
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(0, response_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().aaaa_record_queries_.value());
+
+  EXPECT_EQ(1, config_->stats().local_aaaa_record_answers_.value());
+  EXPECT_EQ(0, config_->stats().downstream_rx_invalid_queries_.value());
+  EXPECT_TRUE(config_->stats().downstream_rx_bytes_.used());
+  EXPECT_TRUE(config_->stats().downstream_tx_bytes_.used());
 }
 
 TEST_F(DnsFilterTest, InvalidLabelNameTooLongTest) {
@@ -2561,6 +2599,223 @@ server_config:
 
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+// A query in a different case than the configured domain matches when case_insensitive is set,
+// and the response echoes the client's original query-name case (issue #45381).
+TEST_F(DnsFilterTest, CaseInsensitiveExactMatch) {
+  InSequence s;
+
+  const std::string case_insensitive_config = R"EOF(
+stat_prefix: "my_prefix"
+case_insensitive: true
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+    - name: "www.foo1.com"
+      endpoint:
+        address_list:
+          address:
+          - "10.0.0.1"
+)EOF";
+  setup(case_insensitive_config);
+
+  const std::string domain("WWW.FOO1.COM");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(1, response_ctx_->answers_.size());
+
+  // The answer name preserves the exact case the client sent.
+  const auto answer = response_ctx_->answers_.find(domain);
+  ASSERT_NE(answer, response_ctx_->answers_.end());
+  Utils::verifyAddress({"10.0.0.1"}, answer->second);
+
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+  EXPECT_EQ(1, config_->stats().local_a_record_answers_.value());
+}
+
+// The default (case_insensitive unset) preserves byte-exact matching: an upper-case query for a
+// lower-case configured domain is not a known domain and yields NAME_ERROR (reproduces #45381).
+TEST_F(DnsFilterTest, CaseInsensitiveDisabledByDefault) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+
+  const std::string query =
+      Utils::buildQueryForDomain("WWW.FOO1.COM", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(0, response_ctx_->answers_.size());
+  EXPECT_EQ(0, config_->stats().known_domain_queries_.value());
+}
+
+// Domain names in the configuration are also normalized on load, so a mixed-case configured
+// domain matches a lower-case query.
+TEST_F(DnsFilterTest, CaseInsensitiveMixedCaseConfig) {
+  InSequence s;
+
+  const std::string mixed_case_config = R"EOF(
+stat_prefix: "my_prefix"
+case_insensitive: true
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+    - name: "WwW.FoO1.CoM"
+      endpoint:
+        address_list:
+          address:
+          - "10.0.0.1"
+)EOF";
+  setup(mixed_case_config);
+
+  const std::string domain("www.foo1.com");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(1, response_ctx_->answers_.size());
+
+  const auto answer = response_ctx_->answers_.find(domain);
+  ASSERT_NE(answer, response_ctx_->answers_.end());
+  Utils::verifyAddress({"10.0.0.1"}, answer->second);
+}
+
+// Wildcard virtual domains match case-insensitively, exercising the getVirtualDomainName wildcard
+// handling and the label walk in getEndpointConfigForDomain.
+TEST_F(DnsFilterTest, CaseInsensitiveWildcard) {
+  InSequence s;
+
+  const std::string wildcard_config = R"EOF(
+stat_prefix: "my_prefix"
+case_insensitive: true
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.FooBaz.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+)EOF";
+  setup(wildcard_config);
+
+  const std::string domain("WWW.FOOBAZ.COM");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress({"10.0.0.1"}, answer.second);
+  }
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+// A mixed-case SRV service and host-name targets resolve for a query in a different case. The SRV
+// answer echoes the original queried service name; targets/additional records are normalized.
+TEST_F(DnsFilterTest, CaseInsensitiveSrvTargetResolution) {
+  InSequence s;
+
+  const std::string srv_config = R"EOF(
+stat_prefix: "my_prefix"
+case_insensitive: true
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+    - name: "Primary.VOIP.Subzero.com"
+      endpoint:
+        address_list: { address: [ "10.0.3.1" ] }
+    - name: "VOIP.Subzero.com"
+      endpoint:
+        service_list:
+          services:
+          - service_name: "SIP"
+            protocol: { name: "tcp" }
+            ttl: 86400s
+            targets: [ { host_name: "Primary.VOIP.Subzero.com", weight: 30, priority: 10, port: 5060 } ]
+)EOF";
+  setup(srv_config);
+
+  const std::string service("_SIP._TCP.VOIP.SUBZERO.COM");
+  const std::string query =
+      Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_EQ(1, response_ctx_->answers_.size());
+
+  // The SRV answer echoes the client's original service-name case; its target is normalized.
+  const auto answer = response_ctx_->answers_.find(service);
+  ASSERT_NE(answer, response_ctx_->answers_.end());
+  DnsSrvRecord* srv_rec = dynamic_cast<DnsSrvRecord*>(answer->second.get());
+  ASSERT_NE(srv_rec, nullptr);
+  EXPECT_EQ(1, srv_rec->targets_.size());
+  EXPECT_EQ("primary.voip.subzero.com", srv_rec->targets_.begin()->first);
+
+  // The target's address is returned as an additional record.
+  ASSERT_EQ(1, response_ctx_->additional_.size());
+  const auto additional = response_ctx_->additional_.find("primary.voip.subzero.com");
+  ASSERT_NE(additional, response_ctx_->additional_.end());
+  Utils::verifyAddress({"10.0.3.1"}, additional->second);
+}
+
+// Case-insensitive domain matching must not lower-case a redirected cluster name; Envoy cluster
+// names are case-sensitive.
+TEST_F(DnsFilterTest, CaseInsensitiveClusterNameStaysCaseSensitive) {
+  InSequence s;
+
+  const std::string cluster_redirect_config = R"EOF(
+stat_prefix: "my_prefix"
+case_insensitive: true
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "www.ClusterDomain.com"
+        endpoint:
+          cluster_name: "MyMixedCaseCluster"
+)EOF";
+  setup(cluster_redirect_config);
+
+  // The domain is matched case-insensitively, but the cluster lookup must use the original case.
+  EXPECT_CALL(listener_factory_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(absl::string_view("MyMixedCaseCluster")))
+      .WillOnce(Return(nullptr));
+
+  const std::string query =
+      Utils::buildQueryForDomain("WWW.CLUSTERDOMAIN.COM", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
 }
 

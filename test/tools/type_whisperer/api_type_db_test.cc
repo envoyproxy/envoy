@@ -12,7 +12,7 @@ namespace {
 // type information exists.
 TEST(ApiTypeDb, GetLatestTypeInformationForTypeUnknown) {
   const auto unknown_type_information = ApiTypeDb::getLatestTypeInformation("foo");
-  EXPECT_EQ(absl::nullopt, unknown_type_information);
+  EXPECT_EQ(std::nullopt, unknown_type_information);
 }
 
 // Validate that ApiTypeDb::getLatestTypeInformation is idempotent when no

@@ -13,14 +13,12 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-uint64_t Tracer::generateTraceId() {
+uint64_t Tracer::generateTraceId(SystemTime timestamp) {
   if (timestamp_trace_ids_) {
     // Generate timestamp-prefixed 64-bit value:
     // [32-bit epoch seconds][32-bit random]
-    const uint32_t epoch_seconds =
-        static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(
-                                  time_source_.monotonicTime().time_since_epoch())
-                                  .count());
+    const uint32_t epoch_seconds = static_cast<uint32_t>(
+        std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count());
     const uint32_t random_part = static_cast<uint32_t>(random_generator_.random());
 
     // Combine: timestamp in upper 32 bits, random in lower 32 bits
@@ -80,11 +78,11 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   // Set trace id(s)
   if (trace_id_128bit_) {
     span_ptr->setTraceId(random_number);
-    span_ptr->setTraceIdHigh(generateTraceId());
+    span_ptr->setTraceIdHigh(generateTraceId(timestamp));
   } else {
     if (timestamp_trace_ids_) {
       // 64-bit: timestamp-prefixed
-      span_ptr->setTraceId(generateTraceId());
+      span_ptr->setTraceId(generateTraceId(timestamp));
     } else {
       // Legacy behavior: trace id equals span id
       span_ptr->setTraceId(random_number);

@@ -116,7 +116,7 @@ TEST(PropertyMatchDataInputTest, PropertyMatchDataInputTest) {
   MatchInput match_input(request, stream_info, MatchAction::RouteAction);
 
   auto result = input->get(match_input);
-  EXPECT_EQ(absl::nullopt, result.stringData());
+  EXPECT_EQ(std::nullopt, result.stringData());
 
   request.data_["key_0"] = "value_0";
 
@@ -160,7 +160,9 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
   EXPECT_TRUE(matcher->supportsDataInputType(
       "Envoy::Extensions::NetworkFilters::GenericProxy::RequestMatchData"));
 
-  { EXPECT_EQ(matcher->match(DataInputGetResult::NoData()), Matcher::MatchResult::NoMatch); }
+  {
+    EXPECT_EQ(matcher->match(DataInputGetResult::NoData()), Matcher::MatchResult::NoMatch);
+  }
 
   {
     EXPECT_EQ(matcher->match(DataInputGetResult::CreateString("fake_data")),

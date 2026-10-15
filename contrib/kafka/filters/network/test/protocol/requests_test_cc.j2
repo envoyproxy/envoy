@@ -58,7 +58,7 @@ TEST_F(RequestTest, ShouldParse{{ message_type.name }}V{{ field_list.version }})
   // given
   {{ message_type.name }} data = { {{ field_list.example_value() }} };
   Request<{{ message_type.name }}> message = { {
-    {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, 0, absl::nullopt }, data };
+    {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, 0, std::nullopt }, data };
 
   // when
   auto received = serializeAndDeserialize(message);

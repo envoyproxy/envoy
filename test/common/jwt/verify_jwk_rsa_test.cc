@@ -329,7 +329,7 @@ const std::string JwtTextWithNonExistKid =
 
 class VerifyJwkRsaTest : public testing::Test {
 protected:
-  void SetUp() {
+  void SetUp() override {
     jwks_ = Jwks::createFrom(PublicKeyRSA, Jwks::Type::JWKS);
     EXPECT_EQ(jwks_->getStatus(), Status::Ok);
   }

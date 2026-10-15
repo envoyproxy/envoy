@@ -7,13 +7,13 @@
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 #include "msgpack.hpp"
 
 using testing::AssertionResult;
+using testing::Eq;
 
 namespace Envoy {
 namespace {
@@ -32,11 +32,11 @@ public:
 
   void init(const std::string cluster_name = default_cluster_name,
             bool flush_access_log_on_connected = false,
-            absl::optional<uint32_t> buffer_size_bytes = absl::nullopt,
-            absl::optional<uint32_t> max_connect_attempts = 1,
-            absl::optional<uint64_t> base_backoff_interval = absl::nullopt,
-            absl::optional<uint64_t> max_backoff_interval = absl::nullopt,
-            absl::optional<std::string> formatter_type = absl::nullopt) {
+            std::optional<uint32_t> buffer_size_bytes = std::nullopt,
+            std::optional<uint32_t> max_connect_attempts = 1,
+            std::optional<uint64_t> base_backoff_interval = std::nullopt,
+            std::optional<uint64_t> max_backoff_interval = std::nullopt,
+            std::optional<std::string> formatter_type = std::nullopt) {
     setUpstreamCount(2);
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier(
@@ -108,8 +108,8 @@ public:
             *formatter = proto;
           }
 
-          access_log->mutable_typed_config()->PackFrom(access_log_config);
-          config_blob->PackFrom(tcp_proxy_config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+          std::ignore = config_blob->PackFrom(tcp_proxy_config);
         });
 
     BaseIntegrationTest::initialize();
@@ -193,19 +193,19 @@ TEST_F(FluentdAccessLogIntegrationTest, LogLostOnBufferFull) {
   init(default_cluster_name, false, /* max_buffer_size = */ 0);
   sendBidirectionalData();
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_lost", 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.entries_lost", Eq(1));
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecord) {
   init();
   sendBidirectionalData();
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 1);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.entries_buffered", Eq(1));
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.events_sent", Eq(1));
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.fluentd_cluster.upstream_cx_active", Eq(1));
 
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
     bool validated = false;
@@ -219,12 +219,12 @@ TEST_F(FluentdAccessLogIntegrationTest, SingleEntrySingleRecordWithFormatter) {
   init(default_cluster_name, false, 1, 1, 20, 30, "envoy.extensions.formatter.cel.v3.Cel");
   sendBidirectionalData();
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 1);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.entries_buffered", Eq(1));
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.events_sent", Eq(1));
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.fluentd_cluster.upstream_cx_active", Eq(1));
 
   // Using CEL for formatter validation with sample use case.
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
@@ -240,12 +240,12 @@ TEST_F(FluentdAccessLogIntegrationTest, SingleEntryTwoRecords) {
   init(default_cluster_name, /*flush_access_log_on_connected = */ true);
   sendBidirectionalData();
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 2);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.entries_buffered", Eq(2));
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.events_sent", Eq(1));
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.fluentd_cluster.upstream_cx_active", Eq(1));
 
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
     bool validated = false;
@@ -260,12 +260,12 @@ TEST_F(FluentdAccessLogIntegrationTest, TwoEntries) {
   init(default_cluster_name, /*flush_access_log_on_connected = */ true, /*buffer_size_bytes = */ 1);
   sendBidirectionalData();
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 2);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 2);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.entries_buffered", Eq(2));
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.events_sent", Eq(2));
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.fluentd_cluster.upstream_cx_active", Eq(1));
 
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
     bool validated = false;
@@ -280,12 +280,12 @@ TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosed) {
   init();
   sendBidirectionalData();
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 1);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.entries_buffered", Eq(1));
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.events_sent", Eq(1));
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
-  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 1);
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_total", Eq(1));
+  test_server_->waitForGauge("cluster.fluentd_cluster.upstream_cx_active", Eq(1));
 
   EXPECT_TRUE(fake_access_log_connection_->waitForData([&](const std::string& tcp_data) -> bool {
     bool validated = false;
@@ -295,42 +295,42 @@ TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosed) {
   }));
 
   ASSERT_TRUE(fake_access_log_connection_->close());
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 1);
-  test_server_->waitForGaugeEq("cluster.fluentd_cluster.upstream_cx_active", 0);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.connections_closed", Eq(1));
+  test_server_->waitForGauge("cluster.fluentd_cluster.upstream_cx_active", Eq(0));
 
   // New access log would be discarded because the connection is closed.
   sendBidirectionalData();
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_lost", 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.entries_lost", Eq(1));
 }
 
 TEST_F(FluentdAccessLogIntegrationTest, UpstreamConnectionClosedWithMultipleReconnects) {
   init(default_cluster_name, false, {}, /* max_reconnect_attempts = */ 3);
   sendBidirectionalData();
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.entries_buffered", 1);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.events_sent", 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.entries_buffered", Eq(1));
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.events_sent", Eq(1));
 
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_));
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 1);
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_total", Eq(1));
   ASSERT_TRUE(fake_access_log_connection_->close());
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 1);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.reconnect_attempts", 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.connections_closed", Eq(1));
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.reconnect_attempts", Eq(1));
   FakeRawConnectionPtr fake_access_log_connection_2;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_2));
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 2);
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_total", Eq(2));
   ASSERT_TRUE(fake_access_log_connection_2->close());
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 2);
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.reconnect_attempts", 2);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.connections_closed", Eq(2));
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.reconnect_attempts", Eq(2));
   FakeRawConnectionPtr fake_access_log_connection_3;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_access_log_connection_3));
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_total", 3);
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_total", Eq(3));
   ASSERT_TRUE(fake_access_log_connection_3->close());
 
-  test_server_->waitForCounterEq("access_logs.fluentd.fluentd_1.connections_closed", 3);
-  test_server_->waitForCounterEq("cluster.fluentd_cluster.upstream_cx_connect_attempts_exceeded",
-                                 1);
+  test_server_->waitForCounter("access_logs.fluentd.fluentd_1.connections_closed", Eq(3));
+  test_server_->waitForCounter("cluster.fluentd_cluster.upstream_cx_connect_attempts_exceeded",
+                               Eq(1));
 }
 
 } // namespace

@@ -1,10 +1,8 @@
-#include "source/common/common/logger.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/common.h"
-#include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "gmock/gmock.h"

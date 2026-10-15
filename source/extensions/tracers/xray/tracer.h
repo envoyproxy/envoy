@@ -130,7 +130,7 @@ public:
    * Check if key is set in http request annotation field of a Span.
    */
   bool hasKeyInHttpRequestAnnotations(absl::string_view key) {
-    return http_request_annotations_.find(key) != http_request_annotations_.end();
+    return http_request_annotations_.contains(key);
   }
 
   /*
@@ -155,6 +155,11 @@ public:
 
   // X-Ray tracer does not use the sampling decision from Envoy anyway.
   bool useLocalDecision() const override { return false; }
+
+  /**
+   * @return whether the span will be exported to X-Ray.
+   */
+  bool exportedSpan() const override { return sampled_; };
 
   /**
    * Sets the server error as true for the traced operation/request.
@@ -283,15 +288,15 @@ public:
    */
   Tracing::SpanPtr startSpan(const Tracing::Config&, const std::string& operation_name,
                              Envoy::SystemTime start_time,
-                             const absl::optional<XRayHeader>& xray_header,
-                             const absl::optional<absl::string_view> client_ip);
+                             const std::optional<XRayHeader>& xray_header,
+                             const std::optional<absl::string_view> client_ip);
   /**
    * Creates a Span that is marked as not-sampled.
    * This is useful when the sampling decision is done in Envoy's X-Ray and we want to avoid
    * overruling that decision in the upstream service in case that service itself uses X-Ray for
    * tracing. Also at the same time if X-Ray header is set then preserve its value.
    */
-  XRay::SpanPtr createNonSampledSpan(const absl::optional<XRayHeader>& xray_header) const;
+  XRay::SpanPtr createNonSampledSpan(const std::optional<XRayHeader>& xray_header) const;
 
 private:
   const std::string segment_name_;

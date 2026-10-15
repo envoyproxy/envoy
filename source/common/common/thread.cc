@@ -60,6 +60,14 @@ struct ThreadIds {
     it->second++;
   }
 
+  // Records the current thread as the test thread.
+  void registerTestThread() { test_thread_id_ = std::this_thread::get_id(); }
+
+  // Returns true if the current thread was registered as the test thread. A
+  // default-constructed std::thread::id never matches a running thread, so this
+  // returns false if no test thread was registered (e.g. in production binaries).
+  bool inTestThread() const { return test_thread_id_ == std::this_thread::get_id(); }
+
   // Methods to track how many SkipAssert objects are instantiated.
   void incSkipAsserts() { ++skip_asserts_; }
   void decSkipAsserts() { --skip_asserts_; }
@@ -67,9 +75,10 @@ struct ThreadIds {
 
 private:
   mutable absl::Mutex mutex_;
-  std::atomic<uint32_t> skip_asserts_{};
+  std::atomic<uint32_t> skip_asserts_{0};
   absl::flat_hash_map<std::thread::id, uint32_t>
       main_threads_to_usage_count_ ABSL_GUARDED_BY(mutex_);
+  std::thread::id test_thread_id_;
 };
 
 } // namespace
@@ -90,10 +99,21 @@ bool TestThread::isTestThread() {
   return getpid() == syscall(SYS_gettid);
 #elif defined(__APPLE__)
   return pthread_main_np() != 0;
+#elif defined(WIN32)
+  // Windows has no API to check whether the current thread is the first thread
+  // of the process, so compare with the thread registered at test framework
+  // initialization.
+  return ThreadIds::get().inTestThread();
 #endif
   // Note: final #else fallback omitted intentionally.
 }
 #endif
+
+void TestThread::registerTestThread() {
+#ifdef WIN32
+  ThreadIds::get().registerTestThread();
+#endif
+}
 
 SkipAsserts::SkipAsserts() { ThreadIds::get().incSkipAsserts(); }
 

@@ -31,6 +31,7 @@ envoy_cc_library(
     deps = [
         ":fragment",
         "//envoy/server:instance_interface",
+        "//source/common/common:assert_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/file_system_buffer/v3:pkg_cc_proto",
     ],

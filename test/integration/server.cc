@@ -1,6 +1,8 @@
 #include "test/integration/server.h"
 
+#include <array>
 #include <memory>
+#include <random>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -18,13 +20,59 @@
 
 #include "test/integration/utility.h"
 #include "test/mocks/common.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+namespace {
+
+class SeededRandomGenerator : public Random::RandomGenerator {
+public:
+  explicit SeededRandomGenerator(uint64_t seed) : generator_(seed) {}
+
+  uint64_t random() override {
+    Thread::LockGuard lock(mutex_);
+    return generator_();
+  }
+  std::string uuid() override {
+    Thread::LockGuard lock(mutex_);
+    std::array<uint8_t, 16> bytes;
+    for (size_t i = 0; i < bytes.size(); i += sizeof(uint64_t)) {
+      const uint64_t value = generator_();
+      for (size_t j = 0; j < sizeof(uint64_t); ++j) {
+        bytes[i + j] = static_cast<uint8_t>(value >> (sizeof(uint64_t) * 8 - 8 * (j + 1)));
+      }
+    }
+
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // UUID version 4 (random)
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // UUID variant 1 (RFC4122)
+
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string uuid;
+    uuid.reserve(36);
+    for (size_t i = 0; i < bytes.size(); ++i) {
+      if (i == 4 || i == 6 || i == 8 || i == 10) {
+        uuid.push_back('-');
+      }
+      uuid.push_back(hex[bytes[i] >> 4]);
+      uuid.push_back(hex[bytes[i] & 0x0f]);
+    }
+    return uuid;
+  }
+
+private:
+  Thread::MutexBasicLockable mutex_;
+  std::mt19937_64 generator_;
+};
+
+} // namespace
+
 namespace Server {
 
 OptionsImplBase
@@ -42,7 +90,7 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
   test_options.setServiceClusterName(service_cluster);
   test_options.setServiceNodeName(service_node);
   test_options.setServiceZone(service_zone);
-  test_options.setLogLevel(spdlog::level::info);
+  test_options.setLogLevel(Logger::Levels::info);
 
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);
@@ -70,20 +118,21 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
     std::function<void(IntegrationTestServer&)> server_ready_function,
-    std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
+    std::function<void()> on_server_init_function, TestRandomGeneratorConfig random_config,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats,
     bool use_bootstrap_node_metadata,
-    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto,
-    bool use_admin_server) {
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto, bool use_admin_server,
+    Server::HotRestart* hot_restart) {
   IntegrationTestServerPtr server{std::make_unique<IntegrationTestServerImpl>(
       time_system, api, config_path, use_real_stats, std::move(config_proto))};
+  server->hot_restart_ = hot_restart;
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
-  server->start(version, on_server_init_function, deterministic_value, defer_listener_finalization,
+  server->start(version, on_server_init_function, random_config, defer_listener_finalization,
                 process_object, validation_config, concurrency, drain_time, drain_strategy,
                 watermark_factory, use_bootstrap_node_metadata, use_admin_server);
   return server;
@@ -99,25 +148,36 @@ void IntegrationTestServer::waitUntilListenersReady() {
   ENVOY_LOG(info, "listener wait complete");
 }
 
+void IntegrationTestServer::waitForWorkerThreads() {
+  absl::Notification done;
+  ThreadLocal::TypedSlotPtr<> slot;
+  server().dispatcher().post([&] {
+    slot = ThreadLocal::TypedSlot<>::makeUnique(server().threadLocal());
+    slot->set([](Event::Dispatcher&) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
+      return nullptr;
+    });
+    slot->runOnAllThreads([](OptRef<ThreadLocal::ThreadLocalObject>) {},
+                          [&] {
+                            slot.reset(nullptr);
+                            done.Notify();
+                          });
+  });
+  done.WaitForNotification();
+}
+
 void IntegrationTestServer::setDynamicContextParam(absl::string_view resource_type_url,
                                                    absl::string_view key, absl::string_view value) {
   server().dispatcher().post([this, resource_type_url, key, value]() {
-    ASSERT_TRUE(server()
-                    .localInfo()
-                    .contextProvider()
-                    .setDynamicContextParam(resource_type_url, key, value)
-                    .ok());
+    ASSERT_OK(server().localInfo().contextProvider().setDynamicContextParam(resource_type_url, key,
+                                                                            value));
   });
 }
 
 void IntegrationTestServer::unsetDynamicContextParam(absl::string_view resource_type_url,
                                                      absl::string_view key) {
   server().dispatcher().post([this, resource_type_url, key]() {
-    ASSERT_TRUE(server()
-                    .localInfo()
-                    .contextProvider()
-                    .unsetDynamicContextParam(resource_type_url, key)
-                    .ok());
+    ASSERT_OK(
+        server().localInfo().contextProvider().unsetDynamicContextParam(resource_type_url, key));
   });
 }
 
@@ -130,7 +190,7 @@ void IntegrationTestServer::setAdsConfigSource(
 
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
-    absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+    TestRandomGeneratorConfig random_config, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validator_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
@@ -138,10 +198,10 @@ void IntegrationTestServer::start(
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
-      [version, deterministic_value, process_object, validator_config, concurrency, drain_time,
+      [version, random_config, process_object, validator_config, concurrency, drain_time,
        drain_strategy, watermark_factory, use_bootstrap_node_metadata, use_admin_server,
        this]() -> void {
-        threadRoutine(version, deterministic_value, process_object, validator_config, concurrency,
+        threadRoutine(version, random_config, process_object, validator_config, concurrency,
                       drain_time, drain_strategy, watermark_factory, use_bootstrap_node_metadata,
                       use_admin_server);
       });
@@ -217,7 +277,7 @@ void IntegrationTestServer::serverReady() {
 }
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
-                                          absl::optional<uint64_t> deterministic_value,
+                                          TestRandomGeneratorConfig random_config,
                                           ProcessObjectOptRef process_object,
                                           Server::FieldValidationConfig validation_config,
                                           uint32_t concurrency, std::chrono::seconds drain_time,
@@ -230,9 +290,11 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   Thread::MutexBasicLockable lock;
 
   Random::RandomGeneratorPtr random_generator;
-  if (deterministic_value.has_value()) {
-    random_generator = std::make_unique<testing::NiceMock<Random::MockRandomGenerator>>(
-        deterministic_value.value());
+  if (const auto* value = absl::get_if<TestRandomValue>(&random_config)) {
+    random_generator =
+        std::make_unique<testing::NiceMock<Random::MockRandomGenerator>>(value->value);
+  } else if (const auto* seed = absl::get_if<TestRandomSeed>(&random_config)) {
+    random_generator = std::make_unique<SeededRandomGenerator>(seed->value);
   } else {
     random_generator = std::make_unique<Random::RandomGeneratorImpl>();
   }
@@ -246,9 +308,8 @@ IntegrationTestServerImpl::IntegrationTestServerImpl(
     Event::TestTimeSystem& time_system, Api::Api& api, const std::string& config_path,
     bool use_real_stats, std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto)
     : IntegrationTestServer(time_system, api, config_path, std::move(config_proto)) {
-  stats_allocator_ =
-      (use_real_stats ? std::make_unique<Stats::AllocatorImpl>(symbol_table_)
-                      : std::make_unique<Stats::NotifyingAllocatorImpl>(symbol_table_));
+  stats_allocator_ = (use_real_stats ? std::make_unique<Stats::Allocator>(symbol_table_)
+                                     : std::make_unique<Stats::NotifyingAllocator>(symbol_table_));
 }
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
@@ -259,12 +320,14 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_admin_server) {
   {
     Init::ManagerImpl init_manager{"Server"};
-    Server::HotRestartNopImpl restarter;
+    Server::HotRestartNopImpl nop_restarter;
+    Server::HotRestart& restarter =
+        hotRestartForTest() != nullptr ? *hotRestartForTest() : nop_restarter;
     ThreadLocal::InstanceImpl tls;
     Stats::ThreadLocalStoreImpl stat_store(*stats_allocator_);
     std::unique_ptr<ProcessContext> process_context;
     if (process_object.has_value()) {
-      process_context = std::make_unique<ProcessContextImpl>(process_object->get());
+      process_context = std::make_unique<ProcessContextImpl>(process_object.ref());
     }
     Server::InstanceImpl server(init_manager, options, time_system, hooks, restarter, stat_store,
                                 access_log_lock, std::move(random_generator), tls,

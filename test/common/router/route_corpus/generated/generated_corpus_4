@@ -1,0 +1,118 @@
+goo.gle/debugproto
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/endpoint"
+      }
+      route {
+        cluster: "www2"
+      }
+      request_headers_to_add {
+        header {
+          key: "x-global-header"
+          value: "route-endpoint"
+        }
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      }
+      request_headers_to_add {
+        header {
+          key: "x-vhost-header"
+          value: "route-endpoint"
+        }
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      }
+      request_headers_to_add {
+        header {
+          key: "x-route-header"
+          value: "route-endpoint"
+        }
+        append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      }
+      request_headers_to_remove: "x-route-nope"
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    request_headers_to_add {
+      header {
+        key: "x-global-header"
+        value: "vhost-www2"
+      }
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    }
+    request_headers_to_add {
+      header {
+        key: "x-vhost-header"
+        value: "vhost-www2"
+      }
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    }
+    request_headers_to_remove: "x-vhost-nope"
+  }
+  virtual_hosts {
+    name: "default"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "default"
+      }
+    }
+  }
+  request_headers_to_add {
+    header {
+      key: "x-global-header"
+      value: "global"
+    }
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  }
+  request_headers_to_remove: "x-global-nope"
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.example.com"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: ":scheme"
+    value: "http"
+  }
+  headers {
+    key: "x-safe"
+    value: "safe"
+  }
+  headers {
+    key: "x-global-nope"
+    value: "global"
+  }
+  headers {
+    key: "x-vhost-nope"
+    value: "vhost"
+  }
+  headers {
+    key: "x-route-nope"
+    value: "route"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

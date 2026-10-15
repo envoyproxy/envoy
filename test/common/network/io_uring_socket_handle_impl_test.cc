@@ -13,7 +13,7 @@ namespace {
 class IoUringSocketHandleTestImpl : public IoUringSocketHandleImpl {
 public:
   IoUringSocketHandleTestImpl(Io::IoUringWorkerFactory& factory, bool is_server_socket)
-      : IoUringSocketHandleImpl(factory, INVALID_SOCKET, false, absl::nullopt, is_server_socket) {}
+      : IoUringSocketHandleImpl(factory, INVALID_SOCKET, false, std::nullopt, is_server_socket) {}
   IoUringSocketType ioUringSocketType() const { return io_uring_socket_type_; }
 };
 
@@ -56,14 +56,14 @@ TEST_F(IoUringSocketHandleTest, ReadError) {
   Io::ReadParam read_param{read_buffer, -EAGAIN};
   auto read_param_ref = OptRef<Io::ReadParam>(read_param);
   EXPECT_CALL(socket_, getReadParam()).WillOnce(testing::ReturnRef(read_param_ref));
-  auto ret = impl.read(read_buffer, absl::nullopt);
+  auto ret = impl.read(read_buffer, std::nullopt);
   EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
 
   // Non-EAGAIN error.
   Io::ReadParam read_param_2{read_buffer, -EBADF};
   auto read_param_ref_2 = OptRef<Io::ReadParam>(read_param_2);
   EXPECT_CALL(socket_, getReadParam()).WillOnce(testing::ReturnRef(read_param_ref_2));
-  ret = impl.read(read_buffer, absl::nullopt);
+  ret = impl.read(read_buffer, std::nullopt);
   EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::BadFd);
 }
 
@@ -102,6 +102,52 @@ TEST_F(IoUringSocketHandleTest, WritevError) {
   EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::BadFd);
 }
 
+TEST_F(IoUringSocketHandleTest, WriteBackpressureReturnsEagain) {
+  IoUringSocketHandleTestImpl impl(factory_, false);
+  EXPECT_CALL(worker_, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));
+  EXPECT_CALL(factory_, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
+  impl.initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+
+  // No pending write error, so the write proceeds to the socket.
+  OptRef<Io::WriteParam> no_write_param;
+  EXPECT_CALL(socket_, getWriteParam()).WillOnce(testing::ReturnRef(no_write_param));
+  // The socket is applying backpressure and accepts nothing, so the data stays in the buffer and
+  // the handle reports EAGAIN.
+  Buffer::OwnedImpl write_buffer;
+  write_buffer.add("hello");
+  EXPECT_CALL(socket_, write(testing::An<Buffer::Instance&>()));
+  auto ret = impl.write(write_buffer);
+  EXPECT_EQ(ret.return_value_, 0);
+  EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+  EXPECT_EQ(5, write_buffer.length());
+}
+
+TEST_F(IoUringSocketHandleTest, WritevBackpressureReturnsEagain) {
+  IoUringSocketHandleTestImpl impl(factory_, false);
+  EXPECT_CALL(worker_, addClientSocket(_, _, _)).WillOnce(testing::ReturnRef(socket_));
+  EXPECT_CALL(factory_, getIoUringWorker())
+      .WillOnce(testing::Return(OptRef<Io::IoUringWorker>(worker_)));
+  impl.initializeFileEvent(
+      dispatcher_, [](uint32_t) { return absl::OkStatus(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+
+  // No pending write error, so the write proceeds to the socket.
+  OptRef<Io::WriteParam> no_write_param;
+  EXPECT_CALL(socket_, getWriteParam()).WillOnce(testing::ReturnRef(no_write_param));
+  // The socket accepts nothing while `backpressured`, so the handle reports EAGAIN.
+  Buffer::OwnedImpl write_buffer;
+  write_buffer.add("hello");
+  auto slice = write_buffer.frontSlice();
+  EXPECT_CALL(socket_, write(testing::An<const Buffer::RawSlice*>(), 1))
+      .WillOnce(testing::Return(0));
+  auto ret = impl.writev(&slice, 1);
+  EXPECT_EQ(ret.return_value_, 0);
+  EXPECT_EQ(ret.err_->getErrorCode(), Api::IoError::IoErrorCode::Again);
+}
+
 TEST_F(IoUringSocketHandleTest, SendmsgNotSupported) {
   IoUringSocketHandleTestImpl impl(factory_, true);
 
@@ -130,6 +176,30 @@ TEST_F(IoUringSocketHandleTest, RecvmmsgNotSupported) {
   IoHandle::RecvMsgOutput output(0, nullptr);
   EXPECT_THAT(impl.recvmmsg(array, 0, {}, output).err_->getErrorCode(),
               Api::IoError::IoErrorCode::NoSupport);
+}
+
+TEST_F(IoUringSocketHandleTest, CloseWithSendRstTrueSetsLingerZeroAndCloses) {
+  testing::NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
+  auto os_calls =
+      std::make_unique<Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl>>(
+          &os_sys_calls);
+
+  os_fd_t test_fd = 42;
+  IoUringSocketHandleImpl io_handle(factory_, test_fd, false, std::nullopt, false);
+
+  EXPECT_CALL(os_sys_calls,
+              setsockopt_(test_fd, SOL_SOCKET, SO_LINGER, testing::_, sizeof(struct linger)))
+      .WillOnce(testing::Invoke([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+        const auto* l = static_cast<const struct linger*>(optval);
+        EXPECT_EQ(1, l->l_onoff);
+        EXPECT_EQ(0, l->l_linger);
+        return 0;
+      }));
+
+  io_handle.setAbortiveClose();
+  auto res = io_handle.close();
+  EXPECT_EQ(0, res.return_value_);
+  EXPECT_FALSE(io_handle.isOpen());
 }
 
 } // namespace

@@ -60,6 +60,19 @@ Api::IoCallUint64Result TestIoSocketHandle::writev(const Buffer::RawSlice* slice
   return Test::IoSocketHandlePlatformImpl::writev(slices, num_slice);
 }
 
+Api::IoCallUint64Result TestIoSocketHandle::send(const void* buffer, size_t length) {
+  Address::InstanceConstSharedPtr dnat_peer_address;
+  Buffer::RawSlice slice{const_cast<void*>(buffer), length};
+  if (write_override_) {
+    auto result = write_override_(this, &slice, 1, dnat_peer_address);
+    peer_address_override_.reset();
+    if (result.has_value()) {
+      return std::move(result).value();
+    }
+  }
+  return Test::IoSocketHandlePlatformImpl::send(buffer, length);
+}
+
 IoHandlePtr TestIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen) {
   auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
   if (SOCKET_INVALID(result.return_value_)) {
@@ -93,7 +106,7 @@ Api::SysCallIntResult TestIoSocketHandle::connect(Address::InstanceConstSharedPt
 }
 
 IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only, Socket::Type,
-                                            absl::optional<int> domain,
+                                            std::optional<int> domain,
                                             const SocketCreationOptions& options) const {
   return std::make_unique<TestIoSocketHandle>(
       connect_override_proc_, write_override_proc_, read_override_proc_,

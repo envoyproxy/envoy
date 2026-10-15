@@ -44,7 +44,8 @@ public:
 
     health_checker_ = std::make_shared<ThriftHealthChecker>(
         *cluster_, health_check_config, thrift_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this,
+        Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setup() {
@@ -207,7 +208,7 @@ TEST_F(ThriftHealthCheckerTest, Ping) {
   responseSuccess();
 
   continueHealthCheck();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   responseFailure();
 
   // Shutdown *without* an active request.
@@ -227,7 +228,7 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   responseSuccess();
 
   continueHealthCheck();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   responseFailure();
 
   continueHealthCheck();
@@ -249,6 +250,33 @@ TEST_F(ThriftHealthCheckerTest, PingAndVariousFailures) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
+// Tests that a client whose underlying connection cannot be created (e.g. a network namespace
+// binding failure) results in a network health check failure instead of a crash.
+TEST_F(ThriftHealthCheckerTest, ConnectionCreateFailure) {
+  setup();
+
+  expectSessionCreate();
+  EXPECT_CALL(*this, create_(_)).WillOnce(testing::Invoke([&](ClientCallback& callback) {
+    client_ = new NiceMock<MockClient>(callback);
+    EXPECT_CALL(*client_, start()).WillOnce(Return(false));
+    return client_;
+  }));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, _, _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*timeout_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*timeout_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*interval_timer_, disableTimer()).Times(testing::AnyNumber());
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  // The first check fails gracefully instead of crashing.
+  health_checker_->start();
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
+}
+
 TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
   InSequence s;
   setupAlwaysLogHealthCheckFailures();
@@ -258,13 +286,13 @@ TEST_F(ThriftHealthCheckerTest, AlwaysLogHealthCheckFailures) {
 
   continueHealthCheck();
   // Fail on the exception response.
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false, _));
   responseFailure();
 
   continueHealthCheck();
   // Fail again.
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false, _));
   responseFailure();
 
   continueHealthCheck();
@@ -283,8 +311,8 @@ TEST_F(ThriftHealthCheckerTest, LogInitialFailure) {
   setup();
 
   startHealthChecker();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true, _));
   disconnectHealthCheck();
 
   restartHealthCheckSession();
@@ -311,7 +339,7 @@ TEST_F(ThriftHealthCheckerTest, LogTempFailureFailure) {
   responseSuccess();
 
   continueHealthCheck();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   disconnectHealthCheck();
 
   restartHealthCheckSession();
@@ -335,8 +363,8 @@ TEST_F(ThriftHealthCheckerTest, LogConsecutiveFailures) {
   setup();
 
   startHealthChecker();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true, _));
   responseFailure();
 
   continueHealthCheck();
@@ -367,7 +395,7 @@ TEST_F(ThriftHealthCheckerTest, NoConnectionReuse) {
   client_->raiseResponseResult(true);
 
   restartHealthCheckSession();
-  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   // The connection will be closed on failure.

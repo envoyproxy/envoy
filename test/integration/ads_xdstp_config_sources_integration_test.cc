@@ -1,6 +1,7 @@
 #include "test/integration/ads_xdstp_config_sources_integration.h"
 
 using testing::AssertionResult;
+using testing::Ge;
 
 namespace Envoy {
 
@@ -65,7 +66,7 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, CdsPointsToAuthorityEds) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 }
 
@@ -105,7 +106,7 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityEds) {
       Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
-  test_server_->waitForCounterGe("cluster.cluster_1.update_success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.update_success", Ge(1));
 
   // Send the Listener and route config using the old ADS.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
@@ -122,7 +123,7 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityEds) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
 
   // Update the EDS config.
   cla.mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(50);
@@ -137,7 +138,7 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityEds) {
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
 
   // Ensure that the EDS update was successful.
-  test_server_->waitForCounterGe("cluster.cluster_1.update_success", 2);
+  test_server_->waitForCounter("cluster.cluster_1.update_success", Ge(2));
   makeSingleRequest();
 }
 
@@ -183,7 +184,7 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityToFetchEds) {
       Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
-  test_server_->waitForCounterGe("cluster.cluster_1.update_success", 1);
+  test_server_->waitForCounter("cluster.cluster_1.update_success", Ge(1));
 
   // Send the Listener and route config using the old ADS.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
@@ -200,7 +201,7 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityToFetchEds) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
-  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   makeSingleRequest();
 
   // Update the cluster's load-assignment to a different resource authority.
@@ -239,7 +240,7 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityToFetchEds) {
                                "envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
                               {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
                               default_authority_xds_stream_.get()));
-  test_server_->waitForCounterGe("cluster.cluster_1.update_success", 2);
+  test_server_->waitForCounter("cluster.cluster_1.update_success", Ge(2));
 
   // Authority1 subscription is removed.
   EXPECT_TRUE(compareDiscoveryRequest(

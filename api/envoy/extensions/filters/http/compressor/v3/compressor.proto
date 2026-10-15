@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.compressor.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -38,6 +39,8 @@ message Compressor {
     // direction this common config is applied to), in bytes, that will trigger compression. Defaults to 30.
     google.protobuf.UInt32Value min_content_length = 2;
 
+    //    Using ``content_type`` is deprecated. Use ``content_type_matcher`` instead.
+    //
     // Set of strings that allows specifying which mime-types yield compression; e.g.,
     // ``application/json``, ``text/html``, etc.
     //
@@ -53,7 +56,17 @@ message Compressor {
     // * ``text/plain``
     // * ``text/xml``
     //
-    repeated string content_type = 3;
+    repeated string content_type = 3
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    // Allows specifying which content types yield compression using
+    // envoy.type.matcher.v3.StringMatcher.
+    //
+    // When this field is specified, the default content type list is not used.
+    // If both ``content_type`` and ``content_type_matcher`` are specified,
+    // ``content_type_matcher`` takes precedence and the deprecated ``content_type``
+    // field is ignored.
+    repeated type.matcher.v3.StringMatcher content_type_matcher = 4;
   }
 
   // Configuration for filter behavior on the request direction.
@@ -62,14 +75,25 @@ message Compressor {
   }
 
   // Configuration for filter behavior on the response direction.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message ResponseDirectionConfig {
     CommonDirectionConfig common_config = 1;
 
     // When this field is ``true``, disables compression when the response contains an ``ETag`` header.
     // When this field is ``false``, the filter will preserve weak ``ETag`` values and remove those that
-    // require strong validation.
+    // require strong validation (unless ``weaken_etag_on_compress`` is set).
+    // When both ``disable_on_etag_header`` and ``weaken_etag_on_compress`` are ``true``,
+    // ``weaken_etag_on_compress`` takes precedence (compression is applied and the ETag is weakened).
     bool disable_on_etag_header = 2;
+
+    // When this field is ``true`` and the filter compresses a response that contains a strong
+    // ``ETag``, the filter will weaken the ETag by prepending ``W/`` to its value instead of
+    // removing it. This allows caching and conditional requests to work while indicating the
+    // response body was modified by compression. When ``false`` (default), strong ETags are
+    // removed when compression is applied. When both ``weaken_etag_on_compress`` and
+    // ``disable_on_etag_header`` are ``true``, this field takes precedence so that compression
+    // is applied and the ETag is weakened, supporting gradual rollout to clients and servers.
+    bool weaken_etag_on_compress = 6;
 
     // When this field is ``true``, removes ``Accept-Encoding`` from the request headers before dispatching
     // the request to the upstream so that responses do not get compressed before reaching the filter.

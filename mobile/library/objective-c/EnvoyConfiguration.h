@@ -24,6 +24,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
 @property (nonatomic, assign) NSInteger dnsNumRetries;
 @property (nonatomic, assign) BOOL enableHttp3;
+@property (nonatomic, assign) BOOL enableEarlyData;
 @property (nonatomic, strong) NSDictionary<NSString *, NSNumber *> *quicHints;
 @property (nonatomic, strong) NSArray<NSString *> *quicCanonicalSuffixes;
 @property (nonatomic, assign) BOOL enableGzipDecompression;
@@ -62,6 +63,7 @@ NS_ASSUME_NONNULL_BEGIN
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                                     dnsNumRetries:(NSInteger)dnsNumRetries
                                       enableHttp3:(BOOL)enableHttp3
+                                  enableEarlyData:(BOOL)enableEarlyData
                                         quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                             quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes
                           enableGzipDecompression:(BOOL)enableGzipDecompression

@@ -41,6 +41,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -146,6 +147,17 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
                                                           ThreadLocal::Instance& threadlocal,
                                                           const std::string& san_to_match,
                                                           bool connect_to_upstreams) {
+  return createQuicUpstreamTransportSocketFactory(
+      api, store, context_manager, threadlocal,
+      Ssl::ClientSslTransportOptions().setAlpn(true).setSan(san_to_match).setSni("lyft.com"),
+      connect_to_upstreams);
+}
+
+Network::UpstreamTransportSocketFactoryPtr
+IntegrationUtil::createQuicUpstreamTransportSocketFactory(
+    Api::Api& api, Stats::Store& store, Ssl::ContextManager& context_manager,
+    ThreadLocal::Instance& threadlocal, const Ssl::ClientSslTransportOptions& options,
+    bool connect_to_upstreams) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
   ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
@@ -156,18 +168,16 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
 #ifdef ENVOY_ENABLE_YAML
-  initializeUpstreamTlsContextConfig(
-      Ssl::ClientSslTransportOptions().setAlpn(true).setSan(san_to_match).setSni("lyft.com"),
-      *tls_context, connect_to_upstreams);
+  initializeUpstreamTlsContextConfig(options, *tls_context, connect_to_upstreams);
 #else
   UNREFERENCED_PARAMETER(tls_context);
-  UNREFERENCED_PARAMETER(san_to_match);
+  UNREFERENCED_PARAMETER(options);
   UNREFERENCED_PARAMETER(connect_to_upstreams);
   RELEASE_ASSERT(0, "unsupported");
 #endif // ENVOY_ENABLE_YAML
 
   envoy::config::core::v3::TransportSocket message;
-  message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  std::ignore = message.mutable_typed_config()->PackFrom(quic_transport_socket_config);
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(message);
   return config_factory.createTransportSocketFactory(quic_transport_socket_config, context).value();
@@ -478,7 +488,7 @@ Api::SysCallIntResult OsSysCallsWithMockedDns::getaddrinfo(const char* node,
     }
     return {0, 0};
   }
-  if (nonexisting_addresses_.find(node) != nonexisting_addresses_.end()) {
+  if (nonexisting_addresses_.contains(node)) {
     return {EAI_NONAME, 0};
   }
   std::cerr << "Mock DNS does not have entry for: " << node << std::endl;

@@ -6,6 +6,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::Eq;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -16,6 +17,17 @@ MATCHER_P(HasClientSecret, m, "") {
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseParameters(arg, 0, true);
   auto secret = query_parameters.getFirstValue("client_secret");
   return testing::ExplainMatchResult(testing::Optional(m), secret, result_listener);
+}
+
+MATCHER(HasNoClientSecret, "") {
+  const auto query_parameters = Http::Utility::QueryParamsMulti::parseParameters(arg, 0, true);
+  return !query_parameters.getFirstValue("client_secret").has_value();
+}
+
+MATCHER_P(HasClientId, m, "") {
+  const auto query_parameters = Http::Utility::QueryParamsMulti::parseParameters(arg, 0, true);
+  auto client_id = query_parameters.getFirstValue("client_id");
+  return testing::ExplainMatchResult(testing::Optional(m), client_id, result_listener);
 }
 
 MATCHER_P(HasScope, m, "") {
@@ -124,8 +136,8 @@ resources:
     encodeGoodJsonResponseBody();
   }
 
-  FakeHttpConnectionPtr fake_oauth2_connection_{};
-  FakeStreamPtr oauth2_request_{};
+  FakeHttpConnectionPtr fake_oauth2_connection_;
+  FakeStreamPtr oauth2_request_;
   std::string request_body_;
 };
 
@@ -161,8 +173,66 @@ typed_config:
   });
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
+                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->value()
+                                            .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// A client_secret containing '+', '/' and '=' must be fully percent-encoded on the wire.
+// The assertion is on the raw request body rather than the HasClientSecret matcher, because the
+// matcher decodes with PercentEncoding::decode(), which does not map '+' to a space and so
+// cannot distinguish an unencoded '+' from an encoded one.
+TEST_P(CredentialInjectorIntegrationTest, InjectCredentialSecretWithSpecialCharacters) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_endpoint:
+        cluster: oauth
+        timeout: 3s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        client_secret:
+          name: test-client-secret
+)EOF";
+  const std::string secret_with_special_chars = "sec+ret/with=chars";
+  const std::string expected_wire_encoded_secret = "sec%2Bret%2Fwith%3Dchars";
+  config_helper_.addConfigModifier(
+      [&secret_with_special_chars](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+        secret->set_name("test-client-secret");
+        auto* generic = secret->mutable_generic_secret();
+        generic->mutable_secret()->set_inline_string(secret_with_special_chars);
+      });
+  initializeFilter(filter_config);
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, testing::HasSubstr("client_secret=" + expected_wire_encoded_secret));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeGoodJsonResponseBody();
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -206,8 +276,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -251,8 +321,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   default_request_headers_.setCopy(Envoy::Http::LowerCaseString("Authorization"),
@@ -307,8 +377,8 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   waitForOAuth2Response("test_client_secret");
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   default_request_headers_.setCopy(Envoy::Http::LowerCaseString("Authorization"),
@@ -361,8 +431,8 @@ typed_config:
               path: "{{ test_tmpdir }}/initial_secret.yaml"
 )EOF";
   initializeFilter(filter_config);
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_client_secret", 2,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_client_secret", Eq(2),
       std::chrono::milliseconds(5000));
   EXPECT_EQ(0UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -374,13 +444,13 @@ typed_config:
   // Update the client secret and now token request should succeed after retry
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("client_secret.yaml"),
                               TestEnvironment::temporaryPath("initial_secret.yaml"));
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_requested", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_requested", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   waitForOAuth2Response("test_client_secret");
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   EXPECT_EQ(1UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -452,8 +522,8 @@ typed_config:
           ->counter(
               "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_response_code")
           ->value());
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   EXPECT_EQ(2UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -508,8 +578,8 @@ typed_config:
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeGoodJsonResponseBody(2);
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(500));
 
   EXPECT_EQ(1UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
@@ -537,8 +607,8 @@ typed_config:
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeGoodJsonResponseBody();
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 2,
-                                 std::chrono::milliseconds(1200));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(2),
+                               std::chrono::milliseconds(1200));
 }
 
 TEST_P(CredentialInjectorIntegrationTest, BadTokenNoExpiry) {
@@ -571,8 +641,8 @@ typed_config:
   EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeBadTokenResponseBody();
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", Eq(1),
       std::chrono::milliseconds(1000));
 }
 
@@ -607,8 +677,8 @@ typed_config:
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeBadJsonResponseBody();
 
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", 1,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_bad_token", Eq(1),
       std::chrono::milliseconds(1000));
 }
 
@@ -637,11 +707,11 @@ typed_config:
               path: "{{ test_tmpdir }}/client_secret.yaml"
 )EOF";
   initializeFilter(filter_config);
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 1,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", Eq(1),
       std::chrono::milliseconds(1490));
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 2,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", Eq(2),
       std::chrono::milliseconds(1490));
 }
 
@@ -676,21 +746,21 @@ typed_config:
   EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
   oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_stream_reset", 1,
+  test_server_->waitForCounter(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_stream_reset", Eq(1),
       std::chrono::milliseconds(1000));
   EXPECT_EQ(1UL,
             test_server_->counter("http.config_test.credential_injector.oauth2.token_requested")
                 ->value());
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_requested", 2,
-                                 std::chrono::milliseconds(1200));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_requested", Eq(2),
+                               std::chrono::milliseconds(1200));
   // wait for retried token request and respond with good response
   acceptNewStream();
   EXPECT_THAT(request_body_, HasClientSecret("test_client_secret"));
   oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
   encodeGoodJsonResponseBody(20);
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(1200));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(1200));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -772,10 +842,109 @@ typed_config:
   Buffer::OwnedImpl buffer(MessageUtil::getJsonStringFromMessageOrError(oauth_response));
   oauth2_request_->encodeData(buffer, true);
 
-  test_server_->waitForCounterEq("http.config_test.credential_injector.oauth2.token_fetched", 1,
-                                 std::chrono::milliseconds(2500));
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
+                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->value()
+                                            .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// TLS_CLIENT_AUTH: token request body contains only client_id and grant_type (no client_secret)
+TEST_P(CredentialInjectorIntegrationTest, TlsClientAuthNoClientSecret) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_endpoint:
+        cluster: oauth
+        timeout: 3s
+        uri: "oauth.com/token"
+      client_credentials:
+        client_id: test_client_id
+        auth_type: TLS_CLIENT_AUTH
+)EOF";
+  initializeFilter(filter_config);
+
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasNoClientSecret());
+  EXPECT_THAT(request_body_, HasClientId("test_client_id"));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeGoodJsonResponseBody();
+
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
+                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->value()
+                                            .getStringView());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// TLS_CLIENT_AUTH with scopes: request body contains client_id and scope, no client_secret
+TEST_P(CredentialInjectorIntegrationTest, TlsClientAuthWithScopesNoClientSecret) {
+  const std::string filter_config =
+      R"EOF(
+name: envoy.filters.http.credential_injector
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
+  overwrite: false
+  credential:
+    name: envoy.http.injected_credentials.oauth2
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2
+      token_endpoint:
+        cluster: oauth
+        timeout: 3s
+        uri: "oauth.com/token"
+      scopes:
+        - "openid"
+      client_credentials:
+        client_id: test_client_id
+        auth_type: TLS_CLIENT_AUTH
+)EOF";
+  initializeFilter(filter_config);
+
+  getFakeOauth2Connection();
+  acceptNewStream();
+  EXPECT_THAT(request_body_, HasNoClientSecret());
+  EXPECT_THAT(request_body_, HasClientId("test_client_id"));
+  EXPECT_THAT(request_body_, HasScope("openid"));
+  oauth2_request_->encodeHeaders(jsonResponseHeaders(), false);
+  encodeGoodJsonResponseBody();
+
+  test_server_->waitForCounter("http.config_test.credential_injector.oauth2.token_fetched", Eq(1),
+                               std::chrono::milliseconds(2500));
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
   waitForNextUpstreamRequest();

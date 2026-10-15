@@ -118,7 +118,7 @@ public:
 
   // Executes the parser.
   // @return the number of parsed bytes.
-  virtual size_t execute(const char* slice, int len) PURE;
+  virtual size_t execute(const char* slice, size_t len) PURE;
 
   // Unpauses the parser.
   virtual void resume() PURE;
@@ -136,8 +136,8 @@ public:
   // Returns whether HTTP version is 1.1.
   virtual bool isHttp11() const PURE;
 
-  // Returns the number of bytes in the body. absl::nullopt if no Content-Length header
-  virtual absl::optional<uint64_t> contentLength() const PURE;
+  // Returns the number of bytes in the body. std::nullopt if no Content-Length header
+  virtual std::optional<uint64_t> contentLength() const PURE;
 
   // Returns whether headers are chunked.
   virtual bool isChunked() const PURE;

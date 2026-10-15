@@ -8,7 +8,6 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
-#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/proto/helloworld.pb.h"

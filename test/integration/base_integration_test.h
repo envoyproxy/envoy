@@ -2,10 +2,12 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -19,13 +21,12 @@
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/resources.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
-#include "absl/types/optional.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -44,6 +45,17 @@
 #endif
 
 namespace Envoy {
+
+namespace ThreadLocal {
+class MockInstance;
+}
+
+namespace Server {
+namespace Configuration {
+class MockGenericFactoryContext;
+class MockServerFactoryContext;
+} // namespace Configuration
+} // namespace Server
 
 struct ApiFilesystemConfig {
   std::string bootstrap_path_;
@@ -73,7 +85,7 @@ public:
   BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
-  virtual ~BaseIntegrationTest() = default;
+  virtual ~BaseIntegrationTest();
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
@@ -93,14 +105,16 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
+  void setDeterministicValue(uint64_t value = 0) { random_config_ = TestRandomValue{value}; }
+  // Make test reproducible while retaining a pseudo-random distribution.
+  void setDeterministicSeed(uint64_t seed) { random_config_ = TestRandomSeed{seed}; }
   // Get socket option for a specific listener's socket.
   bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
                        socklen_t* optlen, int address_index = 0);
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
-  absl::optional<uint64_t> waitForNextRawUpstreamConnection(
+  std::optional<uint64_t> waitForNextRawUpstreamConnection(
       const std::vector<uint64_t>& upstream_indices, FakeRawConnectionPtr& fake_upstream_connection,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
 
@@ -161,7 +175,7 @@ public:
   std::vector<std::string>
   waitForAccessLogEntries(const std::string& filename,
                           Network::ClientConnection* client_connection = nullptr,
-                          absl::optional<uint32_t> min_entries = std::nullopt);
+                          std::optional<uint32_t> min_entries = std::nullopt);
 
   // Returns all log entries after the nth access log entry, defaulting to log entry 0.
   // By default will trigger an expect failure if more than one entry is returned.
@@ -199,7 +213,7 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", FakeStream* stream = nullptr,
       OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
-          absl::nullopt);
+          std::nullopt);
 
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
@@ -251,7 +265,7 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", bool expect_node = true,
       OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions =
-          absl::nullopt);
+          std::nullopt);
 
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
@@ -277,16 +291,16 @@ public:
     for (const auto& message : messages) {
       if (!metadata.empty()) {
         envoy::service::discovery::v3::Resource resource;
-        resource.mutable_resource()->PackFrom(message);
+        std::ignore = resource.mutable_resource()->PackFrom(message);
         resource.set_name(intResourceName(message));
         resource.set_version(version);
         for (const auto& kvp : metadata) {
           auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
           (*map)[std::string(kvp.first)] = kvp.second;
         }
-        discovery_response.add_resources()->PackFrom(resource);
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
       } else {
-        discovery_response.add_resources()->PackFrom(message);
+        std::ignore = discovery_response.add_resources()->PackFrom(message);
       }
     }
     static int next_nonce_counter = 0;
@@ -308,20 +322,20 @@ public:
     for (const auto& [name, message] : messages) {
       if (!metadata.empty()) {
         envoy::service::discovery::v3::Resource resource;
-        resource.mutable_resource()->PackFrom(message);
+        std::ignore = resource.mutable_resource()->PackFrom(message);
         resource.set_name(name);
         resource.set_version(version);
         for (const auto& kvp : metadata) {
           auto* map = resource.mutable_metadata()->mutable_typed_filter_metadata();
           (*map)[std::string(kvp.first)] = kvp.second;
         }
-        discovery_response.add_resources()->PackFrom(resource);
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
       } else {
         envoy::service::discovery::v3::Resource resource;
-        resource.mutable_resource()->PackFrom(message);
+        std::ignore = resource.mutable_resource()->PackFrom(message);
         resource.set_name(name);
         resource.set_version(version);
-        discovery_response.add_resources()->PackFrom(resource);
+        std::ignore = discovery_response.add_resources()->PackFrom(resource);
       }
     }
     static int next_nonce_counter = 0;
@@ -407,7 +421,7 @@ public:
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
-      resource.mutable_resource()->PackFrom(message);
+      std::ignore = resource.mutable_resource()->PackFrom(message);
       resource.set_name(intResourceName(message));
       resource.set_version(version);
       for (const auto& alias : aliases) {
@@ -431,7 +445,7 @@ public:
     std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& [name, message] : added_or_updated) {
       envoy::service::discovery::v3::Resource resource;
-      resource.mutable_resource()->PackFrom(message);
+      std::ignore = resource.mutable_resource()->PackFrom(message);
       resource.set_name(name);
       resource.set_version(version);
       for (const auto& alias : aliases) {
@@ -515,7 +529,7 @@ public:
     FakeUpstreamConfig config = upstream_config_;
     config.upstream_protocol_ = type;
     if (type != Http::CodecType::HTTP3) {
-      config.udp_fake_upstream_ = absl::nullopt;
+      config.udp_fake_upstream_ = std::nullopt;
     }
     return config;
   }
@@ -549,12 +563,20 @@ public:
 
   void setDrainTime(std::chrono::seconds drain_time) { drain_time_ = drain_time; }
 
+  // Starts a server-wide drain the way production does: push the drain notification to every
+  // listener so that each connection learns of the drain, then start the drain sequence. Mirrors
+  // InstanceBase::drainListeners() and ListenersHandler::handlerDrainListeners(). Calling the
+  // drain manager directly is not enough, because the connection-level drain-close path is driven
+  // by that notification rather than by polling the drain manager. Blocks until the main thread
+  // has run both.
+  void startServerDrain(Network::DrainDirection direction = Network::DrainDirection::All);
+
 protected:
   static std::string finalizeConfigWithPorts(ConfigHelper& helper, std::vector<uint32_t>& ports,
                                              bool use_lds);
   static envoy::config::bootstrap::v3::Bootstrap configToBootstrap(const std::string& config);
 
-  void setUdpFakeUpstream(absl::optional<FakeUpstreamConfig::UdpConfig> config) {
+  void setUdpFakeUpstream(std::optional<FakeUpstreamConfig::UdpConfig> config) {
     upstream_config_.udp_fake_upstream_ = config;
   }
   bool initialized() const { return initialized_; }
@@ -606,7 +628,12 @@ protected:
   // The config for envoy start-up.
   ConfigHelper config_helper_;
   // The ProcessObject to use when constructing the envoy server.
-  ProcessObjectOptRef process_object_{absl::nullopt};
+  ProcessObjectOptRef process_object_{std::nullopt};
+
+  // If set, the server runs with this hot restart implementation instead of one without a parent,
+  // e.g. to give it listen sockets "inherited" from a parent the test plays. Must outlive the
+  // server.
+  Server::HotRestart* hot_restart_{};
 
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;
@@ -634,10 +661,14 @@ protected:
 
   Network::DownstreamTransportSocketFactoryPtr
   createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
+  std::unique_ptr<ThreadLocal::MockInstance> thread_local_storage_;
+  std::unique_ptr<Server::Configuration::MockGenericFactoryContext> factory_context_storage_;
+  std::unique_ptr<Server::Configuration::MockServerFactoryContext> server_factory_context_storage_;
+  ThreadLocal::Instance& thread_local_;
+  Server::Configuration::GenericFactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& server_factory_context_;
+  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_storage_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl& context_manager_;
 
   // The fake upstreams_ are created using the context_manager, so make sure
   // they are destroyed before it is.
@@ -670,9 +701,7 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  // If this member is not empty, the test will use a fixed RNG value specified
-  // by it.
-  absl::optional<uint64_t> deterministic_value_{};
+  TestRandomGeneratorConfig random_config_;
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

@@ -60,7 +60,7 @@ template <class DataType> struct IpRangeNodeComparator {
  */
 template <class DataType> class IpRangeMatcher : public MatchTree<DataType> {
 public:
-  IpRangeMatcher(DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match,
+  IpRangeMatcher(DataInputPtr<DataType>&& data_input, std::optional<OnMatch<DataType>> on_no_match,
                  const std::shared_ptr<Network::LcTrie::LcTrie<IpRangeNode<DataType>>>& trie)
       : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)), trie_(trie) {
     auto input_type = data_input_->dataInputType();
@@ -112,7 +112,7 @@ public:
 
 private:
   const DataInputPtr<DataType> data_input_;
-  const absl::optional<OnMatch<DataType>> on_no_match_;
+  const std::optional<OnMatch<DataType>> on_no_match_;
   std::shared_ptr<Network::LcTrie::LcTrie<IpRangeNode<DataType>>> trie_;
 };
 
@@ -123,7 +123,7 @@ public:
   createCustomMatcherFactoryCb(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext& factory_context,
                                DataInputFactoryCb<DataType> data_input,
-                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
+                               std::optional<OnMatchFactoryCb<DataType>> on_no_match,
                                OnMatchFactory<DataType>& on_match_factory) override {
     const auto& typed_config =
         MessageUtil::downcastAndValidate<const xds::type::matcher::v3::IPMatcher&>(
@@ -151,7 +151,7 @@ public:
     auto lc_trie = std::make_shared<Network::LcTrie::LcTrie<IpRangeNode<DataType>>>(data);
     return [data_input, lc_trie, on_no_match]() {
       return std::make_unique<IpRangeMatcher<DataType>>(
-          data_input(), on_no_match ? absl::make_optional(on_no_match.value()()) : absl::nullopt,
+          data_input(), on_no_match ? std::make_optional(on_no_match.value()()) : std::nullopt,
           lc_trie);
     };
   };

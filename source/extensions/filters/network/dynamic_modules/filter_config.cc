@@ -18,8 +18,8 @@ DynamicModuleNetworkFilterConfig::DynamicModuleNetworkFilterConfig(
     Event::Dispatcher& main_thread_dispatcher)
     : cluster_manager_(cluster_manager), main_thread_dispatcher_(main_thread_dispatcher),
       stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
-      stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
-      filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {}
+      metrics_(*stats_scope_), filter_name_(filter_name), filter_config_(filter_config),
+      dynamic_module_(std::move(dynamic_module)) {}
 
 void DynamicModuleNetworkFilterConfig::onScheduled(uint64_t event_id) {
   if (on_network_filter_config_scheduled_ != nullptr) {
@@ -129,6 +129,7 @@ absl::StatusOr<DynamicModuleNetworkFilterConfigSharedPtr> newDynamicModuleNetwor
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module network filter config");
   }
+  config->stat_creation_frozen_ = true;
   return config;
 }
 

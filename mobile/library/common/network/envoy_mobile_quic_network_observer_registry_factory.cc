@@ -65,13 +65,28 @@ bool EnvoyMobileQuicNetworkObserverRegistry::isNetworkChangeUpToDate(
   }
 }
 
+EnvoyMobileQuicNetworkObserverRegistryFactory::EnvoyMobileQuicNetworkObserverRegistryFactory(
+    NetworkConnectivityTracker& network_tracker)
+    : network_tracker_(network_tracker) {
+  thread_local_observer_registries_.reserve(1);
+}
+
 EnvoyQuicNetworkObserverRegistryPtr
 EnvoyMobileQuicNetworkObserverRegistryFactory::createQuicNetworkObserverRegistry(
     Event::Dispatcher& dispatcher) {
   auto result =
       std::make_unique<EnvoyMobileQuicNetworkObserverRegistry>(dispatcher, network_tracker_);
-  thread_local_observer_registries_.emplace_back(*result);
+  {
+    absl::WriterMutexLock lock(&mutex_);
+    thread_local_observer_registries_.emplace_back(*result);
+  }
   return result;
+}
+
+std::vector<std::reference_wrapper<EnvoyMobileQuicNetworkObserverRegistry>>
+EnvoyMobileQuicNetworkObserverRegistryFactory::getCreatedObserverRegistries() {
+  absl::ReaderMutexLock lock(&mutex_);
+  return thread_local_observer_registries_;
 }
 
 } // namespace Quic

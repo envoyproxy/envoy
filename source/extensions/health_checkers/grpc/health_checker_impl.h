@@ -49,7 +49,8 @@ class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+                        Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger,
+                        HealthFlagCallbacks& health_flag_callbacks);
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
@@ -145,8 +146,8 @@ protected:
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  absl::optional<std::string> service_name_;
-  absl::optional<std::string> authority_value_;
+  std::optional<std::string> service_name_;
+  std::optional<std::string> authority_value_;
   Router::HeaderParserPtr request_headers_parser_;
 };
 

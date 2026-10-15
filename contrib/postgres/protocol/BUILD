@@ -13,6 +13,5 @@ envoy_contrib_package()
 envoy_cc_library(
     name = "postgres_protocol_lib",
     hdrs = ["postgres_protocol.h"],
-    repository = "@envoy",
     visibility = ["//visibility:public"],
 )

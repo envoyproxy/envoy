@@ -54,7 +54,7 @@ public:
     return SocketInterfaceSingleton::get();
   }
 
-  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  std::optional<std::string> networkNamespace() const override { return std::nullopt; }
 
   InstanceConstSharedPtr withNetworkNamespace(absl::string_view) const override { return nullptr; }
 

@@ -11,6 +11,7 @@ CONTRIB_EXTENSIONS = {
     # HTTP filters
     #
     "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
+    "envoy.filters.http.client_cert":                           "//contrib/client_cert/filters/http/source:config",
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
@@ -32,6 +33,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
     "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
+    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
 
     #
     # Listener filters
@@ -45,6 +47,13 @@ CONTRIB_EXTENSIONS = {
 
     "envoy.filters.network.sip_proxy":                          "//contrib/sip_proxy/filters/network/source:config",
     "envoy.filters.sip.router":                                 "//contrib/sip_proxy/filters/network/source/router:config",
+
+    #
+    # Stat sinks
+    #
+
+    "envoy.stat_sinks.kafka":                            "//contrib/kafka/stat_sinks/source:config_lib",
+    "envoy.stat_sinks.wasm_filter":                      "//contrib/stat_sinks/wasm_filter/source:config_lib",
 
     #
     # Tap sinks
@@ -73,12 +82,6 @@ CONTRIB_EXTENSIONS = {
     "envoy.matching.input_matchers.hyperscan":                  "//contrib/hyperscan/matching/input_matchers/source:config",
 
     #
-    # Connection Balance extensions
-    #
-
-    "envoy.network.connection_balance.dlb":                     "//contrib/dlb/source:connection_balancer",
-
-    #
     # Regex engines
     #
 
@@ -93,6 +96,7 @@ CONTRIB_EXTENSIONS = {
     # Load balancing policies
     #
     "envoy.load_balancing_policies.peak_ewma":      "//contrib/peak_ewma/load_balancing_policies/source:config",
+    "envoy.load_balancing_policies.per_worker_subset": "//contrib/per_worker_subset/load_balancing_policies/source:config",
 
     #
     # xDS delegates
@@ -111,4 +115,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
+
+    #
+    # Reverse tunnel reporters
+    #
+
+    "envoy.bootstrap.reverse_tunnel.reverse_tunnel_reporting_service": "//contrib/reverse_tunnel_reporter/source:config",
 }

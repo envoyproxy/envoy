@@ -23,7 +23,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CacheV2 {
 
-using OptionalDuration = absl::optional<SystemTime::duration>;
+using OptionalDuration = std::optional<SystemTime::duration>;
 
 // According to: https://httpwg.org/specs/rfc7234.html#cache-request-directive
 struct RequestCacheControl {
@@ -79,8 +79,8 @@ struct ResponseCacheControl {
   // https://httpwg.org/specs/rfc7230.html#message.transformations
   bool no_transform_ = false;
 
-  // no_stale is true if any of 'must-revalidate' or 'proxy-revalidate' directives is present
-  // This response must not be served stale without successful validation with the origin
+  // no_stale is true if 'must-revalidate', 'proxy-revalidate', or a valid 's-maxage' is present.
+  // This response must not be served stale without successful validation with the origin.
   bool no_stale_ = false;
 
   // 'public' directive is not used now
@@ -123,9 +123,9 @@ bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& new_headers,
 /**
  * Read a leading positive decimal integer value and advance "*str" past the
  * digits read. If overflow occurs, or no digits exist, return
- * absl::nullopt without advancing "*str".
+ * std::nullopt without advancing "*str".
  */
-absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
+std::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
 
 // Add to out all header names from the given map that match any of the given rules.
 void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
@@ -172,10 +172,10 @@ bool hasVary(const Http::ResponseHeaderMap& headers);
 absl::btree_set<absl::string_view> getVaryValues(const Envoy::Http::ResponseHeaderMap& headers);
 
 // Creates a single string combining the values of the varied headers from
-// entry_headers. Returns an absl::nullopt if no valid vary key can be created
+// entry_headers. Returns an std::nullopt if no valid vary key can be created
 // and the response should not be cached (eg. when disallowed vary headers are
 // present in the response).
-absl::optional<std::string>
+std::optional<std::string>
 createVaryIdentifier(const VaryAllowList& allow_list,
                      const absl::btree_set<absl::string_view>& vary_header_values,
                      const Envoy::Http::RequestHeaderMap& request_headers);

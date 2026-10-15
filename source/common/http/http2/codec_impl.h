@@ -4,6 +4,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -29,7 +31,6 @@
 #include "source/common/http/http2/protocol_constraints.h"
 #include "source/common/http/status.h"
 
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 #ifdef ENVOY_NGHTTP2
@@ -44,6 +45,7 @@ namespace Http {
 namespace Http2 {
 
 // Types inherited from nghttp2 and preserved in oghttp2
+// NOLINTBEGIN(readability-identifier-naming)
 enum ErrorType {
   OGHTTP2_NO_ERROR,
   OGHTTP2_PROTOCOL_ERROR,
@@ -60,6 +62,7 @@ enum ErrorType {
   OGHTTP2_INADEQUATE_SECURITY,
   OGHTTP2_HTTP_1_1_REQUIRED,
 };
+// NOLINTEND(readability-identifier-naming)
 
 class Http2CodecImplTestFixture;
 
@@ -73,12 +76,12 @@ public:
   explicit ReceivedSettingsImpl(absl::Span<const http2::adapter::Http2Setting> settings);
 
   // ReceivedSettings
-  const absl::optional<uint32_t>& maxConcurrentStreams() const override {
+  const std::optional<uint32_t>& maxConcurrentStreams() const override {
     return concurrent_stream_limit_;
   }
 
 private:
-  absl::optional<uint32_t> concurrent_stream_limit_{};
+  std::optional<uint32_t> concurrent_stream_limit_;
 };
 
 class Utility {
@@ -151,7 +154,8 @@ public:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats,
                  Random::RandomGenerator& random_generator,
                  const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                 const uint32_t max_headers_kb, const uint32_t max_headers_count);
+                 const uint32_t max_headers_kb, const uint32_t max_headers_count,
+                 OptRef<Runtime::Loader> runtime = std::nullopt);
 
   ~ConnectionImpl() override;
 
@@ -165,7 +169,16 @@ public:
   bool wantsToWrite() override { return adapter_->want_write(); }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
+    // Snapshot the streams before invoking callbacks. A callback may encode on its stream and
+    // reorder active_streams_, invalidating the traversal. Stream deletion is deferred, so the
+    // pointers remain valid for the duration of this synchronous callback fanout.
+    std::vector<StreamImpl*> streams;
+    streams.reserve(active_streams_.size());
     for (auto& stream : active_streams_) {
+      streams.push_back(stream.get());
+    }
+
+    for (StreamImpl* stream : streams) {
       stream->runHighWatermarkCallbacks();
     }
   }
@@ -178,6 +191,10 @@ public:
   // ScopeTrackedObject
   OptRef<const StreamInfo::StreamInfo> trackedStream() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
+
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
+    encodeMetadata(metadata_map_vector, 0); // 0 is the stream for connection metadata.
+  }
 
 protected:
   friend class ProdNghttp2SessionFactory;
@@ -248,6 +265,10 @@ protected:
       uint8_t flags;
     };
     FrameHeaderInfo current_frame_ = {};
+    // Latched to avoid runtime lookup on the per-frame hot path.
+    // TODO: remove when removing
+    // `envoy.reloadable_features.http2_mask_continuation_flags`.
+    const bool mask_continuation_flags_;
     size_t padding_length_ = 0;
     size_t remaining_data_payload_ = 0;
     // TODO: remove when removing `envoy.reloadable_features.http2_use_oghttp2`.
@@ -330,7 +351,7 @@ protected:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     Stream& getStream() override { return *this; }
     void encodeMetadata(const MetadataMapVector& metadata_map_vector) override;
-    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
+    Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return std::nullopt; }
 
     // Http::Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
@@ -344,9 +365,9 @@ protected:
     absl::string_view responseDetails() override { return details_; }
     Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
-    absl::optional<uint32_t> codecStreamId() const override {
+    std::optional<uint32_t> codecStreamId() const override {
       if (stream_id_ == -1) {
-        return absl::nullopt;
+        return std::nullopt;
       }
       return stream_id_;
     }
@@ -384,8 +405,6 @@ protected:
     // Consumes any decoded data, buffering if backed up.
     void decodeData();
 
-    // Get MetadataEncoder for this stream.
-    NewMetadataEncoder& getMetadataEncoder();
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
     // Callback function for MetadataDecoder.
@@ -422,7 +441,7 @@ protected:
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
-    uint32_t unconsumed_bytes_{0};
+    uint64_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
     StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
@@ -433,22 +452,25 @@ protected:
     Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
-    std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
-    absl::optional<StreamResetReason> deferred_reset_;
+    std::optional<StreamResetReason> deferred_reset_;
     // Holds the reset reason for this stream. Useful if we have buffered data
     // to determine whether we should continue processing that data.
-    absl::optional<StreamResetReason> reset_reason_;
+    std::optional<StreamResetReason> reset_reason_;
     HeaderString cookies_;
-    bool local_end_stream_sent_ : 1;
-    bool remote_end_stream_ : 1;
-    bool remote_rst_ : 1;
-    bool data_deferred_ : 1;
-    bool received_noninformational_headers_ : 1;
-    bool pending_receive_buffer_high_watermark_called_ : 1;
-    bool pending_send_buffer_high_watermark_called_ : 1;
-    bool reset_due_to_messaging_error_ : 1;
+    uint32_t cookie_count_;
+    uint64_t discarded_host_header_size_{0};
+    uint32_t discarded_host_header_count_{0};
+    bool local_end_stream_sent_ : 1 = false;
+    bool remote_end_stream_ : 1 = false;
+    bool remote_rst_ : 1 = false;
+    bool data_deferred_ : 1 = false;
+    bool received_noninformational_headers_ : 1 = false;
+    bool pending_receive_buffer_high_watermark_called_ : 1 = false;
+    bool pending_send_buffer_high_watermark_called_ : 1 = false;
+    bool reset_due_to_messaging_error_ : 1 = false;
     // Latch whether this stream is operating with this flag.
-    bool extend_stream_lifetime_flag_ : 1;
+    bool extend_stream_lifetime_flag_ : 1 = false;
+    bool histograms_recorded_ : 1 = false;
     absl::string_view details_;
 
     /**
@@ -653,6 +675,8 @@ protected:
   const StreamImpl* getStreamUnchecked(int32_t stream_id) const;
   StreamImpl* getStreamUnchecked(int32_t stream_id);
   int saveHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value);
+  void recordHistogramsForStream(StreamImpl& stream);
+  int checkHeaderLimits(StreamImpl& stream);
 
   /**
    * Copies any frames pending internally by nghttp2 into outbound buffer.
@@ -693,8 +717,8 @@ protected:
    * `common_http_protocol_options.headers_with_underscores_action` configuration option in the
    * HttpConnectionManager.
    */
-  virtual absl::optional<int> checkHeaderNameForUnderscores(absl::string_view /* header_name */) {
-    return absl::nullopt;
+  virtual std::optional<int> checkHeaderNameForUnderscores(absl::string_view /* header_name */) {
+    return std::nullopt;
   }
 
   /**
@@ -721,7 +745,7 @@ protected:
 
   // Tracks the stream id of the current stream we're processing.
   // This should only be set while we're in the context of dispatching to nghttp2.
-  absl::optional<int32_t> current_stream_id_;
+  std::optional<int32_t> current_stream_id_;
   std::unique_ptr<http2::adapter::Http2VisitorInterface> visitor_;
   std::unique_ptr<http2::adapter::Http2Adapter> adapter_;
 
@@ -733,6 +757,14 @@ protected:
   bool allow_metadata_;
   uint64_t max_metadata_size_;
   const bool stream_error_on_invalid_http_messaging_;
+  const bool record_http2_histograms_;
+  const uint64_t max_cookie_size_bytes_{0};
+  // Latched value of the `http2_include_cookies_in_limits` runtime feature, read once per
+  // connection instead of on every header field in saveHeader().
+  const bool http2_include_cookies_in_limits_ = false;
+  // Latched value of the `http2_reject_frames_after_end_stream` runtime feature, consulted for
+  // every received HEADERS and DATA frame instead of performing a runtime lookup on the data path.
+  const bool reject_frames_after_end_stream_ = false;
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and
@@ -765,6 +797,8 @@ protected:
   void sendKeepalive();
 
   const MonotonicTime& lastReceivedDataTime() { return last_received_data_time_; }
+
+  void encodeMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id);
 
 private:
   friend class Http2CodecImplTestFixture;
@@ -801,6 +835,12 @@ private:
   bool slowContainsStreamId(int32_t stream_id) const;
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
 
+  // Callback function for MetadataDecoder.
+  void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
+
+  NewMetadataEncoder& getMetadataEncoder();
+  MetadataDecoder& getMetadataDecoder();
+
   // Tracks the current slice we're processing in the dispatch loop.
   const Buffer::RawSlice* current_slice_ = nullptr;
   // Streams that are pending deferred reset. Using an ordered map provides determinism in the rare
@@ -808,8 +848,8 @@ private:
   // remove streams from the map when they are closed in order to avoid calls to resetStreamWorker
   // after the stream has been removed from the active list.
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
-  bool dispatching_ : 1;
-  bool raised_goaway_ : 1;
+  bool dispatching_ : 1 = false;
+  bool raised_goaway_ : 1 = false;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   MonotonicTime last_received_data_time_;
@@ -818,6 +858,8 @@ private:
   std::chrono::milliseconds keepalive_interval_;
   std::chrono::milliseconds keepalive_timeout_;
   uint32_t keepalive_interval_jitter_percent_;
+  std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
+  std::unique_ptr<MetadataDecoder> metadata_decoder_;
 };
 
 /**
@@ -859,14 +901,15 @@ public:
                        const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action,
-                       Server::OverloadManager& overload_manager);
+                       Server::OverloadManager& overload_manager,
+                       OptRef<Runtime::Loader> runtime = std::nullopt);
 
 private:
   // ConnectionImpl
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(int32_t stream_id) override;
   int onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) override;
-  absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
+  std::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
   StreamResetReason getMessagingErrorResetReason() const override {
     return StreamResetReason::LocalReset;
   }
@@ -885,6 +928,10 @@ private:
   // The action to take when a request header name contains underscore characters.
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  // Latched value of the `http2_discard_host_header` runtime feature, read once per connection
+  // instead of on every header field in onHeader().
+  const bool http2_discard_host_header_ = false;
+  // Remove when removing runtime feature `http2_fix_goaway_loadshed_point`.
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
   bool sent_go_away_on_dispatch_{false};

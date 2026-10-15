@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/http_uri.proto";
 
 import "udpa/annotations/status.proto";
@@ -29,7 +30,13 @@ message HttpService {
   HttpUri http_uri = 1;
 
   // Specifies a list of HTTP headers that should be added to each request
-  // handled by this virtual host.
+  // handled by this virtual host. Substitution formatters are supported.
   repeated HeaderValueOption request_headers_to_add = 2
       [(validate.rules).repeated = {max_items: 1000}];
+
+  // Specifies a collection of Formatter plugins that can be used in substitution formatters
+  // in ``request_headers_to_add``.
+  // See the formatters extensions documentation for details.
+  // [#extension-category: envoy.formatter]
+  repeated TypedExtensionConfig formatters = 3;
 }

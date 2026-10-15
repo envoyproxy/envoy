@@ -8,7 +8,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/admin_stream.h"
-#include "test/mocks/server/instance.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -316,8 +316,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   }
 
   std::string rolling_map = sink_->printRollingWindows();
-  EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"))
-      << "cluster1_name = " << cluster1_name_;
+  EXPECT_THAT(rolling_map, HasSubstr(cluster1_name_ + ".total"));
 
   cluster_message_map = buildClusterMap(cluster_stats_buffer_.toString());
 

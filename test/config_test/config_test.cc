@@ -11,6 +11,7 @@
 #include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"
@@ -22,6 +23,7 @@
 #include "test/mocks/server/worker_factory.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -60,13 +62,18 @@ class ConfigTest {
 public:
   ConfigTest(OptionsImplBase& options)
       : api_(Api::createApiForTest(time_system_)),
-        ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()), options_(options) {
+        ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()), options_(options),
+        network_config_provider_manager_(
+            std::make_shared<Filter::NetworkFilterConfigProviderManagerImpl>()),
+        tcp_listener_config_provider_manager_(
+            std::make_shared<Filter::TcpListenerFilterConfigProviderManagerImpl>()) {
     ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(server_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
+    ON_CALL(server_.api_, customStatNamespaces()).WillByDefault(ReturnRef(custom_stat_namespaces_));
     ON_CALL(server_.api_, threadFactory()).WillByDefault(Invoke([&]() -> Thread::ThreadFactory& {
       return api_->threadFactory();
     }));
@@ -100,10 +107,8 @@ public:
         .Times(AtLeast(0));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                    bootstrap, options_,
-                    server_.messageValidationContext().staticValidationVisitor(), *api_)
-                    .ok());
+    EXPECT_OK(Server::InstanceUtil::loadBootstrapConfig(
+        bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_));
     absl::Status creation_status;
     Server::Configuration::InitialImpl initial_config(bootstrap, creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
@@ -136,10 +141,10 @@ public:
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
-                  filters, context, network_config_provider_manager_);
+                  filters, context, *network_config_provider_manager_);
             }));
     ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
-        .WillByDefault(Return(&tcp_listener_config_provider_manager_));
+        .WillByDefault(Return(tcp_listener_config_provider_manager_.get()));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
@@ -182,13 +187,15 @@ public:
   Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
                                                 worker_factory_, false, server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
+  Stats::CustomStatNamespacesImpl custom_stat_namespaces_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
-  Filter::NetworkFilterConfigProviderManagerImpl network_config_provider_manager_;
-  Filter::TcpListenerFilterConfigProviderManagerImpl tcp_listener_config_provider_manager_;
+  std::shared_ptr<Filter::NetworkFilterConfigProviderManagerImpl> network_config_provider_manager_;
+  std::shared_ptr<Filter::TcpListenerFilterConfigProviderManagerImpl>
+      tcp_listener_config_provider_manager_;
 };
 
 void testMerge() {
@@ -214,9 +221,8 @@ void testMerge() {
   OptionsImplBase options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                         Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  ASSERT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                  bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
-                  .ok());
+  ASSERT_OK(Server::InstanceUtil::loadBootstrapConfig(
+      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api));
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
 }
 
@@ -241,9 +247,8 @@ uint32_t run(const std::string& directory) {
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
       ConfigTest test1(options);
       envoy::config::bootstrap::v3::Bootstrap bootstrap;
-      EXPECT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
-                      bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
-                      .ok());
+      EXPECT_OK(Server::InstanceUtil::loadBootstrapConfig(
+          bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api));
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
       OptionsImplBase config = asConfigYaml(options, *api);
       ConfigTest test2(config);

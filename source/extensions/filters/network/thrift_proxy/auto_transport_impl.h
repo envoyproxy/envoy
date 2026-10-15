@@ -44,7 +44,7 @@ public:
   }
 
 private:
-  TransportPtr transport_{};
+  TransportPtr transport_;
   std::string name_;
 };
 

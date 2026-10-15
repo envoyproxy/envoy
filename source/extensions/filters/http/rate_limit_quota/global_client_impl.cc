@@ -43,29 +43,28 @@ using envoy::type::v3::RateLimitStrategy;
 
 GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
     const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-    Server::Configuration::FactoryContext& context, absl::string_view domain_name,
+    Server::Configuration::ServerFactoryContext& context, absl::string_view domain_name,
     std::chrono::milliseconds send_reports_interval,
     Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
-    Envoy::Event::Dispatcher& main_dispatcher)
+    Envoy::Event::Dispatcher& main_dispatcher, absl::Status& creation_status)
     : domain_name_(domain_name), buckets_tls_(buckets_tls),
       send_reports_interval_(send_reports_interval),
-      time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
-      main_dispatcher_(main_dispatcher) {
+      time_source_(context.mainThreadDispatcher().timeSource()), main_dispatcher_(main_dispatcher) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   absl::StatusOr<Grpc::AsyncClientFactoryPtr> rlqs_stream_client_factory =
-      context.serverFactoryContext()
-          .clusterManager()
-          .grpcAsyncClientManager()
-          .factoryForGrpcService(config_with_hash_key.config(), context.scope(), true);
+      context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+          config_with_hash_key.config(), context.scope(), true);
   if (!rlqs_stream_client_factory.ok()) {
-    throw EnvoyException(std::string(rlqs_stream_client_factory.status().message()));
+    creation_status = rlqs_stream_client_factory.status();
+    return;
   }
 
   absl::StatusOr<Grpc::RawAsyncClientPtr> rlqs_stream_client =
       (*rlqs_stream_client_factory)->createUncachedRawAsyncClient();
   if (!rlqs_stream_client.ok()) {
-    throw EnvoyException(std::string(rlqs_stream_client.status().message()));
+    creation_status = rlqs_stream_client.status();
+    return;
   }
   async_client_ = GrpcAsyncClient(std::move(*rlqs_stream_client));
 }
@@ -271,7 +270,7 @@ createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_
 }
 
 void GlobalRateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-  if (response == nullptr) {
+  if (!response) {
     return;
   }
   main_dispatcher_.post(

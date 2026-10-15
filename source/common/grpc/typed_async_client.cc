@@ -15,16 +15,13 @@ void sendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request
   stream->sendMessageRaw(Common::serializeMessage(request), end_stream);
 }
 
-ProtobufTypes::MessagePtr parseMessageUntyped(ProtobufTypes::MessagePtr&& message,
-                                              Buffer::InstancePtr&& response) {
+bool parseMessageUntyped(Protobuf::Message& message, Buffer::InstancePtr&& response) {
   // TODO(htuch): Need to add support for compressed responses as well here.
   if (response->length() > 0) {
     Buffer::ZeroCopyInputStreamImpl stream(std::move(response));
-    if (!message->ParseFromZeroCopyStream(&stream)) {
-      return nullptr;
-    }
+    return message.ParseFromZeroCopyStream(&stream);
   }
-  return std::move(message);
+  return true;
 }
 
 RawAsyncStream* startUntyped(RawAsyncClient* client,

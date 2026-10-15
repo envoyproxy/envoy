@@ -1,10 +1,13 @@
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
+
+#include "source/common/http/http_service_headers.h"
 #include "source/extensions/access_loggers/open_telemetry/http_access_log_impl.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -26,6 +29,16 @@ const std::string ZONE_NAME = "test_zone";
 const std::string CLUSTER_NAME = "test_cluster";
 const std::string NODE_NAME = "test_node";
 
+class MockResourceProvider : public Tracers::OpenTelemetry::ResourceProvider {
+public:
+  MOCK_METHOD(Tracers::OpenTelemetry::Resource, getResource,
+              (const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+                   resource_detectors,
+               Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
+               const Tracers::OpenTelemetry::ResourceProviderOptions& options),
+              (const));
+};
+
 class HttpAccessLoggerImplTest : public testing::Test {
 public:
   HttpAccessLoggerImplTest() : timer_(new Event::MockTimer(&dispatcher_)) {
@@ -40,6 +53,14 @@ public:
   void setupWithConfig(
       envoy::config::core::v3::HttpService http_service,
       envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config) {
+    setupWithConfig(http_service, config,
+                    ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
+  }
+
+  void setupWithConfig(
+      envoy::config::core::v3::HttpService http_service,
+      envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
+      const Tracers::OpenTelemetry::ResourceProvider& resource_provider) {
     cluster_manager_.thread_local_cluster_.cluster_.info_->name_ = "my_o11y_backend";
     cluster_manager_.initializeThreadLocalClusters({"my_o11y_backend"});
     ON_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
@@ -47,21 +68,25 @@ public:
 
     cluster_manager_.initializeClusters({"my_o11y_backend"}, {});
 
-    ON_CALL(local_info_, zoneName()).WillByDefault(ReturnRef(ZONE_NAME));
-    ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRef(CLUSTER_NAME));
-    ON_CALL(local_info_, nodeName()).WillByDefault(ReturnRef(NODE_NAME));
+    ON_CALL(factory_context_.server_factory_context_.local_info_, zoneName())
+        .WillByDefault(ReturnRef(ZONE_NAME));
+    ON_CALL(factory_context_.server_factory_context_.local_info_, clusterName())
+        .WillByDefault(ReturnRef(CLUSTER_NAME));
+    ON_CALL(factory_context_.server_factory_context_.local_info_, nodeName())
+        .WillByDefault(ReturnRef(NODE_NAME));
 
-    http_access_logger_ =
-        std::make_unique<HttpAccessLoggerImpl>(cluster_manager_, http_service, config, dispatcher_,
-                                               local_info_, *stats_store_.rootScope());
+    auto headers_applicator = Http::HttpServiceHeadersApplicator::createOrThrow(
+        http_service, factory_context_.server_factory_context_);
+    http_access_logger_ = std::make_unique<HttpAccessLoggerImpl>(
+        cluster_manager_, http_service, std::move(headers_applicator), config, dispatcher_,
+        factory_context_.server_factory_context_, resource_provider);
   }
 
 protected:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* timer_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<HttpAccessLoggerImpl> http_access_logger_;
 };
 
@@ -341,27 +366,150 @@ TEST(HttpAccessLoggerCacheTest, CacheHitReturnsSameLogger) {
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.set_log_name("test_log");
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "my_o11y_backend";
-  cluster_manager.initializeThreadLocalClusters({"my_o11y_backend"});
-  cluster_manager.initializeClusters({"my_o11y_backend"}, {});
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->name_ = "my_o11y_backend";
+  factory_context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"my_o11y_backend"});
+  factory_context.server_factory_context_.cluster_manager_.initializeClusters({"my_o11y_backend"},
+                                                                              {});
 
-  ON_CALL(local_info, zoneName()).WillByDefault(ReturnRef(ZONE_NAME));
-  ON_CALL(local_info, clusterName()).WillByDefault(ReturnRef(CLUSTER_NAME));
-  ON_CALL(local_info, nodeName()).WillByDefault(ReturnRef(NODE_NAME));
+  ON_CALL(factory_context.server_factory_context_.local_info_, zoneName())
+      .WillByDefault(ReturnRef(ZONE_NAME));
+  ON_CALL(factory_context.server_factory_context_.local_info_, clusterName())
+      .WillByDefault(ReturnRef(CLUSTER_NAME));
+  ON_CALL(factory_context.server_factory_context_.local_info_, nodeName())
+      .WillByDefault(ReturnRef(NODE_NAME));
 
-  auto cache = std::make_shared<HttpAccessLoggerCacheImpl>(
-      cluster_manager, *stats_store.rootScope(), tls, local_info);
+  auto cache = std::make_shared<HttpAccessLoggerCacheImpl>(factory_context.server_factory_context_);
 
-  auto logger1 = cache->getOrCreateLogger(config, http_service);
+  std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator =
+      Http::HttpServiceHeadersApplicator::createOrThrow(http_service,
+                                                        factory_context.server_factory_context_);
+
+  auto logger1 = cache->getOrCreateLogger(config, http_service, headers_applicator);
   ASSERT_NE(nullptr, logger1);
 
-  auto logger2 = cache->getOrCreateLogger(config, http_service);
+  auto logger2 = cache->getOrCreateLogger(config, http_service, headers_applicator);
   EXPECT_EQ(logger1.get(), logger2.get());
+}
+
+// Verifies that failure in creation of the applicator is handled correctly through
+// the cache.
+TEST(HttpAccessLoggerCacheTest, CreateApplicatorFailure) {
+  std::string yaml_string = R"EOF(
+  http_uri:
+    uri: "https://some-o11y.com/otlp/v1/logs"
+    cluster: "my_o11y_backend"
+    timeout: 0.250s
+  request_headers_to_add:
+    - header:
+        key: "x-bad-formatter"
+        value: "%UNCLOSED_FORMATTER"
+  )EOF";
+
+  envoy::config::core::v3::HttpService http_service;
+  TestUtility::loadFromYaml(yaml_string, http_service);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+
+  auto cache = std::make_shared<HttpAccessLoggerCacheImpl>(server_context);
+
+  EXPECT_THROW(cache->getOrCreateApplicator(http_service, server_context), EnvoyException);
+}
+
+TEST_F(HttpAccessLoggerImplTest, LogWithResourceDetectors) {
+  envoy::config::core::v3::HttpService http_service;
+  http_service.mutable_http_uri()->set_uri("https://some-o11y.com/otlp/v1/logs");
+  http_service.mutable_http_uri()->set_cluster("my_o11y_backend");
+  http_service.mutable_http_uri()->mutable_timeout()->set_nanos(250000000);
+
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_log_name("http_test_log");
+
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
+  envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+      EnvironmentResourceDetectorConfig env_config;
+  std::ignore = detector->mutable_typed_config()->PackFrom(env_config);
+
+  TestEnvironment::setEnvVar("OTEL_RESOURCE_ATTRIBUTES", "service.name=http-service", 1);
+
+  setupWithConfig(http_service, config);
+
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
+            EXPECT_TRUE(request_msg.ParseFromString(message->bodyAsString()));
+            EXPECT_EQ(1, request_msg.resource_logs_size());
+            const auto& resource = request_msg.resource_logs(0).resource();
+            bool found_service_name = false;
+            for (const auto& attr : resource.attributes()) {
+              if (attr.key() == "service.name" && attr.value().string_value() == "http-service") {
+                found_service_name = true;
+              }
+            }
+            EXPECT_TRUE(found_service_name);
+            return nullptr;
+          }));
+
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity");
+  http_access_logger_->log(std::move(entry));
+
+  timer_->invokeCallback();
+
+  TestEnvironment::unsetEnvVar("OTEL_RESOURCE_ATTRIBUTES");
+}
+
+TEST_F(HttpAccessLoggerImplTest, LogWithCustomResourceProvider) {
+  envoy::config::core::v3::HttpService http_service;
+  http_service.mutable_http_uri()->set_uri("https://some-o11y.com/otlp/v1/logs");
+  http_service.mutable_http_uri()->set_cluster("my_o11y_backend");
+  http_service.mutable_http_uri()->mutable_timeout()->set_nanos(250000000);
+
+  envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
+  config.set_log_name("http_test_log");
+
+  auto* detector = config.add_resource_detectors();
+  detector->set_name("custom_detector");
+
+  NiceMock<MockResourceProvider> resource_provider;
+  Tracers::OpenTelemetry::Resource resource;
+  resource.attributes_["custom.key"] = "custom.value";
+  resource.schema_url_ = "https://opentelemetry.io/schemas/1.24.0";
+  EXPECT_CALL(resource_provider, getResource(_, _, _, _)).WillOnce(Return(resource));
+
+  setupWithConfig(http_service, config, resource_provider);
+
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
+            EXPECT_TRUE(request_msg.ParseFromString(message->bodyAsString()));
+            EXPECT_EQ(1, request_msg.resource_logs_size());
+            EXPECT_EQ("https://opentelemetry.io/schemas/1.24.0",
+                      request_msg.resource_logs(0).schema_url());
+            const auto& res = request_msg.resource_logs(0).resource();
+            bool found_custom_attr = false;
+            for (const auto& attr : res.attributes()) {
+              if (attr.key() == "custom.key" && attr.value().string_value() == "custom.value") {
+                found_custom_attr = true;
+              }
+            }
+            EXPECT_TRUE(found_custom_attr);
+            return nullptr;
+          }));
+
+  opentelemetry::proto::logs::v1::LogRecord entry;
+  entry.set_severity_text("test-severity");
+  http_access_logger_->log(std::move(entry));
+
+  timer_->invokeCallback();
 }
 
 } // namespace OpenTelemetry

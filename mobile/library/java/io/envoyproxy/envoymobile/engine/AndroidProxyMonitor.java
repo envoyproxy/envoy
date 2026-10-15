@@ -46,7 +46,9 @@ class AndroidProxyMonitor extends BroadcastReceiver {
 
   private void registerReceiver(Context context) {
     context.getApplicationContext().registerReceiver(this, new IntentFilter() {
-      { addAction(Proxy.PROXY_CHANGE_ACTION); }
+      {
+        addAction(Proxy.PROXY_CHANGE_ACTION);
+      }
     });
   }
 

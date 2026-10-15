@@ -3,7 +3,6 @@
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -65,7 +64,7 @@ public:
   NetworkConfigurationFilterTest()
       : connectivity_manager_(std::make_shared<NiceMock<MockConnectivityManager>>()),
         proxy_settings_(std::make_shared<Network::ProxySettings>("127.0.0.1", 82)),
-        filter_(connectivity_manager_, false, false) {
+        filter_(connectivity_manager_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, getRequestHeaders())
         .WillByDefault(Return(&default_request_headers_));
@@ -155,7 +154,7 @@ TEST_F(NetworkConfigurationFilterTest, HostnameDnsLookupFail) {
   EXPECT_CALL(decoder_callbacks_.stream_info_, filterState()).Times(0);
   EXPECT_CALL(*dns_cache_, loadDnsCacheEntry_(Eq("localhost"), 82, false, _))
       .WillOnce(Return(MockDnsCache::MockLoadDnsCacheEntryResult{
-          DnsCache::LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt}));
+          DnsCache::LoadDnsCacheEntryStatus::Overflow, nullptr, std::nullopt}));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(default_request_headers_, false));
 }
@@ -174,7 +173,7 @@ TEST_F(NetworkConfigurationFilterTest, AsyncDnsLookupSuccess) {
       .WillOnce(
           Invoke([&](absl::string_view, uint16_t, bool, DnsCache::LoadDnsCacheEntryCallbacks&) {
             return MockDnsCache::MockLoadDnsCacheEntryResult{
-                DnsCache::LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt};
+                DnsCache::LoadDnsCacheEntryStatus::Loading, handle, std::nullopt};
           }));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_.decodeHeaders(default_request_headers_, false));

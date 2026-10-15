@@ -1,11 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace ConfigTest {

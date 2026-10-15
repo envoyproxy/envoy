@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -16,10 +15,9 @@ envoy_extension_cc_test(
     name = "downstream_connections_monitor_test",
     srcs = ["downstream_connections_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/resource_monitors/downstream_connections:downstream_connections_monitor",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/resource_monitors/downstream_connections/v3:pkg_cc_proto",
     ],
 )
@@ -28,23 +26,25 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/extensions/resource_monitors/downstream_connections:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:options_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/resource_monitors/downstream_connections/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "cx_limit_overload_integration_test",
     size = "large",
     srcs = ["cx_limit_overload_integration_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],

@@ -19,7 +19,7 @@ public:
   // GeoipProviderFactory
   Geolocation::DriverSharedPtr
   createGeoipProviderDriver(const Protobuf::Message& config, const std::string& stat_prefix,
-                            Server::Configuration::FactoryContext& context) override {
+                            Server::Configuration::ServerFactoryContext& context) override {
     return createGeoipProviderDriverTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
                                               config, context.messageValidationVisitor()),
                                           stat_prefix, context);
@@ -35,7 +35,7 @@ protected:
 private:
   virtual Geolocation::DriverSharedPtr
   createGeoipProviderDriverTyped(const ConfigProto& proto_config, const std::string& stat_prefix,
-                                 Server::Configuration::FactoryContext& context) PURE;
+                                 Server::Configuration::ServerFactoryContext& context) PURE;
 
   const std::string name_;
 };

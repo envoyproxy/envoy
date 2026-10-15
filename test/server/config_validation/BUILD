@@ -1,5 +1,5 @@
 load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_cc_test_library", "envoy_package", "envoy_proto_library")
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//bazel:extension_configs.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
@@ -9,7 +9,7 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -18,19 +18,11 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/common/tls:context_lib",
         "//source/server/config_validation:cluster_manager_lib",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_mocks",
-        "//test/mocks/server:instance_mocks",
         "//test/mocks/server:options_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "//test/test_common:simulated_time_system_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -50,8 +42,9 @@ envoy_cc_test(
         "//test/config_test:configs_test_setup.sh",
     ],
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -63,11 +56,14 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/server/admin:admin_filter_lib",
         "//source/server/config_validation:server_lib",
+        "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration:integration_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:file_system_for_test_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
@@ -76,14 +72,17 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dispatcher_test",
     srcs = ["dispatcher_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/server/config_validation:api_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:file_system_for_test_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:thread_factory_for_test_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -99,6 +98,8 @@ envoy_cc_fuzz_test(
         "//test/integration:integration_lib",
         "//test/mocks/server:options_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:file_system_for_test_lib",
+        "//test/test_common:thread_factory_for_test_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
@@ -134,7 +135,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "xds_verifier_test",
     srcs = ["xds_verifier_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":xds_verifier_lib",
         "//test/config:utility_lib",
@@ -145,7 +146,7 @@ envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
@@ -166,7 +167,7 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":xds_fuzz_lib",
         "//source/common/protobuf:utility_lib",

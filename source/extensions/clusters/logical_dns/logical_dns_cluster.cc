@@ -87,6 +87,8 @@ LogicalDnsCluster::LogicalDnsCluster(
     : ClusterImplBase(cluster, context, creation_status), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_refresh_rate, 5000))),
+      dns_min_refresh_rate_ms_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_min_refresh_rate, 0))),
       dns_jitter_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_jitter, 0))),
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
@@ -168,7 +170,7 @@ void LogicalDnsCluster::startResolve() {
             const uint32_t priority = locality_lb_endpoint.priority();
             priority_state_manager.updateClusterPrioritySet(
                 priority, std::move(priority_state_manager.priorityState()[priority].first),
-                absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt, absl::nullopt);
+                std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt);
           }
 
           if (!current_resolved_address_ ||
@@ -188,7 +190,8 @@ void LogicalDnsCluster::startResolve() {
           failure_backoff_strategy_->reset();
 
           if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
-            final_refresh_rate = addrinfo.ttl_;
+            final_refresh_rate =
+                std::max(std::chrono::milliseconds(addrinfo.ttl_), dns_min_refresh_rate_ms_);
           }
           if (dns_jitter_ms_.count() != 0) {
             // Note that `random_.random()` returns a uint64 while

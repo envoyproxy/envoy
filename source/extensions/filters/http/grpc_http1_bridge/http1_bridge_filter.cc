@@ -42,7 +42,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
   }
 
   const bool grpc_request = Grpc::Common::isGrpcRequestHeaders(headers);
-  const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
+  const std::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
   ASSERT(protocol);
   if (protocol.value() < Http::Protocol::Http2 && grpc_request) {
     do_bridging_ = true;

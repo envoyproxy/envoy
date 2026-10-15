@@ -16,9 +16,10 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["http_client_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/http:http_service_headers_lib",
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -30,7 +31,7 @@ envoy_extension_cc_test(
     name = "ext_proc_http_integration_test",
     srcs = ["ext_proc_http_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "2core",
+    rbe_pool = "linux_x64_medium",
     shard_count = 8,
     tags = [
         "cpu:3",

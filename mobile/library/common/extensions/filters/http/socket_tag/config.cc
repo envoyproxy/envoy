@@ -13,9 +13,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SocketTag {
 
-Http::FilterFactoryCb SocketTagFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> SocketTagFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::extensions::filters::http::socket_tag::SocketTag& /*proto_config*/,
-    const std::string&, Server::Configuration::FactoryContext& /*context*/) {
+    Server::Configuration::ServerFactoryContext& /*context*/,
+    Server::Configuration::ExtraFactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<SocketTagFilter>());

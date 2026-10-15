@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -15,8 +17,6 @@
 #include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 #include "source/extensions/filters/network/dubbo_proxy/stats.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,7 +54,7 @@ private:
   ProtocolPtr protocol_;
   ResponseDecoderPtr decoder_;
   MessageMetadataSharedPtr metadata_;
-  bool complete_ : 1;
+  bool complete_ : 1 = false;
   DubboFilters::UpstreamResponseStatus response_status_{
       DubboFilters::UpstreamResponseStatus::MoreData};
 };
@@ -195,7 +195,7 @@ private:
   Stats::TimespanPtr request_timer_;
   ActiveResponseDecoderPtr response_decoder_;
 
-  absl::optional<Router::RouteConstSharedPtr> cached_route_;
+  std::optional<Router::RouteConstSharedPtr> cached_route_;
 
   std::list<ActiveMessageDecoderFilterPtr> decoder_filters_;
   std::function<FilterStatus(DubboFilters::DecoderFilter*)> filter_action_;
@@ -209,8 +209,8 @@ private:
 
   Buffer::OwnedImpl response_buffer_;
 
-  bool pending_stream_decoded_ : 1;
-  bool local_response_sent_ : 1;
+  bool pending_stream_decoded_ : 1 = false;
+  bool local_response_sent_ : 1 = false;
 
   friend class ActiveResponseDecoder;
 };

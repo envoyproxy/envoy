@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,8 +19,6 @@
 #include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/router/upstream_request.h"
 #include "source/extensions/filters/network/thrift_proxy/thrift_object.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -192,10 +191,10 @@ private:
 
 class RouteMatcher {
 public:
-  // validation_clusters = absl::nullopt means that clusters are not validated.
+  // validation_clusters = std::nullopt means that clusters are not validated.
   RouteMatcher(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
+      const std::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
       Server::Configuration::CommonFactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
@@ -231,8 +230,8 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
 public:
   Router(Upstream::ClusterManager& cluster_manager, const RouterStats& stats,
          Runtime::Loader& runtime, ShadowWriter& shadow_writer, bool close_downstream_on_error)
-      : RequestOwner(cluster_manager, stats), passthrough_supported_(false), runtime_(runtime),
-        shadow_writer_(shadow_writer), close_downstream_on_error_(close_downstream_on_error) {}
+      : RequestOwner(cluster_manager, stats), runtime_(runtime), shadow_writer_(shadow_writer),
+        close_downstream_on_error_(close_downstream_on_error) {}
 
   ~Router() override = default;
 
@@ -321,19 +320,19 @@ private:
   void cleanup();
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
-  std::unique_ptr<UpstreamResponseCallbacksImpl> upstream_response_callbacks_{};
-  RouteConstSharedPtr route_{};
+  std::unique_ptr<UpstreamResponseCallbacksImpl> upstream_response_callbacks_;
+  RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;
 
-  bool passthrough_supported_ : 1;
+  bool passthrough_supported_ : 1 = false;
   uint64_t request_size_{};
   Runtime::Loader& runtime_;
   ShadowWriter& shadow_writer_;
-  std::vector<std::reference_wrapper<ShadowRouterHandle>> shadow_routers_{};
+  std::vector<std::reference_wrapper<ShadowRouterHandle>> shadow_routers_;
 
   bool close_downstream_on_error_;
 };

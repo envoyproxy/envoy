@@ -11,13 +11,11 @@
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/config/xds_manager.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
-#include "test/mocks/server/instance.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 
 using testing::Return;
 
@@ -49,7 +47,7 @@ public:
     ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
     THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 
-    ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
+    ASSERT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
   }
@@ -155,7 +153,7 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
       Upstream::HostSetImpl::partitionHosts(
           std::make_shared<Upstream::HostVector>(Upstream::HostVector{host1, host2, host3}),
           Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, {host1, host2, host3}, {}, absl::nullopt, 100);
+      nullptr, {host1, host2, host3}, {}, std::nullopt, 100);
 
   // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
   Upstream::HostSharedPtr host4 = Upstream::makeTestHost(secondary->info(), "tcp://127.0.0.4:80");
@@ -169,7 +167,7 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
       Upstream::HostSetImpl::partitionHosts(
           std::make_shared<Upstream::HostVector>(Upstream::HostVector{host4, host5, host6}),
           Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, {host4, host5, host6}, {}, absl::nullopt, 100);
+      nullptr, {host4, host5, host6}, {}, std::nullopt, 100);
 
   Upstream::HostConstSharedPtr host;
   for (int i = 0; i < 33; ++i) {
@@ -206,7 +204,7 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
       Upstream::HostSetImpl::partitionHosts(
           std::make_shared<Upstream::HostVector>(Upstream::HostVector{host7, host8, host9}),
           Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, {host7, host8, host9}, {}, absl::nullopt, 100);
+      nullptr, {host7, host8, host9}, {}, std::nullopt, 100);
 
   // Priority set
   //   Priority 0: 1/3 healthy, 1/3 degraded
@@ -272,7 +270,7 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
   THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 
-  ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
+  ASSERT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
@@ -294,7 +292,7 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
       Upstream::HostSetImpl::partitionHosts(
           std::make_shared<Upstream::HostVector>(Upstream::HostVector{host1, host2, host3}),
           Upstream::HostsPerLocalityImpl::empty()),
-      nullptr, {host1, host2, host3}, {}, absl::nullopt, 100);
+      nullptr, {host1, host2, host3}, {}, std::nullopt, 100);
 
   for (int i = 0; i < 50; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/upstream/upstream.h"
@@ -54,6 +56,9 @@ enum class DrainBehavior {
   DrainExistingNonMigratableConnections,
 };
 
+class Instance;
+using DrainConnectionsPoolPredicate = std::function<bool(Instance&)>;
+
 /**
  * An instance of a generic connection pool.
  */
@@ -86,6 +91,12 @@ public:
    * @return Upstream::HostDescriptionConstSharedPtr the host for which connections are pooled.
    */
   virtual Upstream::HostDescriptionConstSharedPtr host() const PURE;
+
+  /**
+   * @return const Network::ConnectionSocket::OptionsSharedPtr& the socket
+   * options used to configure connections in this pool.
+   */
+  virtual const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() PURE;
 
   /**
    * Creates an upstream connection, if existing connections do not meet both current and

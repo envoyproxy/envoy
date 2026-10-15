@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/scope_tracker.h"
@@ -11,8 +12,6 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/network/connection_impl.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
@@ -86,6 +85,7 @@ public:
   void write(Buffer::Instance& data, bool end_stream) override;
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void removeConnectionCallbacks(ConnectionCallbacks& cb) override;
+  void onDrain(ConnectionDrainEvent drain_event) override;
 
   // Methods which are applied to each connection attempt.
   void enableHalfClose(bool enabled) override;
@@ -95,10 +95,11 @@ public:
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   void setBufferLimits(uint32_t limit) override;
+  void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) override;
   bool startSecureTransport() override;
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
   void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
-  absl::optional<uint64_t> congestionWindowInBytes() const override;
+  std::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() const override;
@@ -111,7 +112,7 @@ public:
   // Note, this might change before connect finishes.
   ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override;
   // Note, this might change before connect finishes.
-  absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
+  std::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   // Note, this might change before connect finishes.
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
   State state() const override;
@@ -198,13 +199,14 @@ private:
 
   // State which needs to be applied to every connection attempt.
   struct PerConnectionState {
-    absl::optional<bool> detect_early_close_when_read_disabled_;
-    absl::optional<bool> no_delay_;
-    absl::optional<bool> enable_half_close_;
+    std::optional<bool> detect_early_close_when_read_disabled_;
+    std::optional<bool> no_delay_;
+    std::optional<bool> enable_half_close_;
     std::unique_ptr<ConnectionStats> connection_stats_;
-    absl::optional<uint32_t> buffer_limits_;
-    absl::optional<bool> start_secure_transport_;
-    absl::optional<std::chrono::milliseconds> delayed_close_timeout_;
+    std::optional<uint32_t> buffer_limits_;
+    std::optional<std::chrono::milliseconds> buffer_high_watermark_timeout_;
+    std::optional<bool> start_secure_transport_;
+    std::optional<std::chrono::milliseconds> delayed_close_timeout_;
   };
 
   // State which needs to be saved and applied only to the final connection
@@ -216,10 +218,10 @@ private:
     std::vector<WriteFilterSharedPtr> write_filters_;
     std::vector<FilterSharedPtr> filters_;
     std::vector<AccessLog::InstanceSharedPtr> access_log_handlers_;
-    absl::optional<Buffer::InstancePtr> write_buffer_;
-    absl::optional<int> read_disable_count_;
-    absl::optional<bool> end_stream_;
-    absl::optional<bool> initialize_read_filters_;
+    std::optional<Buffer::InstancePtr> write_buffer_;
+    std::optional<int> read_disable_count_;
+    std::optional<bool> end_stream_;
+    std::optional<bool> initialize_read_filters_;
   };
 
   // State which is needed to construct a new connection.
@@ -246,6 +248,10 @@ private:
 
   // True when connect() has finished, either success or failure.
   bool connect_finished_ = false;
+  // Set if the wrapper is notified of a drain sequence before the final connection has been
+  // chosen. Retained so that deferred callbacks registered after the notification are replayed it,
+  // and so that the event can be handed to the chosen connection once the connect completes.
+  std::optional<ConnectionDrainEvent> drain_event_;
   Event::TimerPtr next_attempt_timer_;
 };
 

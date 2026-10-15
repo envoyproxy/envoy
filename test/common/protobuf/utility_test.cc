@@ -8,6 +8,7 @@
 #include "envoy/config/cluster/v3/filter.pb.h"
 #include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/base64.h"
@@ -21,15 +22,13 @@
 #include "test/common/protobuf/utility_test_file_wip_2.pb.h"
 #include "test/common/protobuf/utility_test_message_field_wip.pb.h"
 #include "test/common/stats/stat_test_utility.h"
-#include "test/mocks/init/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/proto/deprecated.pb.h"
 #include "test/proto/sensitive.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -39,11 +38,19 @@
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
+using testing::Not;
 using namespace std::chrono_literals;
+
+using testing::Contains;
+using testing::ContainsRegex;
+using testing::ElementsAre;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 
-using ::testing::HasSubstr;
+using testing::HasSubstr;
 
 bool checkProtoEquality(const Protobuf::Value& proto1, std::string text_proto2) {
   Protobuf::Value proto2;
@@ -183,7 +190,7 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   (*s3.mutable_fields())["cdb"].set_string_value("ij");
 
   Protobuf::Any a1;
-  a1.PackFrom(s);
+  std::ignore = a1.PackFrom(s);
   // The two base64 encoded Struct to test map is identical to the struct above, this tests whether
   // a map is deterministically serialized and hashed.
   Protobuf::Any a2 = a1;
@@ -191,8 +198,8 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   Protobuf::Any a3 = a1;
   a3.set_value(Base64::decode("CgsKAmFiEgUaA2ZnaAoLCgNjZGUSBBoCaWo="));
   Protobuf::Any a4, a5;
-  a4.PackFrom(s2);
-  a5.PackFrom(s3);
+  std::ignore = a4.PackFrom(s2);
+  std::ignore = a5.PackFrom(s3);
 
   EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
   EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
@@ -210,11 +217,10 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<Protobuf::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
-  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
+  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated), ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
   repeated.Add()->set_value(20);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
+              ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -276,7 +282,7 @@ TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
   auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
   auto* cluster_type = cluster->mutable_cluster_type();
   cluster_type->set_name("outer");
-  cluster_type->mutable_typed_config()->PackFrom(outer);
+  std::ignore = cluster_type->mutable_typed_config()->PackFrom(outer);
 
   EXPECT_THROW_WITH_MESSAGE(
       TestUtility::validate(bootstrap, /*recurse_into_any*/ true), EnvoyException,
@@ -297,14 +303,13 @@ TEST_F(ProtobufUtilityTest, JsonConvertAnyUnknownMessageType) {
   source_any.set_type_url("type.googleapis.com/bad.type.url");
   source_any.set_value("asdf");
   auto status = MessageUtil::getJsonStringFromMessage(source_any, true).status();
-  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status, Not(IsOk()));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertKnownGoodMessage) {
   Protobuf::Any source_any;
-  source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
-  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any, true),
-              testing::HasSubstr("@type"));
+  std::ignore = source_any.PackFrom(envoy::config::bootstrap::v3::Bootstrap::default_instance());
+  EXPECT_THAT(MessageUtil::getJsonStringFromMessageOrError(source_any, true), HasSubstr("@type"));
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertOrErrorAnyWithUnknownMessageType) {
@@ -1214,20 +1219,15 @@ TEST_F(ProtobufUtilityTest, SanitizeUTF8) {
 
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {
   const Protobuf::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
-  EXPECT_EQ(obj.fields_size(), 1);
-  EXPECT_EQ(obj.fields().at("test_key").kind_case(), Protobuf::Value::KindCase::kStringValue);
-  EXPECT_EQ(obj.fields().at("test_key").string_value(), "test_value");
+  EXPECT_THAT(obj.fields(), UnorderedElementsAre(IsStructString("test_key", "test_value")));
 }
 
 TEST_F(ProtobufUtilityTest, KeyValueStructMap) {
   const Protobuf::Struct obj = MessageUtil::keyValueStruct(
       {{"test_key", "test_value"}, {"test_another_key", "test_another_value"}});
-  EXPECT_EQ(obj.fields_size(), 2);
-  EXPECT_EQ(obj.fields().at("test_key").kind_case(), Protobuf::Value::KindCase::kStringValue);
-  EXPECT_EQ(obj.fields().at("test_key").string_value(), "test_value");
-  EXPECT_EQ(obj.fields().at("test_another_key").kind_case(),
-            Protobuf::Value::KindCase::kStringValue);
-  EXPECT_EQ(obj.fields().at("test_another_key").string_value(), "test_another_value");
+  EXPECT_THAT(obj.fields(),
+              UnorderedElementsAre(IsStructString("test_key", "test_value"),
+                                   IsStructString("test_another_key", "test_another_value")));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilEqual_NullValues) {
@@ -1331,10 +1331,77 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("null"), "null_value: NULL_VALUE"));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("true"), "bool_value: true"));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("1"), "number_value: 1"));
+  // Plain (untagged) float/double literals are left as strings, preserving pre-existing
+  // behavior for configs that rely on this fallback (e.g. a string match `exact: 3.14`).
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("3.14"), "string_value: \"3.14\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml(".inf"), "string_value: \".inf\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("-.inf"), "string_value: \"-.inf\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml(".nan"), "string_value: \".nan\""));
+  // An explicit `!!float` tag opts a scalar into being parsed as a JSON number.
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float 3.14"), "number_value: 3.14"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float 1e2"), "number_value: 100"));
+  // The explicit tag wins over the int64 decoder, which ignores tags: an integer literal outside
+  // int32 range must not become an int64 string.
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float 3000000000"),
+                                 "number_value: 3000000000"));
+  // Non-finite values use the proto3 JSON string forms.
+  EXPECT_TRUE(
+      checkProtoEquality(ValueUtil::loadFromYaml("!!float .inf"), "string_value: \"Infinity\""));
+  EXPECT_TRUE(
+      checkProtoEquality(ValueUtil::loadFromYaml("!!float -.inf"), "string_value: \"-Infinity\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float .nan"), "string_value: \"NaN\""));
+  // A `!!float` scalar that does not decode as a double is rejected rather than falling back to a
+  // string or a bool.
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml("!!float abc"), EnvoyException,
+                          "Invalid !!float value 'abc'");
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml("!!float true"), EnvoyException,
+                          "Invalid !!float value 'true'");
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("9223372036854775807"),
                                  "string_value: \"9223372036854775807\""));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("\"foo\""), "string_value: \"foo\""));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("foo"), "string_value: \"foo\""));
+}
+
+// Mirrors the dynamic modules / Go filter config shape from
+// https://github.com/envoyproxy/envoy/issues/45678: a `google.protobuf.Struct` packed in an `Any`.
+// Tagged floats survive the MessageToJsonString round trip as numbers, untagged floats stay
+// strings.
+TEST_F(ProtobufUtilityTest, MessageUtilLoadFromYamlTaggedFloatIntoAnyStruct) {
+  envoy::config::core::v3::TypedExtensionConfig config;
+  MessageUtil::loadFromYaml(R"EOF(
+name: myfilter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+  value:
+    body:
+      maxSize: !!float 5000.0
+      largeSize: !!float 3000000000
+      untagged: 5000.0
+)EOF",
+                            config, ProtobufMessage::getStrictValidationVisitor());
+  const auto filter_config = MessageUtil::anyConvert<Protobuf::Struct>(config.typed_config());
+  const auto& body = filter_config.fields().at("body").struct_value().fields();
+  EXPECT_TRUE(checkProtoEquality(body.at("maxSize"), "number_value: 5000"));
+  EXPECT_TRUE(checkProtoEquality(body.at("largeSize"), "number_value: 3000000000"));
+  EXPECT_TRUE(checkProtoEquality(body.at("untagged"), "string_value: \"5000.0\""));
+}
+
+// `!!float` values loaded into a typed double field, including the proto3 JSON "Infinity" and
+// "NaN" string forms used for non-finite values, parse back into doubles.
+TEST_F(ProtobufUtilityTest, MessageUtilLoadFromYamlTaggedFloatIntoDouble) {
+  envoy::type::v3::Percent percent;
+  MessageUtil::loadFromYaml("value: !!float 50.5", percent,
+                            ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_EQ(50.5, percent.value());
+  MessageUtil::loadFromYaml("value: !!float .inf", percent,
+                            ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_EQ(std::numeric_limits<double>::infinity(), percent.value());
+  MessageUtil::loadFromYaml("value: !!float -.inf", percent,
+                            ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_EQ(-std::numeric_limits<double>::infinity(), percent.value());
+  MessageUtil::loadFromYaml("value: !!float .nan", percent,
+                            ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_TRUE(std::isnan(percent.value()));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
@@ -1413,9 +1480,7 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   set.emplace(hv2);
   set.emplace(hv3);
 
-  EXPECT_EQ(set.size(), 2); // hv1 == hv2
-  EXPECT_NE(set.find(hv1), set.end());
-  EXPECT_NE(set.find(hv3), set.end());
+  EXPECT_THAT(set, UnorderedElementsAre(hv1, hv3)); // hv1 == hv2
 }
 
 TEST_F(ProtobufUtilityTest, AnyBytes) {
@@ -1423,20 +1488,20 @@ TEST_F(ProtobufUtilityTest, AnyBytes) {
     Protobuf::StringValue source;
     source.set_value("abc");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     EXPECT_EQ(*MessageUtil::anyToBytes(source_any), "abc");
   }
   {
     Protobuf::BytesValue source;
     source.set_value("\x01\x02\x03");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     EXPECT_EQ(*MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
   }
   {
     envoy::config::cluster::v3::Filter filter;
     Protobuf::Any source_any;
-    source_any.PackFrom(filter);
+    std::ignore = source_any.PackFrom(filter);
     EXPECT_EQ(*MessageUtil::anyToBytes(source_any), source_any.value());
   }
 }
@@ -1446,29 +1511,47 @@ TEST_F(ProtobufUtilityTest, KnownAnyToBytes) {
     Protobuf::StringValue source;
     source.set_value("abc");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), "abc");
   }
   {
     Protobuf::BytesValue source;
     source.set_value("\x01\x02\x03");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), "\x01\x02\x03");
   }
   {
     Protobuf::Struct source;
     (*source.mutable_fields())["key"].set_string_value("value");
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     auto result = MessageUtil::knownAnyToBytes(source_any);
-    ASSERT_TRUE(result.ok());
-    EXPECT_EQ(*result, R"({"key":"value"})");
+    ASSERT_THAT(result, IsOkAndHolds(R"({"key":"value"})"));
+  }
+  {
+    xds::type::v3::TypedStruct source;
+    source.set_type_url("type.googleapis.com/example.FilterConfig");
+    (*source.mutable_value()->mutable_fields())["key"].set_string_value("value");
+    Protobuf::Any source_any;
+    std::ignore = source_any.PackFrom(source);
+
+    EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), IsOkAndHolds(R"({"key":"value"})"));
+    EXPECT_THAT(
+        MessageUtil::getJsonStringFromMessage(source_any),
+        IsOkAndHolds(
+            R"({"@type":"type.googleapis.com/xds.type.v3.TypedStruct","type_url":"type.googleapis.com/example.FilterConfig","value":{"key":"value"}})"));
+  }
+  {
+    Protobuf::Any source_any;
+    source_any.set_type_url("type.googleapis.com/xds.type.v3.TypedStruct");
+    source_any.set_value("\x0a");
+    EXPECT_THAT(MessageUtil::knownAnyToBytes(source_any), Not(IsOk()));
   }
   {
     envoy::config::cluster::v3::Filter filter;
     Protobuf::Any source_any;
-    source_any.PackFrom(filter);
+    std::ignore = source_any.PackFrom(filter);
     EXPECT_EQ(*MessageUtil::knownAnyToBytes(source_any), source_any.value());
   }
 }
@@ -1478,7 +1561,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any source_any;
-  source_any.PackFrom(source_duration);
+  std::ignore = source_any.PackFrom(source_duration);
   EXPECT_THROW_WITH_REGEX(
       TestUtility::anyConvert<Protobuf::Timestamp>(source_any), EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
@@ -1488,7 +1571,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
 TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
   envoy::config::cluster::v3::Filter filter;
   Protobuf::Any source_any;
-  source_any.PackFrom(filter);
+  std::ignore = source_any.PackFrom(filter);
   EXPECT_THROW(MessageUtil::anyConvertAndValidate<envoy::config::cluster::v3::Filter>(
                    source_any, ProtobufMessage::getStrictValidationVisitor()),
                ProtoValidationException);
@@ -1498,11 +1581,11 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any source_any;
-  source_any.PackFrom(source_duration);
+  std::ignore = source_any.PackFrom(source_duration);
   Protobuf::Timestamp dst;
   EXPECT_THAT(
       MessageUtil::unpackTo(source_any, dst).message(),
-      testing::ContainsRegex(
+      ContainsRegex(
           R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)"));
 }
 
@@ -1511,18 +1594,18 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     API_NO_BOOST(envoy::api::v2::Cluster) source;
     source.set_drain_connections_on_host_removal(true);
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
-    ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
+    ASSERT_OK(MessageUtil::unpackTo(source_any, dst));
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) source;
     source.set_ignore_health_on_host_removal(true);
     Protobuf::Any source_any;
-    source_any.PackFrom(source);
+    std::ignore = source_any.PackFrom(source);
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
+    ASSERT_OK(MessageUtil::unpackTo(source_any, dst));
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }
@@ -1532,7 +1615,7 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowRightType) {
   Protobuf::Duration src_duration;
   src_duration.set_seconds(42);
   Protobuf::Any source_any;
-  source_any.PackFrom(src_duration);
+  std::ignore = source_any.PackFrom(src_duration);
   Protobuf::Duration dst_duration;
   EXPECT_OK(MessageUtil::unpackTo(source_any, dst_duration));
   // Source and destination are expected to be equal.
@@ -1544,14 +1627,13 @@ TEST_F(ProtobufUtilityTest, UnpackToNoThrowWrongType) {
   Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
   Protobuf::Any source_any;
-  source_any.PackFrom(source_duration);
+  std::ignore = source_any.PackFrom(source_duration);
   Protobuf::Timestamp dst;
   auto status = MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(absl::IsInternal(status));
-  EXPECT_THAT(
-      std::string(status.message()),
-      testing::ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
-                             ".*[\n]*\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
+  EXPECT_THAT(std::string(status.message()),
+              ContainsRegex("Unable to unpack as google.protobuf.Timestamp: "
+                            ".*[\n]*\\[type.googleapis.com/google.protobuf.Duration\\] .*"));
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.
@@ -1621,7 +1703,8 @@ TEST_F(ProtobufUtilityTest, JsonConvertFail) {
   Protobuf::Struct dest_struct;
   std::string expected_duration_text = R"pb(seconds: -281474976710656)pb";
   Protobuf::Duration expected_duration_proto;
-  Protobuf::TextFormat::ParseFromString(expected_duration_text, &expected_duration_proto);
+  std::ignore =
+      Protobuf::TextFormat::ParseFromString(expected_duration_text, &expected_duration_proto);
   EXPECT_THROW(TestUtility::jsonConvert(source_duration, dest_struct), EnvoyException);
 }
 
@@ -1782,34 +1865,33 @@ TEST(DurationUtilTest, NoThrow) {
     duration.set_seconds(5);
     duration.set_nanos(10000000);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_TRUE(result.ok());
-    EXPECT_TRUE(result.value() == 5010);
+    EXPECT_THAT(result, IsOkAndHolds(5010));
   }
   // Below are out-of-range tests
   {
     Protobuf::Duration duration;
     duration.set_seconds(-1);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   {
     Protobuf::Duration duration;
     duration.set_nanos(-1);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   // Invalid number of nanoseconds.
   {
     Protobuf::Duration duration;
     duration.set_nanos(1000000000);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   {
     Protobuf::Duration duration;
     duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   // Invalid number of seconds.
   {
@@ -1818,7 +1900,7 @@ TEST(DurationUtilTest, NoThrow) {
         (std::numeric_limits<int64_t>::max() - 999999999) / (1000 * 1000 * 1000);
     duration.set_seconds(kMaxInt64Nanoseconds + 1);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
   // Max valid seconds and nanoseconds.
   {
@@ -1828,7 +1910,7 @@ TEST(DurationUtilTest, NoThrow) {
     duration.set_seconds(kMaxInt64Nanoseconds);
     duration.set_nanos(999999999);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_TRUE(result.ok());
+    EXPECT_OK(result);
   }
   // Invalid combined seconds and nanoseconds.
   {
@@ -1838,7 +1920,7 @@ TEST(DurationUtilTest, NoThrow) {
     duration.set_seconds(kMaxInt64Nanoseconds);
     duration.set_nanos(999999999);
     const auto result = DurationUtil::durationToMillisecondsNoThrow(duration);
-    EXPECT_FALSE(result.ok());
+    EXPECT_THAT(result, Not(IsOk()));
   }
 }
 
@@ -2286,40 +2368,36 @@ protected:
 TEST_F(StructUtilTest, StructUtilUpdateScalars) {
   {
     const auto obj = updateSimpleStruct(ValueUtil::stringValue("v0"), ValueUtil::stringValue("v1"));
-    EXPECT_EQ(obj.fields().at("key").string_value(), "v1");
+    EXPECT_THAT(obj.fields(), Contains(IsStructString("key", "v1")));
   }
 
   {
     const auto obj = updateSimpleStruct(ValueUtil::numberValue(0), ValueUtil::numberValue(1));
-    EXPECT_EQ(obj.fields().at("key").number_value(), 1);
+    EXPECT_THAT(obj.fields(), Contains(IsStructNumber("key", 1)));
   }
 
   {
     const auto obj = updateSimpleStruct(ValueUtil::boolValue(false), ValueUtil::boolValue(true));
-    EXPECT_EQ(obj.fields().at("key").bool_value(), true);
+    EXPECT_THAT(obj.fields(), Contains(IsStructBool("key", true)));
   }
 
   {
     const auto obj = updateSimpleStruct(ValueUtil::nullValue(), ValueUtil::nullValue());
-    EXPECT_EQ(obj.fields().at("key").kind_case(), Protobuf::Value::KindCase::kNullValue);
+    EXPECT_THAT(obj.fields(), Contains(IsStructNull("key", Protobuf::NULL_VALUE)));
   }
 }
 
 TEST_F(StructUtilTest, StructUtilUpdateDifferentKind) {
   {
     const auto obj = updateSimpleStruct(ValueUtil::stringValue("v0"), ValueUtil::numberValue(1));
-    auto& val = obj.fields().at("key");
-    EXPECT_EQ(val.kind_case(), Protobuf::Value::KindCase::kNumberValue);
-    EXPECT_EQ(val.number_value(), 1);
+    EXPECT_THAT(obj.fields(), Contains(IsStructNumber("key", 1)));
   }
 
   {
     const auto obj =
         updateSimpleStruct(ValueUtil::structValue(MessageUtil::keyValueStruct("subkey", "v0")),
                            ValueUtil::stringValue("v1"));
-    auto& val = obj.fields().at("key");
-    EXPECT_EQ(val.kind_case(), Protobuf::Value::KindCase::kStringValue);
-    EXPECT_EQ(val.string_value(), "v1");
+    EXPECT_THAT(obj.fields(), Contains(IsStructString("key", "v1")));
   }
 }
 
@@ -2334,11 +2412,11 @@ TEST_F(StructUtilTest, StructUtilUpdateList) {
   *with_list.add_values()->mutable_struct_value() = v2;
 
   StructUtil::update(obj, with);
-  ASSERT_THAT(obj.fields().size(), 1);
-  const auto& list_vals = list.values();
-  EXPECT_TRUE(ValueUtil::equal(list_vals[0], ValueUtil::stringValue("v0")));
-  EXPECT_TRUE(ValueUtil::equal(list_vals[1], ValueUtil::numberValue(1)));
-  EXPECT_TRUE(ValueUtil::equal(list_vals[2], ValueUtil::structValue(v2)));
+  EXPECT_THAT(
+      obj.fields(),
+      Contains(IsStructList("key", ElementsAre(IsStructValueString("v0"), IsStructValueNumber(1),
+                                               IsStructValueStruct(UnorderedElementsAre(
+                                                   IsStructString("subkey", "str")))))));
 }
 
 TEST_F(StructUtilTest, StructUtilUpdateNewKey) {
@@ -2347,9 +2425,8 @@ TEST_F(StructUtilTest, StructUtilUpdateNewKey) {
   (*with.mutable_fields())["key1"].set_number_value(1);
   StructUtil::update(obj, with);
 
-  const auto& fields = obj.fields();
-  EXPECT_TRUE(ValueUtil::equal(fields.at("key0"), ValueUtil::numberValue(1)));
-  EXPECT_TRUE(ValueUtil::equal(fields.at("key1"), ValueUtil::numberValue(1)));
+  EXPECT_THAT(obj.fields(),
+              UnorderedElementsAre(IsStructNumber("key0", 1), IsStructNumber("key1", 1)));
 }
 
 TEST_F(StructUtilTest, StructUtilUpdateRecursiveStruct) {
@@ -2360,10 +2437,9 @@ TEST_F(StructUtilTest, StructUtilUpdateRecursiveStruct) {
       MessageUtil::keyValueStruct("tag1", "1");
   StructUtil::update(obj, with);
 
-  ASSERT_EQ(obj.fields().at("tags").kind_case(), Protobuf::Value::KindCase::kStructValue);
-  const auto& tags = obj.fields().at("tags").struct_value().fields();
-  EXPECT_TRUE(ValueUtil::equal(tags.at("tag0"), ValueUtil::stringValue("1")));
-  EXPECT_TRUE(ValueUtil::equal(tags.at("tag1"), ValueUtil::stringValue("1")));
+  EXPECT_THAT(obj.fields(),
+              Contains(IsStructStruct("tags", UnorderedElementsAre(IsStructString("tag0", "1"),
+                                                                   IsStructString("tag1", "1")))));
 }
 
 TEST_F(ProtobufUtilityTest, SubsequentLoadClearsExistingProtoValues) {

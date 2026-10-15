@@ -10,11 +10,14 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/address.h"
+#include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/stream_info.h"
+
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Event {
@@ -61,6 +64,19 @@ public:
    * watermark to under its low watermark.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
+
+  /**
+   * Called when the connection has been notified that it is being drained (for example
+   * because the filter chain or listener that owns it is being drained). Callbacks may
+   * use this signal to begin a graceful shutdown of any state layered on top of the
+   * connection (e.g. send an HTTP/2 GOAWAY or close-after-current-request).
+   *
+   * The connection remains usable after this call; it is not closed by onDrain() itself.
+   * The default implementation is a no-op.
+   * @param drain_event describes the drain sequence (its start time and strategy) as decided on
+   *        the main thread.
+   */
+  virtual void onDrain(ConnectionDrainEvent drain_event) { (void)drain_event; }
 };
 
 /**
@@ -167,6 +183,21 @@ public:
   virtual bool isHalfCloseEnabled() const PURE;
 
   /**
+   * Notify the connection that it is being drained. This will fire onDrain() on every
+   * registered ConnectionCallbacks. Drain is a notification only: the connection is
+   * not closed and remains usable. Callbacks may react by initiating a graceful
+   * shutdown of any higher-level state (e.g. HTTP/2 GOAWAY).
+   *
+   * A connection may be notified more than once (a server drain escalating from InboundOnly to
+   * All re-notifies inbound listeners, and a filter chain drain can follow a server drain). The
+   * first event wins: subsequent notifications are dropped, so a connection that is already
+   * draining stays on its original timeline and its callbacks see onDrain() exactly once.
+   *
+   * @param drain_event describes the drain sequence (start time and strategy).
+   */
+  virtual void onDrain(ConnectionDrainEvent drain_event) PURE;
+
+  /**
    * Close the connection.
    * @param type the connection close type.
    */
@@ -270,7 +301,7 @@ public:
    * @return The unix socket peer credentials of the remote client. Note that this is only
    * supported for unix socket connections.
    */
-  virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
+  virtual std::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
 
   /**
    * Set the stats to update for various connection state changes. Note that for performance reasons
@@ -322,6 +353,14 @@ public:
    * resuming reading.
    */
   virtual void setBufferLimits(uint32_t limit) PURE;
+
+  /**
+   * Set the timeout when connection will be closed due to buffer high watermark usage. This is used
+   * to prevent the connection from staying above the buffer high watermark indefinitely due to slow
+   * processing. By default, the timeout is not set.
+   * @param timeout The timeout value in milliseconds
+   */
+  virtual void setBufferHighWatermarkTimeout(std::chrono::milliseconds timeout) PURE;
 
   /**
    * Get the value set with setBufferLimits.
@@ -381,6 +420,13 @@ public:
   virtual absl::string_view localCloseReason() const PURE;
 
   /**
+   * @return absl::Span<const std::string> every local close reason set on the
+   * connection, in the order in which they were set; empty if no local close
+   * occurred.
+   */
+  virtual absl::Span<const std::string> localCloseReasons() const { return {}; }
+
+  /**
    * Instructs the connection to start using secure transport.
    * Note: Not all underlying transport sockets support such operation.
    * @return boolean telling if underlying transport socket was able to
@@ -389,11 +435,11 @@ public:
   virtual bool startSecureTransport() PURE;
 
   /**
-   *  @return absl::optional<std::chrono::milliseconds> An optional of the most recent round-trip
+   *  @return std::optional<std::chrono::milliseconds> An optional of the most recent round-trip
    *  time of the connection. If the platform does not support this, then an empty optional is
    *  returned.
    */
-  virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
+  virtual std::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
 
   /**
    * Try to configure the connection's initial congestion window.
@@ -416,7 +462,7 @@ public:
    * @note some congestion controller's cwnd is measured in number of packets, in that case the
    * return value is cwnd(in packets) times the connection's MSS.
    */
-  virtual absl::optional<uint64_t> congestionWindowInBytes() const PURE;
+  virtual std::optional<uint64_t> congestionWindowInBytes() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

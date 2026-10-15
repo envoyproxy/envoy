@@ -20,8 +20,12 @@
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/listener_manager/fcds_api.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_info_impl.h"
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/quic_packet_writer_interface.h"
+#endif
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/factory_context_impl.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -76,8 +80,14 @@ public:
     return local_address_;
   }
   Network::SocketSharedPtr getListenSocket(uint32_t worker_index) override;
-  Network::ListenSocketFactoryPtr clone() const override {
-    return absl::WrapUnique(new ListenSocketFactoryImpl(*this));
+  // Clone this factory for a new listener, overriding tcp_backlog_size with the new listener's
+  // configured value. tcp_backlog_size is passed explicitly (rather than carried over from this
+  // factory) because it is the one listener option that can be re-applied to an already-listening
+  // socket via a second listen() call: cloneSocketFactoryFrom() relies on that so that
+  // doFinalPreWorkerInit() calls listen() with the new listener's backlog rather than the one the
+  // existing socket factory was created with.
+  Network::ListenSocketFactoryPtr clone(uint32_t tcp_backlog_size) const override {
+    return absl::WrapUnique(new ListenSocketFactoryImpl(*this, tcp_backlog_size));
   }
   void closeAllSockets() override {
     for (auto& socket : sockets_) {
@@ -96,7 +106,8 @@ private:
                           const Network::SocketCreationOptions& creation_options,
                           uint32_t num_sockets, absl::Status& creation_status);
 
-  ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
+  ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone,
+                          uint32_t tcp_backlog_size);
 
   absl::StatusOr<Network::SocketSharedPtr>
   createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
@@ -138,7 +149,8 @@ public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
-                                 Server::DrainManagerPtr drain_manager);
+                                 Server::DrainManagerPtr drain_manager, Stats::ScopeSharedPtr scope,
+                                 Stats::ScopeSharedPtr listener_scope);
 
   Init::Manager& initManager() override;
   Network::DrainDecision& drainDecision() override;
@@ -167,7 +179,8 @@ public:
   PerListenerFactoryContextImpl(Envoy::Server::Instance& server,
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
-                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager);
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager,
+                                Stats::ScopeSharedPtr scope, Stats::ScopeSharedPtr listener_scope);
 
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,
@@ -182,7 +195,11 @@ public:
   const Network::ListenerInfo& listenerInfo() const override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Configuration::ServerFactoryContext& serverFactoryContext() override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  bool isQuic() const override;
+  bool shouldBypassOverloadManager() const override;
 
+  Stats::Scope& prefixedScope() override;
   Stats::Scope& listenerScope() override;
 
   ListenerFactoryContextBaseImpl& parentFactoryContext() { return *listener_factory_context_base_; }
@@ -198,6 +215,7 @@ private:
  */
 class ListenerImpl final : public Network::ListenerConfig,
                            public Network::FilterChainFactory,
+                           public FcdsClientCallbacks,
                            Logger::Loggable<Logger::Id::config> {
 public:
   /**
@@ -244,10 +262,7 @@ public:
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
   bool blockLdsUpdate(uint64_t new_hash) {
-    // Receiving LDS update with FCDS config will cause full listener update. Therefore,
-    // we should not block the update if FCDS is configured, regardless of the hash.
-    return (!configInternal().has_fcds_config() && new_hash == maybe_stale_hash_) ||
-           !added_via_api_;
+    return (new_hash == maybe_stale_hash_) || !added_via_api_;
   }
   bool blockRemove() { return !added_via_api_; }
 
@@ -295,6 +310,9 @@ public:
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
+  std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const override {
+    return per_connection_buffer_high_watermark_timeout_;
+  }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return listener_filters_timeout_;
   }
@@ -332,6 +350,9 @@ public:
     return listener_factory_context_->listener_factory_context_base_->listener_info_;
   }
 
+  // FilterChainUpdateCallbacks
+  void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) override;
+
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {
       options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
@@ -356,7 +377,8 @@ public:
 private:
   ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash, absl::Status& creation_status);
+               bool workers_started, uint64_t hash, Stats::ScopeSharedPtr scope,
+               Stats::ScopeSharedPtr listener_scope, absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}
@@ -364,6 +386,13 @@ private:
     // Network::UdpListenerConfig
     Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
     Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+#ifdef ENVOY_ENABLE_QUIC
+    Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override {
+      return quic_writer_factory_.get();
+    }
+#else
+    Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override { return nullptr; }
+#endif
     Network::UdpListenerWorkerRouter&
     listenerWorkerRouter(const Network::Address::Instance& address) override {
       auto iter = listener_worker_routers_.find(address.asString());
@@ -375,6 +404,9 @@ private:
     const envoy::config::listener::v3::UdpListenerConfig config_;
     Network::ActiveUdpListenerFactoryPtr listener_factory_;
     Network::UdpPacketWriterFactoryPtr writer_factory_;
+#ifdef ENVOY_ENABLE_QUIC
+    Quic::QuicPacketWriterFactoryPtr quic_writer_factory_;
+#endif
     absl::flat_hash_map<std::string, Network::UdpListenerWorkerRouterPtr> listener_worker_routers_;
   };
 
@@ -414,6 +446,11 @@ private:
   absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
   absl::Status buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
                                        const Network::Address::Instance& address);
+  // Returns true when the listener should steer connections to workers using a reuse port BPF
+  // program. Requires a TCP listener with reuse port enabled, the CPU locality balancer configured,
+  // worker CPU affinity pinning every worker to a CPU, and a kernel that supports reuse port BPF
+  // steering.
+  bool reusePortBpfCpuSteeringEnabled(const envoy::config::listener::v3::Listener& config) const;
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
   void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
   void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);
@@ -431,6 +468,8 @@ private:
   const envoy::config::listener::v3::Listener& configInternal() const {
     return config_maybe_partial_filter_chains_;
   }
+  std::shared_ptr<FcdsSharedFilterChainManager>
+  maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config);
 
   ListenerManagerImpl& parent_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
@@ -441,6 +480,7 @@ private:
   const bool mptcp_enabled_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
+  const std::chrono::milliseconds per_connection_buffer_high_watermark_timeout_;
   const uint64_t listener_tag_;
   const std::string name_;
   const bool added_via_api_;
@@ -495,6 +535,7 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected
   // watcher callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+
   std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context_;
 

@@ -1,3 +1,4 @@
+#include <cmath>
 #include <limits>
 #include <numeric>
 
@@ -53,6 +54,25 @@ Protobuf::Value parseYamlNode(const YAML::Node& node) {
       value.set_string_value(node.as<std::string>());
       break;
     }
+    // Untagged float literals stay strings (see fallback below); only explicit `!!float` is parsed
+    // as a number. Checked before the bool/int64 decoders, which ignore tags, so the tag wins.
+    if (node.Tag() == "tag:yaml.org,2002:float") {
+      double double_value;
+      if (!YAML::convert<double>::decode(node, double_value)) {
+        throw EnvoyException(fmt::format("Invalid !!float value '{}' at line {}, column {}",
+                                         node.Scalar(), node.Mark().line + 1,
+                                         node.Mark().column + 1));
+      }
+      if (std::isfinite(double_value)) {
+        value.set_number_value(double_value);
+      } else if (std::isnan(double_value)) {
+        // JSON numbers cannot encode NaN/Infinity, so use the proto3 JSON string forms instead.
+        value.set_string_value("NaN");
+      } else {
+        value.set_string_value(double_value > 0 ? "Infinity" : "-Infinity");
+      }
+      break;
+    }
     bool bool_value;
     if (YAML::convert<bool>::decode(node, bool_value)) {
       value.set_bool_value(bool_value);
@@ -72,8 +92,9 @@ Protobuf::Value parseYamlNode(const YAML::Node& node) {
       }
       break;
     }
-    // Fall back on string, including float/double case. When protobuf parse the JSON into a message
-    // it will convert based on the type in the message definition.
+    // Fall back on string for anything else, including untagged float/double literals. When
+    // protobuf parses the JSON into a message it will convert based on the type in the message
+    // definition.
     value.set_string_value(node.as<std::string>());
     break;
   }
@@ -111,6 +132,20 @@ void jsonConvertInternal(const Protobuf::Message& source,
                                      status.ToString(), source.DebugString()));
   }
   MessageUtil::loadFromJson(json, dest, validation_visitor);
+}
+
+absl::Status jsonConvertInternalNoThrow(const Protobuf::Message& source,
+                                        ProtobufMessage::ValidationVisitor& validation_visitor,
+                                        Protobuf::Message& dest) {
+  absl::Status conversion_status = absl::OkStatus();
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  std::string json;
+  conversion_status = Protobuf::util::MessageToJsonString(source, &json, json_options);
+  if (conversion_status.ok()) {
+    MessageUtil::loadFromJson(json, dest, validation_visitor);
+  }
+  return conversion_status;
 }
 
 } // namespace
@@ -184,6 +219,38 @@ void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& messa
     return;
   }
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
+}
+
+absl::Status
+MessageUtil::loadFromYamlNoThrow(const std::string& yaml, Protobuf::Message& message,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
+  absl::Status load_status = absl::OkStatus();
+  Protobuf::Value value;
+  TRY_NEEDS_AUDIT { value = parseYamlNode(YAML::Load(yaml)); }
+  END_TRY
+  catch (YAML::ParserException& e) {
+    load_status = absl::InvalidArgumentError(fmt::format("Failed to parse yaml: {}", e.what()));
+  }
+  catch (YAML::BadConversion& e) {
+    load_status =
+        absl::InvalidArgumentError(fmt::format("Failed to convert to yaml: {}", e.what()));
+  }
+  catch (std::exception& e) {
+    // There is a potentially wide space of exceptions thrown by the YAML parser,
+    // and enumerating them all may be difficult. Envoy doesn't work well with
+    // unhandled exceptions, so we capture them and record the exception name in
+    // the status.
+    load_status =
+        absl::InvalidArgumentError(fmt::format("Unexpected YAML exception: {}", e.what()));
+  }
+  if (value.kind_case() == Protobuf::Value::kStructValue ||
+      value.kind_case() == Protobuf::Value::kListValue) {
+    load_status = jsonConvertInternalNoThrow(value, validation_visitor, message);
+  } else {
+    load_status =
+        absl::InvalidArgumentError(fmt::format("Unable to convert YAML as JSON: {}", yaml));
+  }
+  return load_status;
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,

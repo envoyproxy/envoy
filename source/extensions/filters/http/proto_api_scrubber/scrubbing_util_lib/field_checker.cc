@@ -24,10 +24,9 @@ namespace {
 struct TraversalState {
   const Protobuf::Descriptor* current_desc;
   std::vector<std::string> normalized_path;
-  bool is_map_entry;
+  bool is_map_entry{false};
 
-  TraversalState(const Protobuf::Descriptor* root, size_t capacity)
-      : current_desc(root), is_map_entry(false) {
+  TraversalState(const Protobuf::Descriptor* root, size_t capacity) : current_desc(root) {
     normalized_path.reserve(capacity);
   }
 };
@@ -107,7 +106,7 @@ FieldChecker::FieldChecker(const ScrubberContext scrubber_context,
                            const std::string& method_name,
                            const ProtoApiScrubberFilterConfig* filter_config)
     : scrubber_context_(scrubber_context), matching_data_(*stream_info), method_name_(method_name),
-      filter_config_ptr_(filter_config), root_descriptor_(nullptr) {
+      filter_config_ptr_(filter_config) {
 
   if (request_headers.has_value()) {
     matching_data_.onRequestHeaders(request_headers.ref());
@@ -179,8 +178,12 @@ FieldChecker::normalizePath(const std::vector<std::string>& path) const {
 FieldCheckResults FieldChecker::CheckField(const std::vector<std::string>& path,
                                            const Protobuf::Field* field, const int /*field_depth*/,
                                            const Protobuf::Type* parent_type) const {
-  // If the field is unknown (i.e., not present in the descriptor), it should be preserved.
+  // If the field is unknown (i.e., not present in the descriptor), it should be excluded if
+  // scrubbing is enabled.
   if (field == nullptr) {
+    if (filter_config_ptr_->scrubUnknownFields()) {
+      return FieldCheckResults::kExclude;
+    }
     return FieldCheckResults::kInclude;
   }
 

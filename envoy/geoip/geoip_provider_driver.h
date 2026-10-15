@@ -23,7 +23,7 @@ public:
   LookupRequest(Network::Address::InstanceConstSharedPtr&& remote_address)
       : remote_address_(std::move(remote_address)) {};
 
-  const Network::Address::InstanceConstSharedPtr remoteAddress() const { return remote_address_; }
+  const Network::Address::InstanceConstSharedPtr& remoteAddress() const { return remote_address_; }
 
 private:
   Network::Address::InstanceConstSharedPtr remote_address_;
@@ -64,7 +64,7 @@ public:
    */
   virtual DriverSharedPtr
   createGeoipProviderDriver(const Protobuf::Message& config, const std::string& stat_prefix,
-                            Server::Configuration::FactoryContext& context) PURE;
+                            Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.geoip_providers"; }
 };

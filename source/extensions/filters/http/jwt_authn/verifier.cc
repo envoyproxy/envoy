@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "source/common/jwt/check_audience.h"
+#include "source/common/runtime/runtime_features.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement;
@@ -167,7 +168,7 @@ public:
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(nullptr, absl::nullopt, true, true);
+    auto auth = auth_factory_.create(nullptr, std::nullopt, true, true);
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), ctximpl.parentSpan(), extractor_->extract(ctximpl.headers()),
@@ -199,7 +200,7 @@ public:
     ENVOY_LOG(debug, "Called AllowMissingVerifierImpl.verify : {}", __func__);
 
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(nullptr, absl::nullopt, false /* allow failed */,
+    auto auth = auth_factory_.create(nullptr, std::nullopt, false /* allow failed */,
                                      true /* allow missing */);
     extractor_->sanitizeHeaders(ctximpl.headers());
     auth->verify(
@@ -223,7 +224,8 @@ private:
 
 VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                              const Protobuf::Map<std::string, JwtProvider>& providers,
-                             const AuthFactory& factory, const BaseVerifierImpl* parent);
+                             const AuthFactory& factory, const BaseVerifierImpl* parent,
+                             absl::Status& creation_status);
 
 // Base verifier for requires all or any.
 class BaseGroupVerifierImpl : public BaseVerifierImpl {
@@ -250,7 +252,7 @@ class AnyVerifierImpl : public BaseGroupVerifierImpl {
 public:
   AnyVerifierImpl(const JwtRequirementOrList& or_list, const AuthFactory& factory,
                   const Protobuf::Map<std::string, JwtProvider>& providers,
-                  const BaseVerifierImpl* parent)
+                  const BaseVerifierImpl* parent, absl::Status& creation_status)
       : BaseGroupVerifierImpl(parent) {
 
     for (const auto& it : or_list.requirements()) {
@@ -262,7 +264,10 @@ public:
         is_allow_missing_ = true;
         break;
       default:
-        verifiers_.emplace_back(innerCreate(it, providers, factory, this));
+        verifiers_.emplace_back(innerCreate(it, providers, factory, this, creation_status));
+        if (!creation_status.ok()) {
+          return;
+        }
         break;
       }
     }
@@ -275,7 +280,7 @@ public:
       } else {
         requirement.mutable_allow_missing();
       }
-      verifiers_.emplace_back(innerCreate(requirement, providers, factory, this));
+      verifiers_.emplace_back(innerCreate(requirement, providers, factory, this, creation_status));
     }
   }
 
@@ -330,10 +335,13 @@ public:
   AllVerifierImpl(const JwtRequirementAndList& and_list, const AuthFactory& factory,
                   const Protobuf::Map<std::string, JwtProvider>& providers,
                   // const Extractor& extractor_for_allow_fail,
-                  const BaseVerifierImpl* parent)
+                  const BaseVerifierImpl* parent, absl::Status& creation_status)
       : BaseGroupVerifierImpl(parent) {
     for (const auto& it : and_list.requirements()) {
-      verifiers_.emplace_back(innerCreate(it, providers, factory, this));
+      verifiers_.emplace_back(innerCreate(it, providers, factory, this, creation_status));
+      if (!creation_status.ok()) {
+        return;
+      }
     }
   }
 
@@ -368,25 +376,41 @@ JwtProviderList getAllProvidersAsList(const Protobuf::Map<std::string, JwtProvid
   return list;
 }
 
+namespace {
+constexpr absl::string_view kDefaultVerificationStatusHeader = "x-jwt-signature-verified";
+constexpr absl::string_view kVerificationStatusValue = "false";
+} // namespace
+
 class ExtractOnlyWithoutValidationVerifierImpl : public BaseVerifierImpl {
 public:
-  ExtractOnlyWithoutValidationVerifierImpl(const AuthFactory& factory,
-                                           const JwtProviderList& providers,
-                                           const BaseVerifierImpl* parent)
-      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)) {
+  ExtractOnlyWithoutValidationVerifierImpl(
+      const AuthFactory& factory, const JwtProviderList& providers,
+      const envoy::extensions::filters::http::jwt_authn::v3::ExtractOnlyWithoutValidation&
+          extract_config,
+      const BaseVerifierImpl* parent)
+      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(providers)),
+        verification_status_header_(
+            Http::LowerCaseString(extract_config.verification_status_header().empty()
+                                      ? std::string(kDefaultVerificationStatusHeader)
+                                      : extract_config.verification_status_header())) {
     ENVOY_LOG(info,
-              "JWT filter configured for claim extraction only - signature validation is disabled");
+              "JWT filter configured for claim extraction only. "
+              "Header '{}' will be set to 'false' when JWT verification fails.",
+              verification_status_header_.get());
   }
 
   void verify(ContextSharedPtr context) const override {
     ENVOY_LOG(debug, "Extracting JWT claims without signature validation");
 
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    // Set allow_failed=true and allow_missing=true to bypass validation
-    // The key difference is we're telling the authenticator to extract claims
-    // even when signature validation would fail
-    auto auth = auth_factory_.create(nullptr, absl::nullopt,
-                                     /*=allow failed*/ true,
+
+    // Use allow_failed=false so the authenticator surfaces the original
+    // verification status (e.g. JwtExpired) instead of collapsing it to Ok.
+    // allow_missing=true keeps "no token" reported as Ok via the missing
+    // path. The verifier itself collapses any remaining failure into Ok
+    // below, since extract-only mode never fails the request.
+    auto auth = auth_factory_.create(nullptr, std::nullopt,
+                                     /*=allow failed*/ false,
                                      /*=allow missing*/ true);
 
     extractor_->sanitizeHeaders(ctximpl.headers());
@@ -396,10 +420,17 @@ public:
           ctximpl.addExtractedData(name, extracted_data);
         },
         [this, &ctximpl](const Status& status) {
-          // Always treat as success for extract-only mode
-          // This ensures claims are forwarded even if signature validation failed
           ENVOY_LOG(debug, "JWT extraction completed with status: {}, treating as success",
                     static_cast<int>(status));
+          // Status::Ok means verification succeeded; Status::JwtMissed means
+          // no token was present (collapsed by allow_missing). Any other
+          // status is a real verification failure — signal downstream that
+          // the forwarded claims are unverified.
+          if (status != Status::Ok && status != Status::JwtMissed &&
+              Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.jwt_authn_add_verification_status_header")) {
+            ctximpl.headers().setCopy(verification_status_header_, kVerificationStatusValue);
+          }
           onComplete(Status::Ok, ctximpl);
         },
         [&ctximpl]() { ctximpl.callback()->clearRouteCache(); });
@@ -414,11 +445,13 @@ public:
 private:
   const AuthFactory& auth_factory_;
   const ExtractorConstPtr extractor_;
+  Http::LowerCaseString verification_status_header_;
 };
 
 VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                              const Protobuf::Map<std::string, JwtProvider>& providers,
-                             const AuthFactory& factory, const BaseVerifierImpl* parent) {
+                             const AuthFactory& factory, const BaseVerifierImpl* parent,
+                             absl::Status& creation_status) {
   std::string provider_name;
   std::vector<std::string> audiences;
   switch (requirement.requires_type_case()) {
@@ -432,11 +465,11 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
     provider_name = requirement.provider_and_audiences().provider_name();
     break;
   case JwtRequirement::RequiresTypeCase::kRequiresAny:
-    return std::make_unique<AnyVerifierImpl>(requirement.requires_any(), factory, providers,
-                                             parent);
+    return std::make_unique<AnyVerifierImpl>(requirement.requires_any(), factory, providers, parent,
+                                             creation_status);
   case JwtRequirement::RequiresTypeCase::kRequiresAll:
-    return std::make_unique<AllVerifierImpl>(requirement.requires_all(), factory, providers,
-                                             parent);
+    return std::make_unique<AllVerifierImpl>(requirement.requires_all(), factory, providers, parent,
+                                             creation_status);
   case JwtRequirement::RequiresTypeCase::kAllowMissingOrFailed:
     return std::make_unique<AllowFailedVerifierImpl>(factory, getAllProvidersAsList(providers),
                                                      parent);
@@ -445,14 +478,17 @@ VerifierConstPtr innerCreate(const JwtRequirement& requirement,
                                                       parent);
   case JwtRequirement::RequiresTypeCase::kExtractOnlyWithoutValidation:
     return std::make_unique<ExtractOnlyWithoutValidationVerifierImpl>(
-        factory, getAllProvidersAsList(providers), parent);
+        factory, getAllProvidersAsList(providers), requirement.extract_only_without_validation(),
+        parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
   }
 
   const auto& it = providers.find(provider_name);
   if (it == providers.end()) {
-    throw EnvoyException(fmt::format("Required provider ['{}'] is not configured.", provider_name));
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Required provider ['{}'] is not configured.", provider_name));
+    return nullptr;
   }
   if (audiences.empty()) {
     return std::make_unique<ProviderVerifierImpl>(provider_name, factory, it->second, parent);
@@ -468,10 +504,14 @@ ContextSharedPtr Verifier::createContext(Http::RequestHeaderMap& headers,
   return std::make_shared<ContextImpl>(headers, parent_span, *callback);
 }
 
-VerifierConstPtr Verifier::create(const JwtRequirement& requirement,
-                                  const Protobuf::Map<std::string, JwtProvider>& providers,
-                                  const AuthFactory& factory) {
-  return innerCreate(requirement, providers, factory, nullptr);
+absl::StatusOr<VerifierConstPtr>
+Verifier::create(const JwtRequirement& requirement,
+                 const Protobuf::Map<std::string, JwtProvider>& providers,
+                 const AuthFactory& factory) {
+  absl::Status creation_status = absl::OkStatus();
+  auto verifier = innerCreate(requirement, providers, factory, nullptr, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return verifier;
 }
 
 } // namespace JwtAuthn

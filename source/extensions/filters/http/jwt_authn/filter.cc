@@ -55,6 +55,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   state_ = Calling;
   stopped_ = false;
 
+  // Sanitize before any bypass decision when the reloadable feature is enabled (default).
+  // Payload and claim headers are reserved for values this filter writes after verification;
+  // leaving client-supplied values in place on no-verifier paths (empty requires, per-route
+  // disabled, CORS preflight) would forward spoofed identity upstream.
+  config_->sanitizePayloadHeaders(headers);
+
   if (config_->bypassCorsPreflightRequest() && isCorsPreflightRequest(headers)) {
     // The CORS preflight doesn't include user credentials, bypass regardless of JWT requirements.
     // See http://www.w3.org/TR/cors/#cross-origin-request-with-preflight.
@@ -79,7 +85,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           config_.get()->stripFailureResponse()
               ? ""
               : absl::StrCat("Failed JWT authentication: ", error_msg),
-          nullptr, absl::nullopt, generateRcDetails(error_msg));
+          nullptr, std::nullopt, generateRcDetails(error_msg));
       return Http::FilterHeadersStatus::StopIteration;
     }
   } else {
@@ -125,7 +131,7 @@ void Filter::onComplete(const Status& status) {
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
     if (config_.get()->stripFailureResponse()) {
-      decoder_callbacks_->sendLocalReply(code, "", nullptr, absl::nullopt,
+      decoder_callbacks_->sendLocalReply(code, "", nullptr, std::nullopt,
                                          generateRcDetails(JwtVerify::getStatusString(status)));
       return;
     }
@@ -138,7 +144,7 @@ void Filter::onComplete(const Status& status) {
           }
           headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
         },
-        absl::nullopt, generateRcDetails(JwtVerify::getStatusString(status)));
+        std::nullopt, generateRcDetails(JwtVerify::getStatusString(status)));
     return;
   }
   stats_.allowed_.inc();

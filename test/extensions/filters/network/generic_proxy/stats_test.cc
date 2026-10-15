@@ -1,6 +1,6 @@
 #include "source/extensions/filters/network/generic_proxy/stats.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

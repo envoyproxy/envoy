@@ -32,15 +32,14 @@ class ProtocolOptionsConfigImpl : public Upstream::HttpProtocolOptionsConfig {
 public:
   static absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>> createProtocolOptionsConfig(
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
-      Server::Configuration::ServerFactoryContext& server_context);
+      Server::Configuration::GenericFactoryContext& context);
   static absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>> createProtocolOptionsConfig(
       const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
-      const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
+      const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
       bool use_downstream_protocol, bool use_http2,
-      Server::Configuration::ServerFactoryContext& server_context,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      Server::Configuration::GenericFactoryContext& context);
 
   // Given the supplied cluster config, and protocol options configuration,
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
@@ -57,11 +56,11 @@ public:
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return common_http_protocol_options_;
   }
-  const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+  const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const override {
     return upstream_http_protocol_options_;
   }
-  const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  const std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const override {
     return alternate_protocol_cache_options_;
   }
@@ -73,15 +72,15 @@ public:
 
   const Envoy::Http::Http1Settings http1_settings_;
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
-  const envoy::config::core::v3::Http3ProtocolOptions http3_options_{};
+  const envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   const envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
-  const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
+  const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
 
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
   const FiltersList http_filters_;
-  const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
+  const std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_cache_options_;
   const Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory_;
   const bool use_downstream_protocol_{};
@@ -112,20 +111,19 @@ private:
       const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
       envoy::config::core::v3::Http2ProtocolOptions validated_h2_options,
       Envoy::Http::HeaderValidatorFactoryPtr&& header_validator_factory,
-      absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
+      std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
       std::vector<Envoy::Router::ShadowPolicyPtr>&& shadow_policies,
       std::shared_ptr<const Envoy::Router::RetryPolicy>&& retry_policy,
       std::unique_ptr<Envoy::Http::HashPolicy>&& hash_policy,
-      Server::Configuration::ServerFactoryContext& server_context);
+      Server::Configuration::GenericFactoryContext& context, absl::Status& creation_status);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(
       const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
       const envoy::config::core::v3::Http2ProtocolOptions& validated_http2_options,
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
-      const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
+      const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
       bool use_downstream_protocol, bool use_http2,
-      Server::Configuration::ServerFactoryContext& server_context,
-      ProtobufMessage::ValidationVisitor& validation_visitor);
+      Server::Configuration::GenericFactoryContext& context, absl::Status& creation_status);
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {
@@ -136,8 +134,7 @@ public:
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
         config, context.messageValidationVisitor());
-    auto result = ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
-        typed_config, context.serverFactoryContext());
+    auto result = ProtocolOptionsConfigImpl::createProtocolOptionsConfig(typed_config, context);
     if (!result.ok()) {
       return result.status();
     }

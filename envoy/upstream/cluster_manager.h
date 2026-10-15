@@ -26,6 +26,7 @@
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/store.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/thread_local/thread_local.h"
@@ -77,7 +78,7 @@ public:
    * onClusterRemoval is called when a cluster is removed; the argument is the cluster name.
    * @param cluster_name is the name of the removed cluster.
    */
-  virtual void onClusterRemoval(const std::string& cluster_name) PURE;
+  virtual void onClusterRemoval(absl::string_view cluster_name) PURE;
 };
 
 /**
@@ -202,10 +203,8 @@ struct ClusterConnectivityState {
   // goes up by 100. If the connection is established and 2 streams are in use, it
   // would be reduced to 98 (as 2 of the 100 are not available).
   //
-  // Note that if more HTTP/2 streams have been established than are allowed by
-  // a late-received SETTINGS frame, this MAY BE NEGATIVE.
   // Note this tracks the sum of multiple 32 bit stream capacities so must remain 64 bit.
-  int64_t connecting_and_connected_stream_capacity_{};
+  uint64_t connecting_and_connected_stream_capacity_{};
 };
 
 /**
@@ -218,6 +217,14 @@ public:
   // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
   // with the cluster name to the management server.
   virtual void updateOnDemand(std::string cluster_name) PURE;
+
+  // Whether the config source behind this instance has answered an earlier on-demand request for
+  // the cluster with "doesn't exist", and no later update has delivered the cluster.
+  virtual bool isKnownMissing(absl::string_view cluster_name) const PURE;
+
+  // Called when the cluster manager answers an on-demand request from this instance's remembered
+  // "doesn't exist" answer, so the implementation can record the event in its stats.
+  virtual void recordKnownMissingAnswer() PURE;
 };
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
@@ -286,7 +293,7 @@ public:
    */
   virtual absl::StatusOr<bool>
   addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                     const std::string& version_info, const bool avoid_cds_removal = false) PURE;
+                     absl::string_view version_info, const bool avoid_cds_removal = false) PURE;
 
   /**
    * Set a callback that will be invoked when all primary clusters have been initialized.
@@ -316,13 +323,13 @@ public:
     ClusterConstOptRef getCluster(absl::string_view cluster) const {
       auto active_cluster = active_clusters_.find(cluster);
       if (active_cluster != active_clusters_.cend()) {
-        return active_cluster->second;
+        return active_cluster->second.get();
       }
       auto warming_cluster = warming_clusters_.find(cluster);
       if (warming_cluster != warming_clusters_.cend()) {
-        return warming_cluster->second;
+        return warming_cluster->second.get();
       }
-      return absl::nullopt;
+      return std::nullopt;
     }
 
     ClusterInfoMap active_clusters_;
@@ -341,13 +348,21 @@ public:
   virtual ClusterInfoMaps clusters() const PURE;
 
   /**
+   * Iterates over all active clusters and invokes the callback for each.
+   * @param cb the callback to invoke for each active cluster.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual void forEachActiveCluster(std::function<void(const Cluster&)> cb) const PURE;
+
+  /**
    * Receives a cluster name and returns an active cluster (if found).
    * @param cluster_name the name of the cluster.
    * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
+  virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
 
   /**
    * Receives a cluster name and returns an active or warming cluster (if found).
@@ -357,7 +372,7 @@ public:
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
   virtual OptRef<const Cluster>
-  getActiveOrWarmingCluster(const std::string& cluster_name) const PURE;
+  getActiveOrWarmingCluster(absl::string_view cluster_name) const PURE;
 
   /**
    * Returns true iff the given cluster name is known in the cluster-manager
@@ -367,7 +382,7 @@ public:
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual bool hasCluster(const std::string& cluster_name) const PURE;
+  virtual bool hasCluster(absl::string_view cluster_name) const PURE;
 
   /**
    * Returns true iff there's an active cluster in the cluster-manager.
@@ -410,7 +425,7 @@ public:
    * can be removed by setting `remove_ignored` to true while removeCluster().
    * @return true if the action results in the removal of a cluster.
    */
-  virtual bool removeCluster(const std::string& cluster, const bool remove_ignored = false) PURE;
+  virtual bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) PURE;
 
   /**
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
@@ -425,7 +440,7 @@ public:
   /**
    * @return cluster manager wide bind configuration for new upstream connections.
    */
-  virtual const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
+  virtual const std::optional<envoy::config::core::v3::BindConfig>& bindConfig() const PURE;
 
   /**
    * Returns a shared_ptr to the singleton xDS-over-gRPC provider for upstream control plane muxing
@@ -445,10 +460,10 @@ public:
   /**
    * Return the local cluster name, if it was configured.
    *
-   * @return absl::optional<std::string> the local cluster name, or empty if no local cluster was
+   * @return std::optional<std::string> the local cluster name, or empty if no local cluster was
    * configured.
    */
-  virtual const absl::optional<std::string>& localClusterName() const PURE;
+  virtual const std::optional<std::string>& localClusterName() const PURE;
 
   /**
    * This method allows to register callbacks for cluster lifecycle events in the ClusterManager.
@@ -498,6 +513,7 @@ public:
    * to all worker threads and run concurrently.
    */
   using DrainConnectionsHostPredicate = std::function<bool(const Host&)>;
+  using DrainConnectionsPoolPredicate = std::function<bool(ConnectionPool::Instance&)>;
 
   /**
    * Drain all connection pool connections owned by this cluster.
@@ -505,7 +521,7 @@ public:
    * @param predicate supplies the optional drain connections host predicate. If not supplied, all
    *                  hosts are drained.
    */
-  virtual void drainConnections(const std::string& cluster,
+  virtual void drainConnections(absl::string_view cluster,
                                 DrainConnectionsHostPredicate predicate) PURE;
 
   /**
@@ -517,10 +533,18 @@ public:
                                 ConnectionPool::DrainBehavior drain_behavior) PURE;
 
   /**
+   * Drain all connection pool connections matching the pool predicate owned by
+   * all clusters.
+   * @param predicate supplies the drain connections pool predicate.
+   */
+  virtual void drainOrCloseConnPools(DrainConnectionsPoolPredicate predicate,
+                                     ConnectionPool::DrainBehavior drain_behavior) PURE;
+
+  /**
    * Check if the cluster is active and statically configured, and if not, return an error
    * @param cluster, the cluster to check.
    */
-  virtual absl::Status checkActiveStaticCluster(const std::string& cluster) PURE;
+  virtual absl::Status checkActiveStaticCluster(absl::string_view cluster) PURE;
 
   /**
    * Allocates an on-demand CDS API provider from configuration proto or locator.
@@ -619,7 +643,7 @@ public:
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
-                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                   const std::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
@@ -637,7 +661,7 @@ public:
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                       ClusterConnectivityState& state,
-                      absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
+                      std::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

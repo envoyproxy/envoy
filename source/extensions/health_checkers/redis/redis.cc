@@ -17,13 +17,14 @@ RedisHealthChecker::RedisHealthChecker(
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
     Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-    const absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+    const std::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
         aws_iam_config,
-    const absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
-                             AwsIamAuthenticatorSharedPtr>
-        aws_iam_authenticator)
+    const std::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+                            AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator,
+    Upstream::HealthFlagCallbacks& health_flag_callbacks)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
-                            std::move(event_logger)),
+                            std::move(event_logger), health_flag_callbacks),
       client_factory_(client_factory), key_(redis_config.key()),
       redis_stats_(generateRedisStats(cluster.info()->statsScope())),
       auth_username_(
@@ -84,7 +85,8 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
     client_ = parent_.client_factory_.create(
         host_, parent_.dispatcher_, redis_config_, redis_command_stats_,
         parent_.cluster_.info()->statsScope(), parent_.auth_username_, parent_.auth_password_,
-        false, parent_.aws_iam_config_, parent_.aws_iam_authenticator_);
+        false, parent_.aws_iam_config_, parent_.aws_iam_authenticator_,
+        Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2, std::nullopt);
     client_->addConnectionCallbacks(*this);
   }
 

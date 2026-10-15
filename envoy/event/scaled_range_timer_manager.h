@@ -1,12 +1,14 @@
 #pragma once
 
+#include <functional>
+#include <memory>
+
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_timer.h"
 #include "envoy/event/timer.h"
 
 #include "source/common/common/interval_value.h"
-
-#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Event {

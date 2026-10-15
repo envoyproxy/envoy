@@ -21,7 +21,7 @@ envoy_extension_cc_test(
         "zipkin_tracer_impl_test.cc",
     ],
     extension_names = ["envoy.tracers.zipkin"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:time_interface",
         "//envoy/runtime:runtime_interface",
@@ -40,8 +40,8 @@ envoy_extension_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -50,12 +50,26 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.zipkin"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/tracers/zipkin:config",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/mocks/server:tracer_factory_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "zipkin_http_service_integration_test",
+    srcs = ["zipkin_http_service_integration_test.cc"],
+    extension_names = ["envoy.tracers.zipkin"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/tracers/zipkin:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

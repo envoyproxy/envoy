@@ -13,7 +13,7 @@
 #include "test/extensions/filters/network/generic_proxy/mocks/filter.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/route.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -39,7 +39,7 @@ public:
   MockRouteConfigProvider() { ON_CALL(*this, config()).WillByDefault(Return(route_config_)); }
 
   MOCK_METHOD(Rds::ConfigConstSharedPtr, config, (), (const));
-  MOCK_METHOD(const absl::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (), (const));
+  MOCK_METHOD(const std::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
   MOCK_METHOD(absl::Status, onConfigUpdate, ());
 
@@ -120,7 +120,7 @@ public:
     file_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(format);
     file_log_config.set_path("/fake/log/path");
     envoy::config::accesslog::v3::AccessLog config;
-    config.mutable_typed_config()->PackFrom(file_log_config);
+    std::ignore = config.mutable_typed_config()->PackFrom(file_log_config);
     config.set_name("file");
 
     std::vector<Formatter::CommandParserPtr> command_parsers;
@@ -778,7 +778,7 @@ TEST_F(FilterTest, ActiveStreamSingleFrameFiltersContinueEncoding) {
   // Next filter is `mock_0`.
   EXPECT_EQ("mock_0", (*active_stream->nextEncoderHeaderFilterForTest())->filterConfigName());
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
         Buffer::OwnedImpl buffer;
@@ -1007,7 +1007,7 @@ TEST_F(FilterTest, ActiveStreamMultipleFrameFiltersContinueEncoding) {
       .WillOnce(Return(CommonFilterStatus::StopIteration))  // StopIteration will be ignored.
       .WillOnce(Return(CommonFilterStatus::StopIteration)); // StopIteration will be ignored.
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
         Buffer::OwnedImpl buffer;
@@ -1080,8 +1080,9 @@ TEST_F(FilterTest, UpstreamResponseAfterPreviousUpstreamResponse) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   // Response filter chain is stopped by the first filter.
@@ -1122,8 +1123,9 @@ TEST_F(FilterTest, UpstreamResponseAfterPreviousLocalReply) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   // Response filter chain of local reply is stopped by the first filter.
@@ -1165,8 +1167,9 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousLocalReply) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   // Response filter chain of local reply is stopped by the first filter.
@@ -1189,7 +1192,7 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousLocalReply) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   // The latest local reply will skip the filter chain processing and be sent to the downstream
   // directly.
@@ -1222,8 +1225,9 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousUpstreamResponseHeaderIsSent) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   testing::Sequence s;
@@ -1248,7 +1252,7 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousUpstreamResponseHeaderIsSent) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response->message_ = "anything";
@@ -1321,7 +1325,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   // Clean up the stream and log the access log.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -1330,8 +1334,9 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
                     "response-value - 2 test_detail"));
 
   // Check the drain manager.
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
 
   filter_->onDecodingSuccess(std::move(request));
 
@@ -1408,7 +1413,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReplyWhenProcessingBody) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   // Clean up the stream and log the access log.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -1417,8 +1422,9 @@ TEST_F(FilterTest, ActiveStreamSendLocalReplyWhenProcessingBody) {
                     "response-value - 2 test_detail"));
 
   // Check the drain manager.
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
 
   auto request_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   filter_->onDecodingSuccess(std::move(request_frame));
@@ -1506,7 +1512,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReplyWhenTransferringBody) {
 
         return EncodingResult{4};
       }));
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   // Clean up the stream and log the access log.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -1515,8 +1521,9 @@ TEST_F(FilterTest, ActiveStreamSendLocalReplyWhenTransferringBody) {
                     "response-value - 2 test_detail"));
 
   // Check the drain manager.
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
 
   auto request_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   filter_->onDecodingSuccess(std::move(request_frame));
@@ -1601,7 +1608,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1618,8 +1625,9 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
               write("host-value /path-value method-value protocol-value request-value "
                     "response-value - 0 via_upstream"));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
@@ -1690,11 +1698,12 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
               write("host-value /path-value method-value protocol-value request-value "
                     "response-value - 123 via_upstream"));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false)).Times(2);
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false)).Times(2);
   EXPECT_CALL(*server_codec_, encode(_, _))
       .Times(2)
       .WillRepeatedly(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1728,6 +1737,9 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
 }
 
 TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
+  // This test covers the legacy path where drain-close is decided by polling the DrainDecision.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
   mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
 
@@ -1744,7 +1756,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1778,6 +1790,46 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
       1);
 }
 
+// Equivalent of NewStreamAndReplyNormallyWithDrainClose exercising the connection-level drain
+// path: the connection is notified via onDrain() (Immediate strategy) and the drain-close decision
+// is derived from that event instead of polling the DrainDecision, which must not be consulted.
+TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainCloseViaConnectionDrain) {
+  auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
+  mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
+
+  initializeFilter();
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
+  filter_callbacks_.connection_.raiseConnectionDrain(
+      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+  filter_->onDecodingSuccess(std::move(request));
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
+  EXPECT_CALL(*server_codec_, encode(_, _))
+      .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
+        Buffer::OwnedImpl buffer;
+        buffer.add("test");
+        server_codec_callbacks_->writeToConnection(buffer);
+        buffer.drain(buffer.length());
+        return EncodingResult{4};
+      }));
+
+  // The connection is drain-closed once the last active stream completes.
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  response->status_ = {234, false};
+  active_stream->onResponseHeaderFrame(std::move(response));
+
+  EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 0);
+}
+
 TEST_F(FilterTest, NewStreamAndReplyNormallyWithStreamDrainClose) {
   auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
   mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
@@ -1791,7 +1843,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithStreamDrainClose) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1804,10 +1856,9 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithStreamDrainClose) {
         return EncodingResult{4};
       }));
 
-  // The drain close of factory_context_.drain_manager_ is false, but the drain close of
-  // active_stream is true.
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // The stream-level drain close of active_stream is true, which short-circuits the connection
+  // drain decision entirely.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
@@ -1860,7 +1911,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
           }));
   EXPECT_CALL(*span, finishSpan());
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1873,8 +1924,9 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
         return EncodingResult{4};
       }));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
@@ -1924,7 +1976,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracingAndSamplingToTrue) {
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, finishSpan());
 
-  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false));
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
   EXPECT_CALL(*server_codec_, encode(_, _))
       .WillOnce(Invoke([&](const StreamFrame&, EncodingContext&) {
@@ -1937,8 +1989,9 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracingAndSamplingToTrue) {
         return EncodingResult{4};
       }));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
+  // never notified of a drain: no drain close.
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose(_)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();

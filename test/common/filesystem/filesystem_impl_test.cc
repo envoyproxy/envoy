@@ -10,12 +10,16 @@
 #include "source/common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Filesystem {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 static constexpr FlagSet DefaultFlags{
     1 << Filesystem::File::Operation::Read | 1 << Filesystem::File::Operation::Write |
@@ -119,14 +123,14 @@ TEST_F(FileSystemImplTest, DISABLED_FileReadToEndNotReadable) {
 
   std::filesystem::permissions(file_path, std::filesystem::perms::owner_all,
                                std::filesystem::perm_options::remove);
-  EXPECT_FALSE(file_system_.fileReadToEnd(file_path).status().ok());
+  EXPECT_THAT(file_system_.fileReadToEnd(file_path).status(), Not(IsOk()));
 }
 #endif
 
 TEST_F(FileSystemImplTest, FileReadToEndDenylisted) {
-  EXPECT_FALSE(file_system_.fileReadToEnd("/dev/urandom").status().ok());
-  EXPECT_FALSE(file_system_.fileReadToEnd("/proc/cpuinfo").status().ok());
-  EXPECT_FALSE(file_system_.fileReadToEnd("/sys/block/sda/dev").status().ok());
+  EXPECT_THAT(file_system_.fileReadToEnd("/dev/urandom").status(), Not(IsOk()));
+  EXPECT_THAT(file_system_.fileReadToEnd("/proc/cpuinfo").status(), Not(IsOk()));
+  EXPECT_THAT(file_system_.fileReadToEnd("/sys/block/sda/dev").status(), Not(IsOk()));
 }
 
 #ifndef WIN32
@@ -157,7 +161,7 @@ TEST_F(FileSystemImplTest, SplitPathFromFilename) {
   result = file_system_.splitPathFromFilename("/").value();
   EXPECT_EQ(result.directory_, "/");
   EXPECT_EQ(result.file_, "");
-  EXPECT_FALSE(file_system_.splitPathFromFilename("nopathdelimeter").ok());
+  EXPECT_THAT(file_system_.splitPathFromFilename("nopathdelimeter"), Not(IsOk()));
 #ifdef WIN32
   result = file_system_.splitPathFromFilename("c:\\foo/bar").value();
   EXPECT_EQ(result.directory_, "c:\\foo");
@@ -230,6 +234,23 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_TRUE(file_system_.illegalPath("/dev/"));
   // Exception to allow opening from file descriptors. See #7258.
   EXPECT_FALSE(file_system_.illegalPath("/dev/fd/0"));
+
+  if (file_system_.directoryExists("/dev/shm")) {
+    // Exception for /dev/shm/*
+    EXPECT_FALSE(file_system_.illegalPath("/dev/shm/"));
+    EXPECT_FALSE(file_system_.illegalPath("/dev/shm"));
+    EXPECT_TRUE(file_system_.illegalPath("/dev/shm/_some_non_existent_file"));
+    // This is not the same special case as /dev/fd; paths will actually need to exist here to be
+    // considered valid.
+    std::string shmTempFile = "/dev/shm/envoy_test_XXXXXX";
+    auto fd = mkstemp(shmTempFile.data());
+    ASSERT_NE(fd, -1);
+    auto res = file_system_.illegalPath(shmTempFile);
+    close(fd);
+    unlink(shmTempFile.c_str());
+    EXPECT_FALSE(res);
+  }
+
   EXPECT_TRUE(file_system_.illegalPath("/proc"));
   EXPECT_TRUE(file_system_.illegalPath("/proc/"));
   EXPECT_TRUE(file_system_.illegalPath("/sys"));

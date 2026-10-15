@@ -159,6 +159,13 @@ public:
                             /*response_date=*/currentTime(),
                             /*expected_result=*/CacheEntryStatus::RequiresValidation,
                             /*expected_age=*/"1499"},
+                           {"expired_max_stale_satisfied_but_response_s_maxage",
+                            /*request_cache_control=*/"max-stale=500",
+                            /*response_cache_control=*/"s-maxage=1000",
+                            /*request_time=*/currentTime() + Seconds(1499),
+                            /*response_date=*/currentTime(),
+                            /*expected_result=*/CacheEntryStatus::RequiresValidation,
+                            /*expected_age=*/"1499"},
                            {"fresh_and_response_must_revalidate",
                             /*request_cache_control=*/"",
                             /*response_cache_control=*/"public, max-age=1000, must-revalidate",
@@ -173,7 +180,7 @@ public:
 
 LookupResult makeLookupResult(const LookupRequest& lookup_request,
                               const Http::TestResponseHeaderMapImpl& response_headers,
-                              absl::optional<uint64_t> content_length = absl::nullopt) {
+                              std::optional<uint64_t> content_length = std::nullopt) {
   // For the purpose of the test, set the response_time to the date header value.
   ResponseMetadata metadata = {CacheHeadersUtils::httpTime(response_headers.Date())};
   return lookup_request.makeLookupResult(

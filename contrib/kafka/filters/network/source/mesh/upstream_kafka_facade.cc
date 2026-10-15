@@ -1,5 +1,7 @@
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client_impl.h"
 
 namespace Envoy {
@@ -47,7 +49,7 @@ ThreadLocalKafkaFacade::~ThreadLocalKafkaFacade() {
 }
 
 KafkaProducer& ThreadLocalKafkaFacade::getProducerForTopic(const std::string& topic) {
-  const absl::optional<ClusterConfig> cluster_config =
+  const std::optional<ClusterConfig> cluster_config =
       configuration_.computeClusterConfigForTopic(topic);
   if (cluster_config) {
     const auto it = cluster_to_kafka_client_.find(cluster_config->name_);

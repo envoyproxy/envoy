@@ -43,7 +43,7 @@ public:
   // This type is neither copyable nor movable.
   FieldChecker(const FieldChecker&) = delete;
   FieldChecker& operator=(const FieldChecker&) = delete;
-  ~FieldChecker() override {}
+  ~FieldChecker() override = default;
 
   // Make all the overloads from the base class visible here so the one explicit
   // override doesn't hide the other signatures.
@@ -111,7 +111,7 @@ private:
   std::string method_name_;
   const ProtoApiScrubberFilterConfig* filter_config_ptr_;
 
-  const Protobuf::Descriptor* root_descriptor_;
+  const Protobuf::Descriptor* root_descriptor_{nullptr};
 
   // Cache normalized results.
   mutable absl::flat_hash_map<std::vector<std::string>, NormalizationResult> path_cache_;

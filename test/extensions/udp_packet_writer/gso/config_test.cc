@@ -4,6 +4,10 @@
 
 #include "source/extensions/udp_packet_writer/gso/config.h"
 
+#include "test/mocks/server/listener_factory_context.h"
+
+#include "gmock/gmock.h"
+
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
 
 #include "gtest/gtest.h"
@@ -25,8 +29,9 @@ TEST(FactoryTest, CreateUdpPacketWriterFactory) {
   UdpGsoBatchWriterFactoryFactory factory;
   envoy::extensions::udp_packet_writer::v3::UdpGsoBatchWriterFactory writer_config;
   envoy::config::core::v3::TypedExtensionConfig config;
-  config.mutable_typed_config()->PackFrom(writer_config);
-  EXPECT_TRUE(factory.createUdpPacketWriterFactory(config) != nullptr);
+  std::ignore = config.mutable_typed_config()->PackFrom(writer_config);
+  testing::NiceMock<Server::Configuration::MockListenerFactoryContext> listener_context;
+  EXPECT_TRUE(factory.createUdpPacketWriterFactory(config, listener_context) != nullptr);
 }
 
 } // namespace Quic

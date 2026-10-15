@@ -36,7 +36,7 @@ ConfigHelper::ConfigModifierFunction setOriginalDstCluster(int port) {
     auto* listener_filter = listener->add_listener_filters();
     listener_filter->set_name("envoy.filters.listener.original_dst");
     envoy::extensions::filters::listener::original_dst::v3::OriginalDst original_dst;
-    listener_filter->mutable_typed_config()->PackFrom(original_dst);
+    std::ignore = listener_filter->mutable_typed_config()->PackFrom(original_dst);
   };
 }
 
@@ -84,6 +84,35 @@ TEST_P(OriginalDstIntegrationTest, OriginalDstHttpManyConnections) {
     fake_upstream_connection_.reset();
     codec_client_->close();
   }
+}
+
+TEST_P(OriginalDstIntegrationTest, ScopedIpv6OriginalDstCrash) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.clear_load_balancing_policy();
+
+    cluster.set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
+    cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    cluster.mutable_original_dst_lb_config()->set_use_http_header(true);
+    cluster.clear_load_assignment();
+  });
+
+  initialize();
+
+  // Send a raw HTTP/1.1 request with a scoped link-local IPv6 in the override header.
+  auto tcp = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp->write("GET / HTTP/1.1\r\n"
+                         "Host: h\r\n"
+                         "x-envoy-original-dst-host: [fe80::1%1]:80\r\n"
+                         "\r\n",
+                         false));
+
+  // Since chooseHost() now successfully handles the scoped IPv6 address without throwing/aborting,
+  // Envoy should gracefully handle the request and return a 503 response because the target is
+  // unreachable.
+  tcp->waitForData("HTTP/1.1 503");
+  EXPECT_TRUE(absl::StartsWith(tcp->data(), "HTTP/1.1 503"));
 }
 
 class OriginalDstTcpProxyIntegrationTest
@@ -141,7 +170,7 @@ TEST_P(OriginalDstTcpProxyIntegrationTest, TestManyConnections) {
     ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
-  test_server_->waitForCounterGe("cluster_manager.cluster_updated", kMaxConnections);
+  test_server_->waitForCounter("cluster_manager.cluster_updated", testing::Ge(kMaxConnections));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, OriginalDstTcpProxyIntegrationTest,

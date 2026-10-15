@@ -20,7 +20,7 @@ namespace CEL {
 
 class CELAccessLogExtensionFilterFactory : public Envoy::AccessLog::ExtensionFilterFactory {
 public:
-  Envoy::AccessLog::FilterPtr
+  absl::StatusOr<Envoy::AccessLog::FilterPtr>
   createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
                Server::Configuration::GenericFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

@@ -180,7 +180,7 @@ const std::string JwtTextECNoKid =
 
 class VerifyJwkECTest : public testing::Test {
 protected:
-  void SetUp() {
+  void SetUp() override {
     jwks_ = Jwks::createFrom(PublicKeyJwkEC, Jwks::Type::JWKS);
     EXPECT_EQ(jwks_->getStatus(), Status::Ok);
   }

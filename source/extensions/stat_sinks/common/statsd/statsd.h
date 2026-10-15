@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
@@ -17,8 +19,6 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
@@ -26,6 +26,22 @@ namespace Common {
 namespace Statsd {
 
 static const std::string& getDefaultPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "envoy"); }
+
+/**
+ * Scales a histogram sample to the milliseconds reported for a statsd timer when the histogram's
+ * unit requires it. Samples of histograms recording nanoseconds or microseconds are scaled. Samples
+ * of histograms recording milliseconds are reported unchanged, as are those of histograms without a
+ * unit (many of which measure milliseconds already) and of byte histograms, for which statsd has no
+ * dedicated metric type; for those the sample keeps its integer representation. With
+ * `scale_by_unit` false no sample is scaled, which is the behavior before unit scaling was
+ * introduced.
+ * @param histogram the histogram the sample was recorded on.
+ * @param value the recorded sample in the histogram's unit.
+ * @param scale_by_unit whether to scale by the histogram's unit.
+ * @return the sample in milliseconds when it was scaled, or nullopt when it is reported unchanged.
+ */
+std::optional<double> scaledTimerMilliseconds(const Stats::Histogram& histogram, uint64_t value,
+                                              bool scale_by_unit);
 
 /**
  * Implementation of Sink that writes to a UDP statsd address.
@@ -43,16 +59,19 @@ public:
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt,
-                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat());
+                std::optional<uint64_t> buffer_size = std::nullopt,
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat(),
+                const bool scale_histogram_units = false);
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt,
-                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat())
+                std::optional<uint64_t> buffer_size = std::nullopt,
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat(),
+                const bool scale_histogram_units = false)
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
-        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
+        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format),
+        scale_histogram_units_(scale_histogram_units) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -63,6 +82,7 @@ public:
 
   bool getUseTagForTest() { return use_tag_; }
   uint64_t getBufferSizeForTest() { return buffer_size_; }
+  bool getScaleHistogramUnitsForTest() { return scale_histogram_units_; }
   const std::string& getPrefix() { return prefix_; }
 
 private:
@@ -91,13 +111,16 @@ private:
   template <class StatType> const std::string getName(const StatType& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
-  const ThreadLocal::SlotPtr tls_;
+  const ThreadLocal::SlotSharedPtr tls_;
   const Network::Address::InstanceConstSharedPtr server_address_;
   const bool use_tag_;
   // Prefix for all flushed stats.
   const std::string prefix_;
   const uint64_t buffer_size_;
   const Statsd::TagFormat tag_format_;
+  // Whether histogram samples are scaled to milliseconds according to the histogram's unit before
+  // being reported as timers.
+  const bool scale_histogram_units_;
 };
 
 /**
@@ -111,31 +134,39 @@ public:
   static absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
   create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
          ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-         Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
+         Stats::Scope& scope, const std::string& prefix = getDefaultPrefix(),
+         const bool scale_histogram_units = false);
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   const std::string& getPrefix() { return prefix_; }
+  bool getScaleHistogramUnitsForTest() { return scale_histogram_units_; }
 
 protected:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                 ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                 Stats::Scope& scope, absl::Status& creation_status,
-                const std::string& prefix = getDefaultPrefix());
+                const std::string& prefix = getDefaultPrefix(),
+                const bool scale_histogram_units = false);
 
 private:
+  // 16KiB intermediate buffer for flushing.
+  static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
+
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
     TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher);
     ~TlsSink() override;
 
-    void beginFlush(bool expect_empty_buffer);
+    void beginFlush(bool expect_empty_buffer, uint64_t slice_size = FLUSH_SLICE_SIZE_BYTES);
     void commonFlush(const std::string& name, uint64_t value, char stat_type);
     void flushCounter(const std::string& name, uint64_t delta);
     void flushGauge(const std::string& name, uint64_t value);
     void endFlush(bool do_write);
     void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
+    // For samples scaled to milliseconds from a finer unit.
+    void onScaledTimespanComplete(const std::string& name, double milliseconds);
     void onPercentHistogramComplete(const std::string& name, float value);
     uint64_t usedBuffer() const;
     void write(Buffer::Instance& buffer);
@@ -149,21 +180,20 @@ private:
     Event::Dispatcher& dispatcher_;
     Network::ClientConnectionPtr connection_;
     Buffer::OwnedImpl buffer_;
-    absl::optional<Buffer::ReservationSingleSlice> current_buffer_reservation_;
+    std::optional<Buffer::ReservationSingleSlice> current_buffer_reservation_;
     char* current_slice_mem_{};
   };
 
   // Somewhat arbitrary 16MiB limit for buffered stats.
   static constexpr uint32_t MAX_BUFFERED_STATS_BYTES = (1024 * 1024 * 16);
 
-  // 16KiB intermediate buffer for flushing.
-  static constexpr uint32_t FLUSH_SLICE_SIZE_BYTES = (1024 * 16);
-
   // Prefix for all flushed stats.
   const std::string prefix_;
+  // See UdpStatsdSink::scale_histogram_units_.
+  const bool scale_histogram_units_;
 
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   Upstream::ClusterManager& cluster_manager_;
   Stats::Counter& cx_overflow_stat_;
 };

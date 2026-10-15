@@ -88,6 +88,17 @@ TEST_P(AdminInstanceTest, AdminHeapDump) {
 #endif
 }
 
+TEST_P(AdminInstanceTest, AdminPeakHeapDump) {
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+
+#ifdef TCMALLOC
+  EXPECT_EQ(Http::Code::OK, postCallback("/peak_heap_dump", header_map, data));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/peak_heap_dump", header_map, data));
+#endif
+}
+
 TEST_P(AdminInstanceTest, AdminAllocationDump) {
   Buffer::OwnedImpl data;
   Http::TestResponseHeaderMapImpl header_map;

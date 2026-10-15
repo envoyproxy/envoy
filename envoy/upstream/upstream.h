@@ -5,6 +5,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,15 +29,26 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "fmt/format.h"
 
 namespace Envoy {
 namespace Http {
+class ClientCodecFactory;
 class FilterChainManager;
 class HashPolicy;
 } // namespace Http
+
+namespace ConnectionPool {
+class PendingStream;
+} // namespace ConnectionPool
+
+namespace Extensions {
+namespace QueuePolicy {
+template <class ItemType> class QueuePolicyFactory;
+} // namespace QueuePolicy
+} // namespace Extensions
 
 namespace Router {
 class ShadowPolicy;
@@ -121,7 +133,7 @@ public:
    */
   virtual absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
   createLocalAddressSelector(std::vector<UpstreamLocalAddress> upstream_local_addresses,
-                             absl::optional<std::string> cluster_name) const PURE;
+                             std::optional<std::string> cluster_name) const PURE;
 
   std::string category() const override { return "envoy.upstream.local_address_selector"; }
 };
@@ -215,6 +227,23 @@ public:
       Event::Dispatcher& dispatcher,
       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
       const envoy::config::core::v3::Metadata* metadata) const PURE;
+
+  /**
+   * Create a dedicated connection for ORCA out-of-band load reporting per gRFC A51
+   * (xds.service.orca.v3.OpenRcaService), separate from request and health-check pools.
+   * @param dispatcher supplies the owning dispatcher.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
+   * @param factory the transport socket factory for the connection, resolved by the caller.
+   * @param orca_address the resolved address to dial; the caller applies any port override.
+   * Implementations should use the host's address list only when this equals the host address.
+   * @return the connection data.
+   */
+  virtual CreateConnectionData createOrcaReportingConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      Network::UpstreamTransportSocketFactory& factory,
+      Network::Address::InstanceConstSharedPtr orca_address) const PURE;
 
   /**
    * @return host specific gauges.
@@ -323,6 +352,19 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
+
+  /**
+   * Store the HTTP status code from the last active health check response.
+   * Used by HDS to report richer health state to the control plane.
+   * 0 means no response has been recorded yet.
+   */
+  virtual void setLastHealthCheckHttpStatus(uint64_t) PURE;
+
+  /**
+   * @return the HTTP status code from the last active health check response, or
+   * 0 if no response has been recorded.
+   */
+  virtual std::optional<uint64_t> lastHealthCheckHttpStatus() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -334,6 +376,42 @@ using ExcludedHostVector = Phantom<HostVector, Excluded>;
 using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostMapSharedPtr = std::shared_ptr<HostMap>;
 using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
+
+/**
+ * Read only host map indexed by host address string. The map is created in the main thread and
+ * shared by all the worker threads.
+ */
+class HostLookupMap {
+public:
+  virtual ~HostLookupMap() = default;
+
+  /**
+   * @param address the host address string to look up.
+   * @return const HostSharedPtr& the host for the address, or a null host if absent. The reference
+   *         is only valid while the map is alive.
+   */
+  virtual const HostSharedPtr& findHost(absl::string_view address) const PURE;
+
+  /**
+   * @return size_t the number of hosts in the map.
+   */
+  virtual size_t size() const PURE;
+
+  /**
+   * @return bool true if the map holds no hosts.
+   */
+  virtual bool empty() const PURE;
+
+  /**
+   * Invokes a callback for each (address, host) entry. Iteration order is unspecified.
+   *
+   * @param cb the callback to invoke for each entry.
+   */
+  virtual void
+  forEach(absl::FunctionRef<void(absl::string_view, const HostSharedPtr&)> cb) const PURE;
+};
+using HostLookupMapConstSharedPtr = std::shared_ptr<const HostLookupMap>;
+
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -562,10 +640,10 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
-   * @return HostMapConstSharedPtr read only cross priority host map that indexed by host address
+   * @return HostLookupMapConstSharedPtr read only cross priority host map indexed by host address
    * string.
    */
-  virtual HostMapConstSharedPtr crossPriorityHostMap() const PURE;
+  virtual HostLookupMapConstSharedPtr crossPriorityHostMap() const PURE;
 
   /**
    * Parameter class for updateHosts.
@@ -597,9 +675,9 @@ public:
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<bool> weighted_priority_health,
-                           absl::optional<uint32_t> overprovisioning_factor,
-                           HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
+                           std::optional<bool> weighted_priority_health,
+                           std::optional<uint32_t> overprovisioning_factor,
+                           HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
   /**
    * Callback provided during batch updates that can be used to update hosts.
@@ -617,12 +695,17 @@ public:
      * @param hosts_removed supplies the hosts removed since the last update.
      * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
      * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
+     * @param cross_priority_host_map read only cross-priority host map which is created in the main
+     * thread and shared by all the worker threads. This is used when a coalesced batch host update
+     * is applied to a worker thread's priority set, where the shared map is delivered once for the
+     * whole batch.
      */
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
-                             absl::optional<bool> weighted_priority_health,
-                             absl::optional<uint32_t> overprovisioning_factor) PURE;
+                             std::optional<bool> weighted_priority_health,
+                             std::optional<uint32_t> overprovisioning_factor,
+                             HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
   };
 
   /**
@@ -647,6 +730,13 @@ public:
    * @param callback callback to use to add hosts.
    */
   virtual void batchHostUpdate(BatchUpdateCb& callback) PURE;
+
+  /**
+   * @return true if a batch host update (see batchHostUpdate()) is currently in progress. This
+   * remains true while the batch's end-of-batch MemberUpdateCb callbacks are running, allowing
+   * update callbacks to distinguish a coalesced batch update from an individual update.
+   */
+  virtual bool batchUpdateActive() const PURE;
 };
 
 /**
@@ -724,6 +814,7 @@ public:
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \
   COUNTER(upstream_cx_pool_overflow)                                                               \
+  COUNTER(upstream_cx_preconnect_skipped)                                                          \
   COUNTER(upstream_cx_protocol_error)                                                              \
   COUNTER(upstream_cx_rx_bytes_total)                                                              \
   COUNTER(upstream_cx_total)                                                                       \
@@ -738,6 +829,7 @@ public:
   COUNTER(upstream_rq_completed)                                                                   \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
   COUNTER(upstream_rq_max_duration_reached)                                                        \
+  COUNTER(upstream_rq_active_overflow)                                                             \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
@@ -751,6 +843,7 @@ public:
   COUNTER(upstream_rq_retry_overflow)                                                              \
   COUNTER(upstream_rq_retry_success)                                                               \
   COUNTER(upstream_rq_rx_reset)                                                                    \
+  COUNTER(upstream_rq_rx_reset_no_error)                                                           \
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
@@ -758,6 +851,7 @@ public:
   GAUGE(upstream_cx_active, Accumulate)                                                            \
   GAUGE(upstream_cx_rx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
+  GAUGE(upstream_queue_overloaded, Accumulate)                                                     \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
@@ -871,12 +965,10 @@ struct ClusterCircuitBreakersStats {
 };
 
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
-using ClusterRequestResponseSizeStatsOptRef =
-    absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
+using ClusterRequestResponseSizeStatsOptRef = OptRef<ClusterRequestResponseSizeStats>;
 
 using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
-using ClusterTimeoutBudgetStatsOptRef =
-    absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>;
+using ClusterTimeoutBudgetStatsOptRef = OptRef<ClusterTimeoutBudgetStats>;
 
 /**
  * All extension protocol specific options returned by the method at
@@ -886,6 +978,18 @@ using ClusterTimeoutBudgetStatsOptRef =
 class ProtocolOptionsConfig {
 public:
   virtual ~ProtocolOptionsConfig() = default;
+
+  /**
+   * @return an optional upstream (client) HTTP codec factory provided by this options object.
+   *         Defaults to none. An options extension attached via typed_extension_protocol_options
+   *         can override this to make CodecClientProd build a custom or decorated client codec.
+   *         The returned factory's lifetime must be owned by this options object (e.g. by being
+   *         the object itself or a member of it): ClusterInfoImpl pins it with a shared_ptr
+   *         aliasing the options object, so a factory owned elsewhere would dangle.
+   */
+  virtual OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const {
+    return {};
+  }
 };
 using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOptionsConfig>;
 
@@ -921,19 +1025,19 @@ public:
   commonHttpProtocolOptions() const PURE;
 
   /**
-   * @return const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>& the
-   *         optional upstream-specific HTTP protocol options. Returns absl::nullopt if not
+   * @return const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>& the
+   *         optional upstream-specific HTTP protocol options. Returns std::nullopt if not
    *         configured.
    */
-  virtual const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
+  virtual const std::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&
   upstreamHttpProtocolOptions() const PURE;
 
   /**
-   * @return const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+   * @return const std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
    *         the optional alternate protocols cache options for upstream connections. Returns
-   *         absl::nullopt if not configured.
+   *         std::nullopt if not configured.
    */
-  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  virtual const std::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const PURE;
 
   /**
@@ -1010,17 +1114,17 @@ public:
   /**
    * @return the idle timeout for upstream HTTP connection pool connections.
    */
-  virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+  virtual const std::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return the idle timeout for each connection in TCP connection pool.
    */
-  virtual const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const PURE;
+  virtual const std::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const PURE;
 
   /**
    * @return optional maximum connection duration timeout for manager connections.
    */
-  virtual const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+  virtual const std::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
   /**
    * @return how many streams should be anticipated per each current stream.
@@ -1033,9 +1137,22 @@ public:
   virtual float peekaheadRatio() const PURE;
 
   /**
+   * @param host the upstream host being considered for a preconnect.
+   * @return whether anticipatory connections may be opened to the host, per the cluster's
+   * preconnect_enabled_metadata matcher. Does not affect on-demand connections for requests.
+   */
+  virtual bool shouldPreconnect(const Host& host) const PURE;
+
+  /**
    * @return soft limit on size of the cluster's connections read and write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
+
+  /**
+   * @return how long an upstream connection is allowed to remain above the buffer high watermark
+   * before being closed. A zero duration disables the timeout.
+   */
+  virtual std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const PURE;
 
   /**
    * @return uint64_t features supported by the cluster. @see Features.
@@ -1059,6 +1176,15 @@ public:
   }
 
   /**
+   * @return OptRef<const Http::ClientCodecFactory> a per-cluster factory for the upstream (client)
+   *         HTTP codec, if one was attached via typed_extension_protocol_options. When empty, the
+   *         stock codec is used. Non-pure so that only ClusterInfoImpl has to provide it.
+   */
+  virtual OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const {
+    return {};
+  }
+
+  /**
    * @return OptRef<const LoadBalancerConfig> the validated load balancing policy configuration to
    * use for this cluster.
    */
@@ -1078,11 +1204,11 @@ public:
 
   /**
    * @param response Http::ResponseHeaderMap response headers received from upstream
-   * @return absl::optional<bool> absl::nullopt is returned when matching did not took place.
+   * @return std::optional<bool> std::nullopt is returned when matching did not took place.
    *         Otherwise, the boolean value indicates the matching result. True indicates that
    *         response should be treated as error, False as success.
    */
-  virtual absl::optional<bool>
+  virtual std::optional<bool>
   processHttpForOutlierDetection(Http::ResponseHeaderMap& response) const PURE;
 
   /**
@@ -1097,7 +1223,7 @@ public:
   clusterType() const PURE;
 
   /**
-   * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
+   * @return const std::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
    *         for the upstream, if a custom upstream is configured.
    */
   virtual OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const PURE;
@@ -1126,7 +1252,7 @@ public:
   /**
    * @return uint32_t the maximum total size of response headers in KB.
    */
-  virtual absl::optional<uint16_t> maxResponseHeadersKb() const PURE;
+  virtual std::optional<uint16_t> maxResponseHeadersKb() const PURE;
 
   /**
    * @return the human readable name of the cluster.
@@ -1184,14 +1310,13 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * @return absl::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
-   * headers/body sizes of request/response for this cluster.
+   * @return ClusterRequestResponseSizeStatsOptRef stats to track headers/body sizes of
+   * request/response for this cluster.
    */
   virtual ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const PURE;
 
   /**
-   * @return absl::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
-   * budgets for this cluster.
+   * @return ClusterTimeoutBudgetStatsOptRef stats on timeout budgets for this cluster.
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
@@ -1214,6 +1339,27 @@ public:
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * Queue policy for cluster pending requests, resolved once at cluster configuration load time
+   * so that connection pool creation does not need to perform a factory lookup or proto
+   * translation.
+   */
+  struct PendingRqQueuePolicy {
+    // Queue policy factory. Points into the static factory registry.
+    Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>* factory_{};
+    // Translated queue policy configuration.
+    std::unique_ptr<const Protobuf::Message> config_;
+    // Cluster-specific prefix supplied to the queue policy factory.
+    std::string stat_prefix_;
+  };
+
+  /**
+   * @return OptRef<const PendingRqQueuePolicy> the resolved queue policy for cluster pending
+   * requests, or nullopt when not configured (in which case the default FIFO queue policy is
+   * used).
+   */
+  virtual OptRef<const PendingRqQueuePolicy> pendingRqQueuePolicy() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections
@@ -1253,7 +1399,7 @@ public:
    * Calculate upstream protocol(s) based on features.
    */
   virtual std::vector<Http::Protocol>
-  upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
+  upstreamHttpProtocol(std::optional<Http::Protocol> downstream_protocol) const PURE;
 
   /**
    * @return the Http1 Codec Stats.
@@ -1302,6 +1448,7 @@ protected:
 
 using ClusterInfoConstSharedPtr = std::shared_ptr<const ClusterInfo>;
 
+class AdminEndpointProvider;
 class HealthChecker;
 
 /**
@@ -1377,10 +1524,16 @@ public:
    * Set up the drop_category value for the thread local cluster.
    */
   virtual void setDropCategory(absl::string_view drop_category) PURE;
+
+  /**
+   * @return the cluster's admin endpoint provider, used to render synthetic, display-only entries
+   *         on the admin /clusters page, or nullptr if the cluster has none. Defaults to nullptr.
+   */
+  virtual const AdminEndpointProvider* adminEndpointProvider() const { return nullptr; }
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
-using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
+using ClusterConstOptRef = OptRef<const Cluster>;
 
 } // namespace Upstream
 } // namespace Envoy
@@ -1400,3 +1553,22 @@ template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_vie
 };
 
 } // namespace fmt
+
+namespace std {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) const -> decltype(ctx.out()) {
+    absl::string_view out = !host.hostname().empty() ? host.hostname()
+                            : host.address()         ? host.address()->asStringView()
+                                                     : "<empty>";
+    return std::formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace std

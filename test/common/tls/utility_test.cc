@@ -1,16 +1,22 @@
 #include <openssl/x509.h>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
+
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/ssl/tls_certificate_config.h"
 
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/tls/utility.h"
 
 #include "test/common/tls/ssl_test_utility.h"
+#include "test/common/tls/test_data/intermediate_ca_cert_info.h"
 #include "test/common/tls/test_data/long_validity_cert_info.h"
 #include "test/common/tls/test_data/san_dns_cert_info.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -181,6 +187,30 @@ TEST(UtilityTest, TestGetSerialNumber) {
   EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*cert));
 }
 
+TEST(UtilityTest, TestGetSha256DigestFromCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  EXPECT_EQ(TEST_SAN_DNS_CERT_256_HASH, Utility::getSha256DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha1DigestFromCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  EXPECT_EQ(TEST_SAN_DNS_CERT_1_HASH, Utility::getSha1DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha256DigestFromIntermediateCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"));
+  EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_256_HASH, Utility::getSha256DigestFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestGetSha1DigestFromIntermediateCertificate) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/intermediate_ca_cert.pem"));
+  EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_1_HASH, Utility::getSha1DigestFromCertificate(*cert));
+}
+
 TEST(UtilityTest, TestExpirationWithUnixTimeWithExpiredCert) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
@@ -189,7 +219,8 @@ TEST(UtilityTest, TestExpirationWithUnixTimeWithExpiredCert) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
+  auto cert_expiry = TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  EXPECT_EQ(absl::ToUnixSeconds(cert_expiry), Utility::getExpirationUnixTime(cert.get()).count());
 }
 
 TEST(UtilityTest, TestExpirationWithUnixTimeWithNotExpiredCert) {
@@ -199,7 +230,8 @@ TEST(UtilityTest, TestExpirationWithUnixTimeWithNotExpiredCert) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
+  auto cert_expiry = TestUtility::parseTime(TEST_SAN_DNS_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  EXPECT_EQ(absl::ToUnixSeconds(cert_expiry), Utility::getExpirationUnixTime(cert.get()).count());
 }
 
 TEST(UtilityTest, TestDaysUntilExpiration) {
@@ -210,7 +242,7 @@ TEST(UtilityTest, TestDaysUntilExpiration) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(absl::nullopt, Utility::getDaysUntilExpiration(cert.get(), time_source));
+  EXPECT_EQ(std::nullopt, Utility::getDaysUntilExpiration(cert.get(), time_source));
 }
 
 TEST(UtilityTest, TestDaysUntilExpirationWithNull) {
@@ -300,7 +332,9 @@ TEST(UtilityTest, SslErrorDescriptionTest) {
       {SSL_ERROR_SSL, "SSL"},
       {SSL_ERROR_WANT_READ, "WANT_READ"},
       {SSL_ERROR_WANT_WRITE, "WANT_WRITE"},
+#ifdef SSL_ERROR_WANT_PRIVATE_KEY_OPERATION
       {SSL_ERROR_WANT_PRIVATE_KEY_OPERATION, "WANT_PRIVATE_KEY_OPERATION"},
+#endif
   };
 
   for (const auto& test_data : test_set) {
@@ -381,6 +415,76 @@ TEST(UtilityTest, TestMapX509Stack) {
   bssl::UniquePtr<STACK_OF(X509)> fake_cert_chain(sk_X509_new_null());
   sk_X509_push(fake_cert_chain.get(), nullptr);
   EXPECT_EQ(std::vector<std::string>{""}, Utility::mapX509Stack(*fake_cert_chain, func));
+}
+
+using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+
+TEST(UtilityTest, CompliancePolicyFromProto) {
+  TlsProto params;
+  EXPECT_EQ(std::nullopt, Utility::compliancePolicyFromProto(params));
+
+  params.add_compliance_policies(TlsProto::FIPS_202205);
+  EXPECT_EQ(TlsProto::FIPS_202205, Utility::compliancePolicyFromProto(params));
+
+  // More than one policy only reaches here for a proto built without validation.
+  params.add_compliance_policies(TlsProto::CNSA1_202603);
+  EXPECT_ENVOY_BUG(EXPECT_EQ(std::nullopt, Utility::compliancePolicyFromProto(params)),
+                   "more than one policies are not supported");
+}
+
+TEST(UtilityTest, CompliancePolicyToSslPolicy) {
+  EXPECT_TRUE(Utility::compliancePolicyToSslPolicy(TlsProto::FIPS_202205).ok());
+  EXPECT_TRUE(Utility::compliancePolicyToSslPolicy(TlsProto::CNSA2_202603).ok());
+  EXPECT_TRUE(Utility::compliancePolicyToSslPolicy(TlsProto::CNSA1_202603).ok());
+
+  const absl::StatusOr<ssl_compliance_policy_t> unknown =
+      Utility::compliancePolicyToSslPolicy(static_cast<TlsProto::CompliancePolicy>(1234));
+  EXPECT_FALSE(unknown.ok());
+  EXPECT_EQ("Unknown compliance policy: 1234", unknown.status().message());
+}
+
+TEST(UtilityTest, TlsVersionFromProto) {
+  EXPECT_EQ(TLS1_2_VERSION, Utility::tlsVersionFromProto(TlsProto::TLS_AUTO, TLS1_2_VERSION));
+  EXPECT_EQ(TLS1_VERSION, Utility::tlsVersionFromProto(TlsProto::TLSv1_0, 0));
+  EXPECT_EQ(TLS1_1_VERSION, Utility::tlsVersionFromProto(TlsProto::TLSv1_1, 0));
+  EXPECT_EQ(TLS1_2_VERSION, Utility::tlsVersionFromProto(TlsProto::TLSv1_2, 0));
+  EXPECT_EQ(TLS1_3_VERSION, Utility::tlsVersionFromProto(TlsProto::TLSv1_3, 0));
+
+  EXPECT_ENVOY_BUG(
+      EXPECT_EQ(TLS1_2_VERSION, Utility::tlsVersionFromProto(static_cast<TlsProto::TlsProtocol>(99),
+                                                             TLS1_2_VERSION)),
+      "unexpected tls version");
+}
+
+TEST(UtilityTest, ApplyCompliancePolicy) {
+  bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ssl_ctx.get()));
+  const TlsProto::CompliancePolicy unknown = static_cast<TlsProto::CompliancePolicy>(1234);
+
+  EXPECT_TRUE(Utility::applyCompliancePolicyToSslCtx(TlsProto::FIPS_202205, ssl_ctx.get()).ok());
+  EXPECT_EQ("Unknown compliance policy: 1234",
+            Utility::applyCompliancePolicyToSslCtx(unknown, ssl_ctx.get()).message());
+
+  EXPECT_TRUE(Utility::applyCompliancePolicyToSsl(TlsProto::FIPS_202205, ssl.get()).ok());
+  EXPECT_EQ("Unknown compliance policy: 1234",
+            Utility::applyCompliancePolicyToSsl(unknown, ssl.get()).message());
+}
+
+TEST(UtilityTest, EffectiveTlsParamsSkipsHandshakerOwnedFields) {
+  const Ssl::TlsParams params{
+      .cipher_suites = "ECDHE-RSA-AES128-GCM-SHA256",
+      .ecdh_curves = "P-256",
+      .signature_algorithms = "rsa_pss_rsae_sha256",
+  };
+  const Utility::EffectiveTlsParams all = Utility::effectiveTlsParams(params, false, false);
+  EXPECT_EQ(params.cipher_suites, all.cipher_suites);
+  EXPECT_EQ(params.ecdh_curves, all.ecdh_curves);
+  EXPECT_EQ(params.signature_algorithms, all.signature_algorithms);
+
+  const Utility::EffectiveTlsParams none = Utility::effectiveTlsParams(params, true, true);
+  EXPECT_TRUE(none.cipher_suites.empty());
+  EXPECT_TRUE(none.ecdh_curves.empty());
+  EXPECT_TRUE(none.signature_algorithms.empty());
 }
 
 } // namespace

@@ -21,7 +21,7 @@ class AssertionFilterTest : public testing::Test {
 public:
   void setUpFilter(std::string&& proto_str) {
     envoymobile::extensions::filters::http::assertion::Assertion config;
-    Protobuf::TextFormat::ParseFromString(proto_str, &config);
+    std::ignore = Protobuf::TextFormat::ParseFromString(proto_str, &config);
     config_ = std::make_shared<AssertionFilterConfig>(config, context_);
     filter_ = std::make_unique<AssertionFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -689,7 +689,7 @@ match_config {
 }
 )EOF";
 
-  Protobuf::TextFormat::ParseFromString(config_str, &proto_config);
+  std::ignore = Protobuf::TextFormat::ParseFromString(config_str, &proto_config);
 
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(proto_config, "test", context).value();

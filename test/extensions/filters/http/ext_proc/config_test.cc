@@ -1,6 +1,13 @@
-#include "source/extensions/filters/http/ext_proc/config.h"
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
 
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/http/ext_proc/config.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
+
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -13,6 +20,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
+
+using StatusHelpers::HasStatus;
 
 TEST(HttpExtProcConfigTest, CorrectConfig) {
   std::string yaml = R"EOF(
@@ -103,9 +112,10 @@ TEST(HttpExtProcConfigTest, CorrectGrpcServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -130,9 +140,11 @@ TEST(HttpExtProcConfigTest, CorrectHttpServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, messageValidationVisitor()).Times(testing::AtLeast(1));
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -200,12 +212,10 @@ TEST(HttpExtProcConfigTest, InvalidHttpServiceProcessingMode) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(result.status().message(),
-            "If the ext_proc filter is configured with http_service instead of gRPC service, "
-            "then the processing modes of this filter can not be configured to send body or "
-            "trailer.");
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "If the ext_proc filter is configured with http_service instead "
+                                "of gRPC service, then the processing modes of this filter can "
+                                "not be configured to send body or trailer."));
 }
 
 TEST(HttpExtProcConfigTest, HttpServiceTrailerProcessingModeNotSKIP) {
@@ -230,12 +240,10 @@ TEST(HttpExtProcConfigTest, HttpServiceTrailerProcessingModeNotSKIP) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(result.status().message(),
-            "If the ext_proc filter is configured with http_service instead of gRPC service, "
-            "then the processing modes of this filter can not be configured to send body or "
-            "trailer.");
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "If the ext_proc filter is configured with http_service instead "
+                                "of gRPC service, then the processing modes of this filter can "
+                                "not be configured to send body or trailer."));
 }
 
 TEST(HttpExtProcConfigTest, InvalidFullDuplexStreamedConfig) {
@@ -254,11 +262,10 @@ TEST(HttpExtProcConfigTest, InvalidFullDuplexStreamedConfig) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(result.status().message(),
-            "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
-            "then the request_trailer_mode has to be set to SEND");
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "If the ext_proc filter has the request_body_mode set to "
+                                "FULL_DUPLEX_STREAMED, then the request_trailer_mode has to be "
+                                "set to SEND"));
 }
 
 TEST(HttpExtProcConfigTest, GrpcServiceHttpServiceBothSet) {
@@ -283,10 +290,9 @@ TEST(HttpExtProcConfigTest, GrpcServiceHttpServiceBothSet) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(result.status().message(),
-            "One and only one of grpc_service or http_service must be configured");
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "One and only one of grpc_service or http_service must be "
+                                "configured"));
 }
 
 // Verify that the "disable_route_cache_clearing" and "route_cache_action"  setting
@@ -306,10 +312,9 @@ TEST(HttpExtProcConfigTest, InvalidRouteCacheConfig) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(result.ok());
-  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(result.status().message(), "disable_clear_route_cache and route_cache_action can not "
-                                       "be set to none-default at the same time.");
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "disable_clear_route_cache and route_cache_action can not be "
+                                "set to none-default at the same time."));
 }
 
 TEST(HttpExtProcConfigTest, InvalidServiceConfigServerContext) {
@@ -331,9 +336,12 @@ TEST(HttpExtProcConfigTest, InvalidServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context),
-      EnvoyException, "One and only one of grpc_service or http_service must be configured");
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
+  auto result = factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context);
+  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
+                                "One and only one of grpc_service or http_service must be "
+                                "configured"));
 }
 
 TEST(HttpExtProcConfigTest, EmptyConfig) {
@@ -400,9 +408,10 @@ TEST(HttpExtProcConfigTest, UpstreamConfig) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor());
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -484,7 +493,7 @@ TEST(HttpExtProcConfigTest, FullDuplexStreamedValidation) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   // Invalid configuration: FULL_DUPLEX_STREAMED with SKIP trailers
   std::string invalid_yaml = R"EOF(
@@ -501,10 +510,11 @@ TEST(HttpExtProcConfigTest, FullDuplexStreamedValidation) {
   TestUtility::loadFromYaml(invalid_yaml, *proto_config);
 
   auto invalid_result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_FALSE(invalid_result.ok());
-  EXPECT_EQ(invalid_result.status().message(),
-            "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
-            "then the response_trailer_mode has to be set to SEND");
+  EXPECT_THAT(invalid_result,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "If the ext_proc filter has the response_body_mode set to "
+                        "FULL_DUPLEX_STREAMED, then the response_trailer_mode has to be "
+                        "set to SEND"));
 
   // Verify other response_body_mode values work with SKIP trailers
   std::string other_modes_yaml = R"EOF(
@@ -521,7 +531,7 @@ TEST(HttpExtProcConfigTest, FullDuplexStreamedValidation) {
   TestUtility::loadFromYaml(other_modes_yaml, *proto_config);
 
   auto other_result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
-  EXPECT_TRUE(other_result.ok());
+  EXPECT_OK(other_result);
 }
 
 TEST(HttpExtProcConfigTest, StatusOnErrorConfig) {
@@ -566,6 +576,108 @@ TEST(HttpExtProcConfigTest, StatusOnErrorDefaultConfig) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+TEST(HttpExtProcConfigTest, EmitClientSpanConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  emit_client_span: false
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpExtProcConfigTest, PerRouteEmitClientSpanConfig) {
+  std::string yaml = R"EOF(
+  overrides:
+    emit_client_span: false
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory
+          .createRouteSpecificFilterConfig(*proto_config, context,
+                                           context.messageValidationVisitor())
+          .value();
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config);
+  EXPECT_TRUE(typed_config.emitClientSpan().has_value());
+  EXPECT_FALSE(typed_config.emitClientSpan().value());
+}
+
+// The gRPC client is shared across listeners and clusters via a central cache, so it must always
+// be created with the server scope. In particular the scope of an upstream filter, which has a
+// 'cluster.<cluster_name>.' prefix, must not leak into the gRPC client stats.
+TEST(HttpExtProcConfigTest, GrpcClientIsCreatedWithServerScope) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  failure_mode_allow: true
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl cluster_store;
+  Stats::ScopeSharedPtr cluster_scope = cluster_store.createScope("cluster.fake_cluster");
+
+  // Create the filter as an upstream filter, that is with the cluster scope.
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
+  extra_context.scope = *cluster_scope;
+  extra_context.is_upstream = true;
+
+  Http::FilterFactoryCb cb =
+      factory.createHttpFilterFactoryFromProto(*proto_config, context, extra_context).value();
+
+  Http::StreamFilterSharedPtr filter;
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_)).WillOnce(testing::SaveArg<0>(&filter));
+  cb(filter_callback);
+
+  // Opening the stream is the point at which the client asks for the raw async client with the
+  // scope that it was created with. Fail the creation to keep the test to the scope check.
+  Stats::Scope* client_scope = nullptr;
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_,
+              getOrCreateRawAsyncClientWithHashKey(_, _, _))
+      .WillOnce(testing::Invoke(
+          [&client_scope](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope& scope,
+                          bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+            client_scope = &scope;
+            return absl::InternalError("no client for this test");
+          }));
+
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  filter->decodeHeaders(headers, true);
+
+  ASSERT_NE(client_scope, nullptr);
+  EXPECT_EQ(client_scope, &context.scope());
+  EXPECT_NE(client_scope, cluster_scope.get());
+
+  filter->onDestroy();
 }
 
 } // namespace

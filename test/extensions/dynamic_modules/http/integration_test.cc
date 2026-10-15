@@ -1,11 +1,84 @@
+#include <atomic>
+
 #include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/tracer_config.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/logging.h"
 
 namespace Envoy {
+
+namespace {
+
+// Counts child spans named "off_thread_work" that were finished, so SpanAcrossCallbacks can confirm
+// a span spawned in on_request_headers was finished from a later event hook.
+std::atomic<uint32_t>& offThreadWorkSpansFinished() {
+  static std::atomic<uint32_t> counter{0};
+  return counter;
+}
+
+// A minimal tracer that keeps the active span non-null so a module can spawn and finish real child
+// spans. Only the child operation name matters here, so every other method is a no-op.
+class TestTracerSpan : public Tracing::Span {
+public:
+  explicit TestTracerSpan(std::string operation) : operation_(std::move(operation)) {}
+  void setOperation(absl::string_view operation) override { operation_ = std::string(operation); }
+  void setTag(absl::string_view, absl::string_view) override {}
+  void log(SystemTime, const std::string&) override {}
+  void finishSpan() override {
+    if (operation_ == "off_thread_work") {
+      offThreadWorkSpansFinished().fetch_add(1);
+    }
+  }
+  void injectContext(Tracing::TraceContext&, const Tracing::UpstreamContext&) override {}
+  Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
+                              SystemTime) override {
+    return std::make_unique<TestTracerSpan>(name);
+  }
+  void setSampled(bool) override {}
+  bool exportedSpan() const override { return false; }
+  bool useLocalDecision() const override { return false; }
+  std::string getBaggage(absl::string_view) override { return ""; }
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getTraceId() const override { return ""; }
+  std::string getSpanId() const override { return ""; }
+
+private:
+  std::string operation_;
+};
+
+class TestTracerDriver : public Tracing::Driver {
+public:
+  Tracing::SpanPtr startSpan(const Tracing::Config&, Tracing::TraceContext&,
+                             const StreamInfo::StreamInfo&, const std::string& operation_name,
+                             Tracing::Decision) override {
+    return std::make_unique<TestTracerSpan>(operation_name);
+  }
+};
+
+class TestTracerFactory : public Server::Configuration::TracerFactory {
+public:
+  Tracing::DriverSharedPtr
+  createTracerDriver(const Protobuf::Message&,
+                     Server::Configuration::TracerFactoryContext&) override {
+    return std::make_shared<TestTracerDriver>();
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  std::string name() const override { return "envoy.tracers.dynamic_modules_test"; }
+};
+
+REGISTER_FACTORY(TestTracerFactory, Server::Configuration::TracerFactory);
+
+} // namespace
 
 class DynamicModulesIntegrationTest : public testing::TestWithParam<std::string>,
                                       public HttpIntegrationTest {
@@ -22,7 +95,7 @@ public:
   initializeFilter(const std::string& filter_name, const std::string& config = "",
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
-                   bool upstream_filter = false) {
+                   bool upstream_filter = false, const std::string& per_route_type_url = "") {
     std::string module_name = "http_integration_test";
     if (GetParam() != "rust_static") {
       TestEnvironment::setEnvVar(
@@ -48,10 +121,14 @@ typed_config:
 )EOF";
 
     if (!per_route_config.empty()) {
+      // The per-route config defaults to using ``type_url`` so existing callers continue to share
+      // the same Any type for both the filter and per-route configuration.
+      const std::string& effective_per_route_type_url =
+          per_route_type_url.empty() ? type_url : per_route_type_url;
       constexpr auto filter_per_route_config = R"EOF(
 dynamic_module_config:
   name: {}
-per_route_config_name: {}
+filter_name: {}
 filter_config:
   "@type": {}
   value: {}
@@ -59,7 +136,7 @@ filter_config:
       envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute
           per_route_config_proto;
       TestUtility::loadFromYaml(fmt::format(filter_per_route_config, module_name, filter_name,
-                                            type_url, per_route_config),
+                                            effective_per_route_type_url, per_route_config),
                                 per_route_config_proto);
 
       config_helper_.addConfigModifier(
@@ -70,7 +147,7 @@ filter_config:
                                ->Mutable(0)
                                ->mutable_typed_per_filter_config();
 
-            (*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
+            std::ignore = (*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
                 per_route_config_proto);
           });
     }
@@ -166,6 +243,240 @@ TEST_P(DynamicModulesIntegrationTest, PassThrough) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(10U, response->body().size());
+}
+
+TEST_P(DynamicModulesIntegrationTest, FilterConstructorFailsClosed) {
+  // A module whose filter constructor fails must return a 500 to the client instead of crashing the
+  // worker. Only the Rust module can force this path with a caught constructor panic.
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_new_panic filter is only in the rust test module";
+  }
+  initializeFilter("filter_new_panic");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  // The caught constructor panic is what leaves a null filter, so pin the 500 to that path.
+  EXPECT_LOG_CONTAINS("error", "caught panic at FFI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, GoHttpFilterConstructorPanicFailsClosed) {
+  // A Go module whose filter constructor panics must fail closed with a 500 instead of aborting the
+  // worker. The Go SDK panic barrier recovers the panic at the ABI boundary and returns a null
+  // filter.
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  if (GetParam() != "go") {
+    GTEST_SKIP() << "this exercises the Go SDK panic barrier";
+  }
+  initializeFilter("filter_new_panic");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS("error", "recovered panic at the ABI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, HttpFilterConstructorExceptionFailsClosed) {
+  // A C++ module whose filter constructor throws must fail closed with a 500 instead of aborting
+  // the worker. The C++ SDK barrier catches the exception at the ABI boundary and returns a null
+  // filter.
+  if (GetParam() != "cpp") {
+    GTEST_SKIP() << "the throw_on_filter_new filter is only in the cpp test module";
+  }
+  initializeFilter("throw_on_filter_new");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS("error", "caught exception at the ABI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, GenericSecretCallbacks) {
+  // The module subscribes by name with no config source, so the name resolves against the
+  // statically configured secrets.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("test_secret");
+    secret->mutable_generic_secret()->mutable_secret()->set_inline_string("super_secret_value");
+  });
+
+  initializeFilter("generic_secret_callbacks", "test_secret");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  // The value the module read while handling the request.
+  EXPECT_EQ(
+      "super_secret_value",
+      response->headers().get(Http::LowerCaseString("x-secret-value"))[0]->value().getStringView());
+  // The value the module read from the config context while the configuration was being loaded.
+  EXPECT_EQ("super_secret_value", response->headers()
+                                      .get(Http::LowerCaseString("x-secret-value-at-config"))[0]
+                                      ->value()
+                                      .getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionId) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the upstream_connection_id filter is only in the rust test module";
+  }
+
+  initializeFilter("upstream_connection_id");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, LogLevel) {
+  if (GetParam() == "cpp") {
+    GTEST_SKIP() << "the log_level filter is only in the rust and go test modules";
+  }
+
+  // Pin the dynamic modules logger to a known level so the assertions are deterministic, and
+  // restore it afterwards to avoid affecting other tests.
+  auto& logger = Logger::Registry::getLog(Logger::Id::dynamic_modules);
+  const spdlog::level::level_enum original_level = logger.level();
+  logger.set_level(spdlog::level::warn);
+
+  initializeFilter("log_level");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  logger.set_level(original_level);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  // Warn is index 3 in the ABI log level enum.
+  EXPECT_EQ(
+      "3",
+      response->headers().get(Http::LowerCaseString("x-log-level"))[0]->value().getStringView());
+  // Info is below the configured level so it is disabled, Error is above it so it is enabled.
+  EXPECT_EQ("false", response->headers()
+                         .get(Http::LowerCaseString("x-log-info-enabled"))[0]
+                         ->value()
+                         .getStringView());
+  EXPECT_EQ("true", response->headers()
+                        .get(Http::LowerCaseString("x-log-error-enabled"))[0]
+                        ->value()
+                        .getStringView());
+}
+
+// The log callback reports the module source location of the log statement rather than a location
+// inside Envoy. This exercises each SDK's call-site capture end to end.
+TEST_P(DynamicModulesIntegrationTest, LogReportsModuleSourceLocation) {
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  const std::string expected_source_file = GetParam() == "go"    ? "http_integration_test.go"
+                                           : GetParam() == "cpp" ? "http_integration_test.cc"
+                                                                 : "http_integration_test.rs";
+
+  initializeFilter("passthrough");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  Envoy::LogLevelSetter save_levels(spdlog::level::info);
+  Envoy::StartStopRecording recording(Envoy::GetLogSink());
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+
+  // The passthrough filter logs from on_request_headers. That line must carry the module source
+  // location instead of a location inside Envoy.
+  bool found = false;
+  for (const std::string& message : recording.messages()) {
+    if (message.find("on_request_headers called") == std::string::npos) {
+      continue;
+    }
+    found = true;
+    EXPECT_NE(std::string::npos, message.find(expected_source_file)) << message;
+    EXPECT_EQ(std::string::npos, message.find("abi_impl.cc")) << message;
+  }
+  EXPECT_TRUE(found);
+}
+
+// A `direct_response` route is served as a local reply. The module did not send it, so its
+// response callbacks must still run. Regression test for the C++ SDK, which set the same
+// `local_reply_sent_` flag on the local-reply notification that it sets when the module itself
+// calls `sendLocalResponse()`, and then skipped every response callback for the stream.
+TEST_P(DynamicModulesIntegrationTest, ResponseCallbacksOnLocalReply) {
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    // Not this test: with a Go module loaded, ~IntegrationTestServer never returns, because the
+    // exiting server thread runs macOS pthread key destructors and one of them enters the Go
+    // runtime and does not come back. The request itself succeeds. See #46905. Scoped to Apple
+    // platforms because Go is the only SDK here whose runtime installs key destructors and this
+    // has not been seen on Linux.
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        route->clear_route();
+        auto* direct_response = route->mutable_direct_response();
+        direct_response->set_status(200);
+        direct_response->mutable_body()->set_inline_string("ok");
+      });
+  initializeFilter("local_reply_response_headers");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("called", response->headers()
+                          .get(Http::LowerCaseString("on-response-headers"))[0]
+                          ->value()
+                          .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) { runHeaderCallbacksTest(false); }
@@ -309,6 +620,89 @@ TEST_P(DynamicModulesIntegrationTest, PerRouteConfig) {
                      .getStringView());
 }
 
+// Verifies that a ``google.protobuf.Struct`` per-route configuration is serialized to a JSON
+// string before being passed to the dynamic module.
+TEST_P(DynamicModulesIntegrationTest, PerRouteStructConfig) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    // The per_route_config test filter that surfaces the raw config bytes back as a header is
+    // implemented by the Rust integration test data, so the Struct check is scoped to those
+    // language flavors.
+    return;
+  }
+
+  // The regular filter config remains a ``StringValue``, preserving the existing semantics of
+  // the per_route_config test filter for the ``x-config`` header, while the per-route override
+  // is supplied as a ``google.protobuf.Struct``.
+  initializeFilter("per_route_config", "a", R"({"struct_key":"struct_value"})",
+                   "type.googleapis.com/google.protobuf.StringValue", false,
+                   "type.googleapis.com/google.protobuf.Struct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("a", upstream_request_->headers()
+                     .get(Http::LowerCaseString("x-config"))[0]
+                     ->value()
+                     .getStringView());
+  // The per-route ``Struct`` must arrive as its JSON serialization rather than as raw protobuf
+  // binary bytes (which would have started with a ``0x0a`` wire-tag byte and broken any module
+  // that attempted to ``json.Unmarshal`` the payload). See
+  // https://github.com/envoyproxy/envoy/issues/44733.
+  EXPECT_EQ(R"({"struct_key":"struct_value"})",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("x-per-route-config"))[0]
+                ->value()
+                .getStringView());
+}
+
+// Verifies that the ``value`` of an ``xds.type.v3.TypedStruct`` per-route configuration is
+// serialized to JSON before being passed to the module, the same payload a plain
+// ``google.protobuf.Struct`` produces while preserving a logical type URL for config dumps.
+TEST_P(DynamicModulesIntegrationTest, PerRouteTypedStructConfig) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    // The per_route_config test filter that surfaces the raw config bytes back as a header is
+    // implemented by the Rust integration test data, so the TypedStruct check is scoped to those
+    // language flavors.
+    return;
+  }
+
+  // The regular filter config remains a ``StringValue`` for the ``x-config`` header, while the
+  // per-route override is supplied as an ``xds.type.v3.TypedStruct`` whose ``value`` carries the
+  // Struct payload.
+  initializeFilter("per_route_config", "a", R"({"struct_key":"struct_value"})",
+                   "type.googleapis.com/google.protobuf.StringValue", false,
+                   "type.googleapis.com/xds.type.v3.TypedStruct");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("a", upstream_request_->headers()
+                     .get(Http::LowerCaseString("x-config"))[0]
+                     ->value()
+                     .getStringView());
+  // The per-route ``TypedStruct`` must arrive as the JSON serialization of its ``value`` field,
+  // identical to the payload a plain ``Struct`` produces.
+  EXPECT_EQ(R"({"struct_key":"struct_value"})",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("x-per-route-config"))[0]
+                ->value()
+                .getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, BodyCallbacks) {
   initializeFilter("body_callbacks");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -379,6 +773,61 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
 }
 
+// A live, non-serializable object stored in filter state at Request lifespan is carried across
+// recreate_stream: the rebuilt filter recovers the same object and echoes its value.
+TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  }
+  initializeFilter("filter_state_object_recreate");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("0xabcd", response->headers()
+                          .get(Http::LowerCaseString("x-live-object-value"))[0]
+                          ->value()
+                          .getStringView());
+}
+
+// recreate_stream tears the filter chain down on the module's own stack. The in-module filter is
+// destroyed from the deferred deletion list, so the hook keeps using itself and calling back into
+// Envoy after the teardown. A synchronous destroy would have dropped the filter before its hook
+// resumed, so the first request would report a non-zero drop count. Each request builds a filter
+// for the original stream and one for the recreated stream, so the second request also pins down
+// that the dispatcher really runs the deferred destroy rather than dropping it.
+TEST_P(DynamicModulesIntegrationTest, ModuleUsesItselfAfterRecreateStream) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the use_self_after_teardown filter is only in the rust test module";
+  }
+  initializeFilter("use_self_after_teardown");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto sendRequestAndExpectRecreated = [this]() {
+    IntegrationStreamDecoderPtr response =
+        codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    auto recreated = response->headers().get(Http::LowerCaseString("x-recreated"));
+    ASSERT_FALSE(recreated.empty());
+    EXPECT_EQ("true", recreated[0]->value().getStringView());
+  };
+
+  constexpr absl::string_view log_line =
+      "recreated with state alive-torn-down after {} drops, header_set=true recreated=true "
+      "append=false drain=false route=false";
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"info", fmt::format(log_line, 0)},
+                                                         {"info", fmt::format(log_line, 2)}}),
+                             {
+                               sendRequestAndExpectRecreated();
+                               sendRequestAndExpectRecreated();
+                             });
+}
+
 TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestBody) {
   initializeFilter("send_response", "on_request_body");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -416,6 +865,68 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+// Regression test for the streaming-response re-entry fix. The filter produces its response with
+// send_response_headers and stamps a marker from on_response_headers. Before the fix the streaming
+// response re-entered that hook and leaked the marker onto the module's own response. Rust-only
+// because the streaming_response_reentry filter lives in the rust test module.
+TEST_P(DynamicModulesIntegrationTest, StreamingResponseDoesNotReenterEncodeHooks) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the streaming_response_reentry filter is only in the rust test module";
+  }
+  initializeFilter("streaming_response_reentry");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("x-produced")).empty());
+  // The module's response hook must not run for the response it produced.
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-reentered")).empty());
+}
+
+// Regression test for CatchUnwind re-entry. The filter is wrapped in the SDK's CatchUnwind panic
+// guard and completes its response with end-of-stream from on_scheduled. Completing with eos drives
+// FilterManager::onStreamComplete inline, synchronously re-entering the same wrapped filter's
+// on_stream_complete while the on_scheduled catch frame is still on the stack. on_stream_complete
+// bumps a counter; before the fix the re-entrant call is misread as a poisoned filter and skipped,
+// so the counter never moves. Rust-only because the reentrant_stream_complete filter lives in the
+// rust test module.
+TEST_P(DynamicModulesIntegrationTest, ReentrantStreamCompleteRunsUnderCatchUnwind) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the reentrant_stream_complete filter is only in the rust test module";
+  }
+  initializeFilter("reentrant_stream_complete");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("yes",
+            response->headers().get(Http::LowerCaseString("x-done"))[0]->value().getStringView());
+
+  // on_stream_complete must run even though the response was completed (eos) from on_scheduled,
+  // which re-enters the CatchUnwind-wrapped filter synchronously.
+  test_server_->waitForCounter("dynamicmodulescustom.reentrant_stream_complete_total",
+                               testing::Eq(1));
+}
+
+TEST_P(DynamicModulesIntegrationTest, StreamTimingIsAvailableOnStreamComplete) {
+  initializeFilter("stream_timing");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 10, default_response_headers_, 10);
+
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounter("dynamicmodulescustom.stream_timing_observed_total", testing::Eq(1));
 }
 
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
@@ -465,6 +976,78 @@ TEST_P(DynamicModulesIntegrationTest, Scheduler) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+// A module spawns a child span in on_request_headers, does off-thread work, and finishes the span
+// from the scheduled event hook. The request completes and the tracer confirms the span was
+// finished, proving a span can outlive the event hook that created it.
+TEST_P(DynamicModulesIntegrationTest, SpanAcrossCallbacks) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* tracing = hcm.mutable_tracing();
+        // Always trace so the active span is present and the module can spawn a child span.
+        tracing->mutable_random_sampling()->set_value(100.0);
+        auto* provider = tracing->mutable_provider();
+        provider->set_name("envoy.tracers.dynamic_modules_test");
+        std::ignore = provider->mutable_typed_config()->PackFrom(Protobuf::Struct());
+      });
+  const uint32_t before = offThreadWorkSpansFinished().load();
+  initializeFilter("span_across_callbacks");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_GE(offThreadWorkSpansFinished().load(), before + 1);
+}
+
+// Regression test for the shared continue-flag wedge. The upstream replies complete at headers
+// while the client is still uploading. The module holds the response at on_response_headers, a
+// request body chunk continues the decode direction, and the held response is then resumed via
+// continue_encoding. With a single shared continue flag the decode-side continue suppressed the
+// resume and the response never reached the client.
+TEST_P(DynamicModulesIntegrationTest, EarlyResponseDuringUpload) {
+  if (GetParam() != "rust") {
+    GTEST_SKIP() << "Early response during upload test only runs for Rust";
+  }
+  // The upstream half-closes its response while the request keeps uploading, so the router must
+  // keep decoding request data instead of resetting the stream.
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  initializeFilter("early_response_during_upload");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto& request_encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // The request is still open, so wait for the upstream stream without requiring its end of stream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  // Reply complete at headers, for example an early 403, while the client is still uploading.
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  // Wait until the module has held the response at on_response_headers before uploading more, so
+  // the request body continue is interleaved after the encode direction is paused.
+  test_server_->waitForCounter("dynamicmodulescustom.response_pause_total", testing::Ge(1));
+
+  // The request body continues the decode direction, then on_scheduled resumes the held response.
+  codec_client_->sendData(request_encoder, "upload", true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
   initializeFilter("fake_external_cache");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -507,6 +1090,10 @@ TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
 TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
   initializeFilter("stats_callbacks", "header_to_count,header_to_set");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // All modules emit a counter directly from the config context (no per-stream filter),
+  // exercising config-scoped metric emission.
+  test_server_->waitForCounter("dynamicmodulescustom.config_total", testing::Ge(1));
 
   // End-to-end request
   {
@@ -702,6 +1289,18 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
   }
+}
+
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionAttemptsAreAvailableOnStreamComplete) {
+  initializeFilter("upstream_connection_attempts");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 10, default_response_headers_, 10);
+
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounter("dynamicmodulescustom.upstream_connection_attempts_observed_total",
+                               testing::Eq(1));
 }
 
 TEST_P(DynamicModulesIntegrationTest, CustomMetricsNamespace) {
@@ -980,12 +1579,6 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
 
 // Test buffer limit callbacks for non-terminal filters.
 TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
-  // TODO(wbpcode): Enable this test for other SDKs when supported.
-  if (GetParam() != "rust") {
-    // Buffer limit callbacks are only supported in the Rust SDK currently.
-    return;
-  }
-
   initializeFilter("buffer_limit_filter");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
@@ -1017,6 +1610,94 @@ TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   } else {
     EXPECT_EQ(current_limit, 65536);
   }
+}
+
+TEST_P(DynamicModulesIntegrationTest, ListMetadataCallbacks) {
+  initializeFilter("list_metadata_callbacks");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  // Verify number list (3 elements: 10, 20, 30).
+  auto num_size = response->headers().get(Http::LowerCaseString("x-list-num-size"));
+  ASSERT_FALSE(num_size.empty());
+  EXPECT_EQ("3", num_size[0]->value().getStringView());
+  auto num_0 = response->headers().get(Http::LowerCaseString("x-list-num-0"));
+  ASSERT_FALSE(num_0.empty());
+  EXPECT_EQ("10", num_0[0]->value().getStringView());
+  auto num_1 = response->headers().get(Http::LowerCaseString("x-list-num-1"));
+  ASSERT_FALSE(num_1.empty());
+  EXPECT_EQ("20", num_1[0]->value().getStringView());
+  auto num_2 = response->headers().get(Http::LowerCaseString("x-list-num-2"));
+  ASSERT_FALSE(num_2.empty());
+  EXPECT_EQ("30", num_2[0]->value().getStringView());
+
+  // Verify string list (2 elements: "hello", "world").
+  auto str_size = response->headers().get(Http::LowerCaseString("x-list-str-size"));
+  ASSERT_FALSE(str_size.empty());
+  EXPECT_EQ("2", str_size[0]->value().getStringView());
+  auto str_0 = response->headers().get(Http::LowerCaseString("x-list-str-0"));
+  ASSERT_FALSE(str_0.empty());
+  EXPECT_EQ("hello", str_0[0]->value().getStringView());
+  auto str_1 = response->headers().get(Http::LowerCaseString("x-list-str-1"));
+  ASSERT_FALSE(str_1.empty());
+  EXPECT_EQ("world", str_1[0]->value().getStringView());
+
+  // Verify bool list (2 elements: true, false).
+  auto bool_size = response->headers().get(Http::LowerCaseString("x-list-bool-size"));
+  ASSERT_FALSE(bool_size.empty());
+  EXPECT_EQ("2", bool_size[0]->value().getStringView());
+  auto bool_0 = response->headers().get(Http::LowerCaseString("x-list-bool-0"));
+  ASSERT_FALSE(bool_0.empty());
+  EXPECT_EQ("true", bool_0[0]->value().getStringView());
+  auto bool_1 = response->headers().get(Http::LowerCaseString("x-list-bool-1"));
+  ASSERT_FALSE(bool_1.empty());
+  EXPECT_EQ("false", bool_1[0]->value().getStringView());
+}
+
+// Reads every runtime type through the module's SDK and confirms both paths: a key present in the
+// static runtime layer yields its configured value, and an absent key yields the default the module
+// passed in. The module reads these while its config is being created, which is the only place the
+// runtime is reachable, so this also pins that config creation runs where the server context is
+// installed.
+TEST_P(DynamicModulesIntegrationTest, RuntimeValues) {
+  config_helper_.addRuntimeOverride("test.runtime_bool", "true");
+  config_helper_.addRuntimeOverride("test.runtime_int", "42");
+  config_helper_.addRuntimeOverride("test.runtime_number", "0.25");
+  // test.runtime_missing_* are deliberately never set, so the module gets its defaults back.
+
+  initializeFilter("runtime_values");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  auto header = [&response](absl::string_view name) -> std::string {
+    auto values = response->headers().get(Http::LowerCaseString(std::string(name)));
+    if (values.empty()) {
+      return "<missing>";
+    }
+    return std::string(values[0]->value().getStringView());
+  };
+
+  // Keys present in the static runtime layer override the defaults the module passed in.
+  EXPECT_EQ("true", header("x-runtime-bool"));
+  EXPECT_EQ("42", header("x-runtime-int"));
+  EXPECT_EQ("0.25", header("x-runtime-number"));
+
+  // Absent keys fall back to the module's own defaults rather than a zero value, and each type
+  // keeps its own default.
+  EXPECT_EQ("true", header("x-runtime-missing-bool"));
+  EXPECT_EQ("1234", header("x-runtime-missing-int"));
+  EXPECT_EQ("2.5", header("x-runtime-missing-number"));
 }
 
 } // namespace Envoy

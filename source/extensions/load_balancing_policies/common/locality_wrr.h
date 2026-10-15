@@ -2,13 +2,12 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/upstream/edf_scheduler.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -17,8 +16,8 @@ class LocalityWrr {
 public:
   explicit LocalityWrr(const HostSet& host_set, uint64_t seed);
 
-  absl::optional<uint32_t> chooseHealthyLocality();
-  absl::optional<uint32_t> chooseDegradedLocality();
+  std::optional<uint32_t> chooseHealthyLocality();
+  std::optional<uint32_t> chooseDegradedLocality();
 
 private:
   struct LocalityEntry {
@@ -62,7 +61,7 @@ private:
                                         const LocalityWeights& locality_weights,
                                         uint32_t overprovisioning_factor);
 
-  static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
+  static std::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
 
   std::vector<std::shared_ptr<LocalityEntry>> healthy_locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> healthy_locality_scheduler_;

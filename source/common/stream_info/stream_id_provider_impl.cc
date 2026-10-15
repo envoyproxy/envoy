@@ -5,14 +5,14 @@
 namespace Envoy {
 namespace StreamInfo {
 
-absl::optional<uint64_t> StreamIdProviderImpl::toInteger() const {
+std::optional<uint64_t> StreamIdProviderImpl::toInteger() const {
   if (id_.length() < 8) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   uint64_t value;
   if (!StringUtil::atoull(id_.substr(0, 8).c_str(), value, 16)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return value;

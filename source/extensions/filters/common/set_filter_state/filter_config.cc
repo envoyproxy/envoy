@@ -5,6 +5,9 @@
 
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
+
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +31,7 @@ public:
   HashableString(absl::string_view value) : StringAccessorImpl(value) {}
 
   // Hashable
-  absl::optional<uint64_t> hash() const override { return HashUtil::xxHash64(asString()); }
+  std::optional<uint64_t> hash() const override { return HashUtil::xxHash64(asString()); }
 };
 
 class GenericHashableStringObjectFactory : public StreamInfo::FilterState::ObjectFactory {
@@ -41,6 +44,21 @@ public:
 };
 
 REGISTER_FACTORY(GenericHashableStringObjectFactory, StreamInfo::FilterState::ObjectFactory);
+
+class GenericBoolObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override { return "envoy.bool"; }
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override {
+    bool value = false;
+    if (!absl::SimpleAtob(data, &value)) {
+      return nullptr;
+    }
+    return std::make_unique<StreamInfo::BoolAccessorImpl>(value);
+  }
+};
+
+REGISTER_FACTORY(GenericBoolObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 std::vector<Value>
 Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values,
@@ -57,7 +75,6 @@ Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_val
     if (value.factory_ == nullptr) {
       throw EnvoyException(fmt::format("'{}' does not have an object factory", value.key_));
     }
-    value.state_type_ = proto_value.read_only() ? StateType::ReadOnly : StateType::Mutable;
     switch (proto_value.shared_with_upstream()) {
     case FilterStateValueProto::ONCE:
       value.stream_sharing_ = StreamSharing::SharedWithUpstreamConnectionOnce;
@@ -92,8 +109,7 @@ void Config::updateFilterState(const Formatter::Context& context,
       continue;
     }
     ENVOY_LOG(debug, "Created the filter state '{}' from value '{}'", value.key_, bytes_value);
-    info.filterState()->setData(value.key_, std::move(object), value.state_type_, life_span_,
-                                value.stream_sharing_);
+    info.filterState()->setData(value.key_, std::move(object), life_span_, value.stream_sharing_);
   }
 }
 

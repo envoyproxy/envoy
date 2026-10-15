@@ -26,7 +26,7 @@ struct SaveProcessingResponseFilterState
     absl::Status processing_status;
     envoy::service::ext_proc::v3::ProcessingResponse processing_response;
   };
-  absl::optional<Response> response;
+  std::optional<Response> response;
 };
 
 class SaveProcessingResponse

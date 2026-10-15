@@ -14,28 +14,28 @@ namespace Stats {
 
 // TODO(ambuc): Refactor this into common/matchers.cc, since StatsMatcher is really just a thin
 // wrapper around what might be called a StringMatcherList.
-StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config,
+StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v3::StatsMatcher& stats_matcher,
                                    SymbolTable& symbol_table,
                                    Server::Configuration::CommonFactoryContext& context)
     : symbol_table_(symbol_table), stat_name_pool_(std::make_unique<StatNamePool>(symbol_table)) {
 
-  switch (config.stats_matcher().stats_matcher_case()) {
+  switch (stats_matcher.stats_matcher_case()) {
   case envoy::config::metrics::v3::StatsMatcher::StatsMatcherCase::kRejectAll:
     // In this scenario, there are no matchers to store.
-    is_inclusive_ = !config.stats_matcher().reject_all();
+    is_inclusive_ = !stats_matcher.reject_all();
     break;
   case envoy::config::metrics::v3::StatsMatcher::StatsMatcherCase::kInclusionList:
     // If we have an inclusion list, we are being default-exclusive.
-    for (const auto& stats_matcher : config.stats_matcher().inclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcherImpl(stats_matcher, context));
+    for (const auto& pattern : stats_matcher.inclusion_list().patterns()) {
+      matchers_.push_back(Matchers::StringMatcherImpl(pattern, context));
       optimizeLastMatcher();
     }
     is_inclusive_ = false;
     break;
   case envoy::config::metrics::v3::StatsMatcher::StatsMatcherCase::kExclusionList:
     // If we have an exclusion list, we are being default-inclusive.
-    for (const auto& stats_matcher : config.stats_matcher().exclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcherImpl(stats_matcher, context));
+    for (const auto& pattern : stats_matcher.exclusion_list().patterns()) {
+      matchers_.push_back(Matchers::StringMatcherImpl(pattern, context));
       optimizeLastMatcher();
     }
     FALLTHRU;

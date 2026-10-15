@@ -9,6 +9,7 @@
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
+#include "test/integration/filters/test_filters.pb.h"
 
 namespace Envoy {
 
@@ -44,10 +45,14 @@ private:
 
 constexpr char AddInvalidDataFilter::name[];
 
-static Registry::RegisterFactory<SimpleFilterConfig<AddInvalidDataFilter>,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<AddInvalidDataFilter,
+                             test::integration::filters::AddInvalidDataFilterConfig>,
+    Server::Configuration::NamedHttpFilterConfigFactory>
     encoder_register_;
-static Registry::RegisterFactory<SimpleFilterConfig<AddInvalidDataFilter>,
-                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+static Registry::RegisterFactory<
+    UniqueSimpleFilterConfig<AddInvalidDataFilter,
+                             test::integration::filters::AddInvalidDataFilterConfig>,
+    Server::Configuration::UpstreamHttpFilterConfigFactory>
     encoder_register_upstream_;
 } // namespace Envoy

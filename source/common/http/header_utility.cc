@@ -10,7 +10,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
@@ -37,16 +36,31 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
-  // No headers to match is considered a match.
-  if (!config_headers.empty()) {
-    for (const HeaderDataPtr& cfg_header_data : config_headers) {
-      if (!cfg_header_data->matchesHeaders(request_headers)) {
-        return false;
-      }
+  for (const HeaderDataPtr& cfg_header_data : config_headers) {
+    if (!cfg_header_data->matches(request_headers)) {
+      return false;
     }
   }
-
   return true;
+}
+
+template <typename PointerType>
+static bool matchAnyHeaderImpl(const HeaderMap& request_headers,
+                               const std::vector<PointerType>& config_headers) {
+  for (const PointerType& cfg_header_data : config_headers) {
+    if (cfg_header_data->matches(request_headers)) {
+      return true;
+    }
+  }
+  return false;
+}
+bool HeaderUtility::matchAnyHeader(const HeaderMap& request_headers,
+                                   const std::vector<HeaderDataPtr>& config_headers) {
+  return matchAnyHeaderImpl(request_headers, config_headers);
+}
+bool HeaderUtility::matchAnyHeader(const HeaderMap& request_headers,
+                                   const std::vector<HeaderMatcherSharedPtr>& config_headers) {
+  return matchAnyHeaderImpl(request_headers, config_headers);
 }
 
 HeaderUtility::GetAllOfHeaderAsStringResult
@@ -144,7 +158,7 @@ bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
   // TODO(yanavlasov): make validation in HTTP/2 case stricter.
   bool is_valid = true;
   for (auto iter = header_key.begin(); iter != header_key.end() && is_valid; ++iter) {
-    is_valid &= testCharInTable(kGenericHeaderNameCharTable, *iter);
+    is_valid &= CharTables::kGenericHeaderName.hasChar(*iter);
   }
   return is_valid;
 }
@@ -236,13 +250,16 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
-  return response_headers.Status()->value() == "100" ||
-         response_headers.Status()->value() == "102" ||
-         response_headers.Status()->value() == "103" || response_headers.Status()->value() == "104";
+  const absl::string_view status = response_headers.getStatusValue();
+  return status == "100" || status == "102" || status == "103" || status == "104";
 }
 
 bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
+}
+
+bool HeaderUtility::isQuery(const RequestHeaderMap& headers) {
+  return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Query;
 }
 
 bool HeaderUtility::isConnectUdpRequest(const RequestHeaderMap& headers) {
@@ -320,7 +337,7 @@ bool HeaderUtility::isCapsuleProtocol(const RequestOrResponseHeaderMap& headers)
     return false;
   }
   // Parses the header value and extracts the boolean value ignoring parameters.
-  absl::optional<quiche::structured_headers::ParameterizedItem> header_item =
+  std::optional<quiche::structured_headers::ParameterizedItem> header_item =
       quiche::structured_headers::ParseItem(capsule_protocol[0]->value().getStringView());
   return header_item && header_item->item.is_boolean() && header_item->item.GetBoolean();
 }
@@ -373,22 +390,22 @@ bool HeaderUtility::hostHasPort(absl::string_view original_host) {
   return true;
 }
 
-absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
-                                                          absl::optional<uint32_t> listener_port) {
+std::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& headers,
+                                                         std::optional<uint32_t> listener_port) {
   const absl::string_view original_host = headers.getHostValue();
   const absl::string_view::size_type port_start = getPortStart(original_host);
   if (port_start == absl::string_view::npos) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   const absl::string_view port_str = original_host.substr(port_start + 1);
   uint32_t port = 0;
   if (!absl::SimpleAtoi(port_str, &port)) {
-    return absl::nullopt;
+    return std::nullopt;
   }
   if (listener_port.has_value() && port != listener_port) {
     // We would strip ports only if it is specified and they are the same, as local port of the
     // listener.
-    return absl::nullopt;
+    return std::nullopt;
   }
   const absl::string_view host = original_host.substr(0, port_start);
   headers.setHost(host);
@@ -434,7 +451,7 @@ constexpr bool isInvalidToken(unsigned char c) {
   return true;
 }
 
-absl::optional<std::reference_wrapper<const absl::string_view>>
+OptRef<const absl::string_view>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
   if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
@@ -449,7 +466,7 @@ HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   if (headers.Scheme() && absl::StrContains(headers.Scheme()->value().getStringView(), ",")) {
     return SharedResponseCodeDetails::get().InvalidScheme;
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
@@ -512,8 +529,10 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
   return Http::okStatus();
 }
 
+std::atomic<bool> HeaderUtility::disable_request_header_validation_for_tests_{false};
+
 Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMap& headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")) {
+  if (disable_request_header_validation_for_tests_.load(std::memory_order_relaxed)) {
     return Http::okStatus();
   }
 
@@ -549,7 +568,7 @@ Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMa
 }
 
 Http::Status HeaderUtility::checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers) {
-  const absl::optional<uint64_t> status = Utility::getResponseStatusOrNullopt(headers);
+  const std::optional<uint64_t> status = Utility::getResponseStatusOrNullopt(headers);
   if (!status.has_value()) {
     return absl::InvalidArgumentError(
         absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Status.get()));
@@ -593,7 +612,7 @@ HeaderUtility::validateContentLength(absl::string_view header_value,
                                      bool& should_close_connection, size_t& content_length_output) {
   should_close_connection = false;
   std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
-  absl::optional<uint64_t> content_length;
+  std::optional<uint64_t> content_length;
   for (const absl::string_view& value : values) {
     uint64_t new_value;
     if (!absl::SimpleAtoi(value, &new_value) ||

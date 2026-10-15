@@ -47,15 +47,17 @@ public:
     ASSERT(false, "not supported");
     return INVALID_SOCKET;
   }
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
   bool wasConnected() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
-                               absl::optional<uint64_t> max_length_opt) override;
+                               std::optional<uint64_t> max_length_opt) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
+  Api::IoCallUint64Result send(const void* buffer, size_t length) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override;
@@ -79,7 +81,7 @@ public:
   Api::SysCallIntResult ioctl(unsigned long, void*, unsigned long, void*, unsigned long,
                               unsigned long*) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
-  absl::optional<int> domain() override;
+  std::optional<int> domain() override;
   absl::StatusOr<Network::Address::InstanceConstSharedPtr> localAddress() override;
   absl::StatusOr<Network::Address::InstanceConstSharedPtr> peerAddress() override;
 
@@ -91,9 +93,9 @@ public:
   void resetFileEvents() override;
 
   Api::SysCallIntResult shutdown(int how) override;
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return absl::nullopt; }
-  absl::optional<uint64_t> congestionWindowInBytes() const override { return absl::nullopt; }
-  absl::optional<std::string> interfaceName() override { return absl::nullopt; }
+  std::optional<std::chrono::milliseconds> lastRoundTripTime() override { return std::nullopt; }
+  std::optional<uint64_t> congestionWindowInBytes() const override { return std::nullopt; }
+  std::optional<std::string> interfaceName() override { return std::nullopt; }
 
   void setWatermarks(uint32_t watermark) { pending_received_data_.setWatermarks(watermark); }
   void onBelowLowWatermark() {
@@ -104,11 +106,16 @@ public:
     }
   }
   void onAboveHighWatermark() {
-    // Low to high is checked by peer after peer writes data.
+    // Low to high is checked by peer after peer populates the receive buffer.
   }
 
   // UserSpace::IoHandle
-  void setWriteEnd() override {
+  void setEof() override {
+    receive_data_end_stream_ = true;
+    setNewDataAvailable();
+  }
+  void setRst() override {
+    receive_data_reset_ = true;
     receive_data_end_stream_ = true;
     setNewDataAvailable();
   }
@@ -121,36 +128,37 @@ public:
           (receive_data_end_stream_ ? Event::FileReadyType::Closed : 0));
     }
   }
-  void onPeerDestroy() override {
-    peer_handle_ = nullptr;
-    write_shutdown_ = true;
-  }
+  void onPeerDestroy() override;
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
       user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
     }
   }
-  bool isWritable() const override { return !pending_received_data_.highWatermarkTriggered(); }
-  bool isPeerShutDownWrite() const override { return receive_data_end_stream_; }
-  bool isPeerWritable() const override {
-    return peer_handle_ != nullptr && !peer_handle_->isPeerShutDownWrite() &&
-           peer_handle_->isWritable();
+  bool canReceiveData() const override { return !pending_received_data_.highWatermarkTriggered(); }
+  bool hasReceivedEof() const override { return receive_data_end_stream_; }
+  bool isWriteUnblocked() const override {
+    if (peer_handle_ == nullptr) {
+      // Treat closed peer handle as writable so that the connection cleans up. (Analogously,
+      // Linux sends EPOLLOUT along with EPOLLHUP if the peer is shutdown for reads.)
+      return true;
+    }
+    return !peer_handle_->hasReceivedEof() && peer_handle_->canReceiveData();
   }
-  Buffer::Instance* getWriteBuffer() override { return &pending_received_data_; }
+  Buffer::Instance* getReceiveBuffer() override { return &pending_received_data_; }
 
   // `UserspaceIoHandle`
   bool isReadable() const override {
-    return isPeerShutDownWrite() || pending_received_data_.length() > 0;
+    return hasReceivedEof() || pending_received_data_.length() > 0;
   }
 
   // Set the peer which will populate the owned pending_received_data.
-  void setPeerHandle(UserSpace::IoHandle* writable_peer) {
-    // Swapping writable peer is undefined behavior.
+  void setPeerHandle(UserSpace::IoHandle* peer_handle) {
+    // Swapping peers is undefined behavior.
     ASSERT(!peer_handle_);
-    ASSERT(!write_shutdown_);
-    peer_handle_ = writable_peer;
+    ASSERT(!sent_eof_);
+    peer_handle_ = peer_handle;
     ENVOY_LOG(trace, "io handle {} set peer handle to {}.", static_cast<void*>(this),
-              static_cast<void*>(writable_peer));
+              static_cast<void*>(peer_handle));
   }
 
   PassthroughStateSharedPtr passthroughState() override { return passthrough_state_; }
@@ -171,16 +179,27 @@ private:
   // True if pending_received_data_ is not addable. Note that pending_received_data_ may have
   // pending data to drain.
   bool receive_data_end_stream_{false};
+  bool receive_data_reset_{false};
+  // Set by onPeerDestroy() when the peer fully closed (close(), not shutdown(WR)). Reads drain
+  // pending data first, then report ECONNRESET where they would report EOF. This is how a full
+  // peer close is distinguished from a write half-close, which real sockets cannot signal on the
+  // read side.
+  bool receive_data_reset_after_drain_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.
   Buffer::WatermarkBuffer pending_received_data_;
 
-  // Destination of the write(). The value remains non-null until the peer is closed.
+  // write() calls will populate the receive buffer of the peer handle. Guaranteed to be non-null
+  // until close() is called on either this handle or the peer handle.
   UserSpace::IoHandle* peer_handle_{nullptr};
 
-  // The flag whether the peer is valid. Any write attempt must check this flag.
-  bool write_shutdown_{false};
+  // Indicates whether this handle has sent EOF to the peer by calling setEof().
+  bool sent_eof_{false};
+
+  // Set by setAbortiveClose() to indicate that a subsequent close() operation should propagate an
+  // RST (rather than a FIN).
+  bool rst_requested_{false};
 
   // Shared state between peer handles.
   PassthroughStateSharedPtr passthrough_state_{nullptr};

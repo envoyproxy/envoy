@@ -15,22 +15,30 @@
 #include "test/extensions/filters/http/rbac/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 
+#include "gmock/gmock.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
-
-using testing::_;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 namespace {
+
+using ::testing::_;
+using ::testing::Contains;
+using ::testing::Invoke;
+using ::testing::IsSupersetOf;
+using ::testing::Key;
+using ::testing::NiceMock;
+using ::testing::Pair;
+using ::testing::Return;
+using ::testing::ReturnPointee;
+using ::testing::ReturnRef;
+using ::testing::UnorderedElementsAre;
 
 enum class LogResult { Yes, No, Undecided };
 
@@ -282,7 +290,7 @@ on_no_match:
   void setLocalAddressWithNetworkNamespace(const std::string& network_namespace_path,
                                            uint16_t port = 123) {
     address_ = std::make_shared<Network::Address::Ipv4Instance>(
-        "127.0.0.1", port, nullptr, absl::make_optional(std::string(network_namespace_path)));
+        "127.0.0.1", port, nullptr, std::make_optional(std::string(network_namespace_path)));
 
     req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
     ON_CALL(connection_.stream_info_, downstreamAddressProvider())
@@ -291,12 +299,12 @@ on_no_match:
 
   void checkAccessLogMetadata(LogResult expected) {
     if (expected != LogResult::Undecided) {
-      auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
-          Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace);
-      EXPECT_EQ(expected == LogResult::Yes,
-                filter_meta.fields()
-                    .at(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey)
-                    .bool_value());
+      EXPECT_THAT(
+          req_info_.dynamicMetadata().filter_metadata(),
+          Contains(Pair(Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace,
+                        HasStructFields(Contains(IsStructBool(
+                            Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().AccessLogKey,
+                            expected == LogResult::Yes))))));
     } else {
       EXPECT_EQ(req_info_.dynamicMetadata().filter_metadata().end(),
                 req_info_.dynamicMetadata().filter_metadata().find(
@@ -322,7 +330,7 @@ on_no_match:
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
-  NiceMock<Network::MockConnection> connection_{};
+  NiceMock<Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -366,16 +374,13 @@ TEST_F(RoleBasedAccessControlFilterTest, AllowedDynamicMetadataStats) {
   setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "foo",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
+              Contains(Pair(
+                  "envoy.filters.http.rbac",
+                  HasStructFields(IsSupersetOf(StructMatchers(
+                      IsStructString("rules_stat_prefix_enforced_engine_result", "allowed"),
+                      IsStructString("rules_stat_prefix_enforced_effective_policy_id", "foo")))))));
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, DeniedDynamicMetadataStats) {
@@ -385,17 +390,13 @@ TEST_F(RoleBasedAccessControlFilterTest, DeniedDynamicMetadataStats) {
   setMetadata();
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
-  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("denied",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "foo",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
+              Contains(Pair(
+                  "envoy.filters.http.rbac",
+                  HasStructFields(IsSupersetOf(StructMatchers(
+                      IsStructString("rules_stat_prefix_enforced_engine_result", "denied"),
+                      IsStructString("rules_stat_prefix_enforced_effective_policy_id", "foo")))))));
 }
 
 // Make sure dynamic metadata is written in the case that there's a shadow engine but no enforced
@@ -421,17 +422,14 @@ TEST_F(RoleBasedAccessControlFilterTest, ShadowOnlyDynamicMetadataStats) {
 
   // Defaults to allow when there's no engine to enforce.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
-  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_engine_result"));
-  EXPECT_EQ("denied",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
-  ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_effective_policy_id"));
-  EXPECT_EQ(
-      "shadow_rule",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_THAT(
+      req_info_.dynamicMetadata().filter_metadata(),
+      Contains(Pair(
+          "envoy.filters.http.rbac",
+          HasStructFields(UnorderedElementsAre(
+              IsStructString("shadow_rules_prefix_shadow_engine_result", "denied"),
+              IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "shadow_rule"))))));
 }
 
 // Make sure dynamic metadata is written in the case that there's an enforced engine but no shadow
@@ -459,17 +457,14 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedOnlyDynamicMetadataStats) {
 
   // Defaults to allow when there's no engine to enforce.
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
-  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("denied",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "enforced_policy",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(
+      req_info_.dynamicMetadata().filter_metadata(),
+      Contains(Pair("envoy.filters.http.rbac",
+                    HasStructFields(UnorderedElementsAre(
+                        IsStructString("rules_stat_prefix_enforced_engine_result", "denied"),
+                        IsStructString("rules_stat_prefix_enforced_effective_policy_id",
+                                       "enforced_policy"))))));
 }
 
 // Dynamic metadata metrics should only be written if there's a shadow engine and / or there's an
@@ -485,7 +480,6 @@ TEST_F(RoleBasedAccessControlFilterTest, NoEnginesNoDynamicMetadataStats) {
 
   // Defaults to allow when there's no engine to enforce.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
-  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
 
   ASSERT_FALSE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
 }
@@ -513,6 +507,75 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 
   checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, RequestedServerNameNonUtf8) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
+
+  setDestinationPort(999);
+  // By default safe_regex matches non UTF-8 characters
+  setRequestedServerName("w\xFEw.cncf.io");
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("test.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("test.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_allowed",
+            config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
+
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, RequestedServerNameUtf8InUtf8Mode) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.re2_use_latin1_mode", "false"}});
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
+
+  setDestinationPort(999);
+  // By default safe_regex matches non UTF-8 characters
+  setRequestedServerName("w\uc38bw.cncf.io");
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("test.rbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("test.rbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_allowed",
+            config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
+
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, RequestedServerNameNonUtf8InUtf8Mode) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.re2_use_latin1_mode", "false"}});
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
+
+  setDestinationPort(999);
+  // By default safe_regex matches non UTF-8 characters
+  setRequestedServerName("w\xFEw.cncf.io");
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, Path) {
@@ -554,12 +617,12 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
             config_->stats().shadow_allowed_.name());
   EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
-  EXPECT_EQ(
-      "bar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
+              Contains(Pair(
+                  "envoy.filters.http.rbac",
+                  HasStructFields(IsSupersetOf(StructMatchers(
+                      IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"),
+                      IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar")))))));
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
 }
@@ -628,31 +691,18 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideDynamicMetadataStats)
   // Filter iteration should continue since the route-specific policy is ALLOW
   // and there are enforced and shadow rules.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
-  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-
   // We expect the route-specific rules and prefix to be used for the enforced
   // engine and the shadow rules and prefix to be used for the shadow engine.
-  ASSERT_TRUE(filter_meta.fields().contains("override_rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ(
-      "allowed",
-      filter_meta.fields().at("override_rules_stat_prefix_enforced_engine_result").string_value());
-  ASSERT_TRUE(
-      filter_meta.fields().contains("override_rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ("foobar", filter_meta.fields()
-                          .at("override_rules_stat_prefix_enforced_effective_policy_id")
-                          .string_value());
-
-  ASSERT_TRUE(
-      filter_meta.fields().contains("override_shadow_rules_stat_prefix_shadow_engine_result"));
-  EXPECT_EQ("allowed", filter_meta.fields()
-                           .at("override_shadow_rules_stat_prefix_shadow_engine_result")
-                           .string_value());
-  ASSERT_TRUE(filter_meta.fields().contains(
-      "override_shadow_rules_stat_prefix_shadow_effective_policy_id"));
-  EXPECT_EQ("foobar", filter_meta.fields()
-                          .at("override_shadow_rules_stat_prefix_shadow_effective_policy_id")
-                          .string_value());
+  EXPECT_THAT(
+      req_info_.dynamicMetadata().filter_metadata(),
+      Contains(Pair(
+          "envoy.filters.http.rbac",
+          HasStructFields(UnorderedElementsAre(
+              IsStructString("override_rules_stat_prefix_enforced_engine_result", "allowed"),
+              IsStructString("override_rules_stat_prefix_enforced_effective_policy_id", "foobar"),
+              IsStructString("override_shadow_rules_stat_prefix_shadow_engine_result", "allowed"),
+              IsStructString("override_shadow_rules_stat_prefix_shadow_effective_policy_id",
+                             "foobar"))))));
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, NoRouteLocalOverrideDynamicMetadataStatsEmpty) {
@@ -694,25 +744,16 @@ TEST_F(RoleBasedAccessControlFilterTest, NoRouteLocalOverrideDynamicMetadataStat
   // Filter iteration should continue since the route-specific policy is ALLOW and there are
   // enforced and shadow rules.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
-  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-
   // We expect the base rules and prefix to be used since no route-specific stat was set up.
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "foobar",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
-
-  ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_engine_result"));
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
-  ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_effective_policy_id"));
-  EXPECT_EQ(
-      "foobar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_THAT(
+      req_info_.dynamicMetadata().filter_metadata(),
+      Contains(
+          Pair("envoy.filters.http.rbac",
+               HasStructFields(UnorderedElementsAre(
+                   IsStructString("rules_stat_prefix_enforced_engine_result", "allowed"),
+                   IsStructString("rules_stat_prefix_enforced_effective_policy_id", "foobar"),
+                   IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"),
+                   IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "foobar"))))));
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideWithPerRuleStats) {
@@ -968,12 +1009,12 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
             config_->stats().shadow_allowed_.name());
   EXPECT_EQ("test.rbac.shadow_rules_prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
-  EXPECT_EQ(
-      "bar",
-      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+  EXPECT_THAT(req_info_.dynamicMetadata().filter_metadata(),
+              Contains(Pair(
+                  "envoy.filters.http.rbac",
+                  HasStructFields(IsSupersetOf(StructMatchers(
+                      IsStructString("shadow_rules_prefix_shadow_engine_result", "allowed"),
+                      IsStructString("shadow_rules_prefix_shadow_effective_policy_id", "bar")))))));
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
 }
@@ -1085,7 +1126,7 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {
   xds::type::matcher::v3::Matcher matcher;
   auto matcher_on_no_match_action = matcher.mutable_on_no_match()->mutable_action();
   matcher_on_no_match_action->set_name("action");
-  matcher_on_no_match_action->mutable_typed_config()->PackFrom(action);
+  std::ignore = matcher_on_no_match_action->mutable_typed_config()->PackFrom(action);
   *route_config.mutable_rbac()->mutable_matcher() = matcher;
   ActionValidationVisitor validation_visitor;
   NiceMock<Filters::Common::RBAC::MockMatcherEngine> engine{route_config.rbac().matcher(), context_,
@@ -1224,8 +1265,8 @@ public:
       port_range_ = port_range;
     }
 
-    absl::optional<std::string> ip_;
-    absl::optional<envoy::type::v3::Int64Range> port_range_;
+    std::optional<std::string> ip_;
+    std::optional<envoy::type::v3::Int64Range> port_range_;
   };
 
   void upstreamIpTestsBasicPolicySetup(const std::vector<UpstreamIpPortMatcherConfig>& configs,
@@ -1253,7 +1294,7 @@ public:
 
       *matcher_ext_config->mutable_name() = "envoy.rbac.matchers.upstream.upstream_ip_port";
 
-      matcher_ext_config->mutable_typed_config()->PackFrom(matcher);
+      std::ignore = matcher_ext_config->mutable_typed_config()->PackFrom(matcher);
     }
 
     policy.add_principals()->set_any(true);
@@ -1279,7 +1320,7 @@ public:
         std::make_unique<StreamInfo::UpstreamAddress>(
             Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(upstream_ips.back(),
                                                                         false)),
-        StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
+        StreamInfo::FilterState::LifeSpan::Request);
   }
 };
 
@@ -1603,17 +1644,13 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineOnlyAllowsAccessMetadataT
 
   // Verify that dynamic metadata is set correctly even though there's no shadow
   // engine and the enforced engine returned Continue
-  EXPECT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
-
-  // Verify the metadata contents
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
-  EXPECT_EQ("allowed",
-            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
-  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
-  EXPECT_EQ(
-      "enforced_only_policy",
-      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+  EXPECT_THAT(
+      req_info_.dynamicMetadata().filter_metadata(),
+      Contains(Pair("envoy.filters.http.rbac",
+                    HasStructFields(UnorderedElementsAre(
+                        IsStructString("rules_stat_prefix_enforced_engine_result", "allowed"),
+                        IsStructString("rules_stat_prefix_enforced_effective_policy_id",
+                                       "enforced_only_policy"))))));
 }
 
 } // namespace

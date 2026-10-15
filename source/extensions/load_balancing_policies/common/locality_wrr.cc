@@ -14,11 +14,11 @@ LocalityWrr::LocalityWrr(const HostSet& host_set, uint64_t seed) {
                            host_set.localityWeights(), host_set.overprovisioningFactor(), seed);
 }
 
-absl::optional<uint32_t> LocalityWrr::chooseHealthyLocality() {
+std::optional<uint32_t> LocalityWrr::chooseHealthyLocality() {
   return chooseLocality(healthy_locality_scheduler_.get());
 }
 
-absl::optional<uint32_t> LocalityWrr::chooseDegradedLocality() {
+std::optional<uint32_t> LocalityWrr::chooseDegradedLocality() {
   return chooseLocality(degraded_locality_scheduler_.get());
 }
 
@@ -67,7 +67,7 @@ void LocalityWrr::rebuildLocalityScheduler(
   }
 }
 
-absl::optional<uint32_t>
+std::optional<uint32_t>
 LocalityWrr::chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler) {
   if (locality_scheduler == nullptr) {
     return {};

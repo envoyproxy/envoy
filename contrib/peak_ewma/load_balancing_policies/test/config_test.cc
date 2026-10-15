@@ -7,7 +7,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/utility.h"
@@ -28,7 +28,7 @@ namespace PeakEwma {
 // Simple ThreadLocal mock for testing
 class MockThreadLocalInstance : public ThreadLocal::SlotAllocator {
 public:
-  ThreadLocal::SlotPtr allocateSlot() override { return std::make_unique<MockSlot>(); }
+  ThreadLocal::SlotSharedPtr allocateSlot() override { return std::make_shared<MockSlot>(); }
 
 private:
   class MockSlot : public ThreadLocal::Slot {

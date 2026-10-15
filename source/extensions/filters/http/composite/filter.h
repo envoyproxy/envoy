@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
@@ -20,6 +21,22 @@ namespace Composite {
 constexpr absl::string_view MatchedActionsFilterStateKey =
     "envoy.extensions.filters.http.composite.matched_actions";
 
+class CompositePerRouteConfig : public Router::RouteSpecificFilterConfig {
+public:
+  CompositePerRouteConfig(Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree,
+                          Event::Dispatcher& main_dispatcher)
+      : main_dispatcher_(main_dispatcher), match_tree_(std::move(match_tree)) {}
+  ~CompositePerRouteConfig() override;
+
+  const Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>& matchTree() const {
+    return match_tree_;
+  }
+
+private:
+  Event::Dispatcher& main_dispatcher_;
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
+};
+
 struct FactoryCallbacksWrapper;
 
 #define ALL_COMPOSITE_FILTER_STATS(COUNTER)                                                        \
@@ -38,7 +55,7 @@ public:
 
   ProtobufTypes::MessagePtr serializeAsProto() const override { return buildProtoStruct(); }
 
-  absl::optional<std::string> serializeAsString() const override {
+  std::optional<std::string> serializeAsString() const override {
     return Json::Factory::loadFromProtobufStruct(*buildProtoStruct())->asJsonString();
   }
 
@@ -92,9 +109,10 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(FilterStats& stats, Event::Dispatcher& dispatcher, bool is_upstream,
+         Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree = nullptr,
          NamedFilterChainFactoryMapSharedPtr named_filter_chains = nullptr)
       : dispatcher_(dispatcher), stats_(stats), is_upstream_(is_upstream),
-        named_filter_chains_(std::move(named_filter_chains)) {}
+        match_tree_(std::move(match_tree)), named_filter_chains_(std::move(named_filter_chains)) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -137,6 +155,7 @@ public:
   }
 
   void onMatchCallback(const Matcher::Action& action) override;
+  void handleAction(const Matcher::Action& action);
 
   // AccessLog::Instance
   void log(const Formatter::Context& log_context, const StreamInfo::StreamInfo& info) override {
@@ -152,6 +171,9 @@ private:
 
   void updateFilterState(Http::StreamFilterCallbacks* callback, const std::string& filter_name,
                          const std::string& action_name);
+
+  void resolvePerRouteConfig();
+  void matchAndHandleActions();
 
   Event::Dispatcher& dispatcher_;
 
@@ -198,7 +220,10 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   FilterStats& stats_;
   // Filter in the upstream filter chain.
-  bool is_upstream_;
+  bool is_upstream_{false};
+  Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
+  bool per_route_config_resolved_{false};
+  bool match_tree_evaluated_{false};
   // Named filter chains compiled at config time.
   NamedFilterChainFactoryMapSharedPtr named_filter_chains_;
 };

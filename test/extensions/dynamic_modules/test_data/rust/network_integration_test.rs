@@ -11,16 +11,30 @@ fn init() -> bool {
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewNetworkFilterConfigFunction`]
 /// signature.
 fn new_network_filter_config_fn<EC: EnvoyNetworkFilterConfig, ENF: EnvoyNetworkFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn NetworkFilterConfig<ENF>>> {
   match name {
     "flow_control" => Some(Box::new(FlowControlFilterConfig)),
-    "connection_state" => Some(Box::new(ConnectionStateFilterConfig)),
+    "connection_state" => {
+      // Emit a metric directly from the config context (no per-connection filter), exercising the
+      // config-scoped emission path. This would typically be done from a scheduled background task.
+      let config_total = envoy_filter_config.define_counter("config_total").unwrap();
+      envoy_filter_config
+        .increment_counter(config_total, 1)
+        .unwrap();
+      Some(Box::new(ConnectionStateFilterConfig))
+    },
     "half_close" => Some(Box::new(HalfCloseFilterConfig)),
     "buffer_limits" => Some(Box::new(BufferLimitsFilterConfig)),
-    _ => panic!("unknown filter name: {}", name),
+    "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
+    "upstream_connection_id" => Some(Box::new(UpstreamConnectionIdFilterConfig)),
+    "read_attributes" => Some(Box::new(ReadAttributesFilterConfig)),
+    "http_callout_reentrancy_probe" => Some(Box::new(HttpCalloutReentrancyProbeFilterConfig::new(
+      envoy_filter_config,
+    ))),
+    _ => panic!("unknown filter name: {name}"),
   }
 }
 
@@ -301,5 +315,188 @@ impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for BufferLimitsFilter {
 
   fn on_below_write_buffer_low_watermark(&mut self, _envoy_filter: &mut ENF) {
     BELOW_LOW_WATERMARK_CALLED.store(true, Ordering::SeqCst);
+  }
+}
+
+// =============================================================================
+// Dynamic Metadata Test Filter
+// =============================================================================
+
+// Sets several string entries under one namespace via the batch setter, then reads them back to
+// prove the batch and the getter round trip through the ABI. An empty batch must not create a
+// namespace.
+struct DynamicMetadataFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for DynamicMetadataFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(DynamicMetadataFilter)
+  }
+}
+
+struct DynamicMetadataFilter;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for DynamicMetadataFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    envoy_filter.set_dynamic_metadata_string_batch(
+      "dynamic_modules.test",
+      &[
+        ("batch_key1", "batch_value1"),
+        ("batch_key2", "batch_value2"),
+      ],
+    );
+    envoy_filter.set_dynamic_metadata_string_batch("dynamic_modules.empty", &[]);
+
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key1")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value1".to_vec())
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "batch_key2")
+        .map(|value| value.as_slice().to_vec()),
+      Some(b"batch_value2".to_vec())
+    );
+    assert!(envoy_filter
+      .get_dynamic_metadata_string("dynamic_modules.empty", "batch_key1")
+      .is_none());
+
+    // Set a non-UTF-8 byte value and read it back to prove set_dynamic_metadata_bytes preserves it.
+    envoy_filter.set_dynamic_metadata_bytes(
+      "dynamic_modules.test",
+      "bytes_key",
+      &[0xff, 0x00, 0xfe],
+    );
+    assert_eq!(
+      envoy_filter
+        .get_dynamic_metadata_string("dynamic_modules.test", "bytes_key")
+        .map(|value| value.as_slice().to_vec()),
+      Some(vec![0xff, 0x00, 0xfe])
+    );
+
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+}
+
+// =============================================================================
+// Upstream Connection ID Test Filter
+// =============================================================================
+
+struct UpstreamConnectionIdFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for UpstreamConnectionIdFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(UpstreamConnectionIdFilter)
+  }
+}
+
+struct UpstreamConnectionIdFilter;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for UpstreamConnectionIdFilter {
+  fn on_write(
+    &mut self,
+    envoy_filter: &mut ENF,
+    _data_length: usize,
+    _end_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    assert_ne!(envoy_filter.get_upstream_connection_id(), None);
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+}
+
+// =============================================================================
+// Read Attributes Test Filter
+// =============================================================================
+
+// Reads connection stream info attributes through the generic attribute getters and asserts they
+// resolve once the connection is established.
+struct ReadAttributesFilterConfig;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for ReadAttributesFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(ReadAttributesFilter)
+  }
+}
+
+struct ReadAttributesFilter;
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for ReadAttributesFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    assert!(envoy_filter
+      .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress)
+      .is_some());
+    let connection_id = envoy_filter
+      .get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::ConnectionId)
+      .unwrap_or(0);
+    assert!(connection_id > 0);
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+}
+
+// =============================================================================
+// HTTP Callout Reentrancy Probe Test Filter
+// =============================================================================
+
+// Issues an HTTP callout on new connection and increments a counter from on_http_callout_done. The
+// unit tests complete the callout inline, so the gate must keep on_http_callout_done from running
+// and the counter must stay at zero.
+struct HttpCalloutReentrancyProbeFilterConfig {
+  callout_done_total: EnvoyCounterId,
+}
+
+impl HttpCalloutReentrancyProbeFilterConfig {
+  fn new<EC: EnvoyNetworkFilterConfig>(config: &mut EC) -> Self {
+    Self {
+      callout_done_total: config.define_counter("callout_done_total").unwrap(),
+    }
+  }
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilterConfig<ENF> for HttpCalloutReentrancyProbeFilterConfig {
+  fn new_network_filter(&self, _envoy: &mut ENF) -> Box<dyn NetworkFilter<ENF>> {
+    Box::new(HttpCalloutReentrancyProbeFilter {
+      callout_done_total: self.callout_done_total,
+    })
+  }
+}
+
+struct HttpCalloutReentrancyProbeFilter {
+  callout_done_total: EnvoyCounterId,
+}
+
+impl<ENF: EnvoyNetworkFilter> NetworkFilter<ENF> for HttpCalloutReentrancyProbeFilter {
+  fn on_new_connection(
+    &mut self,
+    envoy_filter: &mut ENF,
+  ) -> abi::envoy_dynamic_module_type_on_network_filter_data_status {
+    let _ = envoy_filter.send_http_callout(
+      "callout_cluster",
+      vec![
+        (":method", b"GET"),
+        (":path", b"/"),
+        ("host", b"example.com"),
+      ],
+      None,
+      1000,
+    );
+    abi::envoy_dynamic_module_type_on_network_filter_data_status::Continue
+  }
+
+  fn on_http_callout_done(
+    &mut self,
+    envoy_filter: &mut ENF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+    _body_chunks: Vec<EnvoyBuffer>,
+  ) {
+    let _ = envoy_filter.increment_counter(self.callout_done_total, 1);
   }
 }

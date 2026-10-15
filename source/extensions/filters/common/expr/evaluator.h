@@ -54,12 +54,14 @@ public:
 
   StreamActivation() = default;
 
-  absl::optional<CelValue> FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
+  std::optional<CelValue> FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
   std::vector<const google::api::expr::runtime::CelFunction*>
   FindFunctionOverloads(absl::string_view) const override {
     return {};
   }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool needs_response_path_data() const { return needs_response_path_data_; }
+  // NOLINTNEXTLINE(readability-identifier-naming)
   bool has_response_data() const {
     return activation_response_headers_ != nullptr || activation_response_trailers_ != nullptr;
   }
@@ -156,7 +158,7 @@ public:
 
   // Evaluates an expression for a request. The arena is used to hold intermediate computational
   // results and potentially the final value.
-  absl::optional<CelValue>
+  std::optional<CelValue>
   evaluate(Protobuf::Arena& arena, const ::Envoy::LocalInfo::LocalInfo* local_info,
            const StreamInfo::StreamInfo& info,
            const ::Envoy::Http::RequestHeaderMap* request_headers,

@@ -1,3 +1,4 @@
+#include <optional>
 #include <set>
 
 #include "test/test_common/utility.h"
@@ -57,7 +58,7 @@ TEST_F(ProduceUnitTest, ShouldHandleProduceRequestWithNoRecords) {
   const std::vector<OutboundRecord> records = {};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
-  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const RequestHeader header = {0, 0, 0, std::nullopt};
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   ProduceRequestHolder testee = {filter_, upstream_kafka_facade_, extractor_, message};
@@ -86,7 +87,7 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
   const std::vector<OutboundRecord> records = {r1, r2};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
-  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const RequestHeader header = {0, 0, 0, std::nullopt};
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   std::shared_ptr<ProduceRequestHolder> testee =
@@ -144,7 +145,7 @@ TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
   const std::vector<OutboundRecord> records = {r1, r2};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
-  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const RequestHeader header = {0, 0, 0, std::nullopt};
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   std::shared_ptr<ProduceRequestHolder> testee =
@@ -198,7 +199,7 @@ TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
   const std::vector<OutboundRecord> records = {r1, r2};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
-  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const RequestHeader header = {0, 0, 0, std::nullopt};
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   std::shared_ptr<ProduceRequestHolder> testee =
@@ -248,7 +249,7 @@ TEST_F(ProduceUnitTest, ShouldIgnoreMementoFromAnotherRequest) {
   const std::vector<OutboundRecord> records = {r1};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 
-  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const RequestHeader header = {0, 0, 0, std::nullopt};
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   std::shared_ptr<ProduceRequestHolder> testee =

@@ -55,9 +55,9 @@ TEST(PreviousHostsRetryPredicateConfigTest, EmptyConfig) {
   ASSERT_NE(nullptr, factory);
 
   ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
-  EXPECT_TRUE(
-      dynamic_cast<envoy::extensions::retry::host::previous_hosts::v3::PreviousHostsPredicate*>(
-          config.get()));
+  EXPECT_TRUE(Envoy::Protobuf::DynamicCastMessage<
+              envoy::extensions::retry::host::previous_hosts::v3::PreviousHostsPredicate>(
+      config.get()));
 }
 
 } // namespace

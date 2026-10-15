@@ -1,16 +1,42 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
+load("//bazel:apple.bzl", "envoy_objc_library")
 
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
 
+envoy_objc_library(
+    name = "apple_network_change_monitor_lib",
+    srcs = [
+        "apple_network_change_monitor.mm",
+        "apple_network_change_monitor_impl.mm",
+    ],
+    hdrs = [
+        "apple_network_change_monitor.h",
+        "apple_network_change_monitor_impl.h",
+    ],
+    module_name = "AppleNetworkChangeMonitor",
+    sdk_frameworks = [
+        "CoreTelephony",
+        "Network",
+        "SystemConfiguration",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/cc:network_change_monitor_interface",
+        "//library/common:engine_types_lib",
+        "//library/common/network:network_types_lib",
+        "//library/common/types:c_types_lib",
+    ],
+)
+
 envoy_cc_library(
     name = "envoy_mobile_quic_network_observer_registry_factory_lib",
     srcs = ["envoy_mobile_quic_network_observer_registry_factory.cc"],
     hdrs = ["envoy_mobile_quic_network_observer_registry_factory.h"],
-    repository = "@envoy",
     deps = [
         ":network_types_lib",
+        "@abseil-cpp//absl/synchronization",
         "@envoy//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
     ],
 )
@@ -23,7 +49,6 @@ envoy_cc_library(
     hdrs = [
         "connectivity_manager.h",
     ],
-    repository = "@envoy",
     deps = [
         ":envoy_mobile_quic_network_observer_registry_factory_lib",
         ":network_type_socket_option_lib",
@@ -39,7 +64,9 @@ envoy_cc_library(
         "@envoy//source/common/common:scalar_to_byte_vector_lib",
         "@envoy//source/common/network:addr_family_aware_socket_option_lib",
         "@envoy//source/common/network:socket_option_lib",
+        "@envoy//source/common/runtime:runtime_features_lib",
         "@envoy//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
+        "@envoy//source/server:generic_factory_context_lib",
     ],
 )
 
@@ -47,7 +74,6 @@ envoy_cc_library(
     name = "src_addr_socket_option_lib",
     srcs = ["src_addr_socket_option_impl.cc"],
     hdrs = ["src_addr_socket_option_impl.h"],
-    repository = "@envoy",
     deps = [
         "@envoy//envoy/network:address_interface",
         "@envoy//source/common/network:socket_option_lib",
@@ -59,7 +85,6 @@ envoy_cc_library(
     name = "socket_tag_socket_option_lib",
     srcs = ["socket_tag_socket_option_impl.cc"],
     hdrs = ["socket_tag_socket_option_impl.h"],
-    repository = "@envoy",
     deps = [
         "//library/jni:android_jni_utility_lib",
         "@envoy//envoy/network:address_interface",
@@ -73,7 +98,6 @@ envoy_cc_library(
     name = "network_type_socket_option_lib",
     srcs = ["network_type_socket_option_impl.cc"],
     hdrs = ["network_type_socket_option_impl.h"],
-    repository = "@envoy",
     deps = [
         "@envoy//source/common/common:scalar_to_byte_vector_lib",
         "@envoy//source/common/network:socket_option_lib",
@@ -84,7 +108,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "synthetic_address_lib",
     hdrs = ["synthetic_address_impl.h"],
-    repository = "@envoy",
     deps = [
         "@envoy//envoy/network:address_interface",
         "@envoy//source/common/network:socket_interface_lib",
@@ -105,7 +128,6 @@ envoy_cc_library(
         "@envoy//bazel:apple": ["-framework Security"],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
@@ -123,7 +145,6 @@ envoy_cc_library(
     hdrs = [
         "proxy_settings.h",
     ],
-    repository = "@envoy",
     deps = [
         "@envoy//source/common/network:utility_lib",
     ],
@@ -134,13 +155,11 @@ envoy_cc_library(
     hdrs = [
         "network_types.h",
     ],
-    repository = "@envoy",
 )
 
 envoy_cc_library(
     name = "proxy_resolver_interface_lib",
     hdrs = ["proxy_resolver_interface.h"],
-    repository = "@envoy",
     deps = [
         ":proxy_settings_lib",
         "@envoy//envoy/event:dispatcher_interface",
@@ -150,7 +169,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "proxy_api_lib",
     hdrs = ["proxy_api.h"],
-    repository = "@envoy",
     deps = [
         ":proxy_resolver_interface_lib",
     ],
@@ -182,7 +200,6 @@ envoy_cc_library(
         ],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
             ":proxy_api_lib",

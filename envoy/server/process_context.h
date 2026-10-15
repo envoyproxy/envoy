@@ -1,8 +1,7 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -14,7 +13,7 @@ public:
   virtual ~ProcessObject() = default;
 };
 
-using ProcessObjectOptRef = absl::optional<std::reference_wrapper<ProcessObject>>;
+using ProcessObjectOptRef = OptRef<ProcessObject>;
 
 /**
  * Context passed to filters to access resources from non-Envoy parts of the
@@ -30,6 +29,6 @@ public:
   virtual ProcessObject& get() const PURE;
 };
 
-using ProcessContextOptRef = absl::optional<std::reference_wrapper<ProcessContext>>;
+using ProcessContextOptRef = OptRef<ProcessContext>;
 
 } // namespace Envoy

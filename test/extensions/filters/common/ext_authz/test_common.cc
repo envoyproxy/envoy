@@ -45,7 +45,7 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
                                                const std::string& body,
                                                const HeaderValueOptionVector& headers,
                                                const HeaderValueOptionVector& downstream_headers) {
-  auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  CheckResponsePtr response;
   auto status = response->mutable_status();
   status->set_code(response_status);
 
@@ -89,7 +89,7 @@ CheckResponsePtr TestCommon::makeErrorCheckResponse(Grpc::Status::GrpcStatus res
                                                     envoy::type::v3::StatusCode http_status_code,
                                                     const std::string& body,
                                                     const HeaderValueOptionVector& headers) {
-  auto response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  CheckResponsePtr response;
   auto status = response->mutable_status();
   status->set_code(response_status);
 
@@ -112,11 +112,11 @@ CheckResponsePtr TestCommon::makeErrorCheckResponse(Grpc::Status::GrpcStatus res
   return response;
 }
 
-Response
-TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code, const std::string& body,
-                              const HeaderValueOptionVector& headers,
-                              const HeaderValueOptionVector& downstream_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
+Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_code,
+                                       const std::string& body,
+                                       const HeaderValueOptionVector& headers,
+                                       const HeaderValueOptionVector& downstream_headers,
+                                       const std::optional<Grpc::Status::GrpcStatus>& grpc_status) {
   auto authz_response = Response{};
   authz_response.status = status;
   authz_response.status_code = status_code;

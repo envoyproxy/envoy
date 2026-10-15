@@ -35,7 +35,7 @@
 #include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
 
-#include "absl/types/optional.h"
+#include <optional>
 
 namespace Envoy {
 

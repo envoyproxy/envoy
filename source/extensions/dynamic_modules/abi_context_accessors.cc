@@ -1,0 +1,933 @@
+#include "source/extensions/dynamic_modules/abi_context_accessors.h"
+
+#include <chrono>
+#include <functional>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "envoy/registry/registry.h"
+
+#include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+
+#include "absl/strings/str_split.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace DynamicModules {
+
+namespace {
+
+int64_t monotonicTimeToNanos(const std::optional<MonotonicTime>& time,
+                             const MonotonicTime& start_time, bool* has_time = nullptr) {
+  if (has_time != nullptr) {
+    *has_time = time.has_value();
+  }
+  if (!time.has_value()) {
+    return -1;
+  }
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() - start_time).count();
+}
+
+// Extract a downstream SSL string attribute from the stream info.
+bool getDownstreamSslAttribute(
+    const StreamInfo::StreamInfo& stream_info,
+    std::function<OptRef<const std::string>(const Ssl::ConnectionInfoConstSharedPtr)> extractor,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto& provider = stream_info.downstreamAddressProvider();
+  if (!provider.sslConnection()) {
+    return false;
+  }
+  const Ssl::ConnectionInfoConstSharedPtr ssl = provider.sslConnection();
+  OptRef<const std::string> attr = extractor(ssl);
+  if (!attr.has_value() || attr->empty()) {
+    return false;
+  }
+  const std::string& value = attr.value();
+  *result = {const_cast<char*>(value.data()), value.size()};
+  return true;
+}
+
+// Extract an upstream SSL string attribute from the stream info.
+bool getUpstreamSslAttribute(
+    const StreamInfo::StreamInfo& stream_info,
+    std::function<OptRef<const std::string>(const Ssl::ConnectionInfoConstSharedPtr)> extractor,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto upstream = stream_info.upstreamInfo();
+  if (!upstream.has_value() || !upstream->upstreamSslConnection()) {
+    return false;
+  }
+  const Ssl::ConnectionInfoConstSharedPtr ssl = upstream->upstreamSslConnection();
+  OptRef<const std::string> attr = extractor(ssl);
+  if (!attr.has_value() || attr->empty()) {
+    return false;
+  }
+  const std::string& value = attr.value();
+  *result = {const_cast<char*>(value.data()), value.size()};
+  return true;
+}
+
+// Resolve a dynamic metadata value by filter name and dotted key path. Returns an unset value
+// when the path is absent.
+const Protobuf::Value& dynamicMetadataValue(const StreamInfo::StreamInfo& stream_info,
+                                            envoy_dynamic_module_type_module_buffer filter_name,
+                                            envoy_dynamic_module_type_module_buffer path) {
+  std::string filter_name_str(filter_name.ptr, filter_name.length);
+  // Keep a non-null empty view for an absent path so the split result is unchanged.
+  const absl::string_view path_view =
+      path.ptr == nullptr ? absl::string_view("") : absl::string_view(path.ptr, path.length);
+  std::vector<std::string> path_parts = absl::StrSplit(path_view, '.');
+  const auto& metadata = stream_info.dynamicMetadata();
+  return Envoy::Config::Metadata::metadataValue(&metadata, filter_name_str, path_parts);
+}
+
+} // namespace
+
+HeadersMapOptConstRef
+ContextAccessor::headerMapByType(const Formatter::Context& context,
+                                 envoy_dynamic_module_type_http_header_type type) {
+  switch (type) {
+  case envoy_dynamic_module_type_http_header_type_RequestHeader:
+    return context.requestHeaders();
+  case envoy_dynamic_module_type_http_header_type_RequestTrailer:
+    return context.requestTrailers();
+  case envoy_dynamic_module_type_http_header_type_ResponseHeader:
+    return context.responseHeaders();
+  case envoy_dynamic_module_type_http_header_type_ResponseTrailer:
+    return context.responseTrailers();
+  default:
+    return {};
+  }
+}
+
+bool ContextAccessor::getHeaders(HeadersMapOptConstRef map,
+                                 envoy_dynamic_module_type_envoy_http_header* result_headers) {
+  if (!map) {
+    return false;
+  }
+  size_t i = 0;
+  map->iterate([&i, &result_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    auto& key = header.key();
+    result_headers[i].key_ptr = const_cast<char*>(key.getStringView().data());
+    result_headers[i].key_length = key.size();
+    auto& value = header.value();
+    result_headers[i].value_ptr = const_cast<char*>(value.getStringView().data());
+    result_headers[i].value_length = value.size();
+    i++;
+    return Http::HeaderMap::Iterate::Continue;
+  });
+  return true;
+}
+
+bool ContextAccessor::getHeaderValue(HeadersMapOptConstRef map,
+                                     envoy_dynamic_module_type_module_buffer key,
+                                     envoy_dynamic_module_type_envoy_buffer* result, size_t index,
+                                     size_t* total_count_out) {
+  if (!map.has_value()) {
+    *result = {.ptr = nullptr, .length = 0};
+    if (total_count_out != nullptr) {
+      *total_count_out = 0;
+    }
+    return false;
+  }
+  absl::string_view key_view(key.ptr, key.length);
+
+  // Note: We convert to LowerCaseString which may involve copying. This could be optimized if
+  // callers guarantee lowercase keys.
+  const auto values = map->get(Envoy::Http::LowerCaseString(key_view));
+  if (total_count_out != nullptr) {
+    *total_count_out = values.size();
+  }
+
+  if (index >= values.size()) {
+    *result = {.ptr = nullptr, .length = 0};
+    return false;
+  }
+
+  const auto value = values[index]->value().getStringView();
+  *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  return true;
+}
+
+bool ContextAccessor::getAttributeString(const StreamInfo::StreamInfo& stream_info,
+                                         envoy_dynamic_module_type_attribute_id attribute_id,
+                                         envoy_dynamic_module_type_envoy_buffer* result) {
+  bool ok = false;
+  switch (attribute_id) {
+  case envoy_dynamic_module_type_attribute_id_RequestProtocol: {
+    if (!stream_info.protocol().has_value()) {
+      break;
+    }
+    const auto& protocol_str = Http::Utility::getProtocolString(stream_info.protocol().value());
+    *result = {const_cast<char*>(protocol_str.data()), protocol_str.size()};
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamProtocol: {
+    const auto upstream = stream_info.upstreamInfo();
+    if (!upstream.has_value() || !upstream->upstreamProtocol().has_value()) {
+      break;
+    }
+    const auto& protocol_str =
+        Http::Utility::getProtocolString(upstream->upstreamProtocol().value());
+    *result = {const_cast<char*>(protocol_str.data()), protocol_str.size()};
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseCodeDetails: {
+    if (!stream_info.responseCodeDetails().has_value()) {
+      break;
+    }
+    const auto& details = stream_info.responseCodeDetails().value();
+    *result = {const_cast<char*>(details.data()), details.size()};
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsRouteName: {
+    const auto route = stream_info.route();
+    if (route.has_value()) {
+      const auto& name = route->routeName();
+      *result = {const_cast<char*>(name.data()), name.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsVirtualHostName: {
+    const auto virtual_host = stream_info.virtualHost();
+    if (virtual_host.has_value()) {
+      const auto& name = virtual_host->name();
+      *result = {const_cast<char*>(name.data()), name.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName: {
+    const auto& name = stream_info.virtualClusterName();
+    if (name.has_value() && !name->empty()) {
+      *result = {const_cast<char*>(name->data()), name->size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsClusterName: {
+    const auto cluster_info = stream_info.upstreamClusterInfo();
+    if (cluster_info) {
+      const auto& name = cluster_info->name();
+      *result = {const_cast<char*>(name.data()), name.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsFilterChainName: {
+    const auto filter_chain_info = stream_info.downstreamAddressProvider().filterChainInfo();
+    const absl::string_view name =
+        filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
+    *result = {const_cast<char*>(name.data()), name.size()};
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestId: {
+    const auto provider = stream_info.getStreamIdProvider();
+    if (provider.has_value() && provider->toStringView().has_value()) {
+      absl::string_view view = provider->toStringView().value();
+      *result = {const_cast<char*>(view.data()), view.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_SourceAddress: {
+    const auto& addr_provider = stream_info.downstreamAddressProvider();
+    const auto& address = addr_provider.remoteAddress();
+    if (address) {
+      const auto addr_str = address->asStringView();
+      *result = {const_cast<char*>(addr_str.data()), addr_str.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_DestinationAddress: {
+    const auto& addr_provider = stream_info.downstreamAddressProvider();
+    const auto& address = addr_provider.localAddress();
+    if (address) {
+      const auto addr_str = address->asStringView();
+      *result = {const_cast<char*>(addr_str.data()), addr_str.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName: {
+    const auto& sni = stream_info.downstreamAddressProvider().requestedServerName();
+    if (!sni.empty()) {
+      *result = {const_cast<char*>(sni.data()), sni.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails: {
+    const auto& details = stream_info.connectionTerminationDetails();
+    if (details.has_value() && !details->empty()) {
+      *result = {const_cast<char*>(details->data()), details->size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason: {
+    const auto& reason = stream_info.downstreamTransportFailureReason();
+    if (!reason.empty()) {
+      *result = {const_cast<char*>(reason.data()), reason.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamAddress: {
+    const auto upstream = stream_info.upstreamInfo();
+    if (upstream.has_value() && upstream->upstreamHost() &&
+        upstream->upstreamHost()->address() != nullptr) {
+      auto addr = upstream->upstreamHost()->address()->asStringView();
+      *result = {const_cast<char*>(addr.data()), addr.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamLocalAddress: {
+    const auto upstream = stream_info.upstreamInfo();
+    if (upstream.has_value() && upstream->upstreamLocalAddress() != nullptr) {
+      auto addr = upstream->upstreamLocalAddress()->asStringView();
+      *result = {const_cast<char*>(addr.data()), addr.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamTransportFailureReason: {
+    const auto upstream = stream_info.upstreamInfo();
+    if (upstream.has_value() && !upstream->upstreamTransportFailureReason().empty()) {
+      const auto& reason = upstream->upstreamTransportFailureReason();
+      *result = {const_cast<char*>(reason.data()), reason.size()};
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamRequestedServerName:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->sni();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion:
+    return getDownstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->tlsVersion();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate:
+    return getDownstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->subjectPeerCertificate();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate:
+    return getDownstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->subjectLocalCertificate();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest:
+    return getDownstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->sha256PeerCertificateDigest();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate:
+    return getDownstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          if (ssl->dnsSansLocalCertificate().empty()) {
+            return std::nullopt;
+          }
+          return ssl->dnsSansLocalCertificate().front();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate:
+    return getDownstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          if (ssl->dnsSansPeerCertificate().empty()) {
+            return std::nullopt;
+          }
+          return ssl->dnsSansPeerCertificate().front();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate:
+    return getDownstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          if (ssl->uriSanLocalCertificate().empty()) {
+            return std::nullopt;
+          }
+          return ssl->uriSanLocalCertificate().front();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate:
+    return getDownstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          if (ssl->uriSanPeerCertificate().empty()) {
+            return std::nullopt;
+          }
+          return ssl->uriSanPeerCertificate().front();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_UpstreamTlsVersion:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->tlsVersion();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_UpstreamSubjectPeerCertificate:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->subjectPeerCertificate();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_UpstreamSubjectLocalCertificate:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->subjectLocalCertificate();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          return ssl->sha256PeerCertificateDigest();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_UpstreamDnsSanLocalCertificate:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          if (ssl->dnsSansLocalCertificate().empty()) {
+            return std::nullopt;
+          }
+          return ssl->dnsSansLocalCertificate().front();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_UpstreamDnsSanPeerCertificate:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          if (ssl->dnsSansPeerCertificate().empty()) {
+            return std::nullopt;
+          }
+          return ssl->dnsSansPeerCertificate().front();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_UpstreamUriSanLocalCertificate:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          if (ssl->uriSanLocalCertificate().empty()) {
+            return std::nullopt;
+          }
+          return ssl->uriSanLocalCertificate().front();
+        },
+        result);
+  case envoy_dynamic_module_type_attribute_id_UpstreamUriSanPeerCertificate:
+    return getUpstreamSslAttribute(
+        stream_info,
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> OptRef<const std::string> {
+          if (ssl->uriSanPeerCertificate().empty()) {
+            return std::nullopt;
+          }
+          return ssl->uriSanPeerCertificate().front();
+        },
+        result);
+  default:
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "Unsupported attribute ID {} as string.",
+                        static_cast<int64_t>(attribute_id));
+    break;
+  }
+  return ok;
+}
+
+bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                                      envoy_dynamic_module_type_attribute_id attribute_id,
+                                      uint64_t* result, const HttpAttributeContext* http_context) {
+  bool ok = false;
+  switch (attribute_id) {
+  case envoy_dynamic_module_type_attribute_id_RequestSize: {
+    if (http_context == nullptr) {
+      break;
+    }
+    *result = stream_info.bytesReceived();
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestTotalSize: {
+    if (http_context == nullptr) {
+      break;
+    }
+    *result =
+        stream_info.bytesReceived() +
+        (http_context->request_headers != nullptr ? http_context->request_headers->byteSize() : 0) +
+        (http_context->request_trailers != nullptr ? http_context->request_trailers->byteSize()
+                                                   : 0);
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseCode: {
+    const auto code = stream_info.responseCode();
+    if (code.has_value()) {
+      *result = code.value();
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseFlags: {
+    // Unlike the response code, the flags are always available as a bitmask (0 when none are set),
+    // matching the value exposed by the response.flags CEL attribute.
+    *result = stream_info.legacyResponseFlags();
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseSize: {
+    *result = stream_info.bytesSent();
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus: {
+    if (http_context == nullptr) {
+      break;
+    }
+    const auto& response_headers = http_context->response_headers != nullptr
+                                       ? *http_context->response_headers
+                                       : *Http::StaticEmptyHeaders::get().response_headers;
+    const auto& response_trailers = http_context->response_trailers != nullptr
+                                        ? *http_context->response_trailers
+                                        : *Http::StaticEmptyHeaders::get().response_trailers;
+    const auto status =
+        Grpc::Common::getGrpcStatus(response_trailers, response_headers, stream_info);
+    if (status.has_value()) {
+      *result = static_cast<uint64_t>(status.value());
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ResponseTotalSize: {
+    if (http_context == nullptr) {
+      break;
+    }
+    *result =
+        stream_info.bytesSent() +
+        (http_context->response_headers != nullptr ? http_context->response_headers->byteSize()
+                                                   : 0) +
+        (http_context->response_trailers != nullptr ? http_context->response_trailers->byteSize()
+                                                    : 0);
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_ConnectionId: {
+    const auto connection_id = stream_info.downstreamAddressProvider().connectionID();
+    if (connection_id.has_value()) {
+      *result = connection_id.value();
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_SourcePort: {
+    const auto& addr = stream_info.downstreamAddressProvider().remoteAddress();
+    if (addr && addr->type() == Network::Address::Type::Ip) {
+      *result = addr->ip()->port();
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_DestinationPort: {
+    const auto& addr = stream_info.downstreamAddressProvider().localAddress();
+    if (addr && addr->type() == Network::Address::Type::Ip) {
+      *result = addr->ip()->port();
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamPort: {
+    const auto upstream = stream_info.upstreamInfo();
+    if (upstream.has_value() && upstream->upstreamHost() &&
+        upstream->upstreamHost()->address() != nullptr) {
+      auto ip = upstream->upstreamHost()->address()->ip();
+      if (ip) {
+        *result = ip->port();
+        ok = true;
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount: {
+    *result = stream_info.attemptCount().value_or(0);
+    ok = true;
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsListenerDirection: {
+    const auto listener_info = stream_info.downstreamAddressProvider().listenerInfo();
+    if (listener_info.has_value()) {
+      *result = static_cast<uint64_t>(listener_info->direction());
+      ok = true;
+    }
+    break;
+  }
+  default:
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "Unsupported attribute ID {} as int.", static_cast<int64_t>(attribute_id));
+    break;
+  }
+  return ok;
+}
+
+bool ContextAccessor::getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                                      const Formatter::Context& context,
+                                      envoy_dynamic_module_type_attribute_id attribute_id,
+                                      uint64_t* result) {
+  if (!stream_info.protocol().has_value()) {
+    return getAttributeInt(stream_info, attribute_id, result);
+  }
+  const HttpAttributeContext http_context{
+      context.requestHeaders().ptr(), context.responseHeaders().ptr(),
+      context.responseTrailers().ptr(), context.requestTrailers().ptr()};
+  return getAttributeInt(stream_info, attribute_id, result, &http_context);
+}
+
+bool ContextAccessor::getAttributeBool(const StreamInfo::StreamInfo& stream_info,
+                                       envoy_dynamic_module_type_attribute_id attribute_id,
+                                       bool* result) {
+  bool ok = false;
+  switch (attribute_id) {
+  case envoy_dynamic_module_type_attribute_id_ConnectionMtls: {
+    const auto& provider = stream_info.downstreamAddressProvider();
+    if (provider.sslConnection()) {
+      *result = provider.sslConnection()->peerCertificatePresented();
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_HealthCheck:
+    *result = stream_info.healthCheck();
+    ok = true;
+    break;
+  default:
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "Unsupported attribute ID {} as bool.", static_cast<int64_t>(attribute_id));
+    break;
+  }
+  return ok;
+}
+
+void ContextAccessor::getTimingInfo(const StreamInfo::StreamInfo* stream_info,
+                                    envoy_dynamic_module_type_timing_info* timing_out) {
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  getTimingInfoV2(stream_info, &timing);
+  *timing_out = {timing.start_time_unix_ns,
+                 timing.request_complete_duration_ns,
+                 timing.first_upstream_tx_byte_sent_ns,
+                 timing.last_upstream_tx_byte_sent_ns,
+                 timing.first_upstream_rx_byte_received_ns,
+                 timing.last_upstream_rx_byte_received_ns,
+                 timing.first_downstream_tx_byte_sent_ns,
+                 timing.last_downstream_tx_byte_sent_ns};
+}
+
+void ContextAccessor::getTimingInfoV2(const StreamInfo::StreamInfo* stream_info,
+                                      envoy_dynamic_module_type_timing_info_v2* timing_out) {
+  *timing_out = {};
+  timing_out->start_time_unix_ns = -1;
+  timing_out->downstream_connection_begin_ns = -1;
+  timing_out->downstream_handshake_start_ns = -1;
+  timing_out->downstream_handshake_complete_ns = -1;
+  timing_out->last_downstream_header_rx_byte_received_ns = -1;
+  timing_out->last_downstream_rx_byte_received_ns = -1;
+  timing_out->upstream_connect_start_ns = -1;
+  timing_out->upstream_connect_complete_ns = -1;
+  timing_out->upstream_handshake_complete_ns = -1;
+  timing_out->first_upstream_tx_byte_sent_ns = -1;
+  timing_out->last_upstream_tx_byte_sent_ns = -1;
+  timing_out->first_upstream_rx_byte_received_ns = -1;
+  timing_out->first_upstream_rx_body_byte_received_ns = -1;
+  timing_out->last_upstream_rx_byte_received_ns = -1;
+  timing_out->first_downstream_tx_byte_sent_ns = -1;
+  timing_out->last_downstream_tx_byte_sent_ns = -1;
+  timing_out->last_downstream_ack_received_ns = -1;
+  timing_out->request_complete_duration_ns = -1;
+  timing_out->downstream_connection_end_ns = -1;
+  if (stream_info == nullptr) {
+    return;
+  }
+
+  const MonotonicTime start_time = stream_info->startTimeMonotonic();
+  timing_out->start_time_unix_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                       stream_info->startTime().time_since_epoch())
+                                       .count();
+  timing_out->has_start_time = true;
+
+  const auto request_complete = stream_info->requestComplete();
+  if (request_complete.has_value()) {
+    timing_out->request_complete_duration_ns = request_complete->count();
+    timing_out->has_request_complete = true;
+  }
+
+  const auto downstream = stream_info->downstreamTiming();
+  if (downstream.has_value()) {
+    timing_out->first_downstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(downstream->firstDownstreamTxByteSent(), start_time,
+                             &timing_out->has_first_downstream_tx_byte_sent);
+    timing_out->last_downstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamTxByteSent(), start_time,
+                             &timing_out->has_last_downstream_tx_byte_sent);
+    timing_out->downstream_connection_begin_ns =
+        monotonicTimeToNanos(downstream->downstreamConnectionBegin(), start_time,
+                             &timing_out->has_downstream_connection_begin);
+    timing_out->downstream_handshake_start_ns =
+        monotonicTimeToNanos(downstream->downstreamHandshakeStart(), start_time,
+                             &timing_out->has_downstream_handshake_start);
+    timing_out->downstream_handshake_complete_ns =
+        monotonicTimeToNanos(downstream->downstreamHandshakeComplete(), start_time,
+                             &timing_out->has_downstream_handshake_complete);
+    timing_out->last_downstream_header_rx_byte_received_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamHeaderRxByteReceived(), start_time,
+                             &timing_out->has_last_downstream_header_rx_byte_received);
+    timing_out->last_downstream_rx_byte_received_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamRxByteReceived(), start_time,
+                             &timing_out->has_last_downstream_rx_byte_received);
+    timing_out->last_downstream_ack_received_ns =
+        monotonicTimeToNanos(downstream->lastDownstreamAckReceived(), start_time,
+                             &timing_out->has_last_downstream_ack_received);
+    timing_out->downstream_connection_end_ns =
+        monotonicTimeToNanos(downstream->downstreamConnectionEnd(), start_time,
+                             &timing_out->has_downstream_connection_end);
+  }
+
+  const auto upstream = stream_info->upstreamInfo();
+  if (upstream.has_value()) {
+    const auto& upstream_timing = upstream->upstreamTiming();
+    timing_out->first_upstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(upstream_timing.first_upstream_tx_byte_sent_, start_time,
+                             &timing_out->has_first_upstream_tx_byte_sent);
+    timing_out->last_upstream_tx_byte_sent_ns =
+        monotonicTimeToNanos(upstream_timing.last_upstream_tx_byte_sent_, start_time,
+                             &timing_out->has_last_upstream_tx_byte_sent);
+    timing_out->first_upstream_rx_byte_received_ns =
+        monotonicTimeToNanos(upstream_timing.first_upstream_rx_byte_received_, start_time,
+                             &timing_out->has_first_upstream_rx_byte_received);
+    timing_out->last_upstream_rx_byte_received_ns =
+        monotonicTimeToNanos(upstream_timing.last_upstream_rx_byte_received_, start_time,
+                             &timing_out->has_last_upstream_rx_byte_received);
+    timing_out->upstream_connect_start_ns =
+        monotonicTimeToNanos(upstream_timing.upstream_connect_start_, start_time,
+                             &timing_out->has_upstream_connect_start);
+    timing_out->upstream_connect_complete_ns =
+        monotonicTimeToNanos(upstream_timing.upstream_connect_complete_, start_time,
+                             &timing_out->has_upstream_connect_complete);
+    timing_out->upstream_handshake_complete_ns =
+        monotonicTimeToNanos(upstream_timing.upstream_handshake_complete_, start_time,
+                             &timing_out->has_upstream_handshake_complete);
+    timing_out->first_upstream_rx_body_byte_received_ns =
+        monotonicTimeToNanos(upstream_timing.first_upstream_rx_body_byte_received_, start_time,
+                             &timing_out->has_first_upstream_rx_body_byte_received);
+  }
+}
+
+bool ContextAccessor::getDynamicMetadata(const StreamInfo::StreamInfo& stream_info,
+                                         envoy_dynamic_module_type_module_buffer filter_name,
+                                         envoy_dynamic_module_type_module_buffer path,
+                                         envoy_dynamic_module_type_envoy_buffer* result) {
+  // String values are returned zero-copy here. Numbers and bools have dedicated typed accessors.
+  const auto& value = dynamicMetadataValue(stream_info, filter_name, path);
+  if (value.kind_case() == Protobuf::Value::kStringValue) {
+    const auto& str = value.string_value();
+    *result = {const_cast<char*>(str.data()), str.size()};
+    return true;
+  }
+  return false;
+}
+
+bool ContextAccessor::getDynamicMetadataNumber(const StreamInfo::StreamInfo& stream_info,
+                                               envoy_dynamic_module_type_module_buffer filter_name,
+                                               envoy_dynamic_module_type_module_buffer path,
+                                               double* result) {
+  const auto& value = dynamicMetadataValue(stream_info, filter_name, path);
+  if (value.kind_case() == Protobuf::Value::kNumberValue) {
+    *result = value.number_value();
+    return true;
+  }
+  return false;
+}
+
+bool ContextAccessor::getDynamicMetadataBool(const StreamInfo::StreamInfo& stream_info,
+                                             envoy_dynamic_module_type_module_buffer filter_name,
+                                             envoy_dynamic_module_type_module_buffer path,
+                                             bool* result) {
+  const auto& value = dynamicMetadataValue(stream_info, filter_name, path);
+  if (value.kind_case() == Protobuf::Value::kBoolValue) {
+    *result = value.bool_value();
+    return true;
+  }
+  return false;
+}
+
+bool ContextAccessor::getLocalReplyBody(const Formatter::Context& context,
+                                        envoy_dynamic_module_type_envoy_buffer* result) {
+  absl::string_view body = context.localReplyBody();
+  if (body.empty()) {
+    return false;
+  }
+  *result = {const_cast<char*>(body.data()), body.size()};
+  return true;
+}
+
+envoy_dynamic_module_type_access_log_type
+ContextAccessor::accessLogTypeToAbi(Formatter::AccessLogType log_type) {
+  switch (log_type) {
+  case Formatter::AccessLogType::TcpUpstreamConnected:
+    return envoy_dynamic_module_type_access_log_type_TcpUpstreamConnected;
+  case Formatter::AccessLogType::TcpPeriodic:
+    return envoy_dynamic_module_type_access_log_type_TcpPeriodic;
+  case Formatter::AccessLogType::TcpConnectionEnd:
+    return envoy_dynamic_module_type_access_log_type_TcpConnectionEnd;
+  case Formatter::AccessLogType::DownstreamStart:
+    return envoy_dynamic_module_type_access_log_type_DownstreamStart;
+  case Formatter::AccessLogType::DownstreamPeriodic:
+    return envoy_dynamic_module_type_access_log_type_DownstreamPeriodic;
+  case Formatter::AccessLogType::DownstreamEnd:
+    return envoy_dynamic_module_type_access_log_type_DownstreamEnd;
+  case Formatter::AccessLogType::UpstreamPoolReady:
+    return envoy_dynamic_module_type_access_log_type_UpstreamPoolReady;
+  case Formatter::AccessLogType::UpstreamPeriodic:
+    return envoy_dynamic_module_type_access_log_type_UpstreamPeriodic;
+  case Formatter::AccessLogType::UpstreamEnd:
+    return envoy_dynamic_module_type_access_log_type_UpstreamEnd;
+  case Formatter::AccessLogType::DownstreamTunnelSuccessfullyEstablished:
+    return envoy_dynamic_module_type_access_log_type_DownstreamTunnelSuccessfullyEstablished;
+  case Formatter::AccessLogType::UdpTunnelUpstreamConnected:
+    return envoy_dynamic_module_type_access_log_type_UdpTunnelUpstreamConnected;
+  case Formatter::AccessLogType::UdpPeriodic:
+    return envoy_dynamic_module_type_access_log_type_UdpPeriodic;
+  case Formatter::AccessLogType::UdpSessionEnd:
+    return envoy_dynamic_module_type_access_log_type_UdpSessionEnd;
+  default:
+    return envoy_dynamic_module_type_access_log_type_NotSet;
+  }
+}
+
+void ContextAccessor::setDynamicMetadataString(StreamInfo::StreamInfo& stream_info,
+                                               absl::string_view filter_name, absl::string_view key,
+                                               absl::string_view value) {
+  Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key].set_string_value(value);
+  stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
+}
+
+void ContextAccessor::setDynamicMetadataNumber(StreamInfo::StreamInfo& stream_info,
+                                               absl::string_view filter_name, absl::string_view key,
+                                               double value) {
+  Protobuf::Struct metadata_value;
+  (*metadata_value.mutable_fields())[key].set_number_value(value);
+  stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
+}
+
+void ContextAccessor::setDynamicMetadataStringBatch(
+    StreamInfo::StreamInfo& stream_info, absl::string_view filter_name,
+    const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size) {
+  if (entries_size == 0) {
+    // An empty batch is a no-op and must not create the namespace.
+    return;
+  }
+  Protobuf::Struct metadata_value;
+  auto* fields = metadata_value.mutable_fields();
+  for (size_t i = 0; i < entries_size; i++) {
+    const auto& entry = entries[i];
+    (*fields)[absl::string_view(entry.key_ptr, entry.key_length)].set_string_value(
+        absl::string_view(entry.value_ptr, entry.value_length));
+  }
+  stream_info.setDynamicMetadata(std::string(filter_name), metadata_value);
+}
+
+bool ContextAccessor::getFilterStateBytes(const StreamInfo::StreamInfo& stream_info,
+                                          envoy_dynamic_module_type_module_buffer key,
+                                          envoy_dynamic_module_type_envoy_buffer* result) {
+  if (result == nullptr) {
+    return false;
+  }
+  const absl::string_view key_view(key.ptr, key.length);
+  const auto* accessor =
+      stream_info.filterState().getDataReadOnly<Router::StringAccessor>(key_view);
+  if (accessor == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "key '{}' not found in filter state", key_view);
+    return false;
+  }
+  const absl::string_view value = accessor->asString();
+  *result = {.ptr = const_cast<char*>(value.data()), .length = value.size()};
+  return true;
+}
+
+bool ContextAccessor::setFilterStateBytes(
+    StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
+    std::optional<StreamInfo::FilterState::LifeSpan> life_span,
+    std::optional<StreamInfo::StreamSharingMayImpactPooling> stream_sharing) {
+  const auto& filter_state = stream_info.filterState();
+  if (!filter_state) {
+    return false;
+  }
+  auto accessor = std::make_shared<Router::StringAccessorImpl>(value);
+  if (life_span.has_value() && stream_sharing.has_value()) {
+    filter_state->setData(key, std::move(accessor), life_span.value(), stream_sharing.value());
+  } else if (life_span.has_value()) {
+    filter_state->setData(key, std::move(accessor), life_span.value());
+  } else {
+    filter_state->setData(key, std::move(accessor));
+  }
+  return true;
+}
+
+bool ContextAccessor::setFilterStateTyped(
+    StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
+    std::optional<StreamInfo::FilterState::LifeSpan> life_span) {
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
+  if (factory == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "no ObjectFactory registered for filter state key '{}'", key);
+    return false;
+  }
+
+  auto object = factory->createFromBytes(value);
+  if (object == nullptr) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "ObjectFactory failed to create object for filter state key '{}'", key);
+    return false;
+  }
+
+  if (life_span.has_value()) {
+    stream_info.filterState()->setData(key, std::move(object), life_span.value());
+  } else {
+    stream_info.filterState()->setData(key, std::move(object));
+  }
+  return true;
+}
+
+} // namespace DynamicModules
+} // namespace Extensions
+} // namespace Envoy

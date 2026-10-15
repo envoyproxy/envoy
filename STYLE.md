@@ -28,7 +28,9 @@
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
 * Function names should all use camel case starting with a lower case letter (e.g., `doFoo()`).
-* Struct/Class member variables have a `_` postfix (e.g., `int foo_;`).
+* The Google C++ style guide points out that struct data members, unlike class data members,
+  [shouldn't have trailing underscores](https://google.github.io/styleguide/cppguide.html#Variable_Names).
+  In Envoy we allow both `int foo_;` and `int foo;`, but prefer consistent use within a struct.
 * Enum values using PascalCase (e.g., `RoundRobin`).
 * 100 columns is the line limit.
 * Use your GitHub name in TODO comments, e.g. `TODO(foobar): blah`.
@@ -37,7 +39,7 @@
   * `using BarSharedPtr = std::shared_ptr<Bar>;`
   * `using BlahConstSharedPtr = std::shared_ptr<const Blah>;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
-* `absl::optional<std::reference_wrapper<T>>` has a helper class in `envoy/common/optref.h`, and is type aliased:
+* `std::optional<std::reference_wrapper<T>>` has a helper class in `envoy/common/optref.h`, and is type aliased:
   * `using FooOptRef = OptRef<T>;`
   * `using FooOptConstRef = OptRef<const T>;`
 * If move semantics are intended, prefer specifying function arguments with `&&`.
@@ -52,6 +54,15 @@
   raw memory in a test and return it to the production code with the expectation that the
   production code will hold it in a `unique_ptr` and free it. Envoy uses the factory pattern
   quite a bit for these cases. (Search the code for "factory").
+* For accessor functions, prefer `OptRef<const T>` or `const Type&` as return types for functions
+  that return *const* references to existing objects *when there is no intention of mutation*.
+  If the caller needs to take ownership of the returned object via a `shared_ptr`, add a separate
+  function with a `SharedPtr` suffix that returns a shared pointer to
+  extend ownership. For example:
+  * `const ConnectionInfoProvider& connectionInfoProvider() const;`
+  * `ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const;`
+  * `OptRef<const Route> route() const;`
+  * `RouteConstSharedPtr routeSharedPtr() const;`
 * Prefer explicitly sized integer types, such as uint64_t rather than size_t. In particular, use
   explicitly sized integers for data that is written to disk or involved in math that might overflow.
 * The Google C++ style guide points out that [non-PoD static and global variables are forbidden](https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables).

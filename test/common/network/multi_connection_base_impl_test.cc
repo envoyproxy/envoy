@@ -13,6 +13,7 @@
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/stream_info/mocks.h"
 
+using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
@@ -204,6 +205,106 @@ TEST_F(MultiConnectionBaseImplTest, ConnectTimeoutThenFirstSuccess) {
   EXPECT_FALSE(impl_->connecting());
 }
 
+// Deferred callbacks are not notified while the connect is in flight: they are only notified of
+// events on the final connection, and notifying them here would deliver onDrain() a second time
+// when they are added to that connection.
+TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectFinishedDoesNotNotifyDeferredCallbacks) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  StrictMock<MockConnectionCallbacks> cb_a;
+  StrictMock<MockConnectionCallbacks> cb_b;
+  impl_->addConnectionCallbacks(cb_a);
+  impl_->addConnectionCallbacks(cb_b);
+
+  // Neither callback may be notified (StrictMock catches it).
+  impl_->onDrain(Network::ConnectionDrainEvent{});
+}
+
+// Once the connect completes, the deferred callbacks are added to the chosen connection first and
+// the retained event is handed to it last, so it fans the event out to all of them in one pass,
+// exactly once.
+TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectIsForwardedToFinalConnection) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  StrictMock<MockConnectionCallbacks> cb;
+  impl_->addConnectionCallbacks(cb);
+
+  const MonotonicTime start_time = dispatcher_.timeSource().monotonicTime();
+  impl_->onDrain(Network::ConnectionDrainEvent{start_time, Server::DrainStrategy::Gradual});
+
+  testing::InSequence s;
+  Network::ConnectionDrainEvent forwarded;
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
+  EXPECT_CALL(*createdConnections()[0], addConnectionCallbacks(_));
+  EXPECT_CALL(*createdConnections()[0], onDrain(_))
+      .WillOnce(Invoke([&forwarded](Network::ConnectionDrainEvent event) { forwarded = event; }));
+  connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
+
+  EXPECT_EQ(start_time, forwarded.start_time);
+  EXPECT_EQ(Server::DrainStrategy::Gradual, forwarded.strategy);
+}
+
+// The first event wins before the connect finishes too: a later notification does not replace the
+// event that is handed to the chosen connection.
+TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectFinishedKeepsFirstEvent) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  const MonotonicTime start_time = dispatcher_.timeSource().monotonicTime();
+  impl_->onDrain(Network::ConnectionDrainEvent{start_time, Server::DrainStrategy::Gradual});
+  impl_->onDrain(Network::ConnectionDrainEvent{start_time + std::chrono::seconds(30),
+                                               Server::DrainStrategy::Immediate});
+
+  Network::ConnectionDrainEvent forwarded;
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
+  EXPECT_CALL(*createdConnections()[0], onDrain(_))
+      .WillOnce(Invoke([&forwarded](Network::ConnectionDrainEvent event) { forwarded = event; }));
+  connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
+
+  EXPECT_EQ(start_time, forwarded.start_time);
+  EXPECT_EQ(Server::DrainStrategy::Gradual, forwarded.strategy);
+}
+
+// A callback removed before the connect finished is neither added to the chosen connection nor
+// replayed the drain event: the null slot left by removeConnectionCallbacks() is skipped.
+TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectFinishedSkipsRemovedCallbacks) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  StrictMock<MockConnectionCallbacks> removed_cb;
+  StrictMock<MockConnectionCallbacks> kept_cb;
+  impl_->addConnectionCallbacks(removed_cb);
+  impl_->addConnectionCallbacks(kept_cb);
+  impl_->removeConnectionCallbacks(removed_cb);
+
+  impl_->onDrain(Network::ConnectionDrainEvent{});
+
+  // Only kept_cb is handed to the chosen connection.
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
+  EXPECT_CALL(*createdConnections()[0], addConnectionCallbacks(_));
+  EXPECT_CALL(*createdConnections()[0], onDrain(_));
+  connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
+}
+
+TEST_F(MultiConnectionBaseImplTest, DrainAfterConnectFinishedDelegatesToFinalConnection) {
+  setupMultiConnectionImpl(2);
+  startConnect();
+
+  // Finish connect on the only-created connection (index 0).
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
+  connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
+
+  // onDrain() now delegates to the surviving connection.
+  EXPECT_CALL(*createdConnections()[0], onDrain(_));
+  impl_->onDrain(Network::ConnectionDrainEvent{});
+}
+
 TEST_F(MultiConnectionBaseImplTest, DisallowedFunctions) {
   setupMultiConnectionImpl(2);
   startConnect();
@@ -366,6 +467,29 @@ TEST_F(MultiConnectionBaseImplTest, SetDelayedCloseTimeout) {
   // Verify that setDelayedCloseTimeout() calls are delegated to the remaining connection.
   EXPECT_CALL(*createdConnections()[1], setDelayedCloseTimeout(std::chrono::milliseconds(10)));
   impl_->setDelayedCloseTimeout(std::chrono::milliseconds(10));
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetBufferHighWatermarkTimeout) {
+  setupMultiConnectionImpl(3);
+
+  startConnect();
+
+  const std::chrono::milliseconds initial_timeout(5);
+  EXPECT_CALL(*createdConnections()[0], setBufferHighWatermarkTimeout(initial_timeout));
+  impl_->setBufferHighWatermarkTimeout(initial_timeout);
+
+  EXPECT_CALL(*nextConnection(), setBufferHighWatermarkTimeout(initial_timeout));
+  timeOutAndStartNextAttempt();
+
+  const std::chrono::milliseconds updated_timeout(10);
+  EXPECT_CALL(*createdConnections()[0], setBufferHighWatermarkTimeout(updated_timeout));
+  EXPECT_CALL(*createdConnections()[1], setBufferHighWatermarkTimeout(updated_timeout));
+  impl_->setBufferHighWatermarkTimeout(updated_timeout);
+
+  EXPECT_CALL(*nextConnection(), setBufferHighWatermarkTimeout(updated_timeout));
+  expectConnectionCreation(2);
+  EXPECT_CALL(*nextConnection(), connect());
+  failover_timer_->invokeCallback();
 }
 
 TEST_F(MultiConnectionBaseImplTest, CloseDuringAttempt) {
@@ -1111,7 +1235,7 @@ TEST_F(MultiConnectionBaseImplTest, UnixSocketPeerCredentials) {
   connectFirstAttempt();
 
   EXPECT_CALL(*createdConnections()[0], unixSocketPeerCredentials())
-      .WillOnce(Return(absl::optional<Connection::UnixDomainSocketPeerCredentials>()));
+      .WillOnce(Return(std::optional<Connection::UnixDomainSocketPeerCredentials>()));
   EXPECT_FALSE(impl_->unixSocketPeerCredentials().has_value());
 }
 
@@ -1179,7 +1303,7 @@ TEST_F(MultiConnectionBaseImplTest, LastRoundTripTime) {
 
   connectFirstAttempt();
 
-  absl::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
+  std::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
   EXPECT_CALL(*createdConnections()[0], lastRoundTripTime()).WillOnce(Return(rtt));
   EXPECT_EQ(rtt, impl_->lastRoundTripTime());
 }
@@ -1216,6 +1340,29 @@ TEST_F(MultiConnectionBaseImplTest, GetSocketPanics) {
 
   // getSocket() should panic as it's not implemented for MultiConnectionBaseImpl.
   EXPECT_DEATH(impl_->getSocket(), "not implemented");
+}
+
+TEST_F(MultiConnectionBaseImplTest, RemoveSecondReadFilterBeforeConnectFinished) {
+  setupMultiConnectionImpl(3);
+
+  startConnect();
+
+  MockReadFilterCallbacks callbacks;
+  ReadFilterSharedPtr filter = std::make_shared<MockReadFilter>();
+  filter->initializeReadFilterCallbacks(callbacks);
+  ReadFilterSharedPtr filter2 = std::make_shared<MockReadFilter>();
+  filter2->initializeReadFilterCallbacks(callbacks);
+  impl_->addReadFilter(filter);
+  impl_->addReadFilter(filter2);
+
+  // Removing a deferred filter that is not the first.
+  impl_->removeReadFilter(filter2);
+
+  timeOutAndStartNextAttempt();
+
+  // Only the remaining filter is applied to the final connection.
+  EXPECT_CALL(*createdConnections()[1], addReadFilter(filter));
+  connectSecondAttempt();
 }
 
 } // namespace Network

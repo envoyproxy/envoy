@@ -2,7 +2,6 @@
 
 #include "source/extensions/filters/network/direct_response/filter.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"

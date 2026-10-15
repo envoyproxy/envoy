@@ -87,20 +87,22 @@ jobs:
         gh api \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            /repos/${{ github.repository }}/actions/runs/${{ inputs.run-id }} \
+            "/repos/${GH_REPO}/actions/runs/${RUN_ID}" \
           | jq '.'
-        RUNID=$(gh run view ${{ inputs.run-id }} --repo ${{ github.repository }} --json databaseId | jq -r '.databaseId')
+        RUNID=$(gh run view "${RUN_ID}" --repo "${GH_REPO}" --json databaseId | jq -r '.databaseId')
         echo "value=${RUNID}" >> "$GITHUB_OUTPUT"
       id: run-id
       if: ${{ inputs.runs-after == true }}
       env:
         GH_TOKEN: ${{ github.token }}
+        RUN_ID: ${{ inputs.run-id }}
+        GH_REPO: ${{ github.repository }}
 
     # Load env data
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/actions/github/env/load@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/github/env/load@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Load env
       id: data
       with:
@@ -111,13 +113,13 @@ jobs:
         GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    - uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/github/checks@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -125,13 +127,12 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/actions/jq@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Print request summary
       with:
         input: |
-          action: ${{ fromJSON(steps.data.outputs.data).data.check.action }}
-          summary: ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary) }}
-        input-format: yaml
+          {"action": ${{ toJSON(fromJSON(steps.data.outputs.data).data.check.action) }},
+           "summary": ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary) }}}
         output-path: GITHUB_STEP_SUMMARY
         options: -r
         filter: |
@@ -145,17 +146,16 @@ jobs:
           | $summary.summary as $summary
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/actions/jq@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: request-output
       name: Load request
       with:
         input: |
-          check: ${{ toJSON(fromJSON(steps.data.outputs.data).data.check) }}
-          config: ${{ toJSON(fromJSON(steps.data.outputs.data).data.config) }}
-          request: ${{ toJSON(fromJSON(steps.data.outputs.data).data.request) }}
-          run: ${{ toJSON(fromJSON(steps.data.outputs.data).data.run) }}
-          summary_title: ${{ fromJSON(steps.data.outputs.data).data.summary.title }}
-        input-format: yaml
+          {"check": ${{ toJSON(fromJSON(steps.data.outputs.data).data.check) }},
+           "config": ${{ toJSON(fromJSON(steps.data.outputs.data).data.config) }},
+           "request": ${{ toJSON(fromJSON(steps.data.outputs.data).data.request) }},
+           "run": ${{ toJSON(fromJSON(steps.data.outputs.data).data.run) }},
+           "summary_title": ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary.title) }}}
         filter: |
           .
           | .summary = {title: .summary_title}

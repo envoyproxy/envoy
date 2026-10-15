@@ -14,19 +14,15 @@ namespace Fault {
  * Config registration for the fault injection filter. @see NamedHttpFilterConfigFactory.
  */
 class FaultFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::fault::v3::HTTPFault> {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::fault::v3::HTTPFault> {
 public:
-  FaultFilterFactory() : FactoryBase("envoy.filters.http.fault") {}
+  FaultFilterFactory() : UnifiedFactoryBase("envoy.filters.http.fault") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::fault::v3::HTTPFault& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const envoy::extensions::filters::http::fault::v3::HTTPFault& proto_config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& server_context) override;
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

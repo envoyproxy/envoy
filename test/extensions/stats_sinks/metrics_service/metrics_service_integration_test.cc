@@ -14,6 +14,8 @@
 #include "gtest/gtest.h"
 
 using testing::AssertionResult;
+using testing::Eq;
+using testing::Ge;
 
 namespace Envoy {
 namespace {
@@ -22,10 +24,9 @@ class MetricsServiceIntegrationTest : public Grpc::GrpcClientIntegrationParamTes
                                       public HttpIntegrationTest {
 public:
   MetricsServiceIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'grpc.metrics_service.streams_closed_14' and
-    // stat_prefix 'metrics_service'.
-    skip_tag_extraction_rule_check_ = true;
+    // grpc.metrics_service.streams_closed_* is now covered by the grpc.$.** rule (#36673), so
+    // the tag-extraction check can be enabled here. Toward #21595.
+    skip_tag_extraction_rule_check_ = false;
   }
 
   void createUpstreams() override {
@@ -47,7 +48,7 @@ public:
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
       config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-      metrics_sink->mutable_typed_config()->PackFrom(config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(config);
       // Shrink reporting period down to 1s to make test not take forever.
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
@@ -178,10 +179,10 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
 
   switch (clientType()) {
   case Grpc::ClientType::EnvoyGrpc:
-    test_server_->waitForGaugeEq("cluster.metrics_service.upstream_rq_active", 0);
+    test_server_->waitForGauge("cluster.metrics_service.upstream_rq_active", Eq(0));
     break;
   case Grpc::ClientType::GoogleGrpc:
-    test_server_->waitForCounterGe("grpc.metrics_service.streams_closed_0", 1);
+    test_server_->waitForCounter("grpc.metrics_service.streams_closed_0", Ge(1));
     break;
   default:
     PANIC("reached unexpected code");

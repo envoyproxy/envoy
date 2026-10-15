@@ -28,7 +28,7 @@ public:
     return ProtobufTypes::MessagePtr{new envoy::extensions::health_checkers::redis::v3::Redis()};
   }
 
-  absl::optional<
+  std::optional<
       Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
 };

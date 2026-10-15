@@ -5,6 +5,8 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
+#include "envoy/server/drain_strategy.h"
 
 #include "absl/base/attributes.h"
 #include "absl/status/status.h"
@@ -29,6 +31,21 @@ enum class DrainDirection {
   All,
 };
 
+/**
+ * Describes a drain sequence that a connection has been notified of via
+ * Network::Connection::onDrain(). The values are captured once on the main thread at the moment
+ * the drain sequence is initiated and are propagated unchanged to every affected connection so
+ * that all connections share a single, consistent view of the drain timeline regardless of when
+ * each connection is notified.
+ */
+struct ConnectionDrainEvent {
+  // The monotonic time at which the drain sequence was initiated on the main thread.
+  MonotonicTime start_time;
+  // The drain strategy to apply to this drain sequence. Usually a copy of
+  // Server::Options::drainStrategy(), but a drain sequence may override it.
+  Server::DrainStrategy strategy{Server::DrainStrategy::Gradual};
+};
+
 class DrainDecision {
 public:
   using DrainCloseCb = std::function<absl::Status(std::chrono::milliseconds)>;
@@ -45,7 +62,7 @@ public:
   /**
    * @brief Register a callback to be called proactively when a drain decision enters into a
    *        'close' state.
-   *        NOTE: this API is used in prorietary builds of Envoy and can not be decommissioned.
+   *        NOTE: this API is used in proprietary builds of Envoy and can not be decommissioned.
    *        TODO(yanavlasov): cleanup unused parts of this change without removing this API.
    *
    * @param cb Callback to be called once drain decision enters close state

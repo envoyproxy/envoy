@@ -3,6 +3,8 @@
 #include "envoy/common/callback.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/upstream/host_lookup_map.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "host_set.h"
@@ -25,11 +27,13 @@ public:
   MOCK_METHOD(void, updateHosts,
               (uint32_t priority, UpdateHostsParams&& update_hosts_params,
                LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-               const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
-               absl::optional<uint32_t> overprovisioning_factor,
-               HostMapConstSharedPtr cross_priority_host_map));
+               const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
+               std::optional<uint32_t> overprovisioning_factor,
+               HostLookupMapConstSharedPtr cross_priority_host_map));
   MOCK_METHOD(void, batchHostUpdate, (BatchUpdateCb&));
-  MOCK_METHOD(HostMapConstSharedPtr, crossPriorityHostMap, (), (const));
+  MOCK_METHOD(HostLookupMapConstSharedPtr, crossPriorityHostMap, (), (const));
+
+  bool batchUpdateActive() const override { return batch_update_active_; }
 
   MockHostSet* getMockHostSet(uint32_t priority) {
     getHostSet(priority); // Ensure the host set exists.
@@ -42,7 +46,9 @@ public:
   Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
 
-  HostMapConstSharedPtr cross_priority_host_map_{std::make_shared<HostMap>()};
+  HostLookupMapConstSharedPtr cross_priority_host_map_{
+      std::make_shared<FlatHostLookupMap>(std::make_shared<HostMap>())};
+  bool batch_update_active_{false};
 };
 } // namespace Upstream
 } // namespace Envoy

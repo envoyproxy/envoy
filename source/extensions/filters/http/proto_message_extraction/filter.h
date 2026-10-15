@@ -7,7 +7,6 @@
 #include "envoy/extensions/filters/http/proto_message_extraction/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
 
-#include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/proto_message_extraction/extraction_util/proto_extractor_interface.h"
@@ -40,11 +39,10 @@ public:
 
 private:
   struct HandleDataStatus {
-    explicit HandleDataStatus(Envoy::Http::FilterDataStatus status)
-        : got_messages(false), filter_status(status) {}
+    explicit HandleDataStatus(Envoy::Http::FilterDataStatus status) : filter_status(status) {}
 
     // If true, the function has processed at least one message.
-    bool got_messages;
+    bool got_messages{false};
 
     // If "got_message" is false, return this filter_status.
     Envoy::Http::FilterDataStatus filter_status;
@@ -79,15 +77,6 @@ private:
   bool response_extraction_done_ = false;
 };
 
-class FilterFactory : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
-                          envoy::extensions::filters::http::proto_message_extraction::v3::
-                              ProtoMessageExtractionConfig> {
-private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::proto_message_extraction::v3::
-          ProtoMessageExtractionConfig& proto_config,
-      const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
-};
 } // namespace ProtoMessageExtraction
 } // namespace HttpFilters
 } // namespace Extensions

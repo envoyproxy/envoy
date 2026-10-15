@@ -40,6 +40,8 @@ jobs:
       run-id: ${{ github.event.workflow_run.id }}
 
   tsan:
+    secrets:
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
     permissions:
       actions: read
       contents: read

@@ -4,7 +4,7 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/http/geoip/geoip_filter.h"
 
-#include "test/extensions/filters/http/geoip/mocks.h"
+#include "test/mocks/geoip/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
@@ -44,7 +44,7 @@ MATCHER_P2(HasExpectedHeader, expected_header, expected_value, "") {
 class GeoipFilterTest : public testing::Test {
 public:
   GeoipFilterTest()
-      : dummy_factory_(new DummyGeoipProviderFactory()),
+      : dummy_factory_(new Geolocation::DummyGeoipProviderFactory()),
         dummy_driver_(dummy_factory_->getDriver()) {}
 
   void initializeFilter(const std::string& yaml) {
@@ -67,8 +67,8 @@ public:
   NiceMock<Stats::MockStore> stats_;
   GeoipFilterConfigSharedPtr config_;
   GeoipFilterSharedPtr filter_;
-  std::unique_ptr<DummyGeoipProviderFactory> dummy_factory_;
-  MockDriverSharedPtr dummy_driver_;
+  std::unique_ptr<Geolocation::DummyGeoipProviderFactory> dummy_factory_;
+  Geolocation::MockDriverSharedPtr dummy_driver_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Api::ApiPtr api_ = Api::createApiForTest();
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
@@ -83,7 +83,7 @@ TEST_F(GeoipFilterTest, NoXffSuccessfulLookup) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -117,7 +117,7 @@ TEST_F(GeoipFilterTest, UseXffSuccessfulLookup) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -149,7 +149,7 @@ TEST_F(GeoipFilterTest, GeoHeadersOverridenForIncomingRequest) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -185,7 +185,7 @@ TEST_F(GeoipFilterTest, AllHeadersPropagatedCorrectly) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -246,7 +246,7 @@ TEST_F(GeoipFilterTest, GeoHeaderNotAppendedOnEmptyLookup) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -277,7 +277,7 @@ TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
       provider:
           name: "envoy.geoip_providers.dummy"
           typed_config:
-            "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+            "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
   )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -305,7 +305,7 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderSuccessfulLookup) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -339,7 +339,7 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderWithIpv6) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -373,7 +373,7 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnMissingHeader) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -407,7 +407,7 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnInvalidIp) {
     provider:
         name: "envoy.geoip_providers.dummy"
         typed_config:
-          "@type": type.googleapis.com/test.extensions.filters.http.geoip.DummyProvider
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
   Http::TestRequestHeaderMapImpl request_headers;
@@ -431,6 +431,80 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnInvalidIp) {
   EXPECT_EQ("1.2.3.4:0", captured_rq_.remoteAddress()->asString());
   ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
   filter_->onDestroy();
+}
+
+TEST_F(GeoipFilterTest, NoContinueDecodingWhenStreamDestroyedBeforeLookupCompletes) {
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  Http::TestRequestHeaderMapImpl request_headers;
+  // The stream is gone by the time the lookup completes, so nothing should be recorded either.
+  expectStats(0);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(*dummy_driver_, lookup(_, _))
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_)));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+  // Keep the filter alive through the posted callback so the destroyed_ guard is exercised.
+  // In production, the callback captures a weak_ptr and does nothing if the filter is already gone;
+  // the decoder callbacks and request headers it refers to are invalid after stream destruction.
+  filter_->onDestroy();
+  captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(0, request_headers.size());
+}
+
+// A geolocation lookup needs an IP address, and the downstream connection address is not
+// necessarily one. The filter must skip the lookup rather than pass a non-IP address to the
+// provider, which asserts on one.
+class GeoipFilterNonIpAddressTest : public GeoipFilterTest {
+public:
+  void expectLookupSkipped(Network::Address::InstanceConstSharedPtr remote_address) {
+    initializeProviderFactory();
+    const std::string external_request_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+)EOF";
+    initializeFilter(external_request_yaml);
+    Http::TestRequestHeaderMapImpl request_headers;
+    filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+        remote_address);
+    // No lookup is attempted, but the request is still counted in the total alongside skipped.
+    expectStats();
+    EXPECT_CALL(stats_, counter("prefix.geoip.skipped"));
+    EXPECT_CALL(*dummy_driver_, lookup(_, _)).Times(0);
+    // The request must continue down the chain untouched rather than stall waiting on a lookup
+    // that will never run.
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+    EXPECT_EQ(0, request_headers.size());
+    filter_->onDestroy();
+  }
+};
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForNonIpDownstreamAddress) {
+  expectLookupSkipped(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_address_for_test"));
+}
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForPipeDownstreamAddress) {
+  auto pipe_or_error = Network::Address::PipeInstance::create("/tmp/envoy_geoip_test.sock");
+  ASSERT_TRUE(pipe_or_error.ok());
+  expectLookupSkipped(std::move(*pipe_or_error));
+}
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForNullDownstreamAddress) {
+  expectLookupSkipped(nullptr);
 }
 
 } // namespace

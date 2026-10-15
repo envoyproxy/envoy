@@ -65,7 +65,7 @@ public:
 };
 
 TEST_F(HttpMuxDemuxTest, MulticastFailsWithoutClusters) {
-  auto multiplexer = MuxDemux::create(factory_context_);
+  auto multiplexer = MuxDemux::create(factory_context_.server_factory_context_);
   auto callbacks = makeAsyncClientStreamCallbacks();
   // If no provided clusters exist, multicast call fails.
   EXPECT_THAT(multiplexer->multicast(AsyncClient::StreamOptions(),
@@ -73,19 +73,19 @@ TEST_F(HttpMuxDemuxTest, MulticastFailsWithoutClusters) {
                                          {
                                              .cluster_name = "cluster1",
                                              .callbacks = callbacks,
-                                             .options = absl::nullopt,
+                                             .options = std::nullopt,
                                          },
                                          {
                                              .cluster_name = "cluster2",
                                              .callbacks = callbacks,
-                                             .options = absl::nullopt,
+                                             .options = std::nullopt,
                                          },
                                      }),
               StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(HttpMuxDemuxTest, MulticastFailsWithNoStreamsStarted) {
-  auto multiplexer = MuxDemux::create(factory_context_);
+  auto multiplexer = MuxDemux::create(factory_context_.server_factory_context_);
   auto callbacks = makeAsyncClientStreamCallbacks();
   // Add clusters. The fake HttpClient does not create streams by default.
   factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
@@ -95,19 +95,19 @@ TEST_F(HttpMuxDemuxTest, MulticastFailsWithNoStreamsStarted) {
                                          {
                                              .cluster_name = "cluster1",
                                              .callbacks = callbacks,
-                                             .options = absl::nullopt,
+                                             .options = std::nullopt,
                                          },
                                          {
                                              .cluster_name = "cluster2",
                                              .callbacks = callbacks,
-                                             .options = absl::nullopt,
+                                             .options = std::nullopt,
                                          },
                                      }),
               StatusIs(absl::StatusCode::kInternal));
 }
 
 TEST_F(HttpMuxDemuxTest, IdleInvariants) {
-  auto multiplexer = MuxDemux::create(factory_context_);
+  auto multiplexer = MuxDemux::create(factory_context_.server_factory_context_);
   // Initial state is idle.
   EXPECT_TRUE(multiplexer->isIdle());
   // If multicast call fails, multiplexer remains idle.
@@ -123,7 +123,7 @@ TEST_F(HttpMuxDemuxTest, IdleInvariants) {
                                                                     {
                                                                         .cluster_name = "cluster",
                                                                         .callbacks = callbacks,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                 }));
   EXPECT_FALSE(multiplexer->isIdle());
@@ -137,7 +137,7 @@ TEST_F(HttpMuxDemuxTest, IdleInvariants) {
 }
 
 TEST_F(HttpMuxDemuxTest, Multicast) {
-  auto multiplexer = MuxDemux::create(factory_context_);
+  auto multiplexer = MuxDemux::create(factory_context_.server_factory_context_);
   initializeThreadLocalClusters({"cluster1", "cluster2"});
   auto callbacks1 = makeAsyncClientStreamCallbacks();
   auto callbacks2 = makeAsyncClientStreamCallbacks();
@@ -146,12 +146,12 @@ TEST_F(HttpMuxDemuxTest, Multicast) {
                                                                     {
                                                                         .cluster_name = "cluster1",
                                                                         .callbacks = callbacks1,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                     {
                                                                         .cluster_name = "cluster2",
                                                                         .callbacks = callbacks2,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                 }));
   EXPECT_FALSE(multiplexer->isIdle());
@@ -204,7 +204,7 @@ TEST_F(HttpMuxDemuxTest, Multicast) {
 }
 
 TEST_F(HttpMuxDemuxTest, DeletingMultistreamResetsActiveStareams) {
-  auto multiplexer = MuxDemux::create(factory_context_);
+  auto multiplexer = MuxDemux::create(factory_context_.server_factory_context_);
   initializeThreadLocalClusters({"cluster1", "cluster2"});
   auto callbacks1 = makeAsyncClientStreamCallbacks();
   auto callbacks2 = makeAsyncClientStreamCallbacks();
@@ -213,12 +213,12 @@ TEST_F(HttpMuxDemuxTest, DeletingMultistreamResetsActiveStareams) {
                                                                     {
                                                                         .cluster_name = "cluster1",
                                                                         .callbacks = callbacks1,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                     {
                                                                         .cluster_name = "cluster2",
                                                                         .callbacks = callbacks2,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                 }));
 
@@ -240,7 +240,7 @@ TEST_F(HttpMuxDemuxTest, DeletingMultistreamResetsActiveStareams) {
 }
 
 TEST_F(HttpMuxDemuxTest, MulticastWithPerBackendOptions) {
-  auto multiplexer = MuxDemux::create(factory_context_);
+  auto multiplexer = MuxDemux::create(factory_context_.server_factory_context_);
 
   // Track the options passed to start() for each stream
   std::vector<AsyncClient::StreamOptions> captured_options;
@@ -293,7 +293,7 @@ TEST_F(HttpMuxDemuxTest, MulticastWithPerBackendOptions) {
 }
 
 TEST_F(HttpMuxDemuxTest, MulticastDifferentHeaders) {
-  auto multiplexer = MuxDemux::create(factory_context_);
+  auto multiplexer = MuxDemux::create(factory_context_.server_factory_context_);
   initializeThreadLocalClusters({"cluster1", "cluster2"});
   auto callbacks1 = makeAsyncClientStreamCallbacks();
   auto callbacks2 = makeAsyncClientStreamCallbacks();
@@ -302,12 +302,12 @@ TEST_F(HttpMuxDemuxTest, MulticastDifferentHeaders) {
                                                                     {
                                                                         .cluster_name = "cluster1",
                                                                         .callbacks = callbacks1,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                     {
                                                                         .cluster_name = "cluster2",
                                                                         .callbacks = callbacks2,
-                                                                        .options = absl::nullopt,
+                                                                        .options = std::nullopt,
                                                                     },
                                                                 }));
 

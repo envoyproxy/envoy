@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["api_impl.h"],
     deps = [
         "//envoy/api:api_interface",
+        "//envoy/stats:store_interface",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:socket_lib",

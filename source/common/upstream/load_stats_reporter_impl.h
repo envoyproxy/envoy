@@ -14,6 +14,27 @@
 namespace Envoy {
 namespace Upstream {
 
+/**
+ * Implementation of LoadStatsReporter that streams load reports to a management server via gRPC.
+ *
+ * The reporter sends load statistics for clusters as directed by the management server.
+ * The frequency of reports is determined by the load_reporting_interval in the LoadStatsResponse.
+ *
+ * By default, load reports for a locality are sent if the sum of the latched `rq_total_` values
+ * or the sum of the current `rq_active_` values for hosts in the locality is non-zero during the
+ * reporting interval. Reporting on non-zero `rq_active_` is needed to report long-lived
+ * connections/requests (e.g., when web-sockets are used).
+ *
+ * The following runtime feature controls the behavior of the load reporter:
+ * - envoy.reloadable_features.report_load_for_non_zero_stats: If true, load reports for a
+ *   locality are sent if any of the following conditions are met for the sum of host stats in that
+ *   locality:
+ *     - Latched `rq_success_` is non-zero.
+ *     - Latched `rq_error_` is non-zero.
+ *     - Current `rq_active_` is non-zero.
+ *     - Latched `rq_total_` is non-zero.
+ *     - Any custom load metrics are non-zero in `LoadMetricStats`.
+ */
 class LoadStatsReporterImpl
     : public LoadStatsReporter,
       public Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v3::LoadStatsResponse>,
@@ -28,7 +49,7 @@ public:
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override;
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
+      Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
@@ -50,12 +71,12 @@ private:
   Grpc::AsyncClient<envoy::service::load_stats::v3::LoadStatsRequest,
                     envoy::service::load_stats::v3::LoadStatsResponse>
       async_client_;
-  Grpc::AsyncStream<envoy::service::load_stats::v3::LoadStatsRequest> stream_{};
+  Grpc::AsyncStream<envoy::service::load_stats::v3::LoadStatsRequest> stream_;
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;
   const envoy::service::load_stats::v3::LoadStatsRequest request_template_;
-  std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse> message_;
+  Grpc::ResponsePtr<envoy::service::load_stats::v3::LoadStatsResponse> message_{nullptr};
   // Map from cluster name to start of measurement interval.
   absl::node_hash_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;

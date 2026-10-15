@@ -22,7 +22,7 @@ public:
   createInputMatcherFactoryCb(const Protobuf::Message& config,
                               Server::Configuration::ServerFactoryContext& context) override {
     const auto& cel_matcher_config =
-        dynamic_cast<const ::xds::type::matcher::v3::CelMatcher&>(config);
+        Envoy::Protobuf::DynamicCastMessage<::xds::type::matcher::v3::CelMatcher>(config);
     CelMatcherSharedPtr cel_matcher =
         std::make_shared<::xds::type::matcher::v3::CelMatcher>(cel_matcher_config);
 

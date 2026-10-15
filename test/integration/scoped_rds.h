@@ -9,6 +9,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/api_version.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
@@ -31,11 +34,7 @@ protected:
   };
 
   ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat
-    // 'http.scoped_rds.foo-scoped-routes.grpc.srds_cluster.streams_closed_16' and stat_prefix
-    // 'srds_cluster'.
-    skip_tag_extraction_rule_check_ = true;
+    skip_tag_extraction_rule_check_ = false;
 
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
                                       (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
@@ -45,6 +44,16 @@ protected:
   }
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
+
+  void TearDown() override {
+    // Stop the server before fixture destruction starts. Otherwise, late xDS work on the server
+    // thread can race with the vptr update in HttpIntegrationTest's destructor.
+    resetConnections();
+    cleanupUpstreamAndDownstream();
+    upstream_request_.reset();
+    codec_client_.reset();
+    test_server_.reset();
+  }
 
   void setupModifications() {
     if (modifications_set_up_) {
@@ -167,17 +176,56 @@ fragments:
             ScopeKeyBuilder scope_key_builder;
         TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
         *filter.mutable_scoped_routes()->mutable_scope_key_builder() = scope_key_builder;
-        config->PackFrom(filter);
+        std::ignore = config->PackFrom(filter);
       });
     }
     modifications_set_up_ = true;
   }
 
+  // Whether the stats store derives tags with the explicit-tags logic (the tag-friendly scope API)
+  // rather than with the legacy tag-extraction rules. Both modes must produce identical stat names,
+  // tag-extracted names and tags for the RDS and scoped RDS stats.
+  bool explicitTags() const { return ipVersion() == Network::Address::IpVersion::v6; }
+
   void initialize() override {
     // Setup two upstream hosts, one for each cluster.
     setUpstreamCount(2);
     setupModifications();
+    // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+    // server in different modes. The mode is read during server initialization, before the runtime
+    // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
     HttpIntegrationTest::initialize();
+
+    // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+    // would silently be exercising the same thing.
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->useExplicitTags(), explicitTags());
+  }
+
+  // Checks a stat's flat name, the name it is tag-extracted to, and the tags attached to it. The
+  // connection manager's stat prefix and the (scoped) route configuration name are both carried by
+  // tags, so neither appears in the tag-extracted name.
+  void expectStatTags(const std::string& name, const std::string& tag_extracted_name,
+                      const std::vector<std::pair<std::string, std::string>>& tags) {
+    Stats::CounterSharedPtr counter = test_server_->counter(name);
+    Stats::GaugeSharedPtr gauge = test_server_->gauge(name);
+    const Stats::Metric* metric = counter != nullptr ? static_cast<Stats::Metric*>(counter.get())
+                                                     : static_cast<Stats::Metric*>(gauge.get());
+    ASSERT_NE(metric, nullptr) << "no counter or gauge named '" << name << "'";
+
+    EXPECT_EQ(metric->tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
+
+    std::vector<std::pair<std::string, std::string>> actual_tags;
+    for (const Stats::Tag& tag : metric->tags()) {
+      actual_tags.emplace_back(tag.name_, tag.value_);
+    }
+    std::sort(actual_tags.begin(), actual_tags.end());
+    std::vector<std::pair<std::string, std::string>> expected_tags = tags;
+    std::sort(expected_tags.begin(), expected_tags.end());
+    EXPECT_EQ(actual_tags, expected_tags) << " for stat '" << name << "'";
   }
 
   void createUpstreams() override {
@@ -191,21 +239,22 @@ fragments:
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
-    if (upstream_info->upstream_ == nullptr) {
-      return;
+    if (upstream_info->connection_ != nullptr) {
+      AssertionResult result = upstream_info->connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = upstream_info->connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      result = upstream_info->connection_->waitForNoPost();
+      RELEASE_ASSERT(result, result.message());
+      upstream_info->connection_.reset();
     }
 
-    AssertionResult result = upstream_info->connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = upstream_info->connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    upstream_info->connection_.reset();
+    upstream_info->stream_by_resource_name_.clear();
+    upstream_info->upstream_ = nullptr;
   }
 
   void resetConnections() {
-    if (rds_upstream_info_.upstream_ != nullptr) {
-      resetFakeUpstreamInfo(&rds_upstream_info_);
-    }
+    resetFakeUpstreamInfo(&rds_upstream_info_);
     resetFakeUpstreamInfo(&scoped_rds_upstream_info_);
   }
 
@@ -254,7 +303,7 @@ fragments:
     response.set_type_url(route_conguration_type_url);
     auto route_configuration =
         TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(route_configuration);
+    std::ignore = response.add_resources()->PackFrom(route_configuration);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
@@ -290,7 +339,7 @@ fragments:
       auto resource = response.add_resources();
       resource->set_name(scoped_route_proto.name());
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(scoped_route_proto);
+      std::ignore = resource->mutable_resource()->PackFrom(scoped_route_proto);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
@@ -309,7 +358,7 @@ fragments:
     for (const auto& resource_proto : resource_protos) {
       envoy::config::route::v3::ScopedRouteConfiguration scoped_route_proto;
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
-      response.add_resources()->PackFrom(scoped_route_proto);
+      std::ignore = response.add_resources()->PackFrom(scoped_route_proto);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);

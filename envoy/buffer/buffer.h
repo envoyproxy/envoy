@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
@@ -16,8 +17,8 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/functional/any_invocable.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 
 namespace Envoy {
@@ -78,9 +79,17 @@ public:
   virtual ~SliceData() = default;
 
   /**
+   * Must only be called if the slice is mutable, e.g. it does not wrap an externally
+   * owned buffer fragment. Slices obtained via extractMutableFrontSlice() are always
+   * mutable, slices obtained via extractImmutableFrontSlice() may not be.
    * @return a mutable view of the slice data.
    */
   virtual absl::Span<uint8_t> getMutableData() PURE;
+
+  /**
+   * @return an immutable view of the slice data. May be called on any slice.
+   */
+  virtual absl::Span<const uint8_t> getImmutableData() const PURE;
 };
 
 using SliceDataPtr = std::unique_ptr<SliceData>;
@@ -233,8 +242,7 @@ public:
    * @param max_slices supplies an optional limit on the number of slices to fetch, for performance.
    * @return RawSliceVector with non-empty slices in the buffer.
    */
-  virtual RawSliceVector
-  getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const PURE;
+  virtual RawSliceVector getRawSlices(std::optional<uint64_t> max_slices = std::nullopt) const PURE;
 
   /**
    * Fetch the valid data pointer and valid data length of the first non-zero-length
@@ -249,14 +257,33 @@ public:
    * buffer is not empty otherwise the implementation will have undefined behavior.
    * If the underlying slice is immutable then the implementation must create and return
    * a mutable slice that has a copy of the immutable data.
+   * The slice's drain trackers are called and its account charges credited as part of
+   * the extraction.
    * @return pointer to SliceData object that wraps the front slice
    */
   virtual SliceDataPtr extractMutableFrontSlice() PURE;
 
   /**
+   * Transfer ownership of the front slice to the caller. Must only be called if the
+   * buffer is not empty otherwise the implementation will have undefined behavior.
+   * The slice is transferred as is without copying, so it may be immutable (wrap an externally
+   * owned buffer fragment) and must be read via ``SliceData::getImmutableData()``. Use
+   * ``extractMutableFrontSlice()`` if mutable access is required. The slice keeps its drain
+   * trackers and account charges attached, they are called and credited once the slice is
+   * destroyed.
+   * @return pointer to SliceData object that wraps the front slice
+   */
+  virtual SliceDataPtr extractImmutableFrontSlice() PURE;
+
+  /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).
    */
   virtual uint64_t length() const PURE;
+
+  /**
+   * @return uint64_t the total number of slices in the buffer.
+   */
+  virtual uint64_t sliceCount() const PURE;
 
   /**
    * @return a pointer to the first byte of data that has been linearized out to size bytes.
@@ -552,9 +579,9 @@ public:
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                                   std::function<void()> above_high_watermark,
-                                   std::function<void()> above_overflow_watermark) PURE;
+  virtual InstancePtr createBuffer(absl::AnyInvocable<void()> below_low_watermark,
+                                   absl::AnyInvocable<void()> above_high_watermark,
+                                   absl::AnyInvocable<void()> above_overflow_watermark) PURE;
 
   /**
    * Create and returns a buffer memory account.

@@ -1,9 +1,9 @@
 #include <memory>
+#include <optional>
 #include <ostream>
 
 #include "source/extensions/tracers/datadog/logger.h"
 
-#include "absl/types/optional.h"
 #include "datadog/error.h"
 #include "datadog/string_view.h"
 #include "gtest/gtest.h"
@@ -39,9 +39,9 @@ public:
     set_level(spdlog::level::info);
   }
 
-  absl::optional<std::string> payload_;
+  std::optional<std::string> payload_;
   bool flush_ = false;
-  absl::optional<std::string> pattern_;
+  std::optional<std::string> pattern_;
   std::unique_ptr<spdlog::formatter> formatter_;
 };
 
@@ -58,7 +58,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
   // callback-style error
   logger.log_error([](std::ostream& log) { log << "Beware the ides of March."; });
   EXPECT_EQ("Beware the ides of March.", sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
@@ -68,7 +68,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
     log << "It's my stapler, the Swingline. It's been mine for a very long time.";
   });
   EXPECT_EQ("It's my stapler, the Swingline. It's been mine for a very long time.", sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
@@ -77,7 +77,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
   logger.log_error(datadog::tracing::Error{datadog::tracing::Error::OTHER,
                                            "I'm sorry, Dave, I'm afraid I can't do that."});
   EXPECT_EQ("Datadog [error 1]: I'm sorry, Dave, I'm afraid I can't do that.", sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
@@ -88,7 +88,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
   EXPECT_EQ("I must make my witness. I must lead the people from the waters. I must stay their "
             "stampede to the sea.",
             sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
@@ -102,8 +102,8 @@ TEST(DatadogTracerLoggerTest, Logger) {
   // callback-style error
   spdlogger.set_level(spdlog::level::critical);
   logger.log_error([](std::ostream& log) { log << "Beware the ides of March."; });
-  EXPECT_EQ(absl::nullopt, sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->payload_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
@@ -112,8 +112,8 @@ TEST(DatadogTracerLoggerTest, Logger) {
   spdlogger.set_level(spdlog::level::critical);
   logger.log_error(datadog::tracing::Error{datadog::tracing::Error::OTHER,
                                            "I'm sorry, Dave, I'm afraid I can't do that."});
-  EXPECT_EQ(absl::nullopt, sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->payload_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
@@ -122,8 +122,8 @@ TEST(DatadogTracerLoggerTest, Logger) {
   spdlogger.set_level(spdlog::level::critical);
   logger.log_error("I must make my witness. I must lead the people from the waters. I must stay "
                    "their stampede to the sea.");
-  EXPECT_EQ(absl::nullopt, sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->payload_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
@@ -134,7 +134,7 @@ TEST(DatadogTracerLoggerTest, Logger) {
   // The default level is `info`, so the startup banner will be logged.
   logger.log_startup([](std::ostream& log) { log << "ג  וַיֹּאמֶר אֱלֹהִים, יְהִי אוֹר; וַיְהִי-אוֹר."; });
   EXPECT_EQ("ג  וַיֹּאמֶר אֱלֹהִים, יְהִי אוֹר; וַיְהִי-אוֹר.", sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 
@@ -143,8 +143,8 @@ TEST(DatadogTracerLoggerTest, Logger) {
   // suppress the startup banner. `warn` suffices.
   spdlogger.set_level(spdlog::level::warn);
   logger.log_startup([](std::ostream& log) { log << "R - ½ R g + Λ g  =  κ T"; });
-  EXPECT_EQ(absl::nullopt, sink->payload_);
-  EXPECT_EQ(absl::nullopt, sink->pattern_);
+  EXPECT_EQ(std::nullopt, sink->payload_);
+  EXPECT_EQ(std::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
 }

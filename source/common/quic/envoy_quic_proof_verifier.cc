@@ -36,7 +36,7 @@ class QuicValidateResultCallback : public Ssl::ValidateResultCallback {
 public:
   QuicValidateResultCallback(Event::Dispatcher& dispatcher,
                              std::unique_ptr<quic::ProofVerifierCallback>&& quic_callback,
-                             const std::string& hostname, const std::string& leaf_cert,
+                             const std::string& hostname, absl::string_view leaf_cert,
                              bool accept_untrusted)
       : dispatcher_(dispatcher), quic_callback_(std::move(quic_callback)), hostname_(hostname),
         leaf_cert_(leaf_cert), accept_untrusted_(accept_untrusted) {}
@@ -70,19 +70,20 @@ private:
 } // namespace
 
 quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
-    const std::string& hostname, const uint16_t /*port*/, const std::vector<std::string>& certs,
-    const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
-    const quic::ProofVerifyContext* context, std::string* error_details,
-    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
-    std::unique_ptr<quic::ProofVerifierCallback> callback) {
-  ASSERT(details != nullptr);
-  ASSERT(!certs.empty());
+    const std::string& hostname, const uint16_t /*port*/,
+    const std::vector<absl::string_view>& certs, const std::string& /*ocsp_response*/,
+    const std::string& /*cert_sct*/, const quic::ProofVerifyContext* context,
+    std::string* error_details, std::unique_ptr<quic::ProofVerifyDetails>* details,
+    uint8_t* out_alert, std::unique_ptr<quic::ProofVerifierCallback> callback) {
   auto* verify_context = dynamic_cast<const EnvoyQuicProofVerifyContext*>(context);
   if (verify_context == nullptr) {
     IS_ENVOY_BUG("QUIC proof verify context was not setup correctly.");
     return quic::QUIC_FAILURE;
   }
-  ENVOY_BUG(!verify_context->isServer(), "Client certificates are not supported in QUIC yet.");
+  ASSERT(details != nullptr);
+  ASSERT(!certs.empty());
+  // Server-side client certificate validation is handled by `EnvoyTlsServerHandshaker`.
+  ASSERT(!verify_context->isServer());
 
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   for (const auto& cert_str : certs) {
@@ -103,7 +104,8 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
 
   auto envoy_callback = std::make_unique<QuicValidateResultCallback>(
-      verify_context->dispatcher(), std::move(callback), hostname, certs[0], accept_untrusted_);
+      verify_context->dispatcher(), std::move(callback), hostname, std::string(certs[0]),
+      accept_untrusted_);
   ASSERT(dynamic_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get()) !=
          nullptr);
   // We down cast rather than add customVerifyCertChainForQuic to Envoy::Ssl::Context because
@@ -120,7 +122,9 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   }
   if (result.status == ValidationResults::ValidationStatus::Successful) {
     if (verifyLeafCertMatchesHostname(*cert_view, hostname, error_details)) {
-      *details = std::make_unique<CertVerifyResult>(true);
+      // Hand the verifier-built chain (not the peer-sent list) to the details so the connection
+      // info can report the validated issuer.
+      *details = std::make_unique<CertVerifyResult>(true, std::move(result.validated_chain));
       return quic::QUIC_SUCCESS;
     }
   } else {

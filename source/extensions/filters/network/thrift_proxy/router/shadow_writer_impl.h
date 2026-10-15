@@ -77,7 +77,7 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
   Buffer::OwnedImpl response_buffer_;
   Buffer::OwnedImpl upstream_buffer_;
   MessageMetadataSharedPtr metadata_;
-  absl::optional<bool> success_;
+  std::optional<bool> success_;
   bool complete_ : 1;
 };
 using NullResponseDecoderPtr = std::unique_ptr<NullResponseDecoder>;

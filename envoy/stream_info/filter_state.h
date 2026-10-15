@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "envoy/common/pure.h"
@@ -11,7 +12,6 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -46,14 +46,40 @@ enum class StreamSharingMayImpactPooling {
   SharedWithUpstreamConnectionOnce,
 };
 
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+#define ENVOY_EXECUTION_CONTEXT_KEY_X(X)                                                           \
+  X(ConnectionExecutionContext, "envoy.network.connection_execution_context")
+#else
+#define ENVOY_EXECUTION_CONTEXT_KEY_X(X)
+#endif
+
+#define FOR_EACH_FILTER_STATE_INDEX(X)                                                             \
+  X(LocalReplyOwner, "envoy.filters.network.http_connection_manager.local_reply_owner")            \
+  X(UpstreamServerName, "envoy.network.upstream_server_name")                                      \
+  X(UpstreamSocketOptions, "envoy.network.upstream_socket_options")                                \
+  X(UpstreamSubjectAltNames, "envoy.network.upstream_subject_alt_names")                           \
+  X(NetworkNamespace, "envoy.network.network_namespace")                                           \
+  X(OriginalConnectPort, "envoy.router.original_connect_port")                                     \
+  ENVOY_EXECUTION_CONTEXT_KEY_X(X)
+
+enum class FilterStateIndex : uint32_t {
+#define GENERATE_INDEX_ENUM(enum_val, string_val) enum_val,
+  FOR_EACH_FILTER_STATE_INDEX(GENERATE_INDEX_ENUM)
+#undef GENERATE_INDEX_ENUM
+};
+
+constexpr size_t FilterStateIndexCount = 0
+#define GENERATE_COUNT(enum_val, string_val) +1
+    FOR_EACH_FILTER_STATE_INDEX(GENERATE_COUNT)
+#undef GENERATE_COUNT
+    ;
+
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
  * or a connection by various filters in Envoy. FilterState can be write-once or write-many.
  */
 class FilterState {
 public:
-  enum class StateType { ReadOnly, Mutable };
-
   // Objects stored in the FilterState may have different life span. Life span is what controls
   // how long an object stored in FilterState lives. Implementation of this interface actually
   // stores objects in a (reverse) tree manner - multiple FilterStateImpl with shorter life span may
@@ -99,11 +125,11 @@ public:
     virtual ProtobufTypes::MessagePtr serializeAsProto() const { return nullptr; }
 
     /**
-     * @return absl::optional<std::string> a optional string to the serialization of the filter
+     * @return std::optional<std::string> a optional string to the serialization of the filter
      * state. No value if the filter state cannot be serialized or serialization is not supported.
      * This method can be used to get an unstructured serialization result.
      */
-    virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
+    virtual std::optional<std::string> serializeAsString() const { return std::nullopt; }
 
     /**
      * @return bool true if the object supports field access. False if the object does not support
@@ -136,7 +162,6 @@ public:
 
   struct FilterObject {
     std::shared_ptr<Object> data_;
-    StateType state_type_{StateType::ReadOnly};
     StreamSharingMayImpactPooling stream_sharing_{StreamSharingMayImpactPooling::None};
     std::string name_;
   };
@@ -149,24 +174,19 @@ public:
   /**
    * @param data_name the name of the data being set.
    * @param data an owning pointer to the data to be stored.
-   * @param state_type indicates whether the object is mutable or not.
    * @param life_span indicates the life span of the object: bound to the filter chain, a
    * request, or a connection.
    *
-   * Note that it is an error to call setData() twice with the same
-   * data_name, if the existing object is immutable. Similarly, it is an
-   * error to call setData() with same data_name but different state_types
-   * (mutable and readOnly, or readOnly and mutable) or different life_span.
-   * This is to enforce a single authoritative source for each piece of
-   * data stored in FilterState.
+   * Note that it is an error to call setData() twice with the same data_name, but different
+   * life_span.
    */
   virtual void
-  setData(absl::string_view data_name, std::shared_ptr<Object> data, StateType state_type,
+  setData(absl::string_view data_name, std::shared_ptr<Object> data,
           LifeSpan life_span = LifeSpan::FilterChain,
           StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a typed pointer to the stored data or nullptr if the data does not exist or the data
    * type does not match the expected type.
    */
@@ -175,13 +195,13 @@ public:
   }
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a const pointer to the stored data or nullptr if the data does not exist.
    */
   virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a typed pointer to the stored data or nullptr if the data does not exist or the data
    * type does not match the expected type.
    */
@@ -190,13 +210,13 @@ public:
   }
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a pointer to the stored data or nullptr if the data does not exist.
    */
   virtual Object* getDataMutableGeneric(absl::string_view data_name) PURE;
 
   /**
-   * @param data_name the name of the data being looked up (mutable/readonly).
+   * @param data_name the name of the data being looked up.
    * @return a shared pointer to the stored data or nullptr if the data does not exist.
    */
   virtual std::shared_ptr<Object> getDataSharedMutableGeneric(absl::string_view data_name) PURE;
@@ -239,6 +259,30 @@ public:
    * @return filter objects that are shared with the upstream connection.
    **/
   virtual ObjectsPtr objectsSharedWithUpstreamConnection() const PURE;
+
+  static absl::string_view indexToName(FilterStateIndex index);
+  static std::optional<FilterStateIndex> nameToIndex(absl::string_view name);
+
+  virtual void setIndexedData(
+      FilterStateIndex index, std::shared_ptr<Object> data,
+      LifeSpan life_span = LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
+
+  template <typename T> const T* getIndexedDataReadOnly(FilterStateIndex index) const {
+    return dynamic_cast<const T*>(getIndexedDataReadOnlyGeneric(index));
+  }
+
+  virtual const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const PURE;
+
+  template <typename T> T* getIndexedDataMutable(FilterStateIndex index) {
+    return dynamic_cast<T*>(getIndexedDataMutableGeneric(index));
+  }
+
+  virtual Object* getIndexedDataMutableGeneric(FilterStateIndex index) PURE;
+
+  virtual std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) PURE;
+
+  virtual bool hasIndexedData(FilterStateIndex index) const PURE;
 };
 
 } // namespace StreamInfo

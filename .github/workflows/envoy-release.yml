@@ -4,12 +4,10 @@ permissions:
   contents: read
 
 on:
+  # Post-publish chaining lives in _publish_release.yml -> _release_chain.yml.
   release:
     types:
     - published
-    branches:
-    - main
-    - release/v*
   workflow_dispatch:
     inputs:
       task:
@@ -22,6 +20,11 @@ on:
         - reopen-branch
         - sync-version-histories
         - deprecate-guards
+      branch:
+        description: >-
+          Target branch, eg `release/v1.35`
+          (default: the branch the workflow is run from; not used by `deprecate-guards`)
+        type: string
       dry-run:
         type: boolean
         default: false
@@ -43,6 +46,12 @@ on:
         type: boolean
         default: true
         description: Use changelog summary (required to publish release)
+      recreate:
+        type: boolean
+        default: false
+        description: >-
+          Delete existing PR/branch
+          (closes any open bot PR and deletes the bot branch before recreating it)
 
 env:
   COMMITTER_NAME: publish-envoy[bot]
@@ -50,187 +59,81 @@ env:
 
 
 jobs:
+  validate:
+    if: github.event_name == 'workflow_dispatch' && inputs.task != 'deprecate-guards'
+    runs-on: ubuntu-24.04
+    name: Validate dispatch
+    outputs:
+      branch: ${{ steps.validate.outputs.branch }}
+    steps:
+    - id: validate
+      env:
+        REF: ${{ github.ref_name }}
+        BRANCH: ${{ inputs.branch }}
+      run: |
+        if [[ "$REF" != "main" && ! "$REF" =~ ^release/v[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tasks must be dispatched from main or a release/vX.Y branch (got ${REF})"
+            exit 1
+        fi
+        if [[ -n "$BRANCH" && "$REF" != "main" && "$BRANCH" != "$REF" ]]; then
+            echo "::error::Dispatches from ${REF} cannot target a different branch (${BRANCH}); dispatch from main instead"
+            exit 1
+        fi
+        echo "branch=${BRANCH:-$REF}" >> "$GITHUB_OUTPUT"
+
   ## Triggerable actions
 
   # Create a release commit, when landed this will publish.
   create_release:
-    runs-on: ubuntu-24.04
-    if: github.event_name == 'workflow_dispatch' && inputs.task == 'create-release'
+    needs: validate
+    if: inputs.task == 'create-release'
     name: Create release
-    steps:
-    - id: appauth
-      name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
-
-    - id: checkout
-      name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        committer-name: ${{ env.COMMITTER_NAME }}
-        committer-email: ${{ env.COMMITTER_EMAIL }}
-        strip-prefix: release/
-        token: ${{ steps.appauth.outputs.token }}
-    - run: |
-        if [[ ! -s "changelogs/summary.md" ]]; then
-            if [[ "${{ inputs.summary }}" == "false" ]]; then
-                echo "::warning::Changelog summary (changelogs/summary.md) is empty!"
-                exit 0
-            fi
-            echo "::error::Changelog summary (changelogs/summary.md) is empty!"
-            exit 1
-        fi
-        COMMITTER=$(git log -n 1 --format='%an <%ae>' -- changelogs/summary.md)
-        echo "committer=${COMMITTER}" >> $GITHUB_OUTPUT
-      id: changelog
-      name: Check changelog summary
-    - if: ${{ inputs.author }}
-      name: Validate signoff email
-      uses: envoyproxy/toolshed/actions/email/validate@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        email: ${{ inputs.author }}
-    - uses: envoyproxy/toolshed/actions/github/run@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      name: Create release
-      with:
-        source: |
-          BAZEL_ARGS=(--)
-          BAZEL_RUN_ARGS=(--config=ci)
-          if [[ -n "${{ inputs.author }}" ]]; then
-              BAZEL_ARGS+=(
-                  "--release-author=${{ inputs.author }}"
-                  "--signoff=${{ steps.changelog.outputs.committer }}")
-          else
-              BAZEL_ARGS+=("--release-author=${{ steps.changelog.outputs.committer }}")
-          fi
-        command: >-
-          bazel
-          run
-          "${BAZEL_RUN_ARGS[@]}"
-          @envoy_repo//:release
-          "${BAZEL_ARGS[@]}"
-    - run: |
-        VERSION=$(cat VERSION.txt)
-        echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-      name: Release version
-      id: release
-    - name: Create a PR
-      uses: envoyproxy/toolshed/actions/github/pr@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        base: ${{ github.ref_name }}
-        commit: false
-        append-commit-message: true
-        body: |
-          Created by Envoy publish bot for @${{ github.actor }}
-          ${{ ! inputs.summary && ':warning: Created without changelog summary, this will need to be updated before publishing' || '' }}
-        branch: release/create/${{ steps.checkout.outputs.branch-name }}
-        diff-upload: release-${{ steps.checkout.outputs.branch-name }}
-        diff-show: true
-        dry-run: ${{ ! inputs.pr }}
-        wip: ${{ ! inputs.summary || inputs.wip }}
-        title: >-
-          [${{ (! inputs.summary || inputs.wip) && 'WIP/' || '' }}release/${{ steps.checkout.outputs.branch-name }}]
-          repo: Release ${{ steps.release.outputs.version }}
-        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
+    uses: ./.github/workflows/_release_task.yml
+    secrets:
+      ENVOY_CI_PUBLISH_APP_ID: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    with:
+      task: create-release
+      branch: ${{ needs.validate.outputs.branch }}
+      recreate: ${{ inputs.recreate }}
+      pr: ${{ inputs.pr }}
+      pr-message: ${{ inputs.pr-message }}
+      wip: ${{ inputs.wip }}
+      author: ${{ inputs.author }}
+      summary: ${{ inputs.summary }}
 
   # Re-open a branch.
   reopen-branch:
-    runs-on: ubuntu-24.04
-    if: github.event_name == 'workflow_dispatch' && inputs.task == 'reopen-branch'
+    needs: validate
+    if: inputs.task == 'reopen-branch'
     name: Re-open branch
-    steps:
-    - id: appauth
-      name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
-    - id: checkout
-      name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        committer-name: ${{ env.COMMITTER_NAME }}
-        committer-email: ${{ env.COMMITTER_EMAIL }}
-        strip-prefix: release/
-        token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/actions/github/run@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      name: Re-open branch
-      with:
-        command: >-
-          bazel
-          run
-          --config=ci
-          @envoy_repo//:dev
-          -- ${{ steps.checkout.outputs.branch-name != 'main' && '--patch' || '' }}
-    - run: |
-        VERSION=$(cat VERSION.txt | cut -d- -f1)
-        echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-      name: Dev version
-      id: dev
-    - name: Create a PR
-      uses: envoyproxy/toolshed/actions/github/pr@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        base: ${{ github.ref_name }}
-        commit: false
-        append-commit-message: true
-        body: |
-          Created by Envoy publish bot for @${{ github.actor }}
-        branch: release/dev/${{ steps.checkout.outputs.branch-name }}
-        diff-upload: release-dev-${{ steps.checkout.outputs.branch-name }}
-        diff-show: true
-        dry-run: ${{ ! inputs.pr }}
-        wip: ${{ ! inputs.summary || inputs.wip }}
-        title: >-
-          [dev/${{ steps.checkout.outputs.branch-name }}]
-          repo: Dev ${{ steps.dev.outputs.version }}
-        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
+    uses: ./.github/workflows/_release_task.yml
+    secrets:
+      ENVOY_CI_PUBLISH_APP_ID: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    with:
+      task: reopen-branch
+      branch: ${{ needs.validate.outputs.branch }}
+      recreate: ${{ inputs.recreate }}
+      pr: ${{ inputs.pr }}
+      pr-message: ${{ inputs.pr-message }}
+      wip: ${{ inputs.wip }}
+      summary: ${{ inputs.summary }}
 
   sync_version_histories:
-    runs-on: ubuntu-24.04
-    if: github.event_name == 'workflow_dispatch' && inputs.task == 'sync-version-histories'
+    needs: validate
+    if: inputs.task == 'sync-version-histories'
     name: Sync version histories
-    steps:
-    - id: appauth
-      name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
-        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
-
-    - id: checkout
-      name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        committer-name: ${{ env.COMMITTER_NAME }}
-        committer-email: ${{ env.COMMITTER_EMAIL }}
-        strip-prefix: release/
-        token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/actions/github/run@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      name: Sync version histories
-      with:
-        command: >-
-          bazel
-          run
-          --config=ci @envoy_repo//:sync
-          --
-          --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
-    - name: Create a PR
-      uses: envoyproxy/toolshed/actions/github/pr@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
-      with:
-        append-commit-message: true
-        base: ${{ github.ref_name }}
-        commit: false
-        body: |
-          Created by Envoy publish bot for @${{ github.actor }}
-        branch: release/sync/${{ steps.checkout.outputs.branch-name }}
-        diff-upload: version-histories-${{ steps.checkout.outputs.branch-name }}
-        diff-show: true
-        dry-run: ${{ ! inputs.pr }}
-        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
-        title: >-
-          ${{ steps.checkout.outputs.branch-name != 'main' && format('[{0}]', steps.checkout.outputs.branch-name) || '' }}
-          repo: Sync version histories
+    uses: ./.github/workflows/_release_task.yml
+    secrets:
+      ENVOY_CI_PUBLISH_APP_ID: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    with:
+      task: sync-version-histories
+      branch: ${{ needs.validate.outputs.branch }}
+      recreate: ${{ inputs.recreate }}
+      pr: ${{ inputs.pr }}
+      pr-message: ${{ inputs.pr-message }}
 
   deprecate_guards:
     runs-on: ubuntu-24.04
@@ -243,13 +146,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/actions/github/checkout@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         config: |
           fetch-depth: 0
@@ -279,13 +182,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/actions/appauth@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - name: Checkout repository
-      uses: envoyproxy/toolshed/actions/github/checkout@8d5d8d4b9eeb5e4e76b92341b0b1b1f6438af231  # v0.4.5
+      uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}

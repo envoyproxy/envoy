@@ -21,7 +21,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.rate_limit_descriptors.expr"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/protobuf:utility_lib",
@@ -29,7 +29,7 @@ envoy_extension_cc_test(
         "//source/extensions/rate_limit_descriptors/expr:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/ratelimit:ratelimit_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/rate_limit_descriptors/expr/v3:pkg_cc_proto",

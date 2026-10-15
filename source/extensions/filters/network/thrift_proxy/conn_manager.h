@@ -11,6 +11,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
+#include "source/common/network/drain_close_util.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
@@ -57,7 +58,8 @@ class ConnectionManager : public Network::ReadFilter,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
   ConnectionManager(const ConfigSharedPtr& config, Random::RandomGenerator& random_generator,
-                    TimeSource& time_system, const Network::DrainDecision& drain_decision);
+                    TimeSource& time_system, const Network::DrainDecision& drain_decision,
+                    Server::Configuration::ServerFactoryContext& server_context);
   ~ConnectionManager() override;
 
   // Network::ReadFilter
@@ -69,6 +71,12 @@ public:
   void onEvent(Network::ConnectionEvent) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+  // Only records the event; the drain-close decision is made per response in shouldDrainClose().
+  void onDrain(Network::ConnectionDrainEvent drain_event) override {
+    if (!connection_drain_event_.has_value()) {
+      connection_drain_event_ = drain_event;
+    }
+  }
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
@@ -88,8 +96,7 @@ private:
   struct ResponseDecoder : public DecoderCallbacks, public DecoderEventHandler {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
-          protocol_converter_(std::make_shared<ProtocolConverter>()), complete_{false},
-          passthrough_{false}, pending_transport_end_{false} {
+          protocol_converter_(std::make_shared<ProtocolConverter>()) {
       protocol_converter_->initProtocolConverter(*parent_.parent_.protocol_,
                                                  parent_.response_buffer_);
     }
@@ -134,10 +141,10 @@ private:
     Buffer::OwnedImpl upstream_buffer_;
     MessageMetadataSharedPtr metadata_;
     ProtocolConverterSharedPtr protocol_converter_;
-    absl::optional<bool> success_;
-    bool complete_ : 1;
-    bool passthrough_ : 1;
-    bool pending_transport_end_ : 1;
+    std::optional<bool> success_;
+    bool complete_ : 1 = false;
+    bool passthrough_ : 1 = false;
+    bool pending_transport_end_ : 1 = false;
   };
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
@@ -218,9 +225,7 @@ private:
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr(),
-                       StreamInfo::FilterState::LifeSpan::FilterChain),
-          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false},
-          under_on_local_reply_{false} {
+                       StreamInfo::FilterState::LifeSpan::FilterChain) {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() override {
@@ -365,22 +370,22 @@ private:
     std::list<ThriftFilters::FilterBaseSharedPtr> base_filters_;
     DecoderEventHandlerSharedPtr upgrade_handler_;
     ResponseDecoderPtr response_decoder_;
-    absl::optional<Router::RouteConstSharedPtr> cached_route_;
+    std::optional<Router::RouteConstSharedPtr> cached_route_;
     Buffer::OwnedImpl response_buffer_;
     int32_t original_sequence_id_{0};
     MessageType original_msg_type_{MessageType::Call};
     std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
-    bool local_response_sent_ : 1;
-    bool pending_transport_end_ : 1;
-    bool passthrough_ : 1;
-    bool under_on_local_reply_ : 1;
+    bool local_response_sent_ : 1 = false;
+    bool pending_transport_end_ : 1 = false;
+    bool passthrough_ : 1 = false;
+    bool under_on_local_reply_ : 1 = false;
   };
 
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;
 
   void continueDecoding();
   void dispatch();
-  absl::optional<DirectResponse::ResponseType>
+  std::optional<DirectResponse::ResponseType>
   sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);
@@ -403,6 +408,20 @@ private:
   bool half_closed_{false};
   TimeSource& time_source_;
   const Network::DrainDecision& drain_decision_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+  // The drain type of the listener owning this connection, used to decide whether
+  // /healthcheck/fail should drain-close it.
+  envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Set when the connection is notified of a drain sequence via onDrain().
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
+  // Latched when the filter is created so it is not re-read on every response. See
+  // shouldDrainClose().
+  const bool use_connection_event_drain_ = false;
+
+  // Returns true if the connection should be drain-closed, i.e. whether responses should carry
+  // the Drain header.
+  bool shouldDrainClose();
 
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};

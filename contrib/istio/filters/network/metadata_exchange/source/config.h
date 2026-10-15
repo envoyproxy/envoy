@@ -6,8 +6,7 @@
 #include "contrib/envoy/extensions/filters/network/metadata_exchange/v3/metadata_exchange.pb.validate.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace NetworkFilters {
+namespace Tcp {
 namespace MetadataExchange {
 
 /**
@@ -53,6 +52,5 @@ private:
 };
 
 } // namespace MetadataExchange
-} // namespace NetworkFilters
-} // namespace Extensions
+} // namespace Tcp
 } // namespace Envoy

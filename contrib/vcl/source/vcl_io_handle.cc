@@ -1,5 +1,8 @@
 #include "contrib/vcl/source/vcl_io_handle.h"
 
+#include <format>
+#include <optional>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 
@@ -48,13 +51,13 @@ void vclEndptCopy(sockaddr* addr, socklen_t* addrlen, const vppcom_endpt_t& ep) 
   if (ep.is_ip4) {
     sockaddr_in* addr4 = reinterpret_cast<sockaddr_in*>(addr);
     addr4->sin_family = AF_INET;
-    *addrlen = std::min(static_cast<unsigned int>(sizeof(struct sockaddr_in)), *addrlen);
+    *addrlen = std::min(static_cast<unsigned int>(sizeof(struct in_addr)), *addrlen);
     memcpy(&addr4->sin_addr, ep.ip, *addrlen); // NOLINT(safe-memcpy)
     addr4->sin_port = ep.port;
   } else {
     sockaddr_in6* addr6 = reinterpret_cast<sockaddr_in6*>(addr);
     addr6->sin6_family = AF_INET6;
-    *addrlen = std::min(static_cast<unsigned int>(sizeof(struct sockaddr_in6)), *addrlen);
+    *addrlen = std::min(static_cast<unsigned int>(sizeof(struct in6_addr)), *addrlen);
     memcpy(&addr6->sin6_addr, ep.ip, *addrlen); // NOLINT(safe-memcpy)
     addr6->sin6_port = ep.port;
   }
@@ -67,13 +70,13 @@ Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_e
 
   if (ep.is_ip4) {
     addr.ss_family = AF_INET;
-    len = sizeof(struct sockaddr_in);
+    len = sizeof(struct in_addr);
     auto in4 = reinterpret_cast<struct sockaddr_in*>(&addr);
     memcpy(&in4->sin_addr, ep.ip, len); // NOLINT(safe-memcpy)
     in4->sin_port = ep.port;
   } else {
     addr.ss_family = AF_INET6;
-    len = sizeof(struct sockaddr_in6);
+    len = sizeof(struct in6_addr);
     auto in6 = reinterpret_cast<struct sockaddr_in6*>(&addr);
     memcpy(&in6->sin6_addr, ep.ip, len); // NOLINT(safe-memcpy)
     in6->sin6_port = ep.port;
@@ -90,7 +93,7 @@ Envoy::Network::Address::InstanceConstSharedPtr vclEndptToAddress(const vppcom_e
     // used to create socket. Wrong knowledge of dual stack support won't hurt.
     return *Envoy::Network::Address::addressFromSockAddr(addr, len, /*v6only=*/false);
   } catch (const EnvoyException& e) {
-    PANIC(fmt::format("Invalid remote address for fd: {}, error: {}", sh, e.what()));
+    PANIC(std::format("Invalid remote address for fd: {}, error: {}", sh, e.what()));
   }
 }
 
@@ -197,7 +200,7 @@ Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice
 }
 
 #if VCL_RX_ZC
-Api::IoCallUint64Result VclIoHandle::read(Buffer::Instance& buffer, absl::optional<uint64_t>) {
+Api::IoCallUint64Result VclIoHandle::read(Buffer::Instance& buffer, std::optional<uint64_t>) {
   vppcom_data_segment_t ds[16];
   int32_t rv;
 
@@ -227,7 +230,7 @@ Api::IoCallUint64Result VclIoHandle::read(Buffer::Instance& buffer, absl::option
 }
 #else
 Api::IoCallUint64Result VclIoHandle::read(Buffer::Instance& buffer,
-                                          absl::optional<uint64_t> max_length_opt) {
+                                          std::optional<uint64_t> max_length_opt) {
   uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
@@ -275,6 +278,11 @@ Api::IoCallUint64Result VclIoHandle::write(Buffer::Instance& buffer) {
   return result;
 }
 
+Api::IoCallUint64Result VclIoHandle::send(const void* buffer, size_t length) {
+  Buffer::RawSlice slice{const_cast<void*>(buffer), length};
+  return writev(&slice, 1);
+}
+
 Api::IoCallUint64Result VclIoHandle::recv(void* buffer, size_t length, int flags) {
   VCL_LOG("recv on sh {:x}", sh_);
   int rv = vppcom_session_recvfrom(sh_, buffer, length, flags, nullptr);
@@ -301,7 +309,8 @@ Api::IoCallUint64Result VclIoHandle::sendmsg(const Buffer::RawSlice* slices, uin
     }
   }
   if (num_slices_to_write == 0) {
-    return Api::ioCallUint64ResultNoError();
+    uint8_t empty_payload = 0;
+    return vclCallResultToIoCallResult(vppcom_session_write_msg(sh_, &empty_payload, /*n=*/0));
   }
 
   // VCL has no sendmsg semantics- Treat as a session write followed by a flush
@@ -620,7 +629,7 @@ Api::SysCallIntResult VclIoHandle::setBlocking(bool) {
   return {rv < 0 ? -1 : 0, -rv};
 }
 
-absl::optional<int> VclIoHandle::domain() {
+std::optional<int> VclIoHandle::domain() {
   VCL_LOG("grabbing domain sh {:x}", sh_);
   return {AF_INET};
 };
@@ -769,9 +778,9 @@ IoHandlePtr VclIoHandle::duplicate() {
   return io_handle;
 }
 
-absl::optional<std::chrono::milliseconds> VclIoHandle::lastRoundTripTime() { return {}; }
+std::optional<std::chrono::milliseconds> VclIoHandle::lastRoundTripTime() { return {}; }
 
-absl::optional<uint64_t> VclIoHandle::congestionWindowInBytes() const { return {}; }
+std::optional<uint64_t> VclIoHandle::congestionWindowInBytes() const { return {}; }
 
 } // namespace Vcl
 } // namespace Network

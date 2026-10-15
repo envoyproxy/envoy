@@ -121,6 +121,7 @@ void parseRequestInfoFromBuffer(Buffer::Instance& data, Context& context) {
 
 void parseResponseInfoFromBuffer(Buffer::Instance& buffer, Context& context) {
   ASSERT(buffer.length() >= DubboCodec::HeadersSize);
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   ResponseStatus status = static_cast<ResponseStatus>(buffer.peekInt<uint8_t>(StatusOffset));
   if (!isValidResponseStatus(status)) {
     throw EnvoyException(
@@ -286,7 +287,7 @@ MessageMetadataSharedPtr DirectResponseUtil::heartbeatResponse(MessageMetadata& 
 
 MessageMetadataSharedPtr DirectResponseUtil::localResponse(MessageMetadata& request,
                                                            ResponseStatus status,
-                                                           absl::optional<RpcResponseType> type,
+                                                           std::optional<RpcResponseType> type,
                                                            absl::string_view content) {
   if (!request.hasContext()) {
     request.setContext(std::make_unique<Context>());

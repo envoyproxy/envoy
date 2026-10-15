@@ -1,17 +1,21 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.upstreams.http.tcp"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
@@ -24,11 +28,11 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_filter_interface",
         "//test/mocks/router:router_mocks",
-        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

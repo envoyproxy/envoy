@@ -15,12 +15,11 @@ envoy_extension_cc_test(
     name = "fixed_heap_monitor_test",
     srcs = ["fixed_heap_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.fixed_heap"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/resource_monitors/fixed_heap:fixed_heap_monitor",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:test_runtime_lib",
-        "@abseil-cpp//absl/types:optional",
-        "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
 )
 
@@ -28,13 +27,14 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.fixed_heap"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/fixed_heap:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:options_mocks",
         "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],

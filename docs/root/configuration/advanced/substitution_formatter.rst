@@ -92,9 +92,14 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
+.. _config_access_log_format_bytes_received:
+
 ``%BYTES_RECEIVED%``
   HTTP/THRIFT
-    Body bytes received.
+    Body bytes received from the downstream, i.e. the size of the request body. This value is
+    independent of :ref:`%BYTES_SENT% <config_access_log_format_bytes_sent>`, which reflects the
+    response body sent to the downstream, so the two may differ significantly (e.g. a large file
+    upload with a small response, or vice versa).
 
   TCP
     Downstream bytes received on connection.
@@ -173,7 +178,7 @@ Current supported substitution commands include:
 ``%RESPONSE_CODE_DETAILS(X)%``
   HTTP
     HTTP response code details provides additional information about the response code, such as
-    who set it (the upstream or envoy) and why. The string will not contain any whitespaces, which
+    who set it (the upstream or Envoy) and why. The string will not contain any whitespaces, which
     will be converted to underscore '_', unless optional parameter ``X`` is ``ALLOW_WHITESPACES``.
 
   TCP/UDP
@@ -200,9 +205,15 @@ Current supported substitution commands include:
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
+.. _config_access_log_format_bytes_sent:
+
 ``%BYTES_SENT%``
   HTTP/THRIFT
-    Body bytes sent. For WebSocket connection it will also include response header bytes.
+    Body bytes sent to the downstream, i.e. the size of the response body (which is typically
+    produced by the upstream). For WebSocket connection it will also include response header
+    bytes. This value is independent of :ref:`%BYTES_RECEIVED% <config_access_log_format_bytes_received>`,
+    which reflects the request body received from the downstream, so the two may differ
+    significantly (e.g. a large file upload with a small response, or vice versa).
 
   TCP
     Downstream bytes sent on connection.
@@ -232,7 +243,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_WIRE_BYTES_SENT%``
   HTTP
-    Total number of bytes sent to the upstream by the http stream.
+    Total number of bytes sent to the upstream by the HTTP stream.
 
   TCP
     Total number of bytes sent to the upstream by the tcp proxy.
@@ -242,7 +253,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_WIRE_BYTES_RECEIVED%``
   HTTP
-    Total number of bytes received from the upstream by the http stream.
+    Total number of bytes received from the upstream by the HTTP stream.
 
   TCP
     Total number of bytes received from the upstream by the tcp proxy.
@@ -252,7 +263,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_HEADER_BYTES_SENT%``
   HTTP
-    Number of header bytes sent to the upstream by the http stream.
+    Number of header bytes sent to the upstream by the HTTP stream.
 
   TCP
     Total number of HTTP header bytes sent to the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
@@ -262,14 +273,14 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%``
   HTTP
-    Number of decompressed header bytes sent to the upstream by the http stream.
+    Number of decompressed header bytes sent to the upstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
 ``%UPSTREAM_HEADER_BYTES_RECEIVED%``
   HTTP
-    Number of header bytes received from the upstream by the http stream.
+    Number of header bytes received from the upstream by the HTTP stream.
 
   TCP
     Total number of HTTP header bytes received from the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
@@ -279,7 +290,7 @@ Current supported substitution commands include:
 
 ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``
   HTTP
-    Number of decompressed header bytes received from the upstream by the http stream.
+    Number of decompressed header bytes received from the upstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
@@ -287,7 +298,7 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_WIRE_BYTES_SENT%``
   HTTP
-    Total number of bytes sent to the downstream by the http stream.
+    Total number of bytes sent to the downstream by the HTTP stream.
 
   TCP
     Total number of bytes sent to the downstream by the tcp proxy.
@@ -297,7 +308,7 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_WIRE_BYTES_RECEIVED%``
   HTTP
-    Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
+    Total number of bytes received from the downstream by the HTTP stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
 
   TCP
     Total number of bytes received from the downstream by the tcp proxy.
@@ -307,21 +318,21 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_HEADER_BYTES_SENT%``
   HTTP
-    Number of header bytes sent to the downstream by the http stream.
+    Number of header bytes sent to the downstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
 ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%``
   HTTP
-    Number of decompressed header bytes sent to the downstream by the http stream.
+    Number of decompressed header bytes sent to the downstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
 
 ``%DOWNSTREAM_HEADER_BYTES_RECEIVED%``
   HTTP
-    Number of header bytes received from the downstream by the http stream.
+    Number of header bytes received from the downstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
@@ -330,7 +341,7 @@ Current supported substitution commands include:
 
 ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``
   HTTP
-    Number of decompressed header bytes received from the downstream by the http stream.
+    Number of decompressed header bytes received from the downstream by the HTTP stream.
 
   TCP/UDP
     Not implemented. It will appear as ``0`` in the access logs.
@@ -357,7 +368,18 @@ Current supported substitution commands include:
     The ``START`` and ``END`` time points are specified by the following values (all values
     here are case-sensitive):
 
+    * ``DS_CX_BEG``: The time point at which the downstream connection was established (accepted)
+      by Envoy, i.e. the connection start time. Note this is unlike ``US_CX_BEG``/``US_CX_END``,
+      which mark the begin and end of the upstream connection *establishment*; ``DS_CX_BEG`` is the
+      single time point at which the already-established downstream connection begins.
+    * ``DS_CX_END``: The time point at which the downstream connection was closed, i.e. the
+      connection close time. Note this is unlike ``US_CX_END``, which marks the end of the upstream
+      connection *establishment* rather than the connection close.
+    * ``DS_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
+      ClientHello was received.
+    * ``DS_HS_END``: The time point of the downstream TLS handshake end.
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
+    * ``DS_RX_HDR_END``: The time point of the downstream request header receiving end.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
     * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
     * ``US_CX_END``: The time point of the upstream TCP connect end.
@@ -376,6 +398,12 @@ Current supported substitution commands include:
       Upstream connection establishment time points (``US_CX_*``, ``US_HS_END``) repeat for all requests
       in a given connection.
 
+    .. note::
+
+      The ``DS_CX_BEG`` time point reflects the downstream connection begin and repeats for all
+      requests on a given connection. The ``DS_CX_END`` time point is only populated for requests
+      that are active when the downstream connection closes and renders as ``"-"`` otherwise.
+
     The ``PRECISION`` is specified by the following values (all values here are case-sensitive):
 
     * ``ms``: Millisecond precision.
@@ -388,7 +416,27 @@ Current supported substitution commands include:
       ``*_TX_END`` values lower than ``*_RX_END`` values, in cases where upstream peer has half-closed
       its stream before downstream peer. In these cases the ``COMMON_DURATION`` value will become negative.
 
-  TCP/UDP
+  TCP
+    Total duration between the ``START`` time point and the ``END`` time point in specific ``PRECISION``.
+    The connection time points are populated for TCP connections and specified by the following
+    values (all values here are case-sensitive):
+
+    * ``DS_CX_BEG``: The time point at which the downstream connection was established (accepted)
+      by Envoy, i.e. the connection start time. Note this is unlike ``US_CX_BEG``/``US_CX_END``,
+      which mark the begin and end of the upstream connection *establishment*; ``DS_CX_BEG`` is the
+      single time point at which the already-established downstream connection begins.
+    * ``DS_CX_END``: The time point at which the downstream connection was closed, i.e. the
+      connection close time. Note this is unlike ``US_CX_END``, which marks the end of the upstream
+      connection *establishment* rather than the connection close.
+    * ``DS_HS_BEG``: The time point of the downstream TLS handshake begin, i.e. when the
+      ClientHello was received.
+    * ``DS_HS_END``: The time point of the downstream TLS handshake end.
+    * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
+    * ``US_CX_END``: The time point of the upstream TCP connect end.
+
+    The ``PRECISION`` is the same as the HTTP case above.
+
+  UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
 ``%REQUEST_DURATION%``
@@ -443,12 +491,37 @@ Current supported substitution commands include:
 
   Renders a numeric value in typed JSON logs.
 
+``%ROUTE_RESOLUTION_TIME_US%``
+  HTTP
+    Total wall time in microseconds spent resolving the route for the request. A request that never
+    resolved a route will appear as ``"-"`` in the access logs.
+
+  Renders a numeric value in typed JSON logs.
+
+``%ROUTE_RESOLUTION_COUNT%``
+  HTTP
+    Number of times the route was resolved for the request. A request that never resolved a route
+    will appear as ``0``.
+
+  Renders a numeric value in typed JSON logs.
+
 ``%DOWNSTREAM_HANDSHAKE_DURATION%``
   HTTP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
   TCP
     Total duration in milliseconds from the start of the connection to the TLS handshake being completed.
+
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+  Renders a numeric value in typed JSON logs.
+
+``%DOWNSTREAM_CX_RTT%``
+  HTTP/TCP
+    The last measured round trip time in milliseconds of the downstream connection, as reported by
+    the underlying transport (e.g. the kernel TCP stack). It will appear as ``"-"`` in the access
+    logs if the round trip time is not available.
 
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -947,7 +1020,9 @@ Current supported substitution commands include:
     :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
     where ``NAMESPACE`` is the filter namespace used when setting the metadata, ``KEY`` is an optional
     lookup key in the namespace with the option of specifying nested keys separated by ':', and ``Z`` is an
-    optional parameter denoting string (and other non-structured value) truncation up to ``Z`` characters long.
+    optional parameter denoting truncation of the rendered value up to ``Z`` characters long. In typed
+    output (for example JSON access logs), only string values are truncated; values of any other type
+    (numbers, booleans, structs and lists) keep their type and are logged in full.
     Dynamic Metadata can be set by filters using the :repo:`StreamInfo <envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
 
@@ -1304,6 +1379,12 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%DOWNSTREAM_TLS_GROUP%``
+  HTTP/TCP/THRIFT
+    The name of the TLS group used for the key agreement to establish the downstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%DOWNSTREAM_TLS_VERSION%``
   HTTP/TCP/THRIFT
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the downstream TLS connection.
@@ -1346,9 +1427,34 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256%``
+  HTTP/TCP/THRIFT
+    The hex-encoded SHA256 fingerprint of the verified issuer (CA) certificate from the
+    validated downstream TLS peer certificate. Requires a validated peer certificate chain
+    (e.g., mTLS with ``require_client_certificate: true`` and a ``validation_context``). Returns
+    ``"-"`` if there is no validated peer certificate chain or no issuer certificate can be found.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%DOWNSTREAM_PEER_ISSUER_SERIAL%``
+  HTTP/TCP/THRIFT
+    The serial number of the verified issuer (CA) certificate from the validated downstream TLS
+    peer certificate. Requires a validated peer certificate chain (e.g., mTLS with
+    ``require_client_certificate: true`` and a ``validation_context``). Returns ``"-"`` if there
+    is no validated peer certificate chain or no issuer certificate can be found.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%DOWNSTREAM_PEER_CERT%``
   HTTP/TCP/THRIFT
     The client certificate in the URL-encoded PEM format used to establish the downstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%DOWNSTREAM_PEER_CERT_CHAIN%``
+  HTTP/TCP/THRIFT
+    The client certificate chain used to establish the downstream TLS connection in URL-encoded PEM format.
+    The certificate chain includes the leaf certificate.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
@@ -1428,9 +1534,23 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%UPSTREAM_TLS_GROUP%``
+  HTTP/TCP/THRIFT
+    The name of the TLS group used for the key agreement to establish the upstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%UPSTREAM_TLS_VERSION%``
   HTTP/TCP/THRIFT
     The TLS version (e.g., ``TLSv1.2``, ``TLSv1.3``) used to establish the upstream TLS connection.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+.. _config_access_log_format_upstream_server_name:
+
+``%UPSTREAM_SERVER_NAME%``
+  HTTP/TCP/THRIFT
+    The TLS SNI value used to establish the upstream TLS connection.
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
@@ -1507,6 +1627,9 @@ Current supported substitution commands include:
 ``%FILTER_CHAIN_NAME%``
   The :ref:`network filter chain name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` of the downstream connection.
 
+``%LISTENER_NAME%``
+  The :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the listener that accepted the downstream connection.
+
 .. _config_access_log_format_access_log_type:
 
 ``%ACCESS_LOG_TYPE%``
@@ -1543,6 +1666,14 @@ Current supported substitution commands include:
 ``%TRACE_ID%``
   HTTP
     The trace ID of the request. If the request does not have a trace ID, this will be an empty string.
+  TCP/UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%SPAN_ID%``
+  HTTP
+    The span ID of the active (downstream) span for the request. If the request does not have a span ID,
+    this will be an empty string. Note that span ID availability depends on the tracing provider; not all
+    providers implement span ID retrieval.
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
@@ -1599,8 +1730,13 @@ Current supported substitution commands include:
 ``%COALESCE(JSON_CONFIG):Z%``
   HTTP
     A higher-order formatter operator that evaluates multiple formatter operators in sequence and
-    returns the first non-null, non-empty result. This is useful for implementing fallback behavior,
+    returns the first non-null result. This is useful for implementing fallback behavior,
     such as using SNI when available but falling back to the ``:authority`` header when SNI is not set.
+
+    An operator that produces a value which is present but empty is accepted as the result. Set the
+    runtime guard ``envoy.reloadable_features.coalesce_formatter_accept_empty_values`` to ``false``
+    to restore the legacy behavior, where an empty value is skipped and the next operator is
+    evaluated.
 
     The ``JSON_CONFIG`` parameter is a JSON object with an ``operators`` array. Each operator can be
     specified as either:
@@ -1748,3 +1884,41 @@ Current supported substitution commands include:
 
   TCP/UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
+
+``%FILE_CONTENT(X:Y):Z%``
+  Evaluates to the content of the file at path ``X``. The file is reloaded whenever it changes.
+
+  Optionally specify a directory ``Y`` to watch, and reload the file when changes occur. See
+  :ref:`watched_directory <envoy_v3_api_field_config.core.v3.DataSource.watched_directory>`
+  for more detailed semantics.
+
+  Takes an optional parameter ``Z`` to denote the maximum string length after which the
+  string is truncated.
+
+  This formatter is an extension, which must be explictly configured with:
+
+  .. validated-code-block:: yaml
+    :type-name: envoy.config.core.v3.TypedExtensionConfig
+
+    name: envoy.formatter.file_content
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.file_content.v3.FileContent
+
+``%SECRET(X):Z%``
+  Evaluates to a secret value ``X`` in the configuration for this formatter, with an optional
+  maximum length ``Z`` after which the data is truncated. The format string ``%SECRET(my-api-token)%``
+  could we used with the following formatter extension configuration:
+
+  .. validated-code-block:: yaml
+    :type-name: envoy.config.core.v3.TypedExtensionConfig
+
+    name: envoy.formatter.generic_secret
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.formatter.generic_secret.v3.GenericSecret
+      secret_configs:
+        my-api-token:
+          name: bearer-token
+          sds_config:
+            ads: {}
+
+  This formatter is an extension and must be explicitly configured.

@@ -301,7 +301,7 @@ class StaticLookupBenchmarker {
 public:
   explicit StaticLookupBenchmarker(std::unique_ptr<HeaderMapImpl> impl)
       : header_map_(std::move(impl)) {}
-  absl::optional<HeaderMapImpl::StaticLookupResponse> lookup(absl::string_view key) {
+  std::optional<HeaderMapImpl::StaticLookupResponse> lookup(absl::string_view key) {
     return header_map_->staticLookup(key);
   }
 

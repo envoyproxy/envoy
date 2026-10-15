@@ -11,21 +11,17 @@ namespace HttpFilters {
 namespace BasicAuth {
 
 class BasicAuthFilterFactory
-    : public Common::FactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::basic_auth::v3::BasicAuth,
           envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute> {
 public:
-  BasicAuthFilterFactory() : FactoryBase("envoy.filters.http.basic_auth") {}
+  BasicAuthFilterFactory() : UnifiedFactoryBase("envoy.filters.http.basic_auth") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::basic_auth::v3::BasicAuth& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
-  Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const envoy::extensions::filters::http::basic_auth::v3::BasicAuth& config,
-      const std::string& stats_prefix,
-      Server::Configuration::ServerFactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

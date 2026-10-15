@@ -12,9 +12,8 @@
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -270,75 +269,6 @@ matcher_tree:
 
   const auto result = match_tree()->match(TestData());
   EXPECT_THAT(result, HasStringAction("expected!"));
-}
-
-TEST_F(MatcherTest, TestPrefixMatcherWithoutRetryInnerMissDoesNotRetryShorterPrefix) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss", "false"}});
-  const std::string yaml = R"EOF(
-matcher_tree:
-  input:
-    name: outer_input
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.StringValue
-  prefix_match_map:
-    map:
-      val:
-        matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    name: inner_input
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.BoolValue
-                  value_match:
-                    exact: bar
-              on_match:
-                action:
-                  name: test_action
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: expected!
-      valu:
-        matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    name: inner_input
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.BoolValue
-                  value_match:
-                    exact: foo
-              on_match:
-                action:
-                  name: test_action
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: not expected
-  )EOF";
-
-  envoy::config::common::matcher::v3::Matcher matcher;
-  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
-
-  TestUtility::validate(matcher);
-
-  auto outer_factory = TestDataInputStringFactory("value");
-  auto inner_factory = TestDataInputBoolFactory("bar");
-
-  EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
-  EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"))
-      .Times(2);
-  auto match_tree = factory_.create(matcher);
-
-  const auto result = match_tree()->match(TestData());
-  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST_F(MatcherTest, TestInvalidFloatPrefixMapMatcher) {
@@ -811,9 +741,9 @@ matcher_list:
 }
 
 TEST_F(MatcherTest, RecursiveMatcherNoMatch) {
-  ListMatcher<TestData> matcher(absl::nullopt);
+  ListMatcher<TestData> matcher(std::nullopt);
 
-  matcher.addMatcher(createSingleMatcher(absl::nullopt, [](auto) { return false; }),
+  matcher.addMatcher(createSingleMatcher(std::nullopt, [](auto) { return false; }),
                      stringOnMatch<TestData>("match"));
 
   ActionMatchResult recursive_result = evaluateMatch(matcher, TestData());
@@ -821,10 +751,10 @@ TEST_F(MatcherTest, RecursiveMatcherNoMatch) {
 }
 
 TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
-  ListMatcher<TestData> matcher(absl::nullopt);
+  ListMatcher<TestData> matcher(std::nullopt);
 
   matcher.addMatcher(createSingleMatcher(
-                         absl::nullopt, [](auto) { return false; }, DataAvailability::NotAvailable),
+                         std::nullopt, [](auto) { return false; }, DataAvailability::NotAvailable),
                      stringOnMatch<TestData>("match"));
 
   ActionMatchResult recursive_result = evaluateMatch(matcher, TestData());
@@ -1115,12 +1045,12 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithoutSupport) {
 
 // Ensure that a nested matcher that has an internal failure surfaces the error.
 TEST_P(MatcherAmbiguousTest, KeepMatchingWithFailingNestedMatcher) {
-  auto matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
+  auto matcher = std::make_shared<ListMatcher<TestData>>(std::nullopt);
 
   matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                       stringOnMatch<TestData>("match", /*keep_matching=*/true));
 
-  auto nested_matcher = std::make_shared<ListMatcher<TestData>>(absl::nullopt);
+  auto nested_matcher = std::make_shared<ListMatcher<TestData>>(std::nullopt);
   nested_matcher->addMatcher(
       createSingleMatcher(
           "string", [](auto) { return true; }, DataAvailability::NotAvailable),

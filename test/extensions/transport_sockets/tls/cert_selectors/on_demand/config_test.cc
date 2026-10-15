@@ -113,7 +113,6 @@ TEST(FilterStateMapper, Derivation) {
   auto filter_state_object = std::make_shared<Router::StringAccessorImpl>("new_value");
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData("envoy.tls.certificate_mappers.on_demand_secret", filter_state_object,
-                       StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection,
                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
   auto transport_socket_options =

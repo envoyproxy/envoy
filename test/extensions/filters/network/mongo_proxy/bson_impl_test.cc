@@ -4,6 +4,7 @@
 #include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -30,7 +31,7 @@ TEST(BsonImplTest, Equal) {
 TEST(BsonImplTest, InvalidMessageLength) {
   Buffer::OwnedImpl buffer;
   BufferHelper::writeInt32(buffer, 100);
-  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+  EXPECT_THROW(DocumentImpl::create(buffer, 100), EnvoyException);
 }
 
 TEST(BsonImplTest, InvalidElementType) {
@@ -40,7 +41,7 @@ TEST(BsonImplTest, InvalidElementType) {
   uint8_t invalid_element_type = 0x20;
   buffer.add(&invalid_element_type, sizeof(invalid_element_type));
   BufferHelper::writeCString(buffer, key_name);
-  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+  EXPECT_THROW(DocumentImpl::create(buffer, 100), EnvoyException);
 }
 
 TEST(BsonImplTest, InvalodDocumentTermination) {
@@ -48,13 +49,13 @@ TEST(BsonImplTest, InvalodDocumentTermination) {
   BufferHelper::writeInt32(buffer, 5);
   uint8_t invalid_document_end = 0x1;
   buffer.add(&invalid_document_end, sizeof(invalid_document_end));
-  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+  EXPECT_THROW(DocumentImpl::create(buffer, 100), EnvoyException);
 }
 
 TEST(BsonImplTest, DocumentSizeUnderflow) {
   Buffer::OwnedImpl buffer;
   BufferHelper::writeInt32(buffer, 2);
-  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+  EXPECT_THROW(DocumentImpl::create(buffer, 100), EnvoyException);
 }
 
 TEST(BufferHelperTest, InvalidSize) {
@@ -99,6 +100,69 @@ TEST(BsonImplTest, StringSizeObserved) {
   BufferHelper::writeInt32(buffer, hello.size() + 1);
   buffer.add(s, sizeof(s));
   EXPECT_TRUE(BufferHelper::removeString(buffer) == hello);
+}
+
+TEST(BsonImplTest, DeeplyNestedDestruction) {
+  DocumentSharedPtr root = DocumentImpl::create();
+  DocumentSharedPtr current = root;
+  for (int i = 0; i < 1000; i++) {
+    DocumentSharedPtr next = DocumentImpl::create();
+    current->addDocument("a", next);
+    current = next;
+  }
+
+  root = nullptr;
+}
+
+TEST(BsonImplTest, ParsingDepthLimit) {
+  Buffer::OwnedImpl data;
+  DocumentSharedPtr root = DocumentImpl::create();
+  DocumentSharedPtr current = root;
+  for (int i = 0; i < 200; i++) {
+    DocumentSharedPtr next = DocumentImpl::create();
+    current->addDocument("a", next);
+    current = next;
+  }
+
+  root->encode(data);
+
+  // Now try to parse it. It should throw because 200 > 100.
+  EXPECT_THROW_WITH_MESSAGE(DocumentImpl::create(data, 100), EnvoyException,
+                            "BSON recursion limit exceeded");
+}
+
+TEST(BsonImplTest, ParsingDepthLimitJustBelow) {
+  Buffer::OwnedImpl data;
+  DocumentSharedPtr root = DocumentImpl::create();
+  DocumentSharedPtr current = root;
+  for (int i = 0; i < 100; i++) {
+    DocumentSharedPtr next = DocumentImpl::create();
+    current->addDocument("a", next);
+    current = next;
+  }
+
+  root->encode(data);
+
+  // This should be fine (100 <= 100).
+  DocumentSharedPtr parsed = DocumentImpl::create(data, 100);
+  EXPECT_TRUE(*root == *parsed);
+}
+
+TEST(BsonImplTest, ConfigurableParsingDepthLimit) {
+  Buffer::OwnedImpl data;
+  DocumentSharedPtr root = DocumentImpl::create();
+  DocumentSharedPtr current = root;
+  for (int i = 0; i < 15; i++) {
+    DocumentSharedPtr next = DocumentImpl::create();
+    current->addDocument("a", next);
+    current = next;
+  }
+
+  root->encode(data);
+
+  // Now try to parse it with a small limit. It should throw because 15 > 10.
+  EXPECT_THROW_WITH_MESSAGE(DocumentImpl::create(data, 10), EnvoyException,
+                            "BSON recursion limit exceeded");
 }
 
 } // namespace Bson

@@ -134,7 +134,7 @@ TEST_P(DomainSocketErrorTest, DomainSocketAlreadyInUse) {
   });
   EXPECT_CALL(os_sys_calls_, close(_)).Times(GetParam());
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false, false),
+  EXPECT_THROW(std::ignore = std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false, false),
                Server::HotRestartDomainSocketInUseException);
 }
 
@@ -150,7 +150,7 @@ TEST_P(DomainSocketErrorTest, DomainSocketError) {
   });
   EXPECT_CALL(os_sys_calls_, close(_)).Times(GetParam());
 
-  EXPECT_THROW(std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false, false),
+  EXPECT_THROW(std::ignore = std::make_unique<HotRestartImpl>(0, 0, socket_addr_, 0, false, false),
                EnvoyException);
 }
 

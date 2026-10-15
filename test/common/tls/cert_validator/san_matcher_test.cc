@@ -5,6 +5,7 @@
 #include "source/common/tls/cert_validator/san_matcher.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -14,6 +15,8 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+using ::Envoy::StatusHelpers::HasStatusCode;
 
 // Verify that we get a valid string san matcher for all valid san types.
 TEST(SanMatcherConfigTest, TestValidSanType) {
@@ -36,17 +39,22 @@ TEST(SanMatcherConfigTest, TestValidSanType) {
     }
     if (san_type == envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::
                         SAN_TYPE_UNSPECIFIED) {
-      EXPECT_DEATH(createStringSanMatcher(san_matcher, context), "unhandled value");
+      EXPECT_DEATH(
+          {
+            auto result = createStringSanMatcher(san_matcher, context);
+            UNREFERENCED_PARAMETER(result);
+          },
+          "unhandled value");
     } else {
-      const SanMatcherPtr matcher = createStringSanMatcher(san_matcher, context);
-      EXPECT_NE(matcher.get(), nullptr);
+      auto result = createStringSanMatcher(san_matcher, context);
+      ASSERT_OK(result);
+      EXPECT_NE(result.value().get(), nullptr);
       // Verify that the message is valid.
       TestUtility::validate(san_matcher);
     }
   }
 }
 
-// Verify that setting Invalid OID for OtherName SAN results in a panic.
 TEST(SanMatcherConfigTest, TestInvalidOidOtherNameSanType) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
@@ -54,7 +62,8 @@ TEST(SanMatcherConfigTest, TestInvalidOidOtherNameSanType) {
   san_matcher.set_oid("1.3.6.1.4.1.311.20.2.ffff");
   san_matcher.set_san_type(
       envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::OTHER_NAME);
-  EXPECT_EQ(createStringSanMatcher(san_matcher, context), nullptr);
+  EXPECT_THAT(createStringSanMatcher(san_matcher, context),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(SanMatcherConfigTest, UnspecifiedSanType) {
@@ -73,7 +82,8 @@ TEST(SanMatcherConfigTest, UnspecifiedSanType) {
       static_cast<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType>(
           static_cast<int>(123));
   san_matcher.set_san_type(san_type);
-  EXPECT_EQ(createStringSanMatcher(san_matcher, context), nullptr);
+  EXPECT_THAT(createStringSanMatcher(san_matcher, context),
+              HasStatusCode(absl::StatusCode::kInternal));
 }
 
 } // namespace Tls

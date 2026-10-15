@@ -21,8 +21,8 @@ public:
       const Http::RequestHeaderMap& request_headers,
       UpstreamRequestFactoryPtr upstream_request_factory, absl::string_view cluster_name,
       Event::Dispatcher& dispatcher, SystemTime timestamp,
-      const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker_,
-      const std::shared_ptr<const CacheFilterStatsProvider> stats_provider_,
+      const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker,
+      const std::shared_ptr<const CacheFilterStatsProvider> stats_provider,
       bool ignore_request_cache_control_header);
 
   // Caches may modify the key according to local needs, though care must be
@@ -31,7 +31,11 @@ public:
 
   Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
   bool isCacheableResponse(const Http::ResponseHeaderMap& headers) const {
-    return cacheable_response_checker_->isCacheableResponse(headers);
+    // Request Cache-Control: no-store forbids storing the response. When
+    // ignore_request_cache_control_header is set, request_cache_control_ is left
+    // default-initialized so this check is skipped.
+    return !request_cache_control_.no_store_ &&
+           cacheable_response_checker_->isCacheableResponse(headers);
   }
   const std::shared_ptr<const CacheableResponseChecker>& cacheableResponseChecker() const {
     return cacheable_response_checker_;
@@ -47,7 +51,7 @@ public:
   SystemTime timestamp() const { return timestamp_; }
   bool requiresValidation(const Http::ResponseHeaderMap& response_headers,
                           SystemTime::duration age) const;
-  absl::optional<std::vector<RawByteRange>> parseRange() const;
+  std::optional<std::vector<RawByteRange>> parseRange() const;
   bool isRangeRequest() const;
 
 private:
@@ -90,7 +94,7 @@ public:
   // This is implemented in CacheSessionsImpl so that tests which only use a mock don't
   // need to build the real thing, but declared here so that the actual use-site can
   // create an instance without including the larger header.
-  static std::shared_ptr<CacheSessions> create(Server::Configuration::FactoryContext& context,
+  static std::shared_ptr<CacheSessions> create(Server::Configuration::ServerFactoryContext& context,
                                                std::unique_ptr<HttpCache> cache);
 
   virtual void lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) PURE;

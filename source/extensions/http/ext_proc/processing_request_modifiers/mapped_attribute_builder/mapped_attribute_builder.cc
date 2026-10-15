@@ -11,8 +11,6 @@ namespace Envoy {
 namespace Http {
 namespace ExternalProcessing {
 
-using envoy::service::ext_proc::v3::ProcessingRequest;
-
 // Helper function to convert proto map values to a unique vector of strings.
 // The order of elements in the returned vector is not guaranteed.
 Protobuf::RepeatedPtrField<std::string>
@@ -28,11 +26,12 @@ MappedAttributeBuilder::MappedAttributeBuilder(
     const envoy::extensions::http::ext_proc::processing_request_modifiers::
         mapped_attribute_builder::v3::MappedAttributeBuilder& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder,
-    Server::Configuration::CommonFactoryContext& context)
+    Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : config_(config),
       expression_manager_(expr_builder, context.localInfo(),
                           protoMapValuesToUniqueVector(config.mapped_request_attributes()),
-                          protoMapValuesToUniqueVector(config.mapped_response_attributes())) {}
+                          protoMapValuesToUniqueVector(config.mapped_response_attributes()),
+                          creation_status) {}
 
 bool MappedAttributeBuilder::modifyRequest(
     const Params& params, envoy::service::ext_proc::v3::ProcessingRequest& request) {

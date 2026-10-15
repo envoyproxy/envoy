@@ -5,7 +5,7 @@
 
 #include "source/common/common/scalar_to_byte_vector.h"
 
-#include "absl/types/optional.h"
+#include <optional>
 
 namespace Envoy {
 namespace Network {
@@ -22,14 +22,14 @@ void NetworkTypeSocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const 
   pushScalarToByteVector(network_type_, hash_key);
 }
 
-absl::optional<Socket::Option::Details> NetworkTypeSocketOptionImpl::getOptionDetails(
+std::optional<Socket::Option::Details> NetworkTypeSocketOptionImpl::getOptionDetails(
     const Socket&, envoy::config::core::v3::SocketOption::SocketState /*state*/) const {
   Socket::Option::Details details;
   details.name_ = optname_;
   std::vector<uint8_t> data;
   pushScalarToByteVector(network_type_, data);
   details.value_ = std::string(reinterpret_cast<char*>(data.data()), data.size());
-  return absl::make_optional(std::move(details));
+  return std::make_optional(std::move(details));
 }
 
 bool NetworkTypeSocketOptionImpl::isSupported() const { return true; }

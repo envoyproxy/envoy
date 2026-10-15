@@ -37,6 +37,7 @@ public:
     ON_CALL(*this, findVerifier(_, _)).WillByDefault(Return(nullptr));
     ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
     ON_CALL(*this, stripFailureResponse()).WillByDefault(Return(false));
+    ON_CALL(*this, sanitizePayloadHeaders(_)).WillByDefault(Return());
   }
 
   MOCK_METHOD(const Verifier*, findVerifier,
@@ -47,6 +48,7 @@ public:
   MOCK_METHOD(bool, bypassCorsPreflightRequest, (), (const));
   MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
   MOCK_METHOD(bool, stripFailureResponse, (), (const));
+  MOCK_METHOD(void, sanitizePayloadHeaders, (Http::RequestHeaderMap & headers), (const));
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   JwtAuthnFilterStats stats_;
@@ -310,10 +312,44 @@ TEST_F(FilterTest, TestNoRequirementMatched) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers_));
 }
 
+// Bypass paths must still sanitize payload/claim headers before Continue.
+TEST_F(FilterTest, TestNoRequirementMatchedSanitizesPayloadHeaders) {
+  EXPECT_CALL(*mock_config_.get(), sanitizePayloadHeaders(_))
+      .WillOnce(Invoke([](Http::RequestHeaderMap& headers) {
+        headers.remove(Http::LowerCaseString("x-jwt-claim-sub"));
+      }));
+  EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(nullptr));
+
+  auto headers = Http::TestRequestHeaderMapImpl{{"x-jwt-claim-sub", "spoofed"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_FALSE(headers.has("x-jwt-claim-sub"));
+  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+}
+
+// Per-route disabled bypass must sanitize before Continue.
+TEST_F(FilterTest, TestPerRouteBypassSanitizesPayloadHeaders) {
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
+  EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_))
+      .WillOnce(Return(per_route_config_.get()));
+  EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).Times(0);
+  EXPECT_CALL(*mock_config_.get(), findPerRouteVerifier(_))
+      .WillOnce(Return(std::make_pair(nullptr, EMPTY_STRING)));
+  EXPECT_CALL(*mock_config_.get(), sanitizePayloadHeaders(_))
+      .WillOnce(Invoke([](Http::RequestHeaderMap& headers) {
+        headers.remove(Http::LowerCaseString("sec-istio-auth-userinfo"));
+      }));
+
+  auto headers = Http::TestRequestHeaderMapImpl{{"sec-istio-auth-userinfo", "spoofed"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
+  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+}
+
 // Test if route() return null, fallback to call config config.
 TEST_F(FilterTest, TestNoRoute) {
   // route() call return nullptr
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(nullptr));
+  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(OptRef<const Router::Route>()));
 
   // Calling the findVerifier from filter config.
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(nullptr));
@@ -331,7 +367,8 @@ TEST_F(FilterTest, TestNoRoute) {
 
 // Test if no per-route config, fallback to call config config.
 TEST_F(FilterTest, TestNoPerRouteConfig) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
   // perFilterConfig return nullptr.
   EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_)).WillOnce(Return(nullptr));
 
@@ -351,7 +388,8 @@ TEST_F(FilterTest, TestNoPerRouteConfig) {
 
 // Test bypass requirement from per-route config
 TEST_F(FilterTest, TestPerRouteBypass) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
   EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(per_route_config_.get()));
 
@@ -372,7 +410,8 @@ TEST_F(FilterTest, TestPerRouteBypass) {
 
 // Test per-route config with wrong requirement_name
 TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
   EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(per_route_config_.get()));
 
@@ -396,7 +435,8 @@ TEST_F(FilterTest, TestPerRouteWrongRequirementName) {
 
 // Test verifier from per-route config
 TEST_F(FilterTest, TestPerRouteVerifierOK) {
-  EXPECT_CALL(filter_callbacks_, route()).WillOnce(Return(mock_route_));
+  EXPECT_CALL(filter_callbacks_, route())
+      .WillOnce(Return(makeOptRefFromPtr<const Router::Route>(mock_route_.get())));
   EXPECT_CALL(*mock_route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(per_route_config_.get()));
 

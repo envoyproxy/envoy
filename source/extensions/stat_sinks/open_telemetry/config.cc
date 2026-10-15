@@ -25,7 +25,8 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
   auto otlp_options = std::make_shared<OtlpOptions>(
       sink_config,
       resource_provider->getResource(sink_config.resource_detectors(), server,
-                                     /*service_name=*/""),
+                                     /*service_name=*/"",
+                                     Tracers::OpenTelemetry::ResourceProviderOptions{}),
       server);
   std::shared_ptr<OtlpMetricsFlusher> otlp_metrics_flusher =
       std::make_shared<OtlpMetricsFlusherImpl>(otlp_options);
@@ -50,7 +51,7 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
   case SinkConfig::ProtocolSpecifierCase::kHttpService: {
     std::shared_ptr<OtlpMetricsExporter> http_metrics_exporter =
         std::make_shared<OpenTelemetryHttpMetricsExporter>(server.clusterManager(),
-                                                           sink_config.http_service());
+                                                           sink_config.http_service(), server);
 
     return std::make_unique<OpenTelemetrySink>(
         otlp_metrics_flusher, http_metrics_exporter,

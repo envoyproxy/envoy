@@ -17,7 +17,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/locality.h"
 
-#include "source/common/config/subscription_base.h"
+#include "source/common/config/resource_type_helper.h"
+#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/eds/leds.h"
@@ -28,10 +29,9 @@ namespace Upstream {
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
-class EdsClusterImpl
-    : public BaseDynamicClusterImpl,
-      Envoy::Config::SubscriptionBase<envoy::config::endpoint::v3::ClusterLoadAssignment>,
-      private Config::EdsResourceRemovalCallback {
+class EdsClusterImpl : public BaseDynamicClusterImpl,
+                       public Config::SubscriptionCallbacks,
+                       private Config::EdsResourceRemovalCallback {
 public:
   static absl::StatusOr<std::unique_ptr<EdsClusterImpl>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
@@ -61,7 +61,7 @@ private:
                               LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
                               PriorityStateManager& priority_state_manager,
-                              const HostMap& all_hosts,
+                              const HostLookupMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
   bool validateUpdateSize(int num_resources);
   const std::string& edsServiceName() const {
@@ -70,7 +70,7 @@ private:
   }
 
   // Updates the internal data structures with a given cluster load assignment.
-  void update(envoy::config::endpoint::v3::ClusterLoadAssignment&& cluster_load_assignment);
+  void update(const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
   // EdsResourceRemovalCallback
   void onCachedResourceRemoved(absl::string_view resource_name) override;
@@ -104,6 +104,8 @@ private:
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
+  const Config::ResourceTypeHelper<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_type_helper_;
   Config::SubscriptionPtr subscription_;
   const LocalInfo::LocalInfo& local_info_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
@@ -119,7 +121,7 @@ private:
   // TODO(adisuissa): Avoid saving the entire cluster load assignment, only the
   // relevant parts of the config for each locality. Note that this field must
   // be set when LEDS is used.
-  std::unique_ptr<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
+  ArenaWrappedProto<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
 
   // An optional cache for the EDS resources.
   // Upon a (warming) timeout, a cached resource will be used.

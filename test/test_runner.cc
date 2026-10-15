@@ -5,6 +5,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/logger_delegates.h"
 #include "source/common/common/thread.h"
+#include "source/common/coroutine/backtrace.h"
 #include "source/common/event/libevent.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/exe/process_wide.h"
@@ -17,6 +18,49 @@
 
 #include "absl/debugging/leak_check.h"
 #include "gmock/gmock.h"
+
+#ifdef ENVOY_SSL_OPENSSL
+
+// Configure OpenSSL to use security level 0, allowing legacy TLS versions (1.0/1.1)
+// and weaker keys (e.g., RSA 1024-bit) so that Envoy's own validation can handle
+// rejections with specific error messages rather than OpenSSL blocking them first.
+class OpenSSLConf {
+public:
+  OpenSSLConf(const char* config) {
+    int fd = mkstemp(path_.data());
+    if (fd != -1) {
+      FILE* file = fdopen(fd, "w");
+      if (file) {
+        if (fwrite(config, 1, strlen(config), file) == strlen(config)) {
+          fclose(file);
+          if (setenv("OPENSSL_CONF", path_.c_str(), 1) == 0) {
+            return;
+          }
+        }
+      }
+    }
+    throw std::runtime_error("Failed to set up OPENSSL_CONF");
+  }
+
+  ~OpenSSLConf() { unlink(path_.c_str()); }
+
+private:
+  std::string path_{"/tmp/openssl.conf.XXXXXX"};
+};
+
+static OpenSSLConf openssl_conf(R"(
+  openssl_conf = openssl_init
+
+  [openssl_init]
+  ssl_conf = ssl_sect
+
+  [ssl_sect]
+  system_default = system_default_sect
+
+  [system_default_sect]
+  CipherString = DEFAULT:@SECLEVEL=0
+)");
+#endif
 
 namespace Envoy {
 
@@ -80,6 +124,9 @@ bool isDeathTestChild(int argc, char** argv) {
 int TestRunner::runTests(int argc, char** argv) {
   const bool is_death_test_child = isDeathTestChild(argc, argv);
   ::testing::InitGoogleMock(&argc, argv);
+  // Record the thread initializing gtest (the first thread of the process) as the test thread,
+  // for platforms that cannot identify it directly.
+  Thread::TestThread::registerTestThread();
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
   ProcessWide process_wide(false);
@@ -139,6 +186,7 @@ int TestRunner::runTests(int argc, char** argv) {
   // The downside of this is that if there's a crash, the backtrace is lost, as
   // the backtracing mechanism uses logging, so force the backtraces to stderr.
   BackwardsTrace::setLogToStderr(true);
+  Coroutine::Backtrace::setLogToStderr(true);
 #endif
 
   TestEnvironment::initializeOptions(argc, argv);

@@ -18,6 +18,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/server_codec_impl.h"
 
 #include "quiche/quic/test_tools/quic_session_peer.h"
@@ -26,7 +27,10 @@
 #include "source/common/listener_manager/connection_handler_impl.h"
 
 #include "test/integration/utility.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -40,6 +44,29 @@ using testing::AssertionResult;
 using testing::AssertionSuccess;
 
 namespace Envoy {
+
+FakeUpstream::FakeListener::FakeListener(FakeUpstream& parent, bool is_quic)
+    : parent_(parent), name_("fake_upstream"), init_manager_(nullptr),
+      listener_info_(std::make_shared<testing::NiceMock<Network::MockListenerInfo>>()) {
+  if (is_quic) {
+#if defined(ENVOY_ENABLE_QUIC)
+    // Only initialize this when needed to avoid slowing down non-QUIC integration tests.
+    context_ =
+        std::make_unique<testing::NiceMock<Server::Configuration::MockListenerFactoryContext>>();
+    udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
+        parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_, *context_);
+    // Initialize QUICHE flags.
+    quiche::FlagRegistry::getInstance();
+#else
+    ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
+#endif
+  } else {
+    udp_listener_config_.listener_factory_ =
+        std::make_unique<Server::ActiveRawUdpListenerFactory>(1);
+  }
+}
+
+FakeUpstream::FakeListener::~FakeListener() = default;
 
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                        Event::TestTimeSystem& time_system)
@@ -401,8 +428,10 @@ FakeHttpConnection::FakeHttpConnection(
     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
     uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    bool deferred_read_enable)
     : FakeConnectionBase(shared_connection, time_system), type_(type),
+      deferred_read_enable_(deferred_read_enable),
       header_validator_factory_(
           IntegrationUtil::makeHeaderValidationFactory(fakeUpstreamHeaderValidatorConfig())) {
   ASSERT(max_request_headers_count != 0);
@@ -433,8 +462,43 @@ FakeHttpConnection::FakeHttpConnection(
     ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
   }
+  // The codec holds a reference to the network connection. Destroy it from the disconnect callback,
+  // while the connection is guaranteed to still be alive and before waitForDisconnect() can wake
+  // the test thread.
+  shared_connection_.setDisconnectCallback([this]() { codec_.reset(); });
   shared_connection_.connection().addReadFilter(
       Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+}
+
+FakeHttpConnection::~FakeHttpConnection() { shared_connection_.clearDisconnectCallback(); }
+
+AssertionResult FakeHttpConnection::halfCloseForCleanup(std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeHttpConnection half-close for cleanup");
+  if (!shared_connection_.connected()) {
+    return AssertionSuccess();
+  }
+
+  return shared_connection_.executeOnDispatcher(
+      [this](Network::Connection& connection) {
+        shutting_down_for_cleanup_ = true;
+        if (!connection.isHalfCloseEnabled()) {
+          connection.enableHalfClose(true);
+        }
+        Buffer::OwnedImpl empty;
+        connection.write(empty, true);
+      },
+      timeout);
+}
+
+void FakeHttpConnection::initialize() {
+  FakeConnectionBase::initialize();
+  if (deferred_read_enable_ && shared_connection_.connected() &&
+      !shared_connection_.connection().readEnabled()) {
+    // Re-enable reads that were explicitly deferred by consumeConnection(defer_read_enable=true)
+    // to ensure the HTTP codec and read filter are fully initialized before processing request
+    // bytes. This must not re-enable reads when disable_and_do_not_enable_ is active.
+    shared_connection_.connection().readDisable(false);
+  }
 }
 
 AssertionResult FakeConnectionBase::close(std::chrono::milliseconds timeout) {
@@ -457,6 +521,35 @@ AssertionResult FakeConnectionBase::close(Network::ConnectionCloseType close_typ
   }
   return shared_connection_.executeOnDispatcher(
       [&close_type](Network::Connection& connection) { connection.close(close_type); }, timeout);
+}
+
+AssertionResult
+FakeConnectionBase::halfCloseAndWaitForDisconnect(std::chrono::milliseconds timeout) {
+  ENVOY_LOG(trace, "FakeConnectionBase half-close and wait for disconnect");
+  if (!shared_connection_.connected()) {
+    return AssertionSuccess();
+  }
+
+  bool half_close_was_enabled = false;
+  AssertionResult result = shared_connection_.executeOnDispatcher(
+      [&half_close_was_enabled](Network::Connection& connection) {
+        half_close_was_enabled = connection.isHalfCloseEnabled();
+        if (half_close_was_enabled) {
+          return;
+        }
+        connection.enableHalfClose(true);
+        Buffer::OwnedImpl empty;
+        connection.write(empty, true);
+      },
+      timeout);
+  if (!result) {
+    return result;
+  }
+  if (half_close_was_enabled) {
+    return AssertionFailure()
+           << "Cannot wait for a reciprocal close on a connection configured for half-close.";
+  }
+  return waitForDisconnect(timeout);
 }
 
 AssertionResult FakeConnectionBase::readDisable(bool disable, std::chrono::milliseconds timeout) {
@@ -576,6 +669,16 @@ AssertionResult FakeConnectionBase::waitForHalfClose(milliseconds timeout) {
   absl::MutexLock lock(lock_);
   if (!time_system_.waitFor(lock_, absl::Condition(&half_closed_), timeout)) {
     return AssertionFailure() << "Timed out waiting for half close.";
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult FakeConnectionBase::waitForDispatcherBarrier(milliseconds timeout) {
+  auto done = std::make_shared<absl::Notification>();
+  ASSERT(!dispatcher_.isThreadSafe());
+  dispatcher_.post([done]() { done->Notify(); });
+  if (!done->WaitForNotificationWithTimeout(absl::FromChrono(timeout))) {
+    return AssertionFailure() << "Timed out waiting for fake-upstream dispatcher barrier.";
   }
   return AssertionSuccess();
 }
@@ -712,8 +815,8 @@ void FakeUpstream::initializeServer() {
   }
 
   dispatcher_->post([this]() -> void {
-    EXPECT_TRUE(socket_factories_[0]->doFinalPreWorkerInit().ok());
-    handler_->addListener(absl::nullopt, listener_, runtime_, random_);
+    EXPECT_OK(socket_factories_[0]->doFinalPreWorkerInit());
+    handler_->addListener(std::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
   });
   thread_ = api_->threadFactory().createThread([this]() -> void { threadRoutine(); });
@@ -821,8 +924,10 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
   return runOnDispatcherThreadAndWait([&]() {
     absl::MutexLock lock(lock_);
     connection = std::make_unique<FakeHttpConnection>(
-        *this, consumeConnection(), http_type_, time_system_, config_.max_request_headers_kb_,
-        config_.max_request_headers_count_, config_.headers_with_underscores_action_);
+        *this, consumeConnection(/*defer_read_enable=*/true), http_type_, time_system_,
+        config_.max_request_headers_kb_, config_.max_request_headers_count_,
+        config_.headers_with_underscores_action_,
+        /*deferred_read_enable=*/read_disable_on_new_connection_ && !disable_and_do_not_enable_);
     connection->initialize();
     return AssertionSuccess();
   });
@@ -858,9 +963,11 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       EXPECT_TRUE(upstream.runOnDispatcherThreadAndWait([&]() {
         absl::MutexLock lock(upstream.lock_);
         connection = std::make_unique<FakeHttpConnection>(
-            upstream, upstream.consumeConnection(), upstream.http_type_, upstream.timeSystem(),
-            Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-            envoy::config::core::v3::HttpProtocolOptions::ALLOW);
+            upstream, upstream.consumeConnection(/*defer_read_enable=*/true), upstream.http_type_,
+            upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+            Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
+            /*deferred_read_enable=*/upstream.read_disable_on_new_connection_ &&
+                !upstream.disable_and_do_not_enable_);
         connection->initialize();
         return AssertionSuccess();
       }));
@@ -929,7 +1036,7 @@ void FakeUpstream::convertFromRawToHttp(FakeRawConnectionPtr& raw_connection,
   raw_connection.release();
 }
 
-SharedConnectionWrapper& FakeUpstream::consumeConnection() {
+SharedConnectionWrapper& FakeUpstream::consumeConnection(bool defer_read_enable) {
   ASSERT(!new_connections_.empty());
   auto* const connection_wrapper = new_connections_.front().get();
   // Skip the thread safety check if the network connection has already been freed since there's no
@@ -939,10 +1046,11 @@ SharedConnectionWrapper& FakeUpstream::consumeConnection() {
   connection_wrapper->moveBetweenLists(new_connections_, consumed_connections_);
   if (read_disable_on_new_connection_ && connection_wrapper->connected() &&
       http_type_ != Http::CodecType::HTTP3 && !disable_and_do_not_enable_) {
-    // Re-enable read and early close detection.
     auto& connection = connection_wrapper->connection();
     connection.detectEarlyCloseWhenReadDisabled(true);
-    connection.readDisable(false);
+    if (!defer_read_enable) {
+      connection.readDisable(false);
+    }
   }
   return *connection_wrapper;
 }

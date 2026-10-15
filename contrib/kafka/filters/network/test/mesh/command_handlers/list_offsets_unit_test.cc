@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/list_offsets.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,7 +22,7 @@ TEST(ListOffsetsTest, shouldBeAlwaysReadyForAnswer) {
   // given
   MockAbstractRequestListener filter;
   EXPECT_CALL(filter, onRequestReadyForAnswer());
-  const RequestHeader header = {LIST_OFFSETS_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const RequestHeader header = {LIST_OFFSETS_REQUEST_API_KEY, 0, 0, std::nullopt};
   const ListOffsetsRequest data = {0, {}};
   const auto message = std::make_shared<Request<ListOffsetsRequest>>(header, data);
   ListOffsetsRequestHolder testee = {filter, message};

@@ -16,21 +16,17 @@ namespace HttpFilters {
 namespace GrpcFieldExtraction {
 
 class FilterFactoryCreator
-    : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
+    : public Envoy::Extensions::HttpFilters::Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig> {
 public:
   FilterFactoryCreator();
 
 private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Envoy::Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
           proto_config,
-      const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
-
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoWithServerContextTyped(
-      const envoy::extensions::filters::http::grpc_field_extraction::v3::GrpcFieldExtractionConfig&
-          proto_config,
-      const std::string&, Envoy::Server::Configuration::ServerFactoryContext&) override;
+      Envoy::Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 } // namespace GrpcFieldExtraction
 } // namespace HttpFilters

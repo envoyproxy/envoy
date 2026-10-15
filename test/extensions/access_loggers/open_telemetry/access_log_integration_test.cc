@@ -2,6 +2,7 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
@@ -10,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -17,6 +19,7 @@
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 
 using testing::AssertionResult;
+using testing::Eq;
 
 constexpr char EXPECTED_REQUEST_MESSAGE[] = R"EOF(
     resource_logs:
@@ -34,6 +37,9 @@ constexpr char EXPECTED_REQUEST_MESSAGE[] = R"EOF(
           - key: "node_name"
             value:
               string_value: "node_name"
+          - key: "service.name"
+            value:
+              string_value: "my-service"
       scope_logs:
         - log_records:
             body:
@@ -73,6 +79,7 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {
     skip_tag_extraction_rule_check_ = true;
     driver_ = (std::get<2>(GetParam()) == ExporterType::GRPC) ? makeGrpcDriver() : makeHttpDriver();
+    TestEnvironment::setEnvVar("OTEL_RESOURCE_ATTRIBUTES", "service.name=my-service", 1);
   }
 
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
@@ -101,6 +108,11 @@ public:
           envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
               config;
           config.set_log_name("foo");
+          auto* detector = config.add_resource_detectors();
+          detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
+          envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+              EnvironmentResourceDetectorConfig env_config;
+          std::ignore = detector->mutable_typed_config()->PackFrom(env_config);
           driver_.configureExporter(config, fake_upstreams_.back()->localAddress());
           auto* body_config = config.mutable_body();
           body_config->set_string_value("%REQ(:METHOD)% %PROTOCOL% %RESPONSE_CODE%");
@@ -108,7 +120,7 @@ public:
           auto* value = attr_config->add_values();
           value->set_key("response_code_details");
           value->mutable_value()->set_string_value("%RESPONSE_CODE_DETAILS%");
-          access_log->mutable_typed_config()->PackFrom(config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();
@@ -248,6 +260,9 @@ TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
           - key: "node_name"
             value:
               string_value: "node_name"
+          - key: "service.name"
+            value:
+              string_value: "my-service"
       scope_logs:
         - log_records:
             body:
@@ -277,7 +292,7 @@ TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
         });
     new_config_helper.setLds("1");
     ASSERT_TRUE(codec_client_->waitForDisconnect());
-    test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 1);
+    test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(1));
   }
 
   // Make another request, the existing access logger should be used.
@@ -290,7 +305,102 @@ TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
   codec_client_->close();
   cleanup();
 
-  test_server_->waitForCounterEq("access_logs.open_telemetry_access_log.logs_written", 2);
+  test_server_->waitForCounter("access_logs.open_telemetry_access_log.logs_written", Eq(2));
+}
+
+class AccessLogFormatterHeaderTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                     public HttpIntegrationTest {
+public:
+  AccessLogFormatterHeaderTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    skip_tag_extraction_rule_check_ = true;
+  }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  void initialize() override {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      accesslog_cluster->set_name("accesslog");
+      ConfigHelper::setHttp2(*accesslog_cluster);
+    });
+
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* access_log = hcm.add_access_log();
+          access_log->set_name("otel_accesslog");
+
+          envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
+              config;
+          config.set_log_name("foo");
+
+          auto* http = config.mutable_http_service();
+          http->mutable_http_uri()->set_uri(fmt::format(
+              "http://{}:{}/v1/logs", Network::Test::getLoopbackAddressUrlString(GetParam()),
+              fake_upstreams_.back()->localAddress()->ip()->port()));
+          http->mutable_http_uri()->set_cluster("accesslog");
+          http->mutable_http_uri()->mutable_timeout()->set_seconds(1);
+
+          auto* header = http->add_request_headers_to_add();
+          header->mutable_header()->set_key("x-custom-formatter");
+          header->mutable_header()->set_value("%HOSTNAME%");
+
+          auto* body_config = config.mutable_body();
+          body_config->set_string_value("%REQ(:METHOD)% %PROTOCOL% %RESPONSE_CODE%");
+          std::ignore = access_log->mutable_typed_config()->PackFrom(config);
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void cleanup() {
+    if (access_log_connection_) {
+      AssertionResult result = access_log_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = access_log_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+  }
+
+  FakeHttpConnectionPtr access_log_connection_;
+  FakeStreamPtr access_log_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, AccessLogFormatterHeaderTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that request_headers_to_add with a substitution formatter is applied to HTTP exports.
+TEST_P(AccessLogFormatterHeaderTest, HttpExportWithFormatterHeader) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+  codec_client_->close();
+
+  // Wait for the access log export HTTP request.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, access_log_connection_));
+  ASSERT_TRUE(access_log_connection_->waitForNewStream(*dispatcher_, access_log_stream_));
+  ASSERT_TRUE(access_log_stream_->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ("POST", access_log_stream_->headers().getMethodValue());
+  EXPECT_EQ("/v1/logs", access_log_stream_->headers().getPathValue());
+
+  // Verify the custom formatter header was applied.
+  auto values = access_log_stream_->headers().get(Http::LowerCaseString("x-custom-formatter"));
+  ASSERT_FALSE(values.empty());
+  EXPECT_FALSE(values[0]->value().empty());
+  EXPECT_NE(values[0]->value(), "%HOSTNAME%");
+
+  access_log_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  cleanup();
 }
 
 } // namespace

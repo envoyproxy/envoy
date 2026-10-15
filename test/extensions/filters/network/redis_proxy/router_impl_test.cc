@@ -110,8 +110,7 @@ TEST(PrefixRoutesTest, TestFormatterWithCatchAllRoute) {
       "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
 
   stream_info.filterState()->setData(
-      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"));
 
   ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -148,8 +147,7 @@ TEST(PrefixRoutesTest, TestFormatterWithPrefixRoute) {
       "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
 
   stream_info.filterState()->setData(
-      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"));
 
   ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -185,8 +183,7 @@ TEST(PrefixRoutesTest, TestFormatterWithPercentInKey) {
       "{%KEY%}-%ENVIRONMENT(ENVOY_TEST_ENV)%-%FILTER_STATE(redisKey)%-{%KEY%}";
 
   stream_info.filterState()->setData(
-      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "redisKey", std::make_unique<Envoy::Router::StringAccessorImpl>("subjectCN"));
 
   ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -220,8 +217,7 @@ TEST(PrefixRoutesTest, TestKeyPrefixFormatterWithMissingFilterState) {
   const std::string format = "%FILTER_STATE(redisKey)%";
 
   stream_info.filterState()->setData(
-      "randomKey", std::make_unique<Envoy::Router::StringAccessorImpl>("test_value"),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      "randomKey", std::make_unique<Envoy::Router::StringAccessorImpl>("test_value"));
 
   ON_CALL(filter_callbacks, connection()).WillByDefault(ReturnRef(connection));
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));

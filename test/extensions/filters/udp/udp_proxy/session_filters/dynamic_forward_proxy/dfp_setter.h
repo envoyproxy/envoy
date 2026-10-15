@@ -32,11 +32,9 @@ public:
 
   ReadFilterStatus onNewSession() override {
     read_callbacks_->streamInfo().filterState()->setData(
-        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host_),
-        StreamInfo::FilterState::StateType::Mutable);
+        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host_));
     read_callbacks_->streamInfo().filterState()->setData(
-        "envoy.upstream.dynamic_port", std::make_shared<StreamInfo::UInt32AccessorImpl>(port_),
-        StreamInfo::FilterState::StateType::Mutable);
+        "envoy.upstream.dynamic_port", std::make_shared<StreamInfo::UInt32AccessorImpl>(port_));
     return ReadFilterStatus::Continue;
   }
 

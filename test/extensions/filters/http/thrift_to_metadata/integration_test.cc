@@ -74,7 +74,7 @@ public:
   }
 
   void writeMessage(Buffer::OwnedImpl& buffer, MessageType message_type = MessageType::Call,
-                    absl::optional<ReplyType> reply_type = absl::nullopt) {
+                    std::optional<ReplyType> reply_type = std::nullopt) {
     TransportType transport_type = TransportType::Unframed;
     ProtocolType protocol_type = ProtocolType::Binary;
 

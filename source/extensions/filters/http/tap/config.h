@@ -14,14 +14,23 @@ namespace TapFilter {
  * Config registration for the tap filter.
  */
 class TapFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::tap::v3::Tap> {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::tap::v3::Tap> {
 public:
-  TapFilterFactory() : FactoryBase("envoy.filters.http.tap") {}
+  TapFilterFactory() : UnifiedFactoryBase("envoy.filters.http.tap") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  // Shared factory creation used by the listener/cluster and route/vhost-level paths. The
+  // FilterConfig stats are scoped to the given scope.
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
+                      const std::string& stats_prefix,
+                      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+                      ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 } // namespace TapFilter

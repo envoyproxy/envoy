@@ -34,6 +34,7 @@ envoy_cc_library(
         ":rds_interface",
         "//envoy/config:config_provider_manager_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/init:manager_interface",
         "//envoy/json:json_object_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/runtime:runtime_interface",
@@ -53,7 +54,6 @@ envoy_cc_library(
         ":rds_interface",
         "//envoy/common:time_interface",
         "//source/common/protobuf",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -69,7 +69,6 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:host_description_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -99,7 +98,6 @@ envoy_cc_library(
         "//envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -140,7 +138,6 @@ envoy_cc_library(
     hdrs = ["string_accessor.h"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -159,6 +156,17 @@ envoy_cc_library(
     hdrs = ["cluster_specifier_plugin.h"],
     deps = [
         ":router_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "route_specifier_interface",
+    hdrs = ["route_specifier.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/common:optref_lib",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
     ],

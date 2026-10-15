@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,7 +13,6 @@
 #include "envoy/type/v3/ratelimit_unit.pb.h"
 
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace RateLimit {
@@ -23,6 +23,7 @@ namespace RateLimit {
 struct RateLimitOverride {
   uint32_t requests_per_unit_;
   envoy::type::v3::RateLimitUnit unit_;
+  uint32_t unit_multiplier_{1};
 };
 
 /**
@@ -54,8 +55,9 @@ using XRateLimitOption = RateLimitProto::XRateLimitOption;
  */
 struct Descriptor {
   DescriptorEntries entries_;
-  absl::optional<RateLimitOverride> limit_ = absl::nullopt;
-  absl::optional<uint64_t> hits_addend_ = absl::nullopt;
+  std::optional<RateLimitOverride> limit_ = std::nullopt;
+  std::optional<uint64_t> hits_addend_ = std::nullopt;
+  bool is_negative_hits_ = false;
   XRateLimitOption x_ratelimit_option_{};
 
   std::string toString() const {

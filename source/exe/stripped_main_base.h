@@ -78,7 +78,7 @@ protected:
   const Envoy::Server::Options& options_;
   Server::ComponentFactory& component_factory_;
   Stats::SymbolTableImpl symbol_table_;
-  Stats::AllocatorImpl stats_allocator_;
+  Stats::Allocator stats_allocator_;
 
   ThreadLocal::InstanceImplPtr tls_;
   std::unique_ptr<Server::HotRestart> restarter_;

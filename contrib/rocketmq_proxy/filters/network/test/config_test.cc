@@ -1,6 +1,5 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
 
 #include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"

@@ -3,6 +3,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -13,27 +14,31 @@ namespace DynamicModules {
 
 ::Envoy::Matcher::InputMatcherFactoryCb
 DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
-    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& /*context*/) {
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   const auto& proto_config = dynamic_cast<const envoy::extensions::matching::input_matchers::
                                               dynamic_modules::v3::DynamicModuleMatcher&>(config);
 
+  const auto& matcher_name = proto_config.matcher_name();
   const auto& module_config = proto_config.dynamic_module_config();
-  auto dynamic_module_or_error = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close(), module_config.load_globally());
-
-  if (!dynamic_module_or_error.ok()) {
-    throw EnvoyException("Failed to load dynamic module: " +
-                         std::string(dynamic_module_or_error.status().message()));
+  // Input matchers pass no async callback, so a remote source that is not already cached is
+  // rejected rather than fetched.
+  auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
+      module_config, proto_config.matcher_name(), context);
+  if (!load_result.ok()) {
+    throw EnvoyException(std::string(load_result.status().message()));
   }
 
-  auto dynamic_module = std::move(dynamic_module_or_error.value());
+  auto dynamic_module = std::move(load_result->loaded);
 
-  // Resolve required symbols.
+  // Resolve required symbols. A missing ABI symbol is a module-level problem, so it is counted as
+  // module_load_error.
   auto on_config_new = dynamic_module->getFunctionPointer<OnMatcherConfigNewType>(
       "envoy_dynamic_module_on_matcher_config_new");
   if (!on_config_new.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
     throw EnvoyException("Failed to resolve symbol: " +
                          std::string(on_config_new.status().message()));
   }
@@ -41,6 +46,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   auto on_config_destroy = dynamic_module->getFunctionPointer<OnMatcherConfigDestroyType>(
       "envoy_dynamic_module_on_matcher_config_destroy");
   if (!on_config_destroy.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
     throw EnvoyException("Failed to resolve symbol: " +
                          std::string(on_config_destroy.status().message()));
   }
@@ -48,6 +55,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   auto on_match = dynamic_module->getFunctionPointer<OnMatcherMatchType>(
       "envoy_dynamic_module_on_matcher_match");
   if (!on_match.ok()) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
     throw EnvoyException("Failed to resolve symbol: " + std::string(on_match.status().message()));
   }
 
@@ -56,6 +65,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   if (proto_config.has_matcher_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.matcher_config());
     if (!config_or_error.ok()) {
+      Extensions::DynamicModules::incrementLoadFailure(
+          context, matcher_name, Extensions::DynamicModules::ConfigInitErrorStat);
       throw EnvoyException("Failed to parse matcher config: " +
                            std::string(config_or_error.status().message()));
     }
@@ -70,6 +81,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
 
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
   if (in_module_config == nullptr) {
+    Extensions::DynamicModules::incrementLoadFailure(
+        context, matcher_name, Extensions::DynamicModules::ConfigInitErrorStat);
     throw EnvoyException("Failed to initialize dynamic module matcher config");
   }
 
@@ -77,10 +90,24 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   auto shared_module =
       std::shared_ptr<Extensions::DynamicModules::DynamicModule>(std::move(dynamic_module));
 
-  return [shared_module, on_config_destroy = on_config_destroy.value(), on_match = on_match.value(),
-          in_module_config] {
-    return std::make_unique<DynamicModuleInputMatcher>(shared_module, on_config_destroy, on_match,
-                                                       in_module_config);
+  // Own the in-module configuration in a shared holder so it is destroyed exactly once through
+  // on_matcher_config_destroy, whether the factory callback runs zero, one, or many times. The
+  // deleter also holds the module so the destroy hook is never called into an unloaded module.
+  std::shared_ptr<const void> shared_config(
+      in_module_config, [shared_module, on_config_destroy = on_config_destroy.value()](
+                            const void* config) { on_config_destroy(config); });
+
+  // Map the on_error policy to the result the matcher returns when the module cannot complete an
+  // evaluation.
+  using DynamicModuleMatcherProto =
+      envoy::extensions::matching::input_matchers::dynamic_modules::v3::DynamicModuleMatcher;
+  const auto on_error_result = proto_config.on_error() == DynamicModuleMatcherProto::MATCH
+                                   ? ::Envoy::Matcher::MatchResult::Matched
+                                   : ::Envoy::Matcher::MatchResult::NoMatch;
+
+  return [shared_module, on_match = on_match.value(), shared_config, on_error_result] {
+    return std::make_unique<DynamicModuleInputMatcher>(shared_module, on_match, shared_config,
+                                                       on_error_result);
   };
 }
 

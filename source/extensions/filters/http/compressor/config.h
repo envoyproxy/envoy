@@ -14,16 +14,21 @@ namespace Compressor {
  * Config registration for the compressor filter. @see NamedHttpFilterConfigFactory.
  */
 class CompressorFilterFactory
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::compressor::v3::Compressor,
           envoy::extensions::filters::http::compressor::v3::CompressorPerRoute> {
 public:
-  CompressorFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.compressor") {}
+  CompressorFilterFactory() : UnifiedFactoryBase("envoy.filters.http.compressor") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
+      const std::string& stats_prefix, Server::Configuration::GenericFactoryContext& context);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
@@ -32,7 +37,10 @@ private:
       ProtobufMessage::ValidationVisitor& validator) override;
 };
 
+using UpstreamCompressorFilterFactory = CompressorFilterFactory;
+
 DECLARE_FACTORY(CompressorFilterFactory);
+DECLARE_FACTORY(UpstreamCompressorFilterFactory);
 
 } // namespace Compressor
 } // namespace HttpFilters

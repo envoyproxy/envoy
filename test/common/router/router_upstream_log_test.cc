@@ -1,5 +1,6 @@
 #include <ctime>
 #include <memory>
+#include <optional>
 #include <regex>
 
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
@@ -13,16 +14,12 @@
 
 #include "test/common/http/common.h"
 #include "test/mocks/access_log/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
-#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -36,7 +33,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
+std::optional<envoy::config::accesslog::v3::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string yaml = R"EOF(
 name: accesslog
@@ -64,8 +61,7 @@ public:
 
   // Filter
   RetryStatePtr createRetryState(const RetryPolicy&, Http::RequestHeaderMap&,
-                                 const Upstream::ClusterInfo&, const VirtualCluster*,
-                                 RouteStatsContextOptRef,
+                                 const Upstream::ClusterInfo&,
                                  Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
                                  Upstream::ResourcePriority) override {
     EXPECT_EQ(nullptr, retry_state_);
@@ -83,7 +79,7 @@ public:
 
 class RouterUpstreamLogTest : public testing::Test {
 public:
-  void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log,
+  void init(std::optional<envoy::config::accesslog::v3::AccessLog> upstream_log,
             bool flush_upstream_log_on_upstream_stream = false,
             bool enable_periodic_upstream_log = false) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
@@ -93,7 +89,7 @@ public:
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(observability_name));
-    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
+    callbacks_.stream_info_.upstream_cluster_info_ = cluster_info_;
     callbacks_.stream_info_.downstream_bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
 
@@ -158,11 +154,12 @@ public:
     EXPECT_CALL(*per_try_timeout_, disableTimer());
   }
 
-  void
-  run(uint64_t response_code,
-      const std::initializer_list<std::pair<std::string, std::string>>& request_headers_init,
-      const std::initializer_list<std::pair<std::string, std::string>>& response_headers_init,
-      const std::initializer_list<std::pair<std::string, std::string>>& response_trailers_init) {
+  void run(uint64_t response_code,
+           const std::initializer_list<std::pair<std::string, std::string>>& request_headers_init,
+           const std::initializer_list<std::pair<std::string, std::string>>& response_headers_init,
+           const std::initializer_list<std::pair<std::string, std::string>>& response_trailers_init,
+           const std::initializer_list<std::pair<std::string, std::string>>& request_trailers_init =
+               {}) {
     NiceMock<Http::MockRequestEncoder> encoder;
     Http::ResponseDecoder* response_decoder = nullptr;
 
@@ -184,8 +181,12 @@ public:
     expectResponseTimerCreate();
 
     Http::TestRequestHeaderMapImpl headers(request_headers_init);
+    Http::TestRequestTrailerMapImpl request_trailers(request_trailers_init);
     HttpTestUtility::addDefaultHeaders(headers);
-    router_->decodeHeaders(headers, true);
+    router_->decodeHeaders(headers, request_trailers_init.size() == 0);
+    if (request_trailers_init.size() != 0) {
+      router_->decodeTrailers(request_trailers);
+    }
 
     EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
         .WillOnce(Return(RetryStatus::No));
@@ -196,7 +197,7 @@ public:
 
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                     .host_->outlier_detector_,
-                putResult(_, absl::optional<uint64_t>(response_code)));
+                putResult(_, std::optional<uint64_t>(response_code)));
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
@@ -271,7 +272,7 @@ public:
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                     .host_->outlier_detector_,
-                putResult(_, absl::optional<uint64_t>(200)));
+                putResult(_, std::optional<uint64_t>(200)));
     if (response_decoder != nullptr) {
       response_decoder->decodeHeaders(std::move(response_headers), true);
     }
@@ -348,6 +349,20 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
             "GET /foo HTTP/1.0 200 - 0 0 0 0 host 10.0.0.5:9211 10.0.0.5:10211 abcdef value\n");
 }
 
+TEST_F(RouterUpstreamLogTest, LogRequestTrailers) {
+  init(std::nullopt);
+  EXPECT_CALL(*mock_upstream_log_, log(_, _))
+      .WillOnce(Invoke([](const Formatter::Context& log_context, const StreamInfo::StreamInfo&) {
+        ASSERT_TRUE(log_context.requestTrailers().has_value());
+        const auto trailers =
+            log_context.requestTrailers()->get(Http::LowerCaseString("x-request-trailer"));
+        ASSERT_EQ(1, trailers.size());
+        EXPECT_EQ("value", trailers[0]->value().getStringView());
+      }));
+
+  run(200, {}, {}, {}, {{"x-request-trailer", "value"}});
+}
+
 // Test timestamps and durations are emitted.
 TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
   const std::string yaml = R"EOF(
@@ -364,7 +379,7 @@ typed_config:
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  init(std::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
   run(200, {{"x-envoy-original-path", "/foo"}}, {}, {});
 
   EXPECT_EQ(output_.size(), 1U);
@@ -400,7 +415,7 @@ typed_config:
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  init(std::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
   run(200, {{"request-header-name", "request-header-val"}},
       {{"response-header-name", "response-header-val"}},
       {{"response-trailer-name", "response-trailer-val"}});
@@ -438,7 +453,7 @@ typed_config:
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  init(std::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
   run();
 
   EXPECT_EQ(output_.size(), 1U);
@@ -459,7 +474,7 @@ typed_config:
 
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
-  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  init(std::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
   run();
 
   EXPECT_EQ(output_.size(), 1U);
@@ -480,7 +495,7 @@ typed_config:
   envoy::config::accesslog::v3::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log), true);
+  init(std::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log), true);
   run();
 
   // It is expected that there will be two log records, one when a new request is received
@@ -494,7 +509,7 @@ typed_config:
 }
 
 TEST_F(RouterUpstreamLogTest, PeriodicLog) {
-  init(absl::nullopt,
+  init(std::nullopt,
        /*flush_upstream_log_on_upstream_stream=*/false,
        /*enable_periodic_upstream_log=*/true);
 
@@ -578,7 +593,7 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                   .host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
+              putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(*mock_upstream_log_, log(_, _))
       .WillOnce(Invoke(
           [](const Formatter::Context& log_context, const StreamInfo::StreamInfo& stream_info) {

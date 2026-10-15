@@ -7,8 +7,10 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
@@ -21,6 +23,8 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/interval_value.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
@@ -65,8 +69,13 @@ public:
 
   /**
    * Clone this socket factory so it can be used by a new listener (e.g., if the address is shared).
+   * @param tcp_backlog_size supplies the tcp_backlog_size of the new listener. This is passed
+   *        explicitly (rather than read off the existing factory) because it is the one listener
+   *        option that can be re-applied to an already-listening socket via a second listen()
+   *        call, so a change to it does not by itself force full socket recreation; the cloned
+   *        factory must carry the new listener's value rather than the one it is cloned from.
    */
-  virtual ListenSocketFactoryPtr clone() const PURE;
+  virtual ListenSocketFactoryPtr clone(uint32_t tcp_backlog_size) const PURE;
 
   /**
    * Close all sockets. This is used during draining scenarios.
@@ -82,6 +91,14 @@ public:
    */
   virtual absl::Status doFinalPreWorkerInit() PURE;
 };
+
+} // namespace Network
+
+namespace Quic {
+class QuicPacketWriterFactory;
+} // namespace Quic
+
+namespace Network {
 
 /**
  * Configuration for a UDP listener.
@@ -99,6 +116,11 @@ public:
    * @return factory for writing to a UDP socket.
    */
   virtual UdpPacketWriterFactory& packetWriterFactory() PURE;
+
+  /**
+   * @return factory for creating QUIC packet writers.
+   */
+  virtual Quic::QuicPacketWriterFactory* quicPacketWriterFactory() PURE;
 
   /**
    * @param address is used to query the address specific router.
@@ -142,6 +164,11 @@ public:
   virtual ~ListenerInfo() = default;
 
   /**
+   * @return absl::string_view the name of the listener as set in configuration.
+   */
+  virtual absl::string_view name() const PURE;
+
+  /**
    * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
    * listener.
    */
@@ -163,6 +190,13 @@ public:
    * @return whether the listener is a Quic listener.
    */
   virtual bool isQuic() const PURE;
+
+  /**
+   * @return envoy::config::listener::v3::Listener::DrainType the drain type configured on this
+   * listener. DEFAULT listeners drain in response to /healthcheck/fail in addition to listener
+   * removal/modification and hot restart; MODIFY_ONLY listeners do not.
+   */
+  virtual envoy::config::listener::v3::Listener::DrainType drainType() const PURE;
 
   /**
    * @return bool whether the listener should bypass overload manager actions
@@ -215,6 +249,12 @@ public:
    * write buffers.
    */
   virtual uint32_t perConnectionBufferLimitBytes() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds specifying how long a connection is allowed to remain above
+   * the buffer high watermark before it is closed. A zero duration disables the timeout.
+   */
+  virtual std::chrono::milliseconds perConnectionBufferHighWatermarkTimeout() const PURE;
 
   /**
    * @return std::chrono::milliseconds the time to wait for all listener filters to complete
@@ -455,7 +495,7 @@ public:
   virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
 };
 
-using UdpListenerCallbacksOptRef = absl::optional<std::reference_wrapper<UdpListenerCallbacks>>;
+using UdpListenerCallbacksOptRef = OptRef<UdpListenerCallbacks>;
 
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.

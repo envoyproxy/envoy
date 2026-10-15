@@ -42,12 +42,12 @@ bool AddrFamilyAwareSocketOptionImpl::setOption(
   return setIpSocketOption(socket, state, *ipv4_option_, *ipv6_option_);
 }
 
-absl::optional<Socket::Option::Details> AddrFamilyAwareSocketOptionImpl::getOptionDetails(
+std::optional<Socket::Option::Details> AddrFamilyAwareSocketOptionImpl::getOptionDetails(
     const Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
   auto option = getOptionForSocket(socket, *ipv4_option_, *ipv6_option_);
 
   if (!option.has_value()) {
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   return option.value().get().getOptionDetails(socket, state);

@@ -13,7 +13,7 @@ namespace Matcher {
  */
 template <class DataType> class ListMatcher : public MatchTree<DataType> {
 public:
-  explicit ListMatcher(absl::optional<OnMatch<DataType>> on_no_match) : on_no_match_(on_no_match) {}
+  explicit ListMatcher(std::optional<OnMatch<DataType>> on_no_match) : on_no_match_(on_no_match) {}
 
   ActionMatchResult match(const DataType& matching_data,
                           SkippedMatchCb skipped_match_cb = nullptr) override {
@@ -47,7 +47,7 @@ public:
   }
 
 private:
-  absl::optional<OnMatch<DataType>> on_no_match_;
+  std::optional<OnMatch<DataType>> on_no_match_;
   std::vector<std::pair<FieldMatcherPtr<DataType>, OnMatch<DataType>>> matchers_;
 };
 

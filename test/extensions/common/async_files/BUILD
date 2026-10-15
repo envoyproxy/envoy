@@ -12,13 +12,15 @@ envoy_package()
 envoy_cc_test(
     name = "async_file_handle_thread_pool_test",
     srcs = ["async_file_handle_thread_pool_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/server:server_mocks",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
 )
@@ -29,12 +31,13 @@ envoy_cc_test(
         "async_file_manager_thread_pool_test.cc",
         "async_file_manager_thread_pool_with_mocks_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
@@ -45,12 +48,12 @@ envoy_cc_test(
     srcs = [
         "async_file_manager_factory_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/singleton:manager_impl_lib",
         "//source/extensions/common/async_files",
         "//test/mocks/api:api_mocks",
-        "//test/mocks/server:server_mocks",
         "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/common/async_files/v3:pkg_cc_proto",
     ],
@@ -59,7 +62,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "status_after_file_error_test",
     srcs = ["status_after_file_error_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/async_files:status_after_file_error",

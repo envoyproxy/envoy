@@ -41,16 +41,14 @@ public:
     read_callbacks_ = &callbacks;
     // Verify that the filter is able to access the stream info.
     callbacks.streamInfo().filterState()->setData(
-        "test.read", std::make_shared<Router::StringAccessorImpl>("val"),
-        Envoy::StreamInfo::FilterState::StateType::Mutable);
+        "test.read", std::make_shared<Router::StringAccessorImpl>("val"));
   }
 
   void initializeWriteFilterCallbacks(WriteFilterCallbacks& callbacks) override {
     write_callbacks_ = &callbacks;
     // Verify that the filter is able to access the stream info.
     callbacks.streamInfo().filterState()->setData(
-        "test.write", std::make_shared<Router::StringAccessorImpl>("val"),
-        Envoy::StreamInfo::FilterState::StateType::Mutable);
+        "test.write", std::make_shared<Router::StringAccessorImpl>("val"));
   }
 
   ReadFilterStatus onNewSession() override { return ReadFilterStatus::Continue; }

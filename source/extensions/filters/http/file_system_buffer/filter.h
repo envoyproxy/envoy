@@ -126,7 +126,7 @@ private:
 
   const std::shared_ptr<FileSystemBufferFilterConfig> base_config_;
   // config_ is a merge of the base config and any per-route config.
-  absl::optional<FileSystemBufferFilterMergedConfig> config_;
+  std::optional<FileSystemBufferFilterMergedConfig> config_;
   Http::StreamDecoderFilterCallbacks* request_callbacks_ = nullptr;
   Http::StreamEncoderFilterCallbacks* response_callbacks_ = nullptr;
   bool aborted_ = false;

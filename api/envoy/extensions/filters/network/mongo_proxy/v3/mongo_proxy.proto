@@ -4,6 +4,8 @@ package envoy.extensions.filters.network.mongo_proxy.v3;
 
 import "envoy/extensions/filters/common/fault/v3/fault.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -18,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // MongoDB :ref:`configuration overview <config_network_filters_mongo_proxy>`.
 // [#extension: envoy.filters.network.mongo_proxy]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message MongoProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mongo_proxy.v2.MongoProxy";
@@ -46,4 +48,7 @@ message MongoProxy {
   // Note that metrics will not be emitted for "find" commands, since those are considered
   // queries, and metrics for those are emitted under a dedicated "query" namespace.
   repeated string commands = 5;
+
+  // The maximum depth of a BSON document that Envoy will parse. Defaults to 100.
+  google.protobuf.UInt32Value max_bson_depth = 6 [(validate.rules).uint32 = {gt: 0}];
 }

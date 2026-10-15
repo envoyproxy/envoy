@@ -2,6 +2,7 @@
 
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -11,7 +12,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -55,6 +55,16 @@ public:
   public:
     void invokeCallback(ClusterDiscoveryStatus cluster_status) const {
       parent_.invokeCallbackFromItem(name_, item_weak_ptr_, cluster_status);
+    }
+
+    /**
+     * Invoke and drop every callback this worker has queued for the cluster name, not just the
+     * one this invoker was created for. Used when the main thread answers the request without
+     * leaving anything pending there: no later notification will reach this worker, so no
+     * callback for the name may be left behind waiting for one.
+     */
+    void invokeAllCallbacks(ClusterDiscoveryStatus cluster_status) const {
+      parent_.processClusterName(name_, cluster_status);
     }
 
   private:
@@ -109,7 +119,7 @@ private:
     CallbackListItem(ClusterDiscoveryCallbackPtr callback) : callback_(std::move(callback)) {}
 
     ClusterDiscoveryCallbackPtr callback_;
-    absl::optional<CallbackListIterator> self_iterator_;
+    std::optional<CallbackListIterator> self_iterator_;
   };
 
   /**

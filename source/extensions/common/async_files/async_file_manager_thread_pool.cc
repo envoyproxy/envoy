@@ -1,5 +1,7 @@
 #include "source/extensions/common/async_files/async_file_manager_thread_pool.h"
 
+#include <fcntl.h>
+
 #include <memory>
 #include <queue>
 #include <thread>
@@ -161,7 +163,6 @@ void AsyncFileManagerThreadPool::worker() {
     }
     if (action.action_ != nullptr) {
       executeAction(std::move(action));
-      action.action_ = nullptr;
     }
     if (cleanup_action != nullptr) {
       std::move(cleanup_action)->onCancelledBeforeCallback();

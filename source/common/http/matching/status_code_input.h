@@ -2,6 +2,7 @@
 
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/type/matcher/v3/status_code_input.pb.h"
 #include "envoy/type/matcher/v3/status_code_input.pb.validate.h"
 
@@ -108,6 +109,34 @@ class HttpResponseStatusCodeClassInputFactory
 public:
   explicit HttpResponseStatusCodeClassInputFactory()
       : HttpResponseStatusCodeInputFactoryBase("status_code_class_input") {}
+};
+
+inline constexpr absl::string_view LocalReplyTrue = "true";
+inline constexpr absl::string_view LocalReplyFalse = "false";
+
+class HttpResponseLocalReplyInput : public Matcher::DataInput<HttpMatchingData> {
+public:
+  HttpResponseLocalReplyInput() = default;
+  ~HttpResponseLocalReplyInput() override = default;
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
+    const auto& details = data.streamInfo().responseCodeDetails();
+    if (!details.has_value()) {
+      return Matcher::DataInputGetResult::NoData(Matcher::DataAvailability::NotAvailable);
+    }
+    if (details.value() == StreamInfo::ResponseCodeDetails::get().ViaUpstream) {
+      return Matcher::DataInputGetResult::CreateStringView(LocalReplyFalse);
+    }
+    return Matcher::DataInputGetResult::CreateStringView(LocalReplyTrue);
+  }
+};
+
+class HttpResponseLocalReplyInputFactory
+    : public HttpResponseStatusCodeInputFactoryBase<
+          HttpResponseLocalReplyInput, envoy::type::matcher::v3::HttpResponseLocalReplyMatchInput> {
+public:
+  explicit HttpResponseLocalReplyInputFactory()
+      : HttpResponseStatusCodeInputFactoryBase("local_reply") {}
 };
 
 } // namespace Matching

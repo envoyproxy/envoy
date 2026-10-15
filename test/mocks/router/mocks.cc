@@ -27,6 +27,7 @@ TestRetryPolicy::~TestRetryPolicy() = default;
 
 MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
   ON_CALL(*this, enabled()).WillByDefault(Return(false));
+  ON_CALL(*this, responseHeadersToCopy()).WillByDefault(ReturnRef(response_headers_to_copy_));
 }
 
 MockRetryState::MockRetryState() = default;
@@ -114,7 +115,7 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
   ON_CALL(*this, connectConfig()).WillByDefault(Invoke([this]() {
-    return connect_config_.has_value() ? makeOptRef(connect_config_.value()) : absl::nullopt;
+    return connect_config_.has_value() ? makeOptRef(connect_config_.value()) : std::nullopt;
   }));
   ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(early_data_policy_));
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
@@ -136,6 +137,7 @@ MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
+  ON_CALL(*this, ignorePathParametersInPathMatching()).WillByDefault(Return(false));
 }
 
 MockConfig::~MockConfig() = default;
@@ -168,7 +170,8 @@ MockRoute::MockRoute() {
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
-  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_copy_));
+  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(*virtual_host_));
+  ON_CALL(*this, virtualHostSharedPtr()).WillByDefault(Return(virtual_host_));
 
   // Route entry methods.
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(route_entry_.cluster_name_));
@@ -187,7 +190,7 @@ MockRoute::MockRoute() {
   ON_CALL(*this, connectConfig()).WillByDefault(Invoke([this]() {
     return route_entry_.connect_config_.has_value()
                ? makeOptRef(route_entry_.connect_config_.value())
-               : absl::nullopt;
+               : std::nullopt;
   }));
   ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(route_entry_.early_data_policy_));
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(route_entry_.path_matcher_));
@@ -198,6 +201,17 @@ MockRoute::MockRoute() {
 }
 MockRoute::~MockRoute() = default;
 
+MockRouteSpecifier::MockRouteSpecifier() {
+  // By default a specifier is transparent: it hands back exactly what it was given and lets the
+  // rest of the chain run. Tests override this when they want the specifier to do something.
+  ON_CALL(*this, onRoute(_, _, _, _, _))
+      .WillByDefault(
+          Invoke([](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
+                    const StreamInfo::StreamInfo&, uint64_t,
+                    OnRouteInputStatus) -> OnRouteResult { return {std::move(route)}; }));
+}
+MockRouteSpecifier::~MockRouteSpecifier() = default;
+
 MockRouteConfigProvider::MockRouteConfigProvider() {
   ON_CALL(*this, config()).WillByDefault(Return(route_config_));
   ON_CALL(*this, configCast()).WillByDefault(Return(route_config_));
@@ -206,6 +220,9 @@ MockRouteConfigProvider::~MockRouteConfigProvider() = default;
 
 MockRouteConfigProviderManager::MockRouteConfigProviderManager() = default;
 MockRouteConfigProviderManager::~MockRouteConfigProviderManager() = default;
+
+MockVhdsConfigUpdateReceiver::MockVhdsConfigUpdateReceiver() = default;
+MockVhdsConfigUpdateReceiver::~MockVhdsConfigUpdateReceiver() = default;
 
 MockScopedConfig::MockScopedConfig() {
   ON_CALL(*this, getRouteConfig(_)).WillByDefault(Return(route_config_));

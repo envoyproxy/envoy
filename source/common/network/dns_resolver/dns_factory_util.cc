@@ -7,7 +7,7 @@ namespace Network {
 void makeDefaultCaresDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 
@@ -15,7 +15,7 @@ void makeDefaultCaresDnsResolverConfig(
 void makeDefaultAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
   typed_dns_resolver_config.set_name(std::string(AppleDnsResolver));
 }
 
@@ -64,7 +64,7 @@ void handleLegacyDnsResolverData(
   if (!config.dns_resolvers().empty()) {
     cares.mutable_resolvers()->MergeFrom(config.dns_resolvers());
   }
-  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  std::ignore = typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 

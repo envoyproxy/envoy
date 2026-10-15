@@ -137,60 +137,66 @@ HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
   return override_host_status;
 }
 
-std::pair<HostConstSharedPtr, bool> HostUtility::selectOverrideHost(const HostMap* host_map,
-                                                                    HostStatusSet status,
-                                                                    LoadBalancerContext* context) {
+HostUtility::OverrideHostSelectionResult
+HostUtility::selectOverrideHost(const HostLookupMap* host_map, HostStatusSet status,
+                                LoadBalancerContext* context) {
   if (context == nullptr) {
-    return {nullptr, false};
+    return {};
   }
 
-  auto override_host = context->overrideHostToSelect();
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> override_host =
+      context->overrideHostToSelect();
   if (!override_host.has_value()) {
-    return {nullptr, false};
+    return {};
   }
 
-  const bool strict_mode = override_host.value().second;
+  const bool strict_mode = override_host->strict;
 
   if (host_map == nullptr) {
-    return {nullptr, strict_mode};
+    return {nullptr, strict_mode, OverrideHostSelectionStatus::NotFound};
   }
 
-  auto host_iter = host_map->find(override_host.value().first);
+  HostConstSharedPtr host = host_map->findHost(override_host->host);
 
   // The override host cannot be found in the host map.
-  if (host_iter == host_map->end()) {
-    return {nullptr, strict_mode};
+  if (host == nullptr) {
+    return {nullptr, strict_mode, OverrideHostSelectionStatus::NotFound};
   }
-
-  HostConstSharedPtr host = host_iter->second;
-  ASSERT(host != nullptr);
 
   if (status[static_cast<uint32_t>(host->healthStatus())]) {
-    return {host, strict_mode};
+    return {host, strict_mode, OverrideHostSelectionStatus::Success};
   }
-  return {nullptr, strict_mode};
+  return {nullptr, strict_mode, OverrideHostSelectionStatus::Unhealthy};
 }
 
 void HostUtility::forEachHostMetric(
     const ClusterManager& cluster_manager,
     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
     const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb) {
-  for (const auto& [unused_name, cluster_ref] : cluster_manager.clusters().active_clusters_) {
-    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster_ref.get().info();
+  cluster_manager.forEachActiveCluster([&](const Cluster& cluster) {
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
     if (cluster_info->perEndpointStatsEnabled()) {
       const std::string cluster_name =
           Stats::Utility::sanitizeStatsName(cluster_info->observabilityName());
 
       const Stats::TagVector& fixed_tags = cluster_info->statsScope().store().fixedTags();
 
-      for (auto& host_set : cluster_ref.get().prioritySet().hostSetsPerPriority()) {
+      for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
         for (auto& host : host_set->hosts()) {
+          absl::string_view endpoint_observability_name = host->observabilityName();
+          Network::Address::InstanceConstSharedPtr address;
+          if (endpoint_observability_name.empty()) {
+            // Only logical host will have empty observability name for now.
+            address = host->address();
+            endpoint_observability_name = address->asStringView();
+          }
 
           Stats::TagVector tags;
           tags.reserve(fixed_tags.size() + 3);
           tags.insert(tags.end(), fixed_tags.begin(), fixed_tags.end());
           tags.emplace_back(Stats::Tag{Envoy::Config::TagNames::get().CLUSTER_NAME, cluster_name});
-          tags.emplace_back(Stats::Tag{"envoy.endpoint_address", host->address()->asString()});
+          tags.emplace_back(
+              Stats::Tag{"envoy.endpoint_address", std::string(endpoint_observability_name)});
 
           const auto& hostname = host->hostname();
           if (!hostname.empty()) {
@@ -199,10 +205,9 @@ void HostUtility::forEachHostMetric(
 
           auto set_metric_metadata = [&](absl::string_view metric_name,
                                          Stats::PrimitiveMetricMetadata& metric) {
-            metric.setName(
-                absl::StrCat("cluster.", cluster_name, ".endpoint.",
-                             Stats::Utility::sanitizeStatsName(host->address()->asStringView()),
-                             ".", metric_name));
+            metric.setName(absl::StrCat(
+                "cluster.", cluster_name, ".endpoint.",
+                Stats::Utility::sanitizeStatsName(endpoint_observability_name), ".", metric_name));
             metric.setTagExtractedName(absl::StrCat("cluster.endpoint.", metric_name));
             metric.setTags(tags);
 
@@ -233,6 +238,16 @@ void HostUtility::forEachHostMetric(
           }
         }
       }
+    }
+  });
+}
+
+void HostUtility::forEachOrcaLoadReportRecipient(
+    const HostDescription& host, absl::FunctionRef<void(HostLbPolicyData&)> callback) {
+  for (size_t i = 0; i < host.lbPolicyDataCount(); ++i) {
+    OptRef<HostLbPolicyData> data = host.lbPolicyDataAt(i);
+    if (data.has_value() && data->receivesOrcaLoadReport()) {
+      callback(*data);
     }
   }
 }

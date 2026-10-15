@@ -8,6 +8,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/network/socket.h"
+#include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
 
 #include "source/common/stats/custom_stat_namespaces_impl.h"
@@ -23,7 +24,7 @@ public:
   Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store, Event::TimeSystem& time_system,
        Filesystem::Instance& file_system, Random::RandomGenerator& random_generator,
        const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-       const ProcessContextOptRef& process_context = absl::nullopt,
+       const ProcessContextOptRef& process_context = std::nullopt,
        Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   // Api::Api

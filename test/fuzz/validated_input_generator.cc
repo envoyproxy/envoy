@@ -165,7 +165,7 @@ void ValidatedInputGenerator::handleAnyRules(
     // Stop creating any message when a certain depth is reached
     if (max_depth_ > 0 && current_depth_ > max_depth_) {
       auto* any_message = Protobuf::DynamicCastMessage<Protobuf::Any>(msg);
-      any_message->PackFrom(Protobuf::Struct());
+      std::ignore = any_message->PackFrom(Protobuf::Struct());
       return;
     }
     const Protobuf::Descriptor* descriptor = msg->GetDescriptor();
@@ -186,7 +186,7 @@ void ValidatedInputGenerator::handleAnyRules(
             any_message->set_type_url(absl::StrCat("type.googleapis.com/", randomed_typeurl.first));
             auto prototype = randomed_typeurl.second();
             ASSERT(prototype);
-            any_message->PackFrom(*prototype);
+            std::ignore = any_message->PackFrom(*prototype);
           }
           return;
         }

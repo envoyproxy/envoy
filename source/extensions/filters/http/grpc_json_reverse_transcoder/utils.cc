@@ -25,7 +25,7 @@ namespace GrpcJsonReverseTranscoder {
 
 namespace {
 
-absl::Status BuildReplacementVector(nlohmann::json& request, std::string http_rule_path,
+absl::Status buildReplacementVector(nlohmann::json& request, std::string http_rule_path,
                                     std::vector<std::pair<std::string, std::string>>& replacements,
                                     absl::flat_hash_set<std::string>& param_set) {
   size_t end = 0;
@@ -61,7 +61,7 @@ absl::Status BuildReplacementVector(nlohmann::json& request, std::string http_ru
     // "parent.id". In this case, we need to extract the value of the "parent"
     // field from the request object and then extract the value of the "id"
     // field from the "parent" object.
-    absl::optional<std::string> param_value =
+    std::optional<std::string> param_value =
         GetNestedJsonValueAsString(request, key, has_one_path_segment);
     if (!param_value.has_value()) {
       return absl::InvalidArgumentError(
@@ -85,9 +85,9 @@ std::string BuildGrpcMessage(Envoy::Buffer::Instance& body_data) {
   return Envoy::Http::Utility::PercentEncoding::encode(message);
 }
 
-absl::optional<std::string> GetNestedJsonValueAsString(const nlohmann::json& object,
-                                                       const std::string& key,
-                                                       bool has_one_path_segment) {
+std::optional<std::string> GetNestedJsonValueAsString(const nlohmann::json& object,
+                                                      const std::string& key,
+                                                      bool has_one_path_segment) {
   nlohmann::json::json_pointer key_pointer(
       absl::StrCat("/", absl::StrReplaceAll(key, {{".", "/"}})));
   if (!object.contains(key_pointer)) {
@@ -139,7 +139,8 @@ absl::StatusOr<std::string> BuildPath(nlohmann::json& request, std::string http_
                                       std::string http_body_field) {
   std::vector<std::pair<std::string, std::string>> replacements;
   absl::flat_hash_set<std::string> param_set;
-  absl::Status status = BuildReplacementVector(request, http_rule_path, replacements, param_set);
+  const absl::Status status =
+      buildReplacementVector(request, http_rule_path, replacements, param_set);
   if (!status.ok()) {
     return status;
   }

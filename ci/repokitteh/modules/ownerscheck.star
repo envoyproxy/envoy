@@ -59,7 +59,11 @@ def _get_relevant_specs(specs, changed_files):
     for spec in specs:
         path_match = spec["path"]
 
+        path_exclude = spec.get("path_exclude", "")
+
         files = [f for f in changed_files if match(path_match, f["filename"])]
+        if path_exclude and files:
+            files = [f for f in files if not match(path_exclude, f["filename"])]
         allow_global_approval = spec.get("allow_global_approval", True)
         status_label = spec.get("github_status_label", "")
         if files:
@@ -221,9 +225,21 @@ def _assign_from_team(team_name, assignees, exclude_users):
 
 def _assign_from(command, assignees):
     lines = []
+    team_names_without_at = []
+    used_team_mention = False
     for team_name in command.args:
         assigned = _assign_from_team(team_name, assignees, [])
         lines.append("%s assignee is @%s" % (team_name, assigned))
+        if team_name.startswith("@"):
+            used_team_mention = True
+            team_name = team_name[1:]
+        team_names_without_at.append(team_name)
+    if used_team_mention:
+        lines.append(
+            "In future, please do this without the `@`, like `/assign-from " +
+            " ".join(team_names_without_at) +
+            "`, unless you wish to subscribe the group to the PR",
+        )
     if lines:
         github.issue_create_comment("\n".join(lines))
 

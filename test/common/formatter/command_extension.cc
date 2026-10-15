@@ -5,8 +5,8 @@
 namespace Envoy {
 namespace Formatter {
 
-absl::optional<std::string> TestFormatter::format(const Context&,
-                                                  const StreamInfo::StreamInfo&) const {
+std::optional<std::string> TestFormatter::format(const Context&,
+                                                 const StreamInfo::StreamInfo&) const {
   return "TestFormatter";
 }
 
@@ -15,8 +15,20 @@ Protobuf::Value TestFormatter::formatValue(const Context& context,
   return ValueUtil::stringValue(format(context, stream_info).value());
 }
 
-FormatterProviderPtr TestCommandParser::parse(absl::string_view command, absl::string_view,
-                                              absl::optional<size_t>) const {
+bool TestFormatter::formatTo(std::string& sink, const Context& context,
+                             const StreamInfo::StreamInfo& stream_info) const {
+  sink.append(format(context, stream_info).value());
+  return true;
+}
+
+void TestFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                  const StreamInfo::StreamInfo& stream_info) const {
+  sink.addString(format(context, stream_info).value());
+}
+
+absl::StatusOr<FormatterProviderPtr> TestCommandParser::parse(absl::string_view command,
+                                                              absl::string_view,
+                                                              std::optional<size_t>) const {
   if (command == "COMMAND_EXTENSION") {
     return std::make_unique<TestFormatter>();
   }
@@ -41,8 +53,8 @@ ProtobufTypes::MessagePtr TestCommandFactory::createEmptyConfigProto() {
 
 std::string TestCommandFactory::name() const { return "envoy.formatter.TestFormatter"; }
 
-absl::optional<std::string> AdditionalFormatter::format(const Context&,
-                                                        const StreamInfo::StreamInfo&) const {
+std::optional<std::string> AdditionalFormatter::format(const Context&,
+                                                       const StreamInfo::StreamInfo&) const {
   return "AdditionalFormatter";
 }
 
@@ -51,8 +63,20 @@ Protobuf::Value AdditionalFormatter::formatValue(const Context& context,
   return ValueUtil::stringValue(format(context, stream_info).value());
 }
 
-FormatterProviderPtr AdditionalCommandParser::parse(absl::string_view command, absl::string_view,
-                                                    absl::optional<size_t>) const {
+bool AdditionalFormatter::formatTo(std::string& sink, const Context& context,
+                                   const StreamInfo::StreamInfo& stream_info) const {
+  sink.append(format(context, stream_info).value());
+  return true;
+}
+
+void AdditionalFormatter::formatValueTo(ValueSink& sink, const Context& context,
+                                        const StreamInfo::StreamInfo& stream_info) const {
+  sink.addString(format(context, stream_info).value());
+}
+
+absl::StatusOr<FormatterProviderPtr> AdditionalCommandParser::parse(absl::string_view command,
+                                                                    absl::string_view,
+                                                                    std::optional<size_t>) const {
   if (command == "ADDITIONAL_EXTENSION") {
     return std::make_unique<AdditionalFormatter>();
   }

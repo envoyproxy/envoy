@@ -1,7 +1,11 @@
 # Security Reporting Process
 
-Please report any security issue or Envoy crash report to
-envoy-security@googlegroups.com where the issue will be triaged appropriately.
+If you have found a security issue or an Envoy crash, please
+[open a GitHub Security Advisory](https://github.com/envoyproxy/envoy/security/advisories/new).
+This is the preferred reporting channel, as reports can be triaged directly on GitHub.
+
+Alternatively, you may email [envoy-security@googlegroups.com](mailto:envoy-security@googlegroups.com).
+
 Thank you in advance for helping to keep Envoy secure.
 
 # Security Release Process
@@ -482,3 +486,4 @@ and security team to ensure they still qualify for inclusion on the list.
 | Spotify       | Yes      | 02/21       |
 | Netflix       | Yes      | 07/24       |
 | Slack         | Yes      | 07/24       |
+| Datadog       | Yes      | 07/26       |

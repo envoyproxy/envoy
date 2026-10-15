@@ -18,12 +18,15 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -32,6 +35,12 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace Composite {
+
+// Handle returned by load balancers performing asynchronous host selection.
+class TestAsyncHostSelectionHandle : public Upstream::AsyncHostSelectionHandle {
+public:
+  void cancel() override {}
+};
 
 class CompositeClusterTest : public testing::Test {
 public:
@@ -49,7 +58,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     cluster_ = std::shared_ptr<Cluster>(
         new Cluster(cluster_config_, config_, factory_context, creation_status));
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
   }
 
   envoy::config::cluster::v3::Cluster cluster_config_;
@@ -118,7 +127,7 @@ cluster_type:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_null;
   NiceMock<Upstream::MockLoadBalancerContext> context_null;
   EXPECT_CALL(context_null, requestStreamInfo()).WillOnce(Return(&stream_info_null));
-  EXPECT_CALL(stream_info_null, attemptCount()).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(stream_info_null, attemptCount()).WillOnce(Return(std::nullopt));
   EXPECT_EQ(0, lb.getAttemptCount(&context_null));
 }
 
@@ -208,14 +217,14 @@ cluster_type:
   std::vector<uint8_t> hash_key;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
 
   // Test all load balancer methods when no cluster is available.
   auto result = lb.chooseHost(&context);
   EXPECT_EQ(nullptr, result.host);
 
   EXPECT_EQ(nullptr, lb.peekAnotherHost(&context));
-  EXPECT_EQ(absl::nullopt, lb.selectExistingConnection(&context, host, hash_key));
+  EXPECT_EQ(std::nullopt, lb.selectExistingConnection(&context, host, hash_key));
   EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
 }
 
@@ -263,7 +272,7 @@ cluster_type:
   // Test thread aware load balancer.
   CompositeThreadAwareLoadBalancer thread_aware_lb(*cluster_);
   EXPECT_NE(nullptr, thread_aware_lb.factory());
-  EXPECT_TRUE(thread_aware_lb.initialize().ok());
+  EXPECT_OK(thread_aware_lb.initialize());
 
   // Test load balancer factory.
   CompositeLoadBalancerFactory factory(*cluster_);
@@ -329,7 +338,7 @@ TEST_F(CompositeClusterTest, LoadBalancerContextWithNullContext) {
   CompositeLoadBalancerContext wrapper(nullptr, 0);
 
   // Should create owned context and delegate to it.
-  EXPECT_EQ(absl::nullopt, wrapper.computeHashKey());
+  EXPECT_EQ(std::nullopt, wrapper.computeHashKey());
   EXPECT_EQ(nullptr, wrapper.downstreamConnection());
   EXPECT_EQ(nullptr, wrapper.requestStreamInfo());
 
@@ -426,7 +435,7 @@ cluster_type:
   auto cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("target_cluster"))
       .WillRepeatedly(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
@@ -461,7 +470,7 @@ cluster_type:
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("peek_target"))
       .WillOnce(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillOnce(ReturnRef(mock_lb));
@@ -494,7 +503,7 @@ cluster_type:
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(3)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(3)));
 
   EXPECT_EQ(nullptr, lb.peekAnotherHost(&context));
 }
@@ -521,7 +530,7 @@ cluster_type:
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster"))
       .WillOnce(Return(nullptr));
 
@@ -550,7 +559,7 @@ cluster_type:
   NiceMock<Upstream::MockHost> mock_host;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("select_target"))
       .WillOnce(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillOnce(ReturnRef(mock_lb));
@@ -560,7 +569,7 @@ cluster_type:
   NiceMock<Network::MockConnection> mock_connection;
   Upstream::SelectedPoolAndConnection expected_result{mock_pool, mock_connection};
   EXPECT_CALL(mock_lb, selectExistingConnection(_, _, _))
-      .WillOnce(Return(absl::optional<Upstream::SelectedPoolAndConnection>(expected_result)));
+      .WillOnce(Return(std::optional<Upstream::SelectedPoolAndConnection>(expected_result)));
 
   auto connection_result = lb.selectExistingConnection(&context, mock_host, hash_key);
   EXPECT_TRUE(connection_result.has_value());
@@ -582,10 +591,10 @@ TEST_F(CompositeClusterTest, FactoryCreateMethod) {
   envoy::extensions::clusters::composite::v3::ClusterConfig typed_config;
   auto* entry = typed_config.add_clusters();
   entry->set_name("factory_cluster_1");
-  cluster_type->mutable_typed_config()->PackFrom(typed_config);
+  std::ignore = cluster_type->mutable_typed_config()->PackFrom(typed_config);
 
   auto result = factory.create(cluster_config, factory_context);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
   EXPECT_NE(nullptr, result.value().first);
   EXPECT_NE(nullptr, result.value().second);
 }
@@ -601,10 +610,13 @@ TEST_F(CompositeClusterTest, LoadBalancerContextAdditionalMethods) {
   EXPECT_EQ(&criteria, wrapper.metadataMatchCriteria());
 
   // Test overrideHostToSelect.
-  absl::optional<std::pair<absl::string_view, bool>> override_host =
-      std::make_pair("override_host", true);
-  EXPECT_CALL(mock_context, overrideHostToSelect()).WillOnce(Return(override_host));
-  EXPECT_EQ(override_host, wrapper.overrideHostToSelect());
+  Upstream::LoadBalancerContext::OverrideHost override_host{"override_host", true};
+  EXPECT_CALL(mock_context, overrideHostToSelect())
+      .WillOnce(Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host)));
+  OptRef<const Upstream::LoadBalancerContext::OverrideHost> result = wrapper.overrideHostToSelect();
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(override_host.host, result->host);
+  EXPECT_EQ(override_host.strict, result->strict);
 
   // Test setHeadersModifier.
   std::function<void(Http::ResponseHeaderMap&)> modifier;
@@ -651,10 +663,13 @@ cluster_type:
   NiceMock<Upstream::MockLoadBalancerContext> mock_context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(mock_context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
 
-  // Mock cluster manager to return nullptr for missing_cluster_0.
+  // Mock cluster manager to return nullptr for both clusters, so that no cluster can provide a
+  // host for the request.
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster_0"))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster_1"))
       .WillOnce(Return(nullptr));
 
   // chooseHost should return nullptr when cluster is not found.
@@ -688,8 +703,202 @@ cluster_type:
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
 
   // Test attempt 3 which exceeds available clusters (only have 2).
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(3)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(3)));
 
+  auto result = lb.chooseHost(&context);
+  EXPECT_EQ(nullptr, result.host);
+}
+
+// Test that a cluster without an available host is skipped in favor of the next cluster.
+TEST_F(CompositeClusterTest, ChooseHostFailsOverWhenClusterHasNoHost) {
+  initialize(R"EOF(
+name: failover_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: empty_cluster
+    - name: healthy_cluster
+)EOF");
+
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->clusters_);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Upstream::MockThreadLocalCluster> empty_cluster;
+  NiceMock<Upstream::MockThreadLocalCluster> healthy_cluster;
+  NiceMock<Upstream::MockLoadBalancer> empty_lb;
+  NiceMock<Upstream::MockLoadBalancer> healthy_lb;
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("empty_cluster"))
+      .WillOnce(Return(&empty_cluster));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("healthy_cluster"))
+      .WillOnce(Return(&healthy_cluster));
+  EXPECT_CALL(empty_cluster, loadBalancer()).WillRepeatedly(ReturnRef(empty_lb));
+  EXPECT_CALL(healthy_cluster, loadBalancer()).WillRepeatedly(ReturnRef(healthy_lb));
+  EXPECT_CALL(empty_lb, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{nullptr, "no_healthy_upstream"}));
+  EXPECT_CALL(healthy_lb, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{mock_host}));
+
+  auto result = lb.chooseHost(&context);
+  EXPECT_EQ(mock_host, result.host);
+}
+
+// Test that a cluster missing from the cluster manager is skipped in favor of the next cluster.
+TEST_F(CompositeClusterTest, ChooseHostFailsOverWhenClusterIsMissing) {
+  initialize(R"EOF(
+name: failover_missing_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: missing_cluster
+    - name: healthy_cluster
+)EOF");
+
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->clusters_);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Upstream::MockThreadLocalCluster> healthy_cluster;
+  NiceMock<Upstream::MockLoadBalancer> healthy_lb;
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster"))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("healthy_cluster"))
+      .WillOnce(Return(&healthy_cluster));
+  EXPECT_CALL(healthy_cluster, loadBalancer()).WillRepeatedly(ReturnRef(healthy_lb));
+  EXPECT_CALL(healthy_lb, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{mock_host}));
+
+  auto result = lb.chooseHost(&context);
+  EXPECT_EQ(mock_host, result.host);
+}
+
+// Test that the failure details of the last attempted cluster are preserved when none of the
+// clusters can provide a host.
+TEST_F(CompositeClusterTest, ChooseHostFailsWhenNoClusterHasHosts) {
+  initialize(R"EOF(
+name: all_empty_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: empty_cluster_0
+    - name: empty_cluster_1
+)EOF");
+
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->clusters_);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Upstream::MockThreadLocalCluster> empty_cluster_0;
+  NiceMock<Upstream::MockThreadLocalCluster> empty_cluster_1;
+  NiceMock<Upstream::MockLoadBalancer> empty_lb_0;
+  NiceMock<Upstream::MockLoadBalancer> empty_lb_1;
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("empty_cluster_0"))
+      .WillOnce(Return(&empty_cluster_0));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("empty_cluster_1"))
+      .WillOnce(Return(&empty_cluster_1));
+  EXPECT_CALL(empty_cluster_0, loadBalancer()).WillRepeatedly(ReturnRef(empty_lb_0));
+  EXPECT_CALL(empty_cluster_1, loadBalancer()).WillRepeatedly(ReturnRef(empty_lb_1));
+  EXPECT_CALL(empty_lb_0, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{nullptr, "details_0"}));
+  EXPECT_CALL(empty_lb_1, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{nullptr, "details_1"}));
+
+  auto result = lb.chooseHost(&context);
+  EXPECT_EQ(nullptr, result.host);
+  EXPECT_EQ("details_1", result.details);
+}
+
+// Test that asynchronous host selection is returned as is, without trying the next cluster.
+TEST_F(CompositeClusterTest, ChooseHostDoesNotFallOverOnAsyncHostSelection) {
+  initialize(R"EOF(
+name: async_selection_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: async_cluster
+    - name: healthy_cluster
+)EOF");
+
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->clusters_);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Upstream::MockThreadLocalCluster> async_cluster;
+  NiceMock<Upstream::MockLoadBalancer> async_lb;
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("async_cluster"))
+      .WillOnce(Return(&async_cluster));
+  EXPECT_CALL(async_cluster, loadBalancer()).WillRepeatedly(ReturnRef(async_lb));
+  EXPECT_CALL(async_lb, chooseHost(_)).WillOnce(InvokeWithoutArgs([]() {
+    return Upstream::HostSelectionResponse{nullptr,
+                                           std::make_unique<TestAsyncHostSelectionHandle>()};
+  }));
+
+  // The second cluster is never consulted, so no expectation is set for it.
+  auto result = lb.chooseHost(&context);
+  EXPECT_EQ(nullptr, result.host);
+  EXPECT_NE(nullptr, result.cancelable);
+}
+
+// Test that the legacy behavior is kept when the runtime guard is disabled.
+TEST_F(CompositeClusterTest, ChooseHostFailoverDisabledByRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.composite_cluster_skip_clusters_without_hosts", "false"}});
+
+  initialize(R"EOF(
+name: guarded_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    clusters:
+    - name: empty_cluster
+    - name: healthy_cluster
+)EOF");
+
+  CompositeClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
+                                  cluster_->clusters_);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Upstream::MockThreadLocalCluster> empty_cluster;
+  NiceMock<Upstream::MockLoadBalancer> empty_lb;
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(std::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("empty_cluster"))
+      .WillOnce(Return(&empty_cluster));
+  EXPECT_CALL(empty_cluster, loadBalancer()).WillRepeatedly(ReturnRef(empty_lb));
+  EXPECT_CALL(empty_lb, chooseHost(_))
+      .WillOnce(Return(Upstream::HostSelectionResponse{nullptr, "no_healthy_upstream"}));
+
+  // The second cluster is never consulted because failover is disabled.
   auto result = lb.chooseHost(&context);
   EXPECT_EQ(nullptr, result.host);
 }

@@ -71,6 +71,7 @@ void addCleanupHook(std::function<void()> cleanup) {
 void runCleanupHooks() {
   if (cleanup_hooks != nullptr) {
     // Run hooks in reverse order from how they were added.
+    // NOLINTNEXTLINE(modernize-loop-convert)
     for (auto iter = cleanup_hooks->rbegin(), end = cleanup_hooks->rend(); iter != end; ++iter) {
       (*iter)();
     }

@@ -18,11 +18,11 @@ class EnvoyDeterministicConnectionIdGenerator : public quic::DeterministicConnec
 
 public:
   // Hashes |original| to create a new connection ID in Envoy fashion.
-  absl::optional<quic::QuicConnectionId>
+  std::optional<quic::QuicConnectionId>
   GenerateNextConnectionId(const quic::QuicConnectionId& original) override;
   // Replace the connection ID if and only if |original| is not of the expected
   // length in Envoy fashion.
-  absl::optional<quic::QuicConnectionId>
+  std::optional<quic::QuicConnectionId>
   MaybeReplaceConnectionId(const quic::QuicConnectionId& original,
                            const quic::ParsedQuicVersion& version) override;
 };

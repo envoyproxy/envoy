@@ -1,5 +1,6 @@
 #include "source/common/network/utility.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <list>
@@ -111,7 +112,7 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
 
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port, bool v6only,
-                                     absl::optional<std::string> network_namespace) {
+                                     std::optional<std::string> network_namespace) {
   StatusOr<sockaddr_in> sa4 = IpAddressParsing::parseIPv4(ip_address, port);
   if (sa4.ok()) {
     return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
@@ -128,7 +129,7 @@ Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t por
 
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only,
-                                            absl::optional<std::string> network_namespace) {
+                                            std::optional<std::string> network_namespace) {
   if (ip_address.empty()) {
     return nullptr;
   }
@@ -316,10 +317,19 @@ const std::string& Utility::getIpv6CidrCatchAllAddress() {
 Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Instance& address,
                                                             uint32_t port) {
   switch (address.ip()->version()) {
-  case Address::IpVersion::v4:
-    return std::make_shared<Address::Ipv4Instance>(address.ip()->addressAsString(), port);
-  case Address::IpVersion::v6:
-    return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
+  case Address::IpVersion::v4: {
+    // Copy the sockaddr and update the port to preserve all address properties.
+    sockaddr_in addr = *reinterpret_cast<const sockaddr_in*>(address.sockAddr());
+    addr.sin_port = htons(static_cast<uint16_t>(port));
+    return std::make_shared<Address::Ipv4Instance>(&addr, &address.socketInterface());
+  }
+  case Address::IpVersion::v6: {
+    // Copy the sockaddr and update the port to preserve all address properties including scope ID.
+    sockaddr_in6 addr = *reinterpret_cast<const sockaddr_in6*>(address.sockAddr());
+    addr.sin6_port = htons(static_cast<uint16_t>(port));
+    return std::make_shared<Address::Ipv6Instance>(addr, address.ip()->ipv6()->v6only(),
+                                                   &address.socketInterface());
+  }
   }
   PANIC("not handled");
 }
@@ -368,7 +378,14 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
-  return Address::addressFromSockAddrOrDie(orig_addr, 0, -1, true /* default for v6 constructor */);
+  auto address_or_status =
+      Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
+  if (!address_or_status.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to get address from sockaddr for getOriginalDst: {}",
+                   address_or_status.status().message());
+    return nullptr;
+  }
+  return *address_or_status;
 
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
@@ -485,18 +502,32 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::I
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,
                                                uint64_t num_slices, const Address::Ip* local_ip,
                                                const Address::Instance& peer_address) {
+  bool has_payload = false;
+  for (uint64_t i = 0; i < num_slices; ++i) {
+    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
+      has_payload = true;
+      break;
+    }
+  }
+
+  uint8_t empty_payload = 0;
   Api::IoCallUint64Result send_result(
       /*rc=*/0, /*err=*/Api::IoError::none());
 
   const bool is_connected = handle.wasConnected();
+  if (!has_payload &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_send_zero_length_datagrams")) {
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  const char* operation = is_connected ? (has_payload ? "writev" : "send") : "sendmsg";
   do {
     if (is_connected) {
       // The socket is already connected, so the local and peer addresses should not be specified.
-      // Instead, a writev is called.
-      send_result = handle.writev(slices, num_slices);
+      send_result = has_payload ? handle.writev(slices, num_slices)
+                                : handle.send(&empty_payload, /*length=*/0);
     } else {
-      // For non-connected sockets(), calling sendmsg with the peer address specified ensures the
-      // connection happens first.
+      // For non-connected sockets, calling sendmsg with the peer address specifies the destination.
       send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);
     }
   } while (!send_result.ok() &&
@@ -504,10 +535,9 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "{} bytes {}", is_connected ? "writev" : "sendmsg",
-                   send_result.return_value_);
+    ENVOY_LOG_MISC(trace, "{} bytes {}", operation, send_result.return_value_);
   } else {
-    ENVOY_LOG_MISC(debug, "{} failed with error code {}: {}", is_connected ? "writev" : "sendmsg",
+    ENVOY_LOG_MISC(debug, "{} failed with error code {}: {}", operation,
                    static_cast<int>(send_result.err_->getErrorCode()),
                    send_result.err_->getErrorDetails());
   }
@@ -784,6 +814,23 @@ ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
         warn, "GRO requested but not supported by the OS. Check OS config or disable prefer_gro.");
   }
 }
+
+#if defined(__linux__)
+absl::Status Utility::validateNetworkNamespace(absl::string_view netns) {
+  Api::OsSysCalls& posix = Api::OsSysCallsSingleton::get();
+  // Build a null-terminated path without a heap allocation for the common (short) case.
+  absl::FixedArray<char, 256> netns_path(netns.size() + 1);
+  std::copy(netns.begin(), netns.end(), netns_path.begin());
+  netns_path[netns.size()] = '\0';
+  auto open_result = posix.open(netns_path.data(), O_RDONLY);
+  if (open_result.return_value_ < 0) {
+    return absl::InvalidArgumentError(fmt::format("failed to open network namespace file {}: {}",
+                                                  netns, errorDetails(open_result.errno_)));
+  }
+  posix.close(open_result.return_value_);
+  return absl::OkStatus();
+}
+#endif
 
 } // namespace Network
 } // namespace Envoy

@@ -30,6 +30,7 @@ envoy_cc_library(
         "//envoy/common:exception_lib",
         "//source/common/common:minimal_logger_lib",
         "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/grpc_field_extraction/v3:pkg_cc_proto",
         "@proto-field-extraction//:all_libs",
     ],

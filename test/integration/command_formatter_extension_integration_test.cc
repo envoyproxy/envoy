@@ -25,7 +25,7 @@ TEST_F(CommandFormatterExtensionIntegrationTest, BasicExtension) {
   Protobuf::StringValue config;
 
   typed_config.set_name("envoy.formatter.TestFormatter");
-  typed_config.mutable_typed_config()->PackFrom(config);
+  std::ignore = typed_config.mutable_typed_config()->PackFrom(config);
   formatters.push_back(typed_config);
 
   useAccessLog("%COMMAND_EXTENSION()%", formatters);

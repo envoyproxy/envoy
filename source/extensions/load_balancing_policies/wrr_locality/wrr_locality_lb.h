@@ -68,7 +68,7 @@ public:
 
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override;
 
-    bool recreateOnHostChange() const override { return false; }
+    bool recreateOnHostChangeDeprecated() const override { return false; }
 
     const Upstream::ClusterInfo& cluster_info_;
     Upstream::LoadBalancerFactorySharedPtr endpoint_picking_policy_factory_;

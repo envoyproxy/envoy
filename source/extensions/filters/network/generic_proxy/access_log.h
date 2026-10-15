@@ -32,21 +32,26 @@ using FormatterContext = Formatter::Context;
 
 class StringValueFormatterProvider : public FormatterProvider {
 public:
-  using ValueExtractor = std::function<absl::optional<std::string>(const FormatterContext&,
-                                                                   const StreamInfo::StreamInfo&)>;
+  using ValueExtractor = std::function<std::optional<absl::string_view>(const FormatterContext&)>;
 
-  StringValueFormatterProvider(ValueExtractor f, absl::optional<size_t> max_length = absl::nullopt)
+  StringValueFormatterProvider(ValueExtractor f, std::optional<size_t> max_length = std::nullopt)
       : value_extractor_(f), max_length_(max_length) {}
 
   // FormatterProvider
-  absl::optional<std::string> format(const FormatterContext& context,
-                                     const StreamInfo::StreamInfo& stream_info) const override;
+  std::optional<std::string> format(const FormatterContext& context,
+                                    const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const FormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const FormatterContext& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(Formatter::ValueSink& sink, const FormatterContext& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
+  std::optional<absl::string_view> truncate(std::optional<absl::string_view> optional_str) const;
+
   ValueExtractor value_extractor_;
-  absl::optional<size_t> max_length_;
+  std::optional<size_t> max_length_;
 };
 
 class GenericStatusCodeFormatterProvider : public FormatterProvider {
@@ -54,10 +59,14 @@ public:
   GenericStatusCodeFormatterProvider() = default;
 
   // FormatterProvider
-  absl::optional<std::string> format(const FormatterContext& context,
-                                     const StreamInfo::StreamInfo&) const override;
+  std::optional<std::string> format(const FormatterContext& context,
+                                    const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const FormatterContext& context,
                               const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const FormatterContext& context,
+                const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(Formatter::ValueSink& sink, const FormatterContext& context,
+                     const StreamInfo::StreamInfo&) const override;
 };
 
 Formatter::CommandParserPtr createGenericProxyCommandParser();

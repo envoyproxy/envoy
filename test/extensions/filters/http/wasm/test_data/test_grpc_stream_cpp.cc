@@ -75,7 +75,7 @@ FilterHeadersStatus GrpcStreamContextProto::onRequestHeaders(uint32_t, bool) {
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("cluster");
   std::string grpc_service_string;
-  grpc_service.SerializeToString(&grpc_service_string);
+  std::ignore = grpc_service.SerializeToString(&grpc_service_string);
   HeaderStringPairs initial_metadata;
   initial_metadata.push_back(
       std::make_pair<std::string, std::string>("source", "grpc_stream_proto"));

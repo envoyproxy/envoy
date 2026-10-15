@@ -1,7 +1,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 
-#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

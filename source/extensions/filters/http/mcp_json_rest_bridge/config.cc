@@ -10,26 +10,33 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpJsonRestBridge {
 
-Http::FilterFactoryCb McpJsonRestBridgeFilterConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+McpJsonRestBridgeFilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
         proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
-  auto config = std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  auto config_or = McpJsonRestBridgeFilterConfig::create(proto_config);
+  if (!config_or.ok()) {
+    return config_or.status();
+  }
+  auto config = config_or.value();
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<McpJsonRestBridgeFilter>(config));
   };
 }
 
-// TODO(guoyilin): Read route-specific config (perFilterConfig/mostSpecificPerFilterConfig) in the
-// filter.
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 McpJsonRestBridgeFilterConfigFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge&
+    const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute&
         proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<McpJsonRestBridgeFilterConfig>(proto_config);
+  auto config_or = McpJsonRestBridgePerRouteConfig::create(proto_config);
+  if (!config_or.ok()) {
+    return config_or.status();
+  }
+  return config_or.value();
 }
 
 /**

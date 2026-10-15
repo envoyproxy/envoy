@@ -39,6 +39,10 @@ class EngineImpl(
     return envoyEngine.dumpStats()
   }
 
+  override fun drainConnectionsBySocketTag(tag: Int) {
+    envoyEngine.drainConnectionsBySocketTag(tag)
+  }
+
   override fun resetConnectivityState() {
     envoyEngine.resetConnectivityState()
   }

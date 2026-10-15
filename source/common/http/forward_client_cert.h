@@ -12,6 +12,7 @@ namespace Http {
 // Forward declarations - actual types are defined in conn_manager_config.h.
 enum class ForwardClientCertType;
 enum class ClientCertDetailsType;
+enum class ClientCertFormat;
 
 /**
  * Interface for forward client cert matcher actions. This allows the conn_manager_utility
@@ -29,6 +30,11 @@ public:
    * @return the set of client cert details to include.
    */
   virtual const std::vector<ClientCertDetailsType>& setCurrentClientCertDetails() const PURE;
+
+  /**
+   * @return the format to use for the XFCC header value (text or JSON).
+   */
+  virtual ClientCertFormat clientCertFormat() const PURE;
 };
 
 } // namespace Http

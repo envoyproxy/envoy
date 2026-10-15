@@ -17,7 +17,7 @@ namespace ReverseConnection {
 
 // ReverseTunnelAcceptor implementation
 ReverseTunnelAcceptor::ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context)
-    : extension_(nullptr), context_(&context) {
+    : context_(&context) {
   ENVOY_LOG(debug, "reverse_tunnel: created acceptor");
 }
 
@@ -56,8 +56,8 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
     if (socket) {
       ENVOY_LOG(debug, "reverse_tunnel: reusing cached socket for node: {}", node_id);
       // Create IOHandle that owns the socket using RAII.
-      auto io_handle =
-          std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), node_id);
+      auto io_handle = std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket),
+                                                                           node_id, *tls_registry);
       return io_handle;
     }
   }

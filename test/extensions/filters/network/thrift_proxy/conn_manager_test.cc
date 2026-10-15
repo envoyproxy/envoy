@@ -209,7 +209,8 @@ stat_prefix: test
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
+        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_,
+        server_context_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     ON_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
         .WillByDefault(Invoke([this](const std::string& key, const Protobuf::Struct& obj) {
@@ -447,14 +448,28 @@ stat_prefix: test
     transport->encodeFrame(buffer, metadata, msg);
   }
 
-  void testRequestResponse(bool draining = false) {
+  // When `connection_level_drain` is true the drain is delivered to the connection via onDrain()
+  // and the DrainDecision must not be polled; otherwise the legacy polling path is exercised.
+  void testRequestResponse(bool draining = false, bool connection_level_drain = false) {
     TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain",
+                                 connection_level_drain ? "true" : "false"}});
 
     if (draining) {
-      EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
+      if (connection_level_drain) {
+        EXPECT_CALL(drain_decision_, drainClose(_)).Times(0);
+      } else {
+        EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All))
+            .WillOnce(Return(true));
+      }
     }
 
     initializeFilter(defaultYamlConfig(true));
+    if (draining && connection_level_drain) {
+      // Notify after the filter has registered its connection callbacks.
+      filter_callbacks_.connection_.raiseConnectionDrain(
+          Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
+    }
     writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
     checkDecoderEventsCalledToFilters(MessageType::Call, 0x0F, MessageType::Reply, 0x0F);
@@ -693,6 +708,7 @@ stat_prefix: test
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   std::unique_ptr<ConnectionManager> filter_;
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
@@ -834,9 +850,14 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
   write_buffer_.writeBEInt<uint32_t>(err.length());
   write_buffer_.add(err);
   addSeq(write_buffer_, {
-                            0x08, 0x00, 0x02,       // begin i32 field
-                            0x00, 0x00, 0x00, 0x07, // protocol error
-                            0x00,                   // stop field
+                            0x08,
+                            0x00,
+                            0x02, // begin i32 field
+                            0x00,
+                            0x00,
+                            0x00,
+                            0x07, // protocol error
+                            0x00, // stop field
                         });
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, true))
@@ -900,9 +921,14 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
   write_buffer_.writeBEInt<int32_t>(err.length());
   write_buffer_.add(err);
   addSeq(write_buffer_, {
-                            0x08, 0x00, 0x02,       // begin i32 field
-                            0x00, 0x00, 0x00, 0x05, // missing result
-                            0x00,                   // stop field
+                            0x08,
+                            0x00,
+                            0x02, // begin i32 field
+                            0x00,
+                            0x00,
+                            0x00,
+                            0x05, // missing result
+                            0x00, // stop field
                         });
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, true))
@@ -1118,6 +1144,12 @@ route_config:
 TEST_F(ThriftConnectionManagerTest, RequestAndResponse) { testRequestResponse(false); }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponseDraining) { testRequestResponse(true); }
+
+// Equivalent of RequestAndResponseDraining exercising the connection-level drain path: the Drain
+// response header is driven by the onDrain() notification instead of by polling the DrainDecision.
+TEST_F(ThriftConnectionManagerTest, RequestAndResponseDrainingViaConnectionDrain) {
+  testRequestResponse(true, true);
+}
 
 TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
   initializeFilter();
@@ -1711,7 +1743,8 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeate
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
+        config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_,
+        server_context_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -2206,8 +2239,10 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   TestScopedRuntime scoped_runtime;
 
-  // We want the Drain header to be set by RemoteClose which triggers end downstream in local reply.
-  EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
+  // We want the Drain header to be set by RemoteClose which triggers end downstream in local
+  // reply, not by a drain decision: connection-level drain is enabled and the connection is never
+  // notified of a drain, so the DrainDecision is not polled at all.
+  EXPECT_CALL(drain_decision_, drainClose(_)).Times(0);
 
   initializeFilter();
   writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);

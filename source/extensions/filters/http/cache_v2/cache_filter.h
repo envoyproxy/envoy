@@ -74,7 +74,7 @@ public:
 private:
   using CancelFunction = CancelWrapper::CancelFunction;
   // Gets the cluster name for the current route, if there is one.
-  absl::optional<absl::string_view> clusterName();
+  std::optional<absl::string_view> clusterName();
   // Gets an AsyncClient for the given cluster, or nullopt if there is no upstream.
   OptRef<Http::AsyncClient> asyncClient(absl::string_view cluster_name);
 

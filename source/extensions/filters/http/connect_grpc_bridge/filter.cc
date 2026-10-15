@@ -68,7 +68,7 @@ void renameHeader(Http::HeaderMap& headers, const Envoy::Http::LowerCaseString& 
   headers.remove(from);
 }
 
-absl::optional<std::string> formatGrpcTimeout(uint64_t timeout_ms) {
+std::optional<std::string> formatGrpcTimeout(uint64_t timeout_ms) {
   if (timeout_ms <= GRPC_MAX_TIMEOUT_INTEGRAL) {
     return absl::StrCat(timeout_ms, GrpcTimeoutSuffixes::get().MillisecondsSuffix);
   }
@@ -172,10 +172,10 @@ Buffer::OwnedImpl convertGrpcResponseToConnectStreamingResponse(const T& headers
 }
 
 template <typename T>
-absl::optional<Buffer::OwnedImpl>
+std::optional<Buffer::OwnedImpl>
 convertGrpcResponseToConnectUnaryResponse(Http::ResponseHeaderMap& response_headers,
                                           const T& trailers) {
-  absl::optional<Buffer::OwnedImpl> encoded_error;
+  std::optional<Buffer::OwnedImpl> encoded_error;
 
   response_headers.remove(ConnectHeaderParts::get().TrailerHeader);
 
@@ -537,7 +537,7 @@ bool ConnectGrpcBridgeFilter::decoderBufferLimitReached(uint64_t buffer_length) 
     decoder_callbacks_->sendLocalReply(
         Http::Code::PayloadTooLarge,
         "Request rejected because the filter's internal buffer size exceeds the configured limit.",
-        nullptr, absl::nullopt, RcDetails::get().ConnectBridgeUnaryRequestTooLarge);
+        nullptr, std::nullopt, RcDetails::get().ConnectBridgeUnaryRequestTooLarge);
     return true;
   }
   return false;
@@ -554,7 +554,7 @@ bool ConnectGrpcBridgeFilter::encoderBufferLimitReached(uint64_t buffer_length) 
         Http::Code::InternalServerError,
         "Response discarded because the filter's internal buffer size exceeds the configured "
         "limit.",
-        nullptr, absl::nullopt, RcDetails::get().ConnectBridgeUnaryResponseTooLarge);
+        nullptr, std::nullopt, RcDetails::get().ConnectBridgeUnaryResponseTooLarge);
     return true;
   }
   return false;

@@ -21,7 +21,7 @@ public:
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
-  void closeSocket(Network::ConnectionEvent event) override;
+  void closeSocket(Network::ConnectionEvent event, bool abort_reset) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
 

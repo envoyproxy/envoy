@@ -36,7 +36,7 @@ public:
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
-    const auto& lb_config = dynamic_cast<const WrrLocalityLbProto&>(config);
+    const auto& lb_config = Envoy::Protobuf::DynamicCastMessage<WrrLocalityLbProto>(config);
     Upstream::TypedLoadBalancerFactory* endpoint_picking_policy_factory = nullptr;
     // Iterate through the list of endpoint picking policies to find the first one that we know
     // about.

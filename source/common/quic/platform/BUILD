@@ -68,7 +68,6 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         "@abseil-cpp//absl/base",
         "@abseil-cpp//absl/time",
-        "@abseil-cpp//absl/types:optional",
     ],
 )
 
@@ -122,25 +121,6 @@ envoy_quiche_platform_impl_cc_library(
     deps = [
         "//source/server:backtrace_lib",
         "@quiche//:quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_mem_slice_impl_lib",
-    srcs = [
-        "quiche_mem_slice_impl.cc",
-    ],
-    hdrs = [
-        "quiche_mem_slice_impl.h",
-    ],
-    deps = [
-        ":quiche_flags_impl_lib",
-        ":quiche_logging_impl_lib",
-        "//source/common/buffer:buffer_lib",
-        "@abseil-cpp//absl/container:node_hash_map",
-        "@abseil-cpp//absl/hash",
-        "@quiche//:quiche_common_buffer_allocator_lib",
-        "@quiche//:quiche_common_callbacks",
     ],
 )
 

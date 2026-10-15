@@ -1,14 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -17,19 +21,26 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
         "//test/extensions/dynamic_modules/test_data/c:listener_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/rust:listener_integration_test",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.listener.dynamic_modules"],
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/http:message_lib",
         "//source/common/stats:isolated_store_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/listener/dynamic_modules:config",
         "//source/extensions/filters/listener/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:thread_local_cluster_mocks",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
@@ -37,7 +48,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.listener.dynamic_modules"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/listener/dynamic_modules:config",
@@ -49,14 +61,16 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.listener.dynamic_modules"],
+    rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/registry",
         "//source/common/http:message_lib",
         "//source/common/network:address_lib",
         "//source/common/network:io_socket_error_lib",
@@ -70,5 +84,33 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
+    ],
+)
+
+envoy_extension_cc_dyn_module_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/cpp:listener_integration_test",
+        "//test/extensions/dynamic_modules/test_data/go:listener_integration_test",
+        "//test/extensions/dynamic_modules/test_data/rust:listener_integration_test",
+    ],
+    env = {"GODEBUG": "cgocheck=0"},
+    extension_names = ["envoy.filters.listener.dynamic_modules"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//envoy/registry",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/dynamic_modules:abi_impl",
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        "//source/extensions/filters/listener/dynamic_modules:config",
+        "//source/extensions/filters/network/direct_response:config",
+        "//source/extensions/filters/network/echo:config",
+        "//source/extensions/matching/network/common:inputs_lib",
+        "//test/integration:integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/listener/dynamic_modules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/echo/v3:pkg_cc_proto",
     ],
 )

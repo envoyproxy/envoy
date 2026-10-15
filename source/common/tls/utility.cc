@@ -8,11 +8,16 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/ssl/ssl.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
+#include "openssl/tls1.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {
@@ -220,6 +225,22 @@ std::string Utility::getSerialNumberFromCertificate(X509& cert) {
   return "";
 }
 
+std::string Utility::getSha256DigestFromCertificate(X509& cert) {
+  std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+  unsigned int n;
+  X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
+  RELEASE_ASSERT(n == computed_hash.size(), "");
+  return Hex::encode(computed_hash);
+}
+
+std::string Utility::getSha1DigestFromCertificate(X509& cert) {
+  std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
+  unsigned int n;
+  X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
+  RELEASE_ASSERT(n == computed_hash.size(), "");
+  return Hex::encode(computed_hash);
+}
+
 std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
   std::vector<std::string> subject_alt_names;
   bssl::UniquePtr<GENERAL_NAMES> san_names(
@@ -252,19 +273,19 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(str)), ASN1_STRING_length(str));
     break;
   case GEN_IPADD: {
-    if (general_name->d.ip->length == 4) {
+    if (ASN1_STRING_length(general_name->d.ip) == 4) {
       sockaddr_in sin;
       memset(&sin, 0, sizeof(sin));
       sin.sin_port = 0;
       sin.sin_family = AF_INET;
-      safeMemcpyUnsafeSrc(&sin.sin_addr, general_name->d.ip->data);
+      safeMemcpyUnsafeSrc(&sin.sin_addr, ASN1_STRING_get0_data(general_name->d.ip));
       san = Network::Address::Ipv4Instance::sockaddrToString(sin);
-    } else if (general_name->d.ip->length == 16) {
+    } else if (ASN1_STRING_length(general_name->d.ip) == 16) {
       sockaddr_in6 sin6;
       memset(&sin6, 0, sizeof(sin6));
       sin6.sin6_port = 0;
       sin6.sin6_family = AF_INET6;
-      safeMemcpyUnsafeSrc(&sin6.sin6_addr, general_name->d.ip->data);
+      safeMemcpyUnsafeSrc(&sin6.sin6_addr, ASN1_STRING_get0_data(general_name->d.ip));
       san = Network::Address::Ipv6Instance::sockaddrToString(sin6);
     }
     break;
@@ -431,19 +452,18 @@ std::chrono::seconds Utility::getExpirationUnixTime(const X509* cert) {
   return std::chrono::duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch());
 }
 
-absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
-                                                         TimeSource& time_source) {
+std::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert, TimeSource& time_source) {
   if (cert == nullptr) {
-    return absl::make_optional(std::numeric_limits<uint32_t>::max());
+    return std::make_optional(std::numeric_limits<uint32_t>::max());
   }
   int days, seconds;
   if (ASN1_TIME_diff(&days, &seconds, currentASN1Time(time_source).get(),
                      X509_get0_notAfter(cert))) {
     if (days >= 0 && seconds >= 0) {
-      return absl::make_optional(days);
+      return std::make_optional(days);
     }
   }
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 std::vector<std::string> Utility::getCertificateExtensionOids(X509& cert) {
@@ -512,7 +532,7 @@ SystemTime Utility::getExpirationTime(const X509& cert) {
   return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
-absl::optional<std::string> Utility::getLastCryptoError() {
+std::optional<std::string> Utility::getLastCryptoError() {
   auto err = ERR_get_error();
 
   if (err != 0) {
@@ -522,7 +542,7 @@ absl::optional<std::string> Utility::getLastCryptoError() {
     return std::string(errbuf);
   }
 
-  return absl::nullopt;
+  return std::nullopt;
 }
 
 absl::string_view Utility::getErrorDescription(int err) {
@@ -607,7 +627,8 @@ std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
   if (dist_points != nullptr) {
     for (const DIST_POINT* dp : dist_points.get()) {
       if (dp->distpoint != nullptr && dp->distpoint->type == 0) {
-        GENERAL_NAMES* names = dp->distpoint->name.fullname;
+        GENERAL_NAMES* names =
+            ENVOY_OPENSSL_CAST(reinterpret_cast<GENERAL_NAMES*>, dp->distpoint->name.fullname);
         if (names != nullptr) {
           for (const GENERAL_NAME* general_name : names) {
             crldps.push_back(Utility::generalNameAsString(general_name));
@@ -617,6 +638,133 @@ std::vector<std::string> Utility::getCertificateCrlDpsForLogging(X509* cert) {
     }
   }
   return crldps;
+}
+
+std::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+Utility::compliancePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
+  switch (params.compliance_policies_size()) {
+  case 0:
+    return std::nullopt;
+  case 1:
+    return params.compliance_policies(0);
+  default:
+    IS_ENVOY_BUG("more than one policies are not supported");
+    return std::nullopt;
+  }
+}
+
+absl::StatusOr<ssl_compliance_policy_t> Utility::compliancePolicyToSslPolicy(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy) {
+  using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  switch (policy) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case TlsProto::FIPS_202205:
+    return ssl_compliance_policy_fips_202205;
+  case TlsProto::CNSA2_202603:
+    return ssl_compliance_policy_cnsa2_202603;
+  case TlsProto::CNSA1_202603:
+    return ssl_compliance_policy_cnsa1_202603;
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unknown compliance policy: ", static_cast<int>(policy)));
+}
+
+unsigned Utility::tlsVersionFromProto(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol version,
+    unsigned default_version) {
+  using TlsProto = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  switch (version) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case TlsProto::TLS_AUTO:
+    return default_version;
+  case TlsProto::TLSv1_0:
+    return TLS1_VERSION;
+  case TlsProto::TLSv1_1:
+    return TLS1_1_VERSION;
+  case TlsProto::TLSv1_2:
+    return TLS1_2_VERSION;
+  case TlsProto::TLSv1_3:
+    return TLS1_3_VERSION;
+  }
+  IS_ENVOY_BUG("unexpected tls version");
+  return default_version;
+}
+
+absl::Status Utility::validateCipherCurveAndSigalgsOnSslCtx(absl::string_view cipher_suites,
+                                                            absl::string_view ecdh_curves,
+                                                            absl::string_view signature_algorithms,
+                                                            SSL_CTX* ssl_ctx) {
+  if (!cipher_suites.empty() &&
+      !SSL_CTX_set_strict_cipher_list(ssl_ctx, std::string(cipher_suites).c_str())) {
+    // Retry each token individually to identify which ciphers are bad.
+    // "-" is both a leading operator (-ALL) and a name separator (ECDHE-RSA-AES128). Don't split
+    // on it; strip the leading "-" from any token that starts with it.
+    std::vector<absl::string_view> ciphers = StringUtil::splitToken(cipher_suites, ":+![|]", false);
+    std::vector<std::string> bad_ciphers;
+    for (const auto& cipher : ciphers) {
+      std::string cipher_str(cipher);
+      if (absl::StartsWith(cipher_str, "-")) {
+        cipher_str.erase(cipher_str.begin());
+      }
+      if (!SSL_CTX_set_strict_cipher_list(ssl_ctx, cipher_str.c_str())) {
+        bad_ciphers.push_back(cipher_str);
+      }
+    }
+    return absl::InvalidArgumentError(fmt::format(
+        "Failed to initialize cipher suites {}. The following ciphers were rejected when tried "
+        "individually: {}",
+        cipher_suites, absl::StrJoin(bad_ciphers, ", ")));
+  }
+  if (!ecdh_curves.empty() &&
+      !SSL_CTX_set1_curves_list(ssl_ctx, std::string(ecdh_curves).c_str())) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to initialize ECDH curves ", ecdh_curves));
+  }
+  if (!signature_algorithms.empty() &&
+      !SSL_CTX_set1_sigalgs_list(ssl_ctx, std::string(signature_algorithms).c_str())) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to initialize TLS signature algorithms ", signature_algorithms));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Utility::applyCompliancePolicyToSslCtx(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL_CTX* ssl_ctx) {
+  auto ssl_policy_or_error = compliancePolicyToSslPolicy(policy);
+  if (!ssl_policy_or_error.ok()) {
+    return ssl_policy_or_error.status();
+  }
+  if (SSL_CTX_set_compliance_policy(ssl_ctx, *ssl_policy_or_error) != 1) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to apply compliance policy: ", getLastCryptoError().value_or("")));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status Utility::applyCompliancePolicyToSsl(
+    envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy,
+    SSL* ssl) {
+  auto ssl_policy_or_error = compliancePolicyToSslPolicy(policy);
+  if (!ssl_policy_or_error.ok()) {
+    return ssl_policy_or_error.status();
+  }
+  if (SSL_set_compliance_policy(ssl, *ssl_policy_or_error) != 1) {
+    return absl::InternalError(absl::StrCat("Failed to apply per-cert compliance policy: ",
+                                            getLastCryptoError().value_or("")));
+  }
+  return absl::OkStatus();
+}
+
+Utility::EffectiveTlsParams Utility::effectiveTlsParams(const Ssl::TlsParams& params,
+                                                        bool provides_ciphers_and_curves,
+                                                        bool provides_sigalgs) {
+  return EffectiveTlsParams{
+      .cipher_suites = provides_ciphers_and_curves ? EMPTY_STRING : params.cipher_suites,
+      .ecdh_curves = provides_ciphers_and_curves ? EMPTY_STRING : params.ecdh_curves,
+      .signature_algorithms = provides_sigalgs ? EMPTY_STRING : params.signature_algorithms,
+  };
 }
 
 } // namespace Tls

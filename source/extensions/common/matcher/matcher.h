@@ -53,7 +53,7 @@ public:
 
     bool matches_{false};            // Does the matcher currently match?
     bool might_change_status_{true}; // Is it possible for matches_ to change in subsequent updates?
-    std::unique_ptr<MatcherCtx> ctx_{}; // Context used by matchers to save interim context.
+    std::unique_ptr<MatcherCtx> ctx_; // Context used by matchers to save interim context.
   };
 
   using MatchStatusVector = std::vector<MatchStatus>;

@@ -2,7 +2,7 @@
 
 #include "source/common/config/utility.h"
 
-#include "test/mocks/stats/mocks.h"
+#include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"

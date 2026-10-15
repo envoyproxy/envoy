@@ -1,7 +1,6 @@
 #include "source/common/tcp/async_tcp_client_impl.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -20,7 +19,7 @@ namespace Tcp {
 
 class CustomMockClientConnection : public Network::MockClientConnection {
 public:
-  ~CustomMockClientConnection() {
+  ~CustomMockClientConnection() override {
     if (state_ != Connection::State::Closed) {
       raiseEvent(Network::ConnectionEvent::LocalClose);
     }
@@ -77,7 +76,7 @@ TEST_F(AsyncTcpClientImplTest, BasicWrite) {
   setUpClient();
   expectCreateConnection();
 
-  EXPECT_CALL(*connection_, write(BufferStringEqual("test data"), _));
+  EXPECT_CALL(*connection_, write(BufferString("test data"), _));
   Buffer::OwnedImpl buff("test data");
   client_->write(buff, false);
 

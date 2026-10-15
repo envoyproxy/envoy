@@ -31,8 +31,8 @@ public:
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
-    ASSERT(dynamic_cast<const MaglevLbProto*>(&config) != nullptr);
-    const MaglevLbProto& typed_proto = dynamic_cast<const MaglevLbProto&>(config);
+    ASSERT(Envoy::Protobuf::DynamicCastMessage<MaglevLbProto>(&config) != nullptr);
+    const MaglevLbProto& typed_proto = Envoy::Protobuf::DynamicCastMessage<MaglevLbProto>(config);
     absl::Status creation_status = absl::OkStatus();
     auto typed_config = std::make_unique<Upstream::TypedMaglevLbConfig>(
         typed_proto, context.regexEngine(), creation_status);

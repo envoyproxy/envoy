@@ -112,7 +112,7 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
       }
   )pb";
   envoy::RouterCheckToolSchema::ValidationItemResult expected_result_proto;
-  Protobuf::TextFormat::ParseFromString(expected_result_str, &expected_result_proto);
+  std::ignore = Protobuf::TextFormat::ParseFromString(expected_result_str, &expected_result_proto);
 
   EXPECT_TRUE(TestUtility::protoEqual(expected_result_proto, test_result, true));
 }
@@ -130,6 +130,23 @@ TEST(RouterCheckTest, DynamicMetadataTest) {
     EXPECT_TRUE(test_result.test_passed()) << "Test " << test_result.test_name() << " failed";
     EXPECT_FALSE(test_result.has_failure()) << "Test " << test_result.test_name() << " has failure";
   }
+}
+
+TEST(RouterCheckTest, RouteMetadataTest) {
+  const std::string config_filename_ =
+      TestEnvironment::runfilesPath(absl::StrCat(kDir, "RouteMetadata.yaml"));
+  const std::string tests_filename_ =
+      TestEnvironment::runfilesPath(absl::StrCat(kDir, "RouteMetadata.golden.proto.json"));
+  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+  const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
+      checktool.compareEntries(tests_filename_);
+  ASSERT_EQ(test_results.size(), 3);
+  // The route metadata matches the expected namespaced value.
+  EXPECT_TRUE(test_results[0].test_passed());
+  // The route metadata value differs from the expected value.
+  EXPECT_FALSE(test_results[1].test_passed());
+  // The default route has no metadata for the namespace.
+  EXPECT_FALSE(test_results[2].test_passed());
 }
 
 } // namespace

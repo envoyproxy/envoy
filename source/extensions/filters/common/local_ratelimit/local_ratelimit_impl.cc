@@ -45,6 +45,10 @@ ShareProviderManager::ShareProviderManager(Event::Dispatcher& main_dispatcher,
 
 ShareProviderManager::~ShareProviderManager() {
   // Ensure the callback is unregistered on the main dispatcher thread.
+  if (main_dispatcher_.isThreadSafe()) {
+    handle_.reset();
+    return;
+  }
   main_dispatcher_.post([h = std::move(handle_)]() {});
 }
 
@@ -87,6 +91,22 @@ bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   return token_bucket_.consume(cb) != 0.0;
 }
 
+void RateLimitTokenBucket::refill(uint64_t tokens) {
+  if (tokens == 0) {
+    return;
+  }
+  // Use a negative consumed value to add tokens back, capped so we never exceed max_tokens.
+  token_bucket_.consume([tokens_to_refill = static_cast<double>(tokens),
+                         max = token_bucket_.maxTokens()](double total) -> double {
+    const double headroom = max - total;
+    if (headroom <= 0) {
+      return 0.0; // Already at or above max, nothing to refill.
+    }
+    // Return negative consumed = tokens added back, capped at available headroom.
+    return -std::min(tokens_to_refill, headroom);
+  });
+}
+
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
     const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
@@ -95,15 +115,22 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
     uint32_t lru_size)
     : time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
-      always_consume_default_token_bucket_(always_consume_default_token_bucket) {
+      always_consume_default_token_bucket_(always_consume_default_token_bucket),
+      shadow_mode_no_short_circuit_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.local_ratelimit_shadow_mode_no_short_circuit")) {
   // Ignore the default token bucket if fill_interval is 0 because 0 fill_interval means nothing
   // and has undefined behavior.
   if (fill_interval.count() > 0) {
-    if (fill_interval < std::chrono::milliseconds(50)) {
-      throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
+    if (max_tokens == 0) {
+      // max_tokens=0 means always reject; no token bucket needed.
+      always_deny_default_ = true;
+    } else {
+      if (fill_interval < std::chrono::milliseconds(50)) {
+        throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
+      }
+      default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(
+          max_tokens, tokens_per_fill, fill_interval, time_source_, false);
     }
-    default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(
-        max_tokens, tokens_per_fill, fill_interval, time_source_, false);
   }
 
   for (const auto& descriptor : descriptors) {
@@ -125,8 +152,10 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     const auto shadow_mode = descriptor.shadow_mode();
 
     // Validate that the descriptor's fill interval is logically correct (same
-    // constraint of >=50msec as for fill_interval).
-    if (per_descriptor_fill_interval < std::chrono::milliseconds(50)) {
+    // constraint of >=50msec as for fill_interval). Skip the check when max_tokens=0
+    // since the fill interval is irrelevant for an always-reject bucket.
+    if (per_descriptor_max_tokens != 0 &&
+        per_descriptor_fill_interval < std::chrono::milliseconds(50)) {
       throw EnvoyException("local rate limit descriptor token bucket fill timer must be >= 50ms");
     }
 
@@ -188,10 +217,24 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
   const double share_factor =
       share_provider_ != nullptr ? share_provider_->getTokensShareFactor() : 1.0;
 
+  std::optional<MatchResult> first_failed_shadow_result;
+
   // See if the request is forbidden by any of the matched descriptors.
   for (const auto& match_result : matched_results) {
-    if (!match_result.token_bucket->consume(
-            share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
+    if (match_result.request_descriptor.get().is_negative_hits_ &&
+        match_result.request_descriptor.get().hits_addend_.has_value()) {
+      // Negative addend means refill tokens instead of consuming.
+      match_result.token_bucket->refill(match_result.request_descriptor.get().hits_addend_.value());
+    } else if (!match_result.token_bucket->consume(
+                   share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
+      if (shadow_mode_no_short_circuit_ && match_result.token_bucket->shadowMode()) {
+        // A shadow mode descriptor never denies the request by itself, so keep evaluating the
+        // remaining descriptors and the default token bucket.
+        if (!first_failed_shadow_result.has_value()) {
+          first_failed_shadow_result = match_result;
+        }
+        continue;
+      }
       // If the request is forbidden by a descriptor, return the result and the descriptor
       // token bucket.
       return {false, std::shared_ptr<TokenBucketContext>(match_result.token_bucket),
@@ -206,6 +249,28 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
   // See if the request is forbidden by the default token bucket.
   if (matched_results.empty() || always_consume_default_token_bucket_) {
     if (default_token_bucket_ == nullptr) {
+      if (always_deny_default_) {
+        return {false, nullptr};
+      }
+    } else {
+      if (const bool result = default_token_bucket_->consume(share_factor); !result) {
+        // If the request is forbidden by the default token bucket, return the result and the
+        // default token bucket.
+        return {false, std::shared_ptr<TokenBucketContext>(default_token_bucket_),
+                RateLimit::XRateLimitOption::RateLimit_XRateLimitOption_UNSPECIFIED};
+      }
+    }
+  }
+
+  // All enforced rate limits passed. If any shadow mode descriptor failed consume(), return that
+  // result.
+  if (first_failed_shadow_result.has_value()) {
+    return {false, std::shared_ptr<TokenBucketContext>(first_failed_shadow_result->token_bucket),
+            first_failed_shadow_result->request_descriptor.get().x_ratelimit_option_};
+  }
+
+  if (matched_results.empty() || always_consume_default_token_bucket_) {
+    if (default_token_bucket_ == nullptr) {
       return {
           true,
           matched_results.empty()
@@ -214,16 +279,7 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
           matched_results.empty()
               ? RateLimit::XRateLimitOption::RateLimit_XRateLimitOption_UNSPECIFIED
               : matched_results[0].request_descriptor.get().x_ratelimit_option_,
-
       };
-    }
-    ASSERT(default_token_bucket_ != nullptr);
-
-    if (const bool result = default_token_bucket_->consume(share_factor); !result) {
-      // If the request is forbidden by the default token bucket, return the result and the
-      // default token bucket.
-      return {false, std::shared_ptr<TokenBucketContext>(default_token_bucket_),
-              RateLimit::XRateLimitOption::RateLimit_XRateLimitOption_UNSPECIFIED};
     }
 
     // If the request is allowed then return the result the token bucket. The descriptor
@@ -232,7 +288,7 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
             matched_results.empty()
                 ? RateLimit::XRateLimitOption::RateLimit_XRateLimitOption_UNSPECIFIED
                 : matched_results[0].request_descriptor.get().x_ratelimit_option_};
-  };
+  }
 
   ASSERT(!matched_results.empty());
   std::shared_ptr<TokenBucketContext> bucket_context =

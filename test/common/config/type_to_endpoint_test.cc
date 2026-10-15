@@ -16,7 +16,7 @@ namespace {
 // Verify type-to-endpoint methods with RDS as an exemplar.
 TEST(TypeToEndpoint, All) {
   // The dummy messages are included for link purposes only.
-  envoy::service::route::v3::RdsDummy _v3_rds_dummy;
+  envoy::service::route::v3::RdsDummy _v3_rds_dummy [[maybe_unused]];
 
   // Delta gRPC endpoints.
   EXPECT_EQ(

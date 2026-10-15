@@ -19,7 +19,7 @@ public:
   // ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
                             ThreadLocalClusterCommand& get_cluster) override;
-  void onClusterRemoval(const std::string& cluster) override;
+  void onClusterRemoval(absl::string_view cluster) override;
 
 private:
   const std::string cluster_name_;

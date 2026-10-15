@@ -28,6 +28,17 @@ typed_config:
   forward_username_header: x-username
 )EOF";
 
+const std::string BasicAuthFilterConfigWithRealm =
+    R"EOF(
+name: envoy.filters.http.basic_auth
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth
+  users:
+    inline_string: |-
+      user1:{SHA}tESsBmE/yNY3lb6a0L6vVQEZNqw=
+  realm: myapp
+)EOF";
+
 // admin, admin
 const std::string AdminUsers =
     R"EOF(
@@ -40,6 +51,11 @@ class BasicAuthIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initializeFilter() {
     config_helper_.prependFilter(BasicAuthFilterConfig);
+    initialize();
+  }
+
+  void initializeFilterWithRealm() {
+    config_helper_.prependFilter(BasicAuthFilterConfigWithRealm);
     initialize();
   }
 
@@ -56,7 +72,7 @@ public:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
+          std::ignore = (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
         });
     config_helper_.prependFilter(BasicAuthFilterConfig);
     initialize();
@@ -74,23 +90,20 @@ public:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
+          std::ignore = (*config)["envoy.filters.http.basic_auth"].PackFrom(per_route_config);
         });
     config_helper_.prependFilter(BasicAuthFilterConfig);
     initialize();
   }
 };
 
-// BasicAuth integration tests that should run with all protocols
-class BasicAuthIntegrationTestAllProtocols : public BasicAuthIntegrationTest {};
-
 INSTANTIATE_TEST_SUITE_P(
-    Protocols, BasicAuthIntegrationTestAllProtocols,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    Protocols, BasicAuthIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Request with valid credential
-TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
+TEST_P(BasicAuthIntegrationTest, ValidCredential) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -115,7 +128,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
 }
 
 // Request without credential
-TEST_P(BasicAuthIntegrationTestAllProtocols, NoCredential) {
+TEST_P(BasicAuthIntegrationTest, NoCredential) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -136,7 +149,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoCredential) {
 }
 
 // Request without wrong password
-TEST_P(BasicAuthIntegrationTestAllProtocols, WrongPasswrod) {
+TEST_P(BasicAuthIntegrationTest, WrongPasswrod) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -158,7 +171,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, WrongPasswrod) {
 }
 
 // Request with none-existed user
-TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
+TEST_P(BasicAuthIntegrationTest, NoneExistedUser) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -180,7 +193,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
 }
 
 // Request with existing username header
-TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
+TEST_P(BasicAuthIntegrationTest, ExistingUsernameHeader) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -205,7 +218,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteDisabled) {
+TEST_P(BasicAuthIntegrationTest, BasicAuthPerRouteDisabled) {
   disablePerRouteFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -223,7 +236,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteDisabled) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabled) {
+TEST_P(BasicAuthIntegrationTest, BasicAuthPerRouteEnabled) {
   initializePerRouteFilter(AdminUsers);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -242,7 +255,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabled) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabledInvalidCredentials) {
+TEST_P(BasicAuthIntegrationTest, BasicAuthPerRouteEnabledInvalidCredentials) {
   initializePerRouteFilter(AdminUsers);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -260,6 +273,27 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, BasicAuthPerRouteEnabledInvalidCred
   EXPECT_EQ("User authentication failed. Invalid username/password combination.", response->body());
   EXPECT_EQ(
       "Basic realm=\"http://host/\"",
+      response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
+}
+
+// Verify that the proto-level realm field is wired through config.
+TEST_P(BasicAuthIntegrationTest, FixedRealmInWWWAuthenticate) {
+  initializeFilterWithRealm();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/some/deep/path"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  EXPECT_EQ("User authentication failed. Missing username and password.", response->body());
+  EXPECT_EQ(
+      "Basic realm=\"myapp\"",
       response->headers().get(Http::Headers::get().WWWAuthenticate)[0]->value().getStringView());
 }
 

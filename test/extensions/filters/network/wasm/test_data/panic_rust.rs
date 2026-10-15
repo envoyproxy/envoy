@@ -10,15 +10,15 @@ struct TestStream;
 impl Context for TestStream {}
 
 impl StreamContext for TestStream {
-    fn on_new_connection(&mut self) -> Action {
-        panic!("");
-    }
+  fn on_new_connection(&mut self) -> Action {
+    panic!("");
+  }
 
-    fn on_downstream_data(&mut self, _: usize, _: bool) -> Action {
-        panic!("");
-    }
+  fn on_downstream_data(&mut self, _: usize, _: bool) -> Action {
+    panic!("");
+  }
 
-    fn on_upstream_data(&mut self, _: usize, _: bool) -> Action {
-        panic!("");
-    }
+  fn on_upstream_data(&mut self, _: usize, _: bool) -> Action {
+    panic!("");
+  }
 }

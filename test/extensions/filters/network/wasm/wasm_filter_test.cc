@@ -6,7 +6,6 @@
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/wasm_base.h"
 
 #include "gmock/gmock.h"

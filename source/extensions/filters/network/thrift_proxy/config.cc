@@ -64,8 +64,8 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
           &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
         filter_config, context.serverFactoryContext().api().randomGenerator(),
-        context.serverFactoryContext().mainThreadDispatcher().timeSource(),
-        context.drainDecision()));
+        context.serverFactoryContext().mainThreadDispatcher().timeSource(), context.drainDecision(),
+        context.serverFactoryContext()));
   };
 }
 
@@ -93,7 +93,7 @@ ConfigImpl::ConfigImpl(
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftFilter router;
     router.set_name("envoy.filters.thrift.router");
     envoy::extensions::filters::network::thrift_proxy::router::v3::Router default_router;
-    router.mutable_typed_config()->PackFrom(default_router);
+    std::ignore = router.mutable_typed_config()->PackFrom(default_router);
     processFilter(router);
   } else {
     for (const auto& filter : config.thrift_filters()) {
@@ -117,7 +117,7 @@ ConfigImpl::ConfigImpl(
         config.trds(), context_.serverFactoryContext(), stats_prefix_, context_.initManager());
   } else {
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context_.serverFactoryContext());
+        config.route_config(), context_.serverFactoryContext(), context_.initManager());
   }
 
   for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {

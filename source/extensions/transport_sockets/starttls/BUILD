@@ -41,7 +41,6 @@ envoy_cc_library(
         "//source/common/common:thread_annotations",
         "//source/common/network:transport_socket_options_lib",
         "@abseil-cpp//absl/synchronization",
-        "@abseil-cpp//absl/types:optional",
         "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
     ],
 )

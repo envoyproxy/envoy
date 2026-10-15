@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "envoy/common/pure.h"
@@ -19,8 +20,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/singleton/const_singleton.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -179,6 +178,9 @@ struct ResponseCodeDetailValues {
   const std::string InvalidPath = "invalid_path";
   // The request was rejected due to using an absolute path on a route not supporting them.
   const std::string AbsolutePath = "absolute_path_rejected";
+  // The QUERY request was rejected because it had no Content-Type field. RFC 10008 Section 2
+  // requires servers to fail such requests.
+  const std::string QueryMissingContentType = "query_missing_content_type";
   // The request was rejected because path normalization was configured on and failed, probably due
   // to an invalid path.
   const std::string PathNormalizationFailed = "path_normalization_failed";
@@ -276,6 +278,7 @@ enum class DetectedCloseType {
 struct LocalCloseReasonValues {
   const std::string DeferredCloseOnDrainedConnection = "deferred_close_on_drained_connection";
   const std::string IdleTimeoutOnConnection = "on_idle_timeout";
+  const std::string DrainDeadlineOnConnection = "on_drain_deadline";
   const std::string CloseForConnectRequestOrTcpTunneling =
       "close_for_connect_request_or_tcp_tunneling";
   const std::string Http2PingTimeout = "http2_ping_timeout";
@@ -283,6 +286,7 @@ struct LocalCloseReasonValues {
   const std::string TransportSocketTimeout = "transport_socket_timeout";
   const std::string TriggeredDelayedCloseTimeout = "triggered_delayed_close_timeout";
   const std::string TcpProxyInitializationFailure = "tcp_initializion_failure:";
+  const std::string TcpProxyDrainClose = "tcp_proxy_drain_close";
   const std::string TcpSessionIdleTimeout = "tcp_session_idle_timeout";
   const std::string MaxConnectionDurationReached = "max_connection_duration_reached";
   const std::string ClosingUpstreamTcpDueToDownstreamRemoteClose =
@@ -293,6 +297,8 @@ struct LocalCloseReasonValues {
       "closing_upstream_tcp_connection_due_to_downstream_reset_close";
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
+  const std::string BufferHighWatermarkTimeout = "buffer_high_watermark_timeout_reached";
+  const std::string OverloadManagerClose = "overload_manager_close";
 };
 
 using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
@@ -361,30 +367,30 @@ struct UpstreamTiming {
     upstream_handshake_complete_ = time_source.monotonicTime();
   }
 
-  absl::optional<MonotonicTime> upstreamHandshakeComplete() const {
+  std::optional<MonotonicTime> upstreamHandshakeComplete() const {
     return upstream_handshake_complete_;
   }
 
-  absl::optional<std::chrono::nanoseconds> connectionPoolCallbackLatency() const {
+  std::optional<std::chrono::nanoseconds> connectionPoolCallbackLatency() const {
     return connection_pool_callback_latency_;
   }
 
-  absl::optional<std::chrono::nanoseconds> connection_pool_callback_latency_;
-  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> first_upstream_rx_body_byte_received_;
+  std::optional<std::chrono::nanoseconds> connection_pool_callback_latency_;
+  std::optional<MonotonicTime> first_upstream_tx_byte_sent_;
+  std::optional<MonotonicTime> last_upstream_tx_byte_sent_;
+  std::optional<MonotonicTime> first_upstream_rx_byte_received_;
+  std::optional<MonotonicTime> last_upstream_rx_byte_received_;
+  std::optional<MonotonicTime> first_upstream_rx_body_byte_received_;
 
-  absl::optional<MonotonicTime> upstream_connect_start_;
-  absl::optional<MonotonicTime> upstream_connect_complete_;
-  absl::optional<MonotonicTime> upstream_handshake_complete_;
+  std::optional<MonotonicTime> upstream_connect_start_;
+  std::optional<MonotonicTime> upstream_connect_complete_;
+  std::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
 struct DownstreamTiming {
   void setValue(absl::string_view key, MonotonicTime value) { timings_[key] = value; }
 
-  absl::optional<MonotonicTime> getValue(absl::string_view value) const {
+  std::optional<MonotonicTime> getValue(absl::string_view value) const {
     auto ret = timings_.find(value);
     if (ret == timings_.end()) {
       return {};
@@ -392,23 +398,32 @@ struct DownstreamTiming {
     return ret->second;
   }
 
-  absl::optional<MonotonicTime> lastDownstreamRxByteReceived() const {
+  std::optional<MonotonicTime> lastDownstreamRxByteReceived() const {
     return last_downstream_rx_byte_received_;
   }
-  absl::optional<MonotonicTime> firstDownstreamTxByteSent() const {
+  std::optional<MonotonicTime> firstDownstreamTxByteSent() const {
     return first_downstream_tx_byte_sent_;
   }
-  absl::optional<MonotonicTime> lastDownstreamTxByteSent() const {
+  std::optional<MonotonicTime> lastDownstreamTxByteSent() const {
     return last_downstream_tx_byte_sent_;
   }
-  absl::optional<MonotonicTime> downstreamHandshakeComplete() const {
+  std::optional<MonotonicTime> downstreamHandshakeStart() const {
+    return downstream_handshake_start_;
+  }
+  std::optional<MonotonicTime> downstreamHandshakeComplete() const {
     return downstream_handshake_complete_;
   }
-  absl::optional<MonotonicTime> lastDownstreamAckReceived() const {
+  std::optional<MonotonicTime> lastDownstreamAckReceived() const {
     return last_downstream_ack_received_;
   }
-  absl::optional<MonotonicTime> lastDownstreamHeaderRxByteReceived() const {
+  std::optional<MonotonicTime> lastDownstreamHeaderRxByteReceived() const {
     return last_downstream_header_rx_byte_received_;
+  }
+  std::optional<MonotonicTime> downstreamConnectionBegin() const {
+    return downstream_connection_begin_;
+  }
+  std::optional<MonotonicTime> downstreamConnectionEnd() const {
+    return downstream_connection_end_;
   }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
@@ -423,6 +438,14 @@ struct DownstreamTiming {
     ASSERT(!last_downstream_tx_byte_sent_);
     last_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
+  void onDownstreamHandshakeStart(TimeSource& time_source) {
+    // Records the time the TLS handshake started, i.e. when the ClientHello was received.
+    // Only the first value is kept so the handshake duration is not skewed by renegotiation
+    // or resumption.
+    if (!downstream_handshake_start_) {
+      downstream_handshake_start_ = time_source.monotonicTime();
+    }
+  }
   void onDownstreamHandshakeComplete(TimeSource& time_source) {
     // An existing value can be overwritten, e.g. in resumption case.
     downstream_handshake_complete_ = time_source.monotonicTime();
@@ -435,20 +458,41 @@ struct DownstreamTiming {
     ASSERT(!last_downstream_header_rx_byte_received_);
     last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
   }
+  void setDownstreamConnectionBegin(MonotonicTime time) {
+    ASSERT(!downstream_connection_begin_);
+    downstream_connection_begin_ = time;
+  }
+  // Sets the downstream handshake start/complete time points to specific values. Used to copy the
+  // connection-level time points onto a request-level stream info for access logging.
+  void setDownstreamHandshakeStart(MonotonicTime time) { downstream_handshake_start_ = time; }
+  void setDownstreamHandshakeComplete(MonotonicTime time) { downstream_handshake_complete_ = time; }
+  void onDownstreamConnectionEnd(TimeSource& time_source) {
+    // Record only the first close so the connection duration is not inflated.
+    if (!downstream_connection_end_) {
+      downstream_connection_end_ = time_source.monotonicTime();
+    }
+  }
 
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
   // The time when the last byte of the request was received.
-  absl::optional<MonotonicTime> last_downstream_rx_byte_received_;
+  std::optional<MonotonicTime> last_downstream_rx_byte_received_;
   // The time when the first byte of the response was sent downstream.
-  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
+  std::optional<MonotonicTime> first_downstream_tx_byte_sent_;
   // The time when the last byte of the response was sent downstream.
-  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  std::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  // The time the TLS handshake started, i.e. when the ClientHello was received. Set at
+  // connection level.
+  std::optional<MonotonicTime> downstream_handshake_start_;
   // The time the TLS handshake completed. Set at connection level.
-  absl::optional<MonotonicTime> downstream_handshake_complete_;
+  std::optional<MonotonicTime> downstream_handshake_complete_;
   // The time the final ack was received from the client.
-  absl::optional<MonotonicTime> last_downstream_ack_received_;
+  std::optional<MonotonicTime> last_downstream_ack_received_;
   // The time when the last header byte was received.
-  absl::optional<MonotonicTime> last_downstream_header_rx_byte_received_;
+  std::optional<MonotonicTime> last_downstream_header_rx_byte_received_;
+  // The time the downstream connection was established.
+  std::optional<MonotonicTime> downstream_connection_begin_;
+  // The time the downstream connection was closed.
+  std::optional<MonotonicTime> downstream_connection_end_;
 };
 
 // Measure the number of bytes sent and received for a stream.
@@ -570,9 +614,9 @@ public:
   virtual void setUpstreamConnectionId(uint64_t id) PURE;
 
   /**
-   * @return the ID of the upstream connection, or absl::nullopt if not available.
+   * @return the ID of the upstream connection, or std::nullopt if not available.
    */
-  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
+  virtual std::optional<uint64_t> upstreamConnectionId() const PURE;
 
   /**
    * @param interface name of the upstream connection's local socket.
@@ -580,10 +624,10 @@ public:
   virtual void setUpstreamInterfaceName(absl::string_view interface_name) PURE;
 
   /**
-   * @return interface name of the upstream connection's local socket, or absl::nullopt if not
+   * @return interface name of the upstream connection's local socket, or std::nullopt if not
    * available.
    */
-  virtual absl::optional<absl::string_view> upstreamInterfaceName() const PURE;
+  virtual std::optional<absl::string_view> upstreamInterfaceName() const PURE;
 
   /**
    * @param connection_info sets the upstream ssl connection.
@@ -686,7 +730,7 @@ public:
   virtual uint64_t upstreamNumStreams() const PURE;
 
   virtual void setUpstreamProtocol(Http::Protocol protocol) PURE;
-  virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
+  virtual std::optional<Http::Protocol> upstreamProtocol() const PURE;
 
   /**
    * Add a host to the list of upstream hosts that were attempted for this request.
@@ -742,7 +786,7 @@ public:
   setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
 
   /*
-   * @param short string type flag to indicate the noteworthy event of this stream. Mutliple flags
+   * @param short string type flag to indicate the noteworthy event of this stream. Multiple flags
    * could be added and will be concatenated with comma. It should not contain any empty or space
    * characters (' ', '\t', '\f', '\v', '\n', '\r').
    *
@@ -759,12 +803,12 @@ public:
   /**
    * @param std::string name denotes the name of the virtual cluster.
    */
-  virtual void setVirtualClusterName(const absl::optional<std::string>& name) PURE;
+  virtual void setVirtualClusterName(const std::optional<std::string>& name) PURE;
 
   /**
    * @return std::string& the name of the virtual cluster which got matched.
    */
-  virtual const absl::optional<std::string>& virtualClusterName() const PURE;
+  virtual const std::optional<std::string>& virtualClusterName() const PURE;
 
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
@@ -799,7 +843,7 @@ public:
   /**
    * @return the protocol of the request.
    */
-  virtual absl::optional<Http::Protocol> protocol() const PURE;
+  virtual std::optional<Http::Protocol> protocol() const PURE;
 
   /**
    * @param protocol the request's protocol.
@@ -809,17 +853,17 @@ public:
   /**
    * @return the response code.
    */
-  virtual absl::optional<uint32_t> responseCode() const PURE;
+  virtual std::optional<uint32_t> responseCode() const PURE;
 
   /**
    * @return the response code details.
    */
-  virtual const absl::optional<std::string>& responseCodeDetails() const PURE;
+  virtual const std::optional<std::string>& responseCodeDetails() const PURE;
 
   /**
    * @return the termination details of the connection.
    */
-  virtual const absl::optional<std::string>& connectionTerminationDetails() const PURE;
+  virtual const std::optional<std::string>& connectionTerminationDetails() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.
@@ -851,13 +895,13 @@ public:
   /**
    * @return the current duration of the request, or the total duration of the request, if ended.
    */
-  virtual absl::optional<std::chrono::nanoseconds> currentDuration() const PURE;
+  virtual std::optional<std::chrono::nanoseconds> currentDuration() const PURE;
 
   /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
    * and may be longer than lastDownstreamTxByteSent.
    */
-  virtual absl::optional<std::chrono::nanoseconds> requestComplete() const PURE;
+  virtual std::optional<std::chrono::nanoseconds> requestComplete() const PURE;
 
   /**
    * Sets the end time for the request. This method is called once the request has been fully
@@ -923,15 +967,42 @@ public:
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
   /**
-   * @return const Router::RouteConstSharedPtr Get the route selected for this request.
+   * @return OptRef<const Router::Route> Get the route selected for this request.
    */
-  virtual Router::RouteConstSharedPtr route() const PURE;
+  virtual OptRef<const Router::Route> route() const PURE;
 
   /**
-   * @return const Router::VirtualHostConstSharedPtr& Get the virtual host selected for this
-   * request.
+   * @return Router::RouteConstSharedPtr Get the route selected for this request, extended to
+   * allow a caller to extend or transfer ownership.
    */
-  virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
+  virtual Router::RouteConstSharedPtr routeSharedPtr() const PURE;
+
+  /**
+   * @return OptRef<const Router::VirtualHost> Get the virtual host selected for this request.
+   */
+  virtual OptRef<const Router::VirtualHost> virtualHost() const PURE;
+
+  /**
+   * @return Router::VirtualHostConstSharedPtr Get the virtual host selected for this request,
+   * extended to allow a caller to extend or transfer ownership.
+   */
+  virtual Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
+
+  /**
+   * Records the wall time of one route resolution, adding to the total time and the count.
+   * @param duration the wall time the resolution took.
+   */
+  virtual void addRouteResolutionTime(std::chrono::nanoseconds duration) PURE;
+
+  /**
+   * @return the total wall time spent resolving the route of this stream.
+   */
+  virtual std::chrono::nanoseconds routeResolutionTime() const PURE;
+
+  /**
+   * @return how many times the route of this stream was resolved.
+   */
+  virtual uint32_t routeResolutionCount() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
@@ -981,11 +1052,15 @@ public:
   setUpstreamClusterInfo(const Upstream::ClusterInfoConstSharedPtr& upstream_cluster_info) PURE;
 
   /**
-   * @return Upstream Connection's ClusterInfo.
-   * This returns an optional to differentiate between unset(absl::nullopt),
-   * no route or cluster does not exist(nullptr), and set to a valid cluster(not nullptr).
+   * @return OptRef<const Upstream::ClusterInfo> Get the cluster info for this request.
    */
-  virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
+  virtual OptRef<const Upstream::ClusterInfo> upstreamClusterInfo() const PURE;
+
+  /**
+   * @return Upstream::ClusterInfoConstSharedPtr Get the cluster info for this request, extended to
+   * allow a caller to extend or transfer ownership.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr upstreamClusterInfoSharedPtr() const PURE;
 
   /**
    * @param provider The unique id implementation this stream uses.
@@ -1013,10 +1088,10 @@ public:
   virtual void setAttemptCount(uint32_t attempt_count) PURE;
 
   /**
-   * @return the number of times the request was attempted upstream, absl::nullopt if the request
+   * @return the number of times the request was attempted upstream, std::nullopt if the request
    * was never attempted upstream.
    */
-  virtual absl::optional<uint32_t> attemptCount() const PURE;
+  virtual std::optional<uint32_t> attemptCount() const PURE;
 
   /**
    * @return the bytes meter for upstream http stream.
@@ -1138,12 +1213,12 @@ public:
    * This should be implemented to call the codecStreamId() method on the
    * associated Http::Stream object.
    */
-  virtual absl::optional<uint32_t> codecStreamId() const PURE;
+  virtual std::optional<uint32_t> codecStreamId() const PURE;
 
   /**
    * @param id the codec level stream ID for the associated stream.
    */
-  virtual void setCodecStreamId(absl::optional<uint32_t> id) PURE;
+  virtual void setCodecStreamId(std::optional<uint32_t> id) PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

@@ -65,8 +65,9 @@ public:
 
   // Overload the default capacity calculations to return the quic capacity
   // (modified by any stream limits in Envoy config)
-  int64_t currentUnusedCapacity() const override {
-    return std::min<int64_t>(quiche_capacity_, effectiveConcurrentStreamLimit());
+  uint32_t currentUnusedCapacity() const override {
+    return static_cast<uint32_t>(
+        std::min<uint64_t>(quiche_capacity_, effectiveConcurrentStreamLimit()));
   }
 
   // Overridden to return true as long as the client is doing handshake even when it is ready for
@@ -212,6 +213,12 @@ private:
   bool attempt_happy_eyeballs_;
   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry_;
 };
+
+// Returns the SNI for HTTP/3 connections to the host. It prefers the server name override, then
+// the host's hostname if `auto_host_sni` is set and the hostname is a valid SNI, then the
+// configured SNI.
+std::string effectiveSni(const Network::TransportSocketOptionsConstSharedPtr& options,
+                         const Upstream::HostDescription& host);
 
 std::unique_ptr<Http3ConnPoolImpl>
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,

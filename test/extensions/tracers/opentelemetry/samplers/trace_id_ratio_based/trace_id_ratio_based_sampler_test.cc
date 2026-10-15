@@ -86,7 +86,7 @@ TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRatioSamplesInclusively) {
                                  Hex::uint64ToHex(random_generator.random()));
 
     auto sampling_result_low = sampler_low->shouldSample(
-        info, absl::nullopt, trace_id, "operation_name",
+        info, std::nullopt, trace_id, "operation_name",
         ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
 
     if (sampling_result_low.decision == Decision::RecordAndSample) {
@@ -94,7 +94,7 @@ TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRatioSamplesInclusively) {
       EXPECT_TRUE(sampling_result_low.isRecording());
 
       auto sampling_result_high = sampler_high->shouldSample(
-          info, absl::nullopt, trace_id, "operation_name",
+          info, std::nullopt, trace_id, "operation_name",
           ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
       EXPECT_TRUE(sampling_result_high.isRecording());
       EXPECT_TRUE(sampling_result_high.isSampled());
@@ -119,7 +119,7 @@ TEST(TraceIdRatioBasedSamplerTest, TestSpecialRatios) {
     auto trace_id = absl::StrCat(Hex::uint64ToHex(random_generator.random()),
                                  Hex::uint64ToHex(random_generator.random()));
     auto sampling_result =
-        sampler->shouldSample(info, absl::nullopt, trace_id, "operation_name",
+        sampler->shouldSample(info, std::nullopt, trace_id, "operation_name",
                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
     EXPECT_EQ(sampling_result.decision, Decision::Drop);
   }
@@ -134,7 +134,7 @@ TEST(TraceIdRatioBasedSamplerTest, TestSpecialRatios) {
     auto trace_id = absl::StrCat(Hex::uint64ToHex(random_generator.random()),
                                  Hex::uint64ToHex(random_generator.random()));
     auto sampling_result =
-        sampler->shouldSample(info, absl::nullopt, trace_id, "operation_name",
+        sampler->shouldSample(info, std::nullopt, trace_id, "operation_name",
                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
     EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   }
@@ -149,7 +149,7 @@ TEST(TraceIdRatioBasedSamplerTest, TestSpecialRatios) {
     auto trace_id = absl::StrCat(Hex::uint64ToHex(random_generator.random()),
                                  Hex::uint64ToHex(random_generator.random()));
     auto sampling_result =
-        sampler->shouldSample(info, absl::nullopt, trace_id, "operation_name",
+        sampler->shouldSample(info, std::nullopt, trace_id, "operation_name",
                               ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
     EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   }

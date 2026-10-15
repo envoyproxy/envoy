@@ -1,4 +1,5 @@
 #pragma once
+#include <format>
 
 #include "source/common/buffer/buffer_impl.h"
 
@@ -91,7 +92,7 @@ public:
     return Message::ValidationOK;
   }
 
-  std::string toString() const { return fmt::format("[{}]", value_); }
+  std::string toString() const { return std::format("[{}]", value_); }
 
   T get() const { return value_; }
 
@@ -186,7 +187,7 @@ public:
   }
 
   std::string toString() const {
-    std::string out = fmt::format("[Array of {}:{{", value_.size());
+    std::string out = std::format("[Array of {}:{{", value_.size());
 
     // Iterate through all elements in the array.
     // No delimiter is required between elements, as each
@@ -316,7 +317,7 @@ public:
   std::string toString() const {
     std::string out;
     for (const auto& value : values_) {
-      out += fmt::format("[{}:{}]", value.first.toString(), value.second->toString());
+      out += std::format("[{}:{}]", value.first.toString(), value.second->toString());
     }
     return out;
   }

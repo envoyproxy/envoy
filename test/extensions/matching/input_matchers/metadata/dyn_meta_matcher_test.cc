@@ -14,7 +14,7 @@
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
-#include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -55,10 +55,11 @@ public:
     metadata_input.set_filter(kFilterNamespace);
     metadata_input.mutable_path()->Add()->set_key(kMetadataKey);
     single_predicate->mutable_input()->set_name("envoy.matching.inputs.dynamic_metadata");
-    single_predicate->mutable_input()->mutable_typed_config()->PackFrom(metadata_input);
+    std::ignore =
+        single_predicate->mutable_input()->mutable_typed_config()->PackFrom(metadata_input);
 
     auto* custom_matcher = single_predicate->mutable_custom_match();
-    custom_matcher->mutable_typed_config()->PackFrom(meta_matcher);
+    std::ignore = custom_matcher->mutable_typed_config()->PackFrom(meta_matcher);
 
     xds::type::matcher::v3::Matcher::OnMatch on_match;
     std::string on_match_config = R"EOF(
@@ -108,8 +109,6 @@ public:
 TEST_F(MetadataMatcherTest, DynamicMetadataMatched) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey),
                      std::string(kMetadataValue));
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree();
 
   EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
@@ -117,8 +116,6 @@ TEST_F(MetadataMatcherTest, DynamicMetadataMatched) {
 
 TEST_F(MetadataMatcherTest, DynamicMetadataNotMatched) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey), "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree();
 
   EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
@@ -126,8 +123,6 @@ TEST_F(MetadataMatcherTest, DynamicMetadataNotMatched) {
 
 TEST_F(MetadataMatcherTest, DynamicMetadataNotMatchedWithInvert) {
   setDynamicMetadata(std::string(kFilterNamespace), std::string(kMetadataKey), "wrong_service");
-  Envoy::Http::Matching::HttpMatchingDataImpl data =
-      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(true);
 
   // The match was completed, no match found but the invert flag was set.

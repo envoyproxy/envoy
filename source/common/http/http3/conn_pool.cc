@@ -13,6 +13,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/upstream_impl.h"
 
+#include "quiche/quic/platform/api/quic_hostname_utils.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http3 {
@@ -45,20 +47,25 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
       100);
 }
 
-const Envoy::Ssl::ClientContextConfig&
-getConfig(Network::UpstreamTransportSocketFactory& transport_socket_factory) {
-  ASSERT(transport_socket_factory.clientContextConfig().has_value());
-  return transport_socket_factory.clientContextConfig().value();
-}
-
-std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                Upstream::HostConstSharedPtr host) {
-  return options && options->serverNameOverride().has_value()
-             ? options->serverNameOverride().value()
-             : getConfig(host->transportSocketFactory()).serverNameIndication();
-}
-
 } // namespace
+
+std::string effectiveSni(const Network::TransportSocketOptionsConstSharedPtr& options,
+                         const Upstream::HostDescription& host) {
+  if (options && options->serverNameOverride().has_value()) {
+    return options->serverNameOverride().value();
+  }
+  const Network::UpstreamTransportSocketFactory& factory = host.transportSocketFactory();
+  OptRef<const Envoy::Ssl::ClientContextConfig> config = factory.clientContextConfig();
+  const std::string& hostname = host.hostname();
+  // QUICHE does not send an invalid SNI but still verifies the certificate against it, so an
+  // invalid hostname such as an IP address falls back to the configured SNI.
+  if (config.has_value() && config->autoHostServerNameIndication() &&
+      quic::QuicHostnameUtils::IsValidSNI(hostname) &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_upstream_auto_host_sni")) {
+    return hostname;
+  }
+  return std::string(factory.defaultServerNameIndication());
+}
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
@@ -70,7 +77,9 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
           return;
         }
         codec_client_->connect();
-        if (readyForStream()) {
+        if (!Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.fix_http3_early_data_timing") &&
+            readyForStream()) {
           // This client can send early data, so check if there are any pending streams can be sent
           // as early data.
           parent_.onUpstreamReadyForEarlyData(*this);
@@ -90,9 +99,14 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
     parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
-  } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::ReadyForEarlyData) {
-    // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
-    parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
+  } else if (state() == ActiveClient::State::ReadyForEarlyData) {
+    if (currentUnusedCapacity() == 0) {
+      // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
+    } else if (Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.fix_http3_early_data_timing")) {
+      parent_.onUpstreamReadyForEarlyData(*this);
+    }
   }
 }
 
@@ -117,20 +131,20 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
                             random_generator, state, client_fn, codec_fn, protocol,
                             overload_manager, {}, nullptr),
       quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
-      server_id_(sni(transport_socket_options, host),
+      server_id_(effectiveSni(transport_socket_options, *host),
                  static_cast<uint16_t>(host_->address()->ip()->port())),
       connect_callback_(connect_callback), attempt_happy_eyeballs_(attempt_happy_eyeballs),
       network_observer_registry_(network_observer_registry) {}
 
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
-  if (connect_callback_ != absl::nullopt) {
+  if (connect_callback_ != std::nullopt) {
     connect_callback_->onHandshakeComplete();
   }
 }
 
 void Http3ConnPoolImpl::onConnectFailed(Envoy::ConnectionPool::ActiveClient& client) {
   ASSERT(client.numActiveStreams() == 0);
-  if (static_cast<ActiveClient&>(client).hasCreatedStream() && connect_callback_ != absl::nullopt) {
+  if (static_cast<ActiveClient&>(client).hasCreatedStream() && connect_callback_ != std::nullopt) {
     connect_callback_->onZeroRttHandshakeFailed();
   }
 }

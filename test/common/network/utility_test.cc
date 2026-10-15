@@ -9,6 +9,7 @@
 #endif
 
 #include <cstdint>
+#include <iterator>
 #include <list>
 #include <memory>
 #include <string>
@@ -24,21 +25,105 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::DoAll;
 using testing::Eq;
 using testing::Invoke;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
+
+using testing::Contains;
+using testing::Key;
 
 namespace Envoy {
 namespace Network {
 namespace {
+
+TEST(NetworkUtility, WriteEmptyDatagramConnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, send(_, 0))
+      .WillOnce(Invoke([](const void* buffer, size_t) -> Api::IoCallUint64Result {
+        EXPECT_NE(nullptr, buffer);
+        return Api::ioCallUint64ResultNoError();
+      }));
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, _, _, _, _)).Times(0);
+
+  Buffer::OwnedImpl buffer;
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, WriteExplicitEmptySliceConnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(true));
+  EXPECT_CALL(io_handle, send(_, 0)).WillOnce(Return(Api::ioCallUint64ResultNoError()));
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, _, _, _, _)).Times(0);
+
+  uint8_t empty_payload = 0;
+  Buffer::RawSlice slice{&empty_payload, 0};
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, &slice, 1, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, WriteEmptyDatagramUnconnected) {
+  StrictMock<MockIoHandle> io_handle;
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(false));
+  EXPECT_CALL(io_handle, send(_, _)).Times(0);
+  EXPECT_CALL(io_handle, writev(_, _)).Times(0);
+  EXPECT_CALL(io_handle, sendmsg(_, 0, 0, nullptr, testing::Ref(peer_address)))
+      .WillOnce(Return(Api::ioCallUint64ResultNoError()));
+
+  Buffer::OwnedImpl buffer;
+  const Api::IoCallUint64Result result =
+      Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(0, result.return_value_);
+}
+
+TEST(NetworkUtility, DropEmptyDatagramWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.udp_send_zero_length_datagrams", "false"}});
+  const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
+
+  for (const bool connected : {false, true}) {
+    StrictMock<MockIoHandle> io_handle;
+    EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(connected));
+
+    Buffer::OwnedImpl buffer;
+    const Api::IoCallUint64Result result =
+        Utility::writeToSocket(io_handle, buffer, nullptr, peer_address);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(0, result.return_value_);
+  }
+}
 
 struct Interface {
   std::string name;
@@ -65,31 +150,31 @@ StatusOr<Interface> getLocalNetworkInterface() {
 }
 
 TEST(NetworkUtility, resolveUrl) {
-  EXPECT_FALSE(Utility::resolveUrl("foo").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("abc://foo").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://1.2.3.4:1234/").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:8001/").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:0/foo").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://127.0.0.1:").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3.3").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3.3.3:0").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://192.168.3:0").status().ok());
+  EXPECT_THAT(Utility::resolveUrl("foo").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("abc://foo").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://1.2.3.4:1234/").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://127.0.0.1:8001/").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://127.0.0.1:0/foo").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://127.0.0.1:").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://192.168.3.3").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://192.168.3.3.3:0").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://192.168.3:0").status(), Not(IsOk()));
 
-  EXPECT_FALSE(Utility::resolveUrl("udp://1.2.3.4:1234/").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:8001/").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:0/foo").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://127.0.0.1:").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3.3").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3.3.3:0").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://192.168.3:0").status().ok());
+  EXPECT_THAT(Utility::resolveUrl("udp://1.2.3.4:1234/").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://127.0.0.1:8001/").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://127.0.0.1:0/foo").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://127.0.0.1:").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://192.168.3.3").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://192.168.3.3.3:0").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://192.168.3:0").status(), Not(IsOk()));
 
-  EXPECT_FALSE(Utility::resolveUrl("tcp://[::1]").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://[:::1]:1").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("tcp://foo:0").status().ok());
+  EXPECT_THAT(Utility::resolveUrl("tcp://[::1]").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://[:::1]:1").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("tcp://foo:0").status(), Not(IsOk()));
 
-  EXPECT_FALSE(Utility::resolveUrl("udp://[::1]").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://[:::1]:1").status().ok());
-  EXPECT_FALSE(Utility::resolveUrl("udp://foo:0").status().ok());
+  EXPECT_THAT(Utility::resolveUrl("udp://[::1]").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://[:::1]:1").status(), Not(IsOk()));
+  EXPECT_THAT(Utility::resolveUrl("udp://foo:0").status(), Not(IsOk()));
 
   EXPECT_EQ("", (*Utility::resolveUrl("unix://"))->asString());
   EXPECT_EQ("foo", (*Utility::resolveUrl("unix://foo"))->asString());
@@ -128,8 +213,8 @@ TEST(NetworkUtility, urlFromDatagramAddress) {
 }
 
 TEST(NetworkUtility, socketTypeFromUrl) {
-  EXPECT_FALSE(Utility::socketTypeFromUrl("foo").ok());
-  EXPECT_FALSE(Utility::socketTypeFromUrl("abc://foo").ok());
+  EXPECT_THAT(Utility::socketTypeFromUrl("foo"), Not(IsOk()));
+  EXPECT_THAT(Utility::socketTypeFromUrl("abc://foo"), Not(IsOk()));
 
   EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://"));
   EXPECT_EQ(Network::Socket::Type::Stream, *Utility::socketTypeFromUrl("unix://foo"));
@@ -252,6 +337,61 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPortNoThrow("[::1]:0")->asString());
 }
 
+TEST(NetworkUtility, GetAddressWithPort) {
+  // Test basic IPv4.
+  auto addr_v4 = std::make_shared<Address::Ipv4Instance>("1.2.3.4", 80);
+  auto addr_v4_new_port = Utility::getAddressWithPort(*addr_v4, 8080);
+  EXPECT_EQ("1.2.3.4:8080", addr_v4_new_port->asString());
+  EXPECT_EQ(Address::IpVersion::v4, addr_v4_new_port->ip()->version());
+
+  // Test basic IPv6.
+  auto addr_v6 = std::make_shared<Address::Ipv6Instance>("::1", 80);
+  auto addr_v6_new_port = Utility::getAddressWithPort(*addr_v6, 8080);
+  EXPECT_EQ("[::1]:8080", addr_v6_new_port->asString());
+  EXPECT_EQ(Address::IpVersion::v6, addr_v6_new_port->ip()->version());
+
+  // Test IPv6 with scope ID.
+  sockaddr_in6 scoped_addr;
+  memset(&scoped_addr, 0, sizeof(scoped_addr));
+  scoped_addr.sin6_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, "fe80::1", &scoped_addr.sin6_addr));
+  scoped_addr.sin6_port = htons(80);
+  scoped_addr.sin6_scope_id = 5;
+
+  auto addr_v6_scoped = std::make_shared<Address::Ipv6Instance>(scoped_addr);
+  EXPECT_EQ("[fe80::1%5]:80", addr_v6_scoped->asString());
+  EXPECT_EQ(5u, addr_v6_scoped->ip()->ipv6()->scopeId());
+
+  auto addr_v6_scoped_new_port = Utility::getAddressWithPort(*addr_v6_scoped, 8080);
+  EXPECT_EQ("[fe80::1%5]:8080", addr_v6_scoped_new_port->asString());
+  EXPECT_EQ(Address::IpVersion::v6, addr_v6_scoped_new_port->ip()->version());
+  EXPECT_EQ(5u, addr_v6_scoped_new_port->ip()->ipv6()->scopeId());
+  EXPECT_EQ(8080u, addr_v6_scoped_new_port->ip()->port());
+
+  // Verify v6only is preserved.
+  sockaddr_in6 v6only_addr;
+  memset(&v6only_addr, 0, sizeof(v6only_addr));
+  v6only_addr.sin6_family = AF_INET6;
+  EXPECT_EQ(1, inet_pton(AF_INET6, "::1", &v6only_addr.sin6_addr));
+  v6only_addr.sin6_port = htons(80);
+  auto addr_v6only_false = std::make_shared<Address::Ipv6Instance>(v6only_addr, false);
+  EXPECT_FALSE(addr_v6only_false->ip()->ipv6()->v6only());
+  auto addr_v6only_false_new_port = Utility::getAddressWithPort(*addr_v6only_false, 8080);
+  EXPECT_FALSE(addr_v6only_false_new_port->ip()->ipv6()->v6only());
+
+  // Verify custom SocketInterface is preserved for IPv4 and IPv6.
+  MockSocketInterface custom_socket_interface({Address::IpVersion::v4, Address::IpVersion::v6});
+  auto addr_v4_custom_sock =
+      std::make_shared<Address::Ipv4Instance>("1.2.3.4", 80, &custom_socket_interface);
+  auto addr_v4_custom_sock_new_port = Utility::getAddressWithPort(*addr_v4_custom_sock, 8080);
+  EXPECT_EQ(&custom_socket_interface, &addr_v4_custom_sock_new_port->socketInterface());
+
+  auto addr_v6_custom_sock =
+      std::make_shared<Address::Ipv6Instance>("::1", 80, &custom_socket_interface);
+  auto addr_v6_custom_sock_new_port = Utility::getAddressWithPort(*addr_v6_custom_sock, 8080);
+  EXPECT_EQ(&custom_socket_interface, &addr_v6_custom_sock_new_port->socketInterface());
+}
+
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
@@ -324,7 +464,7 @@ TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddressGetifaddrsFailure) {
 TEST(NetworkUtility, GetOriginalDst) {
   testing::NiceMock<Network::MockConnectionSocket> socket;
 #ifdef SOL_IP
-  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(socket, ipVersion()).WillOnce(testing::Return(std::nullopt));
 #endif
   EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
 
@@ -348,6 +488,15 @@ TEST(NetworkUtility, GetOriginalDst) {
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
       .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ("12.34.56.78:9527", Utility::getOriginalDst(socket)->asString());
+
+  // Invalid family returned by SO_ORIGINAL_DST should cause addressFromSockAddr to fail and
+  // getOriginalDst to return nullptr
+  sin.sin_family = AF_UNSPEC;
+  EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
+      .WillOnce(DoAll(SetArg2Sockaddr(storage), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(nullptr, Utility::getOriginalDst(socket));
+
+  sin.sin_family = AF_INET;
 #ifndef WIN32
   // Transparent socket gets original dst from local address while connection tracking disabled
   EXPECT_CALL(socket, getSocketOption(Eq(SOL_IP), Eq(SO_ORIGINAL_DST), _, _))
@@ -706,7 +855,7 @@ TEST(ResolvedUdpSocketConfig, Warning) {
       ResolvedUdpSocketConfig resolved_config(envoy::config::core::v3::UdpSocketConfig(), true));
 }
 
-#ifndef WIN32
+#if defined(__linux__)
 TEST(PacketLoss, LossTest) {
   class ZeroTimeSource : public TimeSource {
   public:
@@ -742,9 +891,9 @@ TEST(PacketLoss, LossTest) {
 
   // Send a packet.
   char buf[2048];
-  memset(buf, 0, ABSL_ARRAYSIZE(buf));
-  EXPECT_EQ(ABSL_ARRAYSIZE(buf), sendto(fd, buf, ABSL_ARRAYSIZE(buf), 0,
-                                        reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+  memset(buf, 0, std::size(buf));
+  EXPECT_EQ(std::size(buf), sendto(fd, buf, std::size(buf), 0,
+                                   reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
   // Verify the packet is dropped.
   IoSocketHandleImpl handle(fd);
@@ -766,8 +915,8 @@ TEST(PacketLoss, LossTest) {
   EXPECT_EQ(0, packets_read);
 
   // Send another packet.
-  EXPECT_EQ(ABSL_ARRAYSIZE(buf), sendto(fd, buf, ABSL_ARRAYSIZE(buf), 0,
-                                        reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+  EXPECT_EQ(std::size(buf), sendto(fd, buf, std::size(buf), 0,
+                                   reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
   // Make sure the drop count is now 2.
   Utility::readFromSocket(handle, *address, processor, time_source, recv_msg_method,
@@ -798,14 +947,14 @@ TEST_F(ExecInNetnsTest, Basic) {
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
 
   EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly(Invoke([this](int fd) -> Api::SysCallIntResult {
-    EXPECT_TRUE(fake_fd_map_.contains(fd));
+    EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
     fake_fd_map_.erase(fd);
     return {0, 0};
   }));
 
   EXPECT_CALL(linux_os_syscalls, setns(_, Eq(CLONE_NEWNET)))
       .WillRepeatedly(([this](int fd, int) -> Api::SysCallIntResult {
-        EXPECT_TRUE(fake_fd_map_.contains(fd));
+        EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
         current_netns_ = fake_fd_map_[fd];
         return {0, 0};
       }));
@@ -825,21 +974,20 @@ TEST_F(ExecInNetnsTest, Basic) {
   // Now check basic functionality to ensure the function is called from a "different netns".
   std::function<std::string()> func = [&]() -> std::string { return getCurrentNetns(); };
   auto result = Utility::execInNetworkNamespace(func, "ns1");
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), "ns1");
+  EXPECT_THAT(result, IsOkAndHolds("ns1"));
 
   // Make sure the netns reverted back to the netns the execInNetworkNamespace function was called
-  // from. When the netns was noted before making the jump, it used the fd of "/proc/self/ns/net"
-  // and that is what would show up for the test.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  // from. When the netns was noted before making the jump, it used the fd of the calling thread's
+  // own namespace, "/proc/thread-self/ns/net" (not "/proc/self/ns/net", which is the main
+  // thread's), and that is what would show up for the test.
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 
   // Try another netns.
   result = Utility::execInNetworkNamespace(func, "ns2");
-  EXPECT_TRUE(result.ok());
-  EXPECT_EQ(result.value(), "ns2");
+  EXPECT_THAT(result, IsOkAndHolds("ns2"));
 
   // Make sure the netns reverted back.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 }
 
 TEST_F(ExecInNetnsTest, OpenFail) {
@@ -857,8 +1005,7 @@ TEST_F(ExecInNetnsTest, OpenFail) {
 
   // Expecting failure.
   auto result = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
-  EXPECT_FALSE(result.ok());
-  EXPECT_TRUE(result.status().message().starts_with("failed to open netns file"));
+  EXPECT_THAT(result, HasStatusMessage(testing::StartsWith("failed to open netns file")));
 }
 
 TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
@@ -888,6 +1035,33 @@ TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
         auto _ = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
       },
       "failed to restore original netns .*");
+}
+
+TEST_F(ExecInNetnsTest, ValidateNetworkNamespaceSuccess) {
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillOnce(Invoke([](const char*, int) -> Api::SysCallIntResult { return {42, 0}; }));
+  EXPECT_CALL(os_syscalls, close(42)).WillOnce(Invoke([](int) -> Api::SysCallIntResult {
+    return {0, 0};
+  }));
+
+  EXPECT_TRUE(Utility::validateNetworkNamespace("/var/run/netns/ns1").ok());
+}
+
+TEST_F(ExecInNetnsTest, ValidateNetworkNamespaceOpenFail) {
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+
+  // open() fails (e.g. the namespace does not exist). No close() is expected.
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillOnce(Invoke([](const char*, int) -> Api::SysCallIntResult { return {-1, -1}; }));
+
+  auto status = Utility::validateNetworkNamespace("/var/run/netns/does_not_exist");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_TRUE(status.message().starts_with("failed to open network namespace file"));
 }
 #endif
 

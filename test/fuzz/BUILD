@@ -11,6 +11,7 @@ load(
     "envoy_proto_library",
     "envoy_select_signal_trace",
 )
+load("//bazel:toolchains.bzl", "LLVM_MAJOR")
 
 licenses(["notice"])  # Apache 2
 
@@ -26,9 +27,9 @@ exports_files(["headers.dict"])
 
 cc_library(
     name = "fuzzed_data_provider",
-    hdrs = ["@llvm_toolchain_llvm//:lib/clang/18/include/fuzzer/FuzzedDataProvider.h"],
+    hdrs = ["@llvm_toolchain_llvm//:lib/clang/" + LLVM_MAJOR + "/include/fuzzer/FuzzedDataProvider.h"],
     include_prefix = "",
-    strip_include_prefix = "/lib/clang/18/include",
+    strip_include_prefix = "/lib/clang/" + LLVM_MAJOR + "/include",
     visibility = ["//visibility:public"],
 )
 
@@ -53,6 +54,7 @@ envoy_cc_test_library(
     hdrs = ["fuzz_runner.h"],
     deps = [
         ":fuzzed_data_provider",
+        "//bazel/deps:libprotobuf-mutator",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
@@ -60,7 +62,6 @@ envoy_cc_test_library(
         "//source/common/http/http2:codec_lib",
         "//source/exe:process_wide_lib",
         "//test/test_common:environment_lib",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
     ],
 )
 
@@ -68,11 +69,10 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
-        "//source/common/common:logger_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib_header",
@@ -105,10 +105,10 @@ envoy_cc_test_library(
     srcs = ["validated_input_generator.cc"],
     hdrs = ["validated_input_generator.h"],
     deps = [
+        "//bazel/deps:libprotobuf-mutator",
         "//test/fuzz:mutable_visitor_lib",
         "//test/fuzz:random_lib",
-        "@com_envoyproxy_protoc_gen_validate//validate:cc_validate",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
+        "@protoc-gen-validate//validate:cc_validate",
         "@xds//udpa/type/v1:pkg_cc_proto",
         "@xds//xds/type/v3:pkg_cc_proto",
     ],
@@ -127,7 +127,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "random_test",
     srcs = ["random_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//test/fuzz:random_lib",
     ],

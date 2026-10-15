@@ -8,7 +8,8 @@ for how to generate Envoy heap profiles.
 
 
 For any Envoy binary that build with normal ``tcmalloc``, the :ref:`/heap_dump <operations_admin_interface_heap_dump>` endpoint
-is supported to dump current heap profile of Envoy.
+is supported to dump current heap profile of Envoy. The :ref:`/peak_heap_dump <operations_admin_interface_peak_heap_dump>`
+endpoint is also available to dump the peak heap profile, capturing the heap state at peak memory usage.
 
 Use following Envoy process as a specific example:
 

@@ -1,13 +1,14 @@
 #pragma once
 
 #include <memory>
+#include <optional>
+#include <type_traits>
+#include <vector>
 
+#include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
-#include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -75,16 +76,16 @@ public:
 
   /**
    * Returns a ConfigProtoInfoVector associated with a ApiType::Delta provider.
-   * @return absl::optional<ConfigProtoInfoVector> an optional ConfigProtoInfoVector; the value is
+   * @return std::optional<ConfigProtoInfoVector> an optional ConfigProtoInfoVector; the value is
    * set when a config is available.
    */
-  template <typename P> absl::optional<ConfigProtoInfoVector<P>> configProtoInfoVector() const {
+  template <typename P> std::optional<ConfigProtoInfoVector<P>> configProtoInfoVector() const {
     static_assert(std::is_base_of<Protobuf::Message, P>::value,
                   "Proto type must derive from Protobuf::Message");
 
     const ConfigProtoVector config_protos = getConfigProtos();
     if (config_protos.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     }
     std::vector<const P*> ret_protos;
     ret_protos.reserve(config_protos.size());
@@ -117,7 +118,7 @@ protected:
    * @return const ConfigProtoVector the config protos corresponding to the Config instantiated by
    *         the provider.
    */
-  virtual ConfigProtoVector getConfigProtos() const { PANIC("not implemented"); }
+  virtual ConfigProtoVector getConfigProtos() const PURE;
 
   /**
    * Returns the config implementation associated with the provider.

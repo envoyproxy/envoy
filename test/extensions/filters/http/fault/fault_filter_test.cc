@@ -84,6 +84,15 @@ public:
     http_status: 429
   )EOF";
 
+  const std::string abort_with_response_body_yaml = R"EOF(
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 429
+    response_body: "custom response body"
+  )EOF";
+
   const std::string fixed_delay_and_abort_yaml = R"EOF(
   delay:
     percentage:
@@ -266,6 +275,54 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   EXPECT_CALL(decoder_filter_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(1UL, config_->stats().active_faults_.value());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
+}
+
+TEST_F(FaultFilterTest, AbortWithHttpStatusAndResponseBody) {
+  setUpTest(abort_with_response_body_yaml);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected))
+      .Times(0);
+
+  // Abort related calls
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.abort.abort_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
+      .WillOnce(Return(429));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"}, {"content-length", "20"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true))
+      .WillOnce(
+          [](Buffer::Instance& data, bool) { EXPECT_EQ("custom response body", data.toString()); });
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
@@ -1420,7 +1477,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data1, false));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
+              injectEncodedDataToFilterChain(BufferString("hello"), false));
   token_timer->invokeCallback();
 
   // Advance time by 1s which should refill all tokens.
@@ -1435,14 +1492,14 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
+              injectEncodedDataToFilterChain(BufferString(std::string(1024, 'a')), false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
+              injectEncodedDataToFilterChain(BufferString(std::string(51, 'a')), false));
   token_timer->invokeCallback();
 
   // Get new data with current data buffered, not end_stream.
@@ -1453,13 +1510,13 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(50), _));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'a')), false));
+              injectEncodedDataToFilterChain(BufferString(std::string(51, 'a')), false));
   token_timer->invokeCallback();
 
   // Fire timer, also advance time. No time enable because there is nothing buffered.
   time_system_.advanceTimeWait(std::chrono::milliseconds(50));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(51, 'b')), false));
+              injectEncodedDataToFilterChain(BufferString(std::string(51, 'b')), false));
   token_timer->invokeCallback();
 
   // Advance time by 1s for a full refill.
@@ -1470,7 +1527,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   Buffer::OwnedImpl data4(std::string(1024, 'c'));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
   EXPECT_CALL(encoder_filter_callbacks_,
-              injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
+              injectEncodedDataToFilterChain(BufferString(std::string(1024, 'c')), true));
   token_timer->invokeCallback();
 
   filter_->onDestroy();

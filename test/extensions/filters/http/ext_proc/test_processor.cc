@@ -1,3 +1,6 @@
+// Changing the default behavior of ext_proc is generally not allowed. While you may add tests, you
+// generally should not change or remove existing tests.
+
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
@@ -24,7 +27,7 @@ grpc::Status ProcessorWrapper::Process(
 }
 
 void TestProcessor::start(const Network::Address::IpVersion ip_version, ProcessingFunc cb,
-                          absl::optional<ContextProcessingFunc> context_cb) {
+                          std::optional<ContextProcessingFunc> context_cb) {
   wrapper_ = std::make_unique<ProcessorWrapper>(cb, context_cb);
   grpc::ServerBuilder builder;
   builder.RegisterService(wrapper_.get());

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -16,7 +17,7 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/allocator.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
@@ -31,7 +32,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
-#include "absl/types/optional.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Server {
@@ -77,42 +78,66 @@ public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
       : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
-  ScopeSharedPtr createScope(const std::string& name, bool evictable,
-                             const ScopeStatsLimitSettings& limits) override {
+  ScopeSharedPtr createScopeWithTaggedName(absl::string_view base_name, TagStringViewSpan name_tags,
+                                           absl::string_view tagged_name, bool evictable,
+                                           const ScopeStatsLimitSettings& limits,
+                                           StatsMatcherSharedPtr matcher) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
-        lock_, wrapped_scope_->createScope(name, evictable, limits), store_);
+        lock_,
+        wrapped_scope_->createScopeWithTaggedName(base_name, name_tags, tagged_name, evictable,
+                                                  limits, std::move(matcher)),
+        store_);
   }
 
-  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable,
-                                   const ScopeStatsLimitSettings& limits) override {
+  ScopeSharedPtr scopeFromTaggedName(StatName base_name, StatNameTagSpan name_tags,
+                                     StatName tagged_name, bool evictable,
+                                     const ScopeStatsLimitSettings& limits,
+                                     StatsMatcherSharedPtr matcher) override {
     Thread::LockGuard lock(lock_);
     return std::make_shared<TestScopeWrapper>(
-        lock_, wrapped_scope_->scopeFromStatName(name, evictable, limits), store_);
+        lock_,
+        wrapped_scope_->scopeFromTaggedName(base_name, name_tags, tagged_name, evictable, limits,
+                                            std::move(matcher)),
+        store_);
   }
 
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
+  Counter& counterFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                 StatName tagged_name) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterFromStatNameWithTags(name, tags);
+    return wrapped_scope_->counterFromTaggedName(base_name, name_tags, tagged_name);
   }
 
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
+  Counter& counterFromMergedStatName(StatName tagged_name, StatName base_name,
+                                     std::optional<StatNameTagSpan> tags) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
+    return wrapped_scope_->counterFromMergedStatName(tagged_name, base_name, tags);
   }
 
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
+  Gauge& gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
+                                 std::optional<StatNameTagSpan> tags,
+                                 Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramFromStatNameWithTags(name, tags, unit);
+    return wrapped_scope_->gaugeFromMergedStatName(tagged_name, base_name, tags, import_mode);
   }
 
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
+  Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                             StatName tagged_name, Gauge::ImportMode import_mode) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
+    return wrapped_scope_->gaugeFromTaggedName(base_name, name_tags, tagged_name, import_mode);
+  }
+
+  Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
+                                     StatName tagged_name, Histogram::Unit unit) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->histogramFromTaggedName(base_name, name_tags, tagged_name, unit);
+  }
+
+  TextReadout& textReadoutFromTaggedName(StatName base_name,
+                                         std::optional<StatNameTagSpan> name_tags,
+                                         StatName tagged_name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->textReadoutFromTaggedName(base_name, name_tags, tagged_name);
   }
 
   Counter& counterFromString(const std::string& name) override {
@@ -166,6 +191,11 @@ public:
   Store& store() override { return store_; }
   const Store& constStore() const override { return store_; }
 
+  void setCleanupCallback(std::function<void()> callback) override {
+    Thread::LockGuard lock(lock_);
+    wrapped_scope_->setCleanupCallback(callback);
+  }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopeSharedPtr wrapped_scope_;
@@ -194,6 +224,8 @@ public:
   uint64_t latch() override { return counter_->latch(); }
   void reset() override { return counter_->reset(); }
   uint64_t value() const override { return counter_->value(); }
+  bool noTagExtraction() const override { return counter_->noTagExtraction(); }
+  void markAsNoTagExtraction() override { counter_->markAsNoTagExtraction(); }
   void incRefCount() override { counter_->incRefCount(); }
   bool decRefCount() override { return counter_->decRefCount(); }
   uint32_t use_count() const override { return counter_->use_count(); }
@@ -211,10 +243,9 @@ private:
 };
 
 // A stats allocator which creates NotifyingCounters rather than regular CounterImpls.
-class NotifyingAllocatorImpl : public Stats::AllocatorImpl {
+class NotifyingAllocator : public Stats::Allocator {
 public:
-  using Stats::AllocatorImpl::AllocatorImpl;
-
+  NotifyingAllocator(Stats::SymbolTable& symbol_table) : Stats::Allocator(symbol_table) {}
   void waitForCounterFromStringEq(const std::string& name, uint64_t value) {
     absl::MutexLock l(mutex_);
     ENVOY_LOG_MISC(trace, "waiting for {} to be {}", name, value);
@@ -244,9 +275,9 @@ public:
 
 protected:
   Stats::Counter* makeCounterInternal(StatName name, StatName tag_extracted_name,
-                                      const StatNameTagVector& stat_name_tags) override {
+                                      StatNameTagSpan stat_name_tags) override {
     Stats::Counter* counter = new NotifyingCounter(
-        Stats::AllocatorImpl::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
+        Stats::Allocator::makeCounterInternal(name, tag_extracted_name, stat_name_tags), mutex_,
         condvar_);
     {
       absl::MutexLock l(mutex_);
@@ -276,11 +307,17 @@ private:
 };
 
 /**
- * This is a variant of the isolated store that has locking across all operations so that it can
- * be used during the integration tests.
+ * This is a thread-safe wrapper around a stats store. By default it owns an isolated store, but it
+ * can also wrap an externally owned store so its test-facing state remains authoritative.
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
+  TestIsolatedStoreImpl()
+      : owned_store_(std::make_unique<IsolatedStoreImpl>()), store_(*owned_store_) {}
+  explicit TestIsolatedStoreImpl(SymbolTable& symbol_table)
+      : owned_store_(std::make_unique<IsolatedStoreImpl>(symbol_table)), store_(*owned_store_) {}
+  explicit TestIsolatedStoreImpl(Store& store) : store_(store) {}
+
   // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
@@ -327,8 +364,8 @@ public:
     Thread::LockGuard lock(lock_);
     store_.deliverHistogramToSinks(histogram, value);
   }
-  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
-  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
+  Gauge& nullGauge() override { return store_.nullGauge(); }
+  Counter& nullCounter() override { return store_.nullCounter(); }
   ScopeSharedPtr rootScope() override {
     Thread::LockGuard lock(lock_);
     if (lazy_default_scope_ == nullptr) {
@@ -384,6 +421,7 @@ public:
   void setTagProducer(TagProducerPtr&&) override {}
   void setStatsMatcher(StatsMatcherPtr&&) override {}
   void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
+  void setUseExplicitTags(bool) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
   void mergeHistograms(PostMergeCb cb) override { merge_cb_ = cb; }
@@ -392,7 +430,8 @@ public:
 
 private:
   mutable Thread::MutexBasicLockable lock_;
-  IsolatedStoreImpl store_;
+  std::unique_ptr<IsolatedStoreImpl> owned_store_;
+  Store& store_;
   PostMergeCb merge_cb_;
   ScopeSharedPtr lazy_default_scope_;
   uint32_t eviction_count_{0};
@@ -402,6 +441,14 @@ private:
 
 class IntegrationTestServer;
 using IntegrationTestServerPtr = std::unique_ptr<IntegrationTestServer>;
+
+struct TestRandomValue {
+  uint64_t value;
+};
+struct TestRandomSeed {
+  uint64_t value;
+};
+using TestRandomGeneratorConfig = absl::variant<absl::monostate, TestRandomValue, TestRandomSeed>;
 
 /**
  * Wrapper for running the real server for the purpose of integration tests.
@@ -417,22 +464,25 @@ public:
   static IntegrationTestServerPtr
   create(const std::string& config_path, const Network::Address::IpVersion version,
          std::function<void(IntegrationTestServer&)> on_server_ready_function,
-         std::function<void()> on_server_init_function,
-         absl::optional<uint64_t> deterministic_value, Event::TestTimeSystem& time_system,
-         Api::Api& api, bool defer_listener_finalization = false,
-         ProcessObjectOptRef process_object = absl::nullopt,
+         std::function<void()> on_server_init_function, TestRandomGeneratorConfig random_config,
+         Event::TestTimeSystem& time_system, Api::Api& api,
+         bool defer_listener_finalization = false,
+         ProcessObjectOptRef process_object = std::nullopt,
          Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
          uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
          Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
          Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
          bool use_bootstrap_node_metadata = false,
          std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr,
-         bool use_admin_server = true);
+         bool use_admin_server = true, Server::HotRestart* hot_restart = nullptr);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
 
   void waitUntilListenersReady();
+
+  // Wait until callbacks already running or queued on every server worker have completed.
+  void waitForWorkerThreads();
 
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);
@@ -452,34 +502,47 @@ public:
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
-             std::function<void()> on_server_init_function,
-             absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
-             ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
-             uint32_t concurrency, std::chrono::seconds drain_time,
-             Server::DrainStrategy drain_strategy,
+             std::function<void()> on_server_init_function, TestRandomGeneratorConfig random_config,
+             bool defer_listener_finalization, ProcessObjectOptRef process_object,
+             Server::FieldValidationConfig validation_config, uint32_t concurrency,
+             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
              Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
              bool use_admin_server);
 
-  void waitForCounterEq(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
-                        Event::Dispatcher* dispatcher = nullptr) override {
-    ASSERT_TRUE(
-        TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher));
+  void waitForCounter(const std::string& name, testing::Matcher<uint64_t> value_matcher,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                      Event::Dispatcher* dispatcher = nullptr) override {
+    ASSERT_TRUE(TestUtility::waitForCounter(statStore(), name, value_matcher, time_system_, timeout,
+                                            dispatcher));
   }
 
-  void waitForCounterGe(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
+  template <class... Args> void waitForCounterEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForCounterEq was removed; use "
+                  "IntegrationTestServer::waitForCounter(name, testing::Eq(value), ...) instead.");
   }
 
-  void waitForGaugeEq(const std::string& name, uint64_t value,
-                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
+  template <class... Args> void waitForCounterGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForCounterGe was removed; use "
+                  "IntegrationTestServer::waitForCounter(name, testing::Ge(value), ...) instead.");
   }
 
-  void waitForGaugeGe(const std::string& name, uint64_t value,
-                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
-    ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
+  void waitForGauge(const std::string& name, testing::Matcher<uint64_t> value_matcher,
+                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
+    ASSERT_TRUE(TestUtility::waitForGauge(statStore(), name, value_matcher, time_system_, timeout));
+  }
+
+  template <class... Args> void waitForGaugeEq(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForGaugeEq was removed; use "
+                  "IntegrationTestServer::waitForGauge(name, testing::Eq(value), ...) instead.");
+  }
+
+  template <class... Args> void waitForGaugeGe(Args&&...) {
+    static_assert(DeprecatedStatWaitHelpers::always_false<Args...>,
+                  "IntegrationTestServer::waitForGaugeGe was removed; use "
+                  "IntegrationTestServer::waitForGauge(name, testing::Ge(value), ...) instead.");
   }
 
   void waitForCounterExists(const std::string& name) override {
@@ -566,7 +629,7 @@ public:
   virtual Stats::Store& statStore() PURE;
   virtual Server::ThreadLocalOverloadState& overloadState() PURE;
   virtual Network::Address::InstanceConstSharedPtr adminAddress() PURE;
-  virtual Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() PURE;
+  virtual Stats::NotifyingAllocator& notifyingStatsAllocator() PURE;
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
@@ -590,6 +653,10 @@ protected:
                                        Buffer::WatermarkFactorySharedPtr watermark_factory,
                                        bool use_admin_server) PURE;
 
+  // The hot restart implementation the server runs with: the test's, if it set one, or one that
+  // has no parent.
+  Server::HotRestart* hotRestartForTest() const { return hot_restart_; }
+
   // Will be called by subclass on server thread when the server is ready to be accessed. The
   // server may not have been run yet, but all server access methods (server(), statStore(),
   // adminAddress()) will be available.
@@ -600,8 +667,7 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version,
-                     absl::optional<uint64_t> deterministic_value,
-                     ProcessObjectOptRef process_object,
+                     TestRandomGeneratorConfig random_config, ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
                      Buffer::WatermarkFactorySharedPtr watermark_factory,
@@ -622,6 +688,7 @@ private:
   std::function<void(IntegrationTestServer&)> on_server_ready_cb_;
   bool use_admin_interface_to_quit_{};
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_proto_;
+  Server::HotRestart* hot_restart_{};
 };
 
 // Default implementation of IntegrationTestServer
@@ -649,8 +716,8 @@ public:
 
   Network::Address::InstanceConstSharedPtr adminAddress() override { return admin_address_; }
 
-  Stats::NotifyingAllocatorImpl& notifyingStatsAllocator() override {
-    auto* ret = dynamic_cast<Stats::NotifyingAllocatorImpl*>(stats_allocator_.get());
+  Stats::NotifyingAllocator& notifyingStatsAllocator() override {
+    auto* ret = dynamic_cast<Stats::NotifyingAllocator*>(stats_allocator_.get());
     RELEASE_ASSERT(ret != nullptr,
                    "notifyingStatsAllocator() is not created when real_stats is true");
     return *ret;
@@ -673,7 +740,7 @@ private:
   Network::Address::InstanceConstSharedPtr admin_address_;
   absl::Notification server_gone_;
   Stats::SymbolTableImpl symbol_table_;
-  std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
+  std::unique_ptr<Stats::Allocator> stats_allocator_;
 };
 
 } // namespace Envoy

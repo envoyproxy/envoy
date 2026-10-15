@@ -14,6 +14,8 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_matcher_interface",
+        "//envoy/stats:store_interface",
         "//envoy/stats:timespan_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",

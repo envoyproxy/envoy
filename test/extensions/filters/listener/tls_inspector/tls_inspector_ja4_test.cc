@@ -1,22 +1,23 @@
 #include "source/common/common/hex.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
+#include "source/common/ssl/ssl.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/stats/mocks.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::Eq;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -50,7 +51,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Browser Client Hello
     {"Browser-2",
@@ -66,7 +67,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Browser Client Hello
     {"Browser-3",
@@ -82,7 +83,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Chrome with `Cloudflare` QUIC
     {"Chrome-Cloudflare-QUIC",
@@ -98,7 +99,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // HTTP2 with cookies
     {"HTTP2-with-cookies",
@@ -114,7 +115,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // TLS SNI - Facebook
     {"TLS-SNI-Facebook",
@@ -129,7 +130,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000000000000000000000000000000000000000000000000000000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Apple connection
     {"Apple-Connection",
@@ -144,7 +145,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Microsoft connection
     {"Microsoft-Connection",
@@ -159,7 +160,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // Edge browser connection to Slack
     {"Edge-Slack-Connection",
@@ -175,7 +176,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "eea50f122ddfd506694bb949d38dca486e39a0ef9331a6782bb8392a5bc7395189340732a15909e9c309fc4c7c0bd"
      "4102a78c99979e1eb8dcde030c469c38c3f79cee81c9da56db0ab4a3fe19d54da17bf67fc7efce7bb939a292e7c10"
      "82ac2880021201e639a41e760bacf644eeb7b751c0109159373ffdc666c640b661e2be906aa6c",
-     "t13d1516h2_8daaf6152771_9b887d9acb53"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_9b887d9acb53", "t13d1515h2_8daaf6152771_0ece2fe8a3fb")},
 
     // SSH
     {"SSH2-Example-1",
@@ -228,7 +229,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516h2_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 
     // IPv6
     {"IPv6",
@@ -254,7 +255,7 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     "t13d1516baad_8daaf6152771_e5627efa2ab1"},
+     SSL_SELECT("t13d1516bd_8daaf6152771_e5627efa2ab1", "t13d1515bd_8daaf6152771_de4a06bb82e3")},
 };
 
 class TlsInspectorJA4Test
@@ -264,8 +265,10 @@ public:
       : cfg_(std::make_shared<Config>(
             *store_.rootScope(),
             envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
-        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false,
-                                                                            absl::nullopt, {})) {}
+        io_handle_(
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt, {})) {
+    ON_CALL(os_sys_calls_, close(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
+  }
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);
@@ -348,13 +351,61 @@ TEST_P(TlsInspectorJA4Test, JA4FingerprintFromCapturedClientHello) {
   EXPECT_CALL(socket_, setRequestedServerName(testing::_)).Times(testing::AtMost(1));
 
   // Trigger the event to copy the client hello message into buffer
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
 
   // This is only checked for tests that pass processing
   if (state == Network::FilterStatus::Continue) {
     EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   }
+}
+
+TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericOldBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.ja4_alpn_hex_conversion_fix", "false"}});
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  init();
+
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(0x0303, 0x0303, "", "\x02\x60\x32");
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setJA4Hash(testing::MatchesRegex("^t[0-9]{2}[di][0-9]{4}6032_.*")));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")))
+      .Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::_)).Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, setRequestedServerName(testing::_)).Times(testing::AtMost(1));
+
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  filter_->onData(*buffer_);
+}
+
+TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericNewBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.ja4_alpn_hex_conversion_fix", "true"}});
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  init();
+
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(0x0303, 0x0303, "", "\x02\x60\x32");
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setJA4Hash(testing::MatchesRegex("^t[0-9]{2}[di][0-9]{4}62_.*")));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")))
+      .Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::_)).Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, setRequestedServerName(testing::_)).Times(testing::AtMost(1));
+
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  filter_->onData(*buffer_);
 }
 
 } // namespace

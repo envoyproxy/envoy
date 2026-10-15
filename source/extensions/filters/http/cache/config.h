@@ -11,14 +11,21 @@ namespace HttpFilters {
 namespace Cache {
 
 class CacheFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::cache::v3::CacheConfig> {
+    : public Common::UnifiedFactoryBase<envoy::extensions::filters::http::cache::v3::CacheConfig> {
 public:
-  CacheFilterFactory() : FactoryBase("envoy.filters.http.cache") {}
+  CacheFilterFactory() : UnifiedFactoryBase("envoy.filters.http.cache") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  // Shared factory creation used by both the downstream (FactoryContext) and route/vhost-level
+  // (ServerFactoryContext) paths.
+  static absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactory(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+                      Server::Configuration::ServerFactoryContext& context);
 };
 
 } // namespace Cache

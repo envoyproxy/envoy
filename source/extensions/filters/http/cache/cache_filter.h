@@ -58,7 +58,7 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
 
-  static LookupStatus resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_status,
+  static LookupStatus resolveLookupStatus(std::optional<CacheEntryStatus> cache_entry_status,
                                           FilterState filter_state);
 
 private:
@@ -141,7 +141,7 @@ private:
   std::shared_ptr<HttpCache> cache_;
   LookupContextPtr lookup_;
   LookupResultPtr lookup_result_;
-  absl::optional<CacheEntryStatus> cache_entry_status_;
+  std::optional<CacheEntryStatus> cache_entry_status_;
 
   // Tracks what body bytes still need to be read from the cache. This is
   // currently only one Range, but will expand when full range support is added. Initialized by
@@ -161,7 +161,7 @@ private:
   bool callback_called_directly_ = false;
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
-  absl::optional<InsertStatus> insert_status_;
+  std::optional<InsertStatus> insert_status_;
 
   friend class UpstreamRequest;
 };

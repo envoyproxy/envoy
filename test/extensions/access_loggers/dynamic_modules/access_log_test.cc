@@ -3,10 +3,10 @@
 #include "source/extensions/access_loggers/dynamic_modules/access_log_config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
-#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -16,6 +16,8 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace DynamicModules {
 namespace {
+
+using ::Envoy::StatusHelpers::HasStatusMessage;
 
 class MockSlot : public ThreadLocal::Slot {
 public:
@@ -33,12 +35,15 @@ public:
   void SetUp() override {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("access_log_no_op", "c"), false);
-    EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    EXPECT_OK(dynamic_module);
 
-    auto config = newDynamicModuleAccessLogConfig(
-        "test_logger", "config", std::move(dynamic_module.value()), *stats_.rootScope());
-    EXPECT_TRUE(config.ok()) << config.status().message();
+    auto config =
+        newDynamicModuleAccessLogConfig("test_logger", "config", DefaultMetricsNamespace,
+                                        std::move(dynamic_module.value()), *stats_.rootScope());
+    EXPECT_OK(config);
     config_ = std::move(config.value());
+    // Re-open stat creation so tests can call `define_*` from the test thread.
+    config_->stat_creation_frozen_ = false;
   }
 
   Stats::IsolatedStoreImpl stats_;
@@ -167,7 +172,7 @@ TEST_F(DynamicModuleAccessLogTest, EmitLog) {
   NiceMock<ThreadLocal::MockInstance> tls;
   auto* slot = new NiceMock<MockSlot>();
 
-  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotPtr{slot}));
+  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotSharedPtr{slot}));
 
   auto access_log = std::make_unique<DynamicModuleAccessLog>(
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
@@ -202,7 +207,7 @@ TEST_F(DynamicModuleAccessLogTest, EmitLogNullLogger) {
   NiceMock<ThreadLocal::MockInstance> tls;
   auto* slot = new NiceMock<MockSlot>();
 
-  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotPtr{slot}));
+  EXPECT_CALL(tls, allocateSlot()).WillOnce(testing::Return(ThreadLocal::SlotSharedPtr{slot}));
 
   auto access_log = std::make_unique<DynamicModuleAccessLog>(
       nullptr, config_, static_cast<ThreadLocal::SlotAllocator&>(tls));
@@ -224,12 +229,12 @@ TEST_F(DynamicModuleAccessLogTest, FactoryFunctionMissingSymbol) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("access_log_missing_config_new", "c"),
       false);
-  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  EXPECT_OK(dynamic_module);
 
-  auto config = newDynamicModuleAccessLogConfig(
-      "test_logger", "config", std::move(dynamic_module.value()), *stats_.rootScope());
-  EXPECT_FALSE(config.ok());
-  EXPECT_THAT(config.status().message(), testing::HasSubstr("config_new"));
+  auto config =
+      newDynamicModuleAccessLogConfig("test_logger", "config", DefaultMetricsNamespace,
+                                      std::move(dynamic_module.value()), *stats_.rootScope());
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr("config_new")));
 }
 
 TEST_F(DynamicModuleAccessLogTest, FactoryFunctionModuleReturnsNull) {
@@ -242,10 +247,10 @@ TEST_F(DynamicModuleAccessLogTest, FactoryFunctionModuleReturnsNull) {
     GTEST_SKIP() << "Test module access_log_config_new_fail not available";
   }
 
-  auto config = newDynamicModuleAccessLogConfig(
-      "test_logger", "config", std::move(dynamic_module.value()), *stats_.rootScope());
-  EXPECT_FALSE(config.ok());
-  EXPECT_THAT(config.status().message(), testing::HasSubstr("Failed to initialize"));
+  auto config =
+      newDynamicModuleAccessLogConfig("test_logger", "config", DefaultMetricsNamespace,
+                                      std::move(dynamic_module.value()), *stats_.rootScope());
+  EXPECT_THAT(config, HasStatusMessage(testing::HasSubstr("Failed to initialize")));
 }
 
 TEST_F(DynamicModuleAccessLogTest, MetricsCounterDefineAndIncrement) {
@@ -263,7 +268,7 @@ TEST_F(DynamicModuleAccessLogTest, MetricsCounterDefineAndIncrement) {
                 static_cast<void*>(config_.get()), counter_id, 5));
 
   // Verify the counter value.
-  auto counter = TestUtility::findCounter(stats_, "dynamic_module_access_logger.test_counter");
+  auto counter = TestUtility::findCounter(stats_, "dynamicmodulescustom.test_counter");
   ASSERT_NE(nullptr, counter);
   EXPECT_EQ(5, counter->value());
 }
@@ -291,7 +296,7 @@ TEST_F(DynamicModuleAccessLogTest, MetricsGaugeDefineAndManipulate) {
                 static_cast<void*>(config_.get()), gauge_id, 5));
 
   // Verify the gauge value: 100 + 10 - 5 = 105.
-  auto gauge = TestUtility::findGauge(stats_, "dynamic_module_access_logger.test_gauge");
+  auto gauge = TestUtility::findGauge(stats_, "dynamicmodulescustom.test_gauge");
   ASSERT_NE(nullptr, gauge);
   EXPECT_EQ(105, gauge->value());
 }
@@ -322,8 +327,30 @@ TEST_F(DynamicModuleAccessLogTest, MetricsInvalidId) {
             envoy_dynamic_module_callback_access_logger_set_gauge(static_cast<void*>(config_.get()),
                                                                   999, 1));
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_access_logger_increment_gauge(
+                static_cast<void*>(config_.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_access_logger_decrement_gauge(
+                static_cast<void*>(config_.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_access_logger_record_histogram_value(
                 static_cast<void*>(config_.get()), 999, 1));
+}
+
+// Verifies the factory auto-freezes stat creation so `define_*` returns `Frozen` after init.
+TEST_F(DynamicModuleAccessLogTest, MetricsFrozenAfterInit) {
+  config_->stat_creation_frozen_ = true;
+  envoy_dynamic_module_type_module_buffer name = {.ptr = "frozen_counter", .length = 14};
+  size_t out_id = 0;
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_access_logger_config_define_counter(
+                static_cast<void*>(config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_access_logger_config_define_gauge(
+                static_cast<void*>(config_.get()), name, &out_id));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
+            envoy_dynamic_module_callback_access_logger_config_define_histogram(
+                static_cast<void*>(config_.get()), name, &out_id));
 }
 
 } // namespace

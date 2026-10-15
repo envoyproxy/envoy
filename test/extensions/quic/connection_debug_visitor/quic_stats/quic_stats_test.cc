@@ -44,12 +44,12 @@ public:
     return opt_ref.value().get().value();
   }
 
-  absl::optional<uint64_t> histogramValue(absl::string_view name) {
+  std::optional<uint64_t> histogramValue(absl::string_view name) {
     std::vector<uint64_t> values = store_.histogramValues(absl::StrCat("quic_stats.", name), true);
     ASSERT(values.size() <= 1,
            absl::StrCat(name, " didn't have <=1 value, instead had ", values.size()));
     if (values.empty()) {
-      return absl::nullopt;
+      return std::nullopt;
     } else {
       return values[0];
     }
@@ -138,7 +138,7 @@ TEST_F(QuicStatsTest, Values) {
   EXPECT_EQ(8U, histogramValue("cx_tx_estimated_bandwidth"));
   // No more packets were transmitted (numerator and denominator deltas are zero), so no value
   // should be emitted.
-  EXPECT_EQ(absl::nullopt, histogramValue("cx_tx_percent_retransmitted_packets"));
+  EXPECT_EQ(std::nullopt, histogramValue("cx_tx_percent_retransmitted_packets"));
   EXPECT_EQ(9U, histogramValue("cx_tx_mtu"));
   EXPECT_EQ(10U, histogramValue("cx_rx_mtu"));
 

@@ -76,8 +76,9 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
       scope_(scope), api_(api), stat_name_pool_(scope_->symbolTable()),
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
       cluster_manager_(cluster_manager), dispatcher_(dispatcher),
-      time_source_(dispatcher.timeSource()), lifecycle_stats_handler_(LifecycleStatsHandler(
-                                                 scope, config.config().vm_config().runtime())) {
+      time_source_(dispatcher.timeSource()),
+      lifecycle_stats_handler_(LifecycleStatsHandler(scope, config.config().vm_config().runtime(),
+                                                     lookupWasmVmCountGauge(api.rootScope()))) {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
   ENVOY_LOG(debug, "Base Wasm created {} now active", lifecycle_stats_handler_.getActiveVmCount());
 }
@@ -373,8 +374,19 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }
 
+  // Ideally, all fields of vm_config that affect the Wasm VM should be part of the vm_key, but
+  // the proxy_wasm::makeVmKey() takes the configuration and the code as separate arguments, so
+  // we only include the other fields here. If any other fields are added to vm_config that affect
+  // the Wasm VM, they should be added here.
+  envoy::extensions::wasm::v3::VmConfig vm_key_config;
+  vm_key_config.set_runtime(vm_config.runtime());
+  *vm_key_config.mutable_environment_variables() = vm_config.environment_variables();
+  *vm_key_config.mutable_capability_restriction_config() =
+      vm_config.capability_restriction_config();
+  const std::string vm_id_with_config =
+      absl::StrCat(vm_config.vm_id(), "|", MessageUtil::hash(vm_key_config));
   auto vm_key = proxy_wasm::makeVmKey(
-      vm_config.vm_id(),
+      vm_id_with_config,
       THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(vm_config.configuration()), std::string), code);
   auto complete_cb = [cb, vm_key, plugin, scope, &api, &cluster_manager, &dispatcher,
                       &lifecycle_notifier, create_root_context_for_testing,
@@ -561,9 +573,7 @@ std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPlug
 
 PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                            Server::Configuration::ServerFactoryContext& context,
-                           Stats::Scope& scope, Init::Manager& init_manager,
-                           envoy::config::core::v3::TrafficDirection direction,
-                           const envoy::config::core::v3::Metadata* metadata, bool singleton)
+                           Stats::Scope& scope, Init::Manager& init_manager, bool singleton)
     : is_singleton_handle_(singleton) {
 
   if (config.fail_open()) {
@@ -607,7 +617,7 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
   }
 
   stats_handler_ = std::make_shared<StatsHandler>(scope, absl::StrCat("wasm.", config.name(), "."));
-  plugin_ = std::make_shared<Plugin>(config, direction, context.localInfo(), metadata);
+  plugin_ = std::make_shared<Plugin>(config, context.localInfo());
 
   auto callback = [this, &context](WasmHandleSharedPtr base_wasm) {
     base_wasm_ = base_wasm;

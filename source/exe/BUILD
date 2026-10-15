@@ -11,7 +11,7 @@ load(
     "envoy_select_enable_http3",
     "envoy_select_signal_trace",
 )
-load("//bazel:repositories.bzl", "NO_HTTP3_SKIP_TARGETS", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//bazel:extension_configs.bzl", "NO_HTTP3_SKIP_TARGETS", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
@@ -29,7 +29,7 @@ envoy_cc_binary(
         "//bazel:windows_opt_build": ["generate_pdb_file"],
         "//conditions:default": [],
     }),
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     stamped = True,
     deps = [":envoy_main_entry_lib"],
 )
@@ -52,6 +52,7 @@ envoy_cc_library(
         "//bazel:disable_http3_on_windows_x86_64": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS + WINDOWS_SKIP_TARGETS),
         "//bazel:disable_http3_on_linux_ppc": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS + PPC_SKIP_TARGETS),
         "//bazel:disable_http3_on_linux_ppc64le": envoy_all_extensions(PPC_SKIP_TARGETS + NO_HTTP3_SKIP_TARGETS),
+        "//bazel:disable_http3_on_linux_x86_64": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//bazel:disable_http3_on_not_x86_ppc": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
@@ -60,7 +61,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_main_entry_lib",
     srcs = ["main.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":envoy_main_common_lib",
         ":platform_impl_lib",
@@ -74,7 +75,7 @@ envoy_cc_library(
     name = "stripped_main_base_lib",
     srcs = ["stripped_main_base.cc"],
     hdrs = ["stripped_main_base.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":platform_impl_lib",
         ":process_wide_lib",
@@ -108,7 +109,7 @@ envoy_cc_library(
     hdrs = [
         "main_common.h",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = envoy_select_admin_functionality([":admin_response_lib"]) + [
         ":platform_impl_lib",
         ":process_wide_lib",
@@ -116,6 +117,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
+        "//source/common/coroutine:backtrace_lib",
         "//source/common/grpc:google_grpc_context_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
@@ -169,6 +171,7 @@ envoy_cc_library(
         "//source/common/listener_manager:listener_manager_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/common/version:version_linkstamp",
+        "//source/common/version:version_string_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/server:options_lib",
         # TODO(wbpcode) make this a proper extension
@@ -185,6 +188,7 @@ envoy_cc_library(
     deps = [
         ":stripped_main_base_lib",
         "//source/common/version:version_linkstamp",
+        "//source/common/version:version_string_lib",
     ],
 )
 
@@ -316,6 +320,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:non_copyable",
+        "//source/common/coroutine:backtrace_lib",
         "//source/server:backtrace_lib",
     ],
 )

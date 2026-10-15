@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <optional>
 
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
@@ -9,7 +10,6 @@
 #include "envoy/protobuf/message_validator.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 
@@ -27,7 +27,7 @@ public:
    * ttl must be greater than 0.
    */
   virtual void addOrUpdate(absl::string_view key, absl::string_view value,
-                           absl::optional<std::chrono::seconds> ttl) PURE;
+                           std::optional<std::chrono::seconds> ttl) PURE;
 
   /**
    * Removes a key:value pair from the store. This is a no-op if the key is not present.
@@ -38,9 +38,9 @@ public:
   /**
    * Returns the value of the key provided.
    * @param key supplies a key to return the value of.
-   * @return the value, if the key is in the store, absl::nullopt otherwise.
+   * @return the value, if the key is in the store, std::nullopt otherwise.
    */
-  virtual absl::optional<absl::string_view> get(absl::string_view key) PURE;
+  virtual std::optional<absl::string_view> get(absl::string_view key) PURE;
 
   /**
    * Flushes the store to long term storage.

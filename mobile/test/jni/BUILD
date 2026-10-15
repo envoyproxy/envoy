@@ -160,6 +160,7 @@ cc_library(
     ],
     deps = [
         "//library/jni:jni_helper_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
     ],
     alwayslink = True,
 )
@@ -182,6 +183,7 @@ cc_library(
     deps = [
         "//library/common/http:header_utility_lib",
         "//library/jni:jni_utility_lib",
+        "@envoy//test/test_common:test_version_linkstamp",
         "@envoy//test/test_common:utility_lib",
     ],
     alwayslink = True,

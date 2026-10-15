@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -20,7 +22,7 @@ namespace {
 
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
-  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
+  MOCK_METHOD(std::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
               (const));
   MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
 };
@@ -87,7 +89,7 @@ TEST(UpstreamKafkaFacadeTest, shouldThrowIfThereIsNoConfigurationForGivenTopic) 
   MockUpstreamKafkaConfiguration configuration;
   const ClusterConfig cluster_config = {
       "cluster", 1, {{"bootstrap.servers", "localhost:9092"}}, {}};
-  EXPECT_CALL(configuration, computeClusterConfigForTopic(topic)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(configuration, computeClusterConfigForTopic(topic)).WillOnce(Return(std::nullopt));
   ThreadLocal::MockInstance slot_allocator;
   EXPECT_CALL(slot_allocator, allocateSlot())
       .WillOnce(Invoke(&slot_allocator, &ThreadLocal::MockInstance::allocateSlotMock));

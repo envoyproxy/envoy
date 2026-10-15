@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/network/connection_handler.h"
+
 #include "source/common/common/hash.h"
 #include "source/server/hot_restarting_base.h"
 
@@ -42,7 +44,8 @@ public:
     void drainListeners();
 
     // Network::NonDispatchedUdpPacketHandler
-    void handle(uint32_t worker_index, const Network::UdpRecvData& packet) override;
+    void handle(uint32_t worker_index, const Network::Address::Instance& listener_address,
+                const Network::UdpRecvData& packet) override;
 
   private:
     Server::Instance* const server_{};

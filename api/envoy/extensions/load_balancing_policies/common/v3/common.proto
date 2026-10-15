@@ -7,6 +7,7 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -158,4 +159,30 @@ message ConsistentHashingLbConfig {
   // :ref:`route level hash policy <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
   // will be ignored.
   repeated config.route.v3.RouteAction.HashPolicy hash_policy = 3;
+}
+
+// Connection overrides for the ORCA out-of-band (OOB) reporting stream, used by
+// load balancing policies that consume ORCA load reports (e.g.
+// :ref:`client_side_weighted_round_robin
+// <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`).
+// Whether and when OOB reporting runs is controlled by the embedding policy.
+message OrcaOobReportingConfig {
+  // Optional alternative port for the OOB reporting connection, for example an
+  // ORCA reporting sidecar listening on a dedicated port. If 0 or unset, the
+  // port of the host's ORCA reporting address is used. Ignored for non-IP
+  // (pipe/UDS) host addresses.
+  uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
+
+  // Value of the ``:authority`` header on the OOB gRPC stream. If empty, the
+  // endpoint hostname is used, then the dialed address, then the cluster name.
+  string authority = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+  // Optional key/value pairs used to select a transport socket from the
+  // cluster's :ref:`transport_socket_matches
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`
+  // for the OOB connection. If unset, or if no match is found, the cluster's
+  // default transport socket is used. ALPN ``h2`` is always forced on the OOB
+  // connection regardless of this setting.
+  google.protobuf.Struct transport_socket_match_criteria = 3;
 }

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -11,6 +12,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/registry/registry.h"
+#include "envoy/singleton/instance.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -23,7 +26,10 @@
 #include "source/common/tls/cert_validator/san_matcher.h"
 #include "source/common/tls/stats.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
+#include "openssl/sha.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -31,6 +37,115 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+class CrlCache;
+
+// Holds the parsed CRLs for a single CRL PEM blob. A PEM blob may contain more
+// than one CRL, so they are kept as a list. Instances are shared (via
+// shared_ptr) between every TLS context that references identical CRL content,
+// so the parsed structures - which can be tens of megabytes for CRLs with many
+// revoked entries - are materialized in memory only once. A shared_ptr to the
+// owning cache is held so that holding a CrlListSharedPtr alone is enough to
+// keep both the parsed CRLs and the cache alive.
+struct CrlList {
+  std::vector<bssl::UniquePtr<X509_CRL>> crls;
+  std::shared_ptr<CrlCache> cache;
+};
+using CrlListSharedPtr = std::shared_ptr<CrlList>;
+
+// Process-wide cache that parses each distinct CRL blob once and shares the
+// parsed representation across all TLS contexts that reference it. Without this,
+// a CRL referenced from many `common_tls_context`s is parsed and held in memory
+// once per context, which can consume a large amount of memory for big CRLs.
+//
+// Threading and lifetime model (mirrors SharedPool::ObjectSharedPool):
+//   - All methods must be called on the main (or test) thread. TLS context
+//     creation, the only caller, is confined to that thread.
+//   - Only a weak_ptr is stored, so an entry is released as soon as the last
+//     CrlList referencing it is destroyed (for example after an xDS update).
+//     Each returned CrlList holds a shared_ptr back to this cache, so the cache
+//     outlives every entry handed out from it.
+//   - The parsed X509_CRLs are reference counted by BoringSSL; each X509_STORE a
+//     CRL is added to holds its own reference, so it remains valid for that
+//     store's lifetime independent of this cache.
+class CrlCache : public Singleton::Instance, public std::enable_shared_from_this<CrlCache> {
+public:
+  // Returns the shared parsed representation of `crl_pem`, parsing and caching
+  // it on first use. `crl_path` is only used to build the error message.
+  // Returns an error if `crl_pem` cannot be parsed.
+  absl::StatusOr<CrlListSharedPtr> getOrCreate(const std::string& crl_pem,
+                                               const std::string& crl_path);
+
+  // Number of distinct CRL blobs currently referenced by at least one context.
+  // Exposed for testing.
+  size_t size() const;
+
+private:
+  // Keyed by a SHA-256 digest of the CRL PEM (rather than the PEM itself, to
+  // avoid holding a second full copy of potentially large CRL data); stores a
+  // weak_ptr so entries do not outlive the contexts that use them.
+  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<CrlList>> cache_;
+};
+
+// Returns the process-wide CRL cache, creating it on first use.
+std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager);
+
+class CaCertCache;
+
+// Holds the certificates - and any CRLs, since a trusted CA PEM blob is allowed
+// to carry both - parsed from a single trusted CA PEM blob. Instances are shared
+// (via shared_ptr) between every TLS context that references identical CA
+// content, so the parsed X509 structures, which for a large trust bundle
+// dominate a context's memory, are materialized in memory only once. A
+// shared_ptr to the owning cache is held so that holding a CaCertListSharedPtr
+// alone is enough to keep both the parsed certificates and the cache alive.
+struct CaCertList {
+  std::vector<bssl::UniquePtr<X509>> certs;
+  std::vector<bssl::UniquePtr<X509_CRL>> crls;
+  std::shared_ptr<CaCertCache> cache;
+};
+using CaCertListSharedPtr = std::shared_ptr<CaCertList>;
+
+// Process-wide cache that parses each distinct trusted CA blob once and shares
+// the parsed representation across all TLS contexts that reference it. Without
+// this, a trust bundle referenced from many `common_tls_context`s is parsed and
+// held in memory once per context. That is the common shape for upstream
+// clusters, which frequently share a single trust root, so the duplication grows
+// linearly with the number of clusters.
+//
+// Threading and lifetime model is identical to CrlCache above:
+//   - All methods must be called on the main (or test) thread. TLS context
+//     creation, the only caller, is confined to that thread.
+//   - Only a weak_ptr is stored, so an entry is released as soon as the last
+//     CaCertList referencing it is destroyed (for example after an xDS update).
+//     Each returned CaCertList holds a shared_ptr back to this cache, so the
+//     cache outlives every entry handed out from it.
+//   - The parsed X509s are reference counted by BoringSSL; each X509_STORE a
+//     certificate is added to holds its own reference, so it remains valid for
+//     that store's lifetime independent of this cache. Only the immutable parsed
+//     material is shared - each context keeps its own X509_STORE and therefore
+//     its own store flags.
+class CaCertCache : public Singleton::Instance, public std::enable_shared_from_this<CaCertCache> {
+public:
+  // Returns the shared parsed representation of `ca_pem`, parsing and caching it
+  // on first use. `ca_path` is only used to build the error message. Returns an
+  // error if `ca_pem` cannot be parsed or contains no certificate.
+  absl::StatusOr<CaCertListSharedPtr> getOrCreate(const std::string& ca_pem,
+                                                  const std::string& ca_path);
+
+  // Number of distinct CA blobs currently referenced by at least one context.
+  // Exposed for testing.
+  size_t size() const;
+
+private:
+  // Keyed by a SHA-256 digest of the CA PEM (rather than the PEM itself, to
+  // avoid holding a second full copy of potentially large trust bundles); stores
+  // a weak_ptr so entries do not outlive the contexts that use them.
+  absl::flat_hash_map<std::array<uint8_t, SHA256_DIGEST_LENGTH>, std::weak_ptr<CaCertList>> cache_;
+};
+
+// Returns the process-wide trusted CA cache, creating it on first use.
+std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manager);
 
 class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
@@ -55,9 +170,9 @@ public:
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
 
-  absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_path_; };
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const override;
 
   // Utility functions.
   Envoy::Ssl::ClientValidationStatus
@@ -94,7 +209,7 @@ public:
    * @param subject_alt_names the configured subject_alt_names to match
    * @return true if the verification succeeds
    */
-  static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names);
+  static bool verifySubjectAltName(X509* cert, absl::Span<const std::string> subject_alt_names);
 
   /**
    * Performs subjectAltName matching with the provided matchers.
@@ -116,11 +231,17 @@ private:
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;
-  bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
+  // The parsed CRLs shared with other TLS contexts that reference the same CRL.
+  // This also keeps the CRL cache alive for as long as the validator uses it.
+  CrlListSharedPtr shared_crl_;
+  // The parsed trusted CA certificates shared with other TLS contexts that
+  // reference the same CA blob. This also keeps the CA cache alive for as long
+  // as the validator uses it.
+  CaCertListSharedPtr shared_ca_certs_;
   bool allow_untrusted_certificate_{false};
   bool verify_trusted_ca_{false};
   const bool auto_sni_san_match_{false};

@@ -1,8 +1,7 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
-#include <string>
-#include <vector>
 
 #include "envoy/common/interval_set.h"
 #include "envoy/common/pure.h"

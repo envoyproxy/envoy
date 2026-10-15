@@ -30,7 +30,7 @@ NetworkConfigurationRetryOptionsPredicate::updateOptions(
     ENVOY_LOG(warn, "extra stream info is missing");
 
     // Returning nullopt results in existing socket options being preserved.
-    return Upstream::RetryOptionsPredicate::UpdateOptionsReturn{absl::nullopt};
+    return Upstream::RetryOptionsPredicate::UpdateOptionsReturn{std::nullopt};
   }
 
   StreamInfo::ExtraStreamInfo* extra_stream_info =
@@ -40,7 +40,7 @@ NetworkConfigurationRetryOptionsPredicate::updateOptions(
     ENVOY_LOG(warn, "extra stream info is missing");
 
     // Returning nullopt results in existing socket options being preserved.
-    return Upstream::RetryOptionsPredicate::UpdateOptionsReturn{absl::nullopt};
+    return Upstream::RetryOptionsPredicate::UpdateOptionsReturn{std::nullopt};
   }
 
   // This check is also defensive. The NetworkConfigurationFilter should always set this when
@@ -49,7 +49,7 @@ NetworkConfigurationRetryOptionsPredicate::updateOptions(
     ENVOY_LOG(warn, "network configuration key is missing");
 
     // Returning nullopt results in existing socket options being preserved.
-    return Upstream::RetryOptionsPredicate::UpdateOptionsReturn{absl::nullopt};
+    return Upstream::RetryOptionsPredicate::UpdateOptionsReturn{std::nullopt};
   }
 
   // As a proxy for the many different types of network errors, this code interprets any failure
