@@ -2786,37 +2786,6 @@ Config::ScopedResume makePauseHandle(bool& resumed) {
   return std::make_unique<Cleanup>([&resumed]() { resumed = true; });
 }
 
-// Sets up ADS mux, creates the cluster manager, stubs pause() to track whether CDS was paused,
-// adds a warming cluster with wait_for_warm_on_init: false (whose initialize() is never resolved),
-// and asserts CDS was NOT paused.
-void expectWaitForWarmOnInitFalseDoesNotBlockCds(ClusterManagerImplTest& t,
-                                                 const std::string& cluster_yaml) {
-  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
-      std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(t.factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
-  t.create(defaultConfig());
-
-  bool cds_paused = false;
-  ON_CALL(t.factory_.server_context_.xds_manager_,
-          pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
-      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
-        cds_paused = true;
-        return std::make_unique<Cleanup>([]() {});
-      }));
-
-  auto cluster_config = parseClusterFromV3Yaml(cluster_yaml);
-  std::shared_ptr<MockClusterMockPrioritySet> mock_cluster =
-      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
-  mock_cluster->info_->name_ = cluster_config.name();
-  ON_CALL(*mock_cluster->info_, waitForWarmOnInit()).WillByDefault(Return(false));
-  EXPECT_CALL(*mock_cluster, initialize(_));
-  EXPECT_CALL(t.factory_, clusterFromProto_(ProtoEq(cluster_config), _, true))
-      .WillOnce(Return(std::make_pair(mock_cluster, nullptr)));
-
-  EXPECT_TRUE(*t.cluster_manager_->addOrUpdateCluster(cluster_config, "v1"));
-  EXPECT_FALSE(cds_paused);
-}
-
 // A normal (no-SDS) warming cluster should acquire a CDS pause until it finishes warming.
 TEST_F(ClusterManagerImplTest, WarmingClusterBlocksCdsUntilWarmed) {
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
@@ -2870,7 +2839,20 @@ TEST_F(ClusterManagerImplTest, WarmingClusterBlocksCdsUntilWarmed) {
 
 // A cluster with wait_for_warm_on_init: false must NOT pause CDS.
 TEST_F(ClusterManagerImplTest, WarmingClusterWithWaitForWarmOnInitFalseDoesNotBlockCds) {
-  expectWaitForWarmOnInitFalseDoesNotBlockCds(*this, R"EOF(
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
+      std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  create(defaultConfig());
+
+  bool cds_paused = false;
+  ON_CALL(factory_.server_context_.xds_manager_,
+          pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
+      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+        cds_paused = true;
+        return std::make_unique<Cleanup>([]() {});
+      }));
+
+  const std::string cluster_yaml = R"EOF(
     name: no_wait_cluster
     connect_timeout: 0.250s
     type: STATIC
@@ -2884,7 +2866,18 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithWaitForWarmOnInitFalseDoesNotBl
               socket_address:
                 address: 127.0.0.1
                 port_value: 11001
-  )EOF");
+  )EOF";
+  auto cluster_config = parseClusterFromV3Yaml(cluster_yaml);
+  std::shared_ptr<MockClusterMockPrioritySet> mock_cluster =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  mock_cluster->info_->name_ = cluster_config.name();
+  ON_CALL(*mock_cluster->info_, waitForWarmOnInit()).WillByDefault(Return(false));
+  EXPECT_CALL(*mock_cluster, initialize(_));
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(cluster_config), _, true))
+      .WillOnce(Return(std::make_pair(mock_cluster, nullptr)));
+
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster_config, "v1"));
+  EXPECT_FALSE(cds_paused);
 }
 
 // When one cluster has wait_for_warm_on_init: false and another is warming normally,
@@ -2966,7 +2959,7 @@ TEST_F(ClusterManagerImplTest,
   EXPECT_TRUE(cds_paused);
   EXPECT_FALSE(cds_resumed);
 
-  // Normal cluster finishes warming. CDS should resume even though sds_cluster is still stuck.
+  // Normal cluster finishes warming. CDS should resume even though no_wait_cluster is still warming.
   normal_init_cb();
   EXPECT_TRUE(cds_resumed);
 }
@@ -2986,14 +2979,14 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithDefaultWaitForWarmOnInitBlocksC
         return std::make_unique<Cleanup>([]() {});
       }));
 
-  // SDS with a finite timeout — will eventually resolve, so it should block CDS.
+  // The default waitForWarmOnInit() returns true, so any warming cluster blocks CDS.
   const std::string cluster_yaml = R"EOF(
-    name: sds_nonzero_cluster
+    name: default_wait_cluster
     connect_timeout: 0.250s
     type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: sds_nonzero_cluster
+      cluster_name: default_wait_cluster
       endpoints:
       - lb_endpoints:
         - endpoint:
@@ -3001,29 +2994,17 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithDefaultWaitForWarmOnInitBlocksC
               socket_address:
                 address: 127.0.0.1
                 port_value: 11001
-    transport_socket:
-      name: envoy.transport_sockets.tls
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-        common_tls_context:
-          tls_certificate_sds_secret_configs:
-            - name: client_cert
-              sds_config:
-                ads: {}
-                resource_api_version: V3
-                initial_fetch_timeout: 5s
   )EOF";
   auto cluster_config = parseClusterFromV3Yaml(cluster_yaml);
 
   std::shared_ptr<MockClusterMockPrioritySet> mock_cluster =
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
-  mock_cluster->info_->name_ = "sds_nonzero_cluster";
+  mock_cluster->info_->name_ = "default_wait_cluster";
   EXPECT_CALL(*mock_cluster, initialize(_));
   EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(cluster_config), _, true))
       .WillOnce(Return(std::make_pair(mock_cluster, nullptr)));
 
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster_config, "v1"));
-  // Non-zero timeout means the cluster will eventually finish warming — it should block CDS.
   EXPECT_TRUE(cds_paused);
 }
 
@@ -3138,6 +3119,58 @@ TEST_F(ClusterManagerImplTest, UpdatingWarmingClusterToSkipCdsPauseReleasesHandl
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster_config_v2, "v2"));
   // CDS pause handle must have been released even though the cluster is still warming.
   EXPECT_TRUE(cds_resumed);
+}
+
+// shutdown() must cancel the CDS pause handle before cds_pauses_.clear() fires the
+// destructor.
+TEST_F(ClusterManagerImplTest, ShutdownCancelsCdsPauseBeforeMuxTeardown) {
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
+      std::make_shared<NiceMock<Config::MockGrpcMux>>();
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  create(defaultConfig());
+
+  bool cds_paused = false;
+  bool cds_resumed = false;
+  ON_CALL(factory_.server_context_.xds_manager_,
+          pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
+      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+        cds_paused = true;
+        return makePauseHandle(cds_resumed);
+      }));
+
+  // Add a warming cluster so a live CDS pause handle is acquired.
+  const std::string cluster_yaml = R"EOF(
+    name: warming_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: warming_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  auto cluster_config = parseClusterFromV3Yaml(cluster_yaml);
+  std::shared_ptr<MockClusterMockPrioritySet> mock_cluster =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  mock_cluster->info_->name_ = "warming_cluster";
+  std::function<void()> init_cb;
+  EXPECT_CALL(*mock_cluster, initialize(_)).WillOnce(SaveArg<0>(&init_cb));
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(cluster_config), _, true))
+      .WillOnce(Return(std::make_pair(mock_cluster, nullptr)));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster_config, "v1"));
+  // Confirm a handle was actually acquired, without this the shutdown assertion is vacuous.
+  EXPECT_TRUE(cds_paused);
+
+  // shutdown() calls cancel() on each handle before cds_pauses_.clear(). cancel() replaces
+  // the resume lambda with a no-op, so when clear() fires the Cleanup destructor the
+  // original resume callback is never invoked.
+  cluster_manager_->shutdown();
+  EXPECT_FALSE(cds_resumed);
 }
 
 } // namespace

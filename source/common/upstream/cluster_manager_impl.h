@@ -951,6 +951,9 @@ private:
   absl::Status onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
+  // Acquire or release the CDS pause handle for a single cluster based on its
+  // waitForWarmOnInit() flag.
+  void updateCdsPause(const ClusterData& cluster_data);
   void clusterWarmingToActive(const std::string& cluster_name);
   static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
                               const ClusterConnectivityState& cluster_manager_state,

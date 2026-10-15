@@ -863,6 +863,8 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   ClusterDataPtr new_data = std::move(warming_it->second);
   warming_clusters_.erase(warming_it);
   ClusterDataPtr old_active = std::exchange(active_clusters_[cluster_name], std::move(new_data));
+  // Release the CDS pause handle for this cluster.
+  cds_pauses_.erase(cluster_name);
   // old_active is destroyed here, after both maps are consistent.
 }
 
@@ -905,6 +907,7 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
     removed = true;
     init_helper_.removeCluster(*existing_warming_cluster->second);
     warming_clusters_.erase(existing_warming_cluster);
+    cds_pauses_.erase(cluster_name);
     ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
   }
 
@@ -1007,8 +1010,23 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
+  updateCdsPause(*cluster_entry_it->second);
   updateClusterCounts();
   return result;
+}
+
+void ClusterManagerImpl::updateCdsPause(const ClusterData& cluster_data) {
+  if (init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized ||
+      shutdown_ || !xds_manager_.adsMux()) {
+    return;
+  }
+  const auto& name = cluster_data.cluster_->info()->name();
+  if (!cluster_data.cluster_->info()->waitForWarmOnInit()) {
+    cds_pauses_.erase(name);
+  } else if (!cds_pauses_.contains(name)) {
+    cds_pauses_.emplace(name,
+                        xds_manager_.pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()));
+  }
 }
 
 void ClusterManagerImpl::updateClusterCounts() {
@@ -1025,25 +1043,6 @@ void ClusterManagerImpl::updateClusterCounts() {
   // are warmed up, CDS is resumed, and ACK is sent to ADS, providing a
   // signal to ADS to proceed with RDS updates.
   // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
-  const bool all_clusters_initialized =
-      init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  if (all_clusters_initialized && !shutdown_ && xds_manager_.adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-    // Clusters with wait_for_warm_on_init: false opt out of blocking CDS. All other
-    // warming clusters hold a CDS pause handle until they finish warming. If a cluster
-    // transitions to opt-out via an in-place update, release any existing handle immediately.
-    for (const auto& [name, cluster_data] : warming_clusters_) {
-      if (!cluster_data->cluster_->info()->waitForWarmOnInit()) {
-        cds_pauses_.erase(name);
-      } else if (!cds_pauses_.contains(name)) {
-        cds_pauses_.emplace(name, xds_manager_.pause(type_url));
-      }
-    }
-  }
-  // Release handles for clusters that are no longer warming. Run unconditionally so that
-  // handles are dropped promptly even if shutdown_ is already set.
-  absl::erase_if(cds_pauses_,
-                 [this](const auto& entry) { return !warming_clusters_.contains(entry.first); });
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }

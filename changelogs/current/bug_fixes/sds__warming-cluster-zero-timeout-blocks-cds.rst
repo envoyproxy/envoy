@@ -1,1 +1,0 @@
-Fix warming cluster with ``SDS initial_fetch_timeout: 0s`` or other indefinitely-warming configurations can stall CDS proxy-wide. Add wait_for_warm_on_init: false to opt a cluster out of CDS pause gating while it continues warming in the background.
