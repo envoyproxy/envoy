@@ -22,21 +22,38 @@ using ::Envoy::StatusHelpers::IsOk;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::HasSubstr;
 
-constexpr absl::string_view kVertexClaude = R"({
+constexpr absl::string_view VertexClaude = R"({
   "uri_pattern": "/{version}/projects/{project}/locations/{location}/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
   "mutations": [
     {"body_field": "model"},
     {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
   ]
 })";
-constexpr absl::string_view kVertexGemini =
+constexpr absl::string_view VertexGemini =
     "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
     "{model}:{generateContent|streamGenerateContent?alt=sse}";
+constexpr absl::string_view GeminiApi =
+    R"({"uri_pattern": "/v1beta/models/{model}:{generateContent|streamGenerateContent}",)"
+    R"( "mutations": [{"body_field": "model"}, {"body_field": "stream"}]})";
 
 LlmBindingConstSharedPtr parseOk(absl::string_view text) {
   absl::StatusOr<LlmBindingConstSharedPtr> binding = LlmBinding::parse(text);
   EXPECT_TRUE(binding.ok()) << binding.status();
   return binding.ok() ? *binding : nullptr;
+}
+
+std::optional<LlmBindingRead> read(const LlmBindingConstSharedPtr& binding, absl::string_view path,
+                                   nlohmann::json& body,
+                                   const LlmBindingConstSharedPtr& api_binding = nullptr) {
+  return readClientPath(binding, api_binding, {}, path, body);
+}
+
+absl::StatusOr<std::optional<std::string>> write(const LlmBinding& binding,
+                                                 const LlmBindingRead* arrived,
+                                                 nlohmann::json& body,
+                                                 const LlmBinding* api_binding = nullptr) {
+  bool unresolved = false;
+  return writeRequest(binding, api_binding, arrived, body, unresolved);
 }
 
 TEST(LlmBindingParseTest, ConvertsEveryValueKind) {
@@ -86,66 +103,71 @@ TEST(LlmBindingParseTest, RejectsWhatCannotBeApplied) {
   }
 }
 
-TEST(LlmBindingParseTest, KnowsWhatItRemovesAndReads) {
+TEST(LlmBindingParseTest, KnowsWhatItRemoves) {
   const LlmBindingConstSharedPtr binding = parseOk(R"({"mutations": [
-    {"body_field": "model"}, {"body_field": "stream"},
-    {"body_field": "labels", "value": "{project}-{model}"}
+    {"body_field": "model"}, {"body_field": "stream"}, {"body_field": "labels", "value": "x"}
   ]})");
   EXPECT_TRUE(binding->removesModel());
   EXPECT_TRUE(binding->removesStream());
-  EXPECT_EQ(binding->placeholders(), std::vector<std::string>{"project"});
 }
 
-TEST(LlmBindingParseTest, EmptyPartsFallBackToTheApis) {
-  const LlmBindingConstSharedPtr api =
-      parseOk(R"({"uri_pattern": "/v1beta/models/{model}:{generateContent|streamGenerateContent}",)"
-              R"( "mutations": [{"body_field": "model"}, {"body_field": "stream"}]})");
+// A binding's empty part is the API's: a pattern-only binding takes the API's mutations, and a
+// mutations-only one its pattern.
+TEST(LlmBindingTest, EmptyPartsFallBackToTheApis) {
+  const LlmBindingConstSharedPtr api = parseOk(GeminiApi);
   const LlmBindingConstSharedPtr pattern_only = parseOk("/gw/{model}");
   const LlmBindingConstSharedPtr edits_only =
       parseOk(R"({"mutations": [{"body_field": "x", "value": 1}]})");
 
-  EXPECT_EQ(patternOf(*pattern_only, api.get()), &*pattern_only->pattern());
-  EXPECT_EQ(&editsOf(*pattern_only, api.get()), api.get());
-  EXPECT_EQ(patternOf(*edits_only, api.get()), &*api->pattern());
-  EXPECT_EQ(&editsOf(*edits_only, api.get()), edits_only.get());
-  EXPECT_EQ(patternOf(*edits_only, nullptr), nullptr);
-  EXPECT_EQ(&editsOf(*pattern_only, nullptr), pattern_only.get());
+  // The API removes `model`, so the path's replaces the body's.
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "from-body"})");
+  ASSERT_TRUE(read(pattern_only, "/gw/m", body, api).has_value());
+  EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m"})"));
+  EXPECT_THAT(write(*pattern_only, nullptr, body, api.get()),
+              IsOkAndHolds(std::make_optional<std::string>("/gw/m")));
+  EXPECT_EQ(body, nlohmann::json::object());
+
+  body = nlohmann::json::parse(R"({"model": "m", "stream": true})");
+  EXPECT_THAT(
+      write(*edits_only, nullptr, body, api.get()),
+      IsOkAndHolds(std::make_optional<std::string>("/v1beta/models/m:streamGenerateContent")));
+  EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m", "stream": true, "x": 1})"));
 }
 
 TEST(LlmBindingReadTest, ThePathWinsForAFieldTheBindingRemoves) {
-  const LlmBindingConstSharedPtr binding = parseOk(kVertexClaude);
+  const LlmBindingConstSharedPtr binding = parseOk(VertexClaude);
   nlohmann::json body = nlohmann::json::parse(R"({
     "model": "from-body", "anthropic_version": "vertex-2023-10-16", "max_tokens": 8
   })");
-  std::optional<LlmBindingRead> read =
-      readRequest(binding, nullptr,
-                  "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
-                  "claude-sonnet-4-5@20250929:streamRawPredict?x=1",
-                  body);
-  ASSERT_TRUE(read.has_value());
-  EXPECT_EQ(read->binding, binding);
-  EXPECT_EQ(read->model, "claude-sonnet-4-5@20250929");
-  EXPECT_EQ(read->path_variables.size(), 3);
-  EXPECT_EQ(read->written_fields.at("anthropic_version"), "vertex-2023-10-16");
+  std::optional<LlmBindingRead> arrived =
+      read(binding,
+           "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+           "claude-sonnet-4-5@20250929:streamRawPredict?x=1",
+           body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_EQ(arrived->binding, binding);
+  EXPECT_EQ(arrived->model, "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(arrived->path_variables.size(), 3);
+  EXPECT_EQ(arrived->written_fields.at("anthropic_version"), "vertex-2023-10-16");
   // `stream` stays the body's: Claude on Vertex AI keeps it there.
   EXPECT_EQ(body,
             nlohmann::json::parse(
                 R"({"model": "claude-sonnet-4-5@20250929", "stream": true, "max_tokens": 8})"));
 
   nlohmann::json unary = nlohmann::json::parse(R"({"stream": true})");
-  read = readRequest(binding, nullptr,
-                     "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
-                     "claude-sonnet-4-5@20250929:rawPredict",
-                     unary);
-  ASSERT_TRUE(read.has_value());
+  arrived = read(binding,
+                 "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+                 "claude-sonnet-4-5@20250929:rawPredict",
+                 unary);
+  ASSERT_TRUE(arrived.has_value());
   EXPECT_EQ(unary["stream"], true);
-  EXPECT_TRUE(read->written_fields.empty());
+  EXPECT_TRUE(arrived->written_fields.empty());
 }
 
 TEST(LlmBindingReadTest, TheBodyWinsForAFieldTheBindingKeeps) {
   const LlmBindingConstSharedPtr binding = parseOk("/gw/{model}/{chat|chat-stream}");
   nlohmann::json body = nlohmann::json::parse(R"({"model": "from-body"})");
-  ASSERT_TRUE(readRequest(binding, nullptr, "/gw/from-path/chat-stream", body).has_value());
+  ASSERT_TRUE(read(binding, "/gw/from-path/chat-stream", body).has_value());
   EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "from-body", "stream": true})"));
 
   // A removed `stream` takes the path's value either way.
@@ -153,15 +175,27 @@ TEST(LlmBindingReadTest, TheBodyWinsForAFieldTheBindingKeeps) {
       parseOk(R"({"uri_pattern": "/gw/{model}/{chat|chat-stream}",)"
               R"( "mutations": [{"body_field": "stream"}]})");
   body = nlohmann::json::parse(R"({"stream": true})");
-  ASSERT_TRUE(readRequest(removes_stream, nullptr, "/gw/m/chat", body).has_value());
+  ASSERT_TRUE(read(removes_stream, "/gw/m/chat", body).has_value());
   EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m", "stream": false})"));
 }
 
+// A path that does not name the streaming mode leaves the body's, even under an API binding that
+// removes `stream`.
+TEST(LlmBindingReadTest, ThePathLeavesAModeItDoesNotNameToTheBody) {
+  const LlmBindingConstSharedPtr api = parseOk(GeminiApi);
+  for (absl::string_view pattern : {"/gw/{model}", "/gw/{model}{|?alt=sse}"}) {
+    SCOPED_TRACE(pattern);
+    nlohmann::json body = nlohmann::json::parse(R"({"stream": true})");
+    ASSERT_TRUE(read(parseOk(pattern), "/gw/m?alt=sse", body, api).has_value());
+    EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m", "stream": true})"));
+  }
+}
+
 TEST(LlmBindingReadTest, APathThatDoesNotMatchReadsNothing) {
-  const LlmBindingConstSharedPtr binding = parseOk(kVertexClaude);
+  const LlmBindingConstSharedPtr binding = parseOk(VertexClaude);
   nlohmann::json body = nlohmann::json::parse(R"({"anthropic_version": "vertex-2023-10-16"})");
   const nlohmann::json original = body;
-  EXPECT_FALSE(readRequest(binding, nullptr, "/v1/messages", body).has_value());
+  EXPECT_FALSE(read(binding, "/v1/messages", body).has_value());
   EXPECT_EQ(body, original);
 }
 
@@ -171,22 +205,22 @@ TEST(LlmBindingReadTest, ABindingWithoutAPatternReadsNoPath) {
   const LlmBindingConstSharedPtr edits_only = parseOk(
       R"({"mutations": [{"body_field": "anthropic_version", "value": "bedrock-2023-05-31"}]})");
   nlohmann::json body = nlohmann::json::parse(R"({"anthropic_version": "bedrock-2023-05-31"})");
-  std::optional<LlmBindingRead> read = readRequest(edits_only, nullptr, "/anything", body);
-  ASSERT_TRUE(read.has_value());
-  EXPECT_TRUE(read->model.empty());
-  EXPECT_EQ(read->written_fields.at("anthropic_version"), "bedrock-2023-05-31");
+  std::optional<LlmBindingRead> arrived = read(edits_only, "/anything", body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_TRUE(arrived->model.empty());
+  EXPECT_EQ(arrived->written_fields.at("anthropic_version"), "bedrock-2023-05-31");
   EXPECT_EQ(body, nlohmann::json::object());
 
   const LlmBindingConstSharedPtr api = parseOk("/v1beta/models/{model}:generateContent");
   body = nlohmann::json::object();
-  EXPECT_FALSE(readRequest(edits_only, api.get(), "/anything", body).has_value());
-  read = readRequest(edits_only, api.get(), "/v1beta/models/m:generateContent", body);
-  ASSERT_TRUE(read.has_value());
+  EXPECT_FALSE(read(edits_only, "/anything", body, api).has_value());
+  arrived = read(edits_only, "/v1beta/models/m:generateContent", body, api);
+  ASSERT_TRUE(arrived.has_value());
   EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m"})"));
 
   // A body that is not an object is matched, but not edited.
   nlohmann::json array = nlohmann::json::array();
-  EXPECT_TRUE(readRequest(api, nullptr, "/v1beta/models/m:generateContent", array).has_value());
+  EXPECT_TRUE(read(api, "/v1beta/models/m:generateContent", array).has_value());
   EXPECT_EQ(array, nlohmann::json::array());
 }
 
@@ -194,18 +228,18 @@ TEST(LlmBindingReadTest, ABindingWithoutAPatternReadsNoPath) {
 // bindings, in order.
 TEST(LlmBindingReadTest, ReadsTheClientPathUnderTheFirstBindingThatMatches) {
   const LlmBindingConstSharedPtr own = parseOk("/v1beta/models/{model}:generateContent");
-  const LlmBindingConstSharedPtr vertex = parseOk(kVertexGemini);
+  const LlmBindingConstSharedPtr vertex = parseOk(VertexGemini);
   const std::vector<LlmBindingConstSharedPtr> clients{vertex};
   constexpr absl::string_view vertex_path =
       "/v1/projects/p/locations/l/publishers/google/models/g:generateContent";
 
   nlohmann::json body = nlohmann::json::object();
-  std::optional<LlmBindingRead> read = readClientPath(nullptr, own, clients, vertex_path, body);
-  ASSERT_TRUE(read.has_value());
-  EXPECT_EQ(read->binding, vertex);
-  read = readClientPath(nullptr, own, clients, "/v1beta/models/g:generateContent", body);
-  ASSERT_TRUE(read.has_value());
-  EXPECT_EQ(read->binding, own);
+  std::optional<LlmBindingRead> arrived = readClientPath(nullptr, own, clients, vertex_path, body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_EQ(arrived->binding, vertex);
+  arrived = readClientPath(nullptr, own, clients, "/v1beta/models/g:generateContent", body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_EQ(arrived->binding, own);
   EXPECT_FALSE(readClientPath(nullptr, own, clients, "/v1/messages", body).has_value());
 
   const LlmBindingConstSharedPtr gateway = parseOk("/gw/{model}");
@@ -213,57 +247,63 @@ TEST(LlmBindingReadTest, ReadsTheClientPathUnderTheFirstBindingThatMatches) {
   EXPECT_EQ(readClientPath(gateway, own, clients, "/gw/m", body)->model, "m");
 }
 
-// Every value but the body's model must come from the client's path, and an unnamed wildcard
-// cannot be rendered at all.
-TEST(LlmBindingResolveTest, NeedsEveryPathVariableFromTheClientsPath) {
-  const LlmBindingConstSharedPtr binding = parseOk(kVertexGemini);
-  const LlmBindingRead arrived{
-      nullptr, "", {{"version", "v1"}, {"project", "acme"}, {"location", "us-east5"}}, {}};
-  EXPECT_THAT(checkResolvable(*binding, nullptr, &arrived), IsOk());
-  EXPECT_THAT(checkResolvable(*binding, nullptr, nullptr),
-              HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("`{version}`")));
-  EXPECT_THAT(checkResolvable(*parseOk("/v1/models/{model}"), nullptr, nullptr), IsOk());
-
-  const LlmBindingConstSharedPtr wildcard =
-      parseOk(absl::StrCat("/v1/", std::string(1, '*'), "/{model}"));
-  EXPECT_THAT(checkResolvable(*wildcard, nullptr, &arrived),
-              HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("wildcard")));
-
-  const LlmBindingConstSharedPtr placeholder =
-      parseOk(R"({"mutations": [{"body_field": "labels", "value": "{tenant}"}]})");
-  EXPECT_THAT(checkResolvable(*placeholder, nullptr, &arrived),
-              HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("`{tenant}`")));
-}
-
 // `{model}` is the body's; every other variable is the client's path's, even when the body has a
 // field of that name.
 TEST(LlmBindingWriteTest, RendersTheModelFromTheBodyAndTheRestFromThePath) {
-  const LlmBindingConstSharedPtr binding = parseOk(kVertexGemini);
+  const LlmBindingConstSharedPtr binding = parseOk(VertexGemini);
   const LlmBindingRead arrived{nullptr,
                                "claude-sonnet-4-5",
                                {{"version", "v1"}, {"project", "acme"}, {"location", "us-east5"}},
                                {}};
   nlohmann::json body =
       nlohmann::json::parse(R"({"model": "gemini-2.5-flash", "stream": true, "project": "p2"})");
-  EXPECT_THAT(writeRequest(*binding, nullptr, &arrived, body),
+  EXPECT_THAT(write(*binding, &arrived, body),
               IsOkAndHolds(std::make_optional<std::string>(
                   "/v1/projects/acme/locations/us-east5/publishers/google/models/"
                   "gemini-2.5-flash:streamGenerateContent?alt=sse")));
 
+  // A model that cannot name a path segment is the request's fault.
   for (const char* model : {R"("../x")", R"("a/b")", "1", "null"}) {
     nlohmann::json bad = nlohmann::json::parse(R"({"stream": false})");
     bad["model"] = nlohmann::json::parse(model);
-    EXPECT_THAT(writeRequest(*binding, nullptr, &arrived, bad),
+    bool unresolved = true;
+    EXPECT_THAT(writeRequest(*binding, nullptr, &arrived, bad, unresolved),
                 HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("model id")))
         << model;
+    EXPECT_FALSE(unresolved) << model;
   }
   nlohmann::json no_model = nlohmann::json::object();
-  EXPECT_THAT(writeRequest(*binding, nullptr, &arrived, no_model),
+  EXPECT_THAT(write(*binding, &arrived, no_model),
               HasStatusCode(absl::StatusCode::kInvalidArgument));
   // Without a pattern there is no path to render.
-  EXPECT_THAT(
-      writeRequest(*parseOk(R"({"mutations": [{"body_field": "a"}]})"), nullptr, nullptr, body),
-      IsOkAndHolds(std::nullopt));
+  EXPECT_THAT(write(*parseOk(R"({"mutations": [{"body_field": "a"}]})"), nullptr, body),
+              IsOkAndHolds(std::nullopt));
+}
+
+// A value the client's path did not hold, or an unnamed wildcard, which has none, is the proxy's
+// configuration at fault rather than the request.
+TEST(LlmBindingWriteTest, FlagsAValueTheClientsPathDidNotHold) {
+  const LlmBindingRead arrived{
+      nullptr, "", {{"version", "v1"}, {"project", "acme"}, {"location", "us-east5"}}, {}};
+  const auto expect_unresolved = [](const LlmBinding& binding, const LlmBindingRead* from,
+                                    absl::string_view message) {
+    nlohmann::json body = nlohmann::json::parse(R"({"model": "m"})");
+    bool unresolved = false;
+    EXPECT_THAT(writeRequest(binding, nullptr, from, body, unresolved),
+                HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr(message)));
+    EXPECT_TRUE(unresolved) << message;
+  };
+  const LlmBindingConstSharedPtr vertex = parseOk(VertexGemini);
+  expect_unresolved(*vertex, nullptr, "`{version}`");
+  expect_unresolved(*parseOk(absl::StrCat("/v1/", std::string(1, '*'), "/{model}")), &arrived,
+                    "wildcard");
+  expect_unresolved(*parseOk(R"({"mutations": [{"body_field": "labels", "value": "{tenant}"}]})"),
+                    &arrived, "`{tenant}`");
+
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "m"})");
+  bool unresolved = true;
+  EXPECT_THAT(writeRequest(*vertex, nullptr, &arrived, body, unresolved), IsOk());
+  EXPECT_FALSE(unresolved);
 }
 
 TEST(LlmBindingWriteTest, AppliesTheMutationsInOrder) {
@@ -278,7 +318,7 @@ TEST(LlmBindingWriteTest, AppliesTheMutationsInOrder) {
   const LlmBindingRead arrived{nullptr, "", {{"project", "acme"}}, {}};
   nlohmann::json body =
       nlohmann::json::parse(R"({"model": "claude-haiku-4-5", "max_tokens": 16, "temperature": 1})");
-  ASSERT_THAT(writeRequest(*binding, nullptr, &arrived, body), IsOkAndHolds(std::nullopt));
+  ASSERT_THAT(write(*binding, &arrived, body), IsOkAndHolds(std::nullopt));
   // `{model}` reads the body as it was before `model` was removed.
   EXPECT_EQ(body, nlohmann::json::parse(R"({
     "max_tokens": 16, "top_k": 40, "temperature": 0.5, "labels": {"tenant": "{project}"},
@@ -286,19 +326,28 @@ TEST(LlmBindingWriteTest, AppliesTheMutationsInOrder) {
   })"));
 }
 
+// A mutation that keeps the body's field writes nothing, so it needs no values.
+TEST(LlmBindingWriteTest, KeepingAFieldNeedsNoValues) {
+  const LlmBindingConstSharedPtr binding = parseOk(
+      R"({"mutations": [{"body_field": "x", "value": "{tenant}", "keep_existing": true}]})");
+  nlohmann::json body = nlohmann::json::parse(R"({"x": "existing"})");
+  const nlohmann::json original = body;
+  ASSERT_THAT(write(*binding, nullptr, body), IsOkAndHolds(std::nullopt));
+  EXPECT_EQ(body, original);
+}
+
 TEST(LlmBindingWriteTest, RefusesAPlaceholderItCannotFill) {
   const LlmBindingConstSharedPtr model =
       parseOk(R"({"mutations": [{"body_field": "x", "value": "{model}"}]})");
   nlohmann::json body = nlohmann::json::parse(R"({"model": "../x"})");
-  EXPECT_THAT(writeRequest(*model, nullptr, nullptr, body),
-              HasStatusCode(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(writeRequest(*parseOk(R"({"mutations": [{"body_field": "x", "value": "{tenant}"}]})"),
-                           nullptr, nullptr, body),
+  EXPECT_THAT(write(*model, nullptr, body), HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(write(*parseOk(R"({"mutations": [{"body_field": "x", "value": "{tenant}"}]})"),
+                    nullptr, body),
               HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("`{tenant}`")));
   // An unclosed brace is text.
-  ASSERT_THAT(writeRequest(*parseOk(R"({"mutations": [{"body_field": "x", "value": "a{b"}]})"),
-                           nullptr, nullptr, body),
-              IsOk());
+  ASSERT_THAT(
+      write(*parseOk(R"({"mutations": [{"body_field": "x", "value": "a{b"}]})"), nullptr, body),
+      IsOk());
   EXPECT_EQ(body["x"], "a{b");
 }
 
@@ -315,23 +364,36 @@ TEST(LlmBindingWriteTest, TheSameBindingRestoresWhatTheClientSent) {
   })");
   const LlmBindingRead arrived{binding, "m", {}, {{"anthropic_version", "vertex-2099-01-01"}}};
   nlohmann::json body = nlohmann::json::parse(R"({"model": "m"})");
-  ASSERT_THAT(writeRequest(*binding, nullptr, &arrived, body), IsOk());
+  ASSERT_THAT(write(*binding, &arrived, body), IsOk());
   EXPECT_EQ(body, nlohmann::json::parse(
                       R"({"anthropic_version": "vertex-2099-01-01", "service_tier": "auto"})"));
 
   // Another binding writes its own values.
-  const LlmBindingConstSharedPtr other = parseOk(kVertexClaude);
+  const LlmBindingConstSharedPtr other = parseOk(VertexClaude);
   const LlmBindingRead elsewhere{other, "m", {}, {{"anthropic_version", "vertex-2099-01-01"}}};
   body = nlohmann::json::parse(R"({"model": "m"})");
-  ASSERT_THAT(writeRequest(*binding, nullptr, &elsewhere, body), IsOk());
+  ASSERT_THAT(write(*binding, &elsewhere, body), IsOk());
   EXPECT_EQ(body["anthropic_version"], "vertex-2023-10-16");
+}
+
+// A restored field needs none of the values its default would.
+TEST(LlmBindingWriteTest, ARestoredFieldNeedsNoValues) {
+  const LlmBindingConstSharedPtr binding =
+      parseOk(R"({"mutations": [{"body_field": "tenant", "value": "{project}"}]})");
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "m", "tenant": "client-tenant"})");
+  const nlohmann::json original = body;
+  const std::optional<LlmBindingRead> arrived = read(binding, "/v1/messages", body);
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_FALSE(body.contains("tenant"));
+  ASSERT_THAT(write(*binding, &*arrived, body), IsOkAndHolds(std::nullopt));
+  EXPECT_EQ(body, original);
 }
 
 TEST(LlmBindingWriteTest, EditsOnlyAnObjectBody) {
   const LlmBindingConstSharedPtr binding =
       parseOk(R"({"mutations": [{"body_field": "a", "value": 1}]})");
   nlohmann::json array = nlohmann::json::array();
-  ASSERT_THAT(writeRequest(*binding, nullptr, nullptr, array), IsOk());
+  ASSERT_THAT(write(*binding, nullptr, array), IsOk());
   EXPECT_EQ(array, nlohmann::json::array());
 }
 

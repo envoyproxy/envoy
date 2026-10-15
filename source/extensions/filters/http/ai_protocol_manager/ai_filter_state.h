@@ -105,9 +105,8 @@ public:
   static absl::StatusOr<LlmBindingConstSharedPtr>
   fromFilterState(const StreamInfo::FilterState& filter_state, absl::string_view key);
 
-  // Null when `status()` is not ok.
-  const LlmBindingConstSharedPtr& binding() const { return binding_; }
-  const absl::Status& status() const { return status_; }
+  // The parsed binding, or why `asString()` does not parse.
+  const absl::StatusOr<LlmBindingConstSharedPtr>& binding() const { return binding_; }
 
   // Router::StringAccessor
   absl::string_view asString() const override { return source_; }
@@ -117,15 +116,14 @@ public:
 
 private:
   const std::string source_;
-  LlmBindingConstSharedPtr binding_;
-  absl::Status status_;
+  const absl::StatusOr<LlmBindingConstSharedPtr> binding_;
 };
 
 // What a request leg read from the client's path under the binding the request arrived in. The
 // transcoder sets it once per stream; field access reads `model` and the path variables by name.
 class LlmBindingReadObject : public StreamInfo::FilterState::Object {
 public:
-  explicit LlmBindingReadObject(LlmBindingRead read) : read_(std::move(read)) {}
+  explicit LlmBindingReadObject(LlmBindingRead&& read) : read_(std::move(read)) {}
 
   // The read the transcoder left in `filter_state`; null when there is none.
   static const LlmBindingRead* fromFilterState(const StreamInfo::FilterState& filter_state);

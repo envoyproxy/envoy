@@ -1149,7 +1149,7 @@ StreamGrammar anthropicStreamFromIr() {
 
 // A binding Envoy defines. Its pattern is a constant, so it parses.
 LlmBindingConstSharedPtr builtInBinding(absl::string_view pattern,
-                                        std::vector<LlmBinding::Mutation> mutations) {
+                                        std::vector<LlmBinding::Mutation>&& mutations) {
   return std::make_shared<const LlmBinding>(*UriPattern::parse(pattern), std::move(mutations));
 }
 
@@ -2757,14 +2757,6 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
 
   const LlmBinding* binding =
       ctx.response_binding != nullptr ? ctx.response_binding : pack.binding.get();
-  if (binding != nullptr) {
-    if (absl::Status status = checkResolvable(*binding, pack.binding.get(), ctx.arrived);
-        !status.ok()) {
-      ctx.unresolved = true;
-      return status;
-    }
-  }
-
   // What the client asked for is reported back first: the response echoes it, and the gateway
   // keeps the backend it chose to itself. The resolved model then replaces it before the rules
   // run, so it reaches the body or the path, whichever the dialect carries it in.
@@ -2790,7 +2782,7 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
     return absl::OkStatus();
   }
   absl::StatusOr<std::optional<std::string>> path =
-      writeRequest(*binding, pack.binding.get(), ctx.arrived, json);
+      writeRequest(*binding, pack.binding.get(), ctx.arrived, json, ctx.unresolved);
   if (!path.ok()) {
     return path.status();
   }

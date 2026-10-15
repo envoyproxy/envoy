@@ -5,6 +5,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -15,8 +16,8 @@ namespace AiProtocolManager {
 
 namespace {
 
-constexpr absl::string_view kModelField = "model";
-constexpr absl::string_view kStreamField = "stream";
+constexpr absl::string_view ModelField = "model";
+constexpr absl::string_view StreamField = "stream";
 
 // `value` as JSON; nullopt for a null, which removes the field as an unset value does.
 absl::StatusOr<std::optional<nlohmann::json>> toJson(const Protobuf::Value& value) {
@@ -29,20 +30,6 @@ absl::StatusOr<std::optional<nlohmann::json>> toJson(const Protobuf::Value& valu
     return text.status();
   }
   return nlohmann::json::parse(*text);
-}
-
-// The names of the `{name}` placeholders in `text`.
-std::vector<absl::string_view> placeholderNames(absl::string_view text) {
-  std::vector<absl::string_view> names;
-  while (true) {
-    const size_t open = text.find('{');
-    const size_t close = open == absl::string_view::npos ? open : text.find('}', open);
-    if (close == absl::string_view::npos) {
-      return names;
-    }
-    names.push_back(text.substr(open + 1, close - open - 1));
-    text.remove_prefix(close + 1);
-  }
 }
 
 // `text` with each `{name}` replaced by its value.
@@ -71,21 +58,72 @@ absl::StatusOr<std::string> fillPlaceholders(absl::string_view text,
   }
 }
 
+// The pattern `binding` reads and renders: its own, or `api_binding`'s when it has none. Null
+// when neither has one.
+const UriPattern* patternOf(const LlmBinding& binding, const LlmBinding* api_binding) {
+  if (binding.pattern().has_value()) {
+    return &*binding.pattern();
+  }
+  return api_binding != nullptr && api_binding->pattern().has_value() ? &*api_binding->pattern()
+                                                                      : nullptr;
+}
+
+// The binding whose mutations apply: `binding`, or `api_binding` when `binding` has none.
+const LlmBinding& editsOf(const LlmBinding& binding, const LlmBinding* api_binding) {
+  return binding.mutations().empty() && api_binding != nullptr ? *api_binding : binding;
+}
+
+std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& binding,
+                                          const LlmBinding* api_binding, absl::string_view path,
+                                          nlohmann::json& body) {
+  LlmBindingRead read{binding};
+  const LlmBinding& edits = editsOf(*binding, api_binding);
+  if (const UriPattern* pattern = patternOf(*binding, api_binding); pattern != nullptr) {
+    std::optional<UriPattern::Match> match = pattern->match(path);
+    if (!match.has_value()) {
+      return std::nullopt;
+    }
+    // A field the binding removes has the path as its only home, so the path's value wins. A path
+    // that does not name the streaming mode leaves the body's.
+    if (body.is_object()) {
+      if (!match->model.empty() && (edits.removesModel() || !body.contains(ModelField))) {
+        body[ModelField] = match->model;
+      }
+      if (match->stream.has_value()) {
+        if (edits.removesStream()) {
+          body[StreamField] = *match->stream;
+        } else if (*match->stream && !body.contains(StreamField)) {
+          body[StreamField] = true;
+        }
+      }
+    }
+    read.model = std::move(match->model);
+    read.path_variables = std::move(match->variables);
+  }
+  if (body.is_object()) {
+    for (const LlmBinding::Mutation& mutation : edits.mutations()) {
+      if (!mutation.value.has_value()) {
+        continue;
+      }
+      const auto field = body.find(mutation.body_field);
+      if (field == body.end()) {
+        continue;
+      }
+      read.written_fields.emplace(mutation.body_field, std::move(*field));
+      body.erase(field);
+    }
+  }
+  return read;
+}
+
 } // namespace
 
-LlmBinding::LlmBinding(std::optional<UriPattern> pattern, std::vector<Mutation> mutations)
+LlmBinding::LlmBinding(std::optional<UriPattern>&& pattern, std::vector<Mutation>&& mutations)
     : pattern_(std::move(pattern)), mutations_(std::move(mutations)) {
   for (const Mutation& mutation : mutations_) {
     if (!mutation.value.has_value()) {
-      removes_model_ |= mutation.body_field == kModelField;
-      removes_stream_ |= mutation.body_field == kStreamField;
-    } else if (mutation.value->is_string()) {
-      for (absl::string_view name :
-           placeholderNames(mutation.value->get_ref<const std::string&>())) {
-        if (name != kModelField) {
-          placeholders_.emplace_back(name);
-        }
-      }
+      removes_model_ |= mutation.body_field == ModelField;
+      removes_stream_ |= mutation.body_field == StreamField;
     }
   }
 }
@@ -138,58 +176,6 @@ absl::StatusOr<LlmBindingConstSharedPtr> LlmBinding::parse(absl::string_view tex
   return create(proto);
 }
 
-const UriPattern* patternOf(const LlmBinding& binding, const LlmBinding* api_binding) {
-  if (binding.pattern().has_value()) {
-    return &*binding.pattern();
-  }
-  return api_binding != nullptr && api_binding->pattern().has_value() ? &*api_binding->pattern()
-                                                                      : nullptr;
-}
-
-const LlmBinding& editsOf(const LlmBinding& binding, const LlmBinding* api_binding) {
-  return binding.mutations().empty() && api_binding != nullptr ? *api_binding : binding;
-}
-
-std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& binding,
-                                          const LlmBinding* api_binding, absl::string_view path,
-                                          nlohmann::json& body) {
-  LlmBindingRead read{binding};
-  const LlmBinding& edits = editsOf(*binding, api_binding);
-  if (const UriPattern* pattern = patternOf(*binding, api_binding); pattern != nullptr) {
-    std::optional<UriPattern::Match> match = pattern->match(path);
-    if (!match.has_value()) {
-      return std::nullopt;
-    }
-    // A field the binding removes has the path as its only home, so the path's value wins.
-    if (body.is_object()) {
-      if (!match->model.empty() && (edits.removesModel() || !body.contains(kModelField))) {
-        body[kModelField] = match->model;
-      }
-      if (edits.removesStream()) {
-        body[kStreamField] = match->stream;
-      } else if (match->stream && !body.contains(kStreamField)) {
-        body[kStreamField] = true;
-      }
-    }
-    read.model = std::move(match->model);
-    read.path_variables = std::move(match->variables);
-  }
-  if (body.is_object()) {
-    for (const LlmBinding::Mutation& mutation : edits.mutations()) {
-      if (!mutation.value.has_value()) {
-        continue;
-      }
-      const auto field = body.find(mutation.body_field);
-      if (field == body.end()) {
-        continue;
-      }
-      read.written_fields.emplace(mutation.body_field, std::move(*field));
-      body.erase(field);
-    }
-  }
-  return read;
-}
-
 std::optional<LlmBindingRead>
 readClientPath(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSharedPtr& api_binding,
                absl::Span<const LlmBindingConstSharedPtr> client_bindings, absl::string_view path,
@@ -212,65 +198,42 @@ readClientPath(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSha
   return std::nullopt;
 }
 
-absl::Status checkResolvable(const LlmBinding& binding, const LlmBinding* api_binding,
-                             const LlmBindingRead* arrived) {
-  const auto supplied = [arrived](absl::string_view name) {
-    return name == kModelField || (arrived != nullptr && arrived->path_variables.contains(name));
-  };
-  if (const UriPattern* pattern = patternOf(binding, api_binding); pattern != nullptr) {
-    if (!pattern->renderable()) {
-      return absl::FailedPreconditionError(absl::StrCat(
-          "uri pattern `", pattern->source(), "` has a wildcard, which cannot be rendered"));
-    }
-    for (const std::string& name : pattern->renderVariables()) {
-      if (!supplied(name)) {
-        return absl::FailedPreconditionError(absl::StrCat("uri pattern `", pattern->source(),
-                                                          "` has no value for `{", name,
-                                                          "}`: the client's path names none"));
-      }
-    }
-  }
-  for (const std::string& name : editsOf(binding, api_binding).placeholders()) {
-    if (!supplied(name)) {
-      return absl::FailedPreconditionError(absl::StrCat("a binding mutation has no value for `{",
-                                                        name, "}`: the client's path names none"));
-    }
-  }
-  return absl::OkStatus();
-}
-
 absl::StatusOr<std::optional<std::string>> writeRequest(const LlmBinding& binding,
                                                         const LlmBinding* api_binding,
                                                         const LlmBindingRead* arrived,
-                                                        nlohmann::json& body) {
-  const auto value = [&body, arrived](absl::string_view name) -> std::optional<std::string> {
-    if (name == kModelField) {
-      const auto model = body.find(kModelField);
-      if (model != body.end() && model->is_string()) {
-        return model->get<std::string>();
-      }
-      return std::nullopt;
+                                                        nlohmann::json& body, bool& unresolved) {
+  unresolved = false;
+  // `{model}` reads the body as rendered, before any mutation removes it.
+  std::optional<std::string> model;
+  if (const auto field = body.find(ModelField); field != body.end() && field->is_string()) {
+    model = field->get<std::string>();
+  }
+  const auto value = [&model, arrived, &unresolved](absl::string_view name) {
+    if (name == ModelField) {
+      return model;
     }
     if (arrived != nullptr) {
       if (const auto variable = arrived->path_variables.find(name);
           variable != arrived->path_variables.end()) {
-        return variable->second;
+        return std::make_optional(variable->second);
       }
     }
-    return std::nullopt;
+    unresolved = true;
+    return std::optional<std::string>();
   };
 
   std::optional<std::string> path;
   if (const UriPattern* pattern = patternOf(binding, api_binding); pattern != nullptr) {
-    if (pattern->hasModel()) {
-      const auto model = body.find(kModelField);
-      if (model == body.end() || !model->is_string() ||
-          !isPathToken(model->get_ref<const std::string&>())) {
-        return absl::InvalidArgumentError(absl::StrCat("the request path names the model, so `",
-                                                       kModelField, "` must be a model id"));
-      }
+    if (!pattern->renderable()) {
+      unresolved = true;
+      return absl::FailedPreconditionError(absl::StrCat(
+          "uri pattern `", pattern->source(), "` has a wildcard, which cannot be rendered"));
     }
-    const auto stream = body.find(kStreamField);
+    if (pattern->hasModel() && (!model.has_value() || !isPathToken(*model))) {
+      return absl::InvalidArgumentError(absl::StrCat("the request path names the model, so `",
+                                                     ModelField, "` must be a model id"));
+    }
+    const auto stream = body.find(StreamField);
     absl::StatusOr<std::string> rendered =
         pattern->render(stream != body.end() && stream->is_boolean() && stream->get<bool>(), value);
     if (!rendered.ok()) {
@@ -278,27 +241,31 @@ absl::StatusOr<std::optional<std::string>> writeRequest(const LlmBinding& bindin
     }
     path = *std::move(rendered);
   }
+  if (!body.is_object()) {
+    return path;
+  }
 
   // The filter hands back the arrived binding itself when the request leaves in it.
   const bool same_binding = arrived != nullptr && arrived->binding.get() == &binding;
-  const std::vector<LlmBinding::Mutation>& mutations = editsOf(binding, api_binding).mutations();
-  // Every value is filled before any mutation applies, so all of them read the rendered body.
-  std::vector<std::optional<nlohmann::json>> values;
-  values.reserve(mutations.size());
-  for (const LlmBinding::Mutation& mutation : mutations) {
+  // Each mutation is decided before its placeholders are filled: one that keeps an existing field
+  // or restores the client's value needs none.
+  for (const LlmBinding::Mutation& mutation : editsOf(binding, api_binding).mutations()) {
     if (!mutation.value.has_value()) {
-      values.emplace_back();
+      body.erase(mutation.body_field);
+      continue;
+    }
+    if (mutation.keep_existing && body.contains(mutation.body_field)) {
       continue;
     }
     if (same_binding) {
       if (const auto written = arrived->written_fields.find(mutation.body_field);
           written != arrived->written_fields.end()) {
-        values.emplace_back(written->second);
+        body[mutation.body_field] = written->second;
         continue;
       }
     }
     if (!mutation.value->is_string()) {
-      values.emplace_back(*mutation.value);
+      body[mutation.body_field] = *mutation.value;
       continue;
     }
     absl::StatusOr<std::string> filled =
@@ -306,19 +273,7 @@ absl::StatusOr<std::optional<std::string>> writeRequest(const LlmBinding& bindin
     if (!filled.ok()) {
       return filled.status();
     }
-    values.emplace_back(*std::move(filled));
-  }
-
-  if (!body.is_object()) {
-    return path;
-  }
-  for (size_t i = 0; i < mutations.size(); ++i) {
-    const LlmBinding::Mutation& mutation = mutations[i];
-    if (!values[i].has_value()) {
-      body.erase(mutation.body_field);
-    } else if (!mutation.keep_existing || !body.contains(mutation.body_field)) {
-      body[mutation.body_field] = *std::move(values[i]);
-    }
+    body[mutation.body_field] = *std::move(filled);
   }
   return path;
 }

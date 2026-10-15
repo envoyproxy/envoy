@@ -8,199 +8,34 @@
 
 #include "test/integration/http_integration.h"
 
-#include "absl/container/flat_hash_set.h"
-#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/strip.h"
 #include "absl/strings/substitute.h"
 #include "nlohmann/json.hpp"
-#include "re2/re2.h"
 
 namespace Envoy {
 namespace {
 
 using testing::ElementsAre;
 
-constexpr absl::string_view kClaudeModel = "claude-sonnet-4-5@20250929";
-constexpr absl::string_view kGeminiModel = "gemini-2.5-flash";
-constexpr absl::string_view kVertexClaudePath =
+constexpr absl::string_view ClaudeModel = "claude-sonnet-4-5@20250929";
+constexpr absl::string_view GeminiModel = "gemini-2.5-flash";
+constexpr absl::string_view VertexClaudePath =
     "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5@20250929";
-constexpr absl::string_view kVertexGeminiPath =
+constexpr absl::string_view VertexGeminiPath =
     "/v1/projects/acme/locations/us-east5/publishers/google/models/gemini-2.5-flash";
-constexpr absl::string_view kSystem = "You are an expert in Envoy and distributed systems.";
-constexpr absl::string_view kQuestion = "Explain how Envoy routes an HTTP request.";
-constexpr absl::string_view kStreamQuestion = "Explain HTTP/2 flow control step by step.";
+constexpr absl::string_view SystemPrompt = "You are an expert in Envoy and distributed systems.";
+constexpr absl::string_view Question = "Explain how Envoy routes an HTTP request.";
+constexpr absl::string_view StreamQuestion = "Explain HTTP/2 flow control step by step.";
 
 // The route's credential, as `gcp_authn` would set it: bindings leave credentials to the route.
-constexpr absl::string_view kAccessToken = "Bearer test-access-token";
-
-absl::Status checkAuthorization(const Http::RequestHeaderMap& headers) {
-  const auto authorization = headers.get(Http::LowerCaseString("authorization"));
-  if (authorization.empty() || authorization[0]->value().getStringView() != kAccessToken) {
-    return absl::UnauthenticatedError("Request is missing required authentication credential.");
-  }
-  return absl::OkStatus();
-}
-
-// The request rules of Gemini on Vertex AI's `generateContent` and `streamGenerateContent`: the
-// model and the method in the path, and a `GenerateContentRequest` body. Vertex AI rejects a field
-// it does not know, so a client field left in the body fails the request.
-absl::Status checkVertexGeminiRequest(const Http::RequestHeaderMap& headers, absl::string_view body,
-                                      bool stream) {
-  static const re2::RE2 path("/v1/projects/[a-z][a-z0-9-]*/locations/[a-z0-9-]+/publishers/google/"
-                             "models/[a-z0-9.@-]+:(generateContent|streamGenerateContent)"
-                             "(\\?alt=sse)?");
-  std::string method;
-  std::string alt;
-  if (headers.getMethodValue() != "POST" ||
-      !RE2::FullMatch(headers.getPathValue(), path, &method, &alt)) {
-    return absl::NotFoundError(absl::StrCat("no such Vertex AI method: ", headers.getPathValue()));
-  }
-  if ((method == "streamGenerateContent") != stream || alt.empty() == stream) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("expected the ", stream ? "SSE stream" : "unary", " method"));
-  }
-  if (absl::Status status = checkAuthorization(headers); !status.ok()) {
-    return status;
-  }
-
-  static const absl::flat_hash_set<std::string> kRequestFields = {
-      "contents",         "systemInstruction", "system_instruction",
-      "cachedContent",    "cached_content",    "tools",
-      "toolConfig",       "tool_config",       "labels",
-      "safetySettings",   "safety_settings",   "generationConfig",
-      "generation_config"};
-  static const absl::flat_hash_set<std::string> kGenerationConfigFields = {"temperature",
-                                                                           "topP",
-                                                                           "topK",
-                                                                           "candidateCount",
-                                                                           "maxOutputTokens",
-                                                                           "stopSequences",
-                                                                           "presencePenalty",
-                                                                           "frequencyPenalty",
-                                                                           "seed",
-                                                                           "responseMimeType",
-                                                                           "responseSchema",
-                                                                           "responseJsonSchema",
-                                                                           "thinkingConfig"};
-  const nlohmann::json request = nlohmann::json::parse(body, nullptr, /*allow_exceptions=*/false);
-  if (!request.is_object()) {
-    return absl::InvalidArgumentError("Invalid JSON payload received.");
-  }
-  for (const auto& [name, value] : request.items()) {
-    if (!kRequestFields.contains(name)) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "Invalid JSON payload received. Unknown name \"", name, "\": Cannot find field."));
-    }
-  }
-  const auto contents = request.find("contents");
-  if (contents == request.end() || !contents->is_array() || contents->empty()) {
-    return absl::InvalidArgumentError("contents is not specified");
-  }
-  for (const nlohmann::json& content : *contents) {
-    const auto role = content.find("role");
-    const auto parts = content.find("parts");
-    if (role == content.end() || (*role != "user" && *role != "model") || parts == content.end() ||
-        !parts->is_array() || parts->empty()) {
-      return absl::InvalidArgumentError(absl::StrCat("invalid content: ", content.dump()));
-    }
-  }
-  if (const auto config = request.find("generationConfig"); config != request.end()) {
-    for (const auto& [name, value] : config->items()) {
-      if (!kGenerationConfigFields.contains(name)) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("Invalid JSON payload received. Unknown name \"", name,
-                         "\" at 'generation_config': Cannot find field."));
-      }
-    }
-  }
-  return absl::OkStatus();
-}
-
-// The request rules of Claude on Vertex AI's `rawPredict` and `streamRawPredict`: an Anthropic
-// Messages body with the model in the path alone, the Vertex AI API version in
-// `anthropic_version`, and `stream` matching the method.
-absl::Status checkVertexClaudeRequest(const Http::RequestHeaderMap& headers, absl::string_view body,
-                                      bool stream) {
-  static const re2::RE2 path("/v1/projects/[a-z][a-z0-9-]*/locations/[a-z0-9-]+/publishers/"
-                             "anthropic/models/[a-z0-9.@-]+:(rawPredict|streamRawPredict)");
-  std::string method;
-  if (headers.getMethodValue() != "POST" ||
-      !RE2::FullMatch(headers.getPathValue(), path, &method)) {
-    return absl::NotFoundError(absl::StrCat("no such Vertex AI method: ", headers.getPathValue()));
-  }
-  if ((method == "streamRawPredict") != stream) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("expected the ", stream ? "streaming" : "unary", " method"));
-  }
-  if (absl::Status status = checkAuthorization(headers); !status.ok()) {
-    return status;
-  }
-
-  static const absl::flat_hash_set<std::string> kRequestFields = {"anthropic_version",
-                                                                  "max_tokens",
-                                                                  "messages",
-                                                                  "system",
-                                                                  "stream",
-                                                                  "temperature",
-                                                                  "top_p",
-                                                                  "top_k",
-                                                                  "stop_sequences",
-                                                                  "metadata",
-                                                                  "tools",
-                                                                  "tool_choice",
-                                                                  "thinking",
-                                                                  "service_tier"};
-  const nlohmann::json request = nlohmann::json::parse(body, nullptr, /*allow_exceptions=*/false);
-  if (!request.is_object()) {
-    return absl::InvalidArgumentError("invalid JSON body");
-  }
-  for (const auto& [name, value] : request.items()) {
-    if (!kRequestFields.contains(name)) {
-      return absl::InvalidArgumentError(absl::StrCat(name, ": Extra inputs are not permitted"));
-    }
-  }
-  if (request.value("anthropic_version", "") != "vertex-2023-10-16") {
-    return absl::InvalidArgumentError("anthropic_version: Input should be 'vertex-2023-10-16'");
-  }
-  if (const auto max_tokens = request.find("max_tokens");
-      max_tokens == request.end() || !max_tokens->is_number_integer()) {
-    return absl::InvalidArgumentError("max_tokens: Field required");
-  }
-  const auto messages = request.find("messages");
-  if (messages == request.end() || !messages->is_array() || messages->empty()) {
-    return absl::InvalidArgumentError("messages: Field required");
-  }
-  for (const nlohmann::json& message : *messages) {
-    const auto role = message.find("role");
-    if (role == message.end() || (*role != "user" && *role != "assistant") ||
-        !message.contains("content")) {
-      return absl::InvalidArgumentError(absl::StrCat("invalid message: ", message.dump()));
-    }
-  }
-  const auto streaming = request.find("stream");
-  if (streaming == request.end() ? stream : !streaming->is_boolean() || *streaming != stream) {
-    return absl::InvalidArgumentError("`stream` does not match the method");
-  }
-  return absl::OkStatus();
-}
-
-int httpStatus(const absl::Status& status) {
-  switch (status.code()) {
-  case absl::StatusCode::kNotFound:
-    return 404;
-  case absl::StatusCode::kUnauthenticated:
-    return 401;
-  default:
-    return 400;
-  }
-}
+constexpr absl::string_view AccessToken = "Bearer test-access-token";
 
 // Gemini on Vertex AI's `GenerateContentResponse`s for "Hello from Gemini.": the unary response,
 // and the stream's chunks, the last of which finishes the candidate and counts the tokens.
-constexpr absl::string_view kGeminiUnaryResponse = R"({
+constexpr absl::string_view GeminiUnaryResponse = R"({
   "candidates": [{
     "content": {"role": "model", "parts": [{"text": "Hello from Gemini."}]},
     "finishReason": "STOP", "avgLogprobs": -0.21
@@ -214,7 +49,7 @@ constexpr absl::string_view kGeminiUnaryResponse = R"({
   "modelVersion": "gemini-2.5-flash", "createTime": "2026-10-15T12:00:00.000000Z",
   "responseId": "vertex-response-1"
 })";
-constexpr absl::string_view kGeminiStreamChunks[] = {
+constexpr absl::string_view GeminiStreamChunks[] = {
     R"({"candidates":[{"content":{"role":"model","parts":[{"text":"Hello"}]}}],)"
     R"("usageMetadata":{"trafficType":"ON_DEMAND"},"modelVersion":"gemini-2.5-flash",)"
     R"("createTime":"2026-10-15T12:00:00.000000Z","responseId":"vertex-response-1"})",
@@ -226,14 +61,14 @@ constexpr absl::string_view kGeminiStreamChunks[] = {
 };
 
 // Claude on Vertex AI's Messages response for "Hello from Claude.", and its event stream.
-constexpr absl::string_view kClaudeUnaryResponse = R"({
+constexpr absl::string_view ClaudeUnaryResponse = R"({
   "id": "msg_vrtx_01", "type": "message", "role": "assistant",
   "model": "claude-sonnet-4-5-20250929",
   "content": [{"type": "text", "text": "Hello from Claude."}],
   "stop_reason": "end_turn", "stop_sequence": null,
   "usage": {"input_tokens": 12, "output_tokens": 6}
 })";
-constexpr std::pair<absl::string_view, absl::string_view> kClaudeStreamEvents[] = {
+constexpr std::pair<absl::string_view, absl::string_view> ClaudeStreamEvents[] = {
     {"message_start",
      R"({"type":"message_start","message":{"id":"msg_vrtx_01","type":"message",)"
      R"("role":"assistant","model":"claude-sonnet-4-5-20250929","content":[],)"
@@ -273,7 +108,7 @@ std::vector<std::pair<std::string, nlohmann::json>> sseEvents(absl::string_view 
 // sent to Gemini on Vertex AI, and a Gemini on Vertex AI client sent to Claude on Vertex AI. The
 // route declares only the client's API; a filter ahead of the AI Protocol Manager names the
 // backend's API, its binding and the model, and the client's path supplies the project and the
-// region. The upstream answers as Vertex AI does, so a request off its spec fails the test.
+// region. The upstream answers as Vertex AI does.
 class TranscoderIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public HttpIntegrationTest {
 public:
@@ -284,7 +119,7 @@ public:
     initializeRoute(envoy::type::ai::v3::ANTHROPIC_MESSAGES, "GEMINI_GENERATE_CONTENT",
                     "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
                     "{model}:{generateContent|streamGenerateContent?alt=sse}",
-                    kGeminiModel);
+                    GeminiModel);
   }
 
   // Claude on Vertex AI needs edits of its own, so the binding is spelled out in JSON.
@@ -295,7 +130,7 @@ public:
         R"(anthropic/models/{model}:{rawPredict|streamRawPredict}", "mutations": [)"
         R"({"body_field": "model"}, {"body_field": "anthropic_version", )"
         R"("value": "vertex-2023-10-16", "keep_existing": true}]})",
-        kClaudeModel);
+        ClaudeModel);
   }
 
   IntegrationStreamDecoderPtr sendClientRequest(absl::string_view path,
@@ -312,43 +147,43 @@ public:
 
   // Answers the upstream request as Gemini on Vertex AI would.
   void serveAsVertexGemini(bool stream) {
-    if (!receiveUpstreamRequest(checkVertexGeminiRequest, stream)) {
-      return;
-    }
+    receiveUpstreamRequest();
     if (!stream) {
-      replyJson(kGeminiUnaryResponse);
+      replyJson(GeminiUnaryResponse);
       return;
     }
     replySseHeaders();
     // Gemini on Vertex AI ends each event with CRLFs and the stream without `[DONE]`.
-    for (size_t i = 0; i < std::size(kGeminiStreamChunks); ++i) {
-      upstream_request_->encodeData(absl::StrCat("data: ", kGeminiStreamChunks[i], "\r\n\r\n"),
-                                    i + 1 == std::size(kGeminiStreamChunks));
+    for (size_t i = 0; i < std::size(GeminiStreamChunks); ++i) {
+      upstream_request_->encodeData(absl::StrCat("data: ", GeminiStreamChunks[i], "\r\n\r\n"),
+                                    i + 1 == std::size(GeminiStreamChunks));
     }
   }
 
   // Answers the upstream request as Claude on Vertex AI would.
   void serveAsVertexClaude(bool stream) {
-    if (!receiveUpstreamRequest(checkVertexClaudeRequest, stream)) {
-      return;
-    }
+    receiveUpstreamRequest();
     if (!stream) {
-      replyJson(kClaudeUnaryResponse);
+      replyJson(ClaudeUnaryResponse);
       return;
     }
     replySseHeaders();
-    for (size_t i = 0; i < std::size(kClaudeStreamEvents); ++i) {
-      const auto& [name, data] = kClaudeStreamEvents[i];
+    for (size_t i = 0; i < std::size(ClaudeStreamEvents); ++i) {
+      const auto& [name, data] = ClaudeStreamEvents[i];
       upstream_request_->encodeData(absl::StrCat("event: ", name, "\ndata: ", data, "\n\n"),
-                                    i + 1 == std::size(kClaudeStreamEvents));
+                                    i + 1 == std::size(ClaudeStreamEvents));
     }
   }
 
-  // The request went out to `path` in the client's project and region, with `body`.
+  // The request went out to `path` in the client's project and region, with the route's
+  // credential and `body`.
   void expectUpstreamRequest(absl::string_view path, const nlohmann::json& body) {
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), path);
-    EXPECT_EQ(upstream_request_->headers().getHostValue(), "us-east5-aiplatform.googleapis.com");
-    EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-vertex-location", "us-east5"));
+    const Http::RequestHeaderMap& headers = upstream_request_->headers();
+    EXPECT_EQ(headers.getMethodValue(), "POST");
+    EXPECT_EQ(headers.getPathValue(), path);
+    EXPECT_EQ(headers.getHostValue(), "us-east5-aiplatform.googleapis.com");
+    EXPECT_THAT(headers, ContainsHeader("authorization", AccessToken));
+    EXPECT_THAT(headers, ContainsHeader("x-vertex-location", "us-east5"));
     EXPECT_EQ(nlohmann::json::parse(upstream_body_), body);
   }
 
@@ -365,7 +200,7 @@ private:
               .PackFrom(per_route);
       auto* authorization = route->mutable_request_headers_to_add()->Add();
       authorization->mutable_header()->set_key("authorization");
-      authorization->mutable_header()->set_value(std::string(kAccessToken));
+      authorization->mutable_header()->set_value(std::string(AccessToken));
       authorization->set_append_action(
           envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
       // What the client's path held, read through field access, as a dynamic forward proxy
@@ -416,28 +251,10 @@ typed_config:
     initialize();
   }
 
-  // Waits for the upstream request and checks it against `check`; a request off the spec gets the
-  // error status Vertex AI would send, and fails the test.
-  bool receiveUpstreamRequest(absl::Status (*check)(const Http::RequestHeaderMap&,
-                                                    absl::string_view, bool),
-                              bool stream) {
+  void receiveUpstreamRequest() {
     waitForNextUpstreamRequest();
     // `body()` drains what the stream received, so it is read once.
     upstream_body_ = upstream_request_->body().toString();
-    const absl::Status valid = check(upstream_request_->headers(), upstream_body_, stream);
-    if (valid.ok()) {
-      return true;
-    }
-    ADD_FAILURE() << "Vertex AI would refuse the request: " << valid;
-    upstream_request_->encodeHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", absl::StrCat(httpStatus(valid))},
-                                        {"content-type", "application/json; charset=UTF-8"}},
-        false);
-    upstream_request_->encodeData(
-        nlohmann::json{{"error", {{"code", httpStatus(valid)}, {"message", valid.message()}}}}
-            .dump(),
-        true);
-    return false;
   }
 
   void replyJson(absl::string_view body) {
@@ -464,16 +281,16 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TranscoderIntegrationTest,
 TEST_P(TranscoderIntegrationTest, VertexClaudeRawPredictReachesGeminiGenerateContent) {
   initializeForGemini();
   IntegrationStreamDecoderPtr response =
-      sendClientRequest(absl::StrCat(kVertexClaudePath, ":rawPredict"),
+      sendClientRequest(absl::StrCat(VertexClaudePath, ":rawPredict"),
                         {{"anthropic_version", "vertex-2023-10-16"},
                          {"max_tokens", 1024},
                          {"stream", false},
-                         {"system", kSystem},
-                         {"messages", {{{"role", "user"}, {"content", kQuestion}}}}});
+                         {"system", SystemPrompt},
+                         {"messages", {{{"role", "user"}, {"content", Question}}}}});
   serveAsVertexGemini(/*stream=*/false);
-  expectUpstreamRequest(absl::StrCat(kVertexGeminiPath, ":generateContent"),
-                        {{"systemInstruction", {{"parts", {{{"text", kSystem}}}}}},
-                         {"contents", {{{"role", "user"}, {"parts", {{{"text", kQuestion}}}}}}},
+  expectUpstreamRequest(absl::StrCat(VertexGeminiPath, ":generateContent"),
+                        {{"systemInstruction", {{"parts", {{{"text", SystemPrompt}}}}}},
+                         {"contents", {{{"role", "user"}, {"parts", {{{"text", Question}}}}}}},
                          {"generationConfig", {{"maxOutputTokens", 1024}}}});
 
   ASSERT_TRUE(response->waitForEndStream());
@@ -482,7 +299,7 @@ TEST_P(TranscoderIntegrationTest, VertexClaudeRawPredictReachesGeminiGenerateCon
   EXPECT_EQ(message["type"], "message");
   EXPECT_EQ(message["role"], "assistant");
   // The client hears back about the model it asked for, not the one that served it.
-  EXPECT_EQ(message["model"], kClaudeModel);
+  EXPECT_EQ(message["model"], ClaudeModel);
   EXPECT_EQ(message["content"],
             nlohmann::json::parse(R"([{"type": "text", "text": "Hello from Gemini."}])"));
   EXPECT_EQ(message["stop_reason"], "end_turn");
@@ -495,15 +312,15 @@ TEST_P(TranscoderIntegrationTest, VertexClaudeRawPredictReachesGeminiGenerateCon
 TEST_P(TranscoderIntegrationTest, VertexClaudeStreamRawPredictReachesGeminiStreamGenerateContent) {
   initializeForGemini();
   IntegrationStreamDecoderPtr response =
-      sendClientRequest(absl::StrCat(kVertexClaudePath, ":streamRawPredict"),
+      sendClientRequest(absl::StrCat(VertexClaudePath, ":streamRawPredict"),
                         {{"anthropic_version", "vertex-2023-10-16"},
                          {"max_tokens", 1024},
                          {"stream", true},
-                         {"messages", {{{"role", "user"}, {"content", kStreamQuestion}}}}});
+                         {"messages", {{{"role", "user"}, {"content", StreamQuestion}}}}});
   serveAsVertexGemini(/*stream=*/true);
   expectUpstreamRequest(
-      absl::StrCat(kVertexGeminiPath, ":streamGenerateContent?alt=sse"),
-      {{"contents", {{{"role", "user"}, {"parts", {{{"text", kStreamQuestion}}}}}}},
+      absl::StrCat(VertexGeminiPath, ":streamGenerateContent?alt=sse"),
+      {{"contents", {{{"role", "user"}, {"parts", {{{"text", StreamQuestion}}}}}}},
        {"generationConfig", {{"maxOutputTokens", 1024}}}});
 
   ASSERT_TRUE(response->waitForEndStream());
@@ -522,7 +339,7 @@ TEST_P(TranscoderIntegrationTest, VertexClaudeStreamRawPredictReachesGeminiStrea
                                  "content_block_delta", "content_block_stop", "message_delta",
                                  "message_stop"));
   ASSERT_EQ(events.size(), 7);
-  EXPECT_EQ(events[0].second["message"]["model"], kClaudeModel);
+  EXPECT_EQ(events[0].second["message"]["model"], ClaudeModel);
   EXPECT_EQ(text, "Hello from Gemini.");
   EXPECT_EQ(events[5].second["delta"]["stop_reason"], "end_turn");
   EXPECT_EQ(events[5].second["usage"]["input_tokens"], 9);
@@ -533,17 +350,17 @@ TEST_P(TranscoderIntegrationTest, VertexClaudeStreamRawPredictReachesGeminiStrea
 TEST_P(TranscoderIntegrationTest, VertexGeminiGenerateContentReachesClaudeRawPredict) {
   initializeForClaude();
   IntegrationStreamDecoderPtr response =
-      sendClientRequest(absl::StrCat(kVertexGeminiPath, ":generateContent"),
-                        {{"systemInstruction", {{"parts", {{{"text", kSystem}}}}}},
-                         {"contents", {{{"role", "user"}, {"parts", {{{"text", kQuestion}}}}}}},
+      sendClientRequest(absl::StrCat(VertexGeminiPath, ":generateContent"),
+                        {{"systemInstruction", {{"parts", {{{"text", SystemPrompt}}}}}},
+                         {"contents", {{{"role", "user"}, {"parts", {{{"text", Question}}}}}}},
                          {"generationConfig", {{"maxOutputTokens", 1024}}}});
   serveAsVertexClaude(/*stream=*/false);
-  expectUpstreamRequest(absl::StrCat(kVertexClaudePath, ":rawPredict"),
+  expectUpstreamRequest(absl::StrCat(VertexClaudePath, ":rawPredict"),
                         {{"anthropic_version", "vertex-2023-10-16"},
                          {"max_tokens", 1024},
                          {"stream", false},
-                         {"system", kSystem},
-                         {"messages", {{{"role", "user"}, {"content", kQuestion}}}}});
+                         {"system", SystemPrompt},
+                         {"messages", {{{"role", "user"}, {"content", Question}}}}});
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->headers().getStatusValue(), "200") << response->body();
@@ -553,7 +370,7 @@ TEST_P(TranscoderIntegrationTest, VertexGeminiGenerateContentReachesClaudeRawPre
       reply["candidates"][0]["content"],
       nlohmann::json::parse(R"({"role": "model", "parts": [{"text": "Hello from Claude."}]})"));
   EXPECT_EQ(reply["candidates"][0]["finishReason"], "STOP");
-  EXPECT_EQ(reply["modelVersion"], kGeminiModel);
+  EXPECT_EQ(reply["modelVersion"], GeminiModel);
   EXPECT_EQ(reply["usageMetadata"]["promptTokenCount"], 12);
   EXPECT_EQ(reply["usageMetadata"]["candidatesTokenCount"], 6);
   test_server_->waitForCounter("ai_protocol_manager.transcoder.transcoded", testing::Eq(4));
@@ -563,15 +380,15 @@ TEST_P(TranscoderIntegrationTest, VertexGeminiGenerateContentReachesClaudeRawPre
 TEST_P(TranscoderIntegrationTest, VertexGeminiStreamGenerateContentReachesClaudeStreamRawPredict) {
   initializeForClaude();
   IntegrationStreamDecoderPtr response = sendClientRequest(
-      absl::StrCat(kVertexGeminiPath, ":streamGenerateContent?alt=sse"),
-      {{"contents", {{{"role", "user"}, {"parts", {{{"text", kStreamQuestion}}}}}}},
+      absl::StrCat(VertexGeminiPath, ":streamGenerateContent?alt=sse"),
+      {{"contents", {{{"role", "user"}, {"parts", {{{"text", StreamQuestion}}}}}}},
        {"generationConfig", {{"maxOutputTokens", 1024}}}});
   serveAsVertexClaude(/*stream=*/true);
-  expectUpstreamRequest(absl::StrCat(kVertexClaudePath, ":streamRawPredict"),
+  expectUpstreamRequest(absl::StrCat(VertexClaudePath, ":streamRawPredict"),
                         {{"anthropic_version", "vertex-2023-10-16"},
                          {"max_tokens", 1024},
                          {"stream", true},
-                         {"messages", {{{"role", "user"}, {"content", kStreamQuestion}}}}});
+                         {"messages", {{{"role", "user"}, {"content", StreamQuestion}}}}});
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_EQ(response->headers().getStatusValue(), "200") << response->body();
@@ -582,7 +399,7 @@ TEST_P(TranscoderIntegrationTest, VertexGeminiStreamGenerateContentReachesClaude
   nlohmann::json last;
   for (const auto& [name, data] : sseEvents(response->body())) {
     EXPECT_EQ(name, "");
-    EXPECT_EQ(data["modelVersion"], kGeminiModel);
+    EXPECT_EQ(data["modelVersion"], GeminiModel);
     for (const nlohmann::json& part : data["candidates"][0]["content"]["parts"]) {
       text += part["text"].get<std::string>();
     }

@@ -664,6 +664,32 @@ TEST_F(TranscoderFilterTest, ResponseOnlyInstanceFollowsTheInstructionsToo) {
   EXPECT_EQ(counterValue("transcoded"), 1);
 }
 
+// The model a request leg ahead of the instance read wins over the path, which a backend-side
+// instance may have rewritten since.
+TEST_F(TranscoderFilterTest, ResponseOnlyInstanceTakesTheModelARequestLegRead) {
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/gateway/rewritten/chat"}};
+  setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
+  setBinding(FilterStateKeys::BindingRequest, "/gateway/{model}/{chat|chat-stream}");
+  stream_info_.filterState()->setData(
+      FilterStateKeys::BindingRead,
+      std::make_shared<LlmBindingReadObject>(LlmBindingRead{nullptr, "gemini-2.5-pro", {}, {}}),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  FilterManager manager({std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
+      makeContext(LLMProtocol::OpenAiChatCompletions))});
+  runDecodeChain(manager, R"({"messages": [{"role": "user", "content": "Hi"}]})");
+  ASSERT_TRUE(status_.ok()) << status_;
+
+  const std::string wire =
+      runResponse(manager,
+                  R"({"candidates":[{"content":{"role":"model","parts":[{"text":"Hello back!"}]},)"
+                  R"("finishReason":"STOP"}]})",
+                  /*sse=*/false);
+  EXPECT_EQ(nlohmann::json::parse(wire)["model"], "gemini-2.5-pro");
+}
+
 // A binding that does not parse is the proxy's configuration at fault, so the request fails with
 // a 500, counted as `unresolved`, before anything is transcoded.
 TEST_F(TranscoderFilterTest, UnparseableBindingInstructionFailsTheRequest) {

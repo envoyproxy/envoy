@@ -36,7 +36,9 @@ public:
   struct Match {
     // `{model}`; empty when the matched layout has none.
     std::string model;
-    bool stream{false};
+    // Whether the path is the streaming spelling of the choice; nullopt when the layout's
+    // spellings share a path, which leaves the streaming mode to the body.
+    std::optional<bool> stream;
     // Every other named variable, such as `{project}`.
     absl::flat_hash_map<std::string, std::string> variables;
   };
@@ -55,9 +57,7 @@ public:
 
   // Whether the layout `render()` writes names the model.
   bool hasModel() const { return layouts_.front().front().has_model; }
-  // The named variables of the layout `render()` writes.
-  const std::vector<std::string>& renderVariables() const { return render_variables_; }
-  // Whether that layout has no unnamed wildcard, which `render()` cannot fill.
+  // Whether the layout `render()` writes has no unnamed wildcard, which it cannot fill.
   bool renderable() const { return renderable_; }
   // The pattern as parsed.
   const std::string& source() const { return source_; }
@@ -72,6 +72,8 @@ private:
     std::vector<std::pair<int, std::string>> groups;
     bool has_model{false};
     bool has_wildcard{false};
+    // Whether the layout's spellings differ in their paths, so that a path names its mode.
+    bool decides_stream{false};
   };
   // The unary spelling, then the streaming one when the layout spells it differently.
   using Layout = std::vector<Spelling>;
@@ -83,7 +85,6 @@ private:
 
   std::string source_;
   std::vector<Layout> layouts_;
-  std::vector<std::string> render_variables_;
   bool renderable_{true};
 };
 

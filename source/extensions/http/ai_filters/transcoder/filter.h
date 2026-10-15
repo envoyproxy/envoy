@@ -136,7 +136,12 @@ private:
                                 bool& unresolved);
   // Leaves what a request `ToIr` leg read in this stream's `envoy.ai.binding.read`, for the
   // backend-side leg and for field access.
-  void recordRead(HttpFilters::AiProtocolManager::LlmBindingRead read);
+  void recordRead(HttpFilters::AiProtocolManager::LlmBindingRead&& read);
+  // The model the client's path names, for a request that leaves this instance without the IR's:
+  // what a request leg recorded, or else the path read again under `request_binding`. Called
+  // before the path is rewritten.
+  std::string modelFromPath(
+      const HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr& request_binding) const;
 
   // The engine leg that transcodes this stream's response as `kind`, or `std::nullopt` when the
   // response passes through: response transcoding is off, or the dialect it needs is unknown.
@@ -164,8 +169,8 @@ private:
   // When the stream started, in seconds since the Unix epoch: the `created` time of an IR
   // response whose dialect does not carry one.
   const int64_t created_;
-  // The model the request named, for a response that does not name its own: the one the client's
-  // request path names (as Gemini's does), until a request leg reports the IR's.
+  // The model the request named, for a response that does not name its own: the IR's, as a request
+  // leg reports it, or else the one the client's request path names (as Gemini's does).
   std::string request_model_;
 };
 

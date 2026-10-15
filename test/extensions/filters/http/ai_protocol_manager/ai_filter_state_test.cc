@@ -167,10 +167,10 @@ TEST_P(BindingFactoryTest, BuildsFromAPatternOrJson) {
   std::unique_ptr<StreamInfo::FilterState::Object> object = build(pattern);
   const auto* binding = dynamic_cast<const LlmBindingObject*>(object.get());
   ASSERT_NE(binding, nullptr);
-  EXPECT_TRUE(binding->status().ok());
-  ASSERT_NE(binding->binding(), nullptr);
-  EXPECT_EQ(binding->binding()->pattern()->source(), pattern);
-  EXPECT_TRUE(binding->binding()->mutations().empty());
+  ASSERT_TRUE(binding->binding().ok()) << binding->binding().status();
+  ASSERT_NE(*binding->binding(), nullptr);
+  EXPECT_EQ((*binding->binding())->pattern()->source(), pattern);
+  EXPECT_TRUE((*binding->binding())->mutations().empty());
   EXPECT_EQ(binding->asString(), pattern);
   EXPECT_EQ(object->serializeAsString(), pattern);
 
@@ -181,9 +181,9 @@ TEST_P(BindingFactoryTest, BuildsFromAPatternOrJson) {
   object = build(json);
   binding = dynamic_cast<const LlmBindingObject*>(object.get());
   ASSERT_NE(binding, nullptr);
-  ASSERT_TRUE(binding->status().ok()) << binding->status();
-  ASSERT_EQ(binding->binding()->mutations().size(), 2);
-  EXPECT_TRUE(binding->binding()->removesModel());
+  ASSERT_TRUE(binding->binding().ok()) << binding->binding().status();
+  ASSERT_EQ((*binding->binding())->mutations().size(), 2);
+  EXPECT_TRUE((*binding->binding())->removesModel());
   EXPECT_EQ(binding->asString(), json);
   EXPECT_EQ(object->serializeAsString(), json);
 }
@@ -198,8 +198,7 @@ TEST_P(BindingFactoryTest, KeepsTheErrorOfAValueThatDoesNotParse) {
     std::unique_ptr<StreamInfo::FilterState::Object> object = build(value);
     const auto* binding = dynamic_cast<const LlmBindingObject*>(object.get());
     ASSERT_NE(binding, nullptr) << value;
-    EXPECT_EQ(binding->status().code(), absl::StatusCode::kInvalidArgument) << value;
-    EXPECT_EQ(binding->binding(), nullptr) << value;
+    EXPECT_EQ(binding->binding().status().code(), absl::StatusCode::kInvalidArgument) << value;
     EXPECT_EQ(binding->asString(), value);
   }
 }
@@ -225,7 +224,7 @@ TEST(LlmBindingObjectTest, ReadsWhatAnyWriterLeftAtTheKey) {
                        StreamInfo::FilterState::LifeSpan::FilterChain);
   binding = LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingRequest);
   ASSERT_TRUE(binding.ok());
-  EXPECT_EQ(*binding, set->binding());
+  EXPECT_EQ(*binding, *set->binding());
   filter_state.setData(FilterStateKeys::BindingRequest,
                        std::make_shared<LlmBindingObject>("/v1/{model"),
                        StreamInfo::FilterState::LifeSpan::FilterChain);

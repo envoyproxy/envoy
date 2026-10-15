@@ -447,10 +447,11 @@ listed separated by spaces: a path matches the first that fits it entirely, and 
 the first.
 
 Every named variable matches one path segment and reads its value, which must hold only letters,
-digits and ``-``, ``.``, ``_``, ``@``, and start with a letter or a digit. ``{model}`` and the
-choice are the request's ``model`` and ``stream``. Any other variable, such as ``{project}``, is a
-path variable: it never enters the body, and the ``envoy.ai.binding.read`` object the transcoder
-sets for the stream keeps it for field access, e.g.
+digits and ``-``, ``.``, ``_``, ``@``, and start with a letter or a digit. ``{model}`` is the
+request's ``model``, and the choice its ``stream`` where the two sides differ in the path; a choice
+between queries alone leaves the streaming mode to the body. Any other variable, such as
+``{project}``, is a path variable: it never enters the body, and the ``envoy.ai.binding.read``
+object the transcoder sets for the stream keeps it for field access, e.g.
 ``%FILTER_STATE(envoy.ai.binding.read:FIELD:location)%``. Rendering takes ``{model}`` from the
 body and every other variable from the client's path; unnamed wildcards match on the way in but
 cannot be rendered.

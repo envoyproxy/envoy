@@ -102,6 +102,11 @@ absl::StatusOr<UriPattern::Layout> UriPattern::parseLayout(absl::string_view lay
     }
     spellings.push_back(std::move(spelling));
   }
+  if (spellings.size() == 2 && spellings.front().path != spellings.back().path) {
+    for (Spelling& spelling : spellings) {
+      spelling.decides_stream = true;
+    }
+  }
   return spellings;
 }
 
@@ -122,9 +127,6 @@ UriPattern::UriPattern(std::string source, std::vector<Layout> layouts)
     : source_(std::move(source)), layouts_(std::move(layouts)) {
   for (const Spelling& spelling : layouts_.front()) {
     renderable_ &= !spelling.has_wildcard;
-  }
-  for (const auto& [index, name] : layouts_.front().front().groups) {
-    render_variables_.push_back(name);
   }
 }
 
@@ -157,7 +159,9 @@ std::optional<UriPattern::Match> UriPattern::match(absl::string_view path) const
     for (size_t i = 0; i < layout.size(); ++i) {
       std::optional<Match> match = matchSpelling(layout[i], path);
       if (match.has_value()) {
-        match->stream = i > 0;
+        if (layout[i].decides_stream) {
+          match->stream = i > 0;
+        }
         return match;
       }
     }

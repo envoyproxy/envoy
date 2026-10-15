@@ -33,14 +33,8 @@ LlmProtocolFilterState::getField(absl::string_view field_name) const {
   return absl::monostate{};
 }
 
-LlmBindingObject::LlmBindingObject(absl::string_view value) : source_(value) {
-  absl::StatusOr<LlmBindingConstSharedPtr> binding = LlmBinding::parse(value);
-  if (binding.ok()) {
-    binding_ = *std::move(binding);
-  } else {
-    status_ = binding.status();
-  }
-}
+LlmBindingObject::LlmBindingObject(absl::string_view value)
+    : source_(value), binding_(LlmBinding::parse(value)) {}
 
 absl::StatusOr<LlmBindingConstSharedPtr>
 LlmBindingObject::fromFilterState(const StreamInfo::FilterState& filter_state,
@@ -50,9 +44,6 @@ LlmBindingObject::fromFilterState(const StreamInfo::FilterState& filter_state,
     return nullptr;
   }
   if (const auto* binding = dynamic_cast<const LlmBindingObject*>(object); binding != nullptr) {
-    if (!binding->status().ok()) {
-      return binding->status();
-    }
     return binding->binding();
   }
   // Golang's SetFilterState and the dynamic modules' bytes setter store plain strings.

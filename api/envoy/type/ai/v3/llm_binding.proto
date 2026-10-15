@@ -56,10 +56,11 @@ message LLMBinding {
   // The request path, as a :ref:`URI pattern
   // <config_http_filters_ai_protocol_manager_transcoder_instructions>`: a two-way map between the
   // path and the request's named values, each matching one path segment. ``{model}`` is the
-  // request's model and the ``{unary|stream}`` choice its ``stream``; any other variable, such as
-  // ``{project}``, is a path variable, kept beside the body and never in it. Coming in, the
-  // pattern reads the client's path into those values; going out, it is rendered from them.
-  // Unnamed wildcards and the query are never read. When empty, the API's own path is used.
+  // request's model and the ``{unary|stream}`` choice its ``stream``, where the two sides differ in
+  // the path; any other variable, such as ``{project}``, is a path variable, kept beside the body
+  // and never in it. Coming in, the pattern reads the client's path into those values; going out,
+  // it is rendered from them. Unnamed wildcards and the query are never read. When empty, the
+  // API's own path is used.
   string uri_pattern = 1;
 
   // Edits to the request body, applied in order. When empty, the API's own edits apply, such as

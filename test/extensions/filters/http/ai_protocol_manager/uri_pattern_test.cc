@@ -39,7 +39,7 @@ UriPattern parseOk(absl::string_view pattern) {
 using Values = absl::flat_hash_map<std::string, std::string>;
 
 // An unnamed wildcard segment, kept out of literals the spelling check reads as comments.
-constexpr absl::string_view kWildcard = "*";
+constexpr absl::string_view Wildcard = "*";
 
 absl::StatusOr<std::string> render(const UriPattern& pattern, bool stream, const Values& values) {
   return pattern.render(stream, [&values](absl::string_view name) -> std::optional<std::string> {
@@ -74,7 +74,7 @@ TEST(UriPatternParseTest, RejectsMalformedTemplates) {
 // ever match one.
 TEST(UriPatternParseTest, RejectsNamedVariablesOverSeveralSegments) {
   for (const std::string& pattern : {std::string("/v1/{model}/{rest=**}"),
-                                     absl::StrCat("/v1/{name=models/", kWildcard, "}:predict")}) {
+                                     absl::StrCat("/v1/{name=models/", Wildcard, "}:predict")}) {
     EXPECT_THAT(UriPattern::parse(pattern),
                 HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("must match one path")))
         << pattern;
@@ -82,14 +82,11 @@ TEST(UriPatternParseTest, RejectsNamedVariablesOverSeveralSegments) {
   EXPECT_TRUE(parseOk("/v1/{model=*}:predict").hasModel());
 }
 
-// What rendering needs: the variables of the first layout, and no unnamed wildcard in it.
-TEST(UriPatternParseTest, DescribesTheLayoutItRenders) {
-  const UriPattern vertex = parseOk(kVertexGemini);
-  EXPECT_EQ(vertex.renderVariables(),
-            (std::vector<std::string>{"version", "project", "location", "model"}));
-  EXPECT_TRUE(vertex.renderable());
-  EXPECT_FALSE(parseOk(absl::StrCat("/v1/", kWildcard, "/models/{model}")).renderable());
-  EXPECT_TRUE(parseOk(absl::StrCat("/v1/models/{model} /gw/", kWildcard, "/{model}")).renderable());
+// Rendering cannot fill an unnamed wildcard in the layout it writes.
+TEST(UriPatternParseTest, KnowsWhetherItCanRenderItsLayout) {
+  EXPECT_TRUE(parseOk(kVertexGemini).renderable());
+  EXPECT_FALSE(parseOk(absl::StrCat("/v1/", Wildcard, "/models/{model}")).renderable());
+  EXPECT_TRUE(parseOk(absl::StrCat("/v1/models/{model} /gw/", Wildcard, "/{model}")).renderable());
 }
 
 TEST(UriPatternParseTest, RejectsAnythingButOneChoiceOfTwo) {
@@ -121,15 +118,15 @@ TEST(UriPatternMatchTest, LiftsModelAndStreamMode) {
       gemini.match("/v1beta/models/gemini-2.0-flash:generateContent");
   ASSERT_TRUE(m.has_value());
   EXPECT_EQ(m->model, "gemini-2.0-flash");
-  EXPECT_FALSE(m->stream);
+  EXPECT_EQ(m->stream, false);
 
   m = gemini.match("/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse");
   ASSERT_TRUE(m.has_value());
   EXPECT_EQ(m->model, "gemini-2.0-flash");
-  EXPECT_TRUE(m->stream);
+  EXPECT_EQ(m->stream, true);
   // The query is ignored on both sides.
-  EXPECT_TRUE(gemini.match("/v1beta/models/gemini-2.0-flash:streamGenerateContent")->stream);
-  EXPECT_FALSE(gemini.match("/v1beta/models/gemini-2.0-flash:generateContent?key=x")->stream);
+  EXPECT_EQ(gemini.match("/v1beta/models/gemini-2.0-flash:streamGenerateContent")->stream, true);
+  EXPECT_EQ(gemini.match("/v1beta/models/gemini-2.0-flash:generateContent?key=x")->stream, false);
 }
 
 // A prefix in front of the API's own path is part of the path: a pattern that accepts one says
@@ -144,7 +141,7 @@ TEST(UriPatternMatchTest, MatchesTheWholePath) {
   std::optional<UriPattern::Match> m = parseOk(kVertexGemini).match(vertex);
   ASSERT_TRUE(m.has_value());
   EXPECT_EQ(m->model, "gemini-2.0-flash");
-  EXPECT_FALSE(m->stream);
+  EXPECT_EQ(m->stream, false);
 }
 
 // Every named variable reads a value; `{model}` has a field of its own.
@@ -155,12 +152,12 @@ TEST(UriPatternMatchTest, ReadsEveryNamedVariable) {
                  "streamGenerateContent?alt=sse");
   ASSERT_TRUE(m.has_value());
   EXPECT_EQ(m->model, "gemini-2.5-flash");
-  EXPECT_TRUE(m->stream);
+  EXPECT_EQ(m->stream, true);
   EXPECT_EQ(m->variables,
             (Values{{"version", "v1"}, {"project", "acme"}, {"location", "us-east5"}}));
 
   // Unnamed wildcards and the query read nothing.
-  m = parseOk(absl::StrCat("/gw/", kWildcard, "/{tenant}/v1/chat/completions"))
+  m = parseOk(absl::StrCat("/gw/", Wildcard, "/{tenant}/v1/chat/completions"))
           .match("/gw/x/t-1/v1/chat/completions?key=k");
   ASSERT_TRUE(m.has_value());
   EXPECT_EQ(m->variables, (Values{{"tenant", "t-1"}}));
@@ -175,7 +172,7 @@ TEST(UriPatternMatchTest, MatchesAnyLayout) {
     std::optional<UriPattern::Match> m = gemini.match(path);
     ASSERT_TRUE(m.has_value()) << path;
     EXPECT_EQ(m->model, "gemini-2.0-flash");
-    EXPECT_TRUE(m->stream);
+    EXPECT_EQ(m->stream, true);
   }
   EXPECT_THAT(render(gemini, true, {{"model", "gemini-2.0-flash"}}),
               IsOkAndHolds("/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"));
@@ -213,19 +210,19 @@ TEST(UriPatternMatchTest, ChoiceThatExtendsTheOtherIsMatchedWhole) {
   std::optional<UriPattern::Match> m = bedrock.match("/model/anthropic.claude-3/converse-stream");
   ASSERT_TRUE(m.has_value());
   EXPECT_EQ(m->model, "anthropic.claude-3");
-  EXPECT_TRUE(m->stream);
+  EXPECT_EQ(m->stream, true);
   m = bedrock.match("/model/anthropic.claude-3/converse");
   ASSERT_TRUE(m.has_value());
-  EXPECT_FALSE(m->stream);
+  EXPECT_EQ(m->stream, false);
 }
 
 // Spellings that differ only in their query match alike, and the body says whether to stream.
-TEST(UriPatternMatchTest, ChoiceOfQueriesMatchesAsUnary) {
+TEST(UriPatternMatchTest, ChoiceOfQueriesLeavesTheModeToTheBody) {
   const UriPattern chat = parseOk("/v1/chat/completions{|?stream=true}");
   for (absl::string_view path : {"/v1/chat/completions", "/v1/chat/completions?stream=true"}) {
     std::optional<UriPattern::Match> m = chat.match(path);
     ASSERT_TRUE(m.has_value()) << path;
-    EXPECT_FALSE(m->stream) << path;
+    EXPECT_EQ(m->stream, std::nullopt) << path;
   }
 }
 
@@ -234,7 +231,7 @@ TEST(UriPatternMatchTest, FixedPatternMatchesOnlyItself) {
   std::optional<UriPattern::Match> m = messages.match("/v1/messages?beta=true");
   ASSERT_TRUE(m.has_value());
   EXPECT_TRUE(m->model.empty());
-  EXPECT_FALSE(m->stream);
+  EXPECT_EQ(m->stream, std::nullopt);
   EXPECT_FALSE(messages.match("/anthropic/v1/messages").has_value());
   EXPECT_FALSE(messages.match("/v1/messages/count_tokens").has_value());
 }
@@ -280,7 +277,7 @@ TEST(UriPatternRenderTest, RefusesSegmentsWithoutAValue) {
       render(parseOk(kVertexGemini), false, {{"model", "gemini-2.0-flash"}}),
       HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("has no value for `{version}`")));
   EXPECT_THAT(
-      render(parseOk(absl::StrCat("/v1/", kWildcard, "/models/{model}")), false, {{"model", "m"}}),
+      render(parseOk(absl::StrCat("/v1/", Wildcard, "/models/{model}")), false, {{"model", "m"}}),
       HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr("wildcard")));
 }
 

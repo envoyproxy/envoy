@@ -146,6 +146,7 @@ Coroutine::Task<absl::Status> TranscoderFilter::decode(AiRequestReceiver receive
   }
 
   if (config_->requestHandling() == TranscoderProto::DIRECTION_UNSPECIFIED) {
+    request_model_ = modelFromPath(instructions->request_binding);
     co_return co_await std::move(propagate_request)(std::move(request));
   }
 
@@ -284,18 +285,16 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
       model.has_value()) {
     instructions.resolved_model = std::string(*model);
   }
-
-  // The model the client's path names, for a response that needs it when no request leg of this
-  // instance reports the IR's: what a request leg recorded, or else the path read again under the
-  // binding the request names.
-  if (const LlmBindingRead* read = LlmBindingReadObject::fromFilterState(filter_state);
-      read != nullptr) {
-    request_model_ = read->model;
-  } else {
-    request_model_ = config_->engine().modelFromRequestPath(
-        source_protocol_, request_headers_.getPathValue(), instructions.request_binding);
-  }
   return instructions;
+}
+
+std::string TranscoderFilter::modelFromPath(const LlmBindingConstSharedPtr& request_binding) const {
+  if (const LlmBindingRead* read = LlmBindingReadObject::fromFilterState(*filter_state_);
+      read != nullptr) {
+    return read->model;
+  }
+  return config_->engine().modelFromRequestPath(source_protocol_, request_headers_.getPathValue(),
+                                                request_binding);
 }
 
 absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
@@ -338,16 +337,15 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
     ENVOY_LOG(debug, "transcoder: {} does not match the request path `{}`",
               FilterStateKeys::BindingRequest, ctx.request_path);
   }
-  if (!ctx.ir_model.empty()) {
-    request_model_ = std::move(ctx.ir_model);
-  }
+  request_model_ =
+      !ctx.ir_model.empty() ? std::move(ctx.ir_model) : modelFromPath(instructions.request_binding);
   if (ctx.rewritten_path.has_value()) {
     request_headers_.setPath(*ctx.rewritten_path);
   }
   return absl::OkStatus();
 }
 
-void TranscoderFilter::recordRead(LlmBindingRead read) {
+void TranscoderFilter::recordRead(LlmBindingRead&& read) {
   // Set once per stream, so no other stream sees it; a read already there is left alone.
   if (filter_state_->hasDataWithName(FilterStateKeys::BindingRead)) {
     ENVOY_LOG(debug, "transcoder: {} is already set", FilterStateKeys::BindingRead);
