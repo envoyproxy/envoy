@@ -346,7 +346,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   // Releasing a scope can only lower a max utilization gauge if the scope currently holds the
-  // maximum for some stat type, so skip the recomputation across all scopes otherwise.
+  // maximum for some stat type, so skip the full recompute across all scopes otherwise.
   const bool was_at_max = scopeAtMaxUtilizationLockHeld(*scope);
   scopes_.erase(scope);
   if (was_at_max) {

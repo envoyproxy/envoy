@@ -593,7 +593,7 @@ private:
 
   // Returns true if the scope currently holds the maximum utilization for any stat type, in
   // which case its removal can lower the corresponding gauge. Used to skip the full
-  // recomputation when a scope that is not at the maximum is released.
+  // recompute when a scope that is not at the maximum is released.
   bool scopeAtMaxUtilizationLockHeld(const ScopeImpl& scope) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
