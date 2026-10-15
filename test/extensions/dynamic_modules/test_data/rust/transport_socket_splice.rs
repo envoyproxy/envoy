@@ -35,16 +35,21 @@ fn new_transport_socket_factory_config(
   _config: &[u8],
   is_upstream: bool,
 ) -> Option<Box<dyn TransportSocketFactoryConfig<EnvoyTransportSocketImpl>>> {
-  if name != "splice" {
-    envoy_log_error!("unknown transport socket name {}", name);
-    return None;
-  }
+  // "splice" relays through module-owned pipes, "engine_splice" hands both fds to the engine pump.
+  let engine = match name {
+    "splice" => false,
+    "engine_splice" => true,
+    _ => {
+      envoy_log_error!("unknown transport socket name {}", name);
+      return None;
+    },
+  };
   let role = if is_upstream {
     Role::Upstream
   } else {
     Role::Downstream
   };
-  Some(Box::new(SpliceFactoryConfig { role }))
+  Some(Box::new(SpliceFactoryConfig { role, engine }))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -64,6 +69,7 @@ impl Role {
 
 struct SpliceFactoryConfig {
   role: Role,
+  engine: bool,
 }
 
 impl TransportSocketFactoryConfig<EnvoyTransportSocketImpl> for SpliceFactoryConfig {
@@ -71,7 +77,7 @@ impl TransportSocketFactoryConfig<EnvoyTransportSocketImpl> for SpliceFactoryCon
     &self,
     _envoy: &mut EnvoyTransportSocketImpl,
   ) -> Box<dyn TransportSocket<EnvoyTransportSocketImpl>> {
-    Box::new(SpliceTransportSocket::new(self.role))
+    Box::new(SpliceTransportSocket::new(self.role, self.engine))
   }
 }
 
@@ -98,6 +104,10 @@ struct Direction {
   // The reader could not tell a full pipe from an empty socket, so the writer wakes it once it
   // has drained some of the pipe.
   reader_waiting: bool,
+  // Bytes the reader passed through Envoy and bytes the writer wrote to its socket. They are equal
+  // once nothing of this direction waits in an Envoy buffer, which the engine handoff needs.
+  bytes_read_by_reader: u64,
+  bytes_written_by_writer: u64,
 }
 
 impl Direction {
@@ -108,6 +118,8 @@ impl Direction {
       bytes_arrived_at_writer: None,
       reader_eof: false,
       reader_waiting: false,
+      bytes_read_by_reader: 0,
+      bytes_written_by_writer: 0,
     }
   }
 }
@@ -120,6 +132,8 @@ struct Relay {
   upstream: Option<SocketPtr>,
   downstream_to_upstream: Direction,
   upstream_to_downstream: Direction,
+  // Set once the engine splice pump has taken over both fds. The sockets then stop relaying.
+  pumped: bool,
 }
 
 impl Relay {
@@ -178,6 +192,8 @@ fn wake_writer(socket: Option<SocketPtr>) {
 
 struct SpliceTransportSocket {
   role: Role,
+  // When set, the clean boundary hands both fds to the engine splice pump instead of relaying here.
+  engine: bool,
   // The connection ID an upstream socket is registered under until it closes.
   registered_id: Option<u64>,
   // The socket descriptor, set once the socket joins a relay.
@@ -194,9 +210,10 @@ struct SpliceTransportSocket {
 }
 
 impl SpliceTransportSocket {
-  fn new(role: Role) -> Self {
+  fn new(role: Role, engine: bool) -> Self {
     SpliceTransportSocket {
       role,
+      engine,
       registered_id: None,
       fd: -1,
       relay: None,
@@ -206,6 +223,31 @@ impl SpliceTransportSocket {
       write_shutdown: false,
       failure_reason: String::new(),
     }
+  }
+
+  // Hands both fds to the engine splice pump once both directions have written out every byte they
+  // read, so no byte waits in an Envoy buffer. The new bytes that triggered this read stay on the fd
+  // for the pump. Returns true once the pump owns both fds.
+  fn try_engage_engine(&self, envoy: &EnvoyTransportSocketImpl, relay: &mut Relay) -> bool {
+    let Some(peer) = relay.peer(self.role) else {
+      return false;
+    };
+    let drained = |direction: &Direction| {
+      direction.bytes_read_by_reader > 0
+        && direction.bytes_written_by_writer == direction.bytes_read_by_reader
+    };
+    if !drained(&relay.downstream_to_upstream) || !drained(&relay.upstream_to_downstream) {
+      return false;
+    }
+    if !envoy.start_splice(peer) {
+      return false;
+    }
+    relay.pumped = true;
+    envoy_log_debug!(
+      "connection {} engaged splice pump",
+      envoy.get_connection_id().unwrap_or_default()
+    );
+    true
   }
 
   fn register_upstream(&mut self, envoy: &EnvoyTransportSocketImpl) {
@@ -220,6 +262,7 @@ impl SpliceTransportSocket {
       upstream: Some(envoy.envoy_ptr()),
       downstream_to_upstream: Direction::new(),
       upstream_to_downstream: Direction::new(),
+      pumped: false,
     }));
     UNCLAIMED_UPSTREAMS.with(|upstreams| upstreams.borrow_mut().insert(id, relay.clone()));
     self.registered_id = Some(id);
@@ -277,6 +320,9 @@ impl SpliceTransportSocket {
     };
     let mut relay = relay.borrow_mut();
     *relay.socket(self.role) = None;
+    if relay.pumped {
+      return; // The engine pump owns both fds and drives teardown, so do not wake the peer.
+    }
     relay.inbound(self.role).mode = Mode::Disabled;
     wake_reader(relay.peer(self.role));
   }
@@ -450,6 +496,14 @@ impl TransportSocket<EnvoyTransportSocketImpl> for SpliceTransportSocket {
       return self.read_buffered(envoy);
     };
     let mut relay = relay.borrow_mut();
+    if self.engine {
+      if relay.pumped || self.try_engage_engine(envoy, &mut relay) {
+        return IoResult::keep_open(0, false);
+      }
+      let result = self.read_buffered(envoy);
+      relay.outbound(self.role).bytes_read_by_reader = self.bytes_read_through_envoy;
+      return result;
+    }
     self.maybe_start_splicing(envoy, &mut relay);
     let writer = relay.peer(self.role);
     let direction = relay.outbound(self.role);
@@ -467,6 +521,9 @@ impl TransportSocket<EnvoyTransportSocketImpl> for SpliceTransportSocket {
     self.claim_upstream(envoy);
     let relay = self.relay.clone();
     let mut relay = relay.as_ref().map(|relay| relay.borrow_mut());
+    if relay.as_deref().is_some_and(|relay| relay.pumped) {
+      return IoResult::keep_open(0, false);
+    }
     let pending = envoy.write_buffer_length();
     let mut outbound_pipe_has_bytes = false;
     if let Some(relay) = relay.as_deref_mut() {
@@ -484,6 +541,9 @@ impl TransportSocket<EnvoyTransportSocketImpl> for SpliceTransportSocket {
           IoStatus::Success if n > 0 => {
             written += n;
             self.bytes_drained_from_envoy += n as u64;
+            if let Some(relay) = relay.as_deref_mut() {
+              relay.inbound(self.role).bytes_written_by_writer = self.bytes_drained_from_envoy;
+            }
           },
           IoStatus::Success => break,
           IoStatus::Again => return IoResult::keep_open(written, false),

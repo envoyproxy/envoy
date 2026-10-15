@@ -11,6 +11,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
 #include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
+#include "source/extensions/filters/http/ai_protocol_manager/uri_pattern.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -153,8 +154,9 @@ public:
     MergeConsecutiveByKey,
     // Writes `default_value` to `target_path`, replacing whatever is there.
     SetConst,
-    // Writes the caller-supplied `context_field` to `target_path` if `target_path` is absent or
-    // null and the caller supplied a value.
+    // Writes the caller-supplied `context_field` to `target_path`, when the caller supplied a
+    // value. `RequestModel` replaces what is there; `NowUnixSeconds` only fills in an absent or
+    // null `target_path`.
     SetFromContext,
     // Sets `element_key` on each object element of array `target_path` to the element's position,
     // unless the element already carries it. A `prefix` writes the position as a string after it,
@@ -206,7 +208,8 @@ public:
 
   // A value the caller supplies through `TranscodeContext` because the payload does not carry it.
   enum class ContextField {
-    // The model the request named (`TranscodeContext::request_model`).
+    // The model the client asked for (`TranscodeContext::request_model`). A response reports it
+    // in place of any model the backend named: the gateway keeps its choice of backend to itself.
     RequestModel,
     // The current time in seconds since the Unix epoch (`TranscodeContext::now_unix_seconds`).
     NowUnixSeconds,
@@ -320,8 +323,9 @@ public:
   // destination dialect (e.g. OpenAI's `object: "chat.completion"`).
   static TranscodeRule setConst(std::string path, nlohmann::json value);
 
-  // Sets `path` from the caller-supplied `field` if `path` is missing or null. A field the caller
-  // left empty (or zero) writes nothing, so a later `setDefault` can still apply.
+  // Sets `path` from the caller-supplied `field`: `RequestModel` replaces what is there,
+  // `NowUnixSeconds` only fills in a missing or null `path`. A field the caller left empty (or
+  // zero) writes nothing, so a later `setDefault` can still apply.
   static TranscodeRule setFromContext(std::string path, ContextField field);
 
   // Sets `key` on each object element of the array at `array_path` to the element's position,
@@ -534,27 +538,41 @@ struct TranscodeStreamState {
 // no headers and no clocks itself; the caller passes in what it has and applies what comes back.
 struct TranscodeContext {
   // Inputs.
-  // The request's `:path`, from which a request `ToIr` leg reads what its dialect names in the path
-  // rather than the body (see `DialectTranscodePack::envelope`).
+  // Some APIs (e.g. Gemini) put `model` and `stream` in the URL instead of the JSON body, so
+  // request `ToIr` legs read `request_path` to copy them into the IR body.
   absl::string_view request_path{};
-  // The model the request named, for a response that does not name its own (see
-  // `TranscodeRule::ContextField::RequestModel`).
+
+  // Custom incoming URL pattern so request `ToIr` legs can extract `model` and `stream` from it
+  const UriPattern* request_uri_pattern{nullptr};
+  // Custom upstream URL pattern so request `FromIr` legs can format `rewritten_path` for the
+  // target backend.
+  const UriPattern* response_uri_pattern{nullptr};
+  // Model override for the outbound request (e.g. from a model router) so request `FromIr` legs
+  // send the model name the upstream backend expects to run.
+  absl::string_view resolved_model{};
+  // The model that the client asked for
   absl::string_view request_model{};
-  // The current time, for a response the IR requires a `created` timestamp on but the dialect
-  // does not carry one (see `TranscodeRule::ContextField::NowUnixSeconds`).
+  // The current time, used as a response's `created` when the dialect carries no timestamp (the
+  // IR requires one).
   int64_t now_unix_seconds{0};
   // The stream's memory: required on `StreamEvent` legs, whose stream-state and
   // usage-accumulation rules read and write it.
   TranscodeStreamState* stream_state{nullptr};
 
   // Outputs.
-  // Set by request legs to the request's IR `model` (read after a `ToIr` leg and before a
-  // `FromIr` one), so the caller can hand it back as the fallback model on the response legs.
+  // Set by request legs to the model the client asked for: the request's IR `model`, read after a
+  // `ToIr` leg and before a `FromIr` one replaces it with `resolved_model`. The caller hands it
+  // back as `request_model` on the response legs.
   std::string ir_model{};
-  // Set by a successful request `FromIr` leg whose dialect names request members in the path (see
-  // `DialectTranscodePack::envelope`): the `:path` the request must be sent to, which the caller
-  // applies along with the body. Every other request leg clears it.
+  // Set by a successful request `FromIr` leg that has a path to render, from `response_uri_pattern`
+  // or the dialect's own layout (see `DialectTranscodePack::envelope`): the `:path` the request
+  // must be sent to, which the caller applies along with the body. Every other request leg clears
+  // it.
   std::optional<std::string> rewritten_path{};
+  // Set by a request `ToIr` leg: whether `request_path` matched the pattern the leg followed
+  // (`request_uri_pattern` or the dialect's own layout), and so had its model and streaming mode
+  // lifted. False when there was no pattern, or on any other leg.
+  bool request_path_matched{false};
 };
 
 // The rule sets for one payload kind of a dialect: `to_ir` converts the dialect into the IR
@@ -676,28 +694,6 @@ struct StreamGrammars {
   StreamGrammar from_ir{};
 };
 
-// Where a dialect's API names request members in the request path rather than the body. Gemini
-// names the model and the streaming mode there, calling a custom method on the model:
-// `/v1beta/models/{model}:generateContent`, or `:streamGenerateContent` to stream the response.
-//
-// A request `ToIr` leg lifts what `TranscodeContext::request_path` names into the IR body, unless
-// the body names it itself. A request `FromIr` leg moves it out of the body into
-// `TranscodeContext::rewritten_path`: `{prefix}{model}{unary_method}` or
-// `{prefix}{model}{stream_method}`.
-struct PathTemplate {
-  // What a rendered path puts before the model. A parsed path need only end its own prefix with
-  // this one's last segment (`/models/`), since Vertex AI nests Gemini's models under a project and
-  // a location.
-  std::string prefix{};
-  // The custom method (`:verb`) that follows the model, for a unary and for a streamed response.
-  // A rendered path keeps any query a method ends with; a parsed path's query is ignored.
-  std::string unary_method{};
-  std::string stream_method{};
-  // The IR members the path carries: the model, and whether the response is streamed.
-  std::string model_field{"model"};
-  std::string stream_field{"stream"};
-};
-
 // Declarative dialect pack: every rule needed to move one dialect's payloads to and from the IR.
 //
 // `dialect_schema` is the protocol's own `PayloadSchema`; it is what a request converted out of
@@ -712,8 +708,12 @@ struct DialectTranscodePack {
   LegRules response{};
   // Streamed response events.
   StreamGrammars stream{};
-  // Request members the dialect's API names in the request path, if any.
-  std::optional<PathTemplate> envelope{};
+  // Not all APIs put `model` and `stream` in the URL (e.g. OpenAI and Anthropic keep them in the
+  // JSON body, so this is `std::nullopt`). For APIs whose URL does carry `model` and `stream`
+  // (e.g. Gemini's `/v1beta/models/{model}:{generateContent|streamGenerateContent}`), `ToIr`
+  // extracts them from the URL into the IR body, and `FromIr` moves them from the IR body back
+  // into the outgoing URL.
+  std::optional<UriPattern> envelope{};
   const PayloadSchema* dialect_schema{nullptr};
   const PayloadSchema* ir_schema{nullptr};
 };
@@ -802,10 +802,11 @@ public:
   absl::StatusOr<std::vector<SseEventPtr>> finishStream(const TranscodeLeg& leg,
                                                         TranscodeContext& ctx) const;
 
-  // The model that `path`, a request path of `dialect`'s API, names: empty unless the dialect
-  // names its model in the path (`DialectTranscodePack::envelope`) and `path` is one of its model
-  // methods. For a caller that needs the model without running a request leg.
-  std::string modelFromRequestPath(LLMProtocol dialect, absl::string_view path) const;
+  // The model that `path`, a request path of `dialect`'s API, names: empty unless `path` matches
+  // `pattern`, or the dialect's own layout (`DialectTranscodePack::envelope`) when `pattern` is
+  // null, and that names a model. For a caller that needs the model without running a request leg.
+  std::string modelFromRequestPath(LLMProtocol dialect, absl::string_view path,
+                                   const UriPattern* pattern = nullptr) const;
 
 private:
   absl::StatusOr<const DialectTranscodePack*> findPack(LLMProtocol dialect) const;

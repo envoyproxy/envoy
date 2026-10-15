@@ -212,6 +212,8 @@
 /*/extensions/matching/input_matchers/cel_matcher @tyxia @yanavlasov
 # dynamic metadata input matcher
 /*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
+# URI template input matcher
+/*/extensions/matching/input_matchers/uri_template @agrawroh @wbpcode
 # environment generic input
 /*/extensions/matching/common_inputs/environment_variable @donyu @mattklein123
 # format string matching

@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
-#include "source/extensions/dynamic_modules/worker_index.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,8 +36,7 @@ DynamicModuleAccessLog::DynamicModuleAccessLog(AccessLog::FilterPtr&& filter,
       auto concurrency = context->options().concurrency();
       worker_index = concurrency; // Set main/test thread on free index.
     } else {
-      worker_index =
-          Extensions::DynamicModules::parseWorkerIndexFromDispatcherName(dispatcher.name());
+      worker_index = dispatcher.workerId().value_or(0);
     }
     // Create a thread-local logger wrapper first, then pass it to the module.
     auto tl_logger = std::make_shared<ThreadLocalLogger>(nullptr, config, worker_index);

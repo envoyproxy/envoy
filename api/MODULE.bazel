@@ -1,6 +1,6 @@
 module(
     name = "envoy_api",
-    version = "1.40.0-dev",
+    version = "1.41.0-dev",
     repo_name = "envoy_api",
 )
 
