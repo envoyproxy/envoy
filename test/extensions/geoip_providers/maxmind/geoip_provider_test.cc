@@ -227,6 +227,15 @@ public:
   std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_ ABSL_GUARDED_BY(mutex_);
   std::optional<ConditionalInitializer> cb_added_nullopt = std::nullopt;
   DriverSharedPtr provider_;
+
+  // The provider reports its keys as Http::LowerCaseString; compare them as plain strings.
+  std::vector<std::string> geoHeaderNameStrings() const {
+    std::vector<std::string> names;
+    for (const Http::LowerCaseString& name : provider_->geoHeaderNames()) {
+      names.push_back(name.get());
+    }
+    return names;
+  }
 };
 
 class GeoipProviderTest : public testing::Test, public GeoipProviderTestBase {};
@@ -279,7 +288,7 @@ TEST_F(GeoipProviderTest, GeoHeaderNamesListEveryConfiguredKey) {
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml, cb_added_nullopt);
-  EXPECT_THAT(provider_->geoHeaderNames(),
+  EXPECT_THAT(geoHeaderNameStrings(),
               testing::UnorderedElementsAre("x-geo-country", "x-geo-region", "x-geo-city",
                                             "x-geo-asn", "x-geo-anon-vpn"));
 }
@@ -295,8 +304,7 @@ TEST_F(GeoipProviderTest, DEPRECATED_FEATURE_TEST(GeoHeaderNamesListDeprecatedGe
     anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
   )EOF";
   initializeProvider(config_yaml, cb_added_nullopt);
-  EXPECT_THAT(provider_->geoHeaderNames(),
-              testing::UnorderedElementsAre("x-geo-country", "x-geo-anon"));
+  EXPECT_THAT(geoHeaderNameStrings(), testing::UnorderedElementsAre("x-geo-country", "x-geo-anon"));
 }
 
 TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {
