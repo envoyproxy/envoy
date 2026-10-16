@@ -49,6 +49,11 @@ message FilterConfig {
   // :ref:`UDP dynamic forward proxy <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3.FilterConfig>`
   // filters behavior when enabled.
   //
+  // When this flag is set and the ``envoy.upstream.dynamic_host_candidates`` filter state is
+  // present, the filter instead resolves every host in that list, and continues the request once
+  // all the lookups complete. The request gets a 503 response only when none of the hosts
+  // resolves.
+  //
   // If the flag is not set (default), the filter will use the HTTP Host header
   // for DNS resolution, maintaining backward compatibility.
   bool allow_dynamic_host_from_filter_state = 4;
