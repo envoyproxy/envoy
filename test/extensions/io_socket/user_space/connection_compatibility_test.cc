@@ -1,5 +1,7 @@
 #include <memory>
+#include <string>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -93,6 +95,61 @@ TEST_F(InternalClientConnectionImplTest, ConnectFailed) {
 
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
+
+class InternalFlushWriteConnectionImplTest : public InternalClientConnectionImplTest,
+                                             public testing::WithParamInterface<bool> {
+public:
+  void TearDown() override {
+    if (client_ && client_->state() != Network::Connection::State::Closed) {
+      client_->removeConnectionCallbacks(connection_callbacks);
+      client_->close(Network::ConnectionCloseType::NoFlush);
+    }
+  }
+};
+
+TEST_P(InternalFlushWriteConnectionImplTest, FlushWriteCompletesWhenBlockedPeerCloses) {
+  // The write wakeup must work with and without read-side reset emulation.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_send_rst_on_user_space_socket",
+                               GetParam() ? "true" : "false"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->enableHalfClose(true);
+  client_->addConnectionCallbacks(connection_callbacks);
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected));
+  client_->connect();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Fill the peer directly, then queue a separate write in ConnectionImpl. This avoids relying
+  // on OS buffering or on the number of event-loop iterations needed to produce backpressure.
+  io_handle_peer_->setWatermarks(128);
+  Buffer::OwnedImpl initial_data(std::string(256, 'a'));
+  ASSERT_TRUE(client_->ioHandle().write(initial_data).ok());
+  ASSERT_FALSE(io_handle_peer_->canReceiveData());
+
+  auto pending_write_drained = std::make_shared<bool>(false);
+  Buffer::OwnedImpl pending_data("pending response");
+  pending_data.addDrainTracker([pending_write_drained]() { *pending_write_drained = true; });
+  client_->write(pending_data, false);
+  client_->close(Network::ConnectionCloseType::FlushWrite);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  ASSERT_EQ(Network::Connection::State::Closing, client_->state());
+  EXPECT_FALSE(*pending_write_drained);
+
+  // Half-close makes CloseAfterFlush listen only for Write. Closing the peer must wake that
+  // blocked write even though its EOF/reset notification cannot deliver a Read event here.
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
+  ASSERT_TRUE(io_handle_peer_->close().ok());
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(Network::Connection::State::Closed, client_->state());
+  EXPECT_TRUE(*pending_write_drained);
+}
+
+INSTANTIATE_TEST_SUITE_P(ResetEmulation, InternalFlushWriteConnectionImplTest, testing::Bool());
 
 TEST_F(InternalClientConnectionImplTest, AbortResetEmitsConnectionResetToPeerGuardEnabled) {
   TestScopedRuntime scoped_runtime;
