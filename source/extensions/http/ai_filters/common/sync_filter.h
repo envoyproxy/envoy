@@ -1,8 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <utility>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
 
@@ -36,6 +38,17 @@ public:
   virtual absl::Status decodeSync(HttpFilters::AiProtocolManager::AiRequest& request,
                                   HttpFilters::AiProtocolManager::LocalReplier reply_locally) PURE;
 
+  void setAiFilterCallbacks(
+      std::shared_ptr<HttpFilters::AiProtocolManager::AiFilterCallbacks> callbacks) final {
+    callbacks_ = std::move(callbacks);
+  }
+
+protected:
+  // Empty until the AI Protocol Manager sets them, before decode().
+  OptRef<HttpFilters::AiProtocolManager::AiFilterCallbacks> aiFilterCallbacks() const {
+    return makeOptRefFromPtr(callbacks_.get());
+  }
+
 private:
   Coroutine::Task<absl::Status>
   decode(HttpFilters::AiProtocolManager::AiRequestReceiver receive_request,
@@ -58,6 +71,8 @@ private:
     }
     co_return co_await std::move(propagate_request)(std::move(request));
   }
+
+  std::shared_ptr<HttpFilters::AiProtocolManager::AiFilterCallbacks> callbacks_;
 };
 
 } // namespace Common

@@ -30,8 +30,12 @@ namespace AiProtocolManager {
   COUNTER(sse_event_budget_exhausted)                                                              \
   COUNTER(unsupported_content_encoding)                                                            \
   COUNTER(usage_trailers_synthesized)                                                              \
-  COUNTER(route_cluster_refreshed)                                                                 \
-  COUNTER(route_cluster_refresh_ignored)
+  COUNTER(upstream_candidates_committed)                                                           \
+  COUNTER(upstream_candidates_rejected)                                                            \
+  COUNTER(upstream_candidates_not_followed)                                                        \
+  COUNTER(upstream_candidates_conflict)                                                            \
+  COUNTER(upstream_candidates_unknown_cluster)                                                     \
+  COUNTER(upstream_candidates_rewrite_unavailable)
 
 struct AiProtocolManagerStats {
   ALL_AI_PROTOCOL_MANAGER_STATS(GENERATE_COUNTER_STRUCT)

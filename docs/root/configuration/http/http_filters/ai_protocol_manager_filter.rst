@@ -411,6 +411,68 @@ counted by ``transcoder.failed``.
   Other vendor paths and authentication headers are left to the route, for example through
   ``prefix_rewrite`` and ``request_headers_to_add``.
 
+.. _config_http_filters_ai_protocol_manager_upstream_candidates:
+
+Upstream candidates
+~~~~~~~~~~~~~~~~~~~
+
+An AI filter whose extension allows it may seed the stream's upstream candidates: an ordered
+list of clusters the request may go to, each optionally with the model and the path to send
+there. Once every AI filter is done, and before the request headers continue, the filter commits
+them:
+
+* A candidate is excluded if its cluster does not exist, or if it sets a model the request
+  cannot carry. A model is rewritten only when ``reserialize_body`` is ``ALWAYS``, the request's
+  API is known and carries the model in the body (Gemini carries it in the path), and the body is
+  a JSON object.
+* If no candidate is left, the request is answered with a 503 and the response code details
+  ``ai_protocol_manager_upstream_candidates_exhausted``.
+* Otherwise the first eligible candidate is written to the typed dynamic metadata namespace
+  ``envoy.ai.upstream.candidates`` as a :ref:`PriorityGroupsOverride
+  <envoy_v3_api_msg_extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupsOverride>`
+  with one group, named after the candidate, and the route's cluster is picked again unless the
+  route is already on the candidate's cluster.
+* Only if the route then ends on the candidate's cluster is the request rewritten with the
+  candidate's model and path.
+
+A route follows the candidates through a :ref:`priority_group cluster specifier
+<config_http_cluster_specifier_priority_group>` that reads that namespace. Its configured groups
+serve requests without candidates:
+
+.. code-block:: yaml
+
+  route:
+    inline_cluster_specifier_plugin:
+      extension:
+        name: envoy.router.cluster_specifier_plugin.priority_group
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.router.cluster_specifiers.priority_group.v3.PriorityGroupClusterSpecifier
+          priority_groups:
+          - name: default
+            clusters:
+            - cluster_name: default_backend
+              weight: 1
+          override_metadata_namespace: envoy.ai.upstream.candidates
+
+Only such a route, or a route already on the candidate's cluster, reliably follows. A
+``cluster`` or ``cluster_header`` route ignores the refresh, so the request is forwarded
+unrewritten. A ``weighted_clusters`` route moves to another of its clusters on the refresh, and
+the request is rewritten only if that cluster happens to be the candidate's. A route that does
+not end on the candidate's cluster is counted by ``upstream_candidates_not_followed``.
+
+AI filters can edit the candidates only in a downstream installation, on a route that forwards
+to a cluster, and not on a route that declares a response API other than its request API, as a
+transcoder route does.
+
+The result is stored as the ``envoy.ai.upstream.candidates`` :ref:`filter state object
+<well_known_filter_state>`: each candidate, the AI filter that added it, why it was excluded, the
+outcome (``committed``, ``rejected`` or ``not_followed``) and the chosen candidate. Access logs can
+read it with ``%FILTER_STATE(envoy.ai.upstream.candidates:PLAIN)%``, or one field with
+``%FILTER_STATE(envoy.ai.upstream.candidates:FIELD:outcome)%`` or ``FIELD:chosen``. The filter
+owns the key and the namespace: if the key is already set when the candidates are committed, the
+request is answered with a 500 and the response code details
+``ai_protocol_manager_upstream_candidates_conflict``.
+
 Response token-usage extraction
 -------------------------------
 
@@ -706,8 +768,12 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   sse_event_too_large, Counter, Pending or complete SSE event data exceeded ``max_sse_event_size``; that entire event was skipped.
   unsupported_content_encoding, Counter, The response carried a non-identity ``content-encoding``; extraction skipped.
   usage_trailers_synthesized, Counter, Empty response trailers were synthesized at end of stream to carry token usage to a downstream consumer.
-  route_cluster_refreshed, Counter, "AI filters asked to pick the route's cluster again, and the route was asked once, after the last AI filter. Only cluster specifiers that support it, such as the matcher plugin, change the cluster."
-  route_cluster_refresh_ignored, Counter, "AI filters asked to pick the route's cluster again where the route cannot be changed, such as in an upstream filter chain; the refresh was ignored and the request forwarded."
+  upstream_candidates_committed, Counter, "An AI filter's upstream candidates were committed: the route followed the first eligible candidate and the request was rewritten for it."
+  upstream_candidates_rejected, Counter, "No upstream candidate was eligible, and the request was answered with a 503."
+  upstream_candidates_not_followed, Counter, "The route did not end on the first eligible upstream candidate's cluster, so the request was not rewritten. Only a route already on that cluster, or a ``priority_group`` cluster specifier whose ``override_metadata_namespace`` is ``envoy.ai.upstream.candidates``, reliably follows; a ``weighted_clusters`` route is picked again by the refresh. See :ref:`upstream candidates <config_http_filters_ai_protocol_manager_upstream_candidates>`."
+  upstream_candidates_conflict, Counter, "The ``envoy.ai.upstream.candidates`` filter state key was already set when the candidates were committed, and the request was answered with a 500."
+  upstream_candidates_unknown_cluster, Counter, An upstream candidate named a cluster that does not exist and was excluded.
+  upstream_candidates_rewrite_unavailable, Counter, "An upstream candidate rewrites the model where the request cannot carry it, such as without body reserialization or on a Gemini route, and was excluded."
   request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record.
   request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
   request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.

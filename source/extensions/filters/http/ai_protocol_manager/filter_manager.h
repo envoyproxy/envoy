@@ -41,13 +41,15 @@ public:
 
   // Starts the request filter chain in forward filter order (0..N-1). Unless `always_serialize`,
   // the received body is forwarded instead of the re-serialized document. `request_protocol`
-  // seeds AiRequest::protocol().
+  // seeds AiRequest::protocol(). `stages`, when set, holds one entry per filter.
   void startRequest(JsonWithExtBuf payload_index, BufferManager* buffer_manager,
                     Event::Dispatcher& dispatcher, StreamInfo::StreamInfo& stream_info,
                     OnCompleteFn on_complete, Http::RequestHeaderMap* request_headers = nullptr,
                     LocalReplyFn local_reply_fn = nullptr, bool always_serialize = true,
                     LLMProtocol request_protocol = LLMProtocol::Unspecified,
-                    OnFiltersDoneFn on_filters_done = nullptr);
+                    OnFiltersDoneFn on_filters_done = nullptr,
+                    std::vector<AiFilterStage> stages = {},
+                    bool upstream_candidates_enabled = false);
 
   // Starts the SSE response filter chain in reverse filter order (N-1..0).
   void startSseResponse(ExternalBufferFactory& buffer_factory, FilterChainBridge& bridge,

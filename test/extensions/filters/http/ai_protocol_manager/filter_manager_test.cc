@@ -1,3 +1,4 @@
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -16,6 +17,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
+#include "source/extensions/filters/http/ai_protocol_manager/upstream_candidates.h"
 
 #include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/test_common/status_utility.h"
@@ -306,9 +308,11 @@ TEST_F(FilterManagerTest, FilterLocalReply) {
         completed = true;
       },
       /*request_headers=*/nullptr,
-      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string body,
+                                                absl::string_view details) {
         local_reply_code = code;
-        local_reply_details = std::move(details);
+        local_reply_details = std::move(body);
+        EXPECT_EQ(details, "ai_protocol_manager_filter_rejected");
       });
 
   drain();
@@ -339,9 +343,11 @@ TEST_F(FilterManagerTest, FilterErrorTriggersLocalReply) {
         completed = true;
       },
       /*request_headers=*/nullptr,
-      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string body,
+                                                absl::string_view details) {
         local_reply_code = code;
-        local_reply_details = std::move(details);
+        local_reply_details = std::move(body);
+        EXPECT_EQ(details, "ai_protocol_manager_filter_rejected");
       });
 
   drain();
@@ -456,9 +462,11 @@ TEST_F(FilterManagerTest, SynchronousFilterLocalReplyStopsSubsequentFilterLaunch
         completed = true;
       },
       /*request_headers=*/nullptr,
-      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string body,
+                                                absl::string_view details) {
         local_reply_code = code;
-        local_reply_details = std::move(details);
+        local_reply_details = std::move(body);
+        EXPECT_EQ(details, "ai_protocol_manager_filter_rejected");
       });
 
   drain();
@@ -677,12 +685,16 @@ TEST_F(FilterManagerTest, OnFiltersDoneRunsBeforeTheBodyIsWritten) {
         completed = true;
       },
       &headers, /*local_reply_fn=*/nullptr, /*always_serialize=*/true, LLMProtocol::Unspecified,
-      [this, &filters_done, &headers, &completed](bool refresh_route_cluster) {
+      [this, &filters_done, &headers,
+       &completed](AiRequest& request,
+                   std::shared_ptr<UpstreamCandidates> decision) -> std::optional<SinkReply> {
         filters_done = true;
-        EXPECT_FALSE(refresh_route_cluster);
+        EXPECT_EQ(request.json()["model"], "gpt-4");
+        EXPECT_EQ(decision, nullptr);
         EXPECT_EQ(headers.getPathValue(), "/v1/messages");
         EXPECT_EQ(bridge_.injected_.length(), 0);
         EXPECT_FALSE(completed);
+        return std::nullopt;
       });
 
   drain();
@@ -705,25 +717,17 @@ TEST_F(FilterManagerTest, OnFiltersDoneSkippedOnLocalReply) {
   manager.startRequest(
       std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
       [&completed](absl::Status) { completed = true; }, /*request_headers=*/nullptr,
-      [](Http::Code, std::string) {}, /*always_serialize=*/true, LLMProtocol::Unspecified,
-      [&filters_done](bool) { filters_done = true; });
+      [](Http::Code, std::string, absl::string_view) {}, /*always_serialize=*/true,
+      LLMProtocol::Unspecified,
+      [&filters_done](AiRequest&, std::shared_ptr<UpstreamCandidates>) -> std::optional<SinkReply> {
+        filters_done = true;
+        return std::nullopt;
+      });
 
   drain();
   EXPECT_TRUE(completed);
   EXPECT_FALSE(filters_done);
 }
-
-// Asks for a route cluster refresh, then passes the request on.
-class TestClusterRefreshFilter : public AiFilter {
-public:
-  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
-                                       AiRequestPropagator propagate_request,
-                                       LocalReplier) override {
-    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
-    req->requestRouteAction(AiRouteAction::RefreshCluster);
-    co_return co_await std::move(propagate_request)(std::move(req));
-  }
-};
 
 // Propagates a new request in place of the one it received.
 class TestReplacingFilter : public AiFilter {
@@ -738,25 +742,381 @@ public:
   }
 };
 
-// A filter that propagates a new request cannot withdraw an earlier filter's refresh request.
-TEST_F(FilterManagerTest, OnFiltersDoneKeepsARefreshRequestedBeforeTheRequestIsReplaced) {
-  JsonWithExtBuf doc;
-  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+// Runs a test's edits with its callbacks before receiving, in its window, and after propagating.
+class EditingFilter : public AiFilter {
+public:
+  using EditFn = std::function<void(AiFilterCallbacks&)>;
 
-  std::vector<AiFilterSharedPtr> filters;
-  filters.push_back(std::make_unique<TestClusterRefreshFilter>());
-  filters.push_back(std::make_unique<TestReplacingFilter>());
-  FilterManager manager(std::move(filters));
+  explicit EditingFilter(EditFn in_window, EditFn before_receive = nullptr,
+                         EditFn after_propagate = nullptr)
+      : in_window_(std::move(in_window)), before_receive_(std::move(before_receive)),
+        after_propagate_(std::move(after_propagate)) {}
 
-  std::optional<bool> refresh_route_cluster;
-  manager.startRequest(
-      std::move(doc), &buffer_manager_, *dispatcher_, stream_info_, [](absl::Status) {},
-      /*request_headers=*/nullptr, /*local_reply_fn=*/nullptr, /*always_serialize=*/true,
-      LLMProtocol::Unspecified,
-      [&refresh_route_cluster](bool refresh) { refresh_route_cluster = refresh; });
+  void setAiFilterCallbacks(std::shared_ptr<AiFilterCallbacks> callbacks) override {
+    callbacks_ = std::move(callbacks);
+  }
 
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    if (before_receive_ != nullptr) {
+      before_receive_(*callbacks_);
+    }
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    if (in_window_ != nullptr) {
+      in_window_(*callbacks_);
+    }
+    CO_RETURN_IF_ERROR(co_await std::move(propagate_request)(std::move(req)));
+    if (after_propagate_ != nullptr) {
+      after_propagate_(*callbacks_);
+    }
+    co_return absl::OkStatus();
+  }
+
+  std::shared_ptr<AiFilterCallbacks> callbacks_;
+
+private:
+  const EditFn in_window_;
+  const EditFn before_receive_;
+  const EditFn after_propagate_;
+};
+
+// Bypasses itself, keeping its callbacks.
+class CallbacksKeepingBypassFilter : public AiFilter {
+public:
+  void setAiFilterCallbacks(std::shared_ptr<AiFilterCallbacks> callbacks) override {
+    callbacks_ = std::move(callbacks);
+  }
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver, AiRequestPropagator,
+                                       LocalReplier) override {
+    co_return absl::OkStatus();
+  }
+
+  std::shared_ptr<AiFilterCallbacks> callbacks_;
+};
+
+std::vector<UpstreamCandidate> candidates() {
+  return {{"a", "cluster_a", "model-a", "/a"}, {"b", "cluster_b", "", ""}};
+}
+
+// Receives the request and holds it until `resume` is pushed, keeping its callbacks.
+class HoldingFilter : public AiFilter {
+public:
+  explicit HoldingFilter(std::shared_ptr<Coroutine::AsyncQueue<bool>> resume)
+      : resume_(std::move(resume)) {}
+
+  void setAiFilterCallbacks(std::shared_ptr<AiFilterCallbacks> callbacks) override {
+    callbacks_ = std::move(callbacks);
+  }
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    std::ignore = co_await resume_->pop();
+    co_return co_await std::move(propagate_request)(std::move(req));
+  }
+
+  std::shared_ptr<AiFilterCallbacks> callbacks_;
+
+private:
+  const std::shared_ptr<Coroutine::AsyncQueue<bool>> resume_;
+};
+
+// Seeds in its window, replies locally, then runs a test's edits with its callbacks.
+class SeedThenReplyFilter : public AiFilter {
+public:
+  explicit SeedThenReplyFilter(EditingFilter::EditFn after_reply)
+      : after_reply_(std::move(after_reply)) {}
+
+  void setAiFilterCallbacks(std::shared_ptr<AiFilterCallbacks> callbacks) override {
+    callbacks_ = std::move(callbacks);
+  }
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request, AiRequestPropagator,
+                                       LocalReplier reply_locally) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr req, co_await std::move(receive_request)());
+    EXPECT_OK(callbacks_->upstreamCandidates()->seed(candidates(), ""));
+    std::move(reply_locally)(Http::Code::Forbidden, "denied");
+    after_reply_(*callbacks_);
+    co_return absl::OkStatus();
+  }
+
+private:
+  std::shared_ptr<AiFilterCallbacks> callbacks_;
+  const EditingFilter::EditFn after_reply_;
+};
+
+class UpstreamCandidatesEditorTest : public FilterManagerTest {
+public:
+  void run(std::vector<AiFilterSharedPtr> filters, std::vector<AiFilterStage> stages,
+           bool upstream_candidates_enabled = true) {
+    JsonWithExtBuf doc;
+    doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+    manager_ = std::make_unique<FilterManager>(std::move(filters));
+    manager_->startRequest(
+        std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+        [this](absl::Status status) { status_ = std::move(status); }, &headers_,
+        [this](Http::Code code, std::string body, absl::string_view details) {
+          reply_code_ = code;
+          reply_body_ = std::move(body);
+          reply_details_ = std::string(details);
+        },
+        /*always_serialize=*/true, LLMProtocol::OpenAiChatCompletions,
+        [this](AiRequest&, std::shared_ptr<UpstreamCandidates> decision) {
+          ++hook_calls_;
+          decision_ = std::move(decision);
+          if (on_hook_ != nullptr) {
+            on_hook_();
+          }
+          return sink_reply_;
+        },
+        std::move(stages), upstream_candidates_enabled);
+    drain();
+  }
+
+  static AiFilterStage seeder(std::string name) { return {std::move(name), {/*seed=*/true}}; }
+
+  Http::TestRequestHeaderMapImpl headers_{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+  std::unique_ptr<FilterManager> manager_;
+  absl::Status status_ = absl::UnknownError("request did not complete");
+  int hook_calls_{0};
+  std::shared_ptr<UpstreamCandidates> decision_;
+  std::function<void()> on_hook_;
+  std::optional<SinkReply> sink_reply_;
+  std::optional<Http::Code> reply_code_;
+  std::string reply_body_;
+  std::string reply_details_;
+};
+
+TEST_F(UpstreamCandidatesEditorTest, HookGetsTheSealedSeed) {
+  std::shared_ptr<EditingFilter> filter =
+      std::make_shared<EditingFilter>([](AiFilterCallbacks& callbacks) {
+        EXPECT_EQ(callbacks.filterName(), "f0");
+        ASSERT_TRUE(callbacks.upstreamCandidates().has_value());
+        EXPECT_EQ(callbacks.upstreamCandidates()->current(), nullptr);
+        ASSERT_OK(callbacks.upstreamCandidates()->seed(candidates(), "rule"));
+        ASSERT_NE(callbacks.upstreamCandidates()->current(), nullptr);
+      });
+  on_hook_ = [&filter]() {
+    OptRef<UpstreamCandidatesEditor> editor = filter->callbacks_->upstreamCandidates();
+    EXPECT_EQ(editor->current(), nullptr);
+    EXPECT_THAT(editor->seed(candidates(), ""),
+                HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  };
+  run({filter}, {seeder("f0")});
+
+  ASSERT_OK(status_);
+  EXPECT_EQ(hook_calls_, 1);
+  ASSERT_NE(decision_, nullptr);
+  EXPECT_EQ(decision_->outcome(), UpstreamCandidates::Outcome::Pending);
+  ASSERT_EQ(decision_->entries().size(), 2);
+  EXPECT_EQ(decision_->entries()[0].candidate.name, "a");
+  EXPECT_EQ(decision_->entries()[0].candidate.model, "model-a");
+  EXPECT_EQ(decision_->entries()[0].added_by, "f0/rule");
+  EXPECT_EQ(decision_->entries()[1].added_by, "f0/rule");
+  EXPECT_GT(bridge_.injected_.length(), 0);
+}
+
+TEST_F(UpstreamCandidatesEditorTest, HookGetsNullWithoutASeed) {
+  run({std::make_shared<EditingFilter>(nullptr)}, {seeder("f0")});
+
+  ASSERT_OK(status_);
+  EXPECT_EQ(hook_calls_, 1);
+  EXPECT_EQ(decision_, nullptr);
+}
+
+TEST_F(UpstreamCandidatesEditorTest, SeedOutsideTheWindowFails) {
+  const auto expect_closed = [](AiFilterCallbacks& callbacks) {
+    EXPECT_EQ(callbacks.upstreamCandidates()->current(), nullptr);
+    EXPECT_THAT(callbacks.upstreamCandidates()->seed(candidates(), ""),
+                HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  };
+  run({std::make_shared<EditingFilter>(nullptr, expect_closed, expect_closed)}, {seeder("f0")});
+
+  ASSERT_OK(status_);
+  EXPECT_EQ(decision_, nullptr);
+}
+
+// The next filter holds the request, so the sink has not sealed the decision when this filter's
+// propagate returns; only its own propagate closes its window.
+TEST_F(UpstreamCandidatesEditorTest, PropagateClosesTheWindowBeforeTheSeal) {
+  auto resume = std::make_shared<Coroutine::AsyncQueue<bool>>(1);
+  auto holder = std::make_shared<HoldingFilter>(resume);
+  bool edited = false;
+  auto first = std::make_shared<EditingFilter>(nullptr, nullptr, [&](AiFilterCallbacks& callbacks) {
+    edited = true;
+    ASSERT_OK(holder->callbacks_->upstreamCandidates()->seed(candidates(), ""));
+    EXPECT_EQ(callbacks.upstreamCandidates()->current(), nullptr);
+    EXPECT_THAT(callbacks.upstreamCandidates()->seed(candidates(), ""),
+                HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  });
+  run({first, holder}, {seeder("f0"), seeder("f1")});
+  EXPECT_TRUE(edited);
+  EXPECT_EQ(hook_calls_, 0);
+
+  resume->tryPush(true);
   drain();
-  EXPECT_EQ(refresh_route_cluster, true);
+  ASSERT_OK(status_);
+  EXPECT_EQ(hook_calls_, 1);
+  ASSERT_NE(decision_, nullptr);
+  EXPECT_EQ(decision_->entries()[0].added_by, "f1");
+}
+
+// A local reply closes the window of the filter that sent it, though it received and never
+// propagated.
+TEST_F(UpstreamCandidatesEditorTest, LocalReplyClosesTheWindow) {
+  bool edited = false;
+  run({std::make_shared<SeedThenReplyFilter>([&edited](AiFilterCallbacks& callbacks) {
+        edited = true;
+        EXPECT_EQ(callbacks.upstreamCandidates()->current(), nullptr);
+        EXPECT_THAT(callbacks.upstreamCandidates()->seed(candidates(), ""),
+                    HasStatusCode(absl::StatusCode::kFailedPrecondition));
+      })},
+      {seeder("f0")});
+
+  EXPECT_TRUE(edited);
+  EXPECT_THAT(status_, HasStatusCode(absl::StatusCode::kCancelled));
+  EXPECT_EQ(reply_code_, Http::Code::Forbidden);
+  EXPECT_EQ(reply_details_, "ai_protocol_manager_filter_rejected");
+  EXPECT_EQ(hook_calls_, 0);
+}
+
+TEST_F(UpstreamCandidatesEditorTest, BypassedStageNeverOpensAWindow) {
+  auto bypassed = std::make_shared<CallbacksKeepingBypassFilter>();
+  run({bypassed, std::make_shared<EditingFilter>([&bypassed](AiFilterCallbacks& callbacks) {
+         EXPECT_THAT(bypassed->callbacks_->upstreamCandidates()->seed(candidates(), ""),
+                     HasStatusCode(absl::StatusCode::kFailedPrecondition));
+         ASSERT_OK(callbacks.upstreamCandidates()->seed(candidates(), ""));
+       })},
+      {seeder("f0"), seeder("f1")});
+
+  ASSERT_OK(status_);
+  ASSERT_NE(decision_, nullptr);
+  EXPECT_EQ(decision_->entries()[0].added_by, "f1");
+}
+
+TEST_F(UpstreamCandidatesEditorTest, SeedNeedsThePolicy) {
+  run({std::make_shared<EditingFilter>([](AiFilterCallbacks& callbacks) {
+        EXPECT_THAT(callbacks.upstreamCandidates()->seed(candidates(), ""),
+                    HasStatusCode(absl::StatusCode::kPermissionDenied));
+      })},
+      {AiFilterStage{"f0", {}}});
+
+  ASSERT_OK(status_);
+  EXPECT_EQ(decision_, nullptr);
+}
+
+TEST_F(UpstreamCandidatesEditorTest, LaterFilterSeesTheSeed) {
+  auto first = std::make_shared<EditingFilter>(
+      [](AiFilterCallbacks& callbacks) {
+        ASSERT_OK(callbacks.upstreamCandidates()->seed(candidates(), ""));
+      },
+      nullptr,
+      [](AiFilterCallbacks& callbacks) {
+        EXPECT_EQ(callbacks.upstreamCandidates()->current(), nullptr);
+      });
+  auto second = std::make_shared<EditingFilter>([](AiFilterCallbacks& callbacks) {
+    const UpstreamCandidates* current = callbacks.upstreamCandidates()->current();
+    ASSERT_NE(current, nullptr);
+    EXPECT_EQ(current->entries()[0].added_by, "f0");
+    EXPECT_THAT(callbacks.upstreamCandidates()->seed({{"c", "cluster_c", "", ""}}, ""),
+                HasStatusCode(absl::StatusCode::kAlreadyExists));
+  });
+  run({first, second}, {seeder("f0"), seeder("f1")});
+
+  ASSERT_OK(status_);
+  ASSERT_NE(decision_, nullptr);
+  ASSERT_EQ(decision_->entries().size(), 2);
+  EXPECT_EQ(decision_->entries()[0].candidate.name, "a");
+}
+
+TEST_F(UpstreamCandidatesEditorTest, RejectsInvalidCandidates) {
+  run({std::make_shared<EditingFilter>([](AiFilterCallbacks& callbacks) {
+        UpstreamCandidatesEditor& editor = *callbacks.upstreamCandidates();
+        for (std::vector<UpstreamCandidate> invalid : std::vector<std::vector<UpstreamCandidate>>{
+                 {},
+                 {{"", "cluster_a", "", ""}},
+                 {{"a b", "cluster_a", "", ""}},
+                 {{std::string(33, 'a'), "cluster_a", "", ""}},
+                 {{"a", "cluster_a", "", ""}, {"a", "cluster_b", "", ""}},
+                 {{"a", "", "", ""}},
+                 {{"a", "cluster_a", "", "relative"}},
+                 {{"a", "cluster_a", "", "/a\r\nx-injected: 1"}},
+             }) {
+          EXPECT_THAT(editor.seed(std::move(invalid), ""),
+                      HasStatusCode(absl::StatusCode::kInvalidArgument));
+        }
+        EXPECT_EQ(editor.current(), nullptr);
+        ASSERT_OK(editor.seed(
+            {{std::string(32, 'a'), "cluster_a", "", ""}, {"A-Z_a.z-09", "cluster_b", "", ""}},
+            ""));
+      })},
+      {seeder("f0")});
+
+  ASSERT_OK(status_);
+  ASSERT_NE(decision_, nullptr);
+  EXPECT_EQ(decision_->entries().size(), 2);
+}
+
+// The decision is held per stream, so a filter that propagates a new AiRequest keeps it.
+TEST_F(UpstreamCandidatesEditorTest, ReplacingTheRequestKeepsTheDecision) {
+  run({std::make_shared<EditingFilter>([](AiFilterCallbacks& callbacks) {
+         ASSERT_OK(callbacks.upstreamCandidates()->seed(candidates(), ""));
+       }),
+       std::make_shared<TestReplacingFilter>()},
+      {seeder("f0"), AiFilterStage{"f1", {}}});
+
+  ASSERT_OK(status_);
+  ASSERT_NE(decision_, nullptr);
+  EXPECT_EQ(decision_->entries().size(), 2);
+}
+
+TEST_F(UpstreamCandidatesEditorTest, HookReplyEndsTheRequest) {
+  sink_reply_ = SinkReply{Http::Code::ServiceUnavailable, "no eligible upstream", "test_details"};
+  run({std::make_shared<EditingFilter>(nullptr)}, {seeder("f0")});
+
+  EXPECT_THAT(status_, HasStatusCode(absl::StatusCode::kCancelled));
+  EXPECT_EQ(reply_code_, Http::Code::ServiceUnavailable);
+  EXPECT_EQ(reply_body_, "no eligible upstream");
+  EXPECT_EQ(reply_details_, "test_details");
+  EXPECT_EQ(bridge_.injected_.length(), 0);
+  EXPECT_EQ(stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
+                APMRequestPayloadIndex::kFilterStateKey),
+            nullptr);
+}
+
+TEST_F(UpstreamCandidatesEditorTest, DisabledEditorIsEmpty) {
+  run({std::make_shared<EditingFilter>([](AiFilterCallbacks& callbacks) {
+        EXPECT_EQ(callbacks.filterName(), "f0");
+        EXPECT_FALSE(callbacks.upstreamCandidates().has_value());
+      })},
+      {seeder("f0")}, /*upstream_candidates_enabled=*/false);
+
+  ASSERT_OK(status_);
+  EXPECT_EQ(decision_, nullptr);
+}
+
+TEST_F(UpstreamCandidatesEditorTest, StagesDefaultToUnnamed) {
+  run({std::make_shared<EditingFilter>([](AiFilterCallbacks& callbacks) {
+        EXPECT_EQ(callbacks.filterName(), "");
+        EXPECT_THAT(callbacks.upstreamCandidates()->seed(candidates(), ""),
+                    HasStatusCode(absl::StatusCode::kPermissionDenied));
+      })},
+      {});
+
+  ASSERT_OK(status_);
+}
+
+TEST_F(UpstreamCandidatesEditorTest, SeedAfterTheChainIsGoneFails) {
+  auto filter = std::make_shared<CallbacksKeepingBypassFilter>();
+  run({filter}, {seeder("f0")});
+  manager_.reset();
+
+  EXPECT_EQ(filter->callbacks_->upstreamCandidates()->current(), nullptr);
+  EXPECT_THAT(filter->callbacks_->upstreamCandidates()->seed(candidates(), ""),
+              HasStatusCode(absl::StatusCode::kFailedPrecondition));
 }
 
 TEST_F(FilterManagerTest, SetsContentLengthOnRequestHeaders) {

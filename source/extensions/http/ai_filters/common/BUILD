@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "sync_filter_lib",
     hdrs = ["sync_filter.h"],
     deps = [
+        "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
         "//envoy/http:codes_interface",
         "//source/common/coroutine:status_macros_lib",

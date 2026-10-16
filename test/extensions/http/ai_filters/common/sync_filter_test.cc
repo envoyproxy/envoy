@@ -126,9 +126,10 @@ TEST_F(SyncAiFilterTest, LocalReply) {
         completed = true;
       },
       /*request_headers=*/nullptr,
-      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string body,
+                                                absl::string_view) {
         local_reply_code = code;
-        local_reply_details = std::move(details);
+        local_reply_details = std::move(body);
       });
 
   drain();
@@ -166,9 +167,10 @@ TEST_F(SyncAiFilterTest, ErrorStatusTriggersLocalReply) {
         completed = true;
       },
       /*request_headers=*/nullptr,
-      [&local_reply_code, &local_reply_details](Http::Code code, std::string details) {
+      [&local_reply_code, &local_reply_details](Http::Code code, std::string body,
+                                                absl::string_view) {
         local_reply_code = code;
-        local_reply_details = std::move(details);
+        local_reply_details = std::move(body);
       });
 
   drain();
@@ -176,6 +178,43 @@ TEST_F(SyncAiFilterTest, ErrorStatusTriggersLocalReply) {
   EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(local_reply_code, Http::Code::BadGateway);
   EXPECT_EQ(local_reply_details, "bad request payload");
+}
+
+// Reads its callbacks from decodeSync().
+class TestSyncCallbacksFilter : public SyncAiFilter {
+public:
+  absl::Status decodeSync(AiRequest&, LocalReplier) override {
+    if (!aiFilterCallbacks().has_value()) {
+      return absl::InternalError("no AI filter callbacks");
+    }
+    filter_name_ = std::string(aiFilterCallbacks()->filterName());
+    return absl::OkStatus();
+  }
+
+  bool hasCallbacks() const { return aiFilterCallbacks().has_value(); }
+
+  std::string filter_name_;
+};
+
+TEST_F(SyncAiFilterTest, DecodeSyncSeesItsCallbacks) {
+  JsonWithExtBuf doc;
+  doc.setJson(nlohmann::json{{"model", "gpt-4"}});
+
+  auto filter = std::make_shared<TestSyncCallbacksFilter>();
+  EXPECT_FALSE(filter->hasCallbacks());
+  FilterManager manager({filter});
+
+  absl::Status status;
+  manager.startRequest(std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+                       [&status](absl::Status s) { status = std::move(s); },
+                       /*request_headers=*/nullptr,
+                       /*local_reply_fn=*/nullptr, /*always_serialize=*/true,
+                       HttpFilters::AiProtocolManager::LLMProtocol::Unspecified,
+                       /*on_filters_done=*/nullptr, {{"sync", {}}});
+
+  drain();
+  ASSERT_OK(status);
+  EXPECT_EQ(filter->filter_name_, "sync");
 }
 
 } // namespace

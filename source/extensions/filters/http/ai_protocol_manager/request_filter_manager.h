@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,14 +15,30 @@
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
+#include "source/extensions/filters/http/ai_protocol_manager/upstream_candidates.h"
 
 #include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
+
+// The AiProtocolManager.filters entry a request stage runs.
+struct AiFilterStage {
+  std::string name;
+  UpstreamCandidatesPolicy policy;
+};
+
+// A local reply that ends the request in place of writing it out.
+struct SinkReply {
+  Http::Code code;
+  std::string body;
+  // Response code details; no spaces.
+  std::string details;
+};
 
 // Runs the configured AI filters over a request payload index.
 //
@@ -31,19 +48,26 @@ namespace AiProtocolManager {
 // false.
 class RequestFilterManager : public Logger::Loggable<Logger::Id::ai_protocol_manager> {
 public:
-  using LocalReplyFn = absl::AnyInvocable<void(Http::Code code, std::string details)>;
+  using LocalReplyFn =
+      absl::AnyInvocable<void(Http::Code code, std::string body, absl::string_view details)>;
   using OnCompleteFn = absl::AnyInvocable<void(absl::Status)>;
-  // Runs once every filter has propagated the request and before the sink writes it out, while the
-  // request headers are still held. Told whether any filter requested a route cluster refresh.
-  using OnFiltersDoneFn = absl::AnyInvocable<void(bool refresh_route_cluster)>;
+  // Runs once, after every AI filter propagated or was bypassed and before the sink writes the
+  // body, while the request headers are held. `decision` is sealed, or null when no AI filter
+  // seeded one.
+  using OnFiltersDoneFn = absl::AnyInvocable<std::optional<SinkReply>(
+      AiRequest& request, std::shared_ptr<UpstreamCandidates> decision)>;
 
+  // `stages` names the filters by index; `upstream_candidates_enabled` gives each filter an
+  // UpstreamCandidatesEditor.
   RequestFilterManager(std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
                        BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
                        StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
                        Http::RequestHeaderMap* request_headers = nullptr,
                        LocalReplyFn local_reply_fn = nullptr, bool always_serialize = true,
                        LLMProtocol request_protocol = LLMProtocol::Unspecified,
-                       OnFiltersDoneFn on_filters_done = nullptr);
+                       OnFiltersDoneFn on_filters_done = nullptr,
+                       std::vector<AiFilterStage> stages = {},
+                       bool upstream_candidates_enabled = false);
   ~RequestFilterManager();
 
   // Starts the request filter pipeline and sink coroutines.

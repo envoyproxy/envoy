@@ -9,6 +9,7 @@
 #include "envoy/router/router.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
@@ -40,7 +41,8 @@ class FilterConfig {
 public:
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-      Stats::Scope& scope, AiFilterFactories ai_filter_factories);
+      Stats::Scope& scope, AiFilterFactories ai_filter_factories,
+      Upstream::ClusterManager& cluster_manager);
 
   static absl::StatusOr<FilterConfigSharedPtr>
   create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
@@ -60,6 +62,7 @@ public:
   uint32_t maxJsonBodySize() const { return max_json_body_size_; }
   uint32_t maxParsedSseEvents() const { return max_parsed_sse_events_; }
   AiProtocolManagerStats& stats() const { return stats_; }
+  Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
 
 private:
   // Counters are thread-safe to increment; mutable so a shared const config
@@ -78,6 +81,7 @@ private:
   const uint32_t max_json_body_size_ = 0;
   const uint32_t max_parsed_sse_events_ = 0;
   const AiFilterFactories ai_filter_factories_;
+  Upstream::ClusterManager& cluster_manager_;
 };
 
 // Per-route configuration. Its presence declares the route an AI endpoint.
@@ -214,8 +218,10 @@ private:
   // Sets endStream on decode_manager_ and executes the AI filter chain or replays the body.
   void finalizeDecode(bool has_trailers);
 
-  // Picks the route's cluster again for the AI filters that asked, once they are all done.
-  void refreshRouteCluster();
+  // Whether AI filters get an UpstreamCandidatesEditor: only where the commit can refresh the
+  // route, and not on a transcoder route, which the commit would reach after the request was
+  // rewritten for another API.
+  bool upstreamCandidatesEnabled() const;
 
   // Invoked when the SSE response filter pipeline completes or fails.
   void onEncodeComplete(absl::Status status);

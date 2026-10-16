@@ -347,12 +347,30 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "upstream_candidates_lib",
+    srcs = ["upstream_candidates.cc"],
+    hdrs = ["upstream_candidates.h"],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_cc_library(
     name = "ai_filter_lib",
     hdrs = ["ai_filter.h"],
     deps = [
         ":ai_request_lib",
         ":ai_response_lib",
         ":token_usage_lib",
+        ":upstream_candidates_lib",
+        "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
         "//envoy/config:typed_config_interface",
         "//envoy/http:codes_interface",
@@ -382,6 +400,8 @@ envoy_cc_library(
         ":replay_awaitable_lib",
         ":serializer_lib",
         ":task_group_lib",
+        ":upstream_candidates_lib",
+        "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
@@ -393,6 +413,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -435,11 +456,13 @@ envoy_cc_library(
         ":schema_lib",
         ":serializer_lib",
         ":stats_lib",
+        ":upstream_candidates_lib",
         "//envoy/common:exception_lib",
         "//envoy/http:codes_interface",
         "//envoy/router:router_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/stats:stats_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
@@ -454,6 +477,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/router/cluster_specifiers/priority_group/v3:pkg_cc_proto",
     ],
 )
 

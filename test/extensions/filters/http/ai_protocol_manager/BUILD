@@ -153,16 +153,21 @@ envoy_extension_cc_test(
         "//envoy/http:codes_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/coroutine:status_macros_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:serializer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:upstream_candidates_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/router/cluster_specifiers/priority_group/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
     ],
 )
@@ -220,6 +225,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "upstream_candidates_test",
+    srcs = ["upstream_candidates_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/router:string_accessor_lib",
+        "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:upstream_candidates_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "ai_request_test",
     srcs = ["ai_request_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
@@ -268,6 +285,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_manager_lib",
         "//source/extensions/filters/http/ai_protocol_manager:serializer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:upstream_candidates_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@nlohmann_json//:json",
@@ -332,6 +350,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
@@ -367,21 +386,19 @@ envoy_extension_cc_test(
     srcs = ["ai_filter_route_cluster_integration_test.cc"],
     extension_names = [
         "envoy.filters.http.ai_protocol_manager",
-        "envoy.matching.inputs.filter_state",
-        "envoy.router.cluster_specifier_plugin.matcher",
+        "envoy.router.cluster_specifier_plugin.priority_group",
     ],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/coroutine:status_macros_lib",
-        "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:config",
-        "//source/extensions/matching/network/common:inputs_lib",
-        "//source/extensions/router/cluster_specifiers/matcher:config",
+        "//source/extensions/router/cluster_specifiers/priority_group:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",
+        "@nlohmann_json//:json",
     ],
 )
 

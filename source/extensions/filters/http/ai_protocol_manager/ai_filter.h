@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/codes.h"
@@ -20,6 +21,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_response.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
+#include "source/extensions/filters/http/ai_protocol_manager/upstream_candidates.h"
 
 #include "absl/functional/any_invocable.h"
 #include "absl/status/status.h"
@@ -85,6 +87,37 @@ private:
 // Callable callback to send an immediate HTTP local reply and abort processing.
 using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string details) &&>;
 
+// Shapes the stream's upstream decision; the AI Protocol Manager commits it once every AI filter is
+// done. Acts only between this filter's receive and its propagate, and not after a local reply or
+// cancel.
+class UpstreamCandidatesEditor {
+public:
+  virtual ~UpstreamCandidatesEditor() = default;
+
+  // The decision as earlier AI filters left it; nullptr until one seeds or outside this filter's
+  // window. Valid until this filter propagates, replies locally or an await fails.
+  virtual const UpstreamCandidates* current() const PURE;
+
+  // PermissionDenied unless this filter's policy allows seeding; AlreadyExists if an earlier filter
+  // seeded; InvalidArgument on an empty list, an empty cluster, an invalid path (not starting with
+  // '/', or not a valid header value), or a bad or duplicate name; FailedPrecondition outside this
+  // filter's window. `detail`, if set, is appended to the filter name in each entry's added_by.
+  virtual absl::Status seed(std::vector<UpstreamCandidate> candidates,
+                            absl::string_view detail) PURE;
+};
+
+// The AI analogue of Http::StreamDecoderFilterCallbacks.
+class AiFilterCallbacks {
+public:
+  virtual ~AiFilterCallbacks() = default;
+
+  // The AiProtocolManager.filters entry name.
+  virtual absl::string_view filterName() const PURE;
+
+  // Empty where the AI Protocol Manager will not commit a decision.
+  virtual OptRef<UpstreamCandidatesEditor> upstreamCandidates() PURE;
+};
+
 // Abstract interface implemented by AI filter instances.
 //
 // A filter defines two independent logical flows, mirroring the HTTP filter model: decode on the
@@ -97,6 +130,9 @@ using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string detail
 class AiFilter {
 public:
   virtual ~AiFilter() = default;
+
+  // Called once per stream, before decode(). The callbacks hold only a weak reference to the chain.
+  virtual void setAiFilterCallbacks(std::shared_ptr<AiFilterCallbacks>) {}
 
   // Invoked when an AI request arrives.
   // Returns absl::OkStatus() on normal completion, or an error status on failure.
@@ -140,14 +176,24 @@ struct AiFilterContext {
   uint64_t request_payload_bytes{0};
   // Route-declared response/backend wire API; Unspecified when the route named none.
   LLMProtocol response_protocol = LLMProtocol::Unspecified;
-  // Whether the AI Protocol Manager applies an AiRouteAction requested on this stream; false in an
-  // upstream filter chain, which has no route to act on.
-  bool route_actions_supported{false};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.
 using AiFilterFactoryCb = std::function<AiFilterSharedPtr(const AiFilterContext& context)>;
-using AiFilterFactories = std::vector<AiFilterFactoryCb>;
+
+// What an AI filter may do to the upstream decision, declared by its factory from its config.
+struct UpstreamCandidatesPolicy {
+  bool seed{false};
+};
+
+// One AiProtocolManager.filters entry.
+struct AiFilterFactory {
+  std::string name;
+  AiFilterFactoryCb cb;
+  UpstreamCandidatesPolicy policy;
+};
+
+using AiFilterFactories = std::vector<AiFilterFactory>;
 
 // Extension point behind AiProtocolManager.filters.
 class AiFilterConfigFactory : public Config::TypedFactory {
@@ -159,6 +205,12 @@ public:
   createAiFilterFactory(const Protobuf::Message& config,
                         Server::Configuration::ServerFactoryContext& context,
                         Stats::Scope& scope) PURE;
+
+  // `config` is the message createAiFilterFactory() was given.
+  virtual UpstreamCandidatesPolicy
+  upstreamCandidatesPolicy(const Protobuf::Message& /*config*/) const {
+    return {};
+  }
 
   std::string category() const override { return "envoy.http.ai_filters"; }
 };

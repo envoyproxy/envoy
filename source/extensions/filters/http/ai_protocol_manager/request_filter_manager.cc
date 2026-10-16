@@ -4,6 +4,8 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/common/optref.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/status_macros.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_pipeline.h"
@@ -11,10 +13,49 @@
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
 #include "source/extensions/filters/http/ai_protocol_manager/task_group.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
+
+namespace {
+
+constexpr absl::string_view FilterRejectedDetails = "ai_protocol_manager_filter_rejected";
+
+} // namespace
+
+// One request stage's AiFilterCallbacks. A filter can outlive the chain, so this holds the chain
+// weakly and owns its name.
+class StageCallbacks : public AiFilterCallbacks,
+                       public UpstreamCandidatesEditor,
+                       public Logger::Loggable<Logger::Id::ai_protocol_manager> {
+public:
+  StageCallbacks(std::weak_ptr<RequestFilterManager::AsyncState> state, size_t index,
+                 AiFilterStage stage, bool editor_enabled)
+      : state_(std::move(state)), index_(index), stage_(std::move(stage)),
+        editor_enabled_(editor_enabled) {}
+
+  // AiFilterCallbacks
+  absl::string_view filterName() const override { return stage_.name; }
+  OptRef<UpstreamCandidatesEditor> upstreamCandidates() override {
+    if (!editor_enabled_) {
+      return {};
+    }
+    return makeOptRef<UpstreamCandidatesEditor>(*this);
+  }
+
+  // UpstreamCandidatesEditor
+  const UpstreamCandidates* current() const override;
+  absl::Status seed(std::vector<UpstreamCandidate> candidates, absl::string_view detail) override;
+
+private:
+  const std::weak_ptr<RequestFilterManager::AsyncState> state_;
+  const size_t index_;
+  const AiFilterStage stage_;
+  const bool editor_enabled_;
+};
 
 class RequestFilterManager::AsyncState
     : public TaskGroup,
@@ -25,14 +66,18 @@ public:
              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
              StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
              Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn,
-             bool always_serialize, LLMProtocol request_protocol, OnFiltersDoneFn on_filters_done)
+             bool always_serialize, LLMProtocol request_protocol, OnFiltersDoneFn on_filters_done,
+             std::vector<AiFilterStage> stages, bool upstream_candidates_enabled)
       : TaskGroup(dispatcher), filters_(std::move(filters)),
         payload_index_(std::move(payload_index)), pipeline_(filters_.size()),
         buffer_manager_(buffer_manager), stream_info_(stream_info),
         on_complete_(std::move(on_complete)), request_headers_(request_headers),
         local_reply_fn_(std::move(local_reply_fn)), always_serialize_(always_serialize),
         request_protocol_(request_protocol), on_filters_done_(std::move(on_filters_done)),
-        filter_handoff_status_(filters_.size()) {}
+        stages_(std::move(stages)), upstream_candidates_enabled_(upstream_candidates_enabled),
+        filter_handoff_status_(filters_.size()) {
+    ASSERT(stages_.empty() || stages_.size() == filters_.size());
+  }
 
   ~AsyncState() override { cancel(); }
 
@@ -83,6 +128,15 @@ public:
   }
 
 private:
+  friend class StageCallbacks;
+
+  // Whether stage `index` may read or edit the decision: between its receive and its propagate.
+  // A bypassed stage never receives, so it never opens one.
+  bool inWindow(size_t index) const {
+    return !terminated() && !sealed_ && filter_handoff_status_[index].received &&
+           !filter_handoff_status_[index].propagated;
+  }
+
   void launchFilters() {
     for (size_t i = 0; i < filters_.size(); ++i) {
       if (terminated()) {
@@ -97,12 +151,15 @@ private:
         return AsyncState::propagateRequestTask(weak_state, i, std::move(req));
       });
 
-      LocalReplier replier = [weak_state](Http::Code code, std::string details) {
+      LocalReplier replier = [weak_state](Http::Code code, std::string body) {
         if (auto state = weak_state.lock()) {
-          state->triggerLocalReply(code, std::move(details));
+          state->triggerLocalReply(code, std::move(body), FilterRejectedDetails);
         }
       };
 
+      filters_[i]->setAiFilterCallbacks(std::make_shared<StageCallbacks>(
+          weak_state, i, i < stages_.size() ? std::move(stages_[i]) : AiFilterStage{},
+          upstream_candidates_enabled_));
       auto task =
           filters_[i]->decode(std::move(receiver), std::move(propagator), std::move(replier));
       // Holds the filter until its coroutine completes, which can be after ~RequestFilterManager.
@@ -148,10 +205,6 @@ private:
       co_return absl::InvalidArgumentError("cannot propagate null AiRequestPtr");
     }
     filter_handoff_status_[index].propagated = true;
-    // Recorded here so a filter that propagates a new AiRequest cannot withdraw an earlier refresh.
-    if (req->routeActionRequested(AiRouteAction::RefreshCluster)) {
-      refresh_route_cluster_ = true;
-    }
     co_return co_await pipeline_.propagate(index, std::move(req));
   }
 
@@ -164,8 +217,14 @@ private:
     final_req_ = std::move(*res);
     ASSERT(final_req_ != nullptr);
 
+    sealed_ = true;
     if (OnFiltersDoneFn on_filters_done = std::move(on_filters_done_)) {
-      on_filters_done(refresh_route_cluster_);
+      if (std::optional<SinkReply> reply = on_filters_done(*final_req_, decision_);
+          reply.has_value()) {
+        // Cancelling only flags this running coroutine, so returning OK here is safe.
+        triggerLocalReply(reply->code, std::move(reply->body), reply->details);
+        co_return absl::OkStatus();
+      }
     }
 
     if (always_serialize_) {
@@ -259,14 +318,14 @@ private:
     ENVOY_LOG(debug, "ai_protocol_manager: filter chain error: {}", status.message());
 
     if (reply_fn != nullptr) {
-      reply_fn(Http::Code::BadGateway, std::string(status.message()));
+      reply_fn(Http::Code::BadGateway, std::string(status.message()), FilterRejectedDetails);
     }
     if (on_complete != nullptr) {
       on_complete(std::move(status));
     }
   }
 
-  void triggerLocalReply(Http::Code code, std::string details) {
+  void triggerLocalReply(Http::Code code, std::string body, absl::string_view details) {
     if (terminated()) {
       return;
     }
@@ -274,11 +333,11 @@ private:
     LocalReplyFn reply_fn = std::move(local_reply_fn_);
     OnCompleteFn on_complete = std::move(on_complete_);
     cancel();
-    ENVOY_LOG(debug, "ai_protocol_manager: filter chain triggered local reply: {} {}",
-              static_cast<uint32_t>(code), details);
+    ENVOY_LOG(debug, "ai_protocol_manager: filter chain triggered local reply: {} {} ({})",
+              static_cast<uint32_t>(code), body, details);
 
     if (reply_fn != nullptr) {
-      reply_fn(code, std::move(details));
+      reply_fn(code, std::move(body), details);
     }
     if (on_complete != nullptr) {
       on_complete(absl::CancelledError("local reply sent"));
@@ -301,22 +360,62 @@ private:
   const bool always_serialize_{true};
   const LLMProtocol request_protocol_;
   OnFiltersDoneFn on_filters_done_;
-  // Whether any filter that propagated the request asked for a route cluster refresh.
-  bool refresh_route_cluster_{false};
+  // Moved into each stage's callbacks at launch.
+  std::vector<AiFilterStage> stages_;
+  const bool upstream_candidates_enabled_;
+  // Created by the first seed; held per stream, so replacing the AiRequest does not drop it.
+  std::shared_ptr<UpstreamCandidates> decision_;
+  // Set once the sink has the request; no edits after.
+  bool sealed_{false};
   AiRequestPtr final_req_;
   std::vector<FilterHandoffStatus> filter_handoff_status_;
 };
+
+const UpstreamCandidates* StageCallbacks::current() const {
+  std::shared_ptr<RequestFilterManager::AsyncState> state = state_.lock();
+  return state != nullptr && state->inWindow(index_) ? state->decision_.get() : nullptr;
+}
+
+absl::Status StageCallbacks::seed(std::vector<UpstreamCandidate> candidates,
+                                  absl::string_view detail) {
+  std::shared_ptr<RequestFilterManager::AsyncState> state = state_.lock();
+  absl::Status status;
+  if (state == nullptr || !state->inWindow(index_)) {
+    status = absl::FailedPreconditionError(
+        "upstream candidates are editable only between receiving and propagating the request");
+  } else if (!stage_.policy.seed) {
+    status = absl::PermissionDeniedError("this AI filter may not seed upstream candidates");
+  } else if (state->decision_ != nullptr) {
+    status = absl::AlreadyExistsError("an earlier AI filter seeded upstream candidates");
+  } else {
+    absl::StatusOr<std::shared_ptr<UpstreamCandidates>> decision = UpstreamCandidates::create(
+        std::move(candidates),
+        detail.empty() ? stage_.name : absl::StrCat(stage_.name, "/", detail));
+    if (decision.ok()) {
+      state->decision_ = std::move(*decision);
+      ENVOY_LOG(debug, "ai_protocol_manager: AI filter '{}' seeded {} upstream candidates",
+                stage_.name, state->decision_->entries().size());
+      return absl::OkStatus();
+    }
+    status = decision.status();
+  }
+  ENVOY_LOG(debug, "ai_protocol_manager: refused upstream candidates seed from AI filter '{}': {}",
+            stage_.name, status.message());
+  return status;
+}
 
 RequestFilterManager::RequestFilterManager(
     std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
     BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
     StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
     Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn, bool always_serialize,
-    LLMProtocol request_protocol, OnFiltersDoneFn on_filters_done)
+    LLMProtocol request_protocol, OnFiltersDoneFn on_filters_done,
+    std::vector<AiFilterStage> stages, bool upstream_candidates_enabled)
     : async_state_(std::make_shared<AsyncState>(
           std::move(filters), std::move(payload_index), buffer_manager, dispatcher, stream_info,
           std::move(on_complete), request_headers, std::move(local_reply_fn), always_serialize,
-          request_protocol, std::move(on_filters_done))) {}
+          request_protocol, std::move(on_filters_done), std::move(stages),
+          upstream_candidates_enabled)) {}
 
 RequestFilterManager::~RequestFilterManager() { cancel(); }
 

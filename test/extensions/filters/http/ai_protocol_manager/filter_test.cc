@@ -1,25 +1,33 @@
 #include <deque>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <tuple>
 
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
+#include "envoy/extensions/router/cluster_specifiers/priority_group/v3/priority_group.pb.h"
 #include "envoy/http/codes.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/coroutine/status_macros.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
+#include "source/extensions/filters/http/ai_protocol_manager/upstream_candidates.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
@@ -147,13 +155,13 @@ public:
     }
     filter_ = std::make_unique<AiProtocolManagerFilter>(
         factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
-                                                       AiFilterFactories{}));
+                                                       AiFilterFactories{}, cluster_manager_));
     filter_->setDecoderFilterCallbacks(callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   // Parses unconfigured routes too, so a test can show the chain is not run there.
-  void createFilterWithAiFilters(
+  void createFilterWithAiFilterFactories(
       AiFilterFactories ai_filter_factories,
       envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::
           BodyReserialization reserialize_body =
@@ -165,10 +173,24 @@ public:
     proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
     proto.mutable_request_handling()->set_reserialize_body(reserialize_body);
     filter_ = std::make_unique<AiProtocolManagerFilter>(
-        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
-                                                       std::move(ai_filter_factories)));
+        factory_,
+        std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
+                                             std::move(ai_filter_factories), cluster_manager_));
     filter_->setDecoderFilterCallbacks(callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  // Names each AI filter after its position, with the default policy.
+  void createFilterWithAiFilters(
+      std::vector<AiFilterFactoryCb> callbacks,
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::
+          BodyReserialization reserialize_body =
+              envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS) {
+    AiFilterFactories factories;
+    for (AiFilterFactoryCb& cb : callbacks) {
+      factories.push_back({absl::StrCat("filter_", factories.size()), std::move(cb), {}});
+    }
+    createFilterWithAiFilterFactories(std::move(factories), reserialize_body);
   }
 
   // decodeHeaders() for a stream the filter is expected to engage on.
@@ -238,6 +260,7 @@ public:
 
   std::deque<Event::PostCb> posted_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   InMemoryExternalBufferFactory factory_;
   FilterConfigSharedPtr config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -532,7 +555,7 @@ public:
     metadata_writes_.clear();
     typed_metadata_writes_.clear();
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                             AiFilterFactories{});
+                                             AiFilterFactories{}, cluster_manager_);
     filter_ = std::make_unique<AiProtocolManagerFilter>(factory_, config_);
     // A stream filter receives both callback sets in production; encode-path
     // code may rely on the decoder callbacks (e.g. the buffer memory account).
@@ -601,6 +624,7 @@ public:
   LogLevelSetter log_level_setter_{spdlog::level::trace};
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
   InMemoryExternalBufferFactory factory_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<RouteConfig> route_config_;
@@ -1429,18 +1453,6 @@ TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesTotalPayloadBytes) {
   EXPECT_EQ(seen[0].payload_bytes, first.size() + second.size());
 }
 
-// Asks for the route cluster to be picked again, then passes the request on.
-class RefreshRequestingAiFilter : public AiFilter {
-public:
-  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
-                                       AiRequestPropagator propagate_request,
-                                       LocalReplier) override {
-    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
-    request->requestRouteAction(AiRouteAction::RefreshCluster);
-    co_return co_await std::move(propagate_request)(std::move(request));
-  }
-};
-
 class RejectingAiFilter : public AiFilter {
 public:
   Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request, AiRequestPropagator,
@@ -1451,99 +1463,372 @@ public:
   }
 };
 
-AiFilterSharedPtr makeRefreshRequestingAiFilter(const AiFilterContext&) {
-  return std::make_unique<RefreshRequestingAiFilter>();
-}
+// Seeds `candidates` when it has an editor, then passes the request on.
+class SeedingAiFilter : public AiFilter {
+public:
+  SeedingAiFilter(std::vector<UpstreamCandidate> candidates, std::optional<bool>& had_editor,
+                  std::function<void()> on_seeded)
+      : candidates_(std::move(candidates)), had_editor_(had_editor),
+        on_seeded_(std::move(on_seeded)) {}
 
-// The cluster is picked again before the replay releases the held headers to the router.
-TEST_F(AiProtocolManagerFilterTest, RefreshesRouteClusterWhenAnAiFilterAsks) {
-  bool route_actions_supported = false;
-  createFilterWithAiFilters({[&](const AiFilterContext& context) {
-    route_actions_supported = context.route_actions_supported;
-    return makeRefreshRequestingAiFilter(context);
-  }});
-  setRouteConfig();
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+  void setAiFilterCallbacks(std::shared_ptr<AiFilterCallbacks> callbacks) override {
+    callbacks_ = std::move(callbacks);
+  }
 
-  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).WillOnce([this]() {
-    EXPECT_EQ(inject_calls_, 0);
-  });
-  EXPECT_CALL(callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
-  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    OptRef<UpstreamCandidatesEditor> editor = callbacks_->upstreamCandidates();
+    had_editor_ = editor.has_value();
+    if (editor.has_value()) {
+      EXPECT_TRUE(editor->seed(candidates_, "rule").ok());
+      if (on_seeded_ != nullptr) {
+        on_seeded_();
+      }
+    }
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
 
-  EXPECT_TRUE(route_actions_supported);
+private:
+  std::shared_ptr<AiFilterCallbacks> callbacks_;
+  const std::vector<UpstreamCandidate> candidates_;
+  std::optional<bool>& had_editor_;
+  const std::function<void()> on_seeded_;
+};
+
+class UpstreamCandidatesCommitTest : public AiProtocolManagerFilterTest {
+public:
+  using RequestHandling =
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling;
+
+  UpstreamCandidatesCommitTest() {
+    cluster_manager_.initializeThreadLocalClusters({"cluster_a", "cluster_b"});
+    ON_CALL(callbacks_.stream_info_, setDynamicTypedMetadata(testing::_, testing::_))
+        .WillByDefault(Invoke([this](const std::string& name, const Protobuf::Any& value) {
+          (*callbacks_.stream_info_.metadata_.mutable_typed_filter_metadata())[name] = value;
+        }));
+  }
+
+  AiFilterFactory seeder(std::vector<UpstreamCandidate> candidates) {
+    return {"seeder",
+            [this, candidates](const AiFilterContext&) -> AiFilterSharedPtr {
+              return std::make_shared<SeedingAiFilter>(candidates, had_editor_, on_seeded_);
+            },
+            {/*seed=*/true}};
+  }
+
+  // Sends a Chat Completions request through `factories` on a route declaring `request_protocol`
+  // and, when set, `response_protocol`.
+  void run(AiFilterFactories factories,
+           RequestHandling::BodyReserialization reserialize_body = RequestHandling::ALWAYS,
+           envoy::type::ai::v3::LLMProtocol request_protocol =
+               envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS,
+           envoy::type::ai::v3::LLMProtocol response_protocol =
+               envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED) {
+    createFilterWithAiFilterFactories(std::move(factories), reserialize_body);
+    PerRouteProto proto;
+    proto.mutable_request()->set_llm_protocol(request_protocol);
+    proto.mutable_response()->set_llm_protocol(response_protocol);
+    route_config_ = std::make_unique<RouteConfig>(proto);
+    ON_CALL(callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(testing::Return(route_config_.get()));
+    request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                      {":path", "/v1/chat/completions"},
+                                                      {"content-type", "application/json"}};
+    ASSERT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+              Http::FilterHeadersStatus::StopIteration);
+    Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+    EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+    drain();
+  }
+
+  void routeTo(std::string cluster) { callbacks_.route_->route_entry_.cluster_name_ = cluster; }
+
+  // Moves the route to `cluster` when refreshed, after the override is rendered.
+  void expectRefreshTo(std::string cluster) {
+    EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster())
+        .WillOnce([this, cluster]() {
+          EXPECT_TRUE(typedMetadata().has_value());
+          EXPECT_EQ(inject_calls_, 0);
+          routeTo(cluster);
+        });
+  }
+
+  const UpstreamCandidates* record() {
+    return UpstreamCandidates::fromFilterState(*callbacks_.stream_info_.filterState());
+  }
+
+  std::optional<
+      envoy::extensions::router::cluster_specifiers::priority_group::v3::PriorityGroupsOverride>
+  typedMetadata() {
+    const auto& typed = callbacks_.stream_info_.metadata_.typed_filter_metadata();
+    const auto it = typed.find(std::string(UpstreamCandidates::kFilterStateKey));
+    if (it == typed.end()) {
+      return std::nullopt;
+    }
+    envoy::extensions::router::cluster_specifiers::priority_group::v3::PriorityGroupsOverride
+        groups;
+    EXPECT_TRUE(MessageUtil::unpackTo(it->second, groups).ok());
+    return groups;
+  }
+
+  nlohmann::json forwardedBody() { return nlohmann::json::parse(injected_.toString()); }
+
+  std::optional<bool> had_editor_;
+  std::function<void()> on_seeded_;
+};
+
+TEST_F(UpstreamCandidatesCommitTest, NoDecisionHasNoEffect) {
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicTypedMetadata(testing::_, testing::_)).Times(0);
+  run({{"pass",
+        [](const AiFilterContext&) -> AiFilterSharedPtr {
+          return std::make_unique<PassThroughAiFilter>();
+        },
+        {/*seed=*/true}}});
+
   EXPECT_EQ(local_reply_calls_, 0);
-  EXPECT_GT(inject_calls_, 0);
   EXPECT_TRUE(injected_end_stream_);
-  EXPECT_EQ(counterValue("route_cluster_refreshed"), 1);
+  EXPECT_EQ(record(), nullptr);
+  EXPECT_EQ(forwardedBody()["model"], "gpt-4");
+  EXPECT_EQ(counterValue("upstream_candidates_committed"), 0);
 }
 
-TEST_F(AiProtocolManagerFilterTest, RefreshesRouteClusterOnceWhenAskedTwice) {
-  createFilterWithAiFilters({makeRefreshRequestingAiFilter, makeRefreshRequestingAiFilter});
-  setRouteConfig();
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+// The cluster is picked again before the replay releases the held headers to the router, and the
+// request is rewritten only once the route followed.
+TEST_F(UpstreamCandidatesCommitTest, CommitsTheFirstEligibleCandidate) {
+  routeTo("default");
+  expectRefreshTo("cluster_a");
+  run({seeder({{"a", "cluster_a", "model-a", "/v1/a"}, {"b", "cluster_b", "", ""}})});
 
+  EXPECT_EQ(had_editor_, true);
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(forwardedBody()["model"], "model-a");
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/a");
+
+  const UpstreamCandidates* committed = record();
+  ASSERT_NE(committed, nullptr);
+  EXPECT_EQ(committed->outcome(), UpstreamCandidates::Outcome::Committed);
+  ASSERT_NE(committed->chosen(), nullptr);
+  EXPECT_EQ(committed->chosen()->candidate.name, "a");
+  EXPECT_EQ(committed->entries()[0].added_by, "seeder/rule");
+
+  const auto groups = typedMetadata();
+  ASSERT_TRUE(groups.has_value());
+  ASSERT_EQ(groups->priority_groups_size(), 1);
+  EXPECT_EQ(groups->priority_groups(0).name(), "a");
+  ASSERT_EQ(groups->priority_groups(0).clusters_size(), 1);
+  EXPECT_EQ(groups->priority_groups(0).clusters(0).cluster_name(), "cluster_a");
+  EXPECT_EQ(groups->priority_groups(0).clusters(0).weight().value(), 1);
+  EXPECT_EQ(counterValue("upstream_candidates_committed"), 1);
+}
+
+TEST_F(UpstreamCandidatesCommitTest, SkipsTheRefreshWhenAlreadyOnTheCandidate) {
+  routeTo("cluster_a");
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+  run({seeder({{"a", "cluster_a", "model-a", ""}})});
+
+  EXPECT_EQ(forwardedBody()["model"], "model-a");
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
+  ASSERT_NE(record(), nullptr);
+  EXPECT_EQ(record()->outcome(), UpstreamCandidates::Outcome::Committed);
+  EXPECT_EQ(counterValue("upstream_candidates_committed"), 1);
+}
+
+// A route whose refresh is a no-op, such as a plain cluster route, keeps the request unchanged.
+TEST_F(UpstreamCandidatesCommitTest, RewritesNothingWhenTheRouteDoesNotFollow) {
+  routeTo("default");
   EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster());
-  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-  EXPECT_TRUE(injected_end_stream_);
-  EXPECT_EQ(counterValue("route_cluster_refreshed"), 1);
+  run({seeder({{"a", "cluster_a", "model-a", "/v1/a"}})});
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(forwardedBody()["model"], "gpt-4");
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
+  ASSERT_NE(record(), nullptr);
+  EXPECT_EQ(record()->outcome(), UpstreamCandidates::Outcome::NotFollowed);
+  EXPECT_EQ(record()->chosen(), nullptr);
+  EXPECT_EQ(counterValue("upstream_candidates_not_followed"), 1);
 }
 
-TEST_F(AiProtocolManagerFilterTest, KeepsRouteClusterWhenNoAiFilterAsks) {
-  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
-    return std::make_unique<PassThroughAiFilter>();
-  }});
-  setRouteConfig();
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
-
+TEST_F(UpstreamCandidatesCommitTest, NotFollowedWhenTheRouteEntryIsGone) {
+  on_seeded_ = [this]() { callbacks_.route_.reset(); };
   EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
-  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-  EXPECT_TRUE(injected_end_stream_);
-  EXPECT_EQ(counterValue("route_cluster_refreshed"), 0);
+  run({seeder({{"a", "cluster_a", "model-a", ""}})});
+
+  EXPECT_EQ(forwardedBody()["model"], "gpt-4");
+  ASSERT_NE(record(), nullptr);
+  EXPECT_EQ(record()->outcome(), UpstreamCandidates::Outcome::NotFollowed);
+  EXPECT_FALSE(typedMetadata().has_value());
+  EXPECT_EQ(counterValue("upstream_candidates_not_followed"), 1);
 }
 
-TEST_F(AiProtocolManagerFilterTest, KeepsRouteClusterWhenALaterAiFilterRejects) {
-  createFilterWithAiFilters(
-      {makeRefreshRequestingAiFilter, [](const AiFilterContext&) -> AiFilterSharedPtr {
-         return std::make_unique<RejectingAiFilter>();
-       }});
-  setRouteConfig();
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+TEST_F(UpstreamCandidatesCommitTest, ExcludesUnknownClusters) {
+  routeTo("default");
+  expectRefreshTo("cluster_b");
+  run({seeder({{"a", "missing", "", ""}, {"b", "cluster_b", "", ""}})});
 
+  const UpstreamCandidates* committed = record();
+  ASSERT_NE(committed, nullptr);
+  ASSERT_NE(committed->chosen(), nullptr);
+  EXPECT_EQ(committed->chosen()->candidate.name, "b");
+  EXPECT_EQ(committed->entries()[0].excluded_by, "ai_protocol_manager");
+  EXPECT_EQ(committed->entries()[0].excluded_reason, "unknown_cluster");
+  EXPECT_TRUE(committed->entries()[1].excluded_by.empty());
+  EXPECT_EQ(counterValue("upstream_candidates_unknown_cluster"), 1);
+}
+
+TEST_F(UpstreamCandidatesCommitTest, RejectsWhenNothingIsEligible) {
   EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
-  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
+  EXPECT_LOG_NOT_CONTAINS("error", "replay failed",
+                          run({seeder({{"a", "missing", "", ""}, {"b", "gone", "", ""}})}));
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::ServiceUnavailable);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_upstream_candidates_exhausted");
+  EXPECT_EQ(inject_calls_, 0);
+  ASSERT_NE(record(), nullptr);
+  EXPECT_EQ(record()->outcome(), UpstreamCandidates::Outcome::Rejected);
+  EXPECT_EQ(record()->entries()[1].excluded_reason, "unknown_cluster");
+  EXPECT_FALSE(typedMetadata().has_value());
+  EXPECT_EQ(counterValue("upstream_candidates_rejected"), 1);
+  EXPECT_EQ(counterValue("upstream_candidates_unknown_cluster"), 2);
+}
+
+class UpstreamCandidatesRewriteUnavailableTest
+    : public UpstreamCandidatesCommitTest,
+      public testing::WithParamInterface<
+          std::tuple<UpstreamCandidatesCommitTest::RequestHandling::BodyReserialization,
+                     envoy::type::ai::v3::LLMProtocol>> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    WhereTheModelCannotBeRewritten, UpstreamCandidatesRewriteUnavailableTest,
+    testing::Values(std::make_tuple(UpstreamCandidatesCommitTest::RequestHandling::DISABLE,
+                                    envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS),
+                    std::make_tuple(UpstreamCandidatesCommitTest::RequestHandling::ALWAYS,
+                                    envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED),
+                    std::make_tuple(UpstreamCandidatesCommitTest::RequestHandling::ALWAYS,
+                                    envoy::type::ai::v3::GEMINI_GENERATE_CONTENT)));
+
+TEST_P(UpstreamCandidatesRewriteUnavailableTest, ExcludesModelCandidates) {
+  routeTo("cluster_b");
+  run({seeder({{"a", "cluster_a", "model-a", ""}, {"b", "cluster_b", "", "/v1/b"}})},
+      std::get<0>(GetParam()), std::get<1>(GetParam()));
+
+  const UpstreamCandidates* committed = record();
+  ASSERT_NE(committed, nullptr);
+  EXPECT_EQ(committed->entries()[0].excluded_reason, "rewrite_unavailable");
+  ASSERT_NE(committed->chosen(), nullptr);
+  EXPECT_EQ(committed->chosen()->candidate.name, "b");
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/b");
+  EXPECT_EQ(counterValue("upstream_candidates_rewrite_unavailable"), 1);
+}
+
+// Propagates a Chat Completions request whose root is an array in place of the one it received.
+class ArrayRootAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    JsonWithExtBuf doc;
+    doc.setJson(nlohmann::json::array({"hi"}));
+    co_return co_await std::move(propagate_request)(
+        std::make_unique<AiRequest>(std::move(doc), LLMProtocol::OpenAiChatCompletions));
+  }
+};
+
+// A root that is not an object has no model field, so the commit must not write one.
+TEST_F(UpstreamCandidatesCommitTest, ExcludesModelCandidatesWhenTheRootIsNotAnObject) {
+  routeTo("cluster_a");
+  expectRefreshTo("cluster_b");
+  run({seeder({{"a", "cluster_a", "model-a", ""}, {"b", "cluster_b", "", ""}}),
+       {"array",
+        [](const AiFilterContext&) -> AiFilterSharedPtr {
+          return std::make_unique<ArrayRootAiFilter>();
+        },
+        {}}});
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(forwardedBody(), nlohmann::json::array({"hi"}));
+  const UpstreamCandidates* committed = record();
+  ASSERT_NE(committed, nullptr);
+  EXPECT_EQ(committed->entries()[0].excluded_reason, "rewrite_unavailable");
+  ASSERT_NE(committed->chosen(), nullptr);
+  EXPECT_EQ(committed->chosen()->candidate.name, "b");
+  EXPECT_EQ(counterValue("upstream_candidates_rewrite_unavailable"), 1);
+}
+
+// Whatever already holds the key, such as an object set_filter_state stored, fails closed.
+TEST_F(UpstreamCandidatesCommitTest, FailsClosedWhenTheKeyIsTaken) {
+  callbacks_.stream_info_.filterState()->setData(
+      UpstreamCandidates::kFilterStateKey, std::make_shared<Router::StringAccessorImpl>("forged"),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+  run({seeder({{"a", "cluster_a", "", ""}})});
+
+  EXPECT_EQ(local_reply_code_, Http::Code::InternalServerError);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_upstream_candidates_conflict");
+  EXPECT_EQ(inject_calls_, 0);
+  EXPECT_EQ(record(), nullptr);
+  EXPECT_EQ(counterValue("upstream_candidates_conflict"), 1);
+}
+
+// The decision is dropped with the request when a later AI filter rejects it.
+TEST_F(UpstreamCandidatesCommitTest, ALaterRejectionSkipsTheCommit) {
+  EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+  run({seeder({{"a", "cluster_a", "", ""}}),
+       {"reject",
+        [](const AiFilterContext&) -> AiFilterSharedPtr {
+          return std::make_unique<RejectingAiFilter>();
+        },
+        {}}});
+
   EXPECT_EQ(local_reply_calls_, 1);
   EXPECT_EQ(local_reply_code_, Http::Code::Forbidden);
+  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_filter_rejected");
   EXPECT_EQ(inject_calls_, 0);
+  EXPECT_EQ(record(), nullptr);
 }
 
-// Without downstream callbacks, as in an upstream filter chain, there is no route to act on.
-TEST_F(AiProtocolManagerFilterTest, IgnoresRouteClusterRefreshWithoutDownstreamCallbacks) {
+// Without downstream callbacks, as in an upstream filter chain, there is no route to commit to.
+TEST_F(UpstreamCandidatesCommitTest, NoEditorWithoutDownstreamCallbacks) {
   ON_CALL(callbacks_, downstreamCallbacks())
       .WillByDefault(testing::Return(OptRef<Http::DownstreamStreamFilterCallbacks>{}));
-  bool route_actions_supported = true;
-  createFilterWithAiFilters({[&](const AiFilterContext& context) {
-    route_actions_supported = context.route_actions_supported;
-    return makeRefreshRequestingAiFilter(context);
-  }});
-  setRouteConfig();
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+  run({seeder({{"a", "cluster_a", "model-a", ""}})});
 
-  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-  EXPECT_FALSE(route_actions_supported);
+  EXPECT_EQ(had_editor_, false);
   EXPECT_TRUE(injected_end_stream_);
-  EXPECT_EQ(counterValue("route_cluster_refreshed"), 0);
-  EXPECT_EQ(counterValue("route_cluster_refresh_ignored"), 1);
+  EXPECT_EQ(record(), nullptr);
+}
+
+TEST_F(UpstreamCandidatesCommitTest, NoEditorWithoutARouteEntry) {
+  callbacks_.route_.reset();
+  run({seeder({{"a", "cluster_a", "model-a", ""}})});
+
+  EXPECT_EQ(had_editor_, false);
+  EXPECT_EQ(record(), nullptr);
+}
+
+// The transcoder rewrites the request for the backend's API before the commit would run.
+TEST_F(UpstreamCandidatesCommitTest, NoEditorOnATranscoderRoute) {
+  run({seeder({{"a", "cluster_a", "model-a", ""}})}, RequestHandling::ALWAYS,
+      envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS, envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+
+  EXPECT_EQ(had_editor_, false);
+  EXPECT_EQ(record(), nullptr);
+}
+
+TEST_F(UpstreamCandidatesCommitTest, EditorWhenTheRouteDeclaresOneApiForBothLegs) {
+  routeTo("cluster_a");
+  run({seeder({{"a", "cluster_a", "", ""}})}, RequestHandling::ALWAYS,
+      envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS, envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+
+  EXPECT_EQ(had_editor_, true);
+  ASSERT_NE(record(), nullptr);
+  EXPECT_EQ(record()->outcome(), UpstreamCandidates::Outcome::Committed);
 }
 
 class AiProtocolManagerFilterStateTest : public AiProtocolManagerFilterTest {
@@ -2459,9 +2744,12 @@ TEST_F(AiProtocolManagerFilterTest,
   filter_ = std::make_unique<AiProtocolManagerFilter>(
       factory_, std::make_shared<const FilterConfig>(
                     proto, *stats_store_.rootScope(),
-                    AiFilterFactories{[](const AiFilterContext&) -> AiFilterSharedPtr {
-                      return std::make_shared<UnaryTaggingAiFilter>("tagged");
-                    }}));
+                    AiFilterFactories{{"tagged",
+                                       [](const AiFilterContext&) -> AiFilterSharedPtr {
+                                         return std::make_shared<UnaryTaggingAiFilter>("tagged");
+                                       },
+                                       {}}},
+                    cluster_manager_));
   filter_->setDecoderFilterCallbacks(callbacks_);
   filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 

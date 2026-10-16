@@ -8,6 +8,7 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
@@ -136,10 +137,12 @@ TEST(AiProtocolManagerConfigTest, RejectsZeroCaps) {
 // falling back to the parser's own default when unset.
 TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
   {
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
     proto_config.mutable_request_handling();
-    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{});
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{},
+                              cluster_manager);
     EXPECT_EQ(config.inlineStringThresholdBytes(),
               JsonWithExtBufParser::kDefaultInlineStringThresholdBytes);
   }
@@ -149,7 +152,8 @@ TEST(AiProtocolManagerConfigTest, InlineStringThresholdDefaultsAndOverrides) {
         ->mutable_limits()
         ->mutable_inline_string_threshold_bytes()
         ->set_value(4096);
-    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{});
+    const FilterConfig config(proto_config, *stats_store.rootScope(), AiFilterFactories{},
+                              cluster_manager);
     EXPECT_EQ(config.inlineStringThresholdBytes(), 4096);
   }
 }
@@ -280,6 +284,13 @@ public:
     }
     return [](const AiFilterContext&) -> AiFilterSharedPtr { return nullptr; };
   }
+  // Seeds when its Struct config says so.
+  UpstreamCandidatesPolicy
+  upstreamCandidatesPolicy(const Protobuf::Message& config) const override {
+    const auto& fields = dynamic_cast<const Protobuf::Struct&>(config).fields();
+    const auto it = fields.find("seed");
+    return {/*seed=*/it != fields.end() && it->second.bool_value()};
+  }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::Struct>();
   }
@@ -316,6 +327,49 @@ TEST(AiProtocolManagerConfigTest, ResolvesConfiguredAiFilters) {
   AiProtocolManagerFilterConfigFactory factory;
   EXPECT_TRUE(factory.createFilterFactoryFromProto(proto, "stats", context).ok());
   EXPECT_EQ(test_factory.factories_created_, 2);
+}
+
+// Each entry keeps its name and the policy its factory derives from the entry's config.
+TEST(AiProtocolManagerConfigTest, KeepsAiFilterNamesAndPolicies) {
+  TestAiFilterConfigFactory test_factory;
+  Registry::InjectFactory<AiFilterConfigFactory> registration(test_factory);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  Protobuf::Struct seeding;
+  (*seeding.mutable_fields())["seed"].set_bool_value(true);
+  auto proto = configWithAiFilter(seeding);
+  auto* plain = proto.add_filters();
+  plain->set_name("plain");
+  EXPECT_TRUE(plain->mutable_typed_config()->PackFrom(Protobuf::Struct()));
+
+  const auto config =
+      FilterConfig::create(proto, context.server_factory_context_, *stats_store.rootScope());
+  ASSERT_TRUE(config.ok()) << config.status();
+  const AiFilterFactories& factories = (*config)->aiFilterFactories();
+  ASSERT_EQ(factories.size(), 2);
+  EXPECT_EQ(factories[0].name, "test.ai_filter");
+  EXPECT_TRUE(factories[0].policy.seed);
+  EXPECT_EQ(factories[1].name, "plain");
+  EXPECT_FALSE(factories[1].policy.seed);
+  EXPECT_EQ(&(*config)->clusterManager(), &context.server_factory_context_.cluster_manager_);
+}
+
+// A factory that declares nothing gets the default policy.
+TEST(AiProtocolManagerConfigTest, DefaultUpstreamCandidatesPolicyAllowsNothing) {
+  class PlainFactory : public AiFilterConfigFactory {
+  public:
+    absl::StatusOr<AiFilterFactoryCb>
+    createAiFilterFactory(const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+                          Stats::Scope&) override {
+      return [](const AiFilterContext&) -> AiFilterSharedPtr { return nullptr; };
+    }
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Protobuf::Struct>();
+    }
+    std::string name() const override { return "test.plain_ai_filter"; }
+  };
+  PlainFactory factory;
+  EXPECT_FALSE(factory.upstreamCandidatesPolicy(Protobuf::Struct()).seed);
 }
 
 TEST(AiProtocolManagerConfigTest, RejectsUnknownAiFilter) {

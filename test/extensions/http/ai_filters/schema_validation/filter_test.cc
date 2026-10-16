@@ -83,9 +83,9 @@ public:
     manager.startRequest(
         std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
         [this](absl::Status status) { status_ = std::move(status); }, &request_headers_,
-        [this](Http::Code code, std::string details) {
+        [this](Http::Code code, std::string body, absl::string_view) {
           reply_code_ = code;
-          reply_details_ = std::move(details);
+          reply_details_ = std::move(body);
         },
         /*always_serialize=*/true, declared_protocol);
     for (int i = 0; i < 20; ++i) {

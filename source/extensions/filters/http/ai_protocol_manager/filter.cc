@@ -4,6 +4,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/data/ai/v3/token_usage.pb.h"
+#include "envoy/extensions/router/cluster_specifiers/priority_group/v3/priority_group.pb.h"
 #include "envoy/http/codes.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -19,6 +20,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/schema.h"
+#include "source/extensions/filters/http/ai_protocol_manager/upstream_candidates.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
@@ -143,11 +145,130 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
   return typed;
 }
 
+const Router::RouteEntry* routeEntry(Http::StreamDecoderFilterCallbacks& callbacks) {
+  OptRef<const Router::Route> route = callbacks.route();
+  return route.has_value() ? route->routeEntry() : nullptr;
+}
+
 } // namespace
+
+// Commits a sealed upstream decision: validates it, steers the route to its first eligible entry
+// through priority_group, and rewrites the request only once the route followed.
+class UpstreamCandidatesCommit : public Logger::Loggable<Logger::Id::filter> {
+public:
+  static std::optional<SinkReply> run(const FilterConfig& config,
+                                      Http::StreamDecoderFilterCallbacks& callbacks,
+                                      Http::RequestHeaderMap& headers, AiRequest& request,
+                                      std::shared_ptr<UpstreamCandidates> decision);
+
+private:
+  static void publish(Http::StreamDecoderFilterCallbacks& callbacks,
+                      std::shared_ptr<UpstreamCandidates> decision) {
+    callbacks.streamInfo().filterState()->setData(UpstreamCandidates::kFilterStateKey,
+                                                  std::move(decision),
+                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
+  static void notFollowed(const FilterConfig& config, Http::StreamDecoderFilterCallbacks& callbacks,
+                          std::shared_ptr<UpstreamCandidates> decision) {
+    ENVOY_LOG(debug, "ai_protocol_manager: route did not follow the upstream candidates");
+    decision->setOutcome(UpstreamCandidates::Outcome::NotFollowed);
+    publish(callbacks, std::move(decision));
+    config.stats().upstream_candidates_not_followed_.inc();
+  }
+};
+
+std::optional<SinkReply>
+UpstreamCandidatesCommit::run(const FilterConfig& config,
+                              Http::StreamDecoderFilterCallbacks& callbacks,
+                              Http::RequestHeaderMap& headers, AiRequest& request,
+                              std::shared_ptr<UpstreamCandidates> decision) {
+  if (decision == nullptr) {
+    return std::nullopt;
+  }
+  AiProtocolManagerStats& stats = config.stats();
+  // Only the commit writes the key; an object already there, such as one set_filter_state stored,
+  // fails the request closed rather than routing without a record.
+  if (callbacks.streamInfo().filterState()->hasDataWithName(UpstreamCandidates::kFilterStateKey)) {
+    ENVOY_LOG(debug, "ai_protocol_manager: upstream candidates key already set");
+    stats.upstream_candidates_conflict_.inc();
+    return SinkReply{Http::Code::InternalServerError, "upstream decision conflict",
+                     "ai_protocol_manager_upstream_candidates_conflict"};
+  }
+  OptRef<Http::DownstreamStreamFilterCallbacks> downstream = callbacks.downstreamCallbacks();
+  const Router::RouteEntry* route_entry = routeEntry(callbacks);
+  if (route_entry == nullptr || !downstream.has_value()) {
+    notFollowed(config, callbacks, std::move(decision));
+    return std::nullopt;
+  }
+
+  // A model rewrite needs the re-serialized body and a protocol that carries the model in it;
+  // Gemini carries it in :path.
+  const bool model_rewritable =
+      config.alwaysSerializeRequest() && request.protocol() != LLMProtocol::Unspecified &&
+      request.protocol() != LLMProtocol::GeminiGenerateContent && request.json().is_object();
+  std::optional<size_t> first;
+  for (size_t i = 0; i < decision->entries().size(); ++i) {
+    const UpstreamCandidate& candidate = decision->entries()[i].candidate;
+    if (config.clusterManager().getThreadLocalCluster(candidate.cluster) == nullptr) {
+      decision->exclude(i, "ai_protocol_manager", "unknown_cluster");
+      stats.upstream_candidates_unknown_cluster_.inc();
+    } else if (!candidate.model.empty() && !model_rewritable) {
+      decision->exclude(i, "ai_protocol_manager", "rewrite_unavailable");
+      stats.upstream_candidates_rewrite_unavailable_.inc();
+    } else if (!first.has_value()) {
+      first = i;
+    }
+  }
+  if (!first.has_value()) {
+    ENVOY_LOG(debug, "ai_protocol_manager: no eligible upstream candidate");
+    decision->setOutcome(UpstreamCandidates::Outcome::Rejected);
+    publish(callbacks, std::move(decision));
+    stats.upstream_candidates_rejected_.inc();
+    return SinkReply{Http::Code::ServiceUnavailable, "no eligible upstream",
+                     "ai_protocol_manager_upstream_candidates_exhausted"};
+  }
+
+  const UpstreamCandidate& chosen = decision->entries()[*first].candidate;
+  envoy::extensions::router::cluster_specifiers::priority_group::v3::PriorityGroupsOverride groups;
+  auto* group = groups.add_priority_groups();
+  group->set_name(chosen.name);
+  auto* cluster = group->add_clusters();
+  cluster->set_cluster_name(chosen.cluster);
+  cluster->mutable_weight()->set_value(1);
+  Protobuf::Any typed_groups;
+  MessageUtil::packFrom(typed_groups, groups);
+  callbacks.streamInfo().setDynamicTypedMetadata(std::string(UpstreamCandidates::kFilterStateKey),
+                                                 typed_groups);
+
+  // Skipped when already there, so a weighted route does not pick again.
+  if (route_entry->clusterName() != chosen.cluster) {
+    downstream->refreshRouteCluster();
+    route_entry = routeEntry(callbacks);
+  }
+  if (route_entry == nullptr || route_entry->clusterName() != chosen.cluster) {
+    notFollowed(config, callbacks, std::move(decision));
+    return std::nullopt;
+  }
+
+  if (!chosen.model.empty()) {
+    request.json()["model"] = chosen.model;
+  }
+  if (!chosen.path.empty()) {
+    headers.setPath(chosen.path);
+  }
+  ENVOY_LOG(debug, "ai_protocol_manager: committed upstream candidate '{}' on cluster '{}'",
+            chosen.name, chosen.cluster);
+  decision->setOutcome(UpstreamCandidates::Outcome::Committed, *first);
+  publish(callbacks, std::move(decision));
+  stats.upstream_candidates_committed_.inc();
+  return std::nullopt;
+}
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-    Stats::Scope& scope, AiFilterFactories ai_filter_factories)
+    Stats::Scope& scope, AiFilterFactories ai_filter_factories,
+    Upstream::ClusterManager& cluster_manager)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
@@ -178,7 +299,7 @@ FilterConfig::FilterConfig(
       max_parsed_sse_events_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_parsed_sse_events, DefaultMaxParsedSseEvents)),
-      ai_filter_factories_(std::move(ai_filter_factories)) {}
+      ai_filter_factories_(std::move(ai_filter_factories)), cluster_manager_(cluster_manager) {}
 
 absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
@@ -200,9 +321,11 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
         entry.typed_config(), context.messageValidationVisitor(), *config));
     absl::StatusOr<AiFilterFactoryCb> cb = factory->createAiFilterFactory(*config, context, scope);
     RETURN_IF_NOT_OK_REF(cb.status());
-    factories.push_back(std::move(cb.value()));
+    factories.push_back(
+        {entry.name(), std::move(cb.value()), factory->upstreamCandidatesPolicy(*config)});
   }
-  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories));
+  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories),
+                                              context.clusterManager());
 }
 
 void AiProtocolManagerFilter::onDestroy() {
@@ -423,6 +546,10 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
   decode_manager_->endStream();
   auto on_complete = [this, has_trailers](absl::Status status) {
     if (!status.ok()) {
+      if (payload_rejected_ && absl::IsCancelled(status)) {
+        ENVOY_LOG(debug, "ai_protocol_manager: request ended by local reply: {}", status.message());
+        return;
+      }
       ENVOY_LOG(error, "ai_protocol_manager: replay failed: {}", status.message());
       if (!payload_rejected_) {
         payload_rejected_ = true;
@@ -447,14 +574,15 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     ASSERT(request_headers_ != nullptr);
     const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
                                   request_protocol_, decode_manager_->length(),
-                                  route_response_protocol_,
-                                  /*route_actions_supported=*/
-                                  decoder_callbacks_->downstreamCallbacks().has_value()};
+                                  route_response_protocol_};
     std::vector<AiFilterSharedPtr> filters;
+    std::vector<AiFilterStage> stages;
     filters.reserve(config_->aiFilterFactories().size());
-    for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
-      if (AiFilterSharedPtr filter = factory(context); filter != nullptr) {
+    stages.reserve(config_->aiFilterFactories().size());
+    for (const AiFilterFactory& factory : config_->aiFilterFactories()) {
+      if (AiFilterSharedPtr filter = factory.cb(context); filter != nullptr) {
         filters.push_back(std::move(filter));
+        stages.push_back({factory.name, factory.policy});
       }
     }
     // TODO(penguingao): Avoid always passing downstream StreamInfo when constructing
@@ -464,35 +592,30 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
     filter_manager_->startRequest(
         std::move(request_json_), decode_manager_.get(), decoder_callbacks_->dispatcher(),
         decoder_callbacks_->streamInfo(), std::move(on_complete), request_headers_,
-        [this](Http::Code code, std::string details) {
+        [this](Http::Code code, std::string body, absl::string_view details) {
           ENVOY_LOG(debug, "ai_protocol_manager: rejecting request via local reply: {} {}",
-                    static_cast<uint32_t>(code), details);
+                    static_cast<uint32_t>(code), body);
           payload_rejected_ = true;
-          decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
-                                             "ai_protocol_manager_filter_rejected");
+          decoder_callbacks_->sendLocalReply(code, body, nullptr, std::nullopt, details);
         },
         config_->alwaysSerializeRequest(), request_protocol_,
-        [this](bool refresh_route_cluster) {
-          if (refresh_route_cluster) {
-            refreshRouteCluster();
-          }
-        });
+        [this](AiRequest& request, std::shared_ptr<UpstreamCandidates> decision) {
+          return UpstreamCandidatesCommit::run(*config_, *decoder_callbacks_, *request_headers_,
+                                               request, std::move(decision));
+        },
+        std::move(stages), upstreamCandidatesEnabled());
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }
 }
 
-void AiProtocolManagerFilter::refreshRouteCluster() {
-  OptRef<Http::DownstreamStreamFilterCallbacks> downstream =
-      decoder_callbacks_->downstreamCallbacks();
-  if (!downstream.has_value()) {
-    ENVOY_LOG(debug,
-              "ai_protocol_manager: ignoring route cluster refresh: no downstream filter chain");
-    config_->stats().route_cluster_refresh_ignored_.inc();
-    return;
+bool AiProtocolManagerFilter::upstreamCandidatesEnabled() const {
+  if (route_response_protocol_ != LLMProtocol::Unspecified &&
+      route_response_protocol_ != request_protocol_) {
+    return false;
   }
-  downstream->refreshRouteCluster();
-  config_->stats().route_cluster_refreshed_.inc();
+  return decoder_callbacks_->downstreamCallbacks().has_value() &&
+         routeEntry(*decoder_callbacks_) != nullptr;
 }
 
 Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
