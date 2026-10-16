@@ -1,0 +1,13 @@
+any {
+  [type.googleapis.com/xds.type.v3.TypedStruct] {
+    type_url: "type.googleapis.com/envoy.test.Sensitive"
+    value {
+      fields {
+        key: "sensitive_string"
+        value {
+          string_value: "secret"
+        }
+      }
+    }
+  }
+}

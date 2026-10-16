@@ -74,7 +74,9 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":utility_test_protos_cc_proto",
+        "//source/common/buffer:buffer_lib",
         "//source/common/config:api_version_lib",
+        "//source/common/json:proto_streamer_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/server:instance_mocks",
