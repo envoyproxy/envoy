@@ -320,6 +320,7 @@ envoy_cc_library(
     hdrs = ["null_overload_manager.h"],
     deps = [
         "//envoy/server/overload:overload_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/event:scaled_range_timer_manager_lib",
     ],
 )
