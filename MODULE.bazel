@@ -26,10 +26,9 @@ bazel_dep(name = "cel-cpp", version = "0.16.1.envoy")
 bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
-bazel_dep(name = "emsdk", version = "4.0.23.envoy")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.3.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.3.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.4.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.4.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -74,8 +73,8 @@ bazel_dep(name = "protoc-gen-validate", version = "1.3.3.envoy")
 bazel_dep(name = "proto-converter", version = "0.0.0-20260912-3850764.envoy")
 bazel_dep(name = "proto-field-extraction", version = "0.0.0-240710-d5d39f0.envoy")
 bazel_dep(name = "proto-processing", version = "0.0.0-250110-279353c.envoy")
-bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
-bazel_dep(name = "proxy-wasm-cpp-sdk", version = "0.0.0-250925-e5256b0.envoy")
+bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy.1")
+bazel_dep(name = "proxy-wasm-cpp-sdk", version = "0.0.0-250925-e5256b0.envoy.1")
 bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.5")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
 bazel_dep(name = "qatlib", version = "26.02.0.envoy")
@@ -105,7 +104,7 @@ bazel_dep(name = "tclap", version = "1.2.5.bcr.1")
 bazel_dep(name = "tcmalloc", version = "0.0.0-250926-12f2552.envoy")
 bazel_dep(name = "thrift", version = "0.24.0.envoy")
 bazel_dep(name = "uadk", version = "2.9.envoy")
-bazel_dep(name = "v8", version = "14.6.202.10.envoy")
+bazel_dep(name = "v8", version = "14.6.202.10.envoy.1")
 bazel_dep(name = "vectorscan", version = "5.4.11.envoy")
 bazel_dep(name = "wamr", version = "2.4.5.envoy")
 bazel_dep(name = "wasmtime", version = "45.0.2.envoy")
@@ -143,7 +142,7 @@ local_path_override(
 
 single_version_override(
     module_name = "proxy-wasm-cpp-sdk",
-    version = "0.0.0-250925-e5256b0.envoy",
+    version = "0.0.0-250925-e5256b0.envoy.1",
 )
 
 single_version_override(
@@ -246,12 +245,12 @@ llvm.toolchain_root(
 )
 llvm.sysroot(
     name = "llvm_toolchain",
-    label = "@sysroot_linux_amd64//:sysroot",
+    label = "@sysroot_linux_amd64//sysroot",
     targets = ["linux-x86_64"],
 )
 llvm.sysroot(
     name = "llvm_toolchain",
-    label = "@sysroot_linux_arm64//:sysroot",
+    label = "@sysroot_linux_arm64//sysroot",
     targets = ["linux-aarch64"],
 )
 use_repo(llvm, "llvm_toolchain")

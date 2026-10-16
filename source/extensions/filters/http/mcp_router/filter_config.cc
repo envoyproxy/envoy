@@ -3,7 +3,7 @@
 #include <utility>
 #include <vector>
 
-#include "source/extensions/filters/common/mcp/filter_state.h"
+#include "source/extensions/filters/common/mcp/constants.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -84,7 +84,7 @@ McpRouterConfigImpl::McpRouterConfigImpl(
       default_backend_name_(backends_.size() == 1 ? backends_[0].name : ""),
       factory_context_(context), lazy_initialization_(proto_config.lazy_initialization()),
       session_identity_(parseSessionIdentity(proto_config)),
-      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
+      metadata_namespace_(Filters::Common::Mcp::McpConstants::McpfilterNamespace),
       stats_(generateStats(stats_prefix, scope)) {}
 
 const McpBackendConfig* McpRouterConfigImpl::findBackend(const std::string& name) const {

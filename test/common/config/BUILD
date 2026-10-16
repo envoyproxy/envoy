@@ -24,6 +24,22 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "dependent_type_pausing_subscription_test",
+    srcs = ["dependent_type_pausing_subscription_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:cleanup_lib",
+        "//source/common/config:dependent_type_pausing_subscription_lib",
+        "//source/common/config:dependent_type_urls_lib",
+        "//source/common/config:resource_name_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/config:xds_manager_mocks",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "ttl_test",
     srcs = ["ttl_test.cc"],
     rbe_pool = "linux_x64_small",

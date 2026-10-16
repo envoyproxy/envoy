@@ -8,6 +8,7 @@
 #include "envoy/config/cluster/v3/filter.pb.h"
 #include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/base64.h"
@@ -1330,10 +1331,77 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("null"), "null_value: NULL_VALUE"));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("true"), "bool_value: true"));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("1"), "number_value: 1"));
+  // Plain (untagged) float/double literals are left as strings, preserving pre-existing
+  // behavior for configs that rely on this fallback (e.g. a string match `exact: 3.14`).
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("3.14"), "string_value: \"3.14\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml(".inf"), "string_value: \".inf\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("-.inf"), "string_value: \"-.inf\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml(".nan"), "string_value: \".nan\""));
+  // An explicit `!!float` tag opts a scalar into being parsed as a JSON number.
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float 3.14"), "number_value: 3.14"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float 1e2"), "number_value: 100"));
+  // The explicit tag wins over the int64 decoder, which ignores tags: an integer literal outside
+  // int32 range must not become an int64 string.
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float 3000000000"),
+                                 "number_value: 3000000000"));
+  // Non-finite values use the proto3 JSON string forms.
+  EXPECT_TRUE(
+      checkProtoEquality(ValueUtil::loadFromYaml("!!float .inf"), "string_value: \"Infinity\""));
+  EXPECT_TRUE(
+      checkProtoEquality(ValueUtil::loadFromYaml("!!float -.inf"), "string_value: \"-Infinity\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("!!float .nan"), "string_value: \"NaN\""));
+  // A `!!float` scalar that does not decode as a double is rejected rather than falling back to a
+  // string or a bool.
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml("!!float abc"), EnvoyException,
+                          "Invalid !!float value 'abc'");
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml("!!float true"), EnvoyException,
+                          "Invalid !!float value 'true'");
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("9223372036854775807"),
                                  "string_value: \"9223372036854775807\""));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("\"foo\""), "string_value: \"foo\""));
   EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("foo"), "string_value: \"foo\""));
+}
+
+// Mirrors the dynamic modules / Go filter config shape from
+// https://github.com/envoyproxy/envoy/issues/45678: a `google.protobuf.Struct` packed in an `Any`.
+// Tagged floats survive the MessageToJsonString round trip as numbers, untagged floats stay
+// strings.
+TEST_F(ProtobufUtilityTest, MessageUtilLoadFromYamlTaggedFloatIntoAnyStruct) {
+  envoy::config::core::v3::TypedExtensionConfig config;
+  MessageUtil::loadFromYaml(R"EOF(
+name: myfilter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+  value:
+    body:
+      maxSize: !!float 5000.0
+      largeSize: !!float 3000000000
+      untagged: 5000.0
+)EOF",
+                            config, ProtobufMessage::getStrictValidationVisitor());
+  const auto filter_config = MessageUtil::anyConvert<Protobuf::Struct>(config.typed_config());
+  const auto& body = filter_config.fields().at("body").struct_value().fields();
+  EXPECT_TRUE(checkProtoEquality(body.at("maxSize"), "number_value: 5000"));
+  EXPECT_TRUE(checkProtoEquality(body.at("largeSize"), "number_value: 3000000000"));
+  EXPECT_TRUE(checkProtoEquality(body.at("untagged"), "string_value: \"5000.0\""));
+}
+
+// `!!float` values loaded into a typed double field, including the proto3 JSON "Infinity" and
+// "NaN" string forms used for non-finite values, parse back into doubles.
+TEST_F(ProtobufUtilityTest, MessageUtilLoadFromYamlTaggedFloatIntoDouble) {
+  envoy::type::v3::Percent percent;
+  MessageUtil::loadFromYaml("value: !!float 50.5", percent,
+                            ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_EQ(50.5, percent.value());
+  MessageUtil::loadFromYaml("value: !!float .inf", percent,
+                            ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_EQ(std::numeric_limits<double>::infinity(), percent.value());
+  MessageUtil::loadFromYaml("value: !!float -.inf", percent,
+                            ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_EQ(-std::numeric_limits<double>::infinity(), percent.value());
+  MessageUtil::loadFromYaml("value: !!float .nan", percent,
+                            ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_TRUE(std::isnan(percent.value()));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
