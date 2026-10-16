@@ -69,6 +69,23 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "custom_metrics_test",
+    srcs = ["custom_metrics_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//source/extensions/wasm_runtime/null:config",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "plugin_test",
     srcs = ["plugin_test.cc"],
     rbe_pool = "linux_x64_small",

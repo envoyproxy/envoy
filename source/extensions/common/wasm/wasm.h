@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <map>
@@ -110,10 +111,87 @@ protected:
   // Lifecycle stats
   LifecycleStatsHandler lifecycle_stats_handler_;
 
-  // Plugin stats
-  absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
-  absl::flat_hash_map<uint32_t, Stats::Gauge*> gauges_;
-  absl::flat_hash_map<uint32_t, Stats::Histogram*> histograms_;
+  // A metric defined by the module through define_metric.
+  template <class StatType> struct CustomMetric {
+    // The name of the metric, including the custom stat namespace.
+    Stats::StatName name;
+    // The metric, if custom metrics are not evictable. May point to a null stat if the metric
+    // could not be created.
+    StatType* stat = nullptr;
+    // Evictable mode only: the name of the metric in the central cache of the scope, set on the
+    // first successful lookup. Used by get_metric, which must not re-create an evicted metric.
+    Stats::StatName central_name;
+    // Evictable gauges only: increments that were discarded because the gauge could not be
+    // created, and that the next decrements on this thread must not apply.
+    uint64_t discarded_increments = 0;
+  };
+
+  // Returns the metric, or nullptr if it currently cannot be created. In evictable mode the
+  // metric is looked up on every call, and the returned pointer must not be retained.
+  template <class StatType> StatType* customMetric(CustomMetric<StatType>& metric) {
+    if (!custom_metrics_evictable_) {
+      return metric.stat;
+    }
+    StatType& stat = lookupCustomMetric<StatType>(metric.name);
+    // Null stats, returned for metrics that cannot be created, have an empty name.
+    if (stat.statName().empty()) {
+      return nullptr;
+    }
+    if (metric.central_name.empty()) {
+      metric.central_name = stat_name_pool_.add(stat.statName());
+    }
+    return &stat;
+  }
+
+  template <class StatType>
+  void defineCustomMetric(CustomMetric<StatType>& metric, Stats::StatName name) {
+    metric.name = name;
+    if (custom_metrics_evictable_) {
+      // Create the metric when it is defined, as in non-evictable mode.
+      customMetric(metric);
+    } else {
+      metric.stat = &lookupCustomMetric<StatType>(name);
+    }
+  }
+
+  // Returns the value of the metric. In evictable mode, an evicted metric is not re-created and
+  // its value is zero.
+  template <class StatType> uint64_t customMetricValue(const CustomMetric<StatType>& metric) {
+    if (!custom_metrics_evictable_) {
+      return metric.stat->value();
+    }
+    if (metric.central_name.empty()) {
+      return 0;
+    }
+    if constexpr (std::is_same_v<StatType, Stats::Counter>) {
+      auto counter = custom_metrics_scope_->findCounter(metric.central_name);
+      return counter.has_value() ? counter->value() : 0;
+    } else {
+      auto gauge = custom_metrics_scope_->findGauge(metric.central_name);
+      return gauge.has_value() ? gauge->value() : 0;
+    }
+  }
+
+  template <class StatType> StatType& lookupCustomMetric(Stats::StatName name) {
+    if constexpr (std::is_same_v<StatType, Stats::Counter>) {
+      return custom_metrics_scope_->counterFromStatName(name);
+    } else if constexpr (std::is_same_v<StatType, Stats::Gauge>) {
+      return custom_metrics_scope_->gaugeFromStatName(name, Stats::Gauge::ImportMode::Accumulate);
+    } else {
+      return custom_metrics_scope_->histogramFromStatName(name,
+                                                          Stats::Histogram::Unit::Unspecified);
+    }
+  }
+
+  // Custom metrics. Each clone of the VM runs on a single thread and has its own maps.
+  Stats::ScopeSharedPtr custom_metrics_scope_;
+  bool custom_metrics_evictable_ = false;
+  // Metric ids by name, per metric type, so that defining the same metric again returns the
+  // same id.
+  std::array<absl::flat_hash_map<std::string, uint32_t>, 3> custom_metric_ids_;
+  absl::flat_hash_map<uint32_t, CustomMetric<Stats::Counter>> counters_;
+  absl::flat_hash_map<uint32_t, CustomMetric<Stats::Gauge>> gauges_;
+  absl::flat_hash_map<uint32_t, CustomMetric<Stats::Histogram>> histograms_;
 
   CreateContextFn create_context_for_testing_;
   CreateContextFn create_root_context_for_testing_;
