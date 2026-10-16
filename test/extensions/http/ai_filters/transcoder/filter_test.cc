@@ -59,6 +59,8 @@ using HttpFilters::AiProtocolManager::FlatteningJsonDecoder;
 using HttpFilters::AiProtocolManager::FlattenJsonField;
 using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
+using HttpFilters::AiProtocolManager::LlmBinding;
+using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
 using HttpFilters::AiProtocolManager::LlmBindingObject;
 using HttpFilters::AiProtocolManager::LlmBindingRead;
 using HttpFilters::AiProtocolManager::LlmBindingReadObject;
@@ -170,7 +172,9 @@ public:
     return AiFilterContext{.stream_info = stream_info_,
                            .request_headers = request_headers_,
                            .request_protocol = source_protocol,
-                           .response_protocol = target_protocol_};
+                           .response_protocol = target_protocol_,
+                           .request_binding = route_request_binding_,
+                           .response_binding = route_response_binding_};
   }
 
   void runDecodeChain(std::vector<AiFilterSharedPtr> filters, const std::string& payload) {
@@ -285,6 +289,9 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_;
   // The backend's dialect, as the route declares it for the filters `makeContext()` builds.
   LLMProtocol target_protocol_{LLMProtocol::Unspecified};
+  // The bindings the route declares for those filters.
+  LlmBindingConstSharedPtr route_request_binding_;
+  LlmBindingConstSharedPtr route_response_binding_;
 
   absl::Status status_;
   bool completed_{false};
@@ -599,6 +606,62 @@ TEST_F(TranscoderFilterTest, RequestBindingLiftsTheModelFromTheClientsPath) {
   const LlmBindingRead* read = LlmBindingReadObject::fromFilterState(*stream_info_.filterState());
   ASSERT_NE(read, nullptr);
   EXPECT_EQ(read->model, "claude-sonnet-4-5");
+}
+
+// The route's request binding reads the client's path when filter state names none.
+TEST_F(TranscoderFilterTest, RouteRequestBindingLiftsTheModelFromTheClientsPath) {
+  route_request_binding_ = *LlmBinding::parse("/anthropic/{model}/{messages|stream}");
+
+  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
+                  R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",
+                  "/anthropic/claude-sonnet-4-5/stream");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  const nlohmann::json out = forwarded();
+  EXPECT_EQ(out["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(out["stream"], true);
+}
+
+constexpr absl::string_view ChatToClaude =
+    R"({"model": "claude-sonnet-4-5", "max_completion_tokens": 16,)"
+    R"( "messages": [{"role": "user", "content": "Hi"}]})";
+
+// The route's response binding renders the path the request leaves on.
+TEST_F(TranscoderFilterTest, RouteResponseBindingSendsTheRequest) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  route_response_binding_ = *LlmBinding::parse("/gateway/{model}/{messages|messages-stream}");
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  std::string(ChatToClaude));
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/gateway/claude-sonnet-4-5/messages");
+}
+
+TEST_F(TranscoderFilterTest, FilterStateBindingReplacesTheRoutes) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  route_response_binding_ = *LlmBinding::parse("/gateway/{model}/{messages|messages-stream}");
+  setBinding(FilterStateKeys::BindingResponse, "/override/{model}/{messages|messages-stream}");
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  std::string(ChatToClaude));
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/override/claude-sonnet-4-5/messages");
+}
+
+// The route's response binding is how the route's backend carries its API, so a backend that
+// filter state names instead leaves in its own API's binding.
+TEST_F(TranscoderFilterTest, RouteResponseBindingLapsesForAnotherBackendApi) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  route_response_binding_ = *LlmBinding::parse("/gateway/{model}/{messages|messages-stream}");
+  setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  std::string(ChatToClaude));
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1beta/models/claude-sonnet-4-5:generateContent");
 }
 
 // A binding set once per connection is shared by every stream on it, so what one stream's path

@@ -106,9 +106,10 @@ std::vector<std::pair<std::string, nlohmann::json>> sseEvents(absl::string_view 
 
 // Partner models on Vertex AI behind one route, in both directions: a Claude on Vertex AI client
 // sent to Gemini on Vertex AI, and a Gemini on Vertex AI client sent to Claude on Vertex AI. The
-// route declares only the client's API; a filter ahead of the AI Protocol Manager names the
-// backend's API, its binding and the model, and the client's path supplies the project and the
-// region. The upstream answers as Vertex AI does.
+// route declares the client's API. The backend's API and binding are the route's for Gemini, and
+// come from a filter ahead of the AI Protocol Manager for Claude, as from a model router; that
+// filter names the model either way, and the client's path supplies the project and the region.
+// The upstream answers as Vertex AI does.
 class TranscoderIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public HttpIntegrationTest {
 public:
@@ -116,21 +117,22 @@ public:
 
   // Gemini's own edits apply to a binding with only a pattern: `model` and `stream` leave the body.
   void initializeForGemini() {
-    initializeRoute(envoy::type::ai::v3::ANTHROPIC_MESSAGES, "GEMINI_GENERATE_CONTENT",
+    initializeRoute(envoy::type::ai::v3::ANTHROPIC_MESSAGES,
+                    envoy::type::ai::v3::GEMINI_GENERATE_CONTENT,
                     "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
                     "{model}:{generateContent|streamGenerateContent?alt=sse}",
-                    GeminiModel);
+                    GeminiModel, /*binding_on_route=*/true);
   }
 
   // Claude on Vertex AI needs edits of its own, so the binding is spelled out in JSON.
   void initializeForClaude() {
     initializeRoute(
-        envoy::type::ai::v3::GEMINI_GENERATE_CONTENT, "ANTHROPIC_MESSAGES",
+        envoy::type::ai::v3::GEMINI_GENERATE_CONTENT, envoy::type::ai::v3::ANTHROPIC_MESSAGES,
         R"({"uri_pattern": "/{version}/projects/{project}/locations/{location}/publishers/)"
         R"(anthropic/models/{model}:{rawPredict|streamRawPredict}", "mutations": [)"
         R"({"body_field": "model"}, {"body_field": "anthropic_version", )"
         R"("value": "vertex-2023-10-16", "keep_existing": true}]})",
-        ClaudeModel);
+        ClaudeModel, /*binding_on_route=*/false);
   }
 
   IntegrationStreamDecoderPtr sendClientRequest(absl::string_view path,
@@ -188,12 +190,22 @@ public:
   }
 
 private:
-  void initializeRoute(envoy::type::ai::v3::LLMProtocol client_api, absl::string_view backend_api,
-                       absl::string_view response_binding, absl::string_view resolved_model) {
-    config_helper_.addConfigModifier([client_api](ConfigHelper::HttpConnectionManager& hcm) {
+  // The backend's API and its binding, a URI pattern when on the route, go on the route when
+  // `binding_on_route`, and otherwise in filter state beside the resolved model.
+  void initializeRoute(envoy::type::ai::v3::LLMProtocol client_api,
+                       envoy::type::ai::v3::LLMProtocol backend_api,
+                       absl::string_view response_binding, absl::string_view resolved_model,
+                       bool binding_on_route) {
+    config_helper_.addConfigModifier([client_api, backend_api, response_binding,
+                                      binding_on_route](ConfigHelper::HttpConnectionManager& hcm) {
       envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
           per_route;
       per_route.mutable_request()->set_llm_protocol(client_api);
+      if (binding_on_route) {
+        per_route.mutable_response()->set_llm_protocol(backend_api);
+        per_route.mutable_response()->mutable_binding()->set_uri_pattern(
+            std::string(response_binding));
+      }
       auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
       std::ignore =
           (*route->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
@@ -228,11 +240,16 @@ typed_config:
       response_handling: TO_IR
 )EOF");
 
-    config_helper_.prependFilter(absl::Substitute(R"EOF(
-name: envoy.filters.http.set_filter_state
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
-  on_request_headers:
+    std::string instructions = absl::Substitute(R"EOF(
+  - object_key: envoy.ai.model.resolved
+    format_string:
+      text_format_source:
+        inline_string: '$0'
+)EOF",
+                                                resolved_model);
+    if (!binding_on_route) {
+      absl::StrAppend(&instructions,
+                      absl::Substitute(R"EOF(
   - object_key: envoy.ai.llm_protocol.response
     format_string:
       text_format_source:
@@ -241,12 +258,16 @@ typed_config:
     format_string:
       text_format_source:
         inline_string: '$1'
-  - object_key: envoy.ai.model.resolved
-    format_string:
-      text_format_source:
-        inline_string: '$2'
 )EOF",
-                                                  backend_api, response_binding, resolved_model));
+                                       envoy::type::ai::v3::LLMProtocol_Name(backend_api),
+                                       response_binding));
+    }
+    config_helper_.prependFilter(absl::StrCat(R"EOF(
+name: envoy.filters.http.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+  on_request_headers:)EOF",
+                                              instructions));
 
     initialize();
   }

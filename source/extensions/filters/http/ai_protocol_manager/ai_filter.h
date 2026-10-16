@@ -19,6 +19,7 @@
 #include "source/common/coroutine/task.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_response.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
 #include "absl/functional/any_invocable.h"
@@ -140,6 +141,11 @@ struct AiFilterContext {
   uint64_t request_payload_bytes{0};
   // Route-declared response/backend wire API; Unspecified when the route named none.
   LLMProtocol response_protocol = LLMProtocol::Unspecified;
+  // How the route's clients and its backend carry their APIs on HTTP; null when the route names
+  // none, and the request's when filter state names an API other than the route's. The
+  // envoy.ai.binding.request and envoy.ai.binding.response filter state objects replace them.
+  LlmBindingConstSharedPtr request_binding{};
+  LlmBindingConstSharedPtr response_binding{};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.

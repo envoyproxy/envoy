@@ -188,12 +188,18 @@ public:
     return filter_->decodeHeaders(headers, /*end_stream=*/false);
   }
 
-  // Attaches a per-route config declaring the route an AI endpoint with a
-  // request payload for the filter to hold.
-  void setRouteConfig() {
+  // A route declaring a Chat Completions endpoint.
+  static PerRouteProto chatRoute() {
     PerRouteProto proto;
     proto.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-    route_config_ = std::make_unique<RouteConfig>(proto);
+    return proto;
+  }
+
+  // Attaches a per-route config declaring the route an AI endpoint with a
+  // request payload for the filter to hold.
+  void setRouteConfig() { setRouteConfig(chatRoute()); }
+  void setRouteConfig(const PerRouteProto& proto) {
+    route_config_ = RouteConfig::create(proto).value();
     ON_CALL(callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
     ON_CALL(encoder_callbacks_, mostSpecificPerFilterConfig())
@@ -519,7 +525,7 @@ public:
 
   // Attaches a per-route config on the encode path.
   void setEncodeRouteConfig(const PerRouteProto& proto) {
-    route_config_ = std::make_unique<RouteConfig>(proto);
+    route_config_ = RouteConfig::create(proto).value();
     ON_CALL(encoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
   }
@@ -1349,6 +1355,8 @@ public:
     std::string path;
     const StreamInfo::StreamInfo* stream_info;
     uint64_t payload_bytes;
+    LlmBindingConstSharedPtr request_binding;
+    LlmBindingConstSharedPtr response_binding;
   };
 
   ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen)
@@ -1360,7 +1368,8 @@ public:
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
     seen_.push_back({context_.request_protocol, request->protocol(),
                      std::string(context_.request_headers.getPathValue()), &context_.stream_info,
-                     context_.request_payload_bytes});
+                     context_.request_payload_bytes, context_.request_binding,
+                     context_.response_binding});
     request->json()["model"] = "rewritten";
     co_return co_await std::move(propagate_request)(std::move(request));
   }
@@ -1449,13 +1458,14 @@ TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesTotalPayloadBytes) {
 
 class AiProtocolManagerFilterStateTest : public AiProtocolManagerFilterTest {
 public:
-  // What the AI filters see on a Chat Completions route when filter state names `named`.
-  std::vector<ContextRecordingAiFilter::Seen> runWithFilterState(LLMProtocol named) {
+  // What the AI filters see on `route`, a Chat Completions route, when filter state names `named`.
+  std::vector<ContextRecordingAiFilter::Seen>
+  runWithFilterState(LLMProtocol named, const PerRouteProto& route = chatRoute()) {
     std::vector<ContextRecordingAiFilter::Seen> seen;
     createFilterWithAiFilters({[&seen](const AiFilterContext& context) -> AiFilterSharedPtr {
       return std::make_unique<ContextRecordingAiFilter>(context, seen);
     }});
-    setRouteConfig();
+    setRouteConfig(route);
     callbacks_.stream_info_.filterState()->setData(FilterStateKeys::LlmProtocolRequest,
                                                    std::make_shared<RequestLlmProtocol>(named),
                                                    StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -1472,6 +1482,33 @@ TEST_F(AiProtocolManagerFilterStateTest, FilterStateOutranksTheRoute) {
   ASSERT_EQ(seen.size(), 1);
   EXPECT_EQ(seen[0].protocol, LLMProtocol::AnthropicMessages);
   EXPECT_EQ(seen[0].request_protocol, LLMProtocol::AnthropicMessages);
+}
+
+// A Chat Completions route whose clients and backend carry their APIs on bindings of its own.
+PerRouteProto routeWithBindings() {
+  PerRouteProto proto = AiProtocolManagerFilterTest::chatRoute();
+  proto.mutable_request()->mutable_binding()->set_uri_pattern("/gateway/{model}/chat");
+  proto.mutable_response()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  proto.mutable_response()->mutable_binding()->set_uri_pattern("/v1/messages");
+  return proto;
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, RouteBindingsReachTheAiFilters) {
+  const auto seen = runWithFilterState(LLMProtocol::Unspecified, routeWithBindings());
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_NE(seen[0].request_binding, nullptr);
+  EXPECT_EQ(seen[0].request_binding->pattern()->source(), "/gateway/{model}/chat");
+  ASSERT_NE(seen[0].response_binding, nullptr);
+  EXPECT_EQ(seen[0].response_binding->pattern()->source(), "/v1/messages");
+}
+
+// The route's request binding is how its clients carry the route's API, so it lapses for a
+// request that filter state names another API for.
+TEST_F(AiProtocolManagerFilterStateTest, RouteRequestBindingLapsesForAnotherApi) {
+  const auto seen = runWithFilterState(LLMProtocol::AnthropicMessages, routeWithBindings());
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].request_binding, nullptr);
+  EXPECT_NE(seen[0].response_binding, nullptr);
 }
 
 TEST_F(AiProtocolManagerFilterStateTest, UnspecifiedFilterStateLeavesTheRoute) {

@@ -118,8 +118,8 @@ public:
       HttpFilters::AiProtocolManager::AiResponseStreamPropagator propagate_response) override;
 
 private:
-  // The transcoding instructions in filter state that the request legs follow; each is unset when
-  // no filter ahead of this one left it.
+  // The transcoding instructions the request legs follow, from filter state or else the route;
+  // each is unset when neither names it.
   struct Instructions {
     HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr request_binding;
     HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr response_binding;
@@ -166,6 +166,9 @@ private:
   // The stream's filter state, where the instructions are left. Held by pointer: the stream info
   // itself is only valid for as long as `AiFilterContext` says.
   const StreamInfo::FilterStateSharedPtr filter_state_;
+  // The route's bindings, which the filter state objects replace for one request.
+  const HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr route_request_binding_;
+  const HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr route_response_binding_;
   // When the stream started, in seconds since the Unix epoch: the `created` time of an IR
   // response whose dialect does not carry one.
   const int64_t created_;

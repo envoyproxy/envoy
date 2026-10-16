@@ -124,6 +124,8 @@ TranscoderFilter::TranscoderFilter(TranscoderFilterConfigSharedPtr config,
     : config_(std::move(config)), source_protocol_(context.request_protocol),
       target_protocol_(context.response_protocol), request_headers_(context.request_headers),
       filter_state_(context.stream_info.filterState()),
+      route_request_binding_(context.request_binding),
+      route_response_binding_(context.response_binding),
       created_(std::chrono::duration_cast<std::chrono::seconds>(
                    context.stream_info.startTime().time_since_epoch())
                    .count()) {}
@@ -264,6 +266,7 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
 
 absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstructions() {
   const StreamInfo::FilterState& filter_state = *filter_state_;
+  const LLMProtocol route_target_protocol = target_protocol_;
   target_protocol_ = ResponseLlmProtocol::resolve(filter_state, target_protocol_);
 
   Instructions instructions;
@@ -279,6 +282,14 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
           absl::StrCat("transcoder: filter state `", *key, "`: ", binding.status().message()));
     }
     *into = *std::move(binding);
+  }
+  // The route's bindings stand in for keys left unset. The response one is how the route's backend
+  // carries its API, so it lapses when filter state names another.
+  if (instructions.request_binding == nullptr) {
+    instructions.request_binding = route_request_binding_;
+  }
+  if (instructions.response_binding == nullptr && target_protocol_ == route_target_protocol) {
+    instructions.response_binding = route_response_binding_;
   }
   if (const std::optional<absl::string_view> model =
           stringFromFilterState(filter_state, FilterStateKeys::ModelResolved);
@@ -334,8 +345,8 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
              leg->direction == TranscodeDirection::ToIr) {
     // The instruction was set on purpose, so a path it does not match is more likely a
     // misconfiguration than intent. The request still goes through on what the body says.
-    ENVOY_LOG(debug, "transcoder: {} does not match the request path `{}`",
-              FilterStateKeys::BindingRequest, ctx.request_path);
+    ENVOY_LOG(debug, "transcoder: the request binding does not match the request path `{}`",
+              ctx.request_path);
   }
   request_model_ =
       !ctx.ir_model.empty() ? std::move(ctx.ir_model) : modelFromPath(instructions.request_binding);

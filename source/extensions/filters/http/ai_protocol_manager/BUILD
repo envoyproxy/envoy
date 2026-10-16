@@ -396,6 +396,7 @@ envoy_cc_library(
     deps = [
         ":ai_request_lib",
         ":ai_response_lib",
+        ":llm_binding_lib",
         ":token_usage_lib",
         "//envoy/common:pure_lib",
         "//envoy/config:typed_config_interface",
@@ -474,6 +475,7 @@ envoy_cc_library(
         ":filter_manager_lib",
         ":json_with_ext_buf_lib",
         ":json_with_ext_buf_parser_lib",
+        ":llm_binding_lib",
         ":llm_protocol_conversion_lib",
         ":response_handler_lib",
         ":schema_lib",

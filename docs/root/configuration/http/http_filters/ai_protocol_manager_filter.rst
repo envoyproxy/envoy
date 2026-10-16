@@ -417,21 +417,31 @@ independent, and a key that is not set leaves today's behavior in place.
 
 ``envoy.ai.binding.request``
   How the client's request carries its API on HTTP. The ``TO_IR`` leg reads the client's path
-  and body under it; the path itself is not rewritten. Without it, the client API's own binding
-  and those Envoy knows for it are tried: Gemini's ``/v1beta/models/{model}:generateContent`` and
-  its Vertex AI form, and Claude on Vertex AI's ``rawPredict`` and ``streamRawPredict`` for
-  Anthropic Messages. A gateway that serves an API under its own prefix names the prefix here.
+  and body under it; the path itself is not rewritten. Without it, the route's binding applies,
+  and without that, the client API's own binding and those Envoy knows for it are tried: Gemini's
+  ``/v1beta/models/{model}:generateContent`` and its Vertex AI form, and Claude on Vertex AI's
+  ``rawPredict`` and ``streamRawPredict`` for Anthropic Messages. A gateway that serves an API
+  under its own prefix names the prefix here.
 
 ``envoy.ai.binding.response``
   How the backend expects its API on HTTP. The ``FROM_IR`` leg renders its path into ``:path``
-  and applies its edits, in place of the backend API's own binding; a Gemini backend on Vertex
-  AI, for example, names Vertex's path here. When it is unset and the backend speaks the
-  client's API, the request leaves in the binding it arrived in.
+  and applies its edits, in place of the route's binding and the backend API's own; a Gemini
+  backend on Vertex AI, for example, names Vertex's path here. When neither it nor the route
+  names one and the backend speaks the client's API, the request leaves in the binding it
+  arrived in.
 
 ``envoy.ai.model.resolved``
   The model to send upstream in place of the one the client asked for. It reaches the body and
   the rendered path alike. The response still reports the model the client asked for; which
   backend served it stays with the gateway.
+
+A route declares its bindings beside each ``llm_protocol``, in :ref:`request.binding
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.binding>` and
+:ref:`response.binding
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponsePerRoute.binding>`,
+which are checked when the configuration loads. A route's binding is how that side carries the
+route's API, so it lapses when filter state names another API for the side: a router that sends a
+request to another backend API names that backend's binding too, or the API's own applies.
 
 A binding is written as a URI pattern, starting with ``/``, or as an :ref:`LLMBinding
 <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON, starting with ``{``. A part the binding leaves
