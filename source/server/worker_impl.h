@@ -73,6 +73,10 @@ public:
                           const std::list<const Network::FilterChain*>& filter_chains,
                           Network::ConnectionDrainEvent drain_event) override;
   void onListenerDrain(uint64_t listener_tag, Network::ConnectionDrainEvent drain_event) override;
+  void stopListenerAddresses(
+      const Network::ListenerConfig& listener,
+      const std::vector<Network::Address::InstanceConstSharedPtr>& addresses) override;
+  void removeListenerAddresses(const Network::ListenerConfig& listener) override;
 
 private:
   void threadRoutine(OptRef<GuardDog> guard_dog, const std::function<void()>& cb);

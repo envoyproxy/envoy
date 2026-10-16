@@ -55,6 +55,10 @@ public:
                Network::ConnectionDrainEvent drain_event));
   MOCK_METHOD(void, onListenerDrain,
               (uint64_t listener_tag, Network::ConnectionDrainEvent drain_event));
+  MOCK_METHOD(void, stopListenerAddresses,
+              (const Network::ListenerConfig& listener,
+               const std::vector<Network::Address::InstanceConstSharedPtr>& addresses));
+  MOCK_METHOD(void, removeListenerAddresses, (const Network::ListenerConfig& listener));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

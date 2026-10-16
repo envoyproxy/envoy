@@ -83,7 +83,7 @@ protected:
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
-    EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
+    EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_)).RetiresOnSaturation();
     // Drain notifications are scheduled whenever a listener or its filter chains begin draining.
     // They are not the focus of these tests, so allow them in any number.
     EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(::testing::AnyNumber());
