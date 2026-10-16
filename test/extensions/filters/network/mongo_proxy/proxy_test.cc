@@ -729,7 +729,9 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
   EXPECT_EQ(1U, store_.counter("mongo.test.cx_destroy_local_with_active_rq").value());
 }
 
-// The filter's stats carry the stat prefix, command, collection and callsite as explicit tags.
+// The dynamic stats carry the command, collection and callsite as explicit per-stat tags. The
+// isolated test store drops scope-level tags, so the prefix tag and its removal from the
+// tag-extracted names are only observable in the integration test, which covers both stats modes.
 TEST_F(MongoProxyFilterTest, StatsAreTagged) {
   initializeFilter();
 
@@ -769,16 +771,13 @@ TEST_F(MongoProxyFilterTest, StatsAreTagged) {
     EXPECT_EQ(expected_tags, actual_tags) << " for stat '" << name << "'";
   };
 
-  expect_tags("mongo.test.op_query", "mongo.op_query", {{"envoy.mongo_prefix", "test"}});
-  expect_tags("mongo.test.cmd.insert.total", "mongo.cmd.total",
-              {{"envoy.mongo_prefix", "test"}, {"envoy.mongo_cmd", "insert"}});
-  expect_tags("mongo.test.collection.test.query.total", "mongo.collection.query.total",
-              {{"envoy.mongo_prefix", "test"}, {"envoy.mongo_collection", "test"}});
+  expect_tags("mongo.test.cmd.insert.total", "mongo.test.cmd.total",
+              {{"envoy.mongo_cmd", "insert"}});
+  expect_tags("mongo.test.collection.test.query.total", "mongo.test.collection.query.total",
+              {{"envoy.mongo_collection", "test"}});
   expect_tags("mongo.test.collection.test.callsite.getByMongoId.query.total",
-              "mongo.collection.callsite.query.total",
-              {{"envoy.mongo_prefix", "test"},
-               {"envoy.mongo_collection", "test"},
-               {"envoy.mongo_callsite", "getByMongoId"}});
+              "mongo.test.collection.callsite.query.total",
+              {{"envoy.mongo_collection", "test"}, {"envoy.mongo_callsite", "getByMongoId"}});
 }
 
 } // namespace MongoProxy
