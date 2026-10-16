@@ -198,7 +198,8 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
                                   getQuicEcnCodepointFromTosByte(data.tos_));
   if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
     if (non_dispatched_udp_packet_handler_.has_value()) {
-      non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
+      non_dispatched_udp_packet_handler_->handle(
+          worker_index_, *listen_socket_.connectionInfoProvider().localAddress(), std::move(data));
     }
   }
 

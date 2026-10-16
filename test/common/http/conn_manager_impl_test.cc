@@ -5744,5 +5744,78 @@ TEST_F(HttpConnectionManagerImplTest, TransportFailureReasonPropagationLocalClos
             filter_callbacks_.connection_.stream_info_.downstreamTransportFailureReason());
 }
 
+// Route resolution time and count are measured per stream and readable through StreamInfo.
+TEST_F(HttpConnectionManagerImplTest, RouteResolutionTimeAndCount) {
+  setup();
+  setupFilterChain(1, 0);
+
+  int route_calls = 0;
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillRepeatedly(Invoke([&](const Router::RouteCallback&, const Http::RequestHeaderMap&,
+                                 const Envoy::StreamInfo::StreamInfo&,
+                                 uint64_t) -> Router::VirtualHostRoute {
+        // Advance the monotonic clock during resolution so the measured time is non-zero.
+        const MonotonicTime now = test_time_.timeSystem().monotonicTime();
+        const std::chrono::microseconds delta =
+            route_calls++ == 0 ? std::chrono::microseconds(100) : std::chrono::microseconds(250);
+        test_time_.timeSystem().setMonotonicTime(now + delta);
+        return Router::VirtualHostRoute{route_config_provider_.route_config_->route_->virtual_host_,
+                                        route_config_provider_.route_config_->route_};
+      }));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        StreamInfo::StreamInfo& stream_info = decoder_filters_[0]->callbacks_->streamInfo();
+        // The first resolution happened during decodeHeaders.
+        EXPECT_EQ(1U, stream_info.routeResolutionCount());
+        EXPECT_EQ(std::chrono::microseconds(100), stream_info.routeResolutionTime());
+
+        // Clearing and refreshing the cache resolves the route a second time.
+        decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
+        decoder_filters_[0]->callbacks_->clusterInfo();
+        EXPECT_EQ(2U, stream_info.routeResolutionCount());
+        EXPECT_EQ(std::chrono::microseconds(350), stream_info.routeResolutionTime());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  startRequest(true);
+  doRemoteClose();
+}
+
+// The route resolution histograms are recorded at stream end when the option is enabled.
+TEST_F(HttpConnectionManagerImplTest, RouteResolutionStatsRecordedWhenEnabled) {
+  record_route_resolution_stats_ = true;
+  setup();
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  startRequest(true);
+  doRemoteClose();
+
+  EXPECT_TRUE(
+      fake_stats_.findHistogramByString("downstream_rq_route_resolution_time_us").has_value());
+  EXPECT_TRUE(fake_stats_.histogramRecordedValues("downstream_rq_route_resolution_time_us"));
+  EXPECT_EQ((std::vector<uint64_t>{1}),
+            fake_stats_.histogramValues("downstream_rq_route_resolutions", false));
+}
+
+// The route resolution histograms are absent when the option is left at its default.
+TEST_F(HttpConnectionManagerImplTest, RouteResolutionStatsDisabledByDefault) {
+  setup();
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  startRequest(true);
+  doRemoteClose();
+
+  EXPECT_FALSE(
+      fake_stats_.findHistogramByString("downstream_rq_route_resolution_time_us").has_value());
+  EXPECT_FALSE(fake_stats_.findHistogramByString("downstream_rq_route_resolutions").has_value());
+}
+
 } // namespace Http
 } // namespace Envoy

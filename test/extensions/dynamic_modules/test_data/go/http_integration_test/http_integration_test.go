@@ -31,6 +31,7 @@ func init() {
 		"fake_external_cache":          &FakeExternalCacheConfigFactory{},
 		"stats_callbacks":              &StatsCallbacksConfigFactory{},
 		"stream_timing":                &StreamTimingConfigFactory{},
+		"upstream_connection_attempts": &UpstreamConnectionAttemptsConfigFactory{},
 		"streaming_terminal_filter":    &StreamingTerminalConfigFactory{},
 		"buffer_limit_filter":          &BufferLimitConfigFactory{},
 		"http_stream_basic":            &HttpStreamBasicConfigFactory{},
@@ -1020,9 +1021,89 @@ type StreamTimingFilter struct {
 func (f *StreamTimingFilter) OnStreamComplete() {
 	timing := f.handle.GetTimingInfo()
 	assert(timing.StartTimeUnixNs > 0, "start time")
+	assert(timing.HasStartTime, "start time available")
+	assert(timing.DownstreamConnectionBeginNs != -1, "downstream connection accepted")
+	assert(timing.HasDownstreamConnectionBegin, "downstream connection marker available")
+	assert(timing.DownstreamHandshakeStartNs == -1, "no downstream TLS handshake start")
+	assert(!timing.HasDownstreamHandshakeStart, "no downstream TLS start marker")
+	assert(timing.DownstreamHandshakeCompleteNs == -1, "no downstream TLS handshake completion")
+	assert(!timing.HasDownstreamHandshakeComplete, "no downstream TLS completion marker")
+	assert(timing.LastDownstreamHeaderRxByteReceivedNs >= 0, "request headers received")
+	assert(timing.HasLastDownstreamHeaderRxByteReceived, "request headers marker available")
+	assert(timing.LastDownstreamRxByteReceivedNs >= timing.LastDownstreamHeaderRxByteReceivedNs,
+		"request received")
+	assert(timing.HasLastDownstreamRxByteReceived, "request received marker available")
+	assert(timing.UpstreamConnectStartNs >= 0, "upstream connect start")
+	assert(timing.HasUpstreamConnectStart, "upstream connect start marker available")
+	assert(timing.UpstreamConnectCompleteNs >= timing.UpstreamConnectStartNs, "upstream connect complete")
+	assert(timing.HasUpstreamConnectComplete, "upstream connect end marker available")
+	assert(timing.UpstreamHandshakeCompleteNs == -1, "no upstream TLS handshake")
+	assert(!timing.HasUpstreamHandshakeComplete, "no upstream TLS completion marker")
+	assert(timing.FirstUpstreamTxByteSentNs >= 0, "upstream request start")
+	assert(timing.HasFirstUpstreamTxByteSent, "upstream request start marker available")
+	assert(timing.LastUpstreamTxByteSentNs >= timing.FirstUpstreamTxByteSentNs, "upstream request complete")
+	assert(timing.HasLastUpstreamTxByteSent, "upstream request end marker available")
+	assert(timing.FirstUpstreamRxByteReceivedNs >= 0, "upstream response start")
+	assert(timing.HasFirstUpstreamRxByteReceived, "upstream response start marker available")
+	assert(timing.FirstUpstreamRxBodyByteReceivedNs >= timing.FirstUpstreamRxByteReceivedNs,
+		"upstream response body start")
+	assert(timing.HasFirstUpstreamRxBodyByteReceived, "upstream body start marker available")
+	assert(timing.LastUpstreamRxByteReceivedNs >= timing.FirstUpstreamRxBodyByteReceivedNs,
+		"upstream response complete")
+	assert(timing.HasLastUpstreamRxByteReceived, "upstream response end marker available")
+	assert(timing.FirstDownstreamTxByteSentNs >= 0, "downstream response start")
+	assert(timing.HasFirstDownstreamTxByteSent, "downstream response start marker available")
+	assert(timing.LastDownstreamTxByteSentNs >= timing.FirstDownstreamTxByteSentNs,
+		"downstream response complete")
+	assert(timing.HasLastDownstreamTxByteSent, "downstream response end marker available")
+	assert(timing.LastDownstreamAckReceivedNs == -1, "no TCP final ACK marker")
+	assert(!timing.HasLastDownstreamAckReceived, "no TCP final ACK marker available")
 	assert(timing.RequestCompleteDurationNs >= 0, "request complete duration")
+	assert(timing.HasRequestComplete, "request complete marker available")
+	assert(timing.DownstreamConnectionEndNs == -1, "connection remains open")
+	assert(!timing.HasDownstreamConnectionEnd, "connection close marker unavailable")
 	assertEq(f.handle.IncrementCounterValue(f.timingObservedTotal, 1), shared.MetricsSuccess,
 		"timing counter")
+}
+
+// -----------------------------------------------------------------------------
+// UpstreamConnectionAttempts
+// -----------------------------------------------------------------------------
+
+type UpstreamConnectionAttemptsConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *UpstreamConnectionAttemptsConfigFactory) Create(h shared.HttpFilterConfigHandle,
+	_ []byte) (shared.HttpFilterFactory, error) {
+	observedTotal, result := h.DefineCounter("upstream_connection_attempts_observed_total")
+	assertEq(result, shared.MetricsSuccess, "upstream attempts counter definition")
+	return &UpstreamConnectionAttemptsFilterFactory{observedTotal: observedTotal}, nil
+}
+
+type UpstreamConnectionAttemptsFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+	observedTotal shared.MetricID
+}
+
+func (f *UpstreamConnectionAttemptsFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &UpstreamConnectionAttemptsFilter{handle: h, observedTotal: f.observedTotal}
+}
+
+type UpstreamConnectionAttemptsFilter struct {
+	shared.EmptyHttpFilter
+	handle        shared.HttpFilterHandle
+	observedTotal shared.MetricID
+}
+
+func (f *UpstreamConnectionAttemptsFilter) OnStreamComplete() {
+	remoteAddress, ok := f.handle.GetUpstreamRemoteAddress()
+	assert(ok && remoteAddress.Len > 0, "upstream remote address")
+	assertEq(len(f.handle.GetUpstreamHostsAttempted()), 1, "upstream hosts attempted")
+	assertEq(len(f.handle.GetUpstreamConnectionIDsAttempted()), 1,
+		"upstream connection IDs attempted")
+	assertEq(f.handle.IncrementCounterValue(f.observedTotal, 1), shared.MetricsSuccess,
+		"upstream attempts counter")
 }
 
 // -----------------------------------------------------------------------------

@@ -10,6 +10,45 @@
 namespace Envoy {
 namespace DynamicModules {
 
+class DownstreamDirectRemoteAddressFilter : public HttpFilter {
+public:
+  DownstreamDirectRemoteAddressFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
+    headers.set("x-downstream-peer",
+                handle_.getDownstreamDirectRemoteAddress().value_or("unavailable"));
+    return HeadersStatus::Continue;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+};
+
+class DownstreamDirectRemoteAddressFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<DownstreamDirectRemoteAddressFilter>(handle);
+  }
+};
+
+class DownstreamDirectRemoteAddressConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<DownstreamDirectRemoteAddressFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(DownstreamDirectRemoteAddressConfigFactory,
+                                    "downstream_direct_remote_address");
+
 // --- config_init_failure ---
 
 class ConfigInitFailureConfigFactory : public HttpFilterConfigFactory {
@@ -702,6 +741,12 @@ public:
     static constexpr char serialized_any[] = {0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02};
     handle_.setTypedMetadata("ns_req_header_typed",
                              std::string_view(serialized_any, sizeof(serialized_any)));
+    auto typed_metadata = handle_.getTypedMetadata("ns_req_header_typed");
+    if (!typed_metadata.has_value() || typed_metadata->first != "t/x" ||
+        typed_metadata->second != std::string_view("\x01\x02", 2) ||
+        handle_.getTypedMetadata("missing").has_value()) {
+      std::abort();
+    }
 
     // Try getting metadata from router, cluster, and host.
     // In C++ SDK namespaces like "envoy.filters.http.router" are needed if mapped directly,
@@ -878,6 +923,15 @@ public:
     }
     auto typed_after = handle_.getFilterStateTyped("envoy.test.http_typed_object_for_rust");
     if (!typed_after.has_value() || *typed_after != "typed_value") {
+      std::abort();
+    }
+    if (!handle_.setFilterStateValue("shared_filter_state_key", "shared_filter_state_value",
+                                     FilterStateLifeSpan::Connection,
+                                     FilterStateStreamSharing::SharedWithUpstreamConnection)) {
+      std::abort();
+    }
+    if (auto val = handle_.getFilterState("shared_filter_state_key");
+        !val || *val != "shared_filter_state_value") {
       std::abort();
     }
     testFilterState("req_header_key", "req_header_value");

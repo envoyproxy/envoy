@@ -9,6 +9,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/upstream/host_lookup_map.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -2015,7 +2016,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto counter_stat = server_context_.store_.findCounterByString(
       "dynamicmodulescustom.handle_counter.outcome.resolved");
   ASSERT_TRUE(counter_stat.has_value());
-  EXPECT_EQ(8, counter_stat->get().value());
+  EXPECT_EQ(8, counter_stat->value());
 
   // Resolving the same tuple again yields the same child, which is what makes a cached handle
   // equivalent to the id path rather than a second stat.
@@ -2043,7 +2044,7 @@ TEST_F(DynamicModuleClusterTest, MetricsResolveAndRecordByHandle) {
   auto gauge_stat = server_context_.store_.findGaugeByString(
       "dynamicmodulescustom.handle_gauge.outcome.resolved");
   ASSERT_TRUE(gauge_stat.has_value());
-  EXPECT_EQ(12, gauge_stat->get().value());
+  EXPECT_EQ(12, gauge_stat->value());
 
   // Histogram vec. The record forwards the value to the resolved child, which the isolated store
   // delivers to sinks, so intercept that to assert the tagged child receives the value.
@@ -4999,6 +5000,63 @@ TEST_F(DynamicModuleClusterTest, PreInitCompleteOffMainThreadFailsClosed) {
         t.join();
       },
       "envoy_dynamic_module_callback_cluster_pre_init_complete must be called on the main thread");
+}
+
+// Verifies that `cluster_use_persistent_host_map` is a safe no-op when called off the main thread.
+TEST_F(DynamicModuleClusterTest, UsePersistentHostMapOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  void* cluster_ptr = cluster.get();
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t(
+            [&] { envoy_dynamic_module_callback_cluster_use_persistent_host_map(cluster_ptr); });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_use_persistent_host_map must be called on the main "
+      "thread");
+
+  // The flat backing stays in use.
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, hosts));
+  EXPECT_EQ(nullptr, dynamic_cast<const Upstream::PersistentHostLookupMap*>(
+                         cluster->prioritySet().crossPriorityHostMap().get()));
+}
+
+// Verifies that the cross-priority host map keeps working once `cluster_use_persistent_host_map`
+// selects the persistent backing.
+TEST_F(DynamicModuleClusterTest, UsePersistentHostMap) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  envoy_dynamic_module_callback_cluster_use_persistent_host_map(cluster.get());
+
+  std::vector<std::string> addresses = {"127.0.0.1:10001", "127.0.0.1:10002"};
+  std::vector<uint32_t> weights = {1, 2};
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, addresses, weights, hosts));
+  const auto host_map = cluster->prioritySet().crossPriorityHostMap();
+  EXPECT_NE(nullptr, dynamic_cast<const Upstream::PersistentHostLookupMap*>(host_map.get()));
+  EXPECT_EQ(2, host_map->size());
+  EXPECT_EQ(hosts[0], cluster->findHostByAddress("127.0.0.1:10001"));
+  EXPECT_EQ(hosts[1], cluster->findHostByAddress("127.0.0.1:10002"));
+
+  // Adding an address again is skipped based on the cross-priority host map.
+  std::vector<Upstream::HostSharedPtr> duplicate_hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, duplicate_hosts));
+  EXPECT_TRUE(duplicate_hosts.empty());
+  EXPECT_EQ(2, cluster->prioritySet().crossPriorityHostMap()->size());
+
+  EXPECT_EQ(1, cluster->removeHosts({hosts[0]}));
+  EXPECT_EQ(1, cluster->prioritySet().crossPriorityHostMap()->size());
+  EXPECT_EQ(nullptr, cluster->findHostByAddress("127.0.0.1:10001"));
+  EXPECT_EQ(hosts[1], cluster->findHostByAddress("127.0.0.1:10002"));
 }
 
 // Verifies that `cluster_find_host_by_address` is fail-closed when called off the main thread.

@@ -23,6 +23,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -407,8 +408,8 @@ public:
                             const std::string& tag_extracted_name, TagPairs tags, uint64_t value) {
     Stats::CounterOptConstRef counter = store.findCounterByString(name);
     ASSERT_TRUE(counter.has_value()) << "no counter named '" << name << "'";
-    EXPECT_EQ(counter->get().value(), value) << " for stat '" << name << "'";
-    expectMetric(counter->get(), name, tag_extracted_name, std::move(tags));
+    EXPECT_EQ(counter->value(), value) << " for stat '" << name << "'";
+    expectMetric(counter.ref(), name, tag_extracted_name, std::move(tags));
   }
 
   static void expectHistogram(Stats::TestUtil::TestStore& store, const std::string& name,
@@ -417,7 +418,7 @@ public:
     Stats::HistogramOptConstRef histogram = store.findHistogramByString(name);
     ASSERT_TRUE(histogram.has_value()) << "no histogram named '" << name << "'";
     EXPECT_EQ(store.histogramValues(name, false), values) << " for stat '" << name << "'";
-    expectMetric(histogram->get(), name, tag_extracted_name, std::move(tags));
+    expectMetric(histogram.ref(), name, tag_extracted_name, std::move(tags));
   }
 
   const std::string& response_code_tag_{Config::TagNames::get().RESPONSE_CODE};
@@ -425,6 +426,8 @@ public:
   const std::string& route_tag_{Config::TagNames::get().ROUTE};
   const std::string& virtual_cluster_tag_{Config::TagNames::get().VIRTUAL_CLUSTER};
   const std::string& virtual_host_tag_{Config::TagNames::get().VIRTUAL_HOST};
+  const std::string& from_zone_tag_{Config::TagNames::get().UPSTREAM_FROM_ZONE};
+  const std::string& to_zone_tag_{Config::TagNames::get().UPSTREAM_TO_ZONE};
 };
 
 INSTANTIATE_TEST_SUITE_P(Tagged, TaggedCodeStatsTest,
@@ -451,11 +454,13 @@ TEST_P(TaggedCodeStatsTest, ExplicitTags) {
   expectCounter(cluster_store_, "prefix.external.upstream_rq_completed",
                 "prefix.external.upstream_rq_completed", {}, 1);
 
-  // The zones are part of the stat name; they carry no tags of their own.
-  expectCounter(cluster_store_, "prefix.zone.from_az.to_az.upstream_rq_200",
-                "prefix.zone.from_az.to_az.upstream_rq", {{response_code_tag_, "200"}}, 1);
+  // The zones stay in the flat stat name and are carried as tags as well.
+  expectCounter(
+      cluster_store_, "prefix.zone.from_az.to_az.upstream_rq_200", "prefix.zone.upstream_rq",
+      {{from_zone_tag_, "from_az"}, {to_zone_tag_, "to_az"}, {response_code_tag_, "200"}}, 1);
   expectCounter(cluster_store_, "prefix.zone.from_az.to_az.upstream_rq_completed",
-                "prefix.zone.from_az.to_az.upstream_rq_completed", {}, 1);
+                "prefix.zone.upstream_rq_completed",
+                {{from_zone_tag_, "from_az"}, {to_zone_tag_, "to_az"}}, 1);
 
   // An invalid response code holds no code to tag the stat with, and goes into no class.
   expectCounter(cluster_store_, "prefix.upstream_rq_unknown", "prefix.upstream_rq_unknown", {}, 1);
@@ -492,7 +497,8 @@ TEST_P(TaggedCodeStatsTest, ExplicitTagsUnknownResponseCode) {
                 "vhost.route.upstream_rq_unknown",
                 {{virtual_host_tag_, "test-vhost"}, {route_tag_, "test-route"}}, 1);
   expectCounter(cluster_store_, "prefix.zone.from_az.to_az.upstream_rq_unknown",
-                "prefix.zone.from_az.to_az.upstream_rq_unknown", {}, 1);
+                "prefix.zone.upstream_rq_unknown",
+                {{from_zone_tag_, "from_az"}, {to_zone_tag_, "to_az"}}, 1);
 }
 
 TEST_P(TaggedCodeStatsTest, ResponseTimingTags) {
@@ -517,7 +523,8 @@ TEST_P(TaggedCodeStatsTest, ResponseTimingTags) {
   expectHistogram(cluster_store_, "prefix.internal.upstream_rq_time",
                   "prefix.internal.upstream_rq_time", {}, five);
   expectHistogram(cluster_store_, "prefix.zone.from_az.to_az.upstream_rq_time",
-                  "prefix.zone.from_az.to_az.upstream_rq_time", {}, five);
+                  "prefix.zone.upstream_rq_time",
+                  {{from_zone_tag_, "from_az"}, {to_zone_tag_, "to_az"}}, five);
   expectHistogram(global_store_, "vhost.vhost_name.vcluster.req_vcluster_name.upstream_rq_time",
                   "vhost.vcluster.upstream_rq_time",
                   {{virtual_host_tag_, "vhost_name"}, {virtual_cluster_tag_, "req_vcluster_name"}},
@@ -711,23 +718,36 @@ TEST(CodeStatsParityTest, TagsMatchTheDefaultTagProducer) {
   ASSERT_TRUE(tag_producer.ok());
 
   uint32_t checked = 0;
-  const auto check = [&tag_producer, &checked](const Stats::Metric& metric) {
+  const auto check = [&tag_producer, &checked](const Stats::Metric& metric, bool cluster_scoped) {
+    // The cluster store holds its stats without a scope prefix, while in production they live
+    // under a 'cluster.<name>.' scope. Run the producer on the full name production would
+    // extract from, and account for the prefix's own contribution: the 'cluster.' it leaves in
+    // the tag-extracted name and the cluster tag the scope carries.
+    const std::string full_name =
+        cluster_scoped ? absl::StrCat("cluster.fake_cluster.", metric.name()) : metric.name();
     Stats::TagVector expected_tags;
-    const std::string expected_name = (*tag_producer)->produceTags(metric.name(), expected_tags);
-    EXPECT_EQ(expected_name, metric.tagExtractedName()) << " for stat '" << metric.name() << "'";
-    EXPECT_EQ(sortedTags(expected_tags), sortedTags(metric.tags()))
-        << " for stat '" << metric.name() << "'";
+    const std::string expected_name = (*tag_producer)->produceTags(full_name, expected_tags);
+    const std::string tag_extracted_name = cluster_scoped
+                                               ? absl::StrCat("cluster.", metric.tagExtractedName())
+                                               : metric.tagExtractedName();
+    EXPECT_EQ(expected_name, tag_extracted_name) << " for stat '" << full_name << "'";
+    Stats::TagVector tags = metric.tags();
+    if (cluster_scoped) {
+      tags.push_back(Stats::Tag{Config::TagNames::get().CLUSTER_NAME, "fake_cluster"});
+    }
+    EXPECT_EQ(sortedTags(expected_tags), sortedTags(tags)) << " for stat '" << full_name << "'";
     ++checked;
   };
 
   for (RecordingTestStore* store : {&global_store, &cluster_store}) {
+    const bool cluster_scoped = store == &cluster_store;
     for (const Stats::CounterSharedPtr& counter : store->counters()) {
-      check(*counter);
+      check(*counter, cluster_scoped);
     }
     for (const std::string& name : store->histogramNames()) {
       Stats::HistogramOptConstRef histogram = store->findHistogramByString(name);
       ASSERT_TRUE(histogram.has_value()) << "no histogram named '" << name << "'";
-      check(histogram->get());
+      check(histogram.ref(), cluster_scoped);
     }
   }
   EXPECT_LT(0U, checked);

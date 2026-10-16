@@ -139,7 +139,8 @@ message RouteConfiguration {
   // Normally, virtual host matching is done using the :authority (or
   // Host: in HTTP < 2) HTTP header. Setting this will instead, use a
   // different HTTP header for this purpose.
-  string vhost_header = 18;
+  string vhost_header = 18
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Ignore path-parameters in path-matching.
   // Before RFC3986, URI were like(RFC1808): <scheme>://<net_loc>/<path>;<params>?<query>#<fragment>
@@ -174,12 +175,12 @@ message RouteConfiguration {
   //
   // Specifiers are configured at three levels. Specifiers in three levels will run in this order:
   //
-  // 1. The ``route_specifiers`` of
-  //    :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
+  // 1. The ``route_specifiers`` of resolved
+  //    :ref:`route <envoy_v3_api_msg_config.route.v3.Route>`
   // 2. The ``route_specifiers`` of resolved
   //    :ref:`virtual host <envoy_v3_api_msg_config.route.v3.VirtualHost>`
-  // 3. The ``route_specifiers`` of resolved
-  //    :ref:`route <envoy_v3_api_msg_config.route.v3.Route>`.
+  // 3. The ``route_specifiers`` of
+  //    :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`.
   //
   // .. note::
   //   If the route matching resolves no route, the route specifiers at the route configuration

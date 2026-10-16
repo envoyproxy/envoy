@@ -1,6 +1,6 @@
 module(
     name = "envoy",
-    version = "1.40.0-dev",
+    version = "1.41.0-dev",
 )
 
 ####################################################################################
@@ -15,22 +15,20 @@ bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
 bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy")
 bazel_dep(name = "bazel_features", version = "1.51.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
-bazel_dep(name = "boringssl", version = "0.20260813.0")
-bazel_dep(name = "boringssl-fips", version = "0.20260813.0.envoy")
-bazel_dep(name = "boringssl-source", version = "0.20260813.0.envoy")
+bazel_dep(name = "boringssl", version = "0.20260929.0")
+bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy")
+bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
-bazel_dep(name = "brotli", version = "1.2.0.bcr.3")
+bazel_dep(name = "brotli", version = "1.2.0-260930-42a2ed4.envoy")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", repo_name = "buildifier")
 bazel_dep(name = "c-ares", version = "1.34.6.bcr.1")
 bazel_dep(name = "cel-cpp", version = "0.16.1.envoy")
-bazel_dep(name = "cel-spec", version = "0.25.3", repo_name = "dev_cel")
 bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
-bazel_dep(name = "emsdk", version = "4.0.23.envoy")
-bazel_dep(name = "envoy_api", version = "1.40.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.1.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.1.envoy")
+bazel_dep(name = "envoy_api", version = "1.41.0-dev")
+bazel_dep(name = "envoy_toolshed", version = "0.5.4.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.4.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "fmt", version = "12.2.0")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -64,7 +62,7 @@ bazel_dep(name = "nghttp2", version = "1.66.0.envoy")
 bazel_dep(name = "numactl", version = "2.0.19")
 bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2")
 bazel_dep(name = "ocp-diag-core", version = "0.0.0-230505-e965ac0.envoy")
-bazel_dep(name = "openssl", version = "3.5.7.envoy")
+bazel_dep(name = "openssl", version = "3.5.9.envoy")
 bazel_dep(name = "opentelemetry-cpp", version = "1.29.0")
 bazel_dep(name = "opentelemetry-proto", version = "1.8.0")
 bazel_dep(name = "perfetto", version = "57.2.envoy")
@@ -75,13 +73,13 @@ bazel_dep(name = "protoc-gen-validate", version = "1.3.3.envoy")
 bazel_dep(name = "proto-converter", version = "0.0.0-20260912-3850764.envoy")
 bazel_dep(name = "proto-field-extraction", version = "0.0.0-240710-d5d39f0.envoy")
 bazel_dep(name = "proto-processing", version = "0.0.0-250110-279353c.envoy")
-bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
-bazel_dep(name = "proxy-wasm-cpp-sdk", version = "0.0.0-250925-e5256b0.envoy")
-bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.4-251205-5283e57.envoy")
+bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy.1")
+bazel_dep(name = "proxy-wasm-cpp-sdk", version = "0.0.0-250925-e5256b0.envoy.1")
+bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.5")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
 bazel_dep(name = "qatlib", version = "26.02.0.envoy")
 bazel_dep(name = "qatzip", version = "2.0.0.envoy")
-bazel_dep(name = "quiche", version = "0.0.0-260922-7f07dc4.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-261013-132bfd9.envoy")
 bazel_dep(name = "ragel", version = "7.0.4-211228-d4577c9.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
 bazel_dep(name = "rules_apple", version = "5.1.0")
@@ -106,7 +104,7 @@ bazel_dep(name = "tclap", version = "1.2.5.bcr.1")
 bazel_dep(name = "tcmalloc", version = "0.0.0-250926-12f2552.envoy")
 bazel_dep(name = "thrift", version = "0.24.0.envoy")
 bazel_dep(name = "uadk", version = "2.9.envoy")
-bazel_dep(name = "v8", version = "14.6.202.10.envoy")
+bazel_dep(name = "v8", version = "14.6.202.10.envoy.1")
 bazel_dep(name = "vectorscan", version = "5.4.11.envoy")
 bazel_dep(name = "wamr", version = "2.4.5.envoy")
 bazel_dep(name = "wasmtime", version = "45.0.2.envoy")
@@ -144,17 +142,17 @@ local_path_override(
 
 single_version_override(
     module_name = "proxy-wasm-cpp-sdk",
-    version = "0.0.0-250925-e5256b0.envoy",
+    version = "0.0.0-250925-e5256b0.envoy.1",
 )
 
 single_version_override(
     module_name = "boringssl",
-    version = "0.20260813.0",
+    version = "0.20260929.0",
 )
 
 single_version_override(
     module_name = "openssl",
-    version = "3.5.7.envoy",
+    version = "3.5.9.envoy",
 )
 
 # testing/debugging
@@ -202,6 +200,17 @@ wee8_ext = use_extension("@envoy_toolshed//v8:extensions.bzl", "wee8_prebuilt_ex
 wee8_ext.setup()
 use_repo(wee8_ext, "wee8_prebuilt_aarch64", "wee8_prebuilt_x86_64", "wee8_prebuilt_x86_64_libstdcxx")
 
+# These (cmake/ninja) should be kept to latest stable for FIPS
+foreign_cc_tools = use_extension("@rules_foreign_cc//foreign_cc:extensions.bzl", "tools")
+foreign_cc_tools.cmake(
+    mode = "binary",
+    version = "4.0.7",
+)
+foreign_cc_tools.ninja(
+    mode = "binary",
+    version = "1.13.2",
+)
+
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.cxx_cross_lib(
     name = "llvm_toolchain",
@@ -236,12 +245,12 @@ llvm.toolchain_root(
 )
 llvm.sysroot(
     name = "llvm_toolchain",
-    label = "@sysroot_linux_amd64//:sysroot",
+    label = "@sysroot_linux_amd64//sysroot",
     targets = ["linux-x86_64"],
 )
 llvm.sysroot(
     name = "llvm_toolchain",
-    label = "@sysroot_linux_arm64//:sysroot",
+    label = "@sysroot_linux_arm64//sysroot",
     targets = ["linux-aarch64"],
 )
 use_repo(llvm, "llvm_toolchain")
@@ -262,8 +271,8 @@ llvm_minimal_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llv
 llvm_minimal_ext.setup()
 use_repo(llvm_minimal_ext, "llvm_minimal_linux_arm64", "llvm_minimal_linux_x64", "llvm_minimal_macos_arm64")
 
-llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
-use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+envoy_llvm_ext = use_extension("//bazel:extensions.bzl", "envoy_llvm_extension")
+use_repo(envoy_llvm_ext, "llvm_toolchain_llvm")
 
 cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
 use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
@@ -282,8 +291,48 @@ bazel_lib.yq(version = "4.24.4")
 use_repo(bazel_lib, "jq", "jq_toolchains", "yq", "yq_toolchains")
 
 # Java
+java_toolchains = use_extension("@rules_java//java:extensions.bzl", "toolchains")
+use_repo(
+    java_toolchains,
+    "remotejdk25_linux",
+    "remotejdk25_linux_aarch64",
+    "remotejdk25_linux_ppc64le",
+    "remotejdk25_linux_s390x",
+    "remotejdk25_macos",
+    "remotejdk25_macos_aarch64",
+    "remotejdk25_win",
+    "remotejdk25_win_arm64",
+)
+
 java_compat = use_extension("@rules_java//java:rules_java_deps.bzl", "compatibility_proxy")
 use_repo(java_compat, "compatibility_proxy")
+
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and the
+# javabuilder workaround configured in //bazel:envoy_java_toolchain. Register both the default and
+# explicit Java 11 toolchain definitions because rules_java emits separate toolchains for
+# --java_language_version="" and --java_language_version=11. The runtime toolchains below must
+# point at concrete @remotejdk25_*//:jdk targets rather than the remotejdk_25 alias to avoid a
+# self-cycle through Java runtime toolchain resolution.
+register_toolchains(
+    "//bazel:envoy_java_toolchain_default_definition",
+    "//bazel:envoy_java_toolchain_definition",
+    "//bazel:envoy_java_runtime_toolchain_linux",
+    "//bazel:envoy_java_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_java_runtime_toolchain_linux_ppc64le",
+    "//bazel:envoy_java_runtime_toolchain_linux_s390x",
+    "//bazel:envoy_java_runtime_toolchain_macos",
+    "//bazel:envoy_java_runtime_toolchain_macos_aarch64",
+    "//bazel:envoy_java_runtime_toolchain_win",
+    "//bazel:envoy_java_runtime_toolchain_win_arm64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_aarch64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_ppc64le",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_linux_s390x",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_macos",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_macos_aarch64",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_win",
+    "//bazel:envoy_java_bootstrap_runtime_toolchain_win_arm64",
+)
 
 # Python/pip
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
@@ -314,13 +363,14 @@ use_repo(pip, "base_pip3", "fuzzing_pip3")
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
 go_sdk.download(
     name = "go_sdk",
-    version = "1.27.1",
     sdks = {
         "linux_amd64": ("go1.27.1.linux-amd64.tar.gz", "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"),
         "linux_arm64": ("go1.27.1.linux-arm64.tar.gz", "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"),
         "darwin_arm64": ("go1.27.1.darwin-arm64.tar.gz", "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"),
         "darwin_amd64": ("go1.27.1.darwin-amd64.tar.gz", "8f8f52c6649542cf027bbc9b9c68d1ec042f9f34808a40413f0b8b3f66f3caa4"),
+        "windows_amd64": ("go1.27.1.windows-amd64.zip", "a3911b5e0e1b1053f25ed0675f4c1c6aad1e2bfcf253df2b9be4caabd2edd95d"),
     },
+    version = "1.27.1",
 )
 use_repo(
     go_sdk,
@@ -357,7 +407,7 @@ rust.repository_set(
     name = "rust_linux_s390x",
     edition = "2018",
     exec_triple = "s390x-unknown-linux-gnu",
-    versions = ["1.88.0"],
+    versions = ["1.97.1"],
 )
 rust.toolchain(
     edition = "2018",
@@ -367,8 +417,8 @@ rust.toolchain(
         "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
     ],
-    rustfmt_version = "1.88.0",
-    versions = ["1.88.0"],
+    rustfmt_version = "1.97.1",
+    versions = ["1.97.1"],
 )
 use_repo(rust, "rust_toolchains")
 
@@ -386,17 +436,7 @@ crate.from_cargo(
     lockfile = "//:Cargo.Bazel.envoy.lock",
     manifests = ["//:Cargo.toml"],
 )
-crate.from_cargo(
-    name = "dynamic_modules_rust_sdk_crate_index",
-    cargo_lockfile = "//:Cargo.lock",
-    lockfile = "//:Cargo.Bazel.dynamic_modules.lock",
-    manifests = ["//:Cargo.toml"],
-)
-use_repo(
-    crate,
-    "dynamic_modules_rust_sdk_crate_index",
-    "envoy_rust_crate_index",
-)
+use_repo(crate, "envoy_rust_crate_index")
 
 wasm_cargo = use_extension("//bazel:extensions.bzl", "wasm_cargo")
 use_repo(
@@ -409,9 +449,13 @@ crates_deps = use_extension("@proxy-wasm-rust-sdk//bazel:extensions.bzl", "crate
 use_repo(
     crates_deps,
     "crates_vendor",
-    "crates_vendor__hashbrown-0.16.0",
-    "crates_vendor__log-0.4.27",
+    "crates_vendor__hashbrown-0.16.1",
+    "crates_vendor__log-0.4.29",
 )
+
+# The vendored crate BUILD files of @proxy-wasm-rust-sdk reference @platforms, which the module
+# does not depend on.
+inject_repo(crates_deps, "platforms")
 
 # Proto/buf
 buf = use_extension("@rules_buf//buf:extensions.bzl", "buf")

@@ -3,6 +3,8 @@
 
 # Envoy Mobile Bazel build/test options.
 try-import ../.bazelrc
+try-import ../ci.bazelrc
+try-import ../user.bazelrc
 
 #############################################################################
 # global
@@ -44,6 +46,8 @@ build: --copt=-fno-exceptions
 
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
+build --java_runtime_version=remotejdk_21
+build --tool_java_runtime_version=remotejdk_21
 build --define disable_known_issue_asserts=true
 # Unset per_object_debug_info. Causes failures on Android Linux release builds.
 build --features=-per_object_debug_info
@@ -85,6 +89,7 @@ build:android --tool_java_language_version=8
 build:mobile-android --config=mobile-clang
 build:mobile-android --java_language_version=8
 build:mobile-android --tool_java_language_version=8
+build:mobile-android --cxxopt=-std=c++20
 test:mobile-android --build_tests_only
 test:mobile-android --define=static_extension_registration=disabled
 
@@ -142,16 +147,14 @@ build:mobile-rbe --experimental_remote_cache_eviction_retries=5
 #############################################################################
 # ASAN
 build:mobile-asan --config=asan
-build:mobile-asan --config=clang
 build:mobile-asan --config=mobile-clang
 build:mobile-asan --build_tests_only
 test:mobile-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 # MSAN
-build:mobile-msan --config=msan --config=clang
+build:mobile-msan --config=msan
 
 # TSAN
-build:mobile-tsan --config=clang
 build:mobile-tsan --config=tsan
 build:mobile-tsan --config=mobile-clang
 build:mobile-tsan --build_tests_only
@@ -197,7 +200,7 @@ build:mobile-macos --extra_execution_platforms=@envoy//bazel/platforms/rbe:macos
 # system_sdk selects match the active Xcode exactly.
 build:mobile-macos --remote_download_toplevel
 build:mobile-macos --config=ci
-build:mobile-macos --config=remote
+build:mobile-macos --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:mobile-macos --define=envoy_full_protos=disabled
 
 build:mobile-ios --config=mobile-macos

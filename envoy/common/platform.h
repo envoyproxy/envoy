@@ -12,6 +12,9 @@
 
 #ifdef _MSC_VER
 
+#include <sdkddkver.h>
+#define _WIN32_WINNT _WIN32_WINNT_WIN10
+#define NTDDI_VERSION NTDDI_WIN10_FE
 #include <windows.h>
 #include <winsock2.h>
 

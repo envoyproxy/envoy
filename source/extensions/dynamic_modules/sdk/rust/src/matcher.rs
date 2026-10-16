@@ -3,7 +3,7 @@
 //! This module provides traits and types for implementing custom input matchers as dynamic modules.
 //! A matcher evaluates HTTP request/response data and returns a boolean match result.
 
-use crate::abi;
+use crate::{abi, EnvoyBuffer};
 use std::ffi::c_void;
 use std::ptr;
 
@@ -61,46 +61,18 @@ impl MatchContext {
     }
   }
 
-  /// Get all headers from the specified header map as key-value pairs.
+  /// Get all headers from the specified header map as key-value [`EnvoyBuffer`] pairs.
   ///
-  /// Returns a vector of `(key, value)` byte slices, or `None` if the header map
-  /// is not available.
+  /// Returns an empty vector if there are no headers or the header map is not available.
   pub fn get_all_headers(
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
-  ) -> Option<Vec<(&[u8], &[u8])>> {
-    let size = self.get_headers_size(header_type);
-    if size == 0 {
-      return None;
-    }
-
-    let mut headers: Vec<abi::envoy_dynamic_module_type_envoy_http_header> =
-      Vec::with_capacity(size);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_matcher_get_headers(
-        self.envoy_ptr,
-        header_type,
-        headers.as_mut_ptr(),
-      )
-    };
-
-    if !success {
-      return None;
-    }
-    unsafe {
-      headers.set_len(size);
-    }
-
-    Some(
-      headers
-        .iter()
-        .map(|h| unsafe {
-          (
-            crate::ffi_helpers::slice_from_raw_or_empty(h.key_ptr as *const u8, h.key_length),
-            crate::ffi_helpers::slice_from_raw_or_empty(h.value_ptr as *const u8, h.value_length),
-          )
-        })
-        .collect(),
+  ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    crate::utility::collect_headers(
+      || self.get_headers_size(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_matcher_get_headers(self.envoy_ptr, header_type, headers)
+      },
     )
   }
 

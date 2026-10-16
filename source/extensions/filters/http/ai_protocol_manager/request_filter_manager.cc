@@ -25,13 +25,13 @@ public:
              BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
              StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
              Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn,
-             bool always_serialize = true)
+             bool always_serialize, LLMProtocol request_protocol)
       : TaskGroup(dispatcher), filters_(std::move(filters)),
         payload_index_(std::move(payload_index)), pipeline_(filters_.size()),
         buffer_manager_(buffer_manager), stream_info_(stream_info),
         on_complete_(std::move(on_complete)), request_headers_(request_headers),
         local_reply_fn_(std::move(local_reply_fn)), always_serialize_(always_serialize),
-        filter_handoff_status_(filters_.size()) {}
+        request_protocol_(request_protocol), filter_handoff_status_(filters_.size()) {}
 
   ~AsyncState() override { cancel(); }
 
@@ -45,8 +45,8 @@ public:
     if (terminated()) {
       return;
     }
-    bool payload_index_pushed =
-        pipeline_.stage(0)->tryPush(std::make_unique<AiRequest>(std::move(payload_index_)));
+    bool payload_index_pushed = pipeline_.stage(0)->tryPush(
+        std::make_unique<AiRequest>(std::move(payload_index_), request_protocol_));
     ASSERT(payload_index_pushed);
   }
 
@@ -289,6 +289,7 @@ private:
   Http::RequestHeaderMap* request_headers_{nullptr};
   LocalReplyFn local_reply_fn_;
   const bool always_serialize_{true};
+  const LLMProtocol request_protocol_;
   AiRequestPtr final_req_;
   std::vector<FilterHandoffStatus> filter_handoff_status_;
 };
@@ -297,10 +298,12 @@ RequestFilterManager::RequestFilterManager(
     std::vector<AiFilterSharedPtr> filters, JsonWithExtBuf payload_index,
     BufferManager* buffer_manager, Event::Dispatcher& dispatcher,
     StreamInfo::StreamInfo& stream_info, OnCompleteFn on_complete,
-    Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn, bool always_serialize)
+    Http::RequestHeaderMap* request_headers, LocalReplyFn local_reply_fn, bool always_serialize,
+    LLMProtocol request_protocol)
     : async_state_(std::make_shared<AsyncState>(
           std::move(filters), std::move(payload_index), buffer_manager, dispatcher, stream_info,
-          std::move(on_complete), request_headers, std::move(local_reply_fn), always_serialize)) {}
+          std::move(on_complete), request_headers, std::move(local_reply_fn), always_serialize,
+          request_protocol)) {}
 
 RequestFilterManager::~RequestFilterManager() { cancel(); }
 

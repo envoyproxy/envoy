@@ -4,6 +4,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/memory/memory.h"
 
@@ -42,6 +43,17 @@ void GeoipFilter::onDestroy() { destroyed_ = true; }
 Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Save request headers for later header manipulation once geolocation lookups are complete.
   request_headers_ = headers;
+
+  // The configured geolocation headers are this filter's to write: an upstream reads them as facts
+  // about the client address, so a value the client sent must not reach it as one. They are
+  // removed before the lookup rather than overwritten after it, because the lookup sets no header
+  // it has no value for (an address the database does not contain, a lookup error, a field the
+  // database lacks for that address) and does not run at all for the non-IP addresses below.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.geoip_sanitize_geo_headers")) {
+    for (const Http::LowerCaseString& geo_header : driver_->geoHeaderNames()) {
+      headers.remove(geo_header);
+    }
+  }
 
   Network::Address::InstanceConstSharedPtr remote_address;
   const auto& ip_address_header = config_->ipAddressHeader();

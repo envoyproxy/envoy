@@ -18,6 +18,13 @@ DynamicModuleRouteSpecifierFactory::createRouteSpecifier(
       MessageUtil::downcastAndValidate<const DynamicModuleRouteSpecifierProto&>(
           config, context.serverFactoryContext().messageValidationVisitor());
 
+  // A route configuration reloads far more often than a filter chain, and unloading a module that
+  // still owns worker thread locals crashes Envoy, so a route specifier requires do_not_close.
+  if (!proto_config.dynamic_module_config().do_not_close()) {
+    return absl::InvalidArgumentError(
+        "dynamic_module_config.do_not_close must be true for a dynamic module route specifier");
+  }
+
   // No init manager is passed, so a remote source that is not already cached on disk cannot be
   // awaited and is rejected by newDynamicModuleByConfig.
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(

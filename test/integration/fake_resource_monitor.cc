@@ -19,4 +19,18 @@ absl::StatusOr<Server::ResourceMonitorPtr> FakeResourceMonitorFactory::createRes
   return monitor;
 }
 
+FakeSynchronousFeedbackResourceMonitor::~FakeSynchronousFeedbackResourceMonitor() {
+  factory_.onMonitorDestroyed();
+}
+
+void FakeSynchronousFeedbackResourceMonitorFactory::onMonitorDestroyed() { monitor_ = nullptr; }
+
+absl::StatusOr<Server::ResourceMonitorPtr>
+FakeSynchronousFeedbackResourceMonitorFactory::createResourceMonitor(
+    const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext&) {
+  auto monitor = std::make_unique<FakeSynchronousFeedbackResourceMonitor>(*this);
+  monitor_ = monitor.get();
+  return monitor;
+}
+
 } // namespace Envoy

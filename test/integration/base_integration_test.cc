@@ -489,7 +489,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, random_config_,
       timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
       concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_,
-      use_bootstrap_node_metadata_);
+      use_bootstrap_node_metadata_, /*config_proto=*/nullptr, /*use_admin_server=*/true,
+      hot_restart_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 

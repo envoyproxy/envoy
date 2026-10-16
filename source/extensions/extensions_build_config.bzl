@@ -102,6 +102,7 @@ EXTENSIONS = {
     "envoy.matching.matchers.cel_matcher":              "//source/extensions/matching/input_matchers/cel_matcher:config",
     "envoy.matching.matchers.dynamic_modules":           "//source/extensions/matching/input_matchers/dynamic_modules:config",
     "envoy.matching.matchers.metadata_matcher":         "//source/extensions/matching/input_matchers/metadata:config",
+    "envoy.matching.matchers.uri_template":             "//source/extensions/matching/input_matchers/uri_template:config",
 
     #
     # Network Matchers
@@ -219,6 +220,7 @@ EXTENSIONS = {
     "envoy.filters.http.oauth2":                        "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
     "envoy.filters.http.original_src":                  "//source/extensions/filters/http/original_src:config",
+    "envoy.filters.http.priority_load_shed":            "//source/extensions/filters/http/priority_load_shed:config",
     "envoy.filters.http.proto_message_extraction":      "//source/extensions/filters/http/proto_message_extraction:config",
     "envoy.filters.http.proto_api_scrubber":            "//source/extensions/filters/http/proto_api_scrubber:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
@@ -456,6 +458,12 @@ EXTENSIONS = {
     "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 
     #
+    # TLS handshakers
+    #
+
+    "envoy.tls.handshakers.dynamic_modules":             "//source/extensions/transport_sockets/tls/handshakers/dynamic_modules:config",
+
+    #
     # HTTP header formatters
     #
 
@@ -498,6 +506,13 @@ EXTENSIONS = {
     # AI filters
     #
     "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
+    "envoy.http.ai_filters.schema_validation":          "//source/extensions/http/ai_filters/schema_validation:config",
+    "envoy.http.ai_filters.transcoder":                 "//source/extensions/http/ai_filters/transcoder:config",
+
+    #
+    # AI Protocol Manager External Buffer
+    #
+    "envoy.ai_protocol_manager.external_buffer.in_memory": "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
 
     #
     # Injected credentials

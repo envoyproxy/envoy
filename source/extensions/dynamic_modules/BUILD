@@ -14,7 +14,6 @@ envoy_cc_library(
     srcs = [
         "background_fetch_manager.cc",
         "dynamic_module_stats.cc",
-        "worker_index.cc",
     ] + select({
         "//bazel:windows_x86_64": ["win32/dynamic_modules.cc"],
         "//conditions:default": ["posix/dynamic_modules.cc"],
@@ -23,7 +22,6 @@ envoy_cc_library(
         "background_fetch_manager.h",
         "dynamic_module_stats.h",
         "dynamic_modules.h",
-        "worker_index.h",
     ],
     external_deps = ["ssl"],
     deps = [
@@ -38,6 +36,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:remote_data_fetcher_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/dynamic_modules/abi",
@@ -60,6 +59,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
+        "@abseil-cpp//absl/types:variant",
     ],
 )
 

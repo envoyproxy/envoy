@@ -2796,12 +2796,17 @@ TEST_F(ConnectionHandlerTest, HotRestartShutdownUdpListenerKeepsListening) {
 
   // A packet of an unregistered session is forwarded instead of being dropped by a shut down
   // listener or delivered locally.
-  EXPECT_CALL(packet_handler, handle(0, _));
+  EXPECT_CALL(packet_handler, handle(0, _, _));
   EXPECT_CALL(*filter_ptr, onData(_)).Times(0);
   Network::UdpRecvData data;
   data.addresses_.local_ = local_address_;
   data.addresses_.peer_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 20000);
   callbacks->onData(std::move(data));
+}
+
+TEST_F(ConnectionHandlerTest, WorkerId) {
+  EXPECT_EQ(handler_->workerId(), 0);
+  EXPECT_FALSE(MockConnectionHandlerImpl(dispatcher_, std::nullopt).workerId().has_value());
 }
 
 } // namespace

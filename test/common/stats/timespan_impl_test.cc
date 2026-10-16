@@ -40,6 +40,17 @@ TEST_F(TimespanImplTest, ElapsedAndCompleteMicroseconds) {
   span.complete();
 }
 
+TEST_F(TimespanImplTest, ElapsedAndCompleteNanoseconds) {
+  NiceMock<MockHistogram> hist;
+  hist.unit_ = Histogram::Unit::Nanoseconds;
+  HistogramCompletableTimespanImpl span(hist, time_system_);
+  time_system_.advanceTimeWait(std::chrono::nanoseconds(1500));
+  // elapsed() always returns milliseconds; 1500ns rounds down to 0ms.
+  EXPECT_EQ(std::chrono::milliseconds(0), span.elapsed());
+  EXPECT_CALL(hist, recordValue(1500));
+  span.complete();
+}
+
 // Exercises the Histogram::Unit::Null branches in ensureTimeHistogram and tickCount.
 TEST_F(TimespanImplTest, NullUnit) {
   NiceMock<MockHistogram> hist;

@@ -15,6 +15,7 @@
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
 #include "quiche/quic/core/quic_dispatcher.h"
@@ -182,6 +183,20 @@ bool EnvoyQuicDispatcher::processPacket(const quic::QuicSocketAddress& self_addr
 bool EnvoyQuicDispatcher::OnFailedToDispatchPacket(
     const quic::ReceivedPacketInfo& received_packet_info) {
   if (!accept_new_connections()) {
+    // While not accepting (a hot restart parent draining), packets for unknown connections are
+    // handed to the caller for forwarding to the child. A connection this dispatcher closed
+    // recently is not unknown though: it is in the time-wait list, which quiche consults right
+    // after this hook, re-sending the stored CONNECTION_CLOSE (or, for a connection the peer
+    // itself closed, a stateless reset). Forwarding such a packet instead would make the child,
+    // which never knew the connection, answer with a stateless reset to a peer that only missed
+    // our close. Leave those to the time-wait list.
+    // Only reached while draining, so the runtime lookup is off the steady-state path.
+    if (time_wait_list_manager()->IsConnectionIdInTimeWait(
+            received_packet_info.destination_connection_id) &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_hot_restart_time_wait_before_forward")) {
+      return false;
+    }
     current_packet_dispatch_success_ = false;
     return true;
   }

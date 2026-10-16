@@ -155,9 +155,8 @@ protected:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
-  std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
-      crypto_server_stream_factory_;
-  std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>> proof_source_factory_;
+  OptRef<EnvoyQuicCryptoServerStreamFactoryInterface> crypto_server_stream_factory_;
+  OptRef<EnvoyQuicProofSourceFactoryInterface> proof_source_factory_;
   EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr connection_debug_visitor_factory_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;

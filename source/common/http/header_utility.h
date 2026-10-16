@@ -445,8 +445,7 @@ public:
    * @param headers to validate
    * @return details of the error if an error is present, otherwise std::nullopt
    */
-  static std::optional<std::reference_wrapper<const absl::string_view>>
-  requestHeadersValid(const RequestHeaderMap& headers);
+  static OptRef<const absl::string_view> requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
    * Determines if the response should be framed by Connection: Close based on protocol

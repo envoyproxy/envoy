@@ -5,6 +5,8 @@
 #include "source/common/common/assert.h"
 #include "source/extensions/stat_sinks/dynamic_modules/flush_context.h"
 
+#include "absl/cleanup/cleanup.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
@@ -24,10 +26,25 @@ void DynamicModuleStatsSink::onHistogramComplete(const Stats::Histogram& histogr
   // The config members are written once during config creation on the main thread
   // before any worker thread starts, so reading them here needs no synchronization.
   ASSERT(config_->on_histogram_complete_ != nullptr);
-  thread_local std::vector<char> histogram_name_buffer;
+  // A module may record a histogram from inside on_histogram_complete, which re-enters this
+  // function on the same thread. The outermost call reuses a thread local buffer so the common case
+  // does not allocate, while a re-entrant call uses its own local buffer so it never clobbers the
+  // name the outer callback is still reading.
+  thread_local std::vector<char> reusable_name_buffer;
+  thread_local bool reusable_name_buffer_in_use = false;
+  std::vector<char> local_name_buffer;
+  const bool use_reusable = !reusable_name_buffer_in_use;
+  std::vector<char>& histogram_name_buffer =
+      use_reusable ? reusable_name_buffer : local_name_buffer;
+  reusable_name_buffer_in_use = true;
+  const absl::Cleanup release_reusable_name_buffer = [use_reusable] {
+    if (use_reusable) {
+      reusable_name_buffer_in_use = false;
+    }
+  };
   const auto& symbol_table = histogram.constSymbolTable();
   const auto stat_name = histogram.statName();
-  // Serialize into the reused buffer and retry only when it must grow, so the common case walks the
+  // Serialize into the buffer and retry only when it must grow, so the common case walks the
   // symbol table once instead of once to size and once to fill.
   const size_t required_size = symbol_table.serializeToBuffer(
       stat_name, histogram_name_buffer.data(), histogram_name_buffer.size());

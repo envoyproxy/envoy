@@ -14,6 +14,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_chain_bridge.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
@@ -21,6 +22,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -142,11 +144,56 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
   return typed;
 }
 
+// The bindings some filter of `filters` applies.
+BindingUse bindingsApplied(const std::vector<AiFilterSharedPtr>& filters) {
+  BindingUse applied;
+  for (const AiFilterSharedPtr& filter : filters) {
+    const BindingUse use = filter->bindingUse();
+    applied.request = applied.request || use.request;
+    applied.response = applied.response || use.response;
+  }
+  return applied;
+}
+
+// The binding one side of a route declares; null when it declares none. A binding describes how
+// the side carries its API, so it needs the side to name one.
+template <class SidePerRoute>
+absl::StatusOr<LlmBindingConstSharedPtr> routeBinding(absl::string_view side,
+                                                      const SidePerRoute& proto) {
+  if (!proto.has_binding()) {
+    return nullptr;
+  }
+  if (proto.llm_protocol() == envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED) {
+    return absl::InvalidArgumentError(absl::StrCat(side, ".binding needs ", side, ".llm_protocol"));
+  }
+  absl::StatusOr<LlmBindingConstSharedPtr> binding = LlmBinding::create(proto.binding());
+  if (!binding.ok()) {
+    return absl::InvalidArgumentError(absl::StrCat(side, ".binding: ", binding.status().message()));
+  }
+  return binding;
+}
+
 } // namespace
+
+absl::StatusOr<std::unique_ptr<RouteConfig>> RouteConfig::create(const PerRouteProto& proto) {
+  absl::StatusOr<LlmBindingConstSharedPtr> request_binding =
+      routeBinding("request", proto.request());
+  if (!request_binding.ok()) {
+    return request_binding.status();
+  }
+  absl::StatusOr<LlmBindingConstSharedPtr> response_binding =
+      routeBinding("response", proto.response());
+  if (!response_binding.ok()) {
+    return response_binding.status();
+  }
+  return std::unique_ptr<RouteConfig>(
+      new RouteConfig(proto, *std::move(request_binding), *std::move(response_binding)));
+}
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-    Stats::Scope& scope, AiFilterFactories ai_filter_factories)
+    Stats::Scope& scope, AiFilterFactories ai_filter_factories,
+    ExternalBufferFactorySharedPtr buffer_factory)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
@@ -177,11 +224,15 @@ FilterConfig::FilterConfig(
       max_parsed_sse_events_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_parsed_sse_events, DefaultMaxParsedSseEvents)),
-      ai_filter_factories_(std::move(ai_filter_factories)) {}
+      ai_filter_factories_(std::move(ai_filter_factories)),
+      buffer_factory_(std::move(buffer_factory)) {
+  ASSERT(buffer_factory_ != nullptr);
+}
 
 absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
-    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope) {
+    Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+    ExternalBufferFactorySharedPtr buffer_factory) {
   if (proto.filters_size() > 0 && !proto.has_request_handling()) {
     return absl::InvalidArgumentError("ai_protocol_manager: filters require request_handling");
   }
@@ -201,7 +252,8 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     RETURN_IF_NOT_OK_REF(cb.status());
     factories.push_back(std::move(cb.value()));
   }
-  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories));
+  return std::make_shared<const FilterConfig>(proto, scope, std::move(factories),
+                                              std::move(buffer_factory));
 }
 
 void AiProtocolManagerFilter::onDestroy() {
@@ -246,10 +298,22 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
           Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(decoder_callbacks_);
       route_config != nullptr) {
     route_has_request_ = route_config->hasRequest();
-    route_request_protocol_ = route_config->requestProtocol();
+    request_protocol_ = route_config->requestProtocol();
+    route_response_protocol_ = route_config->responseProtocol();
+    route_request_binding_ = route_config->requestBinding();
+    route_response_binding_ = route_config->responseBinding();
     if (route_has_request_) {
-      ENVOY_LOG(debug, "ai_protocol_manager: route declares request API {}",
-                llmProtocolName(route_request_protocol_));
+      if (const LLMProtocol declared =
+              RequestLlmProtocol::fromFilterState(*decoder_callbacks_->streamInfo().filterState());
+          declared != LLMProtocol::Unspecified) {
+        request_protocol_ = declared;
+      }
+      // The route's binding is how its clients carry the route's API, so it lapses for another.
+      if (request_protocol_ != route_config->requestProtocol()) {
+        route_request_binding_ = nullptr;
+      }
+      ENVOY_LOG(debug, "ai_protocol_manager: AI endpoint with request API {}",
+                llmProtocolName(request_protocol_));
     }
   }
 
@@ -276,7 +340,7 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // replayed from there, so it costs no storage IO at all. Past that the chain would have pushed
   // back, which is exactly the point at which offloading starts to pay for itself.
   decode_manager_ = std::make_shared<BufferManager>(
-      BufferManager::Config{decoder_callbacks_->decoderBufferLimit()}, buffer_factory_,
+      BufferManager::Config{decoder_callbacks_->decoderBufferLimit()}, config_->bufferFactory(),
       *decode_bridge_);
 
   // Pin the headers so routing and admission filters do not act on them before
@@ -292,8 +356,7 @@ uint32_t AiProtocolManagerFilter::inlineStringThresholdBytes() const {
   // schema may pin its own, because what has to stay inline for the payload to
   // validate is a property of the wire API, not of the deployment.
   if (isAiEndpoint()) {
-    if (const PayloadSchema* payload_schema =
-            AdapterRegistry::get(route_request_protocol_).schema();
+    if (const PayloadSchema* payload_schema = AdapterRegistry::get(request_protocol_).schema();
         payload_schema != nullptr) {
       if (const std::optional<uint32_t> pinned =
               payload_schema->requestInlineStringThresholdBytes();
@@ -341,21 +404,6 @@ bool AiProtocolManagerFilter::feedParser(const Buffer::Instance& data, bool end_
   if (end_stream) {
     request_json_ = request_parser_->takeDocument();
     request_parser_.reset();
-
-    if (isAiEndpoint()) {
-      // TODO(penguingao): Support validating payload schema on the fly as the Wuffs parser
-      // streams and parses chunks, rejecting invalid fields early before end_stream.
-      if (const PayloadSchema* payload_schema =
-              AdapterRegistry::get(route_request_protocol_).schema();
-          payload_schema != nullptr) {
-        const absl::Status validation_status = payload_schema->validateRequest(request_json_);
-        if (!validation_status.ok()) {
-          config_->stats().request_schema_invalid_.inc();
-          rejectInvalidPayload(validation_status);
-          return false;
-        }
-      }
-    }
     config_->stats().request_parsed_.inc();
   }
   return true;
@@ -454,14 +502,31 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
 
   if (isAiEndpoint() && !decode_manager_->empty() && !payload_rejected_) {
     ASSERT(request_headers_ != nullptr);
-    const AiFilterContext context{decoder_callbacks_->streamInfo(), *request_headers_,
-                                  route_request_protocol_, decode_manager_->length()};
+    const AiFilterContext context{.stream_info = decoder_callbacks_->streamInfo(),
+                                  .request_headers = *request_headers_,
+                                  .request_protocol = request_protocol_,
+                                  .request_payload_bytes = decode_manager_->length(),
+                                  .response_protocol = route_response_protocol_,
+                                  .request_binding = route_request_binding_,
+                                  .response_binding = route_response_binding_};
     std::vector<AiFilterSharedPtr> filters;
     filters.reserve(config_->aiFilterFactories().size());
     for (const AiFilterFactoryCb& factory : config_->aiFilterFactories()) {
       if (AiFilterSharedPtr filter = factory(context); filter != nullptr) {
         filters.push_back(std::move(filter));
       }
+    }
+    // The route and the chain are configured apart, so only a request shows that the chain
+    // leaves a binding the route declares unapplied.
+    const BindingUse applied = bindingsApplied(filters);
+    const bool request_unused = route_request_binding_ != nullptr && !applied.request;
+    const bool response_unused = route_response_binding_ != nullptr && !applied.response;
+    if (request_unused || response_unused) {
+      config_->stats().route_binding_unused_.inc();
+      ENVOY_LOG(debug, "ai_protocol_manager: no AI filter applies the route's {} binding",
+                request_unused && response_unused ? "request and response"
+                : request_unused                  ? "request"
+                                                  : "response");
     }
     // TODO(penguingao): Avoid always passing downstream StreamInfo when constructing
     // FilterManager; when AI Protocol Manager is placed in an upstream filter chain, it should
@@ -477,7 +542,7 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
           decoder_callbacks_->sendLocalReply(code, details, nullptr, std::nullopt,
                                              "ai_protocol_manager_filter_rejected");
         },
-        config_->alwaysSerializeRequest());
+        config_->alwaysSerializeRequest(), request_protocol_);
   } else {
     decode_manager_->replay(0, decode_manager_->length(), std::move(on_complete));
   }
@@ -555,28 +620,31 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
     encode_bridge_ = std::make_unique<EncoderFilterChainBridge>(
         *encoder_callbacks_, *decoder_callbacks_, config_->stats());
     encode_manager_ = std::make_shared<BufferManager>(
-        BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, buffer_factory_,
+        BufferManager::Config{encoder_callbacks_->encoderBufferLimit()}, config_->bufferFactory(),
         *encode_bridge_);
     if (is_sse) {
       filter_manager_->startSseResponse(
-          buffer_factory_, *encode_bridge_, *encode_manager_,
+          config_->bufferFactory(), *encode_bridge_, *encode_manager_,
           [this](absl::Status status) { onEncodeComplete(std::move(status)); });
     } else if (is_json) {
       filter_manager_->startUnaryResponse(
-          buffer_factory_, *encode_bridge_, *encode_manager_,
+          config_->bufferFactory(), *encode_bridge_, *encode_manager_,
           [this](absl::Status status) { onEncodeComplete(std::move(status)); });
     }
   }
 
   if (want_token_usage) {
-    // The wire API to extract against, in precedence order: the route's declared
-    // response API, the route's declared request API, the configured fallback;
-    // Unspecified auto-detects from the response shape.
+    // The wire API to extract against, in precedence order: the backend API a filter left in
+    // filter state, the route's declared response API, the route's declared request API, the
+    // configured fallback; Unspecified auto-detects from the response shape. Resolved through
+    // the same rule the transcoder follows, so the two cannot disagree about the backend.
     LLMProtocol protocol = config_->defaultLLMProtocol();
     if (route_config != nullptr &&
         route_config->effectiveResponseProtocol() != LLMProtocol::Unspecified) {
       protocol = route_config->effectiveResponseProtocol();
     }
+    protocol =
+        ResponseLlmProtocol::resolve(*encoder_callbacks_->streamInfo().filterState(), protocol);
 
     // Observation buffers charge the stream's memory account when tracking is
     // enabled; in an upstream installation the decoder callbacks resolve to the

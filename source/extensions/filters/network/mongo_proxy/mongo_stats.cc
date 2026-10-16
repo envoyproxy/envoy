@@ -24,7 +24,10 @@ MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix,
       reply_time_ms_(stat_name_set_->add("reply_time_ms")),
       time_ms_(stat_name_set_->add("time_ms")), query_(stat_name_set_->add("query")),
       scatter_get_(stat_name_set_->add("scatter_get")), total_(stat_name_set_->add("total")),
-      unknown_command_(stat_name_set_->add("unknown_command")) {
+      unknown_command_(stat_name_set_->add("unknown_command")),
+      proxy_stats_{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                         POOL_GAUGE_PREFIX(scope, prefix),
+                                         POOL_HISTOGRAM_PREFIX(scope, prefix))} {
 
   for (const auto& cmd : commands) {
     stat_name_set_->rememberBuiltin(cmd);

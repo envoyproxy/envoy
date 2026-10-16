@@ -115,9 +115,11 @@ envoy_cc_test(
         "//source/common/listener_manager:connection_handler_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:status_utility_lib",
     ],
@@ -332,6 +334,7 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:null_overload_manager_lib",
         "//source/server:overload_manager_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -341,6 +344,16 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "synchronous_feedback_trigger_test",
+    srcs = ["synchronous_feedback_trigger_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/server:synchronous_feedback_trigger_lib",
+        "//test/test_common:status_utility_lib",
     ],
 )
 
