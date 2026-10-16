@@ -8,6 +8,8 @@
 #include "source/common/io/io_uring_impl.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/functional/function_ref.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Io {
@@ -89,6 +91,9 @@ protected:
   IoUringSocketEntry& addSocket(IoUringSocketEntryPtr&& socket);
   void onFileEvent();
   void submit();
+  // Prepare a request with the given function, which returns IoUringResult::Failed while the
+  // submission queue is full, and submit it unless submission is delayed.
+  void prepareAndSubmit(absl::FunctionRef<IoUringResult()> prepare, absl::string_view operation);
 
   // The iouring instance.
   IoUringPtr io_uring_;
@@ -130,6 +135,8 @@ public:
     status_ = Closed;
     on_closed_cb_ = cb;
   }
+  // Cancel pending writes without relying on dispatcher timers during worker destruction.
+  virtual void cancelWriteOnWorkerShutdown() {}
   void enableRead() override { status_ = ReadEnabled; }
   void disableRead() override { status_ = ReadDisabled; }
   void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
@@ -221,6 +228,7 @@ public:
 
   // IoUringSocket
   void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) override;
+  void cancelWriteOnWorkerShutdown() override;
   void enableRead() override;
   void disableRead() override;
   void write(Buffer::Instance& data) override;
@@ -282,6 +290,9 @@ protected:
   Request* read_cancel_req_{nullptr};
   // This is used for tracking the write or shutdown's cancel request.
   Request* write_or_shutdown_cancel_req_{nullptr};
+  // A successful partial completion can race with cancellation. Do not submit the remaining data
+  // after cancellation was requested, even if the cancel completion has already been processed.
+  bool write_cancellation_requested_{false};
   // This is used for tracking the close request.
   Request* close_req_{nullptr};
   // Whether the write buffer is above the high watermark and backpressure is being applied.

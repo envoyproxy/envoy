@@ -242,11 +242,14 @@ public:
   virtual void injectCompletion(os_fd_t fd, Request* user_data, int32_t result) PURE;
 
   /**
-   * Remove all the injected completions for the specific file descriptor. This is used
-   * to cleanup all the injected completions when a socket closed and remove from the iouring.
-   * @param fd is used to refer to the completions will be removed.
+   * Remove all the injected completions for the given socket. This is used to cleanup all the
+   * injected completions when a socket is closed and removed from the io_uring. It is keyed by the
+   * socket rather than the file descriptor because `IORING_OP_CLOSE` on a socket runs inline at
+   * submit, so the fd number can be reused by a newly accepted socket before the close completion
+   * is reaped. Keying by fd would delete the reused socket's injected completions.
+   * @param socket the socket whose injected completions will be removed.
    */
-  virtual void removeInjectedCompletion(os_fd_t fd) PURE;
+  virtual void removeInjectedCompletion(IoUringSocket& socket) PURE;
 };
 
 using IoUringPtr = std::unique_ptr<IoUring>;

@@ -136,10 +136,10 @@ IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polli
   }
   RELEASE_ASSERT(ret == 0, fmt::format("unable to initialize io_uring: {}", errorDetails(-ret)));
 
-  // Size the completion vector to the submission queue, not the larger completion queue. Each read
-  // completion re-arms one read, so reaping at most one submission queue worth of completions per
-  // pass keeps those read re-arms within the submission queue. A larger burst is reaped across
-  // later passes, which the worker re-arms while hasReadyCompletions stays true.
+  // Size the completion vector to the submission queue, not the larger completion queue, to bound
+  // the completions handled in one pass. A completion can prepare more than one request, so the
+  // worker submits a full submission queue inside the pass. A larger burst is reaped across later
+  // passes, which the worker re-arms while hasReadyCompletions stays true.
   cqes_.resize(io_uring_size, nullptr);
 
   // Set up the provided buffer ring for `multishot` reads when requested. A failure here means the
@@ -356,6 +356,9 @@ IoUringResult IoUringImpl::prepareShutdown(os_fd_t fd, int how, Request* user_da
 IoUringResult IoUringImpl::submit() {
   int res = io_uring_submit(&ring_);
   RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
+  // With SQPOLL the kernel thread consumes submitted entries asynchronously, so wait until an entry
+  // is free for the next prepare. This returns immediately without SQPOLL or when an entry is free.
+  io_uring_sqring_wait(&ring_);
   return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
 }
 
@@ -365,15 +368,16 @@ void IoUringImpl::injectCompletion(os_fd_t fd, Request* user_data, int32_t resul
             fmt::ptr(user_data), injected_completions_.size());
 }
 
-void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
-  ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
+void IoUringImpl::removeInjectedCompletion(IoUringSocket& socket) {
+  ENVOY_LOG(trace, "remove injected completions for socket = {}, size = {}", fmt::ptr(&socket),
             injected_completions_.size());
-  injected_completions_.remove_if([fd](InjectedCompletion& completion) {
-    if (fd == completion.fd_) {
-      // Release the user data before remove this completion.
-      delete reinterpret_cast<Request*>(completion.user_data_);
+  injected_completions_.remove_if([&socket](InjectedCompletion& completion) {
+    if (completion.user_data_ != nullptr && &completion.user_data_->socket() == &socket) {
+      // Release the user data before removing this completion.
+      delete completion.user_data_;
+      return true;
     }
-    return fd == completion.fd_;
+    return false;
   });
 }
 
