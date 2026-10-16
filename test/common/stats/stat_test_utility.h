@@ -2,6 +2,7 @@
 
 #include "envoy/stats/store.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/memory/memory_test_utility.h"
@@ -95,6 +96,7 @@ public:
     return rootScope()->textReadoutFromString(name);
   }
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
+    Thread::LockGuard lock(lock_);
     histogram_values_map_[histogram.name()].push_back(value);
   }
 
@@ -116,11 +118,14 @@ protected:
 private:
   friend class TestScope;
 
+  mutable Thread::MutexBasicLockable lock_;
+
   // The Store keeps a flat map of all the counters in all scopes.
-  absl::flat_hash_map<std::string, Counter*> counter_map_;
-  absl::flat_hash_map<std::string, Gauge*> gauge_map_;
-  absl::flat_hash_map<std::string, Histogram*> histogram_map_;
-  absl::flat_hash_map<std::string, std::vector<uint64_t>> histogram_values_map_;
+  absl::flat_hash_map<std::string, Counter*> counter_map_ ABSL_GUARDED_BY(lock_);
+  absl::flat_hash_map<std::string, Gauge*> gauge_map_ ABSL_GUARDED_BY(lock_);
+  absl::flat_hash_map<std::string, Histogram*> histogram_map_ ABSL_GUARDED_BY(lock_);
+  absl::flat_hash_map<std::string, std::vector<uint64_t>> histogram_values_map_
+      ABSL_GUARDED_BY(lock_);
 };
 
 class TestScope : public IsolatedScopeImpl {
