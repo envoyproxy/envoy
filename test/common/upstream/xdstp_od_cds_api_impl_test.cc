@@ -43,7 +43,7 @@ public:
   }
 
   void expectSingletonSubscription(absl::string_view resource_name) {
-    EXPECT_CALL(xds_manager_, subscribeToSingletonResource(resource_name, _, _, _, _, _, _))
+    EXPECT_CALL(xds_manager_, subscribeToSingletonResource(resource_name, _, _, _, testing::An<Config::SubscriptionCallbacks&>(), _, _))
         .WillOnce(Invoke(
             [this](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
                    absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
@@ -84,7 +84,7 @@ TEST_F(XdstpOdCdsApiImplTest, SingleSubscriptionToSomeCluster) {
   expectSingletonSubscription("fake_cluster");
   odcds_->updateOnDemand("fake_cluster");
 
-  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(_, _, _, _, testing::An<Config::SubscriptionCallbacks&>(), _, _)).Times(0);
   odcds_->updateOnDemand("fake_cluster");
 }
 
@@ -257,7 +257,7 @@ TEST_F(XdstpOdCdsApiImplTest, MultipleSubscriptions) {
   // Subscription for fake_cluster1 succeeds.
   const std::string cluster_name1 = "fake_cluster1";
   Config::SubscriptionCallbacks* callbacks1 = nullptr;
-  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name1, _, _, _, _, _, _))
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name1, _, _, _, testing::An<Config::SubscriptionCallbacks&>(), _, _))
       .WillOnce(Invoke(
           [&callbacks1](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
                         absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
@@ -272,7 +272,7 @@ TEST_F(XdstpOdCdsApiImplTest, MultipleSubscriptions) {
   // Subscription for fake_cluster2 fails.
   const std::string cluster_name2 = "fake_cluster2";
   Config::SubscriptionCallbacks* callbacks2 = nullptr;
-  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name2, _, _, _, _, _, _))
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name2, _, _, _, testing::An<Config::SubscriptionCallbacks&>(), _, _))
       .WillOnce(Invoke(
           [&callbacks2](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
                         absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
@@ -401,7 +401,7 @@ TEST_F(XdstpOdCdsApiImplTest, RegistrationFailureIsNotKnownMissing) {
   InSequence s;
 
   const std::string cluster_name = "fake_cluster";
-  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name, _, _, _, _, _, _))
+  EXPECT_CALL(xds_manager_, subscribeToSingletonResource(cluster_name, _, _, _, testing::An<Config::SubscriptionCallbacks&>(), _, _))
       .WillOnce(testing::Return(absl::InvalidArgumentError("invalid resource name")));
   EXPECT_CALL(notifier_, notifyMissingCluster(cluster_name));
   odcds_->updateOnDemand(cluster_name);

@@ -3505,7 +3505,7 @@ public:
     // is set to true by default, this should be removed.
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.xdstp_based_config_singleton_subscriptions", "true"}});
-    ON_CALL(server_context_.xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _))
+    ON_CALL(server_context_.xds_manager_, subscribeToSingletonResource(_, _, _, _, testing::An<Config::SubscriptionCallbacks&>(), _, _))
         .WillByDefault(Invoke(
             [this](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
                    absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
