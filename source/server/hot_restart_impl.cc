@@ -135,6 +135,8 @@ OptRef<Network::ParentDrainedCallbackRegistrar> HotRestartImpl::parentDrainedCal
   return as_child_;
 }
 
+bool HotRestartImpl::parentUnresponsive() const { return as_child_.parentUnresponsive(); }
+
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   as_parent_.initialize(dispatcher, server);
   as_child_.initialize(dispatcher);

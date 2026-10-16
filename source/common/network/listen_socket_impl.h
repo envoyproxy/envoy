@@ -50,12 +50,15 @@ protected:
 
 template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
-  NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
-                      const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-                      const SocketCreationOptions& creation_options = {})
+  NetworkListenSocket(
+      const Address::InstanceConstSharedPtr& address,
+      const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+      const SocketCreationOptions& creation_options = {},
+      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar = std::nullopt)
       : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address, creation_options)
                                       : nullptr,
-                         address) {
+                         address),
+        parent_drained_callback_registrar_(parent_drained_callback_registrar) {
     // Prebind is applied if the socket is bind to port.
     if (bind_to_port) {
       RELEASE_ASSERT(io_handle_ && io_handle_->isOpen(), "");

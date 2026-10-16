@@ -103,6 +103,16 @@ public:
   virtual OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() PURE;
 
   /**
+   * @return whether the parent instance stopped answering this (child) instance's requests and
+   *         was written off, while possibly still running. duplicateParentListenSocket() then
+   *         returns -1 without knowing whether the parent owns the address, so a UDP listener
+   *         bound afresh for it should start paused (see parentDrainedCallbackRegistrar()) rather
+   *         than read a socket the parent may still be serving. False when there is no parent or
+   *         hot restart is disabled.
+   */
+  virtual bool parentUnresponsive() const PURE;
+
+  /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a
    * new child has begun. The hot restart implementation needs to be created early to deal with
    * shared memory, logging, etc. so late initialization of needed interfaces is done here.

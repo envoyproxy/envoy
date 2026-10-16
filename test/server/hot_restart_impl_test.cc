@@ -52,6 +52,11 @@ struct TestAddresses {
 
 class HotRestartImplTest : public testing::Test {
 public:
+  HotRestartImplTest() {
+    // Send/receive timeouts are set on each domain socket at bind time.
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, _, _, _)).Times(AnyNumber());
+  }
+
   void setup() {
     EXPECT_CALL(hot_restart_os_sys_calls_, shmUnlink(_)).Times(AnyNumber());
     EXPECT_CALL(hot_restart_os_sys_calls_, shmOpen(_, _, _));

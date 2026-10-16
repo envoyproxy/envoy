@@ -24,6 +24,7 @@ public:
   }
   void registerUdpForwardingListener(Network::Address::InstanceConstSharedPtr,
                                      std::shared_ptr<Network::UdpListenerConfig>) override {}
+  bool parentUnresponsive() const override { return false; }
   OptRef<Network::ParentDrainedCallbackRegistrar> parentDrainedCallbackRegistrar() override {
     return std::nullopt;
   }
