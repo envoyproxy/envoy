@@ -185,6 +185,10 @@ private:
   // peer close is distinguished from a write half-close, which real sockets cannot signal on the
   // read side.
   bool receive_data_reset_after_drain_{false};
+  // Next read reports EOF before the pending reset.
+  bool eof_before_reset_{false};
+  // True once a read has reported EOF.
+  bool eof_read_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.
