@@ -32,6 +32,18 @@ enum class GeoField {
   AnonProxy,
   Isp,
   ApplePrivateRelay,
+  CityGeonameId,
+  Latitude,
+  Longitude,
+  TimeZone,
+  PostalCode,
+  RegionName,
+  RegionGeonameId,
+  SubregionGeonameId,
+  CountryGeonameId,
+  ContinentGeonameId,
+  MetroCode,
+  CountryName,
   Count,
 };
 

@@ -73,6 +73,8 @@ public:
     // Load the database files first, so that a configuration that names none of them, or names
     // one that cannot be opened, is rejected before anything is cached.
     DbFileProviders db_file_providers = getDbFileProviders(proto_config, context);
+    // GeoipProviderConfig constructor validates that configured fields have their required
+    // databases (city_db_path, country_db_path) and throws EnvoyException if not.
     const auto provider_config =
         std::make_shared<GeoipProviderConfig>(proto_config, stat_prefix, context.scope());
     std::shared_ptr<GeoipProvider> driver =
