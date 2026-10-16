@@ -584,7 +584,7 @@ public:
   }
 
   const ExtProcFilterStats& stats() const { return stats_; }
-  ExtProcLoggingInfo* loggingInfo() { return logging_info_; }
+  ExtProcLoggingInfo* loggingInfo() { return logging_info_.get(); }
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -740,7 +740,10 @@ private:
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
-  ExtProcLoggingInfo* logging_info_;
+  // Hold a shared_ptr so the logging info object outlives any later overwrite of the
+  // FilterState entry at the same key (e.g. by another filter sharing the same
+  // ``http_filters[].name``); a raw pointer here can dangle after such an overwrite.
+  std::shared_ptr<ExtProcLoggingInfo> logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
 
