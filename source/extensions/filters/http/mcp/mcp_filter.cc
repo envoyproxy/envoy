@@ -600,7 +600,8 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}, end_stream={}", data.length(),
             bytes_parsed_, end_stream);
 
-  if (config_->propagateTraceContext()->reparent_active_span() && !end_stream) {
+  if (config_->propagateTraceContext().has_value() &&
+      config_->propagateTraceContext()->reparent_active_span() && !end_stream) {
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 
