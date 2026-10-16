@@ -50,8 +50,8 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // it has no value for (an address the database does not contain, a lookup error, a field the
   // database lacks for that address) and does not run at all for the non-IP addresses below.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.geoip_sanitize_geo_headers")) {
-    for (const std::string& geo_header : driver_->geoHeaderNames()) {
-      headers.remove(Http::LowerCaseString(geo_header));
+    for (const Http::LowerCaseString& geo_header : driver_->geoHeaderNames()) {
+      headers.remove(geo_header);
     }
   }
 
