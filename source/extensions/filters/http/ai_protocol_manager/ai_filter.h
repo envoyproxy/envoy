@@ -95,9 +95,21 @@ using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string detail
 // The response path has one coroutine per response shape: encodeSSE() and encodeUnary(). SSE
 // frames are small in practice, so a filter is given a whole frame at a time. Large frames that
 // do not fit the HTTP stream window are offloaded to the external buffer.
+// The stream's bindings an AI filter applies.
+struct BindingUse {
+  // The client's: the filter reads the request's path under it.
+  bool request{false};
+  // The backend's: the filter renders the request's path and body under it.
+  bool response{false};
+};
+
 class AiFilter {
 public:
   virtual ~AiFilter() = default;
+
+  // The bindings the filter applies. A binding the route declares that no filter of the chain
+  // applies is counted, since nothing else shows it is ignored.
+  virtual BindingUse bindingUse() const { return {}; }
 
   // Invoked when an AI request arrives.
   // Returns absl::OkStatus() on normal completion, or an error status on failure.

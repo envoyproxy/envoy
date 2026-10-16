@@ -117,6 +117,8 @@ public:
       HttpFilters::AiProtocolManager::AiResponseStreamReceiver receive_response,
       HttpFilters::AiProtocolManager::AiResponseStreamPropagator propagate_response) override;
 
+  HttpFilters::AiProtocolManager::BindingUse bindingUse() const override;
+
 private:
   // The transcoding instructions the request legs follow, from filter state or else the route;
   // each is unset when neither names it.

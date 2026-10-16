@@ -25,6 +25,7 @@ using HttpFilters::AiProtocolManager::AiRequestPtr;
 using HttpFilters::AiProtocolManager::AiRequestReceiver;
 using HttpFilters::AiProtocolManager::AiResponseStreamPropagator;
 using HttpFilters::AiProtocolManager::AiResponseStreamReceiver;
+using HttpFilters::AiProtocolManager::BindingUse;
 using HttpFilters::AiProtocolManager::FieldPathSegment;
 using HttpFilters::AiProtocolManager::FlattenJsonField;
 using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
@@ -262,6 +263,13 @@ Coroutine::Task<absl::Status> TranscoderFilter::encodeSSE(SseStreamReceiver rece
     CO_RETURN_IF_ERROR(co_await propagate_sse(std::move(out)));
   }
   co_return absl::OkStatus();
+}
+
+BindingUse TranscoderFilter::bindingUse() const {
+  // A request `TO_IR` leg reads the client's path, as an instance without a request leg does for
+  // the model its response may need; a request `FROM_IR` leg renders the backend's.
+  const bool renders = config_->requestHandling() == TranscoderProto::FROM_IR;
+  return {.request = !renders, .response = renders};
 }
 
 absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstructions() {

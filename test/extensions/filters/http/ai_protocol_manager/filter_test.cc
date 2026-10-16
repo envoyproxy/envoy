@@ -1359,8 +1359,11 @@ public:
     LlmBindingConstSharedPtr response_binding;
   };
 
-  ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen)
-      : context_(context), seen_(seen) {}
+  ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen,
+                           BindingUse binding_use = {})
+      : context_(context), seen_(seen), binding_use_(binding_use) {}
+
+  BindingUse bindingUse() const override { return binding_use_; }
 
   Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
                                        AiRequestPropagator propagate_request,
@@ -1377,6 +1380,7 @@ public:
 private:
   const AiFilterContext context_;
   std::vector<Seen>& seen_;
+  const BindingUse binding_use_;
 };
 
 // Receives the request and passes it on without editing it.
@@ -1460,11 +1464,13 @@ class AiProtocolManagerFilterStateTest : public AiProtocolManagerFilterTest {
 public:
   // What the AI filters see on `route`, a Chat Completions route, when filter state names `named`.
   std::vector<ContextRecordingAiFilter::Seen>
-  runWithFilterState(LLMProtocol named, const PerRouteProto& route = chatRoute()) {
+  runWithFilterState(LLMProtocol named, const PerRouteProto& route = chatRoute(),
+                     BindingUse binding_use = {}) {
     std::vector<ContextRecordingAiFilter::Seen> seen;
-    createFilterWithAiFilters({[&seen](const AiFilterContext& context) -> AiFilterSharedPtr {
-      return std::make_unique<ContextRecordingAiFilter>(context, seen);
-    }});
+    createFilterWithAiFilters(
+        {[&seen, binding_use](const AiFilterContext& context) -> AiFilterSharedPtr {
+          return std::make_unique<ContextRecordingAiFilter>(context, seen, binding_use);
+        }});
     setRouteConfig(route);
     callbacks_.stream_info_.filterState()->setData(FilterStateKeys::LlmProtocolRequest,
                                                    std::make_shared<RequestLlmProtocol>(named),
@@ -1509,6 +1515,19 @@ TEST_F(AiProtocolManagerFilterStateTest, RouteRequestBindingLapsesForAnotherApi)
   ASSERT_EQ(seen.size(), 1);
   EXPECT_EQ(seen[0].request_binding, nullptr);
   EXPECT_NE(seen[0].response_binding, nullptr);
+}
+
+// Route and chain are configured apart, so a binding the route declares that no AI filter applies
+// is counted where a request shows it.
+TEST_F(AiProtocolManagerFilterStateTest, CountsARouteBindingNoAiFilterApplies) {
+  runWithFilterState(LLMProtocol::Unspecified, routeWithBindings(), {.request = true});
+  EXPECT_EQ(counterValue("route_binding_unused"), 1);
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, RouteBindingsTheChainAppliesAreNotCounted) {
+  runWithFilterState(LLMProtocol::Unspecified, routeWithBindings(),
+                     {.request = true, .response = true});
+  EXPECT_EQ(counterValue("route_binding_unused"), 0);
 }
 
 TEST_F(AiProtocolManagerFilterStateTest, UnspecifiedFilterStateLeavesTheRoute) {

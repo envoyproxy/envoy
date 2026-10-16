@@ -608,6 +608,23 @@ TEST_F(TranscoderFilterTest, RequestBindingLiftsTheModelFromTheClientsPath) {
   EXPECT_EQ(read->model, "claude-sonnet-4-5");
 }
 
+// The bindings an instance applies follow its request leg, so the AI Protocol Manager can count a
+// route binding no instance applies.
+TEST_F(TranscoderFilterTest, AppliesTheBindingsOfItsRequestLeg) {
+  const auto use = [this](TranscoderProto::Direction request_handling) {
+    return TranscoderFilter(makeConfig(request_handling, TranscoderProto::TO_IR),
+                            makeContext(LLMProtocol::OpenAiChatCompletions))
+        .bindingUse();
+  };
+  EXPECT_TRUE(use(TranscoderProto::TO_IR).request);
+  EXPECT_FALSE(use(TranscoderProto::TO_IR).response);
+  EXPECT_FALSE(use(TranscoderProto::FROM_IR).request);
+  EXPECT_TRUE(use(TranscoderProto::FROM_IR).response);
+  // Without a request leg, the instance still reads the client's path for its response's model.
+  EXPECT_TRUE(use(TranscoderProto::DIRECTION_UNSPECIFIED).request);
+  EXPECT_FALSE(use(TranscoderProto::DIRECTION_UNSPECIFIED).response);
+}
+
 // The route's request binding reads the client's path when filter state names none.
 TEST_F(TranscoderFilterTest, RouteRequestBindingLiftsTheModelFromTheClientsPath) {
   route_request_binding_ = *LlmBinding::parse("/anthropic/{model}/{messages|stream}");

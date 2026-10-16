@@ -144,6 +144,17 @@ envoy::data::ai::v3::TokenUsage typedUsage(const TokenUsage& usage, bool degrade
   return typed;
 }
 
+// The bindings some filter of `filters` applies.
+BindingUse bindingsApplied(const std::vector<AiFilterSharedPtr>& filters) {
+  BindingUse applied;
+  for (const AiFilterSharedPtr& filter : filters) {
+    const BindingUse use = filter->bindingUse();
+    applied.request = applied.request || use.request;
+    applied.response = applied.response || use.response;
+  }
+  return applied;
+}
+
 // The binding one side of a route declares; null when it declares none. A binding describes how
 // the side carries its API, so it needs the side to name one.
 template <class SidePerRoute>
@@ -504,6 +515,18 @@ void AiProtocolManagerFilter::finalizeDecode(bool has_trailers) {
       if (AiFilterSharedPtr filter = factory(context); filter != nullptr) {
         filters.push_back(std::move(filter));
       }
+    }
+    // The route and the chain are configured apart, so only a request shows that the chain
+    // leaves a binding the route declares unapplied.
+    const BindingUse applied = bindingsApplied(filters);
+    const bool request_unused = route_request_binding_ != nullptr && !applied.request;
+    const bool response_unused = route_response_binding_ != nullptr && !applied.response;
+    if (request_unused || response_unused) {
+      config_->stats().route_binding_unused_.inc();
+      ENVOY_LOG(debug, "ai_protocol_manager: no AI filter applies the route's {} binding",
+                request_unused && response_unused ? "request and response"
+                : request_unused                  ? "request"
+                                                  : "response");
     }
     // TODO(penguingao): Avoid always passing downstream StreamInfo when constructing
     // FilterManager; when AI Protocol Manager is placed in an upstream filter chain, it should

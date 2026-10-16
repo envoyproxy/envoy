@@ -441,7 +441,8 @@ A route declares its bindings beside each ``llm_protocol``, in :ref:`request.bin
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponsePerRoute.binding>`,
 which are checked when the configuration loads. A route's binding is how that side carries the
 route's API, so it lapses when filter state names another API for the side: a router that sends a
-request to another backend API names that backend's binding too, or the API's own applies.
+request to another backend API names that backend's binding too, or the API's own applies. A
+route's binding that no AI filter of the chain applies is counted by ``route_binding_unused``.
 
 A binding is written as a URI pattern, starting with ``/``, or as an :ref:`LLMBinding
 <envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON, starting with ``{``. A part the binding leaves
@@ -808,6 +809,7 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_parsed, Counter, A held request payload was parsed into a document.
   request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
   request_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
+  route_binding_unused, Counter, "A request on a route that declares a :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>` no AI filter of the chain applies, such as a ``response.binding`` with no transcoder running a request ``FROM_IR`` leg."
   request_external_buffer_error, Counter, The external buffer failed irrecoverably on the request path and the stream was answered with a 500.
   response_external_buffer_error, Counter, The external buffer failed irrecoverably on the response path and the stream was answered with a 500.
   token_usage_found, Counter, A response yielded token usage and metadata was written (includes ``PARTIAL`` records).
