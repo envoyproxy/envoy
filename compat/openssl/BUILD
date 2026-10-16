@@ -653,6 +653,7 @@ mapping_func_filegroup(
         "SSL_CIPHER_standard_name",
         "SSL_clear",
         "SSL_connect",
+        "SSL_CTX_add1_chain_cert",
         "SSL_CTX_add_extra_chain_cert",
         "SSL_CTX_check_private_key",
         "SSL_CTX_free",

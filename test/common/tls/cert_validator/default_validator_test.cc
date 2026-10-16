@@ -10,6 +10,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1181,11 +1182,160 @@ TEST(CrlCacheTest, CrlListKeepsCacheAlive) {
   }
   // The local cache reference is gone, but the CrlList still holds it alive.
   EXPECT_FALSE(weak_cache.expired());
-  EXPECT_EQ(crl_list->cache.get(), weak_cache.lock().get());
+  EXPECT_EQ(weak_cache.lock()->size(), 1);
 
   // Dropping the CrlList releases the cache.
   crl_list.reset();
   EXPECT_TRUE(weak_cache.expired());
+}
+
+// A minimal cache over SharedPemCache that counts parses, used to test the shared release and
+// lifetime behavior independently of any PEM format.
+struct TestPemValue {
+  std::string pem;
+};
+
+class TestPemCache : public SharedPemCache<TestPemValue> {
+public:
+  absl::StatusOr<std::shared_ptr<TestPemValue>> get(const std::string& pem) {
+    return getOrParse(pem, [&]() -> absl::StatusOr<std::unique_ptr<TestPemValue>> {
+      ++parses_;
+      if (pem == "invalid") {
+        return absl::InvalidArgumentError("invalid pem");
+      }
+      return std::make_unique<TestPemValue>(TestPemValue{pem});
+    });
+  }
+
+  int parses_{0};
+};
+
+// An entry is erased as soon as its last reference is released, without waiting for a later
+// insert, and is parsed only once while any reference is held.
+TEST(SharedPemCacheTest, ErasesEntryWhenLastReferenceIsReleased) {
+  auto cache = std::make_shared<TestPemCache>();
+  auto first = cache->get("a");
+  ASSERT_OK(first);
+  auto second = cache->get("a");
+  ASSERT_OK(second);
+  EXPECT_EQ(first->get(), second->get());
+  EXPECT_EQ(cache->parses_, 1);
+  EXPECT_EQ(cache->size(), 1);
+
+  first->reset();
+  EXPECT_EQ(cache->size(), 1);
+  second->reset();
+  EXPECT_EQ(cache->size(), 0);
+
+  // The released key is parsed again on the next lookup.
+  auto again = cache->get("a");
+  ASSERT_OK(again);
+  EXPECT_EQ(cache->parses_, 2);
+  EXPECT_EQ(cache->size(), 1);
+}
+
+// Releasing one of many distinct entries erases only that entry.
+TEST(SharedPemCacheTest, ErasesOnlyTheReleasedEntry) {
+  auto cache = std::make_shared<TestPemCache>();
+  std::vector<std::shared_ptr<TestPemValue>> entries;
+  for (int i = 0; i < 100; ++i) {
+    auto entry = cache->get(absl::StrCat("pem-", i));
+    ASSERT_OK(entry);
+    entries.push_back(std::move(*entry));
+  }
+  EXPECT_EQ(cache->size(), 100);
+
+  for (int i = 0; i < 100; i += 2) {
+    entries[i].reset();
+  }
+  EXPECT_EQ(cache->size(), 50);
+
+  // The surviving entries are still shared rather than re-parsed.
+  const int parses = cache->parses_;
+  auto survivor = cache->get("pem-1");
+  ASSERT_OK(survivor);
+  EXPECT_EQ(survivor->get(), entries[1].get());
+  EXPECT_EQ(cache->parses_, parses);
+}
+
+// A parse error is returned to the caller and nothing is cached.
+TEST(SharedPemCacheTest, ParseErrorIsNotCached) {
+  auto cache = std::make_shared<TestPemCache>();
+  EXPECT_THAT(cache->get("invalid"), HasStatusMessage(testing::HasSubstr("invalid pem")));
+  EXPECT_EQ(cache->size(), 0);
+  EXPECT_THAT(cache->get("invalid"), HasStatusMessage(testing::HasSubstr("invalid pem")));
+  EXPECT_EQ(cache->parses_, 2);
+}
+
+// An entry keeps its cache alive, and releasing the last entry after every other cache reference
+// is gone erases the entry and then destroys the cache.
+TEST(SharedPemCacheTest, EntryKeepsCacheAlive) {
+  std::weak_ptr<TestPemCache> weak_cache;
+  std::shared_ptr<TestPemValue> entry;
+  {
+    auto cache = std::make_shared<TestPemCache>();
+    weak_cache = cache;
+    auto result = cache->get("a");
+    ASSERT_OK(result);
+    entry = std::move(*result);
+  }
+  ASSERT_FALSE(weak_cache.expired());
+  EXPECT_EQ(weak_cache.lock()->size(), 1);
+
+  entry.reset();
+  EXPECT_TRUE(weak_cache.expired());
+}
+
+// The last reference can be released on a thread other than the one that created the entry.
+TEST(SharedPemCacheTest, ReleasesOnAnotherThread) {
+  auto cache = std::make_shared<TestPemCache>();
+  std::vector<std::shared_ptr<TestPemValue>> entries;
+  for (int i = 0; i < 10; ++i) {
+    auto entry = cache->get(absl::StrCat("pem-", i));
+    ASSERT_OK(entry);
+    entries.push_back(std::move(*entry));
+  }
+  EXPECT_EQ(cache->size(), 10);
+
+  Thread::ThreadPtr worker =
+      Thread::threadFactoryForTest().createThread([&entries]() { entries.clear(); });
+  worker->join();
+  EXPECT_EQ(cache->size(), 0);
+}
+
+// The last reference to a key is released on another thread while the main thread looks the same
+// key up again. Whichever order the two take, the entry the main thread ends up holding must stay
+// cached: a release that loses the race to a re-add must not erase the replacement.
+TEST(SharedPemCacheTest, ConcurrentReleaseDoesNotEraseReplacement) {
+  auto cache = std::make_shared<TestPemCache>();
+  // Counts the iterations in which the re-add lost the race and was served the entry being
+  // released, as opposed to re-parsing after the release.
+  int shared_with_release = 0;
+  for (int i = 0; i < 1000; ++i) {
+    auto held = cache->get("a");
+    ASSERT_OK(held);
+    std::shared_ptr<TestPemValue> to_release = std::move(*held);
+    const int parses_before = cache->parses_;
+
+    Thread::ThreadPtr worker =
+        Thread::threadFactoryForTest().createThread([&to_release]() { to_release.reset(); });
+    auto latest = cache->get("a");
+    ASSERT_OK(latest);
+    worker->join();
+    if (cache->parses_ == parses_before) {
+      ++shared_with_release;
+    }
+
+    // The held entry is still the cached one.
+    EXPECT_EQ(cache->size(), 1);
+    auto lookup = cache->get("a");
+    ASSERT_OK(lookup);
+    EXPECT_EQ(lookup->get(), latest->get());
+    latest->reset();
+    lookup->reset();
+    ASSERT_EQ(cache->size(), 0);
+  }
+  testing::Test::RecordProperty("re_adds_sharing_the_released_entry", shared_with_release);
 }
 
 // Two validators created from the same factory context share a single parsed
@@ -1340,7 +1490,7 @@ TEST(CaCertCacheTest, CaCertListKeepsCacheAlive) {
   }
   // The local cache reference is gone, but the CaCertList still holds it alive.
   EXPECT_FALSE(weak_cache.expired());
-  EXPECT_EQ(ca_cert_list->cache.get(), weak_cache.lock().get());
+  EXPECT_EQ(weak_cache.lock()->size(), 1);
 
   // Dropping the CaCertList releases the cache.
   ca_cert_list.reset();

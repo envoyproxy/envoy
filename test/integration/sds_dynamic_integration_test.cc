@@ -20,6 +20,7 @@
 #endif
 
 #include "source/common/ssl/ssl.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
@@ -32,6 +33,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/resources.h"
@@ -39,6 +41,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "integration.h"
@@ -688,6 +691,66 @@ TEST_P(SdsDynamicKeyRotationIntegrationTest, KeyLogRotation) {
   // exercised an in-flight context swap.
   waitForSdsUpdateStats(3);
   cleanupUpstreamAndDownstream();
+}
+
+// Rotating the server certificate over SDS while a connection holds the previous TLS context keeps
+// the previous certificate chain and private key cached until that connection closes. Closing it
+// releases the last reference on the connection's worker thread, which erases them from their
+// caches there.
+TEST_P(SdsDynamicDownstreamIntegrationTest, RotatedCertificateReleasedByLastConnection) {
+  if (test_quic_) {
+    GTEST_SKIP() << "QUIC connections do not hold the TLS context of a server SSL socket";
+  }
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    sendSdsResponse(getServerSecretRsa());
+  };
+  initialize();
+  waitForSdsUpdateStats(1);
+
+  // Look the server's caches up on its main thread; their sizes can be read from this thread.
+  std::shared_ptr<Extensions::TransportSockets::Tls::CertChainCache> cert_chains;
+  std::shared_ptr<Extensions::TransportSockets::Tls::PrivateKeyCache> private_keys;
+  absl::Notification looked_up;
+  test_server_->server().dispatcher().post([&]() {
+    cert_chains = Extensions::TransportSockets::Tls::getCertChainCache(
+        test_server_->server().singletonManager());
+    private_keys = Extensions::TransportSockets::Tls::getPrivateKeyCache(
+        test_server_->server().singletonManager());
+    looked_up.Notify();
+  });
+  looked_up.WaitForNotification();
+  const auto wait_for_sizes = [&](size_t expected) {
+    for (int i = 0;
+         i < 1000 && (cert_chains->size() != expected || private_keys->size() != expected); ++i) {
+      timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    }
+    EXPECT_EQ(cert_chains->size(), expected);
+    EXPECT_EQ(private_keys->size(), expected);
+  };
+  wait_for_sizes(1);
+
+  // This connection's TLS socket holds the context built from the first certificate.
+  codec_client_ = makeHttpConnection(makeSslClientConnection());
+  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0,
+                                dataPlaneUpstreamIndex());
+
+  // Rotate to a different certificate and key. The open connection keeps the previous ones
+  // cached alongside the new ones.
+  envoy::extensions::transport_sockets::tls::v3::Secret rotated = getServerSecretRsa();
+  rotated.mutable_tls_certificate()->mutable_certificate_chain()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/server2cert.pem"));
+  rotated.mutable_tls_certificate()->mutable_private_key()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/server2key.pem"));
+  sendSdsResponse(rotated);
+  waitForSdsUpdateStats(2);
+  wait_for_sizes(2);
+
+  // Closing the connection releases the previous certificate and key.
+  EXPECT_LOG_CONTAINS("debug", "tls: released parsed PEM entry, 1 entries", {
+    cleanupUpstreamAndDownstream();
+    wait_for_sizes(1);
+  });
 }
 
 // A test that SDS server send a good server secret for a static listener.
