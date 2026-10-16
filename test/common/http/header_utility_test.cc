@@ -720,6 +720,88 @@ present_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST_F(MatchHeadersTest, HeaderPresenceWithEmptyAndRepeatedValues) {
+  struct TestCase {
+    bool present;
+    bool invert;
+    bool missing_as_empty;
+    bool absent_matches;
+    bool present_matches;
+  };
+  const TestCase cases[] = {
+      {false, false, false, true, false}, {false, false, true, false, false},
+      {false, true, false, false, true},  {false, true, true, true, true},
+      {true, false, false, false, true},  {true, false, true, true, true},
+      {true, true, false, true, false},   {true, true, true, false, false},
+  };
+  for (const auto& test : cases) {
+    SCOPED_TRACE(fmt::format("present={} invert={} missing_as_empty={}", test.present, test.invert,
+                             test.missing_as_empty));
+    // Exercise ordinary, inline, and pseudo-header lookup paths.
+    for (const auto* name : {"match-header", "content-type", ":path"}) {
+      SCOPED_TRACE(name);
+      const LowerCaseString key(name);
+      envoy::config::route::v3::HeaderMatcher config;
+      config.set_name(name);
+      config.set_present_match(test.present);
+      config.set_invert_match(test.invert);
+      config.set_treat_missing_header_as_empty(test.missing_as_empty);
+      HeaderUtility::HeaderDataPresentMatch matcher(config);
+      for (const auto& value : {std::string(), std::string(128, 'x')}) {
+        TestRequestHeaderMapImpl headers{{"unrelated-header", "value"}};
+        EXPECT_EQ(test.absent_matches, matcher.matchesHeaders(headers));
+        EXPECT_EQ(test.absent_matches, matcher.matchesHeadersIndividually(headers));
+        for (int count = 1; count <= 4; ++count) {
+          headers.addCopy(key, value);
+          EXPECT_EQ(test.present_matches, matcher.matchesHeaders(headers));
+          EXPECT_EQ(test.present_matches, matcher.matchesHeadersIndividually(headers));
+        }
+        // Presence must not depend on which repeated entry has an empty value.
+        headers.addCopy(key, value.empty() ? "nonempty" : "");
+        EXPECT_EQ(test.present_matches, matcher.matchesHeaders(headers));
+        EXPECT_EQ(test.present_matches, matcher.matchesHeadersIndividually(headers));
+
+        headers.remove(key);
+        EXPECT_EQ(test.absent_matches, matcher.matchesHeaders(headers));
+        EXPECT_EQ(test.absent_matches, matcher.matchesHeadersIndividually(headers));
+        headers.addCopy(key, "");
+        EXPECT_EQ(test.present_matches, matcher.matchesHeaders(headers));
+        EXPECT_EQ(test.present_matches, matcher.matchesHeadersIndividually(headers));
+      }
+    }
+  }
+}
+
+TEST_F(MatchHeadersTest, ImplicitHeaderPresenceWithInversionAndMissingAsEmpty) {
+  struct TestCase {
+    bool invert;
+    bool missing_as_empty;
+    bool absent_matches;
+    bool present_matches;
+  };
+  const TestCase cases[] = {
+      {false, false, false, true},
+      {false, true, true, true},
+      {true, false, true, false},
+      {true, true, false, false},
+  };
+  for (const auto& test : cases) {
+    SCOPED_TRACE(fmt::format("invert={} missing_as_empty={}", test.invert, test.missing_as_empty));
+    envoy::config::route::v3::HeaderMatcher config;
+    config.set_name("match-header");
+    config.set_invert_match(test.invert);
+    config.set_treat_missing_header_as_empty(test.missing_as_empty);
+    // No match specifier means present_match=true, despite the proto bool's false default.
+    const auto matcher = HeaderUtility::createHeaderData(config, context_);
+    TestRequestHeaderMapImpl headers{{"unrelated-header", "value"}};
+    EXPECT_EQ(test.absent_matches, matcher->matchesHeaders(headers));
+    EXPECT_EQ(test.absent_matches, matcher->matchesHeadersIndividually(headers));
+    headers.addCopy(LowerCaseString("match-header"), "");
+    EXPECT_EQ(test.present_matches, matcher->matchesHeaders(headers));
+    EXPECT_EQ(test.present_matches, matcher->matchesHeadersIndividually(headers));
+  }
+}
+
 // Test the case present_match is true and treat_missing_header_as_empty is
 // true. Expected always return match.
 TEST_F(MatchHeadersTest, HeaderPresentMatchWithTrueValueTreatMissingAsEmpty) {

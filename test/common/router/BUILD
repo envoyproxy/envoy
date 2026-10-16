@@ -397,6 +397,23 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "router_ratelimit_speed_test",
+    srcs = ["router_ratelimit_speed_test.cc"],
+    deps = [
+        "//source/common/router:router_ratelimit_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "router_ratelimit_speed_test_benchmark_test",
+    benchmark_binary = "router_ratelimit_speed_test",
+)
+
 envoy_cc_test(
     name = "router_test",
     srcs = [
