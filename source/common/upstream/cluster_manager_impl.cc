@@ -1030,19 +1030,23 @@ void ClusterManagerImpl::updateCdsPause(const ClusterData& cluster_data) {
 }
 
 void ClusterManagerImpl::updateClusterCounts() {
-  // This if/else block implements a control flow mechanism that can be used by an ADS
-  // implementation to properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can
-  // use it to detect when a previously sent cluster becomes warm before sending routes that depend
-  // on it. This can improve incidence of HTTP 503 responses from Envoy when a route is used before
-  // it's supporting cluster is ready.
+  // This implements a control flow mechanism that can be used by an ADS implementation to
+  // properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can use it to
+  // detect when a previously sent cluster becomes warm before sending routes that depend on it.
+  // This can improve incidence of HTTP 503 responses from Envoy when a route is used before
+  // its supporting cluster is ready.
   //
-  // We achieve that by leaving CDS in the paused state as long as there is at
-  // least one warming cluster that has not opted out of CDS gating. Clusters
-  // with wait_for_warm_on_init: false remain in warming_clusters_ but do not hold
-  // a pause handle, so they do not block the CDS ACK. Once all blocking clusters
-  // are warmed up, CDS is resumed, and ACK is sent to ADS, providing a
-  // signal to ADS to proceed with RDS updates.
-  // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
+  // We achieve that by leaving CDS in the paused state as long as there is at least one
+  // warming cluster that has not opted out of CDS gating (wait_for_warm_on_init: true).
+  // CDS pause handles are acquired per-cluster via updateCdsPause(), called from loadCluster().
+  // Once all blocking clusters are warmed up, CDS is resumed and ACK is sent to ADS, providing
+  // a signal to ADS to proceed with RDS updates.
+  //
+  // Release handles for clusters that are no longer warming. Iterates every entry in cds_pauses_
+  // and removes any whose cluster name is no longer in warming_clusters_. Run unconditionally so
+  // handles are dropped promptly even if shutdown_ is already set. Cost is O(|cds_pauses_|).
+  absl::erase_if(cds_pauses_,
+                 [this](const auto& entry) { return !warming_clusters_.contains(entry.first); });
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }
