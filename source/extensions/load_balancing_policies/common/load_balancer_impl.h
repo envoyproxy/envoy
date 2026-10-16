@@ -529,7 +529,8 @@ public:
 protected:
   struct Scheduler {
     // EdfScheduler for weighted LB. The edf_ is only created when the original
-    // host weights of 2 or more hosts differ. When not present, the
+    // host weights of 2 or more hosts differ, when hosts are in slow start, or
+    // when alwaysUseWeightedSelection() returns true. When not present, the
     // implementation of chooseHostOnce falls back to unweightedHostPick.
     std::unique_ptr<EdfScheduler<Host>> edf_;
   };
@@ -556,6 +557,9 @@ private:
   friend class EdfLoadBalancerBasePeer;
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) const PURE;
+  // If true, weighted selection via hostWeight() is used even when all original host weights are
+  // equal and no hosts are in slow start.
+  virtual bool alwaysUseWeightedSelection() const { return false; }
   virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
                                                 const HostsSource& source) PURE;
   virtual HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
