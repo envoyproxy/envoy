@@ -33,6 +33,7 @@ struct CreateWasmStats {
 
 #define LIFECYCLE_STATS(COUNTER, GAUGE)                                                            \
   COUNTER(created)                                                                                 \
+  COUNTER(crashed)                                                                                 \
   GAUGE(active, NeverImport)
 
 struct LifecycleStats {
@@ -57,6 +58,7 @@ enum class WasmEvent : int {
   RuntimeError,
   VmCreated,
   VmShutDown,
+  VmCrashed,
   VmReloadBackoff,
   VmReloadSuccess,
   VmReloadFailure,
