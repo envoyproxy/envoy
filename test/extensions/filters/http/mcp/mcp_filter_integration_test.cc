@@ -1453,10 +1453,12 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEn
     ASSERT_EQ(export_request.resource_spans(0).scope_spans_size(), 1);
     ASSERT_EQ(export_request.resource_spans(0).scope_spans(0).spans_size(), 1);
     span = export_request.resource_spans(0).scope_spans(0).spans(0);
+
     EXPECT_EQ(absl::BytesToHexString(span.trace_id()), kTraceId);
     EXPECT_EQ(absl::BytesToHexString(span.parent_span_id()), kIncomingBodyParentId);
     EXPECT_THAT(absl::BytesToHexString(span.span_id()),
                 AllOf(Not(IsEmpty()), Ne(kIncomingBodyParentId)));
+    EXPECT_EQ(span.trace_state(), "rojo=00f067aa0ba902b7");
     EXPECT_EQ(
         span.flags() & opentelemetry::proto::trace::v1::SpanFlags::SPAN_FLAGS_TRACE_FLAGS_MASK, 1);
     EXPECT_TRUE(span.flags() &

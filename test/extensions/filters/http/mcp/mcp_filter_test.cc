@@ -30,6 +30,7 @@ using testing::Not;
 using testing::Pair;
 using testing::Property;
 using testing::Return;
+using testing::Ne;
 
 class McpFilterTest : public testing::Test {
 public:
@@ -3518,15 +3519,22 @@ TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
   filter_ = std::make_unique<McpFilter>(config_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"},
-                                         {"accept", "application/json, text/event-stream"}};
+  static constexpr absl::string_view kIncomingTraceparentHeader =
+      "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01";
+  static constexpr absl::string_view kSpanIdHex = "21b6bcb2a5588606";
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json, text/event-stream"},
+      {"traceparent", std::string(kIncomingTraceparentHeader)},
+  };
   ON_CALL(decoder_callbacks_, requestHeaders())
       .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
   filter_->decodeHeaders(headers, false);
 
   // SPELLCHECKER(off)
-  std::string json = R"({
+  static constexpr absl::string_view kBody = R"({
     "jsonrpc": "2.0",
     "method": "tools/call",
     "id": 1,
@@ -3539,28 +3547,31 @@ TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
     }
   })";
   // SPELLCHECKER(on)
-  Buffer::OwnedImpl buffer(json);
+  Buffer::OwnedImpl buffer(kBody);
 
-  static constexpr absl::string_view kSpanIdHex = "21b6bcb2a5588606";
   EXPECT_CALL(decoder_callbacks_.active_span_, getSpanId())
       .WillOnce(Return(std::string(kSpanIdHex)));
-  EXPECT_CALL(decoder_callbacks_.active_span_, updateParent(_));
+  // The active span should be updated with a `TraceContext` derived from the
+  // body's traceparent, not the incoming traceparent header.
+  EXPECT_CALL(decoder_callbacks_.active_span_, updateParent(_))
+      .WillOnce([](const Tracing::TraceContext& trace_context) {
+        EXPECT_THAT(trace_context.get("traceparent"), Ne(kIncomingTraceparentHeader));
+        EXPECT_EQ(trace_context.get("traceparent"),
+                  "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+      });
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-      .WillOnce(
-          testing::Invoke([&buffer](std::function<void(Buffer::Instance&)> cb) { cb(buffer); }));
+      .WillOnce([&buffer](std::function<void(Buffer::Instance&)> cb) { cb(buffer); });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
-  // It's not the McpFilter's job to rewrite the traceparent header with the new
-  // parent ID. In the case of the OpenTelemetry tracer, that happens in
-  // `Span::injectContext()`.
-  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", headers.get_("traceparent"))
-      << "The traceparent header should not have been rewritten by McpFilter.";
-
+  // McpFilter copies the body's traceparent and tracestate to the outgoing
+  // header. It's up to the implementation of `Span::updateParent()` to again
+  // rewrite the headers based on the given trace context, if it so desires.
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", headers.get_("traceparent"));
   EXPECT_EQ("rojo=00f067aa0ba902b7", headers.get_("tracestate"));
 
-  // The request's traceparent should have been rewritten such that the parent
-  // ID is equal to the active span's ID.
+  // The body's traceparent should have been rewritten such that the parent ID
+  // is equal to the active span's ID.
   EXPECT_THAT(buffer.toString(),
               HasSubstr(absl::StrCat("00-4bf92f3577b34da6a3ce929d0e0e4736-", kSpanIdHex, "-01")))
       << "The request body's traceparent should have been rewritten with a new parent ID";
