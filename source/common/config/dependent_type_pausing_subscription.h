@@ -49,6 +49,11 @@ public:
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) override {
     subscription_->requestOnDemandUpdate(add_these_names);
   }
+  void
+  requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names,
+                        const absl::flat_hash_set<std::string>& remove_these_names) override {
+    subscription_->requestOnDemandUpdate(add_these_names, remove_these_names);
+  }
   void accept(const absl::flat_hash_set<std::string>& patterns) override {
     subscription_->accept(patterns);
   }

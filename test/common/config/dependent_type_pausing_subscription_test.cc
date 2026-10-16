@@ -89,6 +89,8 @@ TEST_F(DependentTypePausingSubscriptionTest, ForwardsSubscriptionMethods) {
   subscription->updateResourceInterest(names);
   EXPECT_CALL(*inner_subscription_, requestOnDemandUpdate(names));
   subscription->requestOnDemandUpdate(names);
+  EXPECT_CALL(*inner_subscription_, requestOnDemandUpdate(names, names));
+  subscription->requestOnDemandUpdate(names, names);
   EXPECT_CALL(*inner_subscription_, accept(names));
   subscription->accept(names);
 }
