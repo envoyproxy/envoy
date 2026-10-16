@@ -151,6 +151,9 @@ private:
   void delayInjectionTimerCallback();
   void tryInjectDelay();
 
+  // Declared first so it is destroyed last: stats_ references the MongoProxyStats it owns, and
+  // other members (e.g. active_query_list_) touch stats_ from their destructors.
+  MongoStatsSharedPtr mongo_stats_;
   std::unique_ptr<Decoder> decoder_;
   // References the per-configuration stats owned by the shared MongoStats, which is kept alive
   // by mongo_stats_.
@@ -177,7 +180,6 @@ private:
   Event::TimerPtr drain_close_timer_;
   TimeSource& time_source_;
   const bool emit_dynamic_metadata_;
-  MongoStatsSharedPtr mongo_stats_;
 
 protected:
   const uint32_t max_bson_depth_;
