@@ -50,7 +50,7 @@ public:
     return absl::OkStatus();
   }
 
-  // Returns a `ByteRange` when `params._meta.traceparent` was found.  Never
+  // Returns a `ByteRange` when `params._meta.traceparent` was found. Never
   // returns a `ByteRange` with `start == 0` or `end < start`.
   const std::optional<ByteRange>& traceparentRange() const { return traceparent_range_; }
 
