@@ -852,6 +852,15 @@ TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedLeadingHexEscape) {
   EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
 }
 
+// A literal 'x' earlier in the token must not be mistaken for the hex-escape
+// introducer: `"xx\x41"` used to terminate the process via an uncaught
+// std::invalid_argument from std::stoul. It must now raise ProtocolError.
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedInvalidHexEscapeLiteralX) {
+  buffer_.add("\"xx\\x41\"\r\n");
+  EXPECT_THROW_WITH_MESSAGE(decoder_.decode(buffer_), ProtocolError,
+                            "invalid hex escape in request");
+}
+
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedCommand) {
   RespValue echo;
   echo.type(RespType::BulkString);
