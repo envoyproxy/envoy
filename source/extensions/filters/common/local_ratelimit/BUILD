@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
     ],
 )
