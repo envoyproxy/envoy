@@ -138,7 +138,8 @@ bool addHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_module_b
   if (!map.has_value()) {
     return false;
   }
-  if (value.ptr == nullptr || value.length == 0) {
+  // A null pointer has no value to add. A non-null pointer with zero length is an empty value.
+  if (value.ptr == nullptr) {
     return false;
   }
   absl::string_view key_view(key.ptr, key.length);
@@ -153,7 +154,8 @@ bool setHeaderValueImpl(HeadersMapOptRef map, envoy_dynamic_module_type_module_b
     return false;
   }
   absl::string_view key_view(key.ptr, key.length);
-  if (value.ptr == nullptr || value.length == 0) {
+  // Only a null pointer removes the header. A non-null pointer with zero length sets it empty.
+  if (value.ptr == nullptr) {
     map->remove(Envoy::Http::LowerCaseString(key_view));
     return true;
   }
