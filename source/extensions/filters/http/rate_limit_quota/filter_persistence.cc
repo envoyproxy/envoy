@@ -40,8 +40,10 @@ initTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
       });
 
   // TODO(bsurber): Implement report timing & usage aggregation based on each
-  // bucket's reporting_interval field. Currently this is not supported and all
-  // usage is reported on the filter-level interval passed in here.
+  // bucket's reporting_interval field. The filter-level reporting_interval
+  // passed in here is the report timer's tick, and each bucket should be
+  // reported on the first tick after its own interval elapses. Currently all
+  // usage is reported on every tick.
 
   // Create the global client resource to be shared via TLS to all worker
   // threads (accessed through a filter-specific LocalRateLimitClient).
