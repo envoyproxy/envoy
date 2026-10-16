@@ -170,6 +170,11 @@ private:
   // IDs of client streams that buffered a WebTransport CONNECT request awaiting the peer's HTTP/3
   // SETTINGS. Flushed and cleared in OnSettingsFrame(). See registerStreamWaitingForSettings().
   absl::flat_hash_set<quic::QuicStreamId> streams_waiting_for_settings_;
+
+  // Whether to accept streams initiated by the server which belong to a WebTransport session, from
+  // QuicProtocolOptions.accept_server_initiated_streams. Only bidirectional streams are accepted
+  // for now. Set in setHttp3Options(), which runs before Initialize(). See CreateIncomingStream().
+  bool accept_server_initiated_streams_{false};
 #endif
 
   // These callbacks are owned by network filters and quic session should outlive
