@@ -194,6 +194,75 @@ TEST(WorkloadMetadataObjectTest, Conversion) {
   }
 }
 
+TEST(WorkloadMetadataObjectTest, AppLabelPrecedence) {
+  struct TestCase {
+    bool raw_present;
+    bool qualified_present;
+    std::string raw;
+    std::string qualified;
+    std::string expected;
+  };
+  const std::vector<TestCase> cases = {
+      {true, true, "v1", "v2", "v1"},  {true, false, "svc", "", "svc"},
+      {false, true, "", "svc", "svc"}, {true, true, "", "svc", "svc"},
+      {true, true, "svc", "", "svc"},  {true, true, "", "", ""},
+      {true, false, "", "", ""},       {false, true, "", "", ""},
+      {false, false, "", "", ""},
+  };
+  struct LabelPair {
+    absl::string_view raw;
+    absl::string_view qualified;
+    absl::string_view field;
+  };
+  // Struct fields are a protobuf Map, so a test cannot control label iteration order. The result
+  // is order independent because both values are collected before one is picked.
+  for (const auto& keys : {LabelPair{AppNameLabel, AppNameQualifiedLabel, AppNameToken},
+                           LabelPair{AppVersionLabel, AppVersionQualifiedLabel, AppVersionToken}}) {
+    for (const auto& test_case : cases) {
+      SCOPED_TRACE(absl::StrCat(keys.field, ": raw_present=", test_case.raw_present,
+                                ", qualified_present=", test_case.qualified_present,
+                                ", raw=", test_case.raw, ", qualified=", test_case.qualified));
+      Envoy::Protobuf::Struct node;
+      auto* labels = (*node.mutable_fields())[LabelsMetadataField].mutable_struct_value();
+      if (test_case.raw_present) {
+        (*labels->mutable_fields())[keys.raw].set_string_value(test_case.raw);
+      }
+      if (test_case.qualified_present) {
+        (*labels->mutable_fields())[keys.qualified].set_string_value(test_case.qualified);
+      }
+      auto obj = convertStructToWorkloadMetadata(node);
+      EXPECT_EQ(absl::get<absl::string_view>(obj->getField(keys.field)), test_case.expected);
+    }
+  }
+}
+
+TEST(WorkloadMetadataObjectTest, AppLabelsWithCanonicalName) {
+  Envoy::Protobuf::Struct node;
+  auto* labels = (*node.mutable_fields())[LabelsMetadataField].mutable_struct_value();
+  (*labels->mutable_fields())[AppNameLabel].set_string_value("my-service");
+  (*labels->mutable_fields())[AppNameQualifiedLabel].set_string_value("microservice");
+  (*labels->mutable_fields())["app.kubernetes.io/instance"].set_string_value("my-service");
+  (*labels->mutable_fields())[CanonicalNameLabel].set_string_value("microservice");
+
+  auto obj = convertStructToWorkloadMetadata(node);
+  EXPECT_EQ(absl::get<absl::string_view>(obj->getField(AppNameToken)), "my-service");
+  EXPECT_EQ(absl::get<absl::string_view>(obj->getField(ServiceNameToken)), "microservice");
+  auto metadata = convertWorkloadMetadataToStruct(*obj);
+  EXPECT_EQ(metadata.fields()
+                .at(LabelsMetadataField)
+                .struct_value()
+                .fields()
+                .at(AppNameLabel)
+                .string_value(),
+            "my-service");
+  checkStructConversion(*obj);
+
+  EXPECT_EQ(obj->baggage(), "service.name=microservice,app.name=my-service");
+  auto peer = convertBaggageToWorkloadMetadata(obj->baggage());
+  EXPECT_EQ(absl::get<absl::string_view>(peer->getField(AppNameToken)), "my-service");
+  EXPECT_EQ(absl::get<absl::string_view>(peer->getField(ServiceNameToken)), "microservice");
+}
+
 TEST(WorkloadMetadataObjectTest, ConvertFromEmpty) {
   Envoy::Protobuf::Struct node;
   auto obj = ::Istio::Common::convertStructToWorkloadMetadata(node);
