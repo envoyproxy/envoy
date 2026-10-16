@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -61,7 +63,16 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   RequestHeaderWriter writer{message->headers()};
   set_headers(writer);
 
-  message->body().add(body);
+  // The body holds every trace collected since the last flush, which can be several megabytes.
+  if (!body.empty()) {
+    auto* payload = new std::string(std::move(body));
+    message->body().addBufferFragment(*new Buffer::BufferFragmentImpl(
+        payload->data(), payload->size(),
+        [payload](const void*, size_t, const Buffer::BufferFragmentImpl* fragment) {
+          delete payload;
+          delete fragment;
+        }));
+  }
 
   const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
       deadline - time_source_.monotonicTime());
@@ -78,7 +89,7 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   }
 
   ENVOY_LOG(debug, "submitting data to {} with payload size {} and {} ms timeout", url.path,
-            body.size(), timeout.count());
+            message->body().length(), timeout.count());
 
   Upstream::ThreadLocalCluster* collector_cluster =
       cluster_manager_.getThreadLocalCluster(cluster_);
