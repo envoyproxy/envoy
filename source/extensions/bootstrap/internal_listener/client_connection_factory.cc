@@ -13,8 +13,6 @@ namespace Extensions {
 namespace Bootstrap {
 namespace InternalListener {
 
-ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
-    InternalClientConnectionFactory::registry_tls_slot_ = nullptr;
 // The default buffer size is 1024 KiB.
 uint32_t InternalClientConnectionFactory::buffer_size_ =
     InternalClientConnectionFactory::DefaultBufferSize;
@@ -40,7 +38,10 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
                                                       address),
       source_address, std::move(transport_socket), options, transport_options);
 
-  if (registry_tls_slot_ == nullptr || !registry_tls_slot_->get().has_value()) {
+  // The thread local registry is owned by the internal listener registry extension. Once that
+  // extension is initialized, this registry is available.
+  ThreadLocalRegistryImpl* registry = ThreadLocalRegistryTls::getExisting();
+  if (registry == nullptr) {
     ENVOY_LOG_MISC(debug,
                    "server has not initialized internal listener registry, close the connection");
     io_handle_server->close();
@@ -48,7 +49,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
   }
 
   // It's either in the main thread or the worker is not yet started.
-  auto internal_listener_manager = registry_tls_slot_->get()->getInternalListenerManager();
+  auto internal_listener_manager = registry->getInternalListenerManager();
   if (!internal_listener_manager.has_value()) {
     io_handle_server->close();
     return client_conn;

@@ -9,7 +9,6 @@
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/network_utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -40,35 +39,14 @@ public:
         buf_(1024) {
     std::tie(io_handle_, io_handle_peer_) =
         IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
-    EXPECT_CALL(tls_allocator_, allocateSlot());
-  }
-  ~ClientConnectionFactoryTest() override { restoreRegistryTlsSlot(); }
-
-  void setupTlsSlot() {
-    tls_slot_ =
-        ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
-            tls_allocator_);
-    tls_slot_->set([r = registry_](Event::Dispatcher&) { return r; });
-    publishTlsSlot();
   }
 
-  void publishTlsSlot() {
-    Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
-        tls_slot_.get();
-  }
+  void setupTlsSlot() { registry_ = std::make_shared<ThreadLocalRegistryImpl>(); }
 
-  void restoreRegistryTlsSlot() {
-    Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_ =
-        original_registry_tls_slot_;
-  }
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   MockInternalListenerManager internal_listener_manager_;
-  std::shared_ptr<ThreadLocalRegistryImpl> registry_{std::make_shared<ThreadLocalRegistryImpl>()};
-  ThreadLocal::MockInstance tls_allocator_;
-  std::unique_ptr<ThreadLocal::TypedSlot<ThreadLocalRegistryImpl>> tls_slot_;
-  ThreadLocal::TypedSlot<ThreadLocalRegistryImpl>* const original_registry_tls_slot_{
-      Bootstrap::InternalListener::InternalClientConnectionFactory::registry_tls_slot_};
+  std::shared_ptr<ThreadLocalRegistryImpl> registry_;
 
   // Owned by IoHandleImpl.
   NiceMock<Event::MockSchedulableCallback>* schedulable_cb_;
@@ -96,12 +74,6 @@ public:
 
 TEST_F(ClientConnectionFactoryTest,
        ConnectFailsIfInternalConnectionThreadLocalRegistryIsNotPublished) {
-  tls_slot_ =
-      ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
-          tls_allocator_);
-  // This slot set publish a nullptr.
-  tls_slot_->set([](Event::Dispatcher&) { return nullptr; });
-  publishTlsSlot();
   auto client_conn = dispatcher_->createClientConnection(
       std::make_shared<Network::Address::EnvoyInternalInstance>(listener_addr),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
