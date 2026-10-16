@@ -31,7 +31,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Can be overridden in the per-route and per-host configurations.
 // The more specific definition completely overrides the less specific definition.
-// [#next-free-field: 7]
+//
+// .. note::
+//   Envoy keeps a single RLQS client, and therefore a single RLQS stream and a single
+//   usage reporting timer, per unique combination of RLQS server target (the :ref:`rlqs_server
+//   <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.rlqs_server>`
+//   cluster name or target URI) and :ref:`domain
+//   <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.domain>`.
+//   All filter configurations that share the same target and domain share that client and its
+//   bucket cache. Client-level settings, such as :ref:`reporting_interval
+//   <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.reporting_interval>`,
+//   are taken from the filter configuration that first creates the client, and are retained
+//   for as long as any filter configuration with the same target and domain remains in use.
+// [#next-free-field: 8]
 message RateLimitQuotaFilterConfig {
   // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
   config.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
@@ -134,6 +146,35 @@ message RateLimitQuotaFilterConfig {
   // filter is enabled but not enforced.
   repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 6
       [(validate.rules).repeated = {max_items: 10}];
+
+  // The interval of the RLQS client's usage reporting timer. Each time the timer fires, the RLQS
+  // client sends a :ref:`RateLimitQuotaUsageReports
+  // <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaUsageReports>` message to the
+  // RLQS server.
+  //
+  // This field sets the granularity of usage reporting, while the per-bucket
+  // :ref:`reporting_interval
+  // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.reporting_interval>`
+  // sets how often each bucket is to be reported. A bucket is reported on the first timer tick at
+  // or after its own reporting interval has elapsed since its last report, so the effective
+  // reporting interval of a bucket is its own interval rounded up to a multiple of this field.
+  //
+  // .. attention::
+  //   Envoy does not yet implement per-bucket reporting intervals. Until it does, the usage of
+  //   every bucket is reported on each tick of this timer, and the per-bucket
+  //   ``reporting_interval`` is ignored.
+  //
+  // This is a client-level setting: see the note on
+  // :ref:`RateLimitQuotaFilterConfig
+  // <envoy_v3_api_msg_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig>`
+  // for how it is shared between filter configurations.
+  //
+  // If not set, defaults to 5 seconds. Must be greater than 0.1 seconds, matching the lower bound
+  // of the per-bucket ``reporting_interval``.
+  //
+  // [#comment: 100000000 nanoseconds = 0.1 seconds]
+  google.protobuf.Duration reporting_interval = 7
+      [(validate.rules).duration = {gt {nanos: 100000000}}];
 }
 
 // Per-route and per-host configuration overrides. The more specific definition completely
@@ -385,7 +426,16 @@ message RateLimitQuotaBucketSettings {
   // the :ref:`RLQS documentation <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
   //
   // After sending the initial report, the data plane is to continue reporting the bucket usage with
-  // the internal specified in this field.
+  // the interval specified in this field.
+  //
+  // Reports are sent on ticks of the RLQS client's reporting timer, configured by the filter-level
+  // :ref:`reporting_interval
+  // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.reporting_interval>`,
+  // so the effective interval is this value rounded up to a multiple of the filter-level interval.
+  //
+  // .. attention::
+  //   Envoy does not yet implement this field. Currently the usage of every bucket is reported on
+  //   each tick of the filter-level reporting timer.
   //
   // If for any reason RLQS client doesn't receive the initial assignment for the reported bucket,
   // the data plane will eventually consider the bucket abandoned and stop sending the usage

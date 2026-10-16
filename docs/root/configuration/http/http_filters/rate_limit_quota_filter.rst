@@ -32,8 +32,21 @@ The RLQS is expected to update the assignment before the TTL runs out. If RLQS f
 has expired, the filter can be configured to continue using the last quota assignment or fall back to a value predefined in the
 :ref:`expired assignment configuration <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>`.
 
-The rate limit quota filter reports the request load for each bucket to the RLQS with the configured ``reporting_interval``. The RLQS may rebalance quota assignments based on the request
-load that each Envoy receives and push new quota assignments to Envoy instances.
+The rate limit quota filter reports the request load for each bucket to the RLQS on the RLQS client's reporting timer, configured by the filter-level
+:ref:`reporting_interval <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.reporting_interval>`
+(5 seconds by default). The RLQS may rebalance quota assignments based on the request load that each Envoy receives and push new quota assignments to Envoy instances.
+
+.. note::
+
+  Envoy does not yet implement the per-bucket
+  :ref:`reporting_interval <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.reporting_interval>`.
+  Until it does, the usage of every bucket is reported on each tick of the filter-level reporting timer.
+
+Envoy keeps a single RLQS client, and therefore a single RLQS stream, bucket cache and reporting timer, per unique combination of RLQS server target
+(the :ref:`rlqs_server <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.rlqs_server>` cluster name or target URI)
+and :ref:`domain <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.domain>`. All filter configurations that share
+the same target and domain share that client. Client-level settings, such as ``reporting_interval``, are taken from the filter configuration that first creates
+the client, and are retained for as long as any filter configuration with the same target and domain remains in use.
 
 Failure modes
 ^^^^^^^^^^^^^
