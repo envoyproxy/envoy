@@ -6,8 +6,7 @@
 #include <string>
 #include <utility>
 
-#include "envoy/buffer/buffer.h"
-
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -24,23 +23,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
-namespace {
-
-// Lets a request body take ownership of a string without copying it.
-class StringBufferFragment : public Buffer::BufferFragment {
-public:
-  explicit StringBufferFragment(std::string&& data) : data_(std::move(data)) {}
-
-  // Buffer::BufferFragment
-  const void* data() const override { return data_.data(); }
-  size_t size() const override { return data_.size(); }
-  void done() override { delete this; }
-
-private:
-  const std::string data_;
-};
-
-} // namespace
 
 AgentHTTPClient::AgentHTTPClient(Upstream::ClusterManager& cluster_manager,
                                  const std::string& cluster, const std::string& reference_host,
@@ -83,7 +65,13 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
 
   // The body holds every trace collected since the last flush, which can be several megabytes.
   if (!body.empty()) {
-    message->body().addBufferFragment(*new StringBufferFragment(std::move(body)));
+    auto* payload = new std::string(std::move(body));
+    message->body().addBufferFragment(*new Buffer::BufferFragmentImpl(
+        payload->data(), payload->size(),
+        [payload](const void*, size_t, const Buffer::BufferFragmentImpl* fragment) {
+          delete payload;
+          delete fragment;
+        }));
   }
 
   const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(

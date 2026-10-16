@@ -38,8 +38,8 @@ envoy_cc_library(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     deps = [
-        "//envoy/buffer:buffer_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:message_lib",
