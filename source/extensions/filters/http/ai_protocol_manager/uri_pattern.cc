@@ -47,8 +47,8 @@ absl::StatusOr<std::vector<std::string>> spellOut(absl::string_view layout) {
       absl::StrCat(before, layout.substr(bar + 1, close - bar - 1), after)};
 }
 
-// Whether `path_template`, which parsed, has an unnamed wildcard. Fails on a named variable that
-// spans more than one segment, whose value could never be a path token.
+// Whether `path_template`, which parsed, has an unnamed wildcard. Fails on a named variable written
+// other than `{name}` or `{name=*}`, whose value rendering could not fill as any one segment.
 absl::StatusOr<bool> hasUnnamedWildcard(absl::string_view path_template) {
   bool wildcard = false;
   while (true) {
@@ -65,8 +65,10 @@ absl::StatusOr<bool> hasUnnamedWildcard(absl::string_view path_template) {
     const absl::string_view variable = path_template.substr(special + 1, close - special - 1);
     const size_t equals = variable.find('=');
     if (equals != absl::string_view::npos && variable.substr(equals + 1) != "*") {
-      return absl::InvalidArgumentError(absl::StrCat("variable `{", variable.substr(0, equals),
-                                                     "}` must match one path segment"));
+      const absl::string_view name = variable.substr(0, equals);
+      return absl::InvalidArgumentError(
+          absl::StrCat("variable `{", variable, "}` must be written `{", name, "}` or `{", name,
+                       "=*}`: a named variable matches any one path segment"));
     }
     path_template.remove_prefix(close + 1);
   }

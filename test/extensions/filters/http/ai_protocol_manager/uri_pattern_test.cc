@@ -73,14 +73,19 @@ TEST(UriPatternParseTest, RejectsMalformedTemplates) {
 
 // A named variable's value must be one path token, so a variable spanning segments could only
 // ever match one.
-TEST(UriPatternParseTest, RejectsNamedVariablesOverSeveralSegments) {
+// A named variable is `{name}` or `{name=*}`: one over several segments never holds a path token,
+// and one fixed to a literal is that literal, written as text.
+TEST(UriPatternParseTest, NamedVariablesMatchAnyOneSegment) {
   for (const std::string& pattern : {std::string("/v1/{model}/{rest=**}"),
-                                     absl::StrCat("/v1/{name=models/", Wildcard, "}:predict")}) {
+                                     absl::StrCat("/v1/{name=models/", Wildcard, "}:predict"),
+                                     std::string("/gateway/{name=abc}")}) {
     EXPECT_THAT(UriPattern::parse(pattern),
-                HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("must match one path")))
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("a named variable matches any one path segment")))
         << pattern;
   }
   EXPECT_TRUE(parseOk("/v1/{model=*}:predict").hasModel());
+  EXPECT_FALSE(parseOk(absl::StrCat("/gateway/", Wildcard, "/{project=*}")).renderable());
 }
 
 // Rendering cannot fill an unnamed wildcard in the layout it writes.
