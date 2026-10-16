@@ -63,6 +63,13 @@ public:
          bool warm);
 
   const SecretData& secretData() const;
+  const envoy::config::core::v3::ConfigSource& sdsConfig() const { return sds_config_; }
+
+  // Applies the secret most recently accepted by `other`, a provider for the same secret name
+  // whose subscription delivers the same resource. This covers a provider created for a name that
+  // is already watched on a shared xDS mux, where the server will not send the secret again.
+  // Returns true if a secret was applied.
+  bool seedFrom(const SdsApi& other);
 
 protected:
   // Ordered for hash stability.
@@ -107,6 +114,8 @@ protected:
 private:
   absl::Status validateUpdateSize(uint32_t added_resources_num,
                                   uint32_t removed_resources_num) const;
+  absl::Status updateSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret,
+                            const std::string& version_info);
   FileContentMap loadFiles();
   uint64_t getHashForFiles(const FileContentMap& files);
   SdsApiStats generateStats(Stats::Scope& scope);
@@ -129,6 +138,12 @@ private:
   TimeSource& time_source_;
   SecretData secret_data_;
   bool started_{false};
+  // Set when the secret was applied from another provider before this one started, so the init
+  // target can be marked ready as soon as the subscription starts.
+  bool seeded_{false};
+  // The last secret applied successfully, kept so that a new provider for the same name can be
+  // seeded from it. Only populated when sds_reuse_secret_across_providers is enabled.
+  std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::Secret> last_secret_;
   std::unique_ptr<Filesystem::Watcher> watcher_;
 };
 

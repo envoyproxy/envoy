@@ -23,6 +23,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1285,6 +1286,243 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretWarmFalseSubscriptionOnce) {
       config_source, "abc.com", secret_context.server_context_, {}, true);
 
   EXPECT_NE(secret_provider2, secret_provider3);
+}
+
+// Fixture for secrets reused across providers for the same secret name, see
+// https://github.com/envoyproxy/envoy/issues/47309.
+class SdsSecretReuseTest : public SecretManagerImplTest {
+protected:
+  SdsSecretReuseTest() : secret_manager_(new SecretManagerImpl(config_tracker_)) {
+    EXPECT_CALL(secret_context_.server_context_, mainThreadDispatcher())
+        .WillRepeatedly(ReturnRef(*dispatcher_));
+    EXPECT_CALL(secret_context_.server_context_, localInfo())
+        .WillRepeatedly(ReturnRef(local_info_));
+    EXPECT_CALL(secret_context_.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+    ads_config_source_.mutable_ads();
+  }
+
+  // A warming provider registered with its own init manager, with the subscription created for it.
+  struct WarmingProvider {
+    TlsCertificateConfigProviderSharedPtr provider_;
+    Config::MockSubscription* subscription_{};
+    Config::SubscriptionCallbacks* callbacks_{};
+    Init::TargetHandlePtr init_target_handle_;
+  };
+
+  WarmingProvider
+  createWarmingProvider(const envoy::config::core::v3::ConfigSource& config_source) {
+    WarmingProvider result;
+    NiceMock<Init::MockManager> init_manager;
+    EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&result](const Init::Target& target) {
+      result.init_target_handle_ = target.createHandle("test");
+    }));
+    result.provider_ = secret_manager_->findOrCreateTlsCertificateProvider(
+        config_source, "abc.com", secret_context_.server_context_, init_manager, true);
+    result.subscription_ = subscriptionFactory().subscription_;
+    result.callbacks_ = subscriptionFactory().callbacks_;
+    return result;
+  }
+
+  void deliver(Config::SubscriptionCallbacks& callbacks, const std::string& yaml,
+               const std::string& version) {
+    envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+    const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+    EXPECT_OK(callbacks.onConfigUpdate(decoded_resources.refvec_, version));
+  }
+
+  static const std::string& versionOf(const TlsCertificateConfigProviderSharedPtr& provider) {
+    return std::dynamic_pointer_cast<TlsCertificateSdsApi>(provider)->secretData().version_info_;
+  }
+
+  Config::MockSubscriptionFactory& subscriptionFactory() {
+    return secret_context_.server_context_.cluster_manager_.subscription_factory_;
+  }
+
+  const std::string secret_yaml_ = R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  envoy::config::core::v3::ConfigSource ads_config_source_;
+  SecretManagerPtr secret_manager_;
+};
+
+// A config source change over ADS creates a new provider for a name that is already watched on
+// the shared mux. The new provider must reuse the secret rather than wait for one that the server
+// will not send again, and must still start its own subscription.
+TEST_F(SdsSecretReuseTest, ReusesSecretAfterAdsConfigSourceChange) {
+  Init::ExpectableWatcherImpl old_watcher;
+  WarmingProvider old_provider = createWarmingProvider(ads_config_source_);
+  old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
+  deliver(*old_provider.callbacks_, secret_yaml_, "v1");
+  ASSERT_NE(old_provider.provider_->secret(), nullptr);
+
+  envoy::config::core::v3::ConfigSource new_config_source = ads_config_source_;
+  new_config_source.mutable_initial_fetch_timeout()->set_seconds(0);
+  WarmingProvider new_provider = createWarmingProvider(new_config_source);
+  EXPECT_NE(old_provider.provider_, new_provider.provider_);
+  ASSERT_NE(new_provider.provider_->secret(), nullptr);
+  EXPECT_THAT(*new_provider.provider_->secret(), ProtoEq(*old_provider.provider_->secret()));
+  EXPECT_EQ("v1", versionOf(new_provider.provider_));
+
+  // The new provider is ready as soon as it is initialized, and still subscribes so that it keeps
+  // receiving updates once the old provider is gone.
+  Init::ExpectableWatcherImpl new_watcher;
+  EXPECT_CALL(*new_provider.subscription_, start(_));
+  EXPECT_CALL(new_watcher, ready());
+  new_provider.init_target_handle_->initialize(new_watcher);
+
+  old_provider = {};
+  deliver(*new_provider.callbacks_, R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    inline_string: "DUMMY_INLINE_STRING_CERTIFICATE_CHAIN"
+  private_key:
+    inline_string: "DUMMY_INLINE_STRING_PRIVATE_KEY"
+)EOF",
+          "v2");
+  EXPECT_EQ("v2", versionOf(new_provider.provider_));
+  EXPECT_EQ("DUMMY_INLINE_STRING_CERTIFICATE_CHAIN",
+            new_provider.provider_->secret()->certificate_chain().inline_string());
+}
+
+// A warming provider created for a name that a non-warming (prefetch) provider already holds
+// reuses the prefetched secret.
+TEST_F(SdsSecretReuseTest, WarmingProviderReusesSecretFromNonWarmingProvider) {
+  envoy::config::core::v3::ConfigSource config_source;
+  auto prefetch_provider = secret_manager_->findOrCreateTlsCertificateProvider(
+      config_source, "abc.com", secret_context_.server_context_, {}, false);
+  deliver(*subscriptionFactory().callbacks_, secret_yaml_, "v1");
+  ASSERT_NE(prefetch_provider->secret(), nullptr);
+
+  WarmingProvider warming_provider = createWarmingProvider(config_source);
+  EXPECT_NE(prefetch_provider, warming_provider.provider_);
+  ASSERT_NE(warming_provider.provider_->secret(), nullptr);
+
+  Init::ExpectableWatcherImpl watcher;
+  EXPECT_CALL(watcher, ready());
+  warming_provider.init_target_handle_->initialize(watcher);
+}
+
+// Different non-ADS config sources may point at different servers, so their secrets are not
+// shared.
+TEST_F(SdsSecretReuseTest, DoesNotReuseSecretAcrossDifferentNonAdsSources) {
+  envoy::config::core::v3::ConfigSource config_source;
+  config_source.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::GRPC);
+  config_source.mutable_api_config_source()
+      ->add_grpc_services()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("sds_a");
+  WarmingProvider old_provider = createWarmingProvider(config_source);
+  Init::ExpectableWatcherImpl old_watcher;
+  old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
+  deliver(*old_provider.callbacks_, secret_yaml_, "v1");
+
+  config_source.mutable_api_config_source()
+      ->mutable_grpc_services(0)
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("sds_b");
+  WarmingProvider new_provider = createWarmingProvider(config_source);
+  EXPECT_EQ(new_provider.provider_->secret(), nullptr);
+
+  Init::ExpectableWatcherImpl new_watcher;
+  new_watcher.expectReady().Times(0);
+  new_provider.init_target_handle_->initialize(new_watcher);
+}
+
+TEST_F(SdsSecretReuseTest, DoesNotReuseSecretWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.sds_reuse_secret_across_providers", "false"}});
+
+  WarmingProvider old_provider = createWarmingProvider(ads_config_source_);
+  Init::ExpectableWatcherImpl old_watcher;
+  old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
+  deliver(*old_provider.callbacks_, secret_yaml_, "v1");
+
+  envoy::config::core::v3::ConfigSource new_config_source = ads_config_source_;
+  new_config_source.mutable_initial_fetch_timeout()->set_seconds(0);
+  WarmingProvider new_provider = createWarmingProvider(new_config_source);
+  EXPECT_EQ(new_provider.provider_->secret(), nullptr);
+
+  Init::ExpectableWatcherImpl new_watcher;
+  new_watcher.expectReady().Times(0);
+  new_provider.init_target_handle_->initialize(new_watcher);
+}
+
+// Once every provider for a name is gone, a new provider for that name waits for the server.
+TEST_F(SdsSecretReuseTest, DoesNotReuseSecretFromDestroyedProvider) {
+  WarmingProvider old_provider = createWarmingProvider(ads_config_source_);
+  Init::ExpectableWatcherImpl old_watcher;
+  old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
+  deliver(*old_provider.callbacks_, secret_yaml_, "v1");
+  old_provider = {};
+
+  envoy::config::core::v3::ConfigSource new_config_source = ads_config_source_;
+  new_config_source.mutable_initial_fetch_timeout()->set_seconds(0);
+  WarmingProvider new_provider = createWarmingProvider(new_config_source);
+  EXPECT_EQ(new_provider.provider_->secret(), nullptr);
+}
+
+// If the reused secret cannot be applied, the new provider falls back to waiting for the server,
+// and applies the same secret when it is delivered.
+TEST_F(SdsSecretReuseTest, FailedReuseWaitsForServer) {
+  const std::string test_data =
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data");
+  const std::string cert =
+      TestEnvironment::readFileToStringForTest(test_data + "/selfsigned_cert.pem");
+  const std::string key =
+      TestEnvironment::readFileToStringForTest(test_data + "/selfsigned_key.pem");
+  const std::string cert_path =
+      TestEnvironment::writeStringToFileForTest("sds_reuse_cert.pem", cert);
+  const std::string key_path = TestEnvironment::writeStringToFileForTest("sds_reuse_key.pem", key);
+  const std::string yaml = fmt::format(R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{}"
+  private_key:
+    filename: "{}"
+)EOF",
+                                       cert_path, key_path);
+
+  WarmingProvider old_provider = createWarmingProvider(ads_config_source_);
+  Init::ExpectableWatcherImpl old_watcher;
+  old_provider.init_target_handle_->initialize(old_watcher);
+  EXPECT_CALL(old_watcher, ready());
+  deliver(*old_provider.callbacks_, yaml, "v1");
+  ASSERT_NE(old_provider.provider_->secret(), nullptr);
+
+  // The key file disappears, so applying the secret to a new provider fails.
+  TestEnvironment::removePath(key_path);
+  envoy::config::core::v3::ConfigSource new_config_source = ads_config_source_;
+  new_config_source.mutable_initial_fetch_timeout()->set_seconds(0);
+  WarmingProvider new_provider = createWarmingProvider(new_config_source);
+  EXPECT_EQ(new_provider.provider_->secret(), nullptr);
+
+  Init::ExpectableWatcherImpl new_watcher;
+  new_watcher.expectReady().Times(0);
+  new_provider.init_target_handle_->initialize(new_watcher);
+  testing::Mock::VerifyAndClearExpectations(&new_watcher);
+
+  // Once the file is back, delivering the same secret applies it.
+  TestEnvironment::writeStringToFileForTest("sds_reuse_key.pem", key);
+  EXPECT_CALL(new_watcher, ready());
+  deliver(*new_provider.callbacks_, yaml, "v1");
+  EXPECT_NE(new_provider.provider_->secret(), nullptr);
 }
 
 } // namespace
