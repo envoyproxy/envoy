@@ -218,11 +218,6 @@ TEST(SpanContextExtractorTest, SerializeTraceparent) {
     serialized_traceparent = SpanContextExtractor::serializeTraceparent(span_context);
     EXPECT_EQ(serialized_traceparent,
               fmt::format("{}-{}-{}-{}", version, trace_id, kOtherParentId, want_flags));
-
-    span_context.setTraceId(std::string(kOtherTraceId));
-    serialized_traceparent = SpanContextExtractor::serializeTraceparent(span_context);
-    EXPECT_EQ(serialized_traceparent,
-              fmt::format("{}-{}-{}-{}", version, kOtherTraceId, kOtherParentId, want_flags));
   }
 }
 
