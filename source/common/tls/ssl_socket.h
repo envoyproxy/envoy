@@ -104,6 +104,8 @@ private:
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
+  const uint32_t read_ahead_buffer_size_;
+  bool read_ahead_enabled_{false};
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
   std::optional<Api::IoError::IoErrorCode> detected_io_error_;

@@ -119,6 +119,7 @@ ContextImpl::ContextImpl(
     Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
     : scope_(scope), stats_(generateSslStats(scope)), factory_context_(factory_context),
       tls_max_version_(config.maxProtocolVersion()),
+      read_ahead_buffer_size_(config.readAheadBufferSize()),
       builtin_stat_names_(getTlsBuiltinStatNames(factory_context)),
       capabilities_(config.capabilities()), tls_keylog_local_(config.tlsKeyLogLocal()),
       tls_keylog_remote_(config.tlsKeyLogRemote()) {

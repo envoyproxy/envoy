@@ -1,8 +1,27 @@
-#include "source/common/buffer/buffer_impl.h"
+#include <cerrno>
+#include <string>
 
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
+
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
+#include "gmock/gmock.h"
 #include "openssl/ssl.h"
 #include "tools/cpp/runfiles/runfiles.h"
 
@@ -192,6 +211,197 @@ static void testParams(benchmark::internal::Benchmark* b) {
 }
 
 BENCHMARK(testThroughput)->Unit(::benchmark::kMicrosecond)->Apply(testParams);
+
+class ReceiveCountingIoHandle : public Network::IoSocketHandleImpl {
+public:
+  explicit ReceiveCountingIoHandle(os_fd_t fd) : IoSocketHandleImpl(fd) {}
+
+  Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
+                                uint64_t num_slice) override {
+    ++num_reads_;
+    return IoSocketHandleImpl::readv(max_length, slices, num_slice);
+  }
+
+  uint64_t numReads() const { return num_reads_; }
+
+private:
+  uint64_t num_reads_{0};
+};
+
+// Measure the production TLS transport socket's receive path with a full batch already queued.
+// Encryption, sending, handshakes, and payload verification are excluded from the timed region.
+static void testReceiveThroughput(benchmark::State& state) {
+  std::string error;
+  std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles> runfiles(
+      bazel::tools::cpp::runfiles::Runfiles::Create("tls_throughput_benchmark",
+                                                    BAZEL_CURRENT_REPOSITORY, &error));
+  TestEnvironment::setRunfiles(runfiles.get());
+
+  int sockets[2];
+  RELEASE_ASSERT(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sockets) == 0, "socketpair");
+  auto receiver = std::make_unique<ReceiveCountingIoHandle>(sockets[0]);
+  const auto& receiver_io_handle = *receiver;
+  Network::IoSocketHandleImpl sender(sockets[1]);
+  const int send_buffer_size = 1024 * 1024;
+  if (setsockopt(sockets[1], SOL_SOCKET, SO_SNDBUF, &send_buffer_size, sizeof(send_buffer_size)) !=
+      0) {
+    state.SkipWithError("Cannot enlarge the socket send buffer for a full ciphertext batch");
+    return;
+  }
+
+  const int tls_version = state.range(0) == 12 ? TLS1_2_VERSION : TLS1_3_VERSION;
+  const size_t record_size = state.range(1);
+  const uint32_t read_ahead_size = state.range(2);
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  if (!Event::Libevent::Global::initialized()) {
+    Event::Libevent::Global::initialize();
+  }
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher("tls_receive_benchmark");
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  ON_CALL(factory_context.server_context_, api()).WillByDefault(testing::ReturnRef(*api));
+  ON_CALL(factory_context.server_context_, serverScope())
+      .WillByDefault(testing::ReturnRef(*stats_store.rootScope()));
+  ContextManagerImpl manager(factory_context.serverFactoryContext());
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto& common_context = *tls_context.mutable_common_tls_context();
+  common_context.mutable_read_ahead_buffer_size()->set_value(read_ahead_size);
+  using TlsParameters = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+  const auto protocol = state.range(0) == 12 ? TlsParameters::TLSv1_2 : TlsParameters::TLSv1_3;
+  common_context.mutable_tls_params()->set_tls_minimum_protocol_version(protocol);
+  common_context.mutable_tls_params()->set_tls_maximum_protocol_version(protocol);
+  auto* certificate = common_context.add_tls_certificates();
+  certificate->mutable_certificate_chain()->set_filename(
+      TestEnvironment::runfilesPath("test/common/tls/test_data/san_dns_cert.pem"));
+  certificate->mutable_private_key()->set_filename(
+      TestEnvironment::runfilesPath("test/common/tls/test_data/san_dns_key.pem"));
+  auto config = ServerContextConfigImpl::create(tls_context, factory_context, {}, false);
+  RELEASE_ASSERT(config.ok(), config.status().ToString());
+  auto factory =
+      ServerSslSocketFactory::create(std::move(*config), manager, *stats_store.rootScope());
+  RELEASE_ASSERT(factory.ok(), factory.status().ToString());
+
+  // The anonymous socketpair needs an address only for connection diagnostics.
+  auto address = Network::Address::PipeInstance::create("tls_receive_benchmark");
+  RELEASE_ASSERT(address.ok(), address.status().ToString());
+  Network::Address::InstanceConstSharedPtr socket_address = std::move(*address);
+  auto socket = std::make_unique<Network::ConnectionSocketImpl>(std::move(receiver), socket_address,
+                                                                socket_address);
+  StreamInfo::StreamInfoImpl stream_info(dispatcher->timeSource(),
+                                         socket->connectionInfoProviderSharedPtr(),
+                                         StreamInfo::FilterState::LifeSpan::Connection);
+  Network::ConnectionImpl connection(*dispatcher, std::move(socket),
+                                     (*factory)->createDownstreamTransportSocket(), stream_info,
+                                     true);
+  Cleanup close_connection(
+      [&connection]() { connection.close(Network::ConnectionCloseType::NoFlush); });
+  auto& transport_socket = *connection.transportSocket();
+  auto& received = connection.getReadBuffer().buffer;
+
+  bssl::UniquePtr<SSL_CTX> client_ctx(SSL_CTX_new(TLS_method()));
+  RELEASE_ASSERT(SSL_CTX_set_min_proto_version(client_ctx.get(), tls_version) == 1,
+                 "minimum TLS version");
+  RELEASE_ASSERT(SSL_CTX_set_max_proto_version(client_ctx.get(), tls_version) == 1,
+                 "maximum TLS version");
+  bssl::UniquePtr<SSL> client_ssl(SSL_new(client_ctx.get()));
+  RELEASE_ASSERT(SSL_set_fd(client_ssl.get(), sockets[1]) == 1, "SSL_set_fd");
+  SSL_set_connect_state(client_ssl.get());
+
+  bool handshake_success = false;
+  for (int i = 0; i < 50; ++i) {
+    const int client_err = SSL_do_handshake(client_ssl.get());
+    const auto result = transport_socket.doRead(received);
+    RELEASE_ASSERT(result.action_ == Network::PostIoAction::KeepOpen && !result.end_stream_read_,
+                   std::string(transport_socket.failureReason()));
+    if (client_err == 1 && transport_socket.canFlushClose()) {
+      handshake_success = true;
+      break;
+    }
+    handleSslError(client_ssl.get(), client_err, false);
+  }
+  RELEASE_ASSERT(handshake_success, "handshake completed successfully");
+  RELEASE_ASSERT(SSL_version(client_ssl.get()) == tls_version, "negotiated TLS version");
+  RELEASE_ASSERT(received.length() == 0, "handshake produced no application data");
+  state.SetLabel(SSL_CIPHER_get_name(SSL_get_current_cipher(client_ssl.get())));
+
+  BIO* output = BIO_new(BIO_s_mem());
+  RELEASE_ASSERT(output != nullptr, "BIO_new");
+  SSL_set0_wbio(client_ssl.get(), output);
+  const std::string plaintext(256 * 1024, 'a');
+
+  const auto queue_batch = [&]() {
+    for (size_t offset = 0; offset < plaintext.size(); offset += record_size) {
+      RELEASE_ASSERT(SSL_write(client_ssl.get(), plaintext.data() + offset, record_size) ==
+                         static_cast<int>(record_size),
+                     "SSL_write");
+    }
+    const uint8_t* ciphertext = nullptr;
+    size_t ciphertext_length = 0;
+    RELEASE_ASSERT(BIO_mem_contents(output, &ciphertext, &ciphertext_length) == 1,
+                   "BIO_mem_contents");
+    size_t sent = 0;
+    while (sent < ciphertext_length) {
+      const ssize_t result = ::send(sockets[1], ciphertext + sent, ciphertext_length - sent, 0);
+      if (result < 0 && errno == EINTR) {
+        continue;
+      }
+      if (result <= 0) {
+        return false;
+      }
+      sent += result;
+    }
+    RELEASE_ASSERT(BIO_reset(output) == 1, "BIO_reset");
+    return true;
+  };
+  const auto receive_batch = [&]() {
+    const auto result = transport_socket.doRead(received);
+    return result.action_ == Network::PostIoAction::KeepOpen && !result.end_stream_read_ &&
+           result.bytes_processed_ == plaintext.size();
+  };
+
+  // Warm up the lazy read-ahead allocation before measuring steady-state receive cost.
+  if (!queue_batch()) {
+    state.SkipWithError("Cannot queue a full ciphertext batch; check socket send buffer capacity");
+    return;
+  }
+  RELEASE_ASSERT(receive_batch() && received.toString() == plaintext, "warmup payload");
+  const uint64_t initial_reads = receiver_io_handle.numReads();
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    state.PauseTiming();
+    received.drain(received.length());
+    if (!queue_batch()) {
+      state.SkipWithError(
+          "Cannot queue a full ciphertext batch; check socket send buffer capacity");
+      break;
+    }
+    state.ResumeTiming();
+    if (!receive_batch()) {
+      state.SkipWithError("TLS transport socket did not consume the queued plaintext batch");
+      break;
+    }
+    state.PauseTiming();
+    RELEASE_ASSERT(received.toString() == plaintext, "received payload");
+    state.ResumeTiming();
+  }
+  state.SetBytesProcessed(state.iterations() * plaintext.size());
+  state.counters["socket_reads_per_batch"] = benchmark::Counter(
+      receiver_io_handle.numReads() - initial_reads, benchmark::Counter::kAvgIterations);
+}
+
+static void receiveParams(benchmark::internal::Benchmark* b) {
+  b->ArgNames({"tls_version", "record_bytes", "read_ahead_bytes"});
+  for (const int tls_version : {12, 13}) {
+    for (const int record_size : {1024, 16 * 1024}) {
+      for (const int read_ahead_size : {0, 16 * 1024, 64 * 1024, 256 * 1024}) {
+        b->Args({tls_version, record_size, read_ahead_size});
+      }
+    }
+  }
+}
+
+BENCHMARK(testReceiveThroughput)->Unit(::benchmark::kMicrosecond)->Apply(receiveParams);
 
 } // namespace Extensions::TransportSockets::Tls
 } // namespace Envoy
