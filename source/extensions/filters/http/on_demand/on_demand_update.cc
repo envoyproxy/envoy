@@ -10,6 +10,8 @@
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -118,8 +120,20 @@ getOdCdsConfig(const ProtoConfig& proto_config) {
 
 } // namespace
 
+OnDemandFilterStats OnDemandFilterConfig::generateStats(Stats::Scope& scope,
+                                                        const std::string& stats_prefix) {
+  const std::string prefix = absl::StrCat(stats_prefix, "on_demand.");
+  return {ALL_ON_DEMAND_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                     POOL_GAUGE_PREFIX(scope, prefix),
+                                     POOL_HISTOGRAM_PREFIX(scope, prefix))};
+}
+
 OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
     : behavior_(std::move(behavior)) {}
+
+OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior, Stats::Scope& scope,
+                                           const std::string& stats_prefix)
+    : behavior_(std::move(behavior)), stats_(generateStats(scope, stats_prefix)) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
@@ -129,6 +143,14 @@ OnDemandFilterConfig::OnDemandFilterConfig(
       createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
   behavior_ = std::move(behavior_or.value());
+}
+
+OnDemandFilterConfig::OnDemandFilterConfig(
+    const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
+    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+    absl::Status& creation_status, Stats::Scope& scope, const std::string& stats_prefix)
+    : OnDemandFilterConfig(proto_config, cm, validation_visitor, creation_status) {
+  stats_ = generateStats(scope, stats_prefix);
 }
 
 OnDemandFilterConfig::OnDemandFilterConfig(
@@ -156,6 +178,8 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   }
   // decodeHeaders() is interrupted.
   decode_headers_active_ = true;
+  route_update_completed_sync_ = false;
+  const MonotonicTime start = now();
   route_config_updated_callback_ =
       std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback(
           [this](bool route_exists) -> void { onRouteConfigUpdateCompletion(route_exists); }));
@@ -163,6 +187,11 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   callbacks_->downstreamCallbacks()->requestRouteConfigUpdate(route_config_updated_callback_);
   // decodeHeaders() is completed.
   decode_headers_active_ = false;
+  // The callback runs synchronously when there is nothing to discover (neither VHDS nor on-demand
+  // SRDS applies); only a callback still pending here is an actual discovery.
+  if (!route_update_completed_sync_) {
+    startRouteDiscovery(start);
+  }
   return callbacks_->route();
 }
 
@@ -198,6 +227,7 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
     return;
   }
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
+  startClusterDiscovery(now());
   auto callback = std::make_unique<Upstream::ClusterDiscoveryCallback>(
       [this](Upstream::ClusterDiscoveryStatus cluster_status) {
         onClusterDiscoveryCompletion(cluster_status);
@@ -237,6 +267,19 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 void OnDemandRouteUpdate::onDestroy() {
   route_config_updated_callback_.reset();
   cluster_discovery_handle_.reset();
+  // A discovery still in flight here was abandoned, e.g. the client went away while waiting.
+  if (auto stats = config_->stats(); stats.has_value()) {
+    if (route_discovery_in_flight_) {
+      stats->route_discovery_cancelled_.inc();
+      stats->route_discovery_pending_.dec();
+    }
+    if (cluster_discovery_in_flight_) {
+      stats->cluster_discovery_cancelled_.inc();
+      stats->cluster_discovery_pending_.dec();
+    }
+  }
+  route_discovery_in_flight_ = false;
+  cluster_discovery_in_flight_ = false;
 }
 
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
@@ -247,8 +290,11 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
 
   // Don't call continueDecoding in the middle of decodeHeaders()
   if (decode_headers_active_) {
+    route_update_completed_sync_ = true;
     return;
   }
+
+  finishRouteDiscovery(route_exists);
 
   // VHDS only reports that the virtual host exists. If none of its routes match the request,
   // requesting the same virtual host again cannot resolve one, so let the router reply instead.
@@ -301,6 +347,7 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     Upstream::ClusterDiscoveryStatus cluster_status) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
+  finishClusterDiscovery(cluster_status);
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.on_demand_cluster_no_recreate_stream")) {
@@ -331,6 +378,72 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     callbacks_->downstreamCallbacks()->recreateClusterInfo();
   }
   callbacks_->continueDecoding();
+}
+
+MonotonicTime OnDemandRouteUpdate::now() const {
+  return callbacks_->dispatcher().timeSource().monotonicTime();
+}
+
+void OnDemandRouteUpdate::startRouteDiscovery(MonotonicTime start) {
+  route_discovery_in_flight_ = true;
+  route_discovery_start_ = start;
+  callbacks_->streamInfo().downstreamTiming().setValue(Timing::RouteDiscoveryStart, start);
+  if (auto stats = config_->stats(); stats.has_value()) {
+    stats->route_discovery_requested_.inc();
+    stats->route_discovery_pending_.inc();
+  }
+}
+
+void OnDemandRouteUpdate::finishRouteDiscovery(bool route_exists) {
+  if (!route_discovery_in_flight_) {
+    return;
+  }
+  route_discovery_in_flight_ = false;
+  const MonotonicTime end = now();
+  callbacks_->streamInfo().downstreamTiming().setValue(Timing::RouteDiscoveryEnd, end);
+  if (auto stats = config_->stats(); stats.has_value()) {
+    (route_exists ? stats->route_discovery_found_ : stats->route_discovery_not_found_).inc();
+    stats->route_discovery_pending_.dec();
+    stats->route_discovery_duration_.recordValue(
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - route_discovery_start_)
+            .count());
+  }
+}
+
+void OnDemandRouteUpdate::startClusterDiscovery(MonotonicTime start) {
+  cluster_discovery_in_flight_ = true;
+  cluster_discovery_start_ = start;
+  callbacks_->streamInfo().downstreamTiming().setValue(Timing::ClusterDiscoveryStart, start);
+  if (auto stats = config_->stats(); stats.has_value()) {
+    stats->cluster_discovery_requested_.inc();
+    stats->cluster_discovery_pending_.inc();
+  }
+}
+
+void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatus cluster_status) {
+  if (!cluster_discovery_in_flight_) {
+    return;
+  }
+  cluster_discovery_in_flight_ = false;
+  const MonotonicTime end = now();
+  callbacks_->streamInfo().downstreamTiming().setValue(Timing::ClusterDiscoveryEnd, end);
+  if (auto stats = config_->stats(); stats.has_value()) {
+    switch (cluster_status) {
+    case Upstream::ClusterDiscoveryStatus::Available:
+      stats->cluster_discovery_available_.inc();
+      break;
+    case Upstream::ClusterDiscoveryStatus::Missing:
+      stats->cluster_discovery_missing_.inc();
+      break;
+    case Upstream::ClusterDiscoveryStatus::Timeout:
+      stats->cluster_discovery_timeout_.inc();
+      break;
+    }
+    stats->cluster_discovery_pending_.dec();
+    stats->cluster_discovery_duration_.recordValue(
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - cluster_discovery_start_)
+            .count());
+  }
 }
 
 } // namespace OnDemand
