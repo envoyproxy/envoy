@@ -284,8 +284,9 @@ TEST_F(GeoipFilterTest, ClientSuppliedGeoHeadersRemovedBeforeLookup) {
           "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
-  const std::vector<std::string> geo_header_names = {"x-geo-country", "x-geo-city",
-                                                     "x-geo-anon-vpn"};
+  const std::vector<Http::LowerCaseString> geo_header_names = {
+      Http::LowerCaseString("x-geo-country"), Http::LowerCaseString("x-geo-city"),
+      Http::LowerCaseString("x-geo-anon-vpn")};
   EXPECT_CALL(*dummy_driver_, geoHeaderNames())
       .WillRepeatedly(Return(absl::MakeConstSpan(geo_header_names)));
   Http::TestRequestHeaderMapImpl request_headers;
@@ -328,7 +329,8 @@ TEST_F(GeoipFilterTest, ClientSuppliedGeoHeadersKeptWhenSanitizationDisabled) {
           "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
-  const std::vector<std::string> geo_header_names = {"x-geo-country", "x-geo-city"};
+  const std::vector<Http::LowerCaseString> geo_header_names = {
+      Http::LowerCaseString("x-geo-country"), Http::LowerCaseString("x-geo-city")};
   EXPECT_CALL(*dummy_driver_, geoHeaderNames())
       .WillRepeatedly(Return(absl::MakeConstSpan(geo_header_names)));
   Http::TestRequestHeaderMapImpl request_headers;
@@ -600,7 +602,8 @@ TEST_F(GeoipFilterNonIpAddressTest, ClientSuppliedGeoHeadersRemovedWhenLookupSki
           "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
 )EOF";
   initializeFilter(external_request_yaml);
-  const std::vector<std::string> geo_header_names = {"x-geo-country"};
+  const std::vector<Http::LowerCaseString> geo_header_names = {
+      Http::LowerCaseString("x-geo-country")};
   EXPECT_CALL(*dummy_driver_, geoHeaderNames())
       .WillRepeatedly(Return(absl::MakeConstSpan(geo_header_names)));
   Http::TestRequestHeaderMapImpl request_headers;
