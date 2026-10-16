@@ -2059,7 +2059,8 @@ TEST_F(UdpProxyFilterTest, PerSessionClusterBasicFlow) {
   InSequence s;
 
   const std::string session_access_log_format =
-      "%DYNAMIC_METADATA(udp.proxy.session:cluster_name)%";
+      "%DYNAMIC_METADATA(udp.proxy.session:cluster_name)% "
+      "%METADATA(CLUSTER:example:hostname)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo
@@ -2078,8 +2079,11 @@ session_filters:
   )EOF",
                         session_access_log_format, ""));
   // Allow for two sessions.
-  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
-      ->resetResourceManager(2, 0, 0, 0, 0);
+  auto& cluster_info = factory_context_.server_factory_context_.cluster_manager_
+                           .thread_local_cluster_.cluster_.info_;
+  cluster_info->resetResourceManager(2, 0, 0, 0, 0);
+  auto* fields = (*cluster_info->metadata_.mutable_filter_metadata())["example"].mutable_fields();
+  (*fields)["hostname"].set_string_value("metadata.example.com");
 
   // Basic flow. Udp proxy doesn't have the cluster info yet.
   expectSessionCreate(upstream_address_);
@@ -2103,8 +2107,8 @@ session_filters:
 
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
-  EXPECT_EQ(output_.front(), "fake_cluster");
-  EXPECT_EQ(output_.back(), "fake_cluster");
+  EXPECT_EQ(output_.front(), "fake_cluster metadata.example.com");
+  EXPECT_EQ(output_.back(), "fake_cluster metadata.example.com");
 }
 
 TEST_F(UdpProxyFilterTest, PerSessionClusterNoClusterFound) {
