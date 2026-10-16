@@ -237,12 +237,16 @@ std::string JA4Fingerprinter::getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_cl
         CBS_init(&sig_alg_data, CBS_data(&extension), CBS_len(&extension));
         uint16_t sig_alg_len;
         if (CBS_get_u16(&sig_alg_data, &sig_alg_len)) {
+          const bool filter_grease = Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.ja4_filter_grease_signature_algorithms");
           while (CBS_len(&sig_alg_data) >= 2) {
             uint16_t sig_alg;
             if (!CBS_get_u16(&sig_alg_data, &sig_alg)) {
               break;
             }
-            sig_algs.push_back(sig_alg);
+            if (!filter_grease || isNotGrease(sig_alg)) {
+              sig_algs.push_back(sig_alg);
+            }
           }
         }
       }
