@@ -89,7 +89,7 @@ public:
 class ThriftConnectionManagerTest : public testing::Test {
 public:
   ThriftConnectionManagerTest()
-      : stats_(ThriftFilterStats::generateStats("test.", *store_.rootScope())) {
+      : stats_(ThriftFilterStats::generateStats("test", *store_.rootScope())) {
     route_config_provider_manager_ = std::make_unique<Router::RouteConfigProviderManagerImpl>(
         context_.server_factory_context_.admin_);
     ON_CALL(*context_.server_factory_context_.access_log_manager_.file_, write(_))
@@ -480,7 +480,7 @@ stat_prefix: test
             Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-    EXPECT_EQ(1U, store_.counter("test.request_call").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
     writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
 
@@ -502,20 +502,21 @@ stat_prefix: test
     }
 
     // This should not be incremented during a close triggered by a drain.
-    EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+    EXPECT_EQ(0U, store_.counter("thrift.test.cx_destroy_local_with_active_rq").value());
 
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-    EXPECT_EQ(1U, store_.counter("test.request").value());
-    EXPECT_EQ(1U, store_.counter("test.request_call").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
     EXPECT_EQ(0U, stats_.request_active_.value());
-    EXPECT_EQ(1U, store_.counter("test.response").value());
-    EXPECT_EQ(1U, store_.counter("test.response_reply").value());
-    EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-    EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-    EXPECT_EQ(1U, store_.counter("test.response_success").value());
-    EXPECT_EQ(0U, store_.counter("test.response_error").value());
-    EXPECT_EQ(draining ? 1U : 0U, store_.counter("test.downstream_response_drain_close").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.response_reply").value());
+    EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+    EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.response_success").value());
+    EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
+    EXPECT_EQ(draining ? 1U : 0U,
+              store_.counter("thrift.test.downstream_response_drain_close").value());
 
     std::string expected_access_log =
         fmt::format("name cluster passthrough_enabled=false framed binary call framed binary reply "
@@ -721,13 +722,13 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.counter("test.request_oneway").value());
-  EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_oneway").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_decoding_error").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
 
   EXPECT_EQ(access_log_data_, "");
 }
@@ -741,13 +742,13 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(0U, store_.counter("test.request_call").value());
-  EXPECT_EQ(1U, store_.counter("test.request_oneway").value());
-  EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_oneway").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
 
   EXPECT_EQ(access_log_data_,
             "name cluster passthrough_enabled=false framed binary oneway - - - - 0 0 0 -\n");
@@ -765,7 +766,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::StopIteration));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 
   // Nothing further happens: we're stopped.
@@ -780,13 +781,13 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   callbacks->continueDecoding();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(0U, store_.counter("test.request_call").value());
-  EXPECT_EQ(1U, store_.counter("test.request_oneway").value());
-  EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_oneway").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_decoding_error").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(0U, stats_.request_active_.value());
@@ -807,8 +808,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0, buffer_.length());
 
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_decoding_error").value());
 
   EXPECT_EQ(access_log_data_, "");
 }
@@ -818,12 +819,12 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesInvalidMsgType) {
   writeFramedBinaryMessage(buffer_, MessageType::Reply, 0x0F); // reply is invalid for a request
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(0U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.counter("test.request_oneway").value());
-  EXPECT_EQ(1U, store_.counter("test.request_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_call").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_oneway").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_invalid_type").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
 
   EXPECT_EQ(access_log_data_, "");
 }
@@ -868,7 +869,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_decoding_error").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
@@ -890,7 +891,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_decoding_error").value());
 
   EXPECT_EQ(access_log_data_, "");
 }
@@ -938,7 +939,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
 
   EXPECT_EQ(access_log_data_, "");
@@ -951,7 +952,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesGarbageRequest) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
 
   EXPECT_EQ(access_log_data_, "");
@@ -963,8 +964,8 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     initializeFilter();
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
     filter_->onEvent(Network::ConnectionEvent::LocalClose);
-    EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
-    EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+    EXPECT_EQ(0U, store_.counter("thrift.test.cx_destroy_local_with_active_rq").value());
+    EXPECT_EQ(0U, store_.counter("thrift.test.cx_destroy_remote_with_active_rq").value());
   }
 
   // Remote close mid-request
@@ -981,7 +982,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 
-    EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.cx_destroy_remote_with_active_rq").value());
 
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
@@ -1000,7 +1001,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::LocalClose);
 
-    EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.cx_destroy_local_with_active_rq").value());
 
     buffer_.drain(buffer_.length());
 
@@ -1016,7 +1017,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
 
-    EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.cx_destroy_remote_with_active_rq").value());
 
     buffer_.drain(buffer_.length());
 
@@ -1032,7 +1033,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
     filter_->onEvent(Network::ConnectionEvent::LocalClose);
 
-    EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+    EXPECT_EQ(1U, store_.counter("thrift.test.cx_destroy_local_with_active_rq").value());
 
     buffer_.drain(buffer_.length());
 
@@ -1064,7 +1065,7 @@ route_config:
   EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::StopIteration));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 
   Router::RouteConstSharedPtr route = callbacks->route();
@@ -1161,7 +1162,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   writeVoidFramedBinaryMessage(write_buffer_, 0x0F);
 
@@ -1174,15 +1175,15 @@ TEST_F(ThriftConnectionManagerTest, RequestAndVoidResponse) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(1U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
                               "binary reply success 0 0 0 -\n");
@@ -1199,7 +1200,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0xFF);
 
@@ -1219,15 +1220,15 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(1U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
                               "binary reply success 0 0 0 -\n");
@@ -1243,7 +1244,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   writeFramedBinaryTApplicationException(write_buffer_, 0x0F);
 
@@ -1256,16 +1257,16 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
-  EXPECT_EQ(1U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
                               "binary exception - 0 0 0 -\n");
@@ -1281,7 +1282,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   writeFramedBinaryIDLException(write_buffer_, 0x0F);
 
@@ -1294,15 +1295,15 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(1U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
                               "binary reply error 0 0 0 -\n");
@@ -1318,7 +1319,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   // Call is not valid in a response
   writeFramedBinaryMessage(write_buffer_, MessageType::Call, 0x0F);
@@ -1332,15 +1333,15 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(1U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(
       access_log_data_,
@@ -1357,7 +1358,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   // illegal negative set length
   addSeq(write_buffer_, {
@@ -1379,16 +1380,16 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
-  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(1U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
-  EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_decoding_error").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
                               "binary exception - 0 0 0 -\n");
@@ -1404,7 +1405,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   // Response with unknown transform
   addSeq(write_buffer_, {
@@ -1424,16 +1425,16 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
-  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(1U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
-  EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_decoding_error").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false header binary call header "
                               "binary exception - 0 0 0 -\n");
@@ -1459,8 +1460,8 @@ TEST_F(ThriftConnectionManagerTest, BadFunctionCallExceptionHandling) {
   EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
-  EXPECT_EQ(1U, store_.counter("test.request_internal_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_internal_error").value());
 
   EXPECT_EQ(access_log_data_, "");
 }
@@ -1489,9 +1490,9 @@ TEST_F(ThriftConnectionManagerTest,
   EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_decoding_error").value());
   // Won't increase this counter as it's expected.
-  EXPECT_EQ(0U, store_.counter("test.request_internal_error").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_internal_error").value());
 
   EXPECT_EQ(access_log_data_, "");
 }
@@ -1507,7 +1508,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   addRepeated(write_buffer_, 8, 0);
 
@@ -1520,15 +1521,15 @@ TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
-  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(1U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
                               "binary exception - 0 0 0 -\n");
@@ -1547,8 +1548,8 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(2U, stats_.request_active_.value());
-  EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(2U, store_.counter("test.request_call").value());
+  EXPECT_EQ(2U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(2U, store_.counter("thrift.test.request_call").value());
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
 
@@ -1560,16 +1561,16 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete,
             callbacks.front()->upstreamData(write_buffer_));
   callbacks.pop_front();
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_reply").value());
 
   writeFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x02);
   callbacks.front()->startUpstreamResponse(transport, proto);
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete,
             callbacks.front()->upstreamData(write_buffer_));
   callbacks.pop_front();
-  EXPECT_EQ(2U, store_.counter("test.response").value());
-  EXPECT_EQ(2U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(2U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(2U, store_.counter("thrift.test.response_reply").value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -1589,7 +1590,7 @@ TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -1609,16 +1610,16 @@ TEST_F(ThriftConnectionManagerTest, RequestWithNoMaxRequestsLimit) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, store_.counter("test.downstream_cx_max_requests").value());
-  EXPECT_EQ(50U, store_.counter("test.request").value());
-  EXPECT_EQ(50U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.downstream_cx_max_requests").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(50U, store_.counter("test.response").value());
-  EXPECT_EQ(50U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(50U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 }
 
 // Test the case where there is a limit on the number of requests but the actual number of requests
@@ -1638,16 +1639,16 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitButNotReach) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, store_.counter("test.downstream_cx_max_requests").value());
-  EXPECT_EQ(49U, store_.counter("test.request").value());
-  EXPECT_EQ(49U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.downstream_cx_max_requests").value());
+  EXPECT_EQ(49U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(49U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(49U, store_.counter("test.response").value());
-  EXPECT_EQ(49U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(49U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(49U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(49U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(49U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 }
 
 // Test the case where there is a limit on the number of requests and the actual number of requests
@@ -1671,16 +1672,16 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReached) {
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.downstream_cx_max_requests").value());
-  EXPECT_EQ(50U, store_.counter("test.request").value());
-  EXPECT_EQ(50U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.downstream_cx_max_requests").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(50U, store_.counter("test.response").value());
-  EXPECT_EQ(50U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(50U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 }
 
 // Test the case where there is a limit on the number of requests and the actual number of requests
@@ -1704,16 +1705,16 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedWithMor
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.downstream_cx_max_requests").value());
-  EXPECT_EQ(50U, store_.counter("test.request").value());
-  EXPECT_EQ(50U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.downstream_cx_max_requests").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(50U, store_.counter("test.response").value());
-  EXPECT_EQ(50U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(50U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(50U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 }
 
 // Test cases where the number of requests is limited and the actual number of requests exceeds the
@@ -1761,16 +1762,16 @@ TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeate
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(5U, store_.counter("test.downstream_cx_max_requests").value());
-  EXPECT_EQ(25U, store_.counter("test.request").value());
-  EXPECT_EQ(25U, store_.counter("test.request_call").value());
+  EXPECT_EQ(5U, store_.counter("thrift.test.downstream_cx_max_requests").value());
+  EXPECT_EQ(25U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(25U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(25U, store_.counter("test.response").value());
-  EXPECT_EQ(25U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(25U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(25U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(25U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(25U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 }
 
 TEST_F(ThriftConnectionManagerTest, DownstreamProtocolUpgrade) {
@@ -1859,8 +1860,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCallWithMultipleFilters) 
   EXPECT_CALL(*bidirectional_filter_, decodeMessageEnd()).WillOnce(Return(FilterStatus::Continue));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 
   // Reverse order for encoder filters.
@@ -1880,12 +1881,12 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCallWithMultipleFilters) 
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(1U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 }
 
 // Tests stop iteration/resume with multiple filters.
@@ -1910,7 +1911,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
     EXPECT_CALL(*custom_decoder_filter_, messageBegin(_))
         .WillOnce(Return(FilterStatus::StopIteration));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-    EXPECT_EQ(0U, store_.counter("test.request").value());
+    EXPECT_EQ(0U, store_.counter("thrift.test.request").value());
     EXPECT_EQ(1U, stats_.request_active_.value());
   }
 
@@ -1927,8 +1928,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
     callbacks->continueDecoding();
   }
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
@@ -1954,7 +1955,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
     EXPECT_CALL(*custom_decoder_filter_, transportEnd())
         .WillOnce(Return(FilterStatus::StopIteration));
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-    EXPECT_EQ(0U, store_.counter("test.request").value());
+    EXPECT_EQ(0U, store_.counter("thrift.test.request").value());
     EXPECT_EQ(1U, stats_.request_active_.value());
   }
 
@@ -1965,8 +1966,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
     callbacks->continueDecoding();
   }
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
@@ -2014,10 +2015,10 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_success").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
                               "binary call success 0 0 0 -\n");
@@ -2068,10 +2069,10 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
                               "binary call error 0 0 0 -\n");
@@ -2106,11 +2107,11 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
             "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
@@ -2165,8 +2166,8 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
     return FilterStatus::Continue;
   }));
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
@@ -2228,12 +2229,12 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
   EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(1U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 }
 
 TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
@@ -2253,7 +2254,7 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
 
@@ -2264,9 +2265,9 @@ TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   // Remote closes the connection.
   filter_callbacks_.connection_.state_ = Network::Connection::State::Closed;
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
-  EXPECT_EQ(0U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
-  EXPECT_EQ(1U, store_.counter("test.downstream_response_drain_close").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.downstream_response_drain_close").value());
 
   // Upstream connection is closed by remote. Hence we expect the downstream connection to be
   // closed after the response is sent. Drain header is set to hint downstream not to use the
@@ -2299,13 +2300,13 @@ payload_passthrough: true
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0, buffer_.length());
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
-  EXPECT_EQ(0U, store_.counter("test.request_oneway").value());
-  EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_oneway").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_decoding_error").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
 }
 
 TEST_F(ThriftConnectionManagerTest, PayloadPassthroughOnDataHandlesThriftOneWay) {
@@ -2327,13 +2328,13 @@ payload_passthrough: true
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(0U, store_.counter("test.request_call").value());
-  EXPECT_EQ(1U, store_.counter("test.request_oneway").value());
-  EXPECT_EQ(0U, store_.counter("test.request_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_oneway").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request_decoding_error").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response").value());
 
   EXPECT_EQ(access_log_data_,
             "name - passthrough_enabled=true framed binary oneway - - - - 0 0 0 -\n");
@@ -2358,7 +2359,7 @@ payload_passthrough: true
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   writeFramedBinaryTApplicationException(write_buffer_, 0x0F);
 
@@ -2371,16 +2372,16 @@ payload_passthrough: true
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
-  EXPECT_EQ(1U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(
       access_log_data_,
@@ -2406,7 +2407,7 @@ payload_passthrough: true
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   writeFramedBinaryIDLException(write_buffer_, 0x0F);
 
@@ -2419,16 +2420,16 @@ payload_passthrough: true
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(1U, store_.counter("test.response_passthrough").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(1U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_passthrough").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(
       access_log_data_,
@@ -2454,7 +2455,7 @@ payload_passthrough: true
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
 
   // Call is not valid in a response
   writeFramedBinaryMessage(write_buffer_, MessageType::Call, 0x0F);
@@ -2468,15 +2469,15 @@ payload_passthrough: true
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request_call").value());
   EXPECT_EQ(0U, stats_.request_active_.value());
-  EXPECT_EQ(1U, store_.counter("test.response").value());
-  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
-  EXPECT_EQ(1U, store_.counter("test.response_invalid_type").value());
-  EXPECT_EQ(0U, store_.counter("test.response_success").value());
-  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_exception").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.response_error").value());
 
   EXPECT_EQ(access_log_data_,
             "name - passthrough_enabled=true framed binary call framed binary call - 0 0 0 -\n");
@@ -2510,7 +2511,7 @@ route_config:
   EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::StopIteration));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, store_.counter("thrift.test.request").value());
   EXPECT_EQ(1U, stats_.request_active_.value());
 
   Router::RouteConstSharedPtr route = callbacks->route();
@@ -2562,7 +2563,7 @@ route_config:
       }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("thrift.test.request").value());
 
   Router::RouteConstSharedPtr route = callbacks->route();
   EXPECT_EQ(nullptr, route);

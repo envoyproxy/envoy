@@ -12,6 +12,8 @@
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
@@ -22,6 +24,8 @@
 #include "source/extensions/filters/network/thrift_proxy/router/rds_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/stats.h"
 #include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -80,7 +84,7 @@ ConfigImpl::ConfigImpl(
     Server::Configuration::FactoryContext& context,
     Router::RouteConfigProviderManager& route_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
-      stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
+      stats_(ThriftFilterStats::generateStats(config.stat_prefix(), context_.scope())),
       transport_(ProtoUtils::getTransportType(config.transport())),
       proto_(ProtoUtils::getProtocolType(config.protocol())),
       payload_passthrough_(config.payload_passthrough()),
