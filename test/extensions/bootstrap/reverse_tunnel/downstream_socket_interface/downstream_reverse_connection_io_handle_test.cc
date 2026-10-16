@@ -529,13 +529,34 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, ReadPartialDataAndStateTransitio
     ssize_t written = write(fds[1], partial_rping.data(), partial_rping.size());
     ASSERT_EQ(written, static_cast<ssize_t>(partial_rping.size()));
 
-    // Read should return the partial data as-is.
+    // The partial RPING is held internally and completed on the next read, so it is not delivered
+    // to the caller buffer. A non-zero count is still reported so the caller does not see EOF.
     Buffer::OwnedImpl buffer;
     auto result = handle->read(buffer, std::nullopt);
 
     EXPECT_EQ(result.return_value_, 3);
     EXPECT_EQ(result.err_, nullptr);
-    EXPECT_EQ(buffer.toString(), partial_rping);
+    EXPECT_EQ(buffer.length(), 0);
+
+    // Write the remaining bytes. The RPING now completes, so it is stripped (the buffer stays
+    // empty) and echoed back to the peer rather than delivered to the caller.
+    const std::string rping_suffix = rping_msg.substr(3);
+    written = write(fds[1], rping_suffix.data(), rping_suffix.size());
+    ASSERT_EQ(written, static_cast<ssize_t>(rping_suffix.size()));
+
+    Buffer::OwnedImpl completion_buffer;
+    auto completion_result = handle->read(completion_buffer, std::nullopt);
+    EXPECT_EQ(completion_result.return_value_, rping_msg.size());
+    EXPECT_EQ(completion_result.err_, nullptr);
+    EXPECT_EQ(completion_buffer.length(), 0);
+
+    // The completed RPING is echoed back to the peer.
+    char echo_buffer[16];
+    const int flags = fcntl(fds[1], F_GETFL, 0);
+    fcntl(fds[1], F_SETFL, flags | O_NONBLOCK);
+    const ssize_t echo_read = read(fds[1], echo_buffer, sizeof(echo_buffer));
+    EXPECT_EQ(echo_read, static_cast<ssize_t>(rping_msg.size()));
+    EXPECT_EQ(std::string(echo_buffer, echo_read), rping_msg);
 
     close(fds[1]);
   }

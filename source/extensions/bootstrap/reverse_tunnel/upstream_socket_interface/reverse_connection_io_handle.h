@@ -28,10 +28,13 @@ public:
    *
    * @param socket the reverse connection socket to own and manage.
    * @param cluster_name the name of the cluster this connection belongs to.
+   * @param retained_ping_prefix a partial ping echo consumed in the pool, seeded into the
+   * interceptor so its completing bytes are stripped rather than leaked into the client codec.
    */
   UpstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
                                     const std::string& cluster_name,
-                                    UpstreamSocketThreadLocal& registry);
+                                    UpstreamSocketThreadLocal& registry,
+                                    absl::string_view retained_ping_prefix = {});
 
   ~UpstreamReverseConnectionIOHandle() override;
 

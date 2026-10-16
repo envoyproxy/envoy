@@ -27,6 +27,12 @@ protected:
   // Disabled permanently after the first non-RPING application byte is observed.
   bool ping_echo_active_{true};
 
+  // Seed a partial ping prefix consumed on the pooled socket before checkout. The completing bytes
+  // arriving on the new handle then finish the RPING instead of leaking into the client codec.
+  void seedRetainedPingPrefix(absl::string_view prefix) {
+    partial_ping_.assign(prefix.begin(), prefix.end());
+  }
+
 private:
   // Drains a complete RPING from `buffer` (echoing via onPingMessage()) and returns the result
   // with the RPING hidden from the caller. Backs the read() path.
@@ -41,6 +47,12 @@ private:
 
   // Partial RPING prefix carried across readv() calls until the keepalive completes; <=4 bytes.
   absl::InlinedVector<char, 5> partial_ping_;
+
+  // RPING keepalive echo bytes in the current read burst while the echo phase is active, across
+  // both the read() and readv() paths. Reset at each read-burst boundary (would-block), so a slow
+  // healthy keepalive stream is never torn down and only a flood that exceeds the budget on a
+  // single wake closes the tunnel.
+  uint64_t echoed_bytes_{0};
 };
 
 } // namespace ReverseConnection

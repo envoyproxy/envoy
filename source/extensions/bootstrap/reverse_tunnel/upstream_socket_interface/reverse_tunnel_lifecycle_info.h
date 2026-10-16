@@ -67,6 +67,8 @@ inline constexpr absl::string_view kLifecycleCloseReasonIdleReadError = "idle_re
 inline constexpr absl::string_view kLifecycleCloseReasonIdlePingWriteFailure =
     "idle_ping_write_failure";
 inline constexpr absl::string_view kLifecycleCloseReasonIdlePingTimeout = "idle_ping_timeout";
+inline constexpr absl::string_view kLifecycleCloseReasonIdleUnexpectedData = "idle_unexpected_data";
+inline constexpr absl::string_view kLifecycleCloseReasonIdleKeepaliveFlood = "idle_keepalive_flood";
 inline constexpr absl::string_view kLifecycleCloseReasonRemoteClose = "remote_close";
 inline constexpr absl::string_view kLifecycleCloseReasonLocalClose = "local_close";
 inline constexpr absl::string_view kLifecycleCloseReasonExplicitClose = "explicit_close";

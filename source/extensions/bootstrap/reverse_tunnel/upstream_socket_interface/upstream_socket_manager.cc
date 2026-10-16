@@ -121,7 +121,7 @@ void UpstreamSocketManager::onGoAway(int fd) {
 
 void UpstreamSocketManager::handoffSocketToWorker(
     const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr socket,
-    const std::chrono::seconds& ping_interval, absl::string_view tenant_id,
+    const std::chrono::milliseconds& ping_interval, absl::string_view tenant_id,
     absl::string_view initiator_worker_id, absl::string_view initiator_connection_id) {
   dispatcher_.post([this, node_id, cluster_id, ping_interval, tenant_id = std::string(tenant_id),
                     initiator_worker_id = std::string(initiator_worker_id),
@@ -135,7 +135,7 @@ void UpstreamSocketManager::handoffSocketToWorker(
 
 void UpstreamSocketManager::addConnectionSocket(
     const std::string& node_id, const std::string& cluster_id, Network::ConnectionSocketPtr socket,
-    const std::chrono::seconds& ping_interval, bool rebalanced, absl::string_view tenant_id,
+    const std::chrono::milliseconds& ping_interval, bool rebalanced, absl::string_view tenant_id,
     absl::string_view initiator_worker_id, absl::string_view initiator_connection_id) {
   const std::string scoped_node_id =
       maybeBuildTenantScopedIdentifier(tenant_isolation_enabled_, tenant_id, node_id);
@@ -224,16 +224,14 @@ void UpstreamSocketManager::addConnectionSocket(
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
-  // Store ping_interval_ if not yet set.
-  if (ping_interval_ == std::chrono::seconds::zero()) {
-    ping_interval_ = ping_interval;
-  }
+  // Store the per-connection ping interval in milliseconds so a sub-second interval is honored.
+  fd_to_ping_interval_[fd] = ping_interval;
 
   // Create per-connection send timer with jitter (matching HTTP/2 keepalive pattern).
   fd_to_ping_send_timer_map_[fd] =
       dispatcher_.createTimer([this, fd]() { sendPingForConnection(fd); });
   fd_to_ping_send_timer_map_[fd]->enableTimer(
-      std::chrono::milliseconds(pingIntervalWithJitterMs()));
+      std::chrono::milliseconds(pingIntervalWithJitterMs(fd)));
 
   // Note the reverse connection start time.
   fd_to_start_time_map_[fd] = dispatcher_.timeSource().monotonicTime();
@@ -252,7 +250,8 @@ bool UpstreamSocketManager::canAcceptConnection(absl::string_view node_id,
 }
 
 Network::ConnectionSocketPtr
-UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
+UpstreamSocketManager::getConnectionSocket(const std::string& node_id,
+                                           std::string* retained_ping_prefix) {
 
   ENVOY_LOG(debug, "reverse_tunnel: getConnectionSocket() called with node_id: {}.", node_id);
 
@@ -290,11 +289,20 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
             "node: {} cluster: {}.",
             fd, remoteConnectionKey, node_id, cluster_id);
 
+  // Carry any partial ping echo retained while idle into the checked-out handle so the completing
+  // bytes are stripped rather than leaked into the client codec.
+  auto scratch_it = fd_to_ping_scratch_.find(fd);
+  if (retained_ping_prefix != nullptr && scratch_it != fd_to_ping_scratch_.end()) {
+    *retained_ping_prefix = std::move(scratch_it->second);
+  }
+
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
   fd_to_ping_send_timer_map_.erase(fd);
   fd_to_miss_count_.erase(fd);
   fd_to_socket_it_map_.erase(fd);
+  fd_to_ping_interval_.erase(fd);
+  fd_to_ping_scratch_.erase(fd);
 
   auto lifecycle_it = fd_to_lifecycle_info_.find(fd);
   if (lifecycle_it != fd_to_lifecycle_info_.end()) {
@@ -479,6 +487,8 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     fd_to_event_map_.erase(fd);
     fd_to_timer_map_.erase(fd);
     fd_to_ping_send_timer_map_.erase(fd);
+    fd_to_ping_interval_.erase(fd);
+    fd_to_ping_scratch_.erase(fd);
 
     // Update the cx_idle_expire_time_ histogram with this info.
     auto start_time = findStartTime(fd);
@@ -574,42 +584,86 @@ void UpstreamSocketManager::cleanStaleNodeEntry(const std::string& node_id) {
 void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   const int fd = io_handle.fdDoNotUse();
 
-  Buffer::OwnedImpl buffer;
-  const auto ping_size =
+  const uint64_t expected =
       ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::PING_MESSAGE
           .size();
-  Api::IoCallUint64Result result = io_handle.read(buffer, std::make_optional(ping_size));
-  if (!result.ok()) {
-    ENVOY_LOG(debug, "reverse_tunnel: Read error on FD: {}: error - {}", fd,
-              result.err_->getErrorDetails());
-    setCloseReason(fd, kLifecycleCloseReasonIdleReadError);
+
+  // Drain every echo currently readable on this edge triggered wake so coalesced acks never leak
+  // into the client codec after the socket is handed off. Read in bounded chunks and strip whole
+  // echoes so a keepalive flood does not force one syscall per five bytes, and cap the work per
+  // wake. A split echo is retained in the five byte scratch and completed on the next wake.
+  constexpr uint64_t kDrainChunkBytes = 1024;
+  constexpr uint64_t kMaxDrainBytesPerWake = 64 * 1024;
+  std::string& scratch = fd_to_ping_scratch_[fd];
+  uint64_t drained = 0;
+  bool acked = false;
+  while (drained < kMaxDrainBytesPerWake) {
+    Buffer::OwnedImpl buffer;
+    Api::IoCallUint64Result result = io_handle.read(buffer, std::make_optional(kDrainChunkBytes));
+    if (result.wouldBlock()) {
+      // A spurious wake or a drained socket. Keep the tunnel and any partial echo held in scratch.
+      break;
+    }
+    if (!result.ok()) {
+      ENVOY_LOG(debug, "reverse_tunnel: Read error on FD: {}: error - {}", fd,
+                result.err_->getErrorDetails());
+      setCloseReason(fd, kLifecycleCloseReasonIdleReadError);
+      markSocketDead(fd);
+      return;
+    }
+    if (result.return_value_ == 0) {
+      // No read error, but the remote peer closed the connection gracefully.
+      ENVOY_LOG(debug, "reverse_tunnel: FD: {}: reverse connection closed", fd);
+      setCloseReason(fd, kLifecycleCloseReasonIdlePeerClose);
+      markSocketDead(fd);
+      return;
+    }
+
+    const uint64_t len = buffer.length();
+    const char* data = static_cast<const char*>(buffer.linearize(len));
+    scratch.append(data, static_cast<size_t>(len));
+    drained += len;
+
+    // Strip every whole echo. A non-RPING byte on an idle keepalive socket means the stream is no
+    // longer a clean keepalive, so close rather than leaking the byte into the client codec.
+    while (scratch.size() >= expected) {
+      if (!::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
+              isPingMessage(absl::string_view{scratch.data(), static_cast<size_t>(expected)})) {
+        ENVOY_LOG(debug, "reverse_tunnel: response is not RPING. fd: {}.", fd);
+        setCloseReason(fd, kLifecycleCloseReasonIdleUnexpectedData);
+        markSocketDead(fd);
+        return;
+      }
+      scratch.erase(0, static_cast<size_t>(expected));
+      acked = true;
+    }
+  }
+
+  // A retained partial must still be a valid RPING prefix, otherwise it is a non-RPING byte that
+  // would be seeded into the client codec at checkout.
+  if (!scratch.empty() && ::Envoy::Extensions::Bootstrap::ReverseConnection::
+                                  ReverseConnectionUtility::classifyRpingPrefix(scratch) ==
+                              ::Envoy::Extensions::Bootstrap::ReverseConnection::
+                                  ReverseConnectionUtility::RpingPrefixMatch::NotRping) {
+    ENVOY_LOG(debug, "reverse_tunnel: non-RPING partial on fd: {}.", fd);
+    setCloseReason(fd, kLifecycleCloseReasonIdleUnexpectedData);
     markSocketDead(fd);
     return;
   }
 
-  // In this case, there is no read error, but the socket has been closed by the remote.
-  // peer in a graceful manner, unlike a connection refused, or a reset.
-  if (result.return_value_ == 0) {
-    ENVOY_LOG(debug, "reverse_tunnel: FD: {}: reverse connection closed", fd);
-    setCloseReason(fd, kLifecycleCloseReasonIdlePeerClose);
+  // An unbounded keepalive flood is anomalous, so close rather than spin the worker. Use a distinct
+  // close reason so a flood is distinguishable from a single stray non-RPING byte.
+  if (drained >= kMaxDrainBytesPerWake) {
+    ENVOY_LOG(debug, "reverse_tunnel: excessive idle keepalive data on fd: {}.", fd);
+    setCloseReason(fd, kLifecycleCloseReasonIdleKeepaliveFlood);
     markSocketDead(fd);
     return;
   }
 
-  if (result.return_value_ < ping_size) {
-    ENVOY_LOG(debug, "reverse_tunnel: FD: {}: no complete ping data yet", fd);
+  if (!acked) {
     return;
   }
 
-  const char* data = static_cast<const char*>(buffer.linearize(ping_size));
-  absl::string_view view{data, static_cast<size_t>(ping_size)};
-  if (!::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::isPingMessage(
-          view)) {
-    ENVOY_LOG(debug, "reverse_tunnel: response is not RPING. fd: {}.", fd);
-    // Treat as a miss; do not immediately kill unless threshold crossed.
-    onPingTimeout(fd);
-    return;
-  }
   ENVOY_LOG(trace, "reverse_tunnel: received ping response. fd: {}.", fd);
   fd_to_timer_map_[fd]->disableTimer();
   // Reset miss counter on success.
@@ -646,24 +700,33 @@ void UpstreamSocketManager::sendPingForConnection(int fd) {
 
   auto buffer = ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
       createPingResponse();
+  const uint64_t ping_size = buffer->length();
 
-  auto ping_response_timeout = ping_interval_ / 2;
+  // Arm the reply deadline at half the interval, with a one millisecond floor so a sub-millisecond
+  // interval does not expire instantly.
+  auto interval_it = fd_to_ping_interval_.find(fd);
+  const std::chrono::milliseconds interval = interval_it == fd_to_ping_interval_.end()
+                                                 ? std::chrono::milliseconds::zero()
+                                                 : interval_it->second;
+  const auto ping_response_timeout = std::max(std::chrono::milliseconds(1), interval / 2);
   fd_to_timer_map_[fd]->enableTimer(ping_response_timeout);
 
-  while (buffer->length() > 0) {
-    Api::IoCallUint64Result result = socket_ptr->ioHandle().write(*buffer);
-    ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping request. return_value: {}",
-              node_id, fd, result.return_value_);
-    if (result.return_value_ == 0) {
-      ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping rc {}, error - {}", node_id, fd,
-                result.return_value_, result.err_->getErrorDetails());
-      if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-        ENVOY_LOG(error, "reverse_tunnel: node:{} FD:{}: failed to send ping", node_id, fd);
-        setCloseReason(fd, kLifecycleCloseReasonIdlePingWriteFailure);
-        markSocketDead(fd);
-        return;
-      }
-    }
+  // Issue a single write. Retrying in a loop would spin on a zero window peer and hang the worker.
+  Api::IoCallUint64Result result = socket_ptr->ioHandle().write(*buffer);
+  ENVOY_LOG(trace, "reverse_tunnel: node:{} FD:{}: sending ping request. return_value: {}", node_id,
+            fd, result.return_value_);
+  if (result.wouldBlock()) {
+    // A zero window peer could not take any bytes. Treat it as a miss and let the reply deadline
+    // drive the miss accounting rather than retrying now.
+    return;
+  }
+  if (!result.ok() || result.return_value_ != ping_size) {
+    // A hard error or a partial write of the five byte keepalive. A split message cannot be
+    // retried, so close the tunnel.
+    ENVOY_LOG(error, "reverse_tunnel: node:{} FD:{}: failed to send ping", node_id, fd);
+    setCloseReason(fd, kLifecycleCloseReasonIdlePingWriteFailure);
+    markSocketDead(fd);
+    return;
   }
 
   if (auto* ext = getUpstreamExtension()) {
@@ -711,17 +774,21 @@ void UpstreamSocketManager::onPingTimeout(const int fd) {
   }
 }
 
-uint64_t UpstreamSocketManager::pingIntervalWithJitterMs() {
+uint64_t UpstreamSocketManager::pingIntervalWithJitterMs(int fd) {
   // 15% upward jitter, matching the HTTP/2 keepalive pattern.
   constexpr uint64_t jitter_percent = 15;
-  const uint64_t interval_ms = static_cast<uint64_t>(ping_interval_.count()) * 1000;
+  auto interval_it = fd_to_ping_interval_.find(fd);
+  const uint64_t interval_ms =
+      interval_it == fd_to_ping_interval_.end()
+          ? 0
+          : static_cast<uint64_t>(std::max<int64_t>(0, interval_it->second.count()));
   return ReverseConnectionUtility::addJitter(interval_ms, jitter_percent, *random_generator_);
 }
 
 void UpstreamSocketManager::rearmPingSendTimer(int fd) {
   auto send_it = fd_to_ping_send_timer_map_.find(fd);
   if (send_it != fd_to_ping_send_timer_map_.end()) {
-    send_it->second->enableTimer(std::chrono::milliseconds(pingIntervalWithJitterMs()));
+    send_it->second->enableTimer(std::chrono::milliseconds(pingIntervalWithJitterMs(fd)));
   }
 }
 
