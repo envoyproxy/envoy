@@ -451,20 +451,18 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  if (connection_.shouldValidateUpstreamHeaders()) {
-    RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
-  }
+  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
 #endif
 
-  const HeaderEntry* method = headers.Method();
-  const HeaderEntry* path = headers.Path();
-  const HeaderEntry* host = headers.Host();
+  const absl::string_view method = headers.getMethodValue();
+  const absl::string_view path = headers.getPathValue();
+  const absl::string_view host = headers.getHostValue();
   bool is_connect = HeaderUtility::isConnect(headers);
   const Http::HeaderValues& header_values = Http::Headers::get();
 
-  if (method->value() == header_values.MethodValues.Head) {
+  if (method == header_values.MethodValues.Head) {
     head_request_ = true;
-  } else if (method->value() == header_values.MethodValues.Connect) {
+  } else if (method == header_values.MethodValues.Connect) {
     disableChunkEncoding();
     connection_.connection().enableHalfClose(true);
     connect_request_ = true;
@@ -484,28 +482,17 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Scheme.get()));
     }
-    if (!host) {
+    if (headers.Host() == nullptr) {
       return absl::InvalidArgumentError(
-          absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
+          absl::StrCat("missing required header: ", header_values.Host.get()));
     }
-    ASSERT(path);
-    ASSERT(host);
 
-    std::string url = absl::StrCat(scheme->value().getStringView(), "://",
-                                   host->value().getStringView(), path->value().getStringView());
+    std::string url = absl::StrCat(scheme->value().getStringView(), "://", host, path);
     ENVOY_CONN_LOG(trace, "Sending fully qualified URL: {}", connection_.connection(), url);
-    connection_.buffer().addFragments(
-        {method->value().getStringView(), SPACE, url, REQUEST_POSTFIX});
+    connection_.buffer().addFragments({method, SPACE, url, REQUEST_POSTFIX});
   } else {
-    absl::string_view host_or_path_view;
-    if (is_connect) {
-      host_or_path_view = host->value().getStringView();
-    } else {
-      host_or_path_view = path->value().getStringView();
-    }
-
-    connection_.buffer().addFragments(
-        {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
+    const absl::string_view host_or_path_view = is_connect ? host : path;
+    connection_.buffer().addFragments({method, SPACE, host_or_path_view, REQUEST_POSTFIX});
   }
 
   encodeHeadersBase(headers, std::nullopt, end_stream,
@@ -535,13 +522,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
                                uint32_t max_headers_kb, const uint32_t max_headers_count)
     : connection_(connection), stats_(stats), codec_settings_(settings),
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count)
-#ifndef ENVOY_ENABLE_UHV
-      ,
-      validate_upstream_headers_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers"))
-#endif
-{
+      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
                                           codec_settings_.allow_custom_methods_);
 }

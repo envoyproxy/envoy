@@ -83,7 +83,15 @@ constexpr absl::string_view kAcceptJsonRedirectConfig = R"EOF(
 
 class CustomResponseIntegrationTest : public HttpProtocolIntegrationTest {
 public:
+  // The stat names asserted below must be the same whether or not the HTTP filters are created
+  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
+  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
   void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
     setMaxRequestHeadersKb(60);
     setMaxRequestHeadersCount(100);
 
@@ -1046,10 +1054,9 @@ TEST_P(CustomResponseIntegrationTest, LocalReplyMatcherIgnoresUpstreamResponse) 
   EXPECT_TRUE(response->headers().get(::Envoy::Http::LowerCaseString("x-local-reply")).empty());
 }
 
-// TODO(#26236): Fix test suite for HTTP/3.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, CustomResponseIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 } // namespace CustomResponse
 } // namespace HttpFilters

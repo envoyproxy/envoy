@@ -19,9 +19,20 @@ genrule(
     ],
     outs = ["configs.tar"],
     cmd = """
+    # `@envoy-examples//:configs` now includes configs from the standalone
+    # `filter-cc`/`wasm-cc` modules. These require custom-built Envoy binaries
+    # (eg `sample.Decoder`) and cannot be validated against the core extension set.
+    # TODO(phlax): expose these separately in envoy-examples so they can be excluded upstream
+    EXAMPLE_CONFIGS=()
+    for config in $(locations @envoy-examples//:configs); do
+        if [[ "$$config" == *envoy-example-filter-cc* || "$$config" == *envoy-example-wasm-cc* ]]; then
+            continue
+        fi
+        EXAMPLE_CONFIGS+=("$$config")
+    done
     $(location @envoy//configs:configgen.sh) $(location @envoy//configs:configgen) $@ $(@D) \
         $(locations @envoy//configs)  \
-        $(locations @envoy-examples//:configs)  \
+        "$${EXAMPLE_CONFIGS[@]}"  \
         $(locations @envoy-examples//:certs)  \
         $(locations @envoy-examples//:lua)  \
         $(locations //:configs)  \

@@ -99,7 +99,7 @@ typed_config:
 // to run combinatorial iterations of each test, we can just run one.
 INSTANTIATE_TEST_SUITE_P(
     Protocols, FileServerIntegrationTest,
-    testing::ValuesIn({HttpProtocolIntegrationTest::getProtocolTestParams()[0]}),
+    testing::ValuesIn(HttpProtocolIntegrationTest::getHttp1OnlyProtocolTestParams()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(FileServerIntegrationTest, ReadsConfiguredIndexFileOnRequestForDirectory) {

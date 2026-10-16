@@ -58,9 +58,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   // downstream codecs decode.
   RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  if (filterManagerConnection()->shouldValidateUpstreamHeaders()) {
-    RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
-  }
+  RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
 #endif
 
   if (write_side_closed()) {
@@ -124,7 +122,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 #else
   spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-  if (headers.Method()->value() == "HEAD") {
+  if (headers.getMethodValue() == "HEAD") {
     sent_head_request_ = true;
   }
 #endif

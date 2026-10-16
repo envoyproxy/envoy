@@ -12,6 +12,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -30,6 +31,7 @@
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/notification.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_manager_impl.h"
@@ -408,9 +410,6 @@ absl::Status InstanceUtil::loadBootstrapConfig(
 }
 
 void InstanceUtil::raiseFileLimits() {
-  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
-    return;
-  }
   if (const auto result = Api::OsSysCallsSingleton::get().raiseFileLimits();
       result.return_value_ != 0) {
     ENVOY_LOG(warn, "Failed to raise file descriptor limit, error {}.",
@@ -494,6 +493,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     if (stats_config.stats_tags().empty() && use_all_default_tags &&
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_explicit_tags")) {
       stats_store_.setUseExplicitTags(true);
+      http_context_.setUseExplicitTags(true);
     }
   }
 
@@ -859,6 +859,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // cluster_manager_factory_ is available.
   RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
+  // All the bootstrap (static) resources have been loaded at this point, so the default message
+  // validation visitor switches to the dynamic one.
+  bootstrap_config_loaded_.store(true);
+
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config() ||
@@ -1067,18 +1071,14 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
-    // Pause RDS to ensure that we don't send any requests until we've
-    // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
-    // so we pause RDS until we've completed all the callbacks.
-    Config::ScopedResume resume_rds = xds_manager.pause(type_url);
+    // Pause all Listener-dependent resource types (RDS, SRDS, VHDS, SDS) to ensure
+    // that no subscription requests are sent until all subscriptions have been registered
+    // in the init callbacks. The pause is lifted when resume goes out of scope.
+    const auto listener_type_url = Config::getTypeUrl<envoy::config::listener::v3::Listener>();
+    Config::ScopedResume resume = xds_manager.pause(Config::dependentTypeUrls(listener_type_url));
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);
-
-    // Now that we're execute all the init callbacks we can resume RDS
-    // as we've subscribed to all the statically defined RDS resources.
-    // This is done by tearing down the maybe_resume_rds Cleanup object.
   });
 }
 
@@ -1099,8 +1099,6 @@ void InstanceBase::run() {
     watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                       "main_thread", *dispatcher_);
   }
-
-  main_dispatch_loop_started_.store(true);
 
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);

@@ -362,6 +362,14 @@ message StatsdSink {
   //   envoy.test_counter:1|c
   //   envoy.test_timer:5|ms
   string prefix = 3;
+
+  // If true, histogram samples are scaled to milliseconds according to the histogram's unit
+  // before being reported as timers: samples of histograms recording microseconds are divided by
+  // 1000 and reported as a fractional millisecond value, while histograms recording milliseconds
+  // or without a declared unit are reported unchanged. By default every sample is reported
+  // unchanged with an ``ms`` suffix regardless of the histogram's unit, so histograms recording
+  // microseconds are reported a factor of 1000 off.
+  bool scale_histogram_units_to_milliseconds = 4;
 }
 
 // Stats configuration proto schema for built-in ``envoy.stat_sinks.dog_statsd`` sink.
@@ -369,6 +377,7 @@ message StatsdSink {
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_v3_api_msg_config.metrics.v3.StatsConfig>`.
 // [#extension: envoy.stat_sinks.dog_statsd]
+// [#next-free-field: 6]
 message DogStatsdSink {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.metrics.v2.DogStatsdSink";
@@ -394,6 +403,12 @@ message DogStatsdSink {
   //
   // Note that this value may not be respected if smaller than a single metric.
   google.protobuf.UInt64Value max_bytes_per_datagram = 4 [(validate.rules).uint64 = {gt: 0}];
+
+  // If true, histogram samples are scaled to milliseconds according to the histogram's unit
+  // before being reported as timers. See :ref:`StatsdSink's scale_histogram_units_to_milliseconds
+  // field <envoy_v3_api_field_config.metrics.v3.StatsdSink.scale_histogram_units_to_milliseconds>`
+  // for more details.
+  bool scale_histogram_units_to_milliseconds = 5;
 }
 
 // Stats configuration proto schema for built-in ``envoy.stat_sinks.hystrix`` sink.

@@ -61,13 +61,7 @@ buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_
   }
 
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    const std::string& worker_name = callbacks.dispatcher().name();
-    auto pos = worker_name.find_first_of('_');
-    ENVOY_BUG(pos != std::string::npos, "worker name is not in expected format worker_{index}");
-    uint32_t worker_index;
-    if (!absl::SimpleAtoi(worker_name.substr(pos + 1), &worker_index)) {
-      IS_ENVOY_BUG("failed to parse worker index from name");
-    }
+    const uint32_t worker_index = callbacks.dispatcher().workerId().value_or(0);
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
             config, config->stats_scope_->symbolTable(), worker_index);
@@ -202,7 +196,7 @@ DynamicModuleConfigFactory::createHttpFilterRouteConfigTyped(
                      DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
-              filter_name, config, std::move(dynamic_module));
+              filter_name, config, std::move(dynamic_module), context.mainThreadDispatcher());
 
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(

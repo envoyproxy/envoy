@@ -35,27 +35,27 @@ void HttpHealthCheckerImplTestBase::expectClientCreate(
         connection_index_.pop_front();
         return test_sessions_[index]->client_connection_;
       }));
-  EXPECT_CALL(*health_checker_, createCodecClient_(_))
-      .WillRepeatedly(
-          Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-            if (!health_check_map.empty()) {
-              const auto& health_check_config =
-                  health_check_map.at(conn_data.host_description_->address()->asString());
-              // To make sure health checker checks the correct port.
-              EXPECT_EQ(health_check_config.port_value(),
-                        conn_data.host_description_->healthCheckAddress()->ip()->port());
-            }
-            uint32_t index = codec_index_.front();
-            codec_index_.pop_front();
-            TestSession& test_session = *test_sessions_[index];
-            std::shared_ptr<Upstream::MockClusterInfo> cluster{
-                new NiceMock<Upstream::MockClusterInfo>()};
-            Event::MockDispatcher dispatcher_;
-            test_session.codec_client_ = new CodecClientForTest(
-                Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
-                nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-            return test_session.codec_client_;
-          }));
+  EXPECT_CALL(*health_checker_, createCodecClient_(_, _))
+      .WillRepeatedly(Invoke([&](Upstream::Host::CreateConnectionData& conn_data,
+                                 Http::CodecType) -> Http::CodecClient* {
+        if (!health_check_map.empty()) {
+          const auto& health_check_config =
+              health_check_map.at(conn_data.host_description_->address()->asString());
+          // To make sure health checker checks the correct port.
+          EXPECT_EQ(health_check_config.port_value(),
+                    conn_data.host_description_->healthCheckAddress()->ip()->port());
+        }
+        uint32_t index = codec_index_.front();
+        codec_index_.pop_front();
+        TestSession& test_session = *test_sessions_[index];
+        std::shared_ptr<Upstream::MockClusterInfo> cluster{
+            new NiceMock<Upstream::MockClusterInfo>()};
+        Event::MockDispatcher dispatcher_;
+        test_session.codec_client_ = new CodecClientForTest(
+            Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_, nullptr,
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+        return test_session.codec_client_;
+      }));
 }
 
 void HttpHealthCheckerImplTestBase::expectStreamCreate(size_t index) {

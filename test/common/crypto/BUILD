@@ -34,8 +34,12 @@ envoy_cc_fuzz_test(
     name = "get_sha_256_digest_fuzz_test",
     srcs = ["get_sha_256_digest_fuzz_test.cc"],
     corpus = "get_sha_256_digest_corpus",
+    external_deps = ["abseil_strings"],
     rbe_pool = "linux_x64_small",
-    deps = ["//source/common/crypto:utility_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/crypto:utility_lib",
+    ],
 )
 
 envoy_cc_fuzz_test(

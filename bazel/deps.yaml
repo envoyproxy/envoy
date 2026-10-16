@@ -1,14 +1,43 @@
-abseil_cpp:
+abseil-cpp:
   project_name: "Abseil"
   project_desc: "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase"
   project_url: "https://abseil.io/"
-  apparent_name: abseil-cpp
-  release_date: "2026-02-11"
+  apparent_name: abseil_cpp
+  release_date: "2026-08-18"
   use_category:
   - dataplane_core
   - controlplane
+  implied_untracked_deps:
+  - gloop
   license: "Apache-2.0"
   license_url: "https://github.com/abseil/abseil-cpp/blob/{version}/LICENSE"
+
+antlr4-cpp-runtime:
+  project_name: "ANTLR4 C++ runtime"
+  project_desc: "Standalone ANTLR4 C++ runtime"
+  project_url: "https://github.com/antlr/antlr4"
+  release_date: "2024-08-03"
+  extensions:
+  - envoy.access_loggers.extension_filters.cel
+  - envoy.access_loggers.wasm
+  - envoy.bootstrap.wasm
+  - envoy.filters.http.ext_proc
+  - envoy.filters.http.wasm
+  - envoy.filters.network.ext_proc
+  - envoy.filters.network.wasm
+  - envoy.formatter.cel
+  - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
+  - envoy.rate_limit_descriptors.expr
+  - envoy.stat_sinks.wasm
+  use_category:
+  - api
+  - controlplane
+  - dataplane_core
+  - dataplane_ext
+  - observability_ext
+  - other
+  license: "Apache-2.0"
+  license_url: "https://github.com/antlr/antlr4/blob/{version}/LICENSE"
 
 aspect_bazel_lib:
   project_name: "Aspect Bazel helpers"
@@ -21,12 +50,12 @@ aspect_bazel_lib:
   license: "Apache-2.0"
   license_url: "https://github.com/aspect-build/bazel-lib/blob/v{version}/LICENSE"
 
-aws_c_auth_testdata:
-  project_name: "aws-c-auth"
+aws-c-auth-testdata:
+  project_name: "aws-c-auth-testdata"
   project_desc: "C99 library implementation of AWS client-side authentication: standard credentials providers and signing"
   project_url: "https://github.com/awslabs/aws-c-auth"
   release_date: "2026-07-10"
-  apparent_name: aws-c-auth-testdata
+  apparent_name: aws_c_auth_testdata
   use_category:
   - test_only
   extensions:
@@ -34,7 +63,7 @@ aws_c_auth_testdata:
   license: "Apache-2.0"
   license_url: "https://github.com/awslabs/aws-c-auth/blob/v{version}/LICENSE"
 
-bazel_compdb:
+bazel-compdb:
   project_name: "bazel-compilation-database"
   project_desc: "Clang JSON compilation database support for Bazel"
   project_url: "https://github.com/grailbio/bazel-compilation-database"
@@ -58,6 +87,7 @@ benchmark:
   project_name: "Benchmark"
   project_desc: "Library to benchmark code snippets"
   project_url: "https://github.com/google/benchmark"
+  apparent_name: google_benchmark
   release_date: "2026-01-21"
   use_category:
   - test_only
@@ -68,6 +98,7 @@ boost:
   project_name: "Boost"
   project_desc: "Boost C++ source libraries"
   project_url: "https://www.boost.org/"
+  apparent_name: boost.headers
   release_date: "2025-08-14"
   use_category:
   - dataplane_ext
@@ -82,7 +113,7 @@ boringssl:
   project_name: "BoringSSL"
   project_desc: "Minimal OpenSSL fork"
   project_url: "https://github.com/google/boringssl"
-  release_date: "2026-04-14"
+  release_date: "2026-09-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -94,7 +125,7 @@ brotli:
   project_name: "brotli"
   project_desc: "brotli compression library"
   project_url: "https://brotli.org"
-  release_date: "2025-10-27"
+  release_date: "2026-09-30"
   use_category:
   - dataplane_core
   - dataplane_ext
@@ -113,11 +144,11 @@ buildtools:
   use_category:
   - test_only
 
-c_ares:
+c-ares:
   project_name: "c-ares"
   project_desc: "C library for asynchronous DNS requests"
   project_url: "https://c-ares.haxx.se/"
-  apparent_name: c-ares
+  apparent_name: c_ares
   release_date: "2026-07-07"
   use_category:
   - dataplane_core
@@ -126,11 +157,11 @@ c_ares:
   license: "c-ares"
   license_url: "https://github.com/c-ares/c-ares/blob/cares-{underscore_version}/LICENSE.md"
 
-cel_cpp:
+cel-cpp:
   project_name: "Common Expression Language (CEL) C++ library"
   project_desc: "Common Expression Language (CEL) C++ library"
   project_url: "https://opensource.google/projects/cel"
-  apparent_name: cel-cpp
+  apparent_name: cel_cpp
   release_date: "2025-11-17"
   use_category:
   - dataplane_ext
@@ -156,39 +187,9 @@ cel_cpp:
   - envoy.tracers.opentelemetry.samplers.cel
   implied_untracked_deps:
   - antlr4_runtimes
+  - cel-spec
   license: "Apache-2.0"
   license_url: "https://github.com/google/cel-cpp/blob/v{version}/LICENSE"
-
-cel_spec:
-  project_name: "Common Expression Language (CEL) spec"
-  project_desc: "Common Expression Language (CEL) spec and conformance tests"
-  project_url: "https://opensource.google/projects/cel"
-  apparent_name: cel-spec
-  release_date: "2026-05-08"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.access_loggers.extension_filters.cel
-  - envoy.access_loggers.wasm
-  - envoy.bootstrap.wasm
-  - envoy.rate_limit_descriptors.expr
-  - envoy.filters.http.ext_proc
-  - envoy.filters.http.rate_limit_quota
-  - envoy.filters.http.rbac
-  - envoy.filters.http.upstream_rbac
-  - envoy.filters.http.wasm
-  - envoy.filters.network.ext_proc
-  - envoy.filters.network.rbac
-  - envoy.filters.network.wasm
-  - envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder
-  - envoy.stat_sinks.wasm
-  - envoy.formatter.cel
-  - envoy.matching.inputs.cel_data_input
-  - envoy.matching.matchers.cel_matcher
-  - envoy.tracers.opentelemetry
-  - envoy.tracers.opentelemetry.samplers.cel
-  license: "Apache-2.0"
-  license_url: "https://github.com/google/cel-spec/blob/v{version}/LICENSE"
 
 colm:
   project_name: "Colm"
@@ -215,11 +216,11 @@ cpp2sky:
   license: "Apache-2.0"
   license_url: "https://github.com/SkyAPM/cpp2sky/blob/v{version}/LICENSE"
 
-dd_trace_cpp:
+dd-trace-cpp:
   project_name: "Datadog C++ Tracing Library"
   project_desc: "Datadog distributed tracing for C++"
   project_url: "https://github.com/DataDog/dd-trace-cpp"
-  apparent_name: dd-trace-cpp
+  apparent_name: dd_trace_cpp
   release_date: "2026-06-19"
   use_category:
   - observability_ext
@@ -227,16 +228,6 @@ dd_trace_cpp:
   - envoy.tracers.datadog
   license: "Apache-2.0"
   license_url: "https://github.com/DataDog/dd-trace-cpp/blob/v{version}/LICENSE.md"
-
-dlb:
-  project_name: "Intel Dlb"
-  project_desc: "Dlb"
-  project_url: "https://networkbuilders.intel.com/solutionslibrary/queue-management-and-load-balancing-on-intel-architecture"
-  release_date: "2023-12-15"
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.network.connection_balance.dlb
 
 dragonbox:
   project_name: "Dragonbox"
@@ -276,7 +267,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-08-25"
+  release_date: "2026-10-15"
   use_category:
   - build
   - controlplane
@@ -286,6 +277,10 @@ envoy_toolshed:
   - sysroot_linux_arm64
   - tsan_libs
   - msan_libs
+  # Prebuilt wee8 repos; must mirror api/bazel/deps.yaml.
+  - wee8_prebuilt_x86_64
+  - wee8_prebuilt_x86_64_libstdcxx
+  - wee8_prebuilt_aarch64
   license: "Apache-2.0"
   license_url: "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE"
 
@@ -295,7 +290,7 @@ fast_float:
     Fast and exact implementation of the C++ from_chars functions for number types: 4x to 10x faster than strtod,
     part of GCC 12, Chromium, Redis and WebKit/Safari
   project_url: "https://github.com/fastfloat/fast_float"
-  release_date: "2024-11-21"
+  release_date: "2026-03-10"
   use_category:
   - dataplane_ext
   extensions:
@@ -305,7 +300,7 @@ fips_cmake_linux_aarch64:
   project_name: "CMake (Linux aarch64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -318,7 +313,7 @@ fips_cmake_linux_x86_64:
   project_name: "CMake (Linux x86_64)"
   project_desc: "Cross-platform family of tools designed to build, test and package software"
   project_url: "https://cmake.org/"
-  release_date: "2026-07-09"
+  release_date: "2026-04-20"
   use_category:
   - build
   - dataplane_core
@@ -331,7 +326,7 @@ fips_go_linux_amd64:
   project_name: "Go (Linux amd64)"
   project_desc: "Go programming language (Linux amd64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -344,7 +339,7 @@ fips_go_linux_arm64:
   project_name: "Go (Linux arm64)"
   project_desc: "Go programming language (Linux arm64)"
   project_url: "https://golang.org/"
-  release_date: "2025-05-07"
+  release_date: "2026-09-01"
   use_category:
   - build
   - dataplane_core
@@ -475,7 +470,7 @@ grpc:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc/grpc/blob/v{version}/LICENSE"
 
-grpc_httpjson_transcoding:
+grpc-httpjson-transcoding:
   project_name: "grpc-httpjson-transcoding"
   project_desc: "Library that supports transcoding so that HTTP/JSON can be converted to gRPC"
   project_url: "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding"
@@ -493,11 +488,11 @@ grpc_httpjson_transcoding:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/{version}/LICENSE"
 
-hessian2_codec:
+hessian2-codec:
   project_name: "hessian2-codec"
   project_desc: "hessian2-codec is a C++ library for hessian2 codec"
   project_url: "https://github.com/alibaba/hessian2-codec.git"
-  apparent_name: hessian2-codec
+  apparent_name: hessian2_codec
   release_date: "2025-01-14"
   use_category:
   - dataplane_ext
@@ -543,13 +538,7 @@ icu:
   license: "ICU"
   license_url: "https://github.com/unicode-org/icu/blob/release-{version}/icu4c/LICENSE"
 
-intel_ittapi:
-  use_category:
-  - dataplane_ext
-  extensions:
-  - envoy.wasm.runtime.v8
-
-ipp_crypto:
+ipp-crypto:
   project_name: "libipp-crypto"
   project_desc: "Intel® Integrated Performance Primitives Cryptography"
   project_url: "https://github.com/intel/cryptography-primitives"
@@ -575,10 +564,11 @@ jemalloc:
   license: "BSD-2-Clause"
   license_url: "https://github.com/jemalloc/jemalloc/blob/{version}/COPYING"
 
-kafka_source:
+kafka:
   project_name: "Kafka (source)"
   project_desc: "Open-source distributed event streaming platform"
   project_url: "https://kafka.apache.org"
+  apparent_name: kafka_source
   release_date: "2026-02-07"
   use_category:
   - dataplane_ext
@@ -642,7 +632,7 @@ libpfm:
   project_name: "libpfm"
   project_desc: "A helper library to develop monitoring tools"
   project_url: "https://sourceforge.net/projects/perfmon2"
-  release_date: "2020-09-02"
+  release_date: "2020-09-03"
   use_category:
   - test_only
 
@@ -715,11 +705,11 @@ lz4:
   extensions:
   - envoy.compression.qatzip.compressor
 
-msgpack_cxx:
+msgpack-cxx:
   project_name: "msgpack for C/C++"
   project_desc: "MessagePack is an efficient binary serialization format"
   project_url: "https://github.com/msgpack/msgpack-c"
-  apparent_name: msgpack-cxx
+  apparent_name: msgpack-c
   release_date: "2024-11-02"
   use_category:
   - observability_ext
@@ -768,11 +758,11 @@ numactl:
   license: "LGPL-2.1"
   license_url: "https://github.com/numactl/numactl/blob/{version}/LICENSE.LGPL2.1"
 
-ocp:
+ocp-diag-core:
   project_name: "ocp"
   project_desc: "Libraries used in gRPC field extraction library"
   project_url: "https://github.com/opencomputeproject/ocp-diag-core"
-  apparent_name: ocp-diag-core
+  apparent_name: ocp
   release_date: "2023-05-05"
   use_category:
   - dataplane_ext
@@ -787,7 +777,7 @@ openssl:
   project_name: "OpenSSL"
   project_desc: "TLS/SSL and crypto library"
   project_url: "https://github.com/openssl/openssl"
-  release_date: "2026-06-09"
+  release_date: "2026-09-29"
   use_category:
   - controlplane
   - dataplane_core
@@ -795,7 +785,7 @@ openssl:
   license: "Apache-2.0"
   license_url: "https://github.com/openssl/openssl/blob/openssl-{version}/LICENSE.txt"
 
-opentelemetry_cpp:
+opentelemetry-cpp:
   project_name: "OpenTelemetry"
   project_desc: "Observability framework and toolkit designed to create and manage telemetry data such as traces, metrics, and logs."
   project_url: "https://opentelemetry.io"
@@ -835,12 +825,12 @@ platforms:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/platforms/blob/{version}/LICENSE"
 
-proto_converter:
+proto-converter:
   project_name: "proto-converter"
   project_desc: "Library that supports the conversion between protobuf binary and json"
   project_url: "https://github.com/grpc-ecosystem/proto-converter"
   apparent_name: proto-converter
-  release_date: "2024-06-25"
+  release_date: "2026-09-12"
   use_category:
   - dataplane_core
   - controlplane
@@ -854,7 +844,7 @@ proto_converter:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/proto-converter/blob/{version}/LICENSE"
 
-proto_field_extraction:
+proto-field-extraction:
   project_name: "proto-field-extraction"
   project_desc: "Library that supports the extraction from protobuf binary"
   project_url: "https://github.com/grpc-ecosystem/proto-field-extraction"
@@ -869,7 +859,7 @@ proto_field_extraction:
   license: "Apache-2.0"
   license_url: "https://github.com/grpc-ecosystem/proto-field-extraction/blob/{version}/LICENSE"
 
-proto_processing:
+proto-processing:
   project_name: "proto-processing"
   project_desc: "Library that provides utility functionality for proto field scrubbing"
   project_url: "https://github.com/grpc-ecosystem/proto_processing_lib"
@@ -898,11 +888,11 @@ protobuf:
   license: "Protocol Buffers"
   license_url: "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE"
 
-proxy_wasm_cpp_host:
+proxy-wasm-cpp-host:
   project_name: "WebAssembly for Proxies (C++ host implementation)"
   project_desc: "WebAssembly for Proxies (C++ host implementation)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-host"
-  apparent_name: proxy-wasm-cpp-host
+  apparent_name: proxy_wasm_cpp_host
   release_date: "2026-06-23"
   use_category:
   - dataplane_ext
@@ -919,11 +909,11 @@ proxy_wasm_cpp_host:
   license: "Apache-2.0"
   license_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-host/blob/{version}/LICENSE"
 
-proxy_wasm_cpp_sdk:
+proxy-wasm-cpp-sdk:
   project_name: "WebAssembly for Proxies (C++ SDK)"
   project_desc: "WebAssembly for Proxies (C++ SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk"
-  apparent_name: proxy-wasm-cpp-sdk
+  apparent_name: proxy_wasm_cpp_sdk
   release_date: "2025-09-25"
   use_category:
   - dataplane_ext
@@ -940,18 +930,18 @@ proxy_wasm_cpp_sdk:
   license: "Apache-2.0"
   license_url: "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/blob/{version}/LICENSE"
 
-proxy_wasm_rust_sdk:
+proxy-wasm-rust-sdk:
   project_name: "WebAssembly for Proxies (Rust SDK)"
   project_desc: "WebAssembly for Proxies (Rust SDK)"
   project_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk"
   apparent_name: proxy-wasm-rust-sdk
-  release_date: "2025-10-01"
+  release_date: "2026-05-20"
   use_category:
   - test_only
   license: "Apache-2.0"
   license_url: "https://github.com/proxy-wasm/proxy-wasm-rust-sdk/blob/v{version}/LICENSE"
 
-qat_zstd:
+qat-zstd:
   project_name: "QAT-ZSTD-Plugin"
   project_desc: "Intel® QuickAssist Technology ZSTD Plugin (QAT ZSTD Plugin)"
   project_url: "https://github.com/intel/QAT-ZSTD-Plugin/"
@@ -991,7 +981,7 @@ quiche:
   project_name: "QUICHE"
   project_desc: "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols"
   project_url: "https://github.com/google/quiche"
-  release_date: "2026-08-24"
+  release_date: "2026-10-06"
   use_category:
   - controlplane
   - dataplane_core
@@ -1193,6 +1183,7 @@ shellcheck:
   project_name: "Shellcheck rules for bazel"
   project_desc: "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos."
   project_url: "https://github.com/aignas/rules_shellcheck"
+  apparent_name: rules_shellcheck
   release_date: "2025-08-13"
   use_category:
   - build
@@ -1212,8 +1203,8 @@ simdutf:
   extensions:
   - envoy.wasm.runtime.v8
 
-skywalking_data_collect_protocol:
-  project_name: "skywalking-data-collect-protocol"
+skywalking-data-collect-protocol:
+  project_name: "Skywalking data collect protocol"
   project_desc: "Data Collect Protocols of Apache SkyWalking"
   project_url: "https://github.com/apache/skywalking-data-collect-protocol"
   release_date: "2026-04-21"
@@ -1235,7 +1226,7 @@ spdlog:
   license: "MIT"
   license_url: "https://github.com/gabime/spdlog/blob/v{version}/LICENSE"
 
-sql_parser:
+sql-parser:
   project_name: "C++ SQL Parser Library"
   project_desc: "Forked from Hyrise SQL Parser"
   project_url: "https://github.com/envoyproxy/sql-parser"
@@ -1297,7 +1288,7 @@ toolchains_llvm:
   project_name: "LLVM toolchain for Bazel"
   project_desc: "LLVM toolchain for Bazel"
   project_url: "https://github.com/bazel-contrib/toolchains_llvm"
-  release_date: "2026-06-13"
+  release_date: "2026-08-29"
   use_category:
   - build
   - dataplane_core
@@ -1344,7 +1335,7 @@ vectorscan:
   license: "BSD-3-Clause"
   license_url: "https://github.com/VectorCamp/vectorscan/blob/vectorscan/{version}/LICENSE"
 
-vpp_vcl:
+vpp-vcl:
   project_name: "VPP Comms Library"
   project_desc: "FD.io Vector Packet Processor (VPP) Comms Library"
   project_url: "https://fd.io/"
@@ -1403,7 +1394,7 @@ xxhash:
   license: "BSD-2-Clause"
   license_url: "https://github.com/Cyan4973/xxHash/blob/v{version}/LICENSE"
 
-yaml_cpp:
+yaml-cpp:
   project_name: "yaml-cpp"
   project_desc: "YAML parser and emitter in C++ matching the YAML 1.2 spec"
   project_url: "https://github.com/jbeder/yaml-cpp"
@@ -1428,12 +1419,12 @@ yq_bzl:
   license: "Apache-2.0"
   license_url: "https://github.com/bazel-contrib/yq.bzl/blob/v{version}/LICENSE"
 
-zlib_ng:
+zlib-ng:
   project_name: "zlib-ng"
   project_desc: "zlib fork (higher performance)"
   project_url: "https://github.com/zlib-ng/zlib-ng"
   apparent_name: zlib-ng
-  release_date: "2025-12-02"
+  release_date: "2026-02-03"
   use_category:
   - controlplane
   - dataplane_core
@@ -1444,7 +1435,7 @@ zstd:
   project_name: "zstd"
   project_desc: "zstd compression library"
   project_url: "https://facebook.github.io/zstd"
-  release_date: "2025-02-19"
+  release_date: "2026-10-13"
   use_category:
   - dataplane_ext
   extensions:

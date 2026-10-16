@@ -105,7 +105,9 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
+  void setDeterministicValue(uint64_t value = 0) { random_config_ = TestRandomValue{value}; }
+  // Make test reproducible while retaining a pseudo-random distribution.
+  void setDeterministicSeed(uint64_t seed) { random_config_ = TestRandomSeed{seed}; }
   // Get socket option for a specific listener's socket.
   bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
                        socklen_t* optlen, int address_index = 0);
@@ -628,6 +630,11 @@ protected:
   // The ProcessObject to use when constructing the envoy server.
   ProcessObjectOptRef process_object_{std::nullopt};
 
+  // If set, the server runs with this hot restart implementation instead of one without a parent,
+  // e.g. to give it listen sockets "inherited" from a parent the test plays. Must outlive the
+  // server.
+  Server::HotRestart* hot_restart_{};
+
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;
 
@@ -694,9 +701,7 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  // If this member is not empty, the test will use a fixed RNG value specified
-  // by it.
-  std::optional<uint64_t> deterministic_value_;
+  TestRandomGeneratorConfig random_config_;
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

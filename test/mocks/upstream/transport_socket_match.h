@@ -23,6 +23,7 @@ public:
               (const));
   MOCK_METHOD(bool, allMatchesSupportAlpn, (), (const));
   MOCK_METHOD(bool, usesFilterState, (), (const));
+  MOCK_METHOD(std::vector<absl::string_view>, matchNames, (), (const));
 
   Network::UpstreamTransportSocketFactoryPtr socket_factory_;
   Stats::TestUtil::TestStore stats_store_;

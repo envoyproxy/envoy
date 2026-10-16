@@ -197,7 +197,8 @@ public:
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
   }
 
   std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(const std::string& alpn,
@@ -371,6 +372,10 @@ public:
         matcher_(std::get<1>(GetParam())) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
+    // These tests assert that the connections of a deleted filter chain are drain-closed at the
+    // first opportunity, which is what the immediate drain strategy does. The default gradual
+    // strategy ramps the drain close over the drain window instead.
+    drain_strategy_ = Server::DrainStrategy::Immediate;
     autonomous_upstream_ = true;
     setUpstreamCount(2);
 
@@ -467,7 +472,8 @@ public:
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_,
+                                                          &server_factory_context_.serverScope());
     address_ = Ssl::getSslAddress(version_, lookupPort("http"));
   }
 

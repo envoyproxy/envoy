@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 
 #include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
@@ -109,6 +110,14 @@ private:
   Event::TimerPtr timer_;
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool connected_{false};
+
+  // True while a listener filter hook (onAccept, onData, onClose) is on the stack. A filter that
+  // calls continueFilterChain from inside its own hook would otherwise re-enter this object and
+  // clear accept_filters_ under the running filter, leaving a dangling iterator and a null socket.
+  bool in_listener_filter_callback_{false};
+  // A continueFilterChain call that arrived `re-entrantly` from a filter hook. It is applied after
+  // the hook returns, in the top level context.
+  std::optional<bool> deferred_continue_success_;
 
   Network::ListenerFilterBufferImplPtr listener_filter_buffer_;
 };

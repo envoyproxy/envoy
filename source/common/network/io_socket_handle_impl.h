@@ -39,6 +39,7 @@ public:
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
 
+  void setAbortiveClose() override;
   Api::IoCallUint64Result close() override;
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,

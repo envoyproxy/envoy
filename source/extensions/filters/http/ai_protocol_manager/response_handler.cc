@@ -21,6 +21,7 @@ constexpr absl::string_view OpenAiDoneSentinel{"[DONE]"};
 // Returns the last `event:` field value in a raw event region as a view (per
 // the SSE spec the last occurrence wins; one leading space is stripped).
 std::optional<absl::string_view> sseEventTypeView(absl::string_view region) {
+  absl::ConsumePrefix(&region, "\xEF\xBB\xBF");
   std::optional<absl::string_view> event_type;
   size_t pos = 0;
   while (pos < region.size()) {
@@ -75,13 +76,13 @@ bool ResponseHandler::processDocument(const nlohmann::json& json) {
     // error: skip it.
     return false;
   }
-  if (format_ == ApiProtocol::Unspecified) {
+  if (format_ == LLMProtocol::Unspecified) {
     format_ = AdapterRegistry::detect(json);
-    if (format_ == ApiProtocol::Unspecified) {
+    if (format_ == LLMProtocol::Unspecified) {
       return false; // Not discriminating; a later document may be.
     }
   }
-  const ApiProtocolAdapter& adapter = AdapterRegistry::get(format_);
+  const LLMProtocolAdapter& adapter = AdapterRegistry::get(format_);
   const ExtractionResult result = adapter.extractUsage(json);
   usage_.merge(result.usage);
   if (result.malformed) {
@@ -96,50 +97,6 @@ bool ResponseHandler::processDocument(const nlohmann::json& json) {
     degraded_ = true;
   }
   return adapter.isTerminalEvent(json);
-}
-
-std::optional<uint64_t> SseResponseHandler::scanView(absl::string_view data) {
-  for (size_t i = 0; i < data.size(); ++i) {
-    const char c = data[i];
-    switch (scan_state_) {
-    case ScanState::LineStart:
-      if (c == '\n') {
-        return i + 1; // LF-terminated blank line: event boundary.
-      }
-      if (c == '\r') {
-        scan_state_ = ScanState::BlankTermCr;
-      } else {
-        scan_state_ = ScanState::LineContent;
-      }
-      break;
-    case ScanState::LineContent:
-      if (c == '\n') {
-        scan_state_ = ScanState::LineStart;
-      } else if (c == '\r') {
-        scan_state_ = ScanState::TermCr;
-      }
-      break;
-    case ScanState::TermCr:
-      // The CR already ended the content line.
-      if (c == '\n') {
-        scan_state_ = ScanState::LineStart; // CRLF pair.
-      } else if (c == '\r') {
-        scan_state_ = ScanState::BlankTermCr; // A new, empty line ended by CR.
-      } else {
-        scan_state_ = ScanState::LineContent; // A new line starting with content.
-      }
-      break;
-    case ScanState::BlankTermCr:
-      // A blank line ended with CR: the boundary is complete, but an
-      // immediately following LF belongs to the same CRLF terminator.
-      scan_state_ = ScanState::LineStart;
-      if (c == '\n') {
-        return i + 1;
-      }
-      return i; // Boundary before this byte; it is re-scanned as next-event input.
-    }
-  }
-  return std::nullopt;
 }
 
 void SseResponseHandler::onData(const Buffer::Instance& data) {
@@ -164,7 +121,7 @@ void SseResponseHandler::retainBytes(absl::string_view bytes) { buffer_.add(byte
 
 void SseResponseHandler::processSlice(absl::string_view view) {
   while (!view.empty() && !parsing_complete_ && !budget_exhausted_) {
-    const auto boundary = scanView(view);
+    const auto boundary = scanner_.scanEvent(view);
     if (discarding_) {
       // Nothing is retained while discarding; the scanner's line state (not
       // raw tail bytes) carries the mid-event position across frames, so a
@@ -202,7 +159,7 @@ void SseResponseHandler::processSlice(absl::string_view view) {
         degraded_ = true;
       }
       buffer_.drain(buffer_.length());
-      // scanView() already left the line state at LineStart.
+      // scanEvent() already left the line state at LineStart.
     } else if (buffer_.length() == 0) {
       // Fast path: process the complete event in place -- nothing retained.
       handleCompleteEvent(view.substr(0, boundary.value()));
@@ -222,7 +179,7 @@ void SseResponseHandler::consumeEvent() {
   const absl::string_view region(static_cast<const char*>(buffer_.linearize(length)), length);
   handleCompleteEvent(region);
   buffer_.drain(buffer_.length());
-  scan_state_ = ScanState::LineStart;
+  scanner_.reset();
 }
 
 void SseResponseHandler::handleCompleteEvent(absl::string_view region) {
@@ -340,7 +297,7 @@ void SseResponseHandler::processSseEvent(absl::string_view event) {
   }
 }
 
-JsonResponseHandler::JsonResponseHandler(ApiProtocol format, uint32_t max_inspected_body_size,
+JsonResponseHandler::JsonResponseHandler(LLMProtocol format, uint32_t max_inspected_body_size,
                                          AiProtocolManagerStats& stats,
                                          const Buffer::BufferMemoryAccountSharedPtr& /*account*/)
     : ResponseHandler(format, stats), max_inspected_body_size_(max_inspected_body_size),

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "source/common/common/cancel_wrapper.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
@@ -61,13 +60,17 @@ public:
   subscribeToCredentialUpdates(CredentialSubscriberCallbacksSharedPtr cs);
 
 protected:
+  // Per-thread credential state. Both members are only ever touched on the thread that owns the
+  // slot: the main thread writes its own copy synchronously from setCredentialsToAllThreads and
+  // setCredentialsPendingToAllThreads, and every other thread applies the same update from its own
+  // dispatcher.
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCredentialsCache() : credentials_(std::make_shared<Credentials>()) {};
 
     // The credentials object.
     CredentialsConstSharedPtr credentials_;
-    // Lock guard.
-    Thread::MutexBasicLockable lock_;
+    // Are credentials pending on this thread?
+    bool credentials_pending_{true};
   };
 
   // Set anonymous credentials to all threads, update stats and close async
@@ -81,8 +84,17 @@ protected:
   // Handle fetch done.
   void handleFetchDone();
 
-  // Set Credentials shared_ptr on all threads.
+  // Set Credentials shared_ptr on all threads, and mark credentials as no longer pending.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
+
+  // Tell every subscriber that credentials have been retrieved. Called both from the thread that
+  // initiates a credential update and again once all threads have applied it; see
+  // setCredentialsToAllThreads. Subscriber notification is idempotent.
+  void notifySubscribers();
+
+  // Mark credentials as pending on all threads, ahead of an async credential fetch. Must be called
+  // on the main thread.
+  void setCredentialsPendingToAllThreads();
 
   virtual void refresh() PURE;
 
@@ -122,12 +134,9 @@ protected:
   AwsClusterManagerPtr aws_cluster_manager_;
   // RAII handle for callbacks from AWS cluster manager
   AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
-  // Are credentials pending?
-  std::atomic<bool> credentials_pending_ = true;
   Thread::MutexBasicLockable mu_;
   std::list<std::weak_ptr<CredentialSubscriberCallbacks>>
       credentials_subscribers_ ABSL_GUARDED_BY(mu_);
-  CancelWrapper::CancelFunction cancel_credentials_update_callback_ = []() {};
 };
 
 } // namespace Aws

@@ -13,7 +13,6 @@
 
 #include "source/common/signal/non_fatal_signal_handler.h"
 #include "source/extensions/watchdog/backtrace_action/backtrace_action.h"
-#include "source/server/backtrace.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -103,9 +102,6 @@ TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
   envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
   config.mutable_cooldown_duration()->set_seconds(20);
 
-  const bool prev_log_to_stderr = BackwardsTrace::logToStderr();
-  BackwardsTrace::setLogToStderr(false);
-
   action_ = std::make_unique<BacktraceAction>(config, context_);
 
   Thread::ThreadId child_tid;
@@ -124,7 +120,7 @@ TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
   absl::Notification logged;
   LogLevelSetter save_levels(spdlog::level::trace);
   LogExpectation expectation(GetLogSink(), [&](Logger::Levels, const std::string& msg) {
-    if (msg.find("Envoy version:") != std::string::npos) {
+    if (msg.find("backtrace for thread") != std::string::npos) {
       logged.Notify();
     }
   });
@@ -135,12 +131,78 @@ TEST_F(BacktraceActionTest, SingleBacktraceLogged) {
 
   EXPECT_TRUE(logged.WaitForNotificationWithTimeout(absl::Seconds(5)));
 
-  BackwardsTrace::setLogToStderr(prev_log_to_stderr);
   dispatcher_->exit();
   thread->join();
 
   EXPECT_EQ(1U, stats_.counter("watchdog.backtrace_action.backtraces_logged").value());
   EXPECT_EQ(0U, stats_.counter("watchdog.backtrace_action.backtraces_failed").value());
+}
+
+TEST_F(BacktraceActionTest, LogsAtConfiguredLevel) {
+#ifndef __linux__
+  GTEST_SKIP() << "signalThread (per-thread signaling) is not supported on this platform.";
+#endif
+  using ConfigProto = envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig;
+
+  LogLevelSetter save_levels(spdlog::level::trace);
+
+  const std::pair<ConfigProto::LogLevel, Logger::Levels> cases[] = {
+      {ConfigProto::CRITICAL, Logger::Levels::critical},
+      {ConfigProto::TRACE, Logger::Levels::trace},
+      {ConfigProto::DEBUG, Logger::Levels::debug},
+      {ConfigProto::INFO, Logger::Levels::info},
+      {ConfigProto::WARN, Logger::Levels::warn},
+      {ConfigProto::ERROR, Logger::Levels::error},
+  };
+
+  std::vector<std::unique_ptr<BacktraceAction>> actions;
+  for (const auto& test_case : cases) {
+    ConfigProto config;
+    config.set_log_level(test_case.first);
+    actions.push_back(std::make_unique<BacktraceAction>(config, context_));
+  }
+
+  Thread::ThreadId child_tid;
+  absl::Notification child_ready;
+  Thread::ThreadPtr thread =
+      api_->threadFactory().createThread([this, &child_tid, &child_ready]() -> void {
+        child_tid = api_->threadFactory().currentThreadId();
+        child_ready.Notify();
+        dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+      });
+  child_ready.WaitForNotification();
+
+  const auto now = api_->timeSource().monotonicTime();
+  const std::vector<std::pair<Thread::ThreadId, MonotonicTime>> tid_ltt_pairs = {{child_tid, now}};
+
+  for (size_t i = 0; i < actions.size(); ++i) {
+    const Logger::Levels expected_level = cases[i].second;
+    absl::Notification logged;
+    std::atomic<bool> wrong_level{false};
+    std::string wrong_level_msg;
+    {
+      LogExpectation expectation(GetLogSink(), [&](Logger::Levels level, const std::string& msg) {
+        if (msg.find("backtrace for thread") == std::string::npos) {
+          return;
+        }
+        if (level != expected_level) {
+          wrong_level = true;
+          wrong_level_msg = msg;
+        }
+        logged.Notify();
+      });
+      dispatcher_->post([&]() {
+        actions[i]->run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::MISS, tid_ltt_pairs,
+                        now);
+      });
+      EXPECT_TRUE(logged.WaitForNotificationWithTimeout(absl::Seconds(5)));
+    }
+    EXPECT_FALSE(wrong_level.load()) << "log at unexpected level: " << wrong_level_msg;
+  }
+
+  dispatcher_->exit();
+  thread->join();
+  actions.clear();
 }
 
 TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
@@ -149,9 +211,6 @@ TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
 #endif
   envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
   config.mutable_cooldown_duration()->set_seconds(20);
-
-  const bool prev_log_to_stderr = BackwardsTrace::logToStderr();
-  BackwardsTrace::setLogToStderr(false);
 
   action_ = std::make_unique<BacktraceAction>(config, context_);
 
@@ -181,7 +240,7 @@ TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
   absl::Notification all_logged;
   LogLevelSetter save_levels(spdlog::level::trace);
   LogExpectation expectation(GetLogSink(), [&](Logger::Levels, const std::string& msg) {
-    if (msg.find("Envoy version:") != std::string::npos) {
+    if (msg.find("backtrace for thread") != std::string::npos) {
       if (++count == 2) {
         all_logged.Notify();
       }
@@ -194,7 +253,6 @@ TEST_F(BacktraceActionTest, MultipleBacktracesLogged) {
 
   EXPECT_TRUE(all_logged.WaitForNotificationWithTimeout(absl::Seconds(5)));
 
-  BackwardsTrace::setLogToStderr(prev_log_to_stderr);
   done2.Notify();
   dispatcher_->exit();
   thread1->join();
@@ -207,9 +265,6 @@ TEST_F(BacktraceActionTest, CooldownPreventsDuplicateBacktrace) {
 #endif
   envoy::extensions::watchdog::backtrace_action::v3::BacktraceActionConfig config;
   config.mutable_cooldown_duration()->set_seconds(60);
-
-  const bool prev_log_to_stderr = BackwardsTrace::logToStderr();
-  BackwardsTrace::setLogToStderr(false);
 
   action_ = std::make_unique<BacktraceAction>(config, context_);
 
@@ -230,7 +285,7 @@ TEST_F(BacktraceActionTest, CooldownPreventsDuplicateBacktrace) {
   absl::Notification first_logged;
   LogLevelSetter save_levels(spdlog::level::trace);
   LogExpectation expectation(GetLogSink(), [&](Logger::Levels, const std::string& msg) {
-    if (msg.find("Envoy version:") != std::string::npos) {
+    if (msg.find("backtrace for thread") != std::string::npos) {
       if (count.fetch_add(1, std::memory_order_relaxed) == 0) {
         first_logged.Notify();
       }
@@ -254,7 +309,6 @@ TEST_F(BacktraceActionTest, CooldownPreventsDuplicateBacktrace) {
   absl::SleepFor(absl::Milliseconds(200));
   EXPECT_EQ(count.load(), 1);
 
-  BackwardsTrace::setLogToStderr(prev_log_to_stderr);
   dispatcher_->exit();
   thread->join();
 }

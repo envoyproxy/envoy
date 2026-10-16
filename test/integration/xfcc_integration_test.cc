@@ -97,10 +97,9 @@ common_tls_context:
   TestUtility::loadFromYaml(TestEnvironment::substitute(target), config);
   auto cfg =
       *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context_);
-  static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
       *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-          std::move(cfg), *context_manager_, *client_stats_store->rootScope())};
+          std::move(cfg), *context_manager_, server_factory_context_.serverScope())};
 }
 
 Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
@@ -114,9 +113,8 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
 
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       tls_context, factory_context_, {}, false);
-  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-      std::move(cfg), *context_manager_, *(upstream_stats_store->rootScope()));
+      std::move(cfg), *context_manager_, server_factory_context_.serverScope());
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {
@@ -511,7 +509,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {listenerStatPrefix("ssl.ocsp_staple_failed"), "listener.ssl.ocsp_staple_failed"},
       {listenerStatPrefix("http.config_test.downstream_rq_2xx"), "listener.http.downstream_rq_xx"},
       {listenerStatPrefix("http.config_test.downstream_rq_5xx"), "listener.http.downstream_rq_xx"},
-      {listenerStatPrefix("worker_0.downstream_cx_total"), "listener.worker_downstream_cx_total"},
+      {listenerStatPrefix("worker_0.downstream_cx_total"), "listener.worker.downstream_cx_total"},
       {listenerStatPrefix("ssl.fail_verify_san"), "listener.ssl.fail_verify_san"},
       {listenerStatPrefix("downstream_cx_transport_socket_connect_timeout"),
        "listener.downstream_cx_transport_socket_connect_timeout"},
@@ -699,7 +697,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.config_test.downstream_rq_failed_path_normalization",
        "http.downstream_rq_failed_path_normalization"},
       {"cluster.cluster_0.original_dst_host_invalid", "cluster.original_dst_host_invalid"},
-      {"server.worker_0.watchdog_miss", "server.worker_watchdog_miss"},
+      {"server.worker_0.watchdog_miss", "server.worker.watchdog_miss"},
       {"http.config_test.downstream_rq_rx_reset", "http.downstream_rq_rx_reset"},
       {"cluster.cluster_0.upstream_cx_destroy_local_with_active_rq",
        "cluster.upstream_cx_destroy_local_with_active_rq"},
@@ -776,7 +774,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
        "listener.admin.downstream_cx_overload_reject"},
       {"http.config_test.tracing.random_sampling", "http.tracing.random_sampling"},
       {"cluster.cluster_0.upstream_cx_pool_overflow", "cluster.upstream_cx_pool_overflow"},
-      {"server.worker_0.watchdog_mega_miss", "server.worker_watchdog_mega_miss"},
+      {"server.worker_0.watchdog_mega_miss", "server.worker.watchdog_mega_miss"},
       {"cluster.cluster_0.upstream_cx_tx_bytes_total", "cluster.upstream_cx_tx_bytes_total"},
       {"http.admin.rs_too_large", "http.rs_too_large"},
       {"listener.admin.downstream_cx_transport_socket_connect_timeout",
@@ -844,7 +842,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"listener.admin.downstream_cx_destroy", "listener.admin.downstream_cx_destroy"}};
 
   tag_extracted_gauge_map = {
-      {listenerStatPrefix("worker_0.downstream_cx_active"), "listener.worker_downstream_cx_active"},
+      {listenerStatPrefix("worker_0.downstream_cx_active"), "listener.worker.downstream_cx_active"},
       {listenerStatPrefix("downstream_cx_active"), "listener.downstream_cx_active"},
       {listenerStatPrefix("downstream_pre_cx_active"), "listener.downstream_pre_cx_active"},
       {"listener.admin.downstream_cx_active", "listener.admin.downstream_cx_active"},

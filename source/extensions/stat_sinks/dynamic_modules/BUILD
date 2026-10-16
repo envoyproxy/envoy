@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
         "@envoy_api//envoy/extensions/stat_sinks/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
@@ -58,6 +59,7 @@ envoy_cc_library(
         "//envoy/stats:sink_interface",
         "//source/common/common:assert_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/cleanup",
     ],
 )
 

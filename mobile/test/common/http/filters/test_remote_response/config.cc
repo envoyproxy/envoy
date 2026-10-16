@@ -7,9 +7,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace TestRemoteResponse {
 
-Http::FilterFactoryCb TestRemoteResponseFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+TestRemoteResponseFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::extensions::filters::http::test_remote_response::TestRemoteResponse&,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
   return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<TestRemoteResponseFilter>());

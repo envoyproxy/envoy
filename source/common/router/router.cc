@@ -41,6 +41,7 @@
 #include "source/common/upstream/host_utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Router {
@@ -121,7 +122,7 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
     std::string prefix = Runtime::runtimeFeatureEnabled(
                              "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
                              ? context.scope().symbolTable().toString(stat_prefix)
-                             : context.scope().symbolTable().toString(context.scope().prefix());
+                             : "";
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
         server_factory_ctx, context.initManager(), context.scope());
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
@@ -260,7 +261,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
   const absl::string_view per_try_timeout_entry =
       request_headers.getEnvoyUpstreamRequestPerTryTimeoutMsValue();
   if (!per_try_timeout_entry.empty()) {
-    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout)) {
+    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout) &&
+        header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -323,7 +325,8 @@ void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time, const TimeoutData& 
 std::optional<std::chrono::milliseconds>
 FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry) {
   uint64_t header_timeout;
-  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout)) {
+  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout) &&
+      header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
     return std::chrono::milliseconds(header_timeout);
   }
   return std::nullopt;
@@ -1593,7 +1596,7 @@ void Filter::onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag response_flags,
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -1865,6 +1868,17 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   // but it's sketchy (as the subsequent upstream might not send a 100-Continue) and not worth
   // the complexity until someone asks for it.
   retry_state_.reset();
+
+  // Apply response_headers_to_remove to informational (1xx) responses so
+  // upstream-internal headers are stripped before forwarding downstream.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.response_headers_to_remove_on_1xx")) {
+    for (const Http::LowerCaseString& header :
+         route_entry_->responseHeaderTransforms(callbacks_->streamInfo(), false)
+             .headers_to_remove) {
+      headers->remove(header);
+    }
+  }
 
   callbacks_->encode1xxHeaders(std::move(headers));
 }
@@ -2174,7 +2188,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
   Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
   if (tb_stats.has_value()) {
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 

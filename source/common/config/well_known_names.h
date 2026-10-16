@@ -89,6 +89,12 @@ public:
 
   // Cluster name tag
   const std::string CLUSTER_NAME = "envoy.cluster_name";
+  // Health check name tag
+  const std::string HEALTH_CHECK_NAME = "envoy.health_check_name";
+  // Originating zone of a cluster's upstream per-zone stats
+  const std::string UPSTREAM_FROM_ZONE = "envoy.upstream_from_zone";
+  // Destination zone of a cluster's upstream per-zone stats
+  const std::string UPSTREAM_TO_ZONE = "envoy.upstream_to_zone";
   // Listener port tag
   const std::string LISTENER_ADDRESS = "envoy.listener_address";
   // Stats prefix for HttpConnectionManager

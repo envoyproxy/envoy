@@ -45,6 +45,10 @@ ShareProviderManager::ShareProviderManager(Event::Dispatcher& main_dispatcher,
 
 ShareProviderManager::~ShareProviderManager() {
   // Ensure the callback is unregistered on the main dispatcher thread.
+  if (main_dispatcher_.isThreadSafe()) {
+    handle_.reset();
+    return;
+  }
   main_dispatcher_.post([h = std::move(handle_)]() {});
 }
 

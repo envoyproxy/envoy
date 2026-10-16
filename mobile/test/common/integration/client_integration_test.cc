@@ -1,3 +1,4 @@
+#include "envoy/common/logger.h"
 #include "envoy/config/core/v3/extension.pb.h"
 
 #include "source/common/quic/quic_server_transport_socket_factory.h"
@@ -87,11 +88,11 @@ public:
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
   }
 
-  ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(spdlog::level::info); }
+  ~ClientIntegrationTest() override { Logger::Context::changeAllLogLevels(Logger::Levels::info); }
 
   void initialize() override {
     builder_.setLogLevel(log_level_);
-    Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(log_level_));
+    Logger::Context::changeAllLogLevels(log_level_);
     builder_.enableWorkerThread(getUseWorkerThread());
     if (getUseWorkerThread()) {
       // Platform cert validation is disabled when using worker thread. The engine will use the
@@ -953,27 +954,14 @@ TEST_P(ClientIntegrationTest, ClearTextNotPermitted) {
   default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
                                    std::to_string(request_data.length()));
 
-  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
-  stream_callbacks.on_data_ = [this](const Buffer::Instance& buffer, uint64_t length,
-                                     bool end_stream, envoy_stream_intel) {
-    if (end_stream) {
-      std::string response_body(length, ' ');
-      buffer.copyOut(0, length, response_body.data());
-      EXPECT_EQ(response_body, "Cleartext is not permitted");
-    }
-    cc_.on_data_calls_++;
-  };
-
-  stream_ = createNewStream(std::move(stream_callbacks));
+  stream_ = createNewStream(createDefaultStreamCallbacks());
   stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
                        true);
 
   terminal_callback_.waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls_, 1);
-  ASSERT_EQ(cc_.status_, "400");
-  ASSERT_EQ(cc_.on_data_calls_, 1);
-  ASSERT_EQ(cc_.on_complete_calls_, 1);
+  ASSERT_EQ(cc_.on_error_calls_, 1);
+  ASSERT_EQ(cc_.on_headers_calls_, 0);
 }
 
 TEST_P(ClientIntegrationTest, BasicHttps) {

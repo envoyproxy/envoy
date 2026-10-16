@@ -30,6 +30,7 @@ public:
 
   // Network::IoHandle
   os_fd_t fdDoNotUse() const override { return fd_; }
+  void setAbortiveClose() override {}
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
   bool wasConnected() const override;

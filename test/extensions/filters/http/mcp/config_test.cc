@@ -53,6 +53,23 @@ TEST_F(McpFilterConfigTest, CreateRouteSpecificConfig) {
   EXPECT_THAT(config_or, IsOkAndHolds(::testing::NotNull()));
 }
 
+TEST_F(McpFilterConfigTest, MaxRequestBodySizeAboveTenMegabytesIsAccepted) {
+  constexpr uint32_t kLargeBodySize = 64 * 1024 * 1024;
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_max_request_body_size()->set_value(kLargeBodySize);
+  ASSERT_OK(factory_->createFilterFactoryFromProto(proto_config, "stats", context_));
+
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.mutable_max_request_body_size()->set_value(kLargeBodySize);
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  auto route_config_or = factory_->createRouteSpecificFilterConfig(
+      override_config, server_context, ProtobufMessage::getNullValidationVisitor());
+  ASSERT_OK(route_config_or);
+  EXPECT_EQ(kLargeBodySize, dynamic_cast<const McpOverrideConfig&>(*route_config_or.value())
+                                .maxRequestBodySize()
+                                .value());
+}
+
 // Test creating filter with server context
 TEST_F(McpFilterConfigTest, CreateFilterWithServerContext) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;

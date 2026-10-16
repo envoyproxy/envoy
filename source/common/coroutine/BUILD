@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "//envoy/common:pure_lib",
         "//envoy/event:timer_interface",
+        "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
 
@@ -80,6 +81,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/functional:any_invocable",
     ],
 )
 
@@ -111,6 +113,17 @@ envoy_cc_library(
         "@abseil-cpp//absl/functional:any_invocable",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "backtrace_lib",
+    srcs = ["backtrace.cc"],
+    hdrs = ["backtrace.h"],
+    deps = [
+        ":task_lib",
+        "//source/common/common:minimal_logger_lib",
+        "@abseil-cpp//absl/debugging:symbolize",
     ],
 )
 

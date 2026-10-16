@@ -383,11 +383,11 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     ENVOY_LOG(debug, "redis: dropping unexpected upstream RESP3 Push frame");
     return;
   }
-  // An init callback (e.g. Hello3InitCallbacks::onResponse on a HELLO 3 failure) can close the
-  // connection from within this very call while the decoder is still draining the same buffer.
-  // A subsequent complete frame in that buffer would then reach onRespValue with no outstanding
-  // request, so guard against front() on an empty list (undefined behavior in release builds) and
-  // drop the surplus frame.
+  // A frame can reach onRespValue with no outstanding request: the upstream sent a surplus or
+  // unsolicited reply, or a callback (e.g. Hello3InitCallbacks::onResponse on a HELLO 3 failure)
+  // closed the connection from within this very call while the decoder is still draining the same
+  // buffer. Guard against front() on an empty list (undefined behavior in release builds) and
+  // drop the frame.
   if (pending_requests_.empty()) {
     ENVOY_LOG(debug, "redis: dropping upstream frame with no outstanding request");
     return;

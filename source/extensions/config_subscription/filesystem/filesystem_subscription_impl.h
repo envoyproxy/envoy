@@ -1,5 +1,8 @@
 #pragma once
 
+#include <chrono>
+#include <optional>
+
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
@@ -39,6 +42,7 @@ public:
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
+  void accept(const absl::flat_hash_set<std::string>&) override {}
 
 protected:
   virtual std::string refreshInternal(ProtobufTypes::MessagePtr* config_update);
@@ -47,8 +51,11 @@ protected:
 
   bool started_{};
   const std::string path_;
+  const std::optional<std::chrono::milliseconds> poll_interval_;
+  Event::TimerPtr poll_timer_;
   std::unique_ptr<Filesystem::Watcher> file_watcher_;
   WatchedDirectoryPtr directory_watcher_;
+  std::optional<uint64_t> config_hash_;
   SubscriptionCallbacks& callbacks_;
   OpaqueResourceDecoderSharedPtr resource_decoder_;
   SubscriptionStats stats_;

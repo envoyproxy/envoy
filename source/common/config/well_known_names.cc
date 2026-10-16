@@ -148,6 +148,16 @@ TagNameValues::TagNameValues() {
   // cluster.(<cluster_name>.)*
   addTokenized(CLUSTER_NAME, "cluster.$.**");
 
+  // cluster.<cluster_name>.health_check.name.(<health_check_name>.)*
+  addRe2(HEALTH_CHECK_NAME, R"(^cluster\.<TAG_VALUE>\.health_check(\.name\.(<TAG_VALUE>))\..+)",
+         ".health_check.");
+
+  // cluster.[<cluster_name>.[<alt_prefix>.]]zone.(<from_zone>.)<to_zone>.*
+  addTokenized(UPSTREAM_FROM_ZONE, "cluster.**.zone.$.*.**");
+
+  // cluster.[<cluster_name>.[<alt_prefix>.]]zone.[<from_zone>.](<to_zone>.)*
+  addTokenized(UPSTREAM_TO_ZONE, "cluster.**.zone.*.$.**");
+
   // listener.[<address>.]http.(<stat_prefix>.)*
   // The <address> part can be anything here (.*?) for the sake of a simpler
   // internal state of the regex which performs better.
@@ -162,13 +172,13 @@ TagNameValues::TagNameValues() {
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
-  // listener.<address|stat_prefix>.(worker_<id>.)*
-  // listener_manager.(worker_<id>.)*
-  // server.(worker_<id>.)*
-  // thread_local_cluster_manager.(worker_<id>.)*
+  // listener.<address|stat_prefix>.worker(_<id>).*
+  // listener_manager.worker(_<id>).*
+  // server.worker(_<id>).*
+  // thread_local_cluster_manager.worker(_<id>).*
   addRe2(
       WORKER_ID,
-      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)|server|listener_manager|thread_local_cluster_manager)\.worker_((\d+)\.))",
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)|server|listener_manager|thread_local_cluster_manager)\.worker(_(\d+))\.)",
       "");
 
   // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"

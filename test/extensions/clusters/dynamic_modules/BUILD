@@ -1,29 +1,36 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:cluster_async_host_selection",
         "//test/extensions/dynamic_modules/test_data/c:cluster_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:cluster_null_lb",
         "//test/extensions/dynamic_modules/test_data/c:cluster_run_on_all_workers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
+    extension_names = ["envoy.clusters.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:metadata_lib",
         "//source/common/http:message_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/common/upstream:host_lookup_map_lib",
         "//source/extensions/clusters/dynamic_modules:cluster_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -52,7 +59,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -61,9 +68,13 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:cluster_filter_state_test",
         "//test/extensions/dynamic_modules/test_data/rust:cluster_integration_test",
     ],
+    extension_names = ["envoy.clusters.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/common:cleanup_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/common/tls:server_context_config_lib",
+        "//source/common/tls:server_ssl_socket_lib",
         "//source/extensions/clusters/dynamic_modules:cluster",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
@@ -72,6 +83,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",

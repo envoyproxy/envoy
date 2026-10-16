@@ -98,13 +98,14 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
 
 TEST_P(QuicHttpIntegrationTest, GetPeerAndLocalCertsInfo) {
   // These are not implemented yet, but configuring them shouldn't cause crash.
-  useAccessLog("%DOWNSTREAM_PEER_CERT% %DOWNSTREAM_PEER_ISSUER% %DOWNSTREAM_PEER_SERIAL% "
+  useAccessLog("%DOWNSTREAM_PEER_CERT% %DOWNSTREAM_PEER_CERT_CHAIN% %DOWNSTREAM_PEER_ISSUER% "
+               "%DOWNSTREAM_PEER_SERIAL% "
                "%DOWNSTREAM_PEER_FINGERPRINT_1% %DOWNSTREAM_PEER_FINGERPRINT_256% "
                "%DOWNSTREAM_LOCAL_SUBJECT% %DOWNSTREAM_PEER_SUBJECT% %DOWNSTREAM_LOCAL_URI_SAN% "
                "%DOWNSTREAM_PEER_URI_SAN%");
   testRouterHeaderOnlyRequestAndResponse();
   std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_EQ("- - - - - - - - -", log);
+  EXPECT_EQ("- - - - - - - - - -", log);
 }
 
 TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
@@ -587,26 +588,10 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   codec_client_->close();
 }
 
-// Test to ensure code coverage of the flag codepath.
-TEST_P(QuicHttpIntegrationTest, DoNotValidatePseudoHeaders) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.validate_http3_pseudo_headers",
-                                    "false");
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  EXPECT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  codec_client_->close();
-}
-
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+  // The test client uses Envoy's HTTP/3 codec, which validates the headers it encodes. Turn that
+  // off so the invalid header reaches the server codec under test.
+  disableCodecHeaderValidation();
 
   initialize();
 
@@ -956,8 +941,6 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -994,8 +977,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_"
                                     "quic_notify_stream_soon_to_destroy",
                                     "true");
@@ -1057,40 +1038,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   codec_client_->close();
 }
 
-TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "false");
-  useAccessLog(
-      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
-      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
-      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
-      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
-      "METADATA("
-      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
-  initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
-                                default_response_headers_,
-                                /*response_size=*/0,
-                                /*upstream_index=*/0, TestUtility::DefaultTimeout);
-  codec_client_->close();
-
-  // Do not flush client acks.
-  std::string log = waitForAccessLog(access_log_name_, 0, false, nullptr);
-  std::vector<std::string> metrics = absl::StrSplit(log, ',');
-  ASSERT_EQ(metrics.size(), 21);
-  EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
-  EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
-  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
-  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
-  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
-  EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
-  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
-}
-
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1119,8 +1067,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1191,8 +1137,6 @@ TEST_P(QuicHttpIntegrationTest, DISABLED_DeferredLoggingWithEnvoyReset) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
@@ -1271,8 +1215,6 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithRetransmission) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "true");
   useAccessLog("%BYTES_RETRANSMITTED%,%PACKETS_RETRANSMITTED%");
   initialize();
 
@@ -2517,6 +2459,92 @@ TEST_P(QuicHttpIntegrationTest, FirstRequestSucceedsWithoutEnvoyBugOnNewConnecti
   test_server_->waitForCounter("server.envoy_bug_failures", testing::Eq(0));
 
   codec_client_->close();
+}
+
+class QuicUpstreamAutoHostSniIntegrationTest : public QuicHttpIntegrationTest {
+public:
+  void initialize() override {
+    setUpstreamProtocol(Http::CodecType::HTTP3);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_load_assignment()
+          ->mutable_endpoints(0)
+          ->mutable_lb_endpoints(0)
+          ->mutable_endpoint()
+          ->set_hostname(upstream_hostname_);
+      // Turn off `auto_sni` so that the request host does not override the SNI.
+      auto& protocol_options = (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+      auto http_protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(protocol_options);
+      http_protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(false);
+      std::ignore = protocol_options.PackFrom(http_protocol_options);
+      auto* transport_socket = cluster->mutable_transport_socket();
+      auto quic_transport = MessageUtil::anyConvert<
+          envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport>(
+          transport_socket->typed_config());
+      quic_transport.mutable_upstream_tls_context()->set_auto_host_sni(true);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(quic_transport);
+    });
+    QuicHttpIntegrationTest::initialize();
+  }
+
+  // Sends a request through the HTTP/3 cluster and checks the SNI that the upstream received.
+  void expectUpstreamSni(absl::string_view expected_sni) {
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    std::string sni;
+    ASSERT_TRUE(fake_upstream_connection_->sharedConnection().executeOnDispatcher(
+        [&sni](Network::Connection& connection) { sni = connection.ssl()->sni(); }));
+    EXPECT_EQ(expected_sni, sni);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client_->close();
+  }
+
+  std::string upstream_hostname_{"upstream.lyft.com"};
+};
+
+INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicUpstreamAutoHostSniIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// The upstream host's hostname takes precedence over the configured SNI.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesHostname) {
+  initialize();
+  expectUpstreamSni("upstream.lyft.com");
+}
+
+// The server certificate is validated against the upstream host's hostname.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, FailsWhenCertificateDoesNotMatchHostname) {
+  upstream_hostname_ = "upstream.example.com";
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  test_server_->waitForCounter(
+      "http3.upstream.tx.quic_connection_close_error_code_QUIC_TLS_CERTIFICATE_UNKNOWN", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_fail", Eq(1));
+  codec_client_->close();
+}
+
+// Hostnames that are not valid SNI fall back to the configured SNI.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesConfiguredSniWithIpHostname) {
+  upstream_hostname_ = Network::Test::getLoopbackAddressString(version_);
+  initialize();
+  expectUpstreamSni("foo.lyft.com");
+}
+
+// Disabling the runtime guard restores the previous behavior.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesConfiguredSniWithRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_upstream_auto_host_sni",
+                                    "false");
+  upstream_hostname_ = "upstream.example.com";
+  initialize();
+  expectUpstreamSni("foo.lyft.com");
 }
 
 } // namespace Quic

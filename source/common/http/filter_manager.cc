@@ -234,11 +234,11 @@ bool ActiveStreamFilterBase::commonHandleAfterDataCallback(
       // frame) or that empty the frame without calling addData (e.g. a compressor buffering
       // internally) do not match and are handled by the existing path. See
       // https://github.com/envoyproxy/envoy/issues/46841.
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_manager_forward_added_data_on_continue") &&
-          parent_.state_.filter_added_data_in_data_callback_ &&
+      if (parent_.state_.filter_added_data_in_data_callback_ &&
           provided_data_nonempty_before_callback && provided_data.length() == 0 && bufferedData() &&
-          bufferedData().get() != &provided_data && bufferedData()->length() > 0) {
+          bufferedData().get() != &provided_data && bufferedData()->length() > 0 &&
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_manager_forward_added_data_on_continue")) {
         provided_data.move(*bufferedData());
       }
     }
@@ -395,9 +395,9 @@ void ActiveStreamFilterBase::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
-  if (!streamInfo().filterState()->hasData<LocalReplyOwnerObject>(LocalReplyFilterStateKey)) {
-    streamInfo().filterState()->setData(
-        LocalReplyFilterStateKey,
+  if (!streamInfo().filterState()->hasIndexedData(StreamInfo::FilterStateIndex::LocalReplyOwner)) {
+    streamInfo().filterState()->setIndexedData(
+        StreamInfo::FilterStateIndex::LocalReplyOwner,
         std::make_shared<LocalReplyOwnerObject>(filter_context_.config_name),
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
@@ -493,10 +493,7 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
-  if (!headers_continued_) {
-    headers_continued_ = true;
-    doHeaders(false);
-  }
+  injectDecodedHeadersToFilterChain(false);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
     parent_.state().observed_decode_end_stream_ = end_stream;
@@ -505,6 +502,13 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
   }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
+void ActiveStreamDecoderFilter::injectDecodedHeadersToFilterChain(bool end_stream) {
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(end_stream);
+  }
 }
 
 OptRef<WebTransportSession> ActiveStreamDecoderFilter::webTransportSession() {
@@ -1068,6 +1072,10 @@ void DownstreamFilterManager::sendLocalReply(
   if (filter_manager_callbacks_.isHalfCloseEnabled()) {
     state_.decoder_filter_chain_aborted_ = true;
   }
+  // For early error handling, do a best-effort attempt to create a filter chain
+  // to ensure access logging. If the filter chain already exists this will be
+  // a no-op.
+  createDownstreamFilterChain();
 
   streamInfo().setResponseCodeDetails(details);
   StreamFilterBase::LocalReplyData data{code, grpc_status, details, false, body};
@@ -1134,10 +1142,6 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Preparing local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
-  // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging. If the filter chain already exists this will be
-  // a no-op.
-  createDownstreamFilterChain();
 
   if (prepared_local_reply_) {
     return;
@@ -1186,10 +1190,6 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
     const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   ENVOY_STREAM_LOG(debug, "Sending local reply with details {}", *this, details);
   ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
-  // For early error handling, do a best-effort attempt to create a filter chain
-  // to ensure access logging. If the filter chain already exists this will be
-  // a no-op.
-  createDownstreamFilterChain();
 
   Utility::sendLocalReply(
       state_.destroyed_,
@@ -1763,7 +1763,11 @@ void FilterManager::callHighWatermarkCallbacks() {
 }
 
 void FilterManager::callLowWatermarkCallbacks() {
-  ASSERT(high_watermark_count_ > 0);
+  if (high_watermark_count_ == 0) {
+    IS_ENVOY_BUG("HTTP filter manager low watermark callback without a preceding high watermark "
+                 "callback");
+    return;
+  }
   --high_watermark_count_;
   for (auto watermark_callbacks : watermark_callbacks_) {
     watermark_callbacks->onBelowWriteBufferLowWatermark();
@@ -2042,10 +2046,7 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
-  if (!headers_continued_) {
-    headers_continued_ = true;
-    doHeaders(false);
-  }
+  injectEncodedHeadersToFilterChain(false);
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.ext_proc_inject_data_with_state_update")) {
     parent_.state_.observed_encode_end_stream_ = end_stream;
@@ -2054,6 +2055,13 @@ void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance&
   }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
+void ActiveStreamEncoderFilter::injectEncodedHeadersToFilterChain(bool end_stream) {
+  if (!headers_continued_) {
+    headers_continued_ = true;
+    doHeaders(end_stream);
+  }
 }
 
 ResponseTrailerMap& ActiveStreamEncoderFilter::addEncodedTrailers() {

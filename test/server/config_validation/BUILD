@@ -1,5 +1,5 @@
 load("//bazel:envoy_build_system.bzl", "envoy_cc_fuzz_test", "envoy_cc_test", "envoy_cc_test_library", "envoy_package", "envoy_proto_library")
-load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
+load("//bazel:extension_configs.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 
 licenses(["notice"])  # Apache 2
@@ -44,6 +44,7 @@ envoy_cc_test(
     env = {"CONFIGS_TAR_PATH": "$(location //configs)"},
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",

@@ -79,10 +79,13 @@ void copyOkResponseMutations(ResponsePtr& response,
 }
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                               const std::optional<std::chrono::milliseconds>& timeout)
+                               const std::optional<std::chrono::milliseconds>& timeout,
+                               bool emit_client_span)
     : async_client_(async_client), timeout_(timeout),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.auth.v3.Authorization.Check")) {}
+          "envoy.service.auth.v3.Authorization.Check")) {
+  emit_client_span_ = emit_client_span;
+}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -100,6 +103,7 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   Http::AsyncClient::RequestOptions options;
   options.setTimeout(timeout_);
   options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
+  options.setSampled(emit_client_span_ ? std::nullopt : std::make_optional(false));
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
   request_ = async_client_->send(service_method_, request, *this, parent_span, options);

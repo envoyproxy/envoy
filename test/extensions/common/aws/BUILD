@@ -34,6 +34,7 @@ envoy_cc_test(
     srcs = ["credential_provider_chains_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:logger",
         "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -105,11 +106,14 @@ envoy_cc_test(
     srcs = ["credentials_provider_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/thread_local:thread_local_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:utility_lib",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/synchronization",
     ],
 )

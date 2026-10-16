@@ -349,6 +349,7 @@ public:
 };
 
 using OdCdsIntegrationTest = OdCdsIntegrationTestBase;
+using testing::Eq;
 using testing::Ge;
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OdCdsIntegrationTest,
@@ -600,6 +601,86 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
   cleanupUpstreamAndDownstream();
 }
 
+// Regression test for on-demand CDS with two DIFFERENT clusters on the same subscription:
+//  - a request to unknown cluster "new_cluster" triggers on-demand discovery (the initial
+//    subscription, via start()), which is resolved and the request succeeds;
+//  - a request to a different unknown cluster "new_cluster_2" triggers a SECOND on-demand
+//    discovery, which goes through requestOnDemandUpdate()/append() on the already-started
+//    subscription.
+TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoverySecondClusterRoutesResponse) {
+  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
+                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
+                    "integration", {});
+  initialize();
+
+  // A second cluster for the second on-demand request. It points at the same upstream as
+  // "new_cluster" -- the endpoint is irrelevant here; what matters is that the second on-demand
+  // response is routed so the cluster is added.
+  auto second_cluster = ConfigHelper::buildStaticCluster(
+      "new_cluster_2", fake_upstreams_[new_cluster_upstream_idx_]->localAddress()->ip()->port(),
+      Network::Test::getLoopbackAddressString(ipVersion()));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  // First request -> first on-demand cluster ("new_cluster"). This is the initial (start()-time)
+  // subscription, which was always routed correctly.
+  Http::TestRequestHeaderMapImpl request_headers_1{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response_1 = codec_client_->makeHeaderOnlyRequest(request_headers_1);
+
+  createXdsConnection();
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  odcds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
+                                           odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response_1->waitForEndStream());
+  verifyResponse(std::move(response_1), "200", {}, {});
+
+  // Reset the downstream/upstream between the two independent requests (the second request routes
+  // to a different cluster, i.e. a new upstream connection). The ODCDS (xds) stream persists.
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Second request -> a DIFFERENT on-demand cluster ("new_cluster_2"). This is the second on-demand
+  // request on the same subscription, so it flows through requestOnDemandUpdate()/append(). The
+  // response must be routed to the ODCDS callbacks so the cluster is added and the request succeeds
+  // (before the fix this timed out with a 503).
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers_2{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"Pick-This-Cluster", "new_cluster_2"}};
+  IntegrationStreamDecoderPtr response_2 = codec_client_->makeHeaderOnlyRequest(request_headers_2);
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster_2"},
+                                           {}, odcds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {second_cluster}, {}, "2", odcds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                           odcds_stream_.get()));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response_2->waitForEndStream());
+  verifyResponse(std::move(response_2), "200", {}, {});
+
+  cleanUpXdsConnection();
+  cleanupUpstreamAndDownstream();
+}
+
 // tests a scenario when:
 //  - making a request to an unknown cluster
 //  - odcds initiates a connection with a request for the cluster
@@ -729,7 +810,7 @@ TEST_P(OdCdsIntegrationTest, DisablingOdCdsAtVirtualHostLevelWorks) {
 class OdCdsAdsIntegrationTest
     : public AdsIntegrationTestBase,
       public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta, bool>> {
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>> {
 public:
   OdCdsAdsIntegrationTest() : AdsIntegrationTestBase(ipVersion(), sotwOrDelta()) {}
 
@@ -737,21 +818,17 @@ public:
 
   static std::string protocolTestParamsToString(
       const ::testing::TestParamInfo<
-          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta, bool>>& p) {
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, Grpc::SotwOrDelta>>& p) {
     return fmt::format(
-        "{}_{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
         std::get<1>(p.param) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld",
-        std::get<3>(p.param) ? "WithOdcdsOverAdsFix" : "WithoutOdcdsOverAdsFix");
+        std::get<2>(p.param) == Grpc::SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld");
   }
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
   Grpc::SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
-  bool odcdsOverAdsFixEnabled() const { return std::get<3>(GetParam()); }
 
   void initialize() override {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.odcds_over_ads_fix",
-                                      odcdsOverAdsFixEnabled() ? "true" : "false");
     AdsIntegrationTestBase::initialize();
 
     test_server_->waitUntilListenersReady();
@@ -863,11 +940,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
                      // Only delta xDS is supported for on-demand CDS.
-                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta),
-                     // Whether to use the new/old OdCdsApiImpl (will be removed once
-                     // "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions"
-                     // is deprecated).
-                     testing::Values(true, false)));
+                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
 
 // tests a scenario when:
 //  - making a request to an unknown cluster
@@ -988,6 +1061,59 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentCluste
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when (the missing-cluster cache is enabled):
+//  - making a request to an unknown cluster
+//  - odcds asks for the cluster, a response says that there is no such cluster, request gets 503
+//  - a second request for the same cluster is answered 503 immediately from the remembered
+//    answer, without a new discovery request
+//  - the server pushes the cluster on the kept subscription, which withdraws the remembered
+//    answer
+//  - a third request reaches the cluster and gets 200
+TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryAnswersKnownMissingImmediately) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.odcds_missing_cluster_cache",
+                                    "true");
+  initialize();
+  doInitialCommunications();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {}));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {}, {"new_cluster"}, "3");
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+
+  // The second request is answered immediately from the remembered answer; no discovery request
+  // is sent (a stray one would make the ACK comparison below fail).
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+  test_server_->waitForCounter("cluster_manager.odcds.known_missing_answers", Eq(1));
+
+  // The subscription interest in the cluster persists, so the server pushes the cluster on its
+  // own once it comes into existence, which withdraws the remembered answer.
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "4");
+  EXPECT_TRUE(compareRequest(Config::TestTypeUrl::get().Cluster, {}, {}));
+
+  // The third request reaches the now-known cluster.
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+  EXPECT_EQ(1, test_server_->counter("cluster_manager.odcds.known_missing_answers")->value());
 
   cleanupUpstreamAndDownstream();
 }
@@ -1168,13 +1294,6 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryMultipleClustersSequenti
 //  - Sending the CDS response for new_cluster2.
 //  - both requests are resumed.
 TEST_P(OdCdsAdsIntegrationTest, NoCdsConfigOnDemandClusterMultipleClustersSequentially) {
-  // This test does not work with the previous OdCdsApi implementation (OdCdsApiImpl),
-  // but works with the new one (XdstpOdCdsApiImpl).
-  // Once envoy.reloadable_features.odcds_over_ads_fix is removed, this test
-  // will only execute the fixed component.
-  if (!odcdsOverAdsFixEnabled()) {
-    GTEST_SKIP() << "This test only passes with the new XdstpOdCdsApiImpl implementation";
-  }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
   });
@@ -1378,13 +1497,6 @@ TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterTwoClustersBeforeResponseAfterIni
 //  - both requests are resumed.
 TEST_P(OdCdsAdsIntegrationTest,
        NoCdsConfigOnDemandDiscoveryTwoClustersBeforeResponseAfterInitialCluster) {
-  // This test does not work with the previous OdCdsApi implementation (OdCdsApiImpl),
-  // but works with the new one (XdstpOdCdsApiImpl).
-  // Once envoy.reloadable_features.odcds_over_ads_fix is removed, this test
-  // will only execute the fixed component.
-  if (!odcdsOverAdsFixEnabled()) {
-    GTEST_SKIP() << "This test only passes with the new XdstpOdCdsApiImpl implementation";
-  }
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_dynamic_resources()->clear_cds_config();
   });
@@ -1959,6 +2071,71 @@ TEST_P(OdCdsXdstpIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentClus
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when (the missing-cluster cache is enabled):
+//  - making a request to an unknown cluster
+//  - odcds asks for the cluster, a response says that there is no such cluster, request gets 503
+//  - a second request for the same cluster is answered 503 immediately from the remembered
+//    answer, without a new discovery request
+//  - the server pushes the cluster on the kept subscription, which withdraws the remembered
+//    answer
+//  - a third request reaches the cluster and gets 200
+TEST_P(OdCdsXdstpIntegrationTest, OnDemandClusterDiscoveryAnswersKnownMissingImmediately) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.odcds_missing_cluster_cache",
+                                    "true");
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  const std::string& cluster_name = new_cluster_.name();
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", cluster_name}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Authority1 should receive the ODCDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TestTypeUrl::get().Cluster, "", {cluster_name}, {cluster_name}, {}, true,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+  // Send a response to remove the requested cluster (not found).
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {cluster_name}, "1", {},
+                                                             authority1_xds_stream_.get());
+  // Expect a CDS ACK from authority1.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {cluster_name}, {},
+                                      {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      authority1_xds_stream_.get()));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+
+  // The second request is answered immediately from the remembered answer; no discovery request
+  // is sent (a stray one would make the ACK comparison below fail).
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "503", {}, {});
+  test_server_->waitForCounter("cluster_manager.odcds.known_missing_answers", Eq(1));
+
+  // The subscription for the cluster persists, so the server pushes the cluster on its own once
+  // it comes into existence, which withdraws the remembered answer.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                             {new_cluster_}, {new_cluster_}, {},
+                                                             "2", {}, authority1_xds_stream_.get());
+  // Expect a CDS ACK from authority1.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {cluster_name}, {},
+                                      {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      authority1_xds_stream_.get()));
+
+  // The third request reaches the now-known cluster.
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+  EXPECT_EQ(1, test_server_->counter("cluster_manager.odcds.known_missing_answers")->value());
 
   cleanupUpstreamAndDownstream();
 }

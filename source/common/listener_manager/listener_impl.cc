@@ -145,11 +145,11 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
   ASSERT(sockets_.size() == num_sockets);
 }
 
-ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone)
+ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone,
+                                                 uint32_t tcp_backlog_size)
     : factory_(factory_to_clone.factory_), local_address_(factory_to_clone.local_address_),
       socket_type_(factory_to_clone.socket_type_), options_(factory_to_clone.options_),
-      listener_name_(factory_to_clone.listener_name_),
-      tcp_backlog_size_(factory_to_clone.tcp_backlog_size_),
+      listener_name_(factory_to_clone.listener_name_), tcp_backlog_size_(tcp_backlog_size),
       bind_type_(factory_to_clone.bind_type_),
       socket_creation_options_(factory_to_clone.socket_creation_options_) {
   for (auto& socket : factory_to_clone.sockets_) {
@@ -477,7 +477,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     }
   }
 
-  const std::optional<std::string> runtime_val =
+  const Runtime::Snapshot::ConstStringOptRef runtime_val =
       listener_factory_context_->serverFactoryContext().runtime().snapshot().get(
           cx_limit_runtime_key_);
   if (runtime_val && runtime_val->empty()) {
@@ -742,10 +742,17 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
   udp_listener_config_ = std::make_shared<UdpListenerConfigImpl>(config.udp_listener_config());
   ProtobufTypes::MessagePtr udp_packet_packet_writer_config;
   if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
+    // When `udp_packet_packet_writer_config` specifies a QUIC-specific packet writer factory
+    // (implementing Quic::QuicPacketWriterFactoryFactory),
+    // getFactory<Network::UdpPacketWriterFactoryFactory>() returns nullptr. Thus, a null check is
+    // necessary here.
     auto* factory_factory = Config::Utility::getFactory<Network::UdpPacketWriterFactoryFactory>(
         config.udp_listener_config().udp_packet_packet_writer_config());
-    udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
-        config.udp_listener_config().udp_packet_packet_writer_config(), *listener_factory_context_);
+    if (factory_factory != nullptr) {
+      udp_listener_config_->writer_factory_ = factory_factory->createUdpPacketWriterFactory(
+          config.udp_listener_config().udp_packet_packet_writer_config(),
+          *listener_factory_context_);
+    }
   }
   if (config.udp_listener_config().has_quic_options()) {
 #ifdef ENVOY_ENABLE_QUIC
@@ -1359,7 +1366,20 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
 
 absl::Status ListenerImpl::cloneSocketFactoryFrom(const ListenerImpl& other) {
   for (auto& socket_factory : other.getSocketFactories()) {
-    RETURN_IF_NOT_OK(addSocketFactory(socket_factory->clone()));
+    // Clone the existing socket factory but override tcp_backlog_size with the new listener's
+    // configured value. Prior to clone() taking tcp_backlog_size as a parameter, the plain
+    // copy constructor carried over the old factory's backlog, causing doFinalPreWorkerInit()
+    // to call listen() with the stale value even when xDS updates the backlog. On Linux,
+    // listen() on an already-listening socket updates the accept queue depth, so passing the
+    // correct value here is sufficient to apply the change.
+    //
+    // tcp_backlog_size is the only listener option that requires this treatment: it is the only
+    // option that both (a) is absent from socketOptionsEqual() — so a change does not trigger new
+    // socket creation — and (b) can be re-applied to an already-listening socket via a second
+    // listen() call. All other mutable options (transparent, freebind, tcp_keepalive,
+    // socket_options, tcp_fast_open_queue_length) are already covered by socketOptionsEqual() and
+    // cause a full socket drain/recreate when changed.
+    RETURN_IF_NOT_OK(addSocketFactory(socket_factory->clone(tcp_backlog_size_)));
   }
   return absl::OkStatus();
 }

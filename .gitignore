@@ -41,6 +41,7 @@
 /bazel-*
 /ci/bazel-*
 /mobile/bazel-*
+/bazel/tests/*/bazel-*
 bazel.output.txt
 clang.bazelrc
 compile_commands.json

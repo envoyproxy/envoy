@@ -729,6 +729,64 @@ typed_config:
   cleanup();
 }
 
+// requestHeaders() returns the stream's request headers on both paths: the same map headers()
+// returns during envoy_on_request, and the request's headers during envoy_on_response, where they
+// are otherwise unreachable. The request-path arm is what pins the "same map" claim -- it writes
+// through requestHeaders() and reads the value back through headers().
+TEST_P(LuaIntegrationTest, RequestHeadersAccessibleOnBothPaths) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        request_handle:requestHeaders():add("x-added-via-request-headers", "1")
+        request_handle:headers():add("x-same-map",
+          tostring(request_handle:headers():get("x-added-via-request-headers")))
+      end
+      function envoy_on_response(response_handle)
+        local req_headers = response_handle:requestHeaders()
+        response_handle:headers():add("x-echoed-path", req_headers:get(":path"))
+        response_handle:headers():add("x-echoed-authority", req_headers:get(":authority"))
+        response_handle:headers():add("x-echoed-same-map", req_headers:get("x-same-map"))
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ(
+      "/test/long/url",
+      response->headers().get(Http::LowerCaseString("x-echoed-path"))[0]->value().getStringView());
+  EXPECT_EQ("foo.lyft.com", response->headers()
+                                .get(Http::LowerCaseString("x-echoed-authority"))[0]
+                                ->value()
+                                .getStringView());
+  // "1" rather than "nil" proves requestHeaders() and headers() are the same map on the request
+  // path, and the round trip through the response proves the write persisted for the whole stream.
+  EXPECT_EQ("1", response->headers()
+                     .get(Http::LowerCaseString("x-echoed-same-map"))[0]
+                     ->value()
+                     .getStringView());
+
+  cleanup();
+}
+
 // Upstream call followed by continuation.
 TEST_P(LuaIntegrationTest, UpstreamHttpCall) {
   const std::string FILTER_AND_CODE =

@@ -17,6 +17,8 @@
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "absl/types/span.h"
+
 namespace Envoy {
 namespace Event {
 class Dispatcher;
@@ -416,6 +418,13 @@ public:
    *         did not occur an empty string view is returned.
    */
   virtual absl::string_view localCloseReason() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> every local close reason set on the
+   * connection, in the order in which they were set; empty if no local close
+   * occurred.
+   */
+  virtual absl::Span<const std::string> localCloseReasons() const { return {}; }
 
   /**
    * Instructs the connection to start using secure transport.

@@ -15,6 +15,7 @@ static void log_info(const char* message) {
   envoy_dynamic_module_type_module_buffer buf;
   buf.ptr = message;
   buf.length = strlen(message);
+  // Exercises the deprecated two-argument logging callback for backward compatibility coverage.
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info, buf);
 }
 
@@ -120,10 +121,7 @@ void envoy_dynamic_module_on_stat_sink_flush(
     log_info("stat sink integration test: flush called");
     return;
   }
-  envoy_dynamic_module_type_module_buffer log_buf;
-  log_buf.ptr = buf;
-  log_buf.length = (size_t)n;
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info, log_buf);
+  log_info(buf);
 }
 
 void envoy_dynamic_module_on_stat_sink_on_histogram_complete(
@@ -145,8 +143,5 @@ void envoy_dynamic_module_on_stat_sink_on_histogram_complete(
     log_info("stat sink integration test: histogram complete");
     return;
   }
-  envoy_dynamic_module_type_module_buffer log_buf;
-  log_buf.ptr = buf;
-  log_buf.length = (size_t)n;
-  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info, log_buf);
+  log_info(buf);
 }

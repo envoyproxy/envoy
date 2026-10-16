@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <optional>
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
@@ -38,6 +39,7 @@ public:
 
   // Dispatcher
   const std::string& name() override { return name_; }
+  std::optional<uint32_t> workerId() const override { return worker_id_; }
   TimeSource& timeSource() override { return *time_system_; }
   GlobalTimeSystem& globalTimeSystem() {
     return *(dynamic_cast<GlobalTimeSystem*>(time_system_.get()));
@@ -155,6 +157,8 @@ public:
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};
+  // Parsed from the name like DispatcherImpl does; tests may override it.
+  std::optional<uint32_t> worker_id_;
 
 private:
   const std::string name_;

@@ -1,10 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
     "envoy_extension_cc_test_library",
 )
@@ -116,10 +116,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "dns_filter_fuzz_test",
     srcs = ["dns_filter_fuzz_test.cc"],
     corpus = "dns_filter_corpus",
+    extension_names = ["envoy.filters.udp.dns_filter"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
