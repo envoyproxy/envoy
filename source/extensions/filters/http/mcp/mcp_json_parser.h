@@ -8,11 +8,16 @@
 #include <unordered_set>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/mcp/constants.h"
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -285,6 +290,13 @@ public:
 
   // Reset parser for reuse
   void reset();
+
+  // Rewrites the MCP request body's `params._meta.traceparent` and
+  // `params._meta.tracestate` values with `new_parent_id` and `new_tracestate`
+  // respectively. No-op when either `new_parent_id` or `new_tracestate` is
+  // empty.
+  static absl::Status rewriteTraceContext(Buffer::Instance& body, absl::string_view new_parent_id,
+                                          absl::string_view new_tracestate);
 
 private:
   McpParserConfig config_;

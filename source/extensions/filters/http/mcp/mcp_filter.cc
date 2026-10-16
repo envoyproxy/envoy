@@ -8,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/codes.h"
@@ -16,19 +17,28 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/tracing/trace_driver.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/tracing/tracing_validation.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -123,8 +133,8 @@ const Http::LowerCaseString& baggageHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "baggage");
 }
 
-void injectTraceContext(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
-                        Http::RequestHeaderMap& headers) {
+void injectTraceContextIntoHeaders(const Protobuf::Map<std::string, Protobuf::Value>& meta_fields,
+                                   Http::RequestHeaderMap& headers) {
   const auto& tp_it = meta_fields.find("traceparent");
   if (tp_it == meta_fields.end() || tp_it->second.kind_case() != Protobuf::Value::kStringValue) {
     return;
@@ -161,6 +171,7 @@ void injectBaggage(const Protobuf::Map<std::string, Protobuf::Value>& meta_field
     headers.setCopy(baggageHeader(), bg);
   }
 }
+
 } // namespace
 
 McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3::Mcp& proto_config,
@@ -589,6 +600,11 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
   ENVOY_LOG(trace, "decodeData: buffer_size={}, already_parsed={}, end_stream={}", data.length(),
             bytes_parsed_, end_stream);
 
+  if (config_->propagateTraceContext().has_value() &&
+      config_->propagateTraceContext()->reparent_active_span() && !end_stream) {
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+
   const uint32_t max_size = getMaxRequestBodySize();
   uint32_t bytes_parsed_in_this_call = 0;
   const bool early_terminate = canEarlyTerminate();
@@ -613,13 +629,13 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
           return Http::FilterDataStatus::StopIterationNoBuffer;
         } else {
           passthrough_reason_ = Filters::Common::Mcp::Status::NotJsonRpc;
-          return completeParsing();
+          return completeParsing(data);
         }
       }
 
       if (parser_->isParsingComplete()) {
         ENVOY_LOG(debug, "mcp parse complete: found all fields");
-        return completeParsing();
+        return completeParsing(data);
       }
 
       // Stop buffering once routing attributes are collected, even if the root
@@ -631,7 +647,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
         // partial-parse error is expected and intentionally ignored.
         const absl::Status finalize_status = parser_->finishParse();
         ENVOY_LOG(trace, "mcp early termination finalize status: {}", finalize_status.message());
-        return completeParsing();
+        return completeParsing(data);
       }
     }
 
@@ -659,7 +675,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
           ENVOY_LOG(debug, "parse error in PASS_THROUGH mode; proceeding");
           passthrough_reason_ = Filters::Common::Mcp::Status::ParseError;
         }
-        return completeParsing();
+        return completeParsing(data);
       }
       Filters::Common::Mcp::Status status = Filters::Common::Mcp::Status::ParseError;
       if (truncated_by_limit) {
@@ -669,7 +685,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
       sendErrorReply("reached end_stream or configured body size, don't get enough data.", status);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
-    return completeParsing();
+    return completeParsing(data);
   }
 
   return Http::FilterDataStatus::StopIterationAndWatermark;
@@ -875,7 +891,7 @@ McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() 
   return ProtocolVersionValidationResult::Ok;
 }
 
-Http::FilterDataStatus McpFilter::completeParsing() {
+Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
   parsing_complete_ = true;
   is_mcp_request_ = parser_->isValidMcpRequest();
 
@@ -967,13 +983,53 @@ Http::FilterDataStatus McpFilter::completeParsing() {
 
   // Handle tracing field extraction and header injection.
   if (config_->propagateTraceContext().has_value() || config_->propagateBaggage().has_value()) {
-    const Protobuf::Value* meta_value = parser_->getNestedValue(
-        std::string(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META));
+    const Protobuf::Value* meta_value =
+        parser_->getNestedValue(Filters::Common::Mcp::McpConstants::Paths::PARAMS_META);
     auto headers = decoder_callbacks_->requestHeaders();
     if (meta_value != nullptr && meta_value->has_struct_value() && headers.has_value()) {
       const auto& meta_fields = meta_value->struct_value().fields();
       if (config_->propagateTraceContext().has_value()) {
-        injectTraceContext(meta_fields, *headers);
+        injectTraceContextIntoHeaders(meta_fields, *headers);
+
+        // Reparent the active span.
+        //
+        // MCP version 2026-07-28 puts the traceparent in the body instead of a
+        // header. If the traceparent was not duplicated in a header, the active
+        // span was created without the necessary context, meaning its trace ID
+        // and parent ID are based on nothing, and are therefore disconnected
+        // from the body's traceparent. Left unchecked, this would break the
+        // distributed trace.
+        //
+        // To ensure the distributed trace is coherent, we will reparent the
+        // active span below the body's traceparent. We must rewrite the body so
+        // any upstream spans are descendants of the active span.
+        Tracing::Span& active_span = decoder_callbacks_->activeSpan();
+        const std::string new_parent_id = active_span.getSpanId();
+
+        if (config_->propagateTraceContext()->reparent_active_span() &&
+            meta_fields.contains(Filters::Common::Mcp::McpConstants::TRACEPARENT_FIELD) &&
+            !new_parent_id.empty()) {
+          Tracing::HttpTraceContext trace_context(*headers);
+          active_span.updateParent(trace_context);
+
+          const std::string new_tracestate = active_span.getTracestate();
+
+          decoder_callbacks_->addDecodedData(data, /*streaming_filter=*/true);
+
+          Buffer::Instance* decoding_buffer = nullptr;
+          decoder_callbacks_->modifyDecodingBuffer(
+              [&decoding_buffer](Buffer::Instance& b) { decoding_buffer = &b; });
+          ASSERT(decoding_buffer != nullptr);
+
+          if (absl::Status status = JsonPathParser::rewriteTraceContext(
+                  *decoding_buffer, new_parent_id, new_tracestate);
+              !status.ok()) {
+            ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
+                                  status.ToString());
+          } else {
+            headers->setContentLength(decoding_buffer->length());
+          }
+        }
       }
       if (config_->propagateBaggage().has_value()) {
         injectBaggage(meta_fields, *headers);

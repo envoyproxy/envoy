@@ -1,7 +1,17 @@
 #include "source/extensions/filters/http/mcp/mcp_json_parser.h"
 
-#include "source/common/common/assert.h"
+#include <algorithm>
+#include <cstddef>
+#include <optional>
 
+#include "envoy/buffer/buffer.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/json/wuffs_json/wuffs_json_cursor.h"
+#include "source/extensions/tracers/opentelemetry/span_context.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
+
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 
@@ -11,6 +21,110 @@ namespace HttpFilters {
 namespace Mcp {
 
 using namespace Filters::Common::Mcp::McpConstants;
+using SpanContext = Envoy::Extensions::Tracers::OpenTelemetry::SpanContext;
+using SpanContextExtractor = Envoy::Extensions::Tracers::OpenTelemetry::SpanContextExtractor;
+
+namespace {
+
+struct ByteRange {
+  size_t start;
+  size_t end;
+
+  size_t size() const { return end - start; }
+};
+
+// Streaming Wuffs JSON cursor handler that records the bounds of the string
+// values for `params._meta.traceparent` and `params._meta.tracestate`.
+class TraceContextLocator : public Json::Wuffs::WuffsJsonCursor::Handler {
+public:
+  TraceContextLocator()
+      : cursor_(*this), meta_path_({{std::string(PARAMS_FIELD)}, {std::string(META_FIELD)}}),
+        traceparent_path_({{std::string(PARAMS_FIELD)},
+                           {std::string(META_FIELD)},
+                           {std::string(TRACEPARENT_FIELD)}}),
+        tracestate_path_({{std::string(PARAMS_FIELD)},
+                          {std::string(META_FIELD)},
+                          {std::string(TRACESTATE_FIELD)}}) {}
+
+  // Feeds all slices to the parser. Must not be called more than once.
+  absl::Status feedSlices(const Buffer::RawSliceVector& slices) {
+    for (const Buffer::RawSlice& slice : slices) {
+      absl::string_view view(reinterpret_cast<const char*>(slice.mem_), slice.len_);
+      bool is_last_slice = &slice == &slices.back();
+      RETURN_IF_NOT_OK(cursor_.feed(view, is_last_slice));
+    }
+    return absl::OkStatus();
+  }
+
+  const std::optional<ByteRange>& metaRange() const { return meta_range_; }
+
+  // Returns a `ByteRange` when `params._meta.traceparent` was found. Never
+  // returns a `ByteRange` with `start == 0` or `end < start`.
+  const std::optional<ByteRange>& traceparentRange() const { return traceparent_range_; }
+
+  // Returns a `ByteRange` when `params._meta.tracestate` was found. Never
+  // returns a `ByteRange` with `start == 0` or `end < start`.
+  const std::optional<ByteRange>& tracestateRange() const { return tracestate_range_; }
+
+  // Json::Wuffs::WuffsJsonCursor::Handler
+  bool openStringCapture(absl::string_view, int, size_t token_start) override {
+    if (cursor_.matchesPatternPath(traceparent_path_)) {
+      capturing_traceparent_ = true;
+      current_start_ = token_start;
+    } else if (cursor_.matchesPatternPath(tracestate_path_)) {
+      capturing_tracestate_ = true;
+      current_start_ = token_start;
+    }
+    return false;
+  }
+  bool onStringChunk(absl::string_view, int, absl::string_view) override { return false; }
+  void closeStringCapture(absl::string_view, int, size_t token_end) override {
+    if (capturing_traceparent_) {
+      capturing_traceparent_ = false;
+      if (token_end >= current_start_ + 2) {
+        traceparent_range_ = ByteRange{current_start_ + 1, token_end - 1};
+      }
+    } else if (capturing_tracestate_) {
+      capturing_tracestate_ = false;
+      if (token_end >= current_start_ + 2) {
+        tracestate_range_ = ByteRange{current_start_ + 1, token_end - 1};
+      }
+    }
+  }
+  absl::Status onKey(absl::string_view, int, size_t token_start) override {
+    if (cursor_.matchesPatternPath(meta_path_)) {
+      capturing_meta_ = true;
+      current_meta_start_ = token_start;
+    }
+    return absl::OkStatus();
+  }
+  absl::Status onNumber(absl::string_view, absl::string_view, int, size_t, size_t) override {
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view, bool, int, size_t, size_t) override {
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view, int, size_t, size_t) override {}
+  void onContainerOpen(absl::string_view, bool, int, size_t) override {}
+  void onContainerClose(int, size_t token_end) override {
+    if (capturing_meta_) {
+      capturing_meta_ = false;
+      if (token_end > current_meta_start_) {
+        meta_range_ = ByteRange{current_meta_start_ + 1, token_end - 1};
+      }
+    }
+  }
+
+private:
+  Json::Wuffs::WuffsJsonCursor cursor_;
+  std::vector<Json::Wuffs::WuffsJsonCursor::PatternSegment> meta_path_, traceparent_path_,
+      tracestate_path_;
+  bool capturing_meta_{false}, capturing_traceparent_{false}, capturing_tracestate_{false};
+  size_t current_meta_start_{0}, current_start_{0};
+  std::optional<ByteRange> meta_range_, traceparent_range_, tracestate_range_;
+};
+
+} // namespace
 
 void McpParserConfig::addMethodConfig(absl::string_view method,
                                       std::vector<AttributeExtractionRule> fields) {
@@ -923,6 +1037,107 @@ void McpJsonParser::reset() {
   stream_parser_.reset();
   extractor_.reset();
   parsing_started_ = false;
+}
+
+struct BufferEdit {
+  ByteRange target;
+  absl::string_view content;
+};
+
+void rewriteBuffer(Buffer::Instance& body, absl::Span<BufferEdit> edits) {
+  // We want to apply replacements to `body` left to right.
+  absl::c_stable_sort(edits, [](const BufferEdit& a, const BufferEdit& b) {
+    return a.target.start < b.target.start;
+  });
+
+  Buffer::OwnedImpl rewritten;
+  size_t cursor = 0;
+  for (const BufferEdit& edit : edits) {
+    const size_t num_bytes_before_target = edit.target.start - cursor;
+    ASSERT(num_bytes_before_target <= body.length());
+    rewritten.move(body, num_bytes_before_target);
+    cursor += num_bytes_before_target;
+
+    body.drain(edit.target.size());
+    cursor += edit.target.size();
+
+    rewritten.add(edit.content);
+  }
+  rewritten.move(body);
+  ASSERT(body.length() == 0);
+  body.move(rewritten);
+}
+
+absl::Status McpJsonParser::rewriteTraceContext(Buffer::Instance& body,
+                                                absl::string_view new_parent_id,
+                                                absl::string_view new_tracestate) {
+  if (new_parent_id.empty()) {
+    return absl::OkStatus();
+  }
+  absl::Span<char> traceparent_in_body;
+  ByteRange meta_range;
+  std::optional<ByteRange> ts_range;
+  {
+    // Try to locate the bounds of the traceparent value without linearizing.
+    TraceContextLocator locator;
+    RETURN_IF_NOT_OK(locator.feedSlices(body.getRawSlices()));
+    const std::optional<ByteRange> tp_range = locator.traceparentRange();
+
+    std::optional<ByteRange> maybe_meta_range = locator.metaRange();
+    if (!maybe_meta_range.has_value()) {
+      return absl::InvalidArgumentError("Failed to find body's params._meta object");
+    }
+    meta_range = *maybe_meta_range;
+
+    ts_range = locator.tracestateRange();
+
+    // It's OK if the body contains neither traceparent nor tracestate.
+    if (!tp_range.has_value() && !ts_range.has_value()) {
+      return absl::OkStatus();
+    }
+    ASSERT(tp_range->end > 0);                // Invariant of `TraceparentLocator`.
+    ASSERT(tp_range->end >= tp_range->start); // Invariant of `TraceparentLocator`.
+
+    // Linearize the buffer just up to the end of the traceparent value.
+    // This potentially avoids copying the entire body.
+    if (tp_range->end > std::numeric_limits<uint32_t>::max()) {
+      return absl::InvalidArgumentError(
+          "Cannot rewrite traceparent because body length exceeds UINT32_MAX");
+    }
+    const uint32_t tp_range_end_u32 = static_cast<uint32_t>(tp_range->end);
+    const absl::Span<char> linearized(reinterpret_cast<char*>(body.linearize(tp_range_end_u32)),
+                                      tp_range->end);
+    traceparent_in_body = linearized.subspan(tp_range->start);
+  }
+
+  // Transform the traceparent value.
+  absl::StatusOr<SpanContext> parsed = SpanContextExtractor::parseTraceparent(
+      absl::string_view(traceparent_in_body.data(), traceparent_in_body.size()), "");
+  RETURN_IF_NOT_OK(parsed.status());
+
+  parsed->setSpanId(std::string(new_parent_id));
+  const std::string new_traceparent = SpanContextExtractor::serializeTraceparent(*parsed);
+
+  if (new_traceparent.size() != traceparent_in_body.size()) {
+    return absl::InternalError(
+        "New traceparent's length unexpected differs from original traceparent");
+  }
+
+  // Overwrite the original traceparent.
+  std::copy(new_traceparent.begin(), new_traceparent.end(), traceparent_in_body.begin());
+
+  std::vector<BufferEdit> rewrites;
+  if (ts_range.has_value()) {
+    rewrites.push_back(BufferEdit{*ts_range, new_tracestate});
+  } else {
+    rewrites.push_back(BufferEdit{ByteRange{meta_range.end, meta_range.end}, ",\"tracestate\":\""});
+    rewrites.push_back(BufferEdit{ByteRange{meta_range.end, meta_range.end}, new_tracestate});
+    rewrites.push_back(BufferEdit{ByteRange{meta_range.end, meta_range.end}, "\""});
+  }
+
+  rewriteBuffer(body, absl::MakeSpan(rewrites));
+
+  return absl::OkStatus();
 }
 
 } // namespace Mcp

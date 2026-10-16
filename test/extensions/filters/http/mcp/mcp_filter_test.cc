@@ -25,6 +25,7 @@ using testing::_;
 using testing::AllOf;
 using testing::Contains;
 using testing::Key;
+using testing::Ne;
 using testing::NiceMock;
 using testing::Not;
 using testing::Pair;
@@ -3509,6 +3510,242 @@ TEST_F(McpFilterTest, RejectModeRejectsDeleteWithoutSessionId) {
               sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
+TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context()->set_reparent_active_span(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  static constexpr absl::string_view kIncomingTraceparentHeader =
+      "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01";
+  static constexpr absl::string_view kSpanIdHex = "21b6bcb2a5588606";
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json, text/event-stream"},
+      {"traceparent", std::string(kIncomingTraceparentHeader)},
+  };
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // SPELLCHECKER(off)
+  static constexpr absl::string_view kBody = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(kBody);
+
+  EXPECT_CALL(decoder_callbacks_.active_span_, getSpanId())
+      .WillOnce(Return(std::string(kSpanIdHex)));
+  // The active span should be updated with a `TraceContext` derived from the
+  // body's traceparent, not the incoming traceparent header.
+  EXPECT_CALL(decoder_callbacks_.active_span_, updateParent(_))
+      .WillOnce([](const Tracing::TraceContext& trace_context) {
+        EXPECT_THAT(trace_context.get("traceparent"), Ne(kIncomingTraceparentHeader));
+        EXPECT_EQ(trace_context.get("traceparent"),
+                  "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+      });
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+      .WillOnce([&buffer](std::function<void(Buffer::Instance&)> cb) { cb(buffer); });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // McpFilter copies the body's traceparent and tracestate to the outgoing
+  // header. It's up to the implementation of `Span::updateParent()` to again
+  // rewrite the headers based on the given trace context, if it so desires.
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", headers.get_("traceparent"));
+  EXPECT_EQ("rojo=00f067aa0ba902b7", headers.get_("tracestate"));
+
+  // The body's traceparent should have been rewritten such that the parent ID
+  // is equal to the active span's ID.
+  EXPECT_THAT(buffer.toString(), HasSubstr(absl::StrCat("\"00-4bf92f3577b34da6a3ce929d0e0e4736-",
+                                                        kSpanIdHex, "-01\"")))
+      << "The request body's traceparent should have been rewritten with a new parent ID";
+}
+
+TEST_F(McpFilterTest, TraceContextReparentActiveSpanWithMergedTracestate) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context()->set_reparent_active_span(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  static constexpr absl::string_view kIncomingTraceparentHeader =
+      "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01";
+  static constexpr absl::string_view kSpanIdHex = "21b6bcb2a5588606";
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json, text/event-stream"},
+      {"traceparent", std::string(kIncomingTraceparentHeader)},
+  };
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // SPELLCHECKER(off)
+  static constexpr absl::string_view kBody = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(kBody);
+
+  EXPECT_CALL(decoder_callbacks_.active_span_, getSpanId())
+      .WillOnce(Return(std::string(kSpanIdHex)));
+  EXPECT_CALL(decoder_callbacks_.active_span_, getTracestate())
+      .WillOnce(Return(std::string("foobar=123")));
+  // The active span should be updated with a `TraceContext` derived from the
+  // body's traceparent, not the incoming traceparent header.
+  EXPECT_CALL(decoder_callbacks_.active_span_, updateParent(_))
+      .WillOnce([](const Tracing::TraceContext& trace_context) {
+        EXPECT_THAT(trace_context.get("traceparent"), Ne(kIncomingTraceparentHeader));
+        EXPECT_EQ(trace_context.get("traceparent"),
+                  "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+      });
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+      .WillOnce([&buffer](std::function<void(Buffer::Instance&)> cb) { cb(buffer); });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // McpFilter copies the body's traceparent and tracestate to the outgoing
+  // header. It's up to the implementation of `Span::updateParent()` to again
+  // rewrite the headers based on the given trace context, if it so desires.
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", headers.get_("traceparent"));
+  EXPECT_EQ("rojo=00f067aa0ba902b7", headers.get_("tracestate"));
+
+  // The body's traceparent should have been rewritten such that the parent ID
+  // is equal to the active span's ID.
+  //
+  // The body's tracestate should also be merged with the active span's
+  // tracestate.
+
+  Protobuf::Struct rewritten_body;
+  TestUtility::loadFromJson(buffer.toString(), rewritten_body);
+
+  Protobuf::Struct want_body;
+  TestUtility::loadFromJson(R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-21b6bcb2a5588606-01",
+        "tracestate": "foobar=123"
+      }
+    }
+  })",
+                            want_body);
+  EXPECT_THAT(rewritten_body, ProtoEq(want_body));
+}
+
+TEST_F(McpFilterTest, TraceContextReparentActiveSpanWithNoBodyTracestate) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_propagate_trace_context()->set_reparent_active_span(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  static constexpr absl::string_view kIncomingTraceparentHeader =
+      "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01";
+  static constexpr absl::string_view kSpanIdHex = "21b6bcb2a5588606";
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"},
+      {"content-type", "application/json"},
+      {"accept", "application/json, text/event-stream"},
+      {"traceparent", std::string(kIncomingTraceparentHeader)},
+  };
+  ON_CALL(decoder_callbacks_, requestHeaders())
+      .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+  filter_->decodeHeaders(headers, false);
+
+  // SPELLCHECKER(off)
+  static constexpr absl::string_view kBody = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  Buffer::OwnedImpl buffer(kBody);
+
+  EXPECT_CALL(decoder_callbacks_.active_span_, getSpanId())
+      .WillOnce(Return(std::string(kSpanIdHex)));
+  EXPECT_CALL(decoder_callbacks_.active_span_, getTracestate())
+      .WillOnce(Return(std::string("foobar=123")));
+  // The active span should be updated with a `TraceContext` derived from the
+  // body's traceparent, not the incoming traceparent header.
+  EXPECT_CALL(decoder_callbacks_.active_span_, updateParent(_))
+      .WillOnce([](const Tracing::TraceContext& trace_context) {
+        EXPECT_THAT(trace_context.get("traceparent"), Ne(kIncomingTraceparentHeader));
+        EXPECT_EQ(trace_context.get("traceparent"),
+                  "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+      });
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+      .WillOnce([&buffer](std::function<void(Buffer::Instance&)> cb) { cb(buffer); });
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  // McpFilter copies the body's traceparent and tracestate to the outgoing
+  // header. It's up to the implementation of `Span::updateParent()` to again
+  // rewrite the headers based on the given trace context, if it so desires.
+  EXPECT_EQ("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", headers.get_("traceparent"));
+  EXPECT_EQ("", headers.get_("tracestate"));
+
+  // The body's traceparent should have been rewritten such that the parent ID
+  // is equal to the active span's ID.
+  //
+  // The body's tracestate should be exactly equal to the active span's
+  // tracestate because neither the body nor headers carried a tracestate.
+
+  Protobuf::Struct rewritten_body;
+  TestUtility::loadFromJson(buffer.toString(), rewritten_body);
+
+  Protobuf::Struct want_body;
+  TestUtility::loadFromJson(R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-21b6bcb2a5588606-01",
+        "tracestate": "foobar=123"
+      }
+    }
+  })",
+                            want_body);
+  EXPECT_THAT(rewritten_body, ProtoEq(want_body));
 }
 
 TEST_F(McpFilterTest, TraceContextEnabledValidParentAndState) {
