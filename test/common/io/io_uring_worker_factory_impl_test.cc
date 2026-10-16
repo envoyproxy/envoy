@@ -1,5 +1,9 @@
+#include "envoy/common/exception.h"
+#include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
+
 #include "source/common/io/io_uring_impl.h"
 #include "source/common/io/io_uring_worker_factory_impl.h"
+#include "source/common/network/socket_interface_impl.h"
 
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
@@ -35,6 +39,44 @@ TEST_F(IoUringWorkerFactoryImplTest, Basic) {
   auto dispatcher = api_->allocateDispatcher("test_thread");
   factory.onWorkerThreadInitialized();
   EXPECT_TRUE(factory.getIoUringWorker().has_value());
+}
+
+TEST_F(IoUringWorkerFactoryImplTest, RejectsNonPowerOfTwoProvidedBufferCount) {
+  envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+  config.mutable_io_uring_options()->mutable_provided_buffer_count()->set_value(129);
+  Network::SocketInterfaceImpl socket_interface;
+  EXPECT_THROW(socket_interface.createBootstrapExtension(config, context_), EnvoyException);
+}
+
+TEST_F(IoUringWorkerFactoryImplTest, RejectsDeferredTaskrunWithSubmissionPolling) {
+  envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+  auto* options = config.mutable_io_uring_options();
+  options->set_enable_deferred_taskrun(true);
+  options->set_enable_submission_queue_polling(true);
+  Network::SocketInterfaceImpl socket_interface;
+  EXPECT_THROW(socket_interface.createBootstrapExtension(config, context_), EnvoyException);
+}
+
+TEST_F(IoUringWorkerFactoryImplTest, RejectsBatchingWithoutMultishotReceive) {
+  envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+  config.mutable_io_uring_options()->set_enable_receive_batching(true);
+  Network::SocketInterfaceImpl socket_interface;
+  EXPECT_THROW(socket_interface.createBootstrapExtension(config, context_), EnvoyException);
+}
+
+TEST_F(IoUringWorkerFactoryImplTest, InitializesWorkerWithReceiveTuningOptions) {
+  envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+  auto* options = config.mutable_io_uring_options();
+  options->mutable_io_uring_size()->set_value(8);
+  options->mutable_read_buffer_size()->set_value(64);
+  options->mutable_provided_buffer_count()->set_value(128);
+  options->set_enable_multishot_receive(true);
+  options->set_enable_deferred_taskrun(true);
+  options->set_enable_receive_batching(true);
+  Network::SocketInterfaceImpl socket_interface;
+  auto extension = socket_interface.createBootstrapExtension(config, context_);
+  ASSERT_NE(nullptr, extension);
+  extension->onWorkerThreadInitialized();
 }
 
 } // namespace

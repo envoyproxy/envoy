@@ -2,6 +2,7 @@
 
 #include <sys/eventfd.h>
 
+#include <algorithm>
 #include <chrono>
 
 namespace Envoy {
@@ -115,12 +116,20 @@ bool isIoUringSupported() {
 }
 
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-                         bool enable_multishot_receive, uint32_t multishot_buffer_size) {
+                         bool enable_multishot_receive, uint32_t multishot_buffer_size,
+                         uint32_t provided_buffer_count, bool enable_deferred_taskrun,
+                         bool enable_receive_batching)
+    : enable_receive_batching_(enable_receive_batching) {
   struct io_uring_params p{};
 
   // Size the completion queue at twice the submission queue to reduce the chance of overflow.
   p.flags |= IORING_SETUP_CQSIZE;
   p.cq_entries = io_uring_size * 2;
+
+  if (enable_deferred_taskrun) {
+    RELEASE_ASSERT(!use_submission_queue_polling, "deferred task work cannot use SQPOLL");
+    p.flags |= IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN | IORING_SETUP_TASKRUN_FLAG;
+  }
 
   if (use_submission_queue_polling) {
     p.flags |= IORING_SETUP_SQPOLL;
@@ -141,12 +150,19 @@ IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polli
   // pass keeps those read re-arms within the submission queue. A larger burst is reaped across
   // later passes, which the worker re-arms while hasReadyCompletions stays true.
   cqes_.resize(io_uring_size, nullptr);
+  if (enable_receive_batching_) {
+    receive_batch_flags_.resize(io_uring_size);
+    next_read_requests_.reserve(std::min<uint32_t>(io_uring_size, 64));
+  }
 
   // Set up the provided buffer ring for `multishot` reads when requested. A failure here means the
   // running kernel lacks provided buffer ring support, in which case `multishot` reads stay
   // disabled and the readv-based read path is used instead.
   if (enable_multishot_receive && multishot_buffer_size > 0) {
-    const uint32_t buffer_count = providedBufferCount(io_uring_size);
+    const uint32_t buffer_count =
+        provided_buffer_count == 0 ? providedBufferCount(io_uring_size) : provided_buffer_count;
+    RELEASE_ASSERT(buffer_count <= 4096 && (buffer_count & (buffer_count - 1)) == 0,
+                   "provided buffer count must be a power of two no larger than 4096");
     auto pool = std::make_shared<IoUringBufferPoolImpl>(ring_, ProvidedBufferGroupId, buffer_count,
                                                         multishot_buffer_size);
     if (pool->valid()) {
@@ -214,20 +230,14 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   }
 
   checkCqOverflow();
-  unsigned count = io_uring_peek_batch_cqe(&ring_, cqes_.data(), cqes_.size());
-  for (unsigned i = 0; i < count; ++i) {
-    struct io_uring_cqe* cqe = cqes_[i];
-    auto* req = reinterpret_cast<Request*>(cqe->user_data);
-    if (req != nullptr) {
-      // Surface the `multishot` completion metadata so the read path can recycle the provided
-      // buffer and keep the request alive while the operation stays armed.
-      req->setMoreCompletions((cqe->flags & IORING_CQE_F_MORE) != 0);
-      req->setBufferId((cqe->flags & IORING_CQE_F_BUFFER)
-                           ? static_cast<int32_t>(cqe->flags >> IORING_CQE_BUFFER_SHIFT)
-                           : -1);
-    }
-    completion_cb(req, cqe->res, false);
+  if ((ring_.flags & IORING_SETUP_DEFER_TASKRUN) && io_uring_cq_ready(&ring_) == 0) {
+    // Reading eventfd does not run deferred work. An empty CQ needs an explicit enter.
+    const int ret = io_uring_get_events(&ring_);
+    RELEASE_ASSERT(ret >= 0,
+                   fmt::format("unable to process io_uring task work: {}", errorDetails(-ret)));
   }
+  unsigned count = io_uring_peek_batch_cqe(&ring_, cqes_.data(), cqes_.size());
+  processCompletionBatch(count, completion_cb);
   io_uring_cq_advance(&ring_, count);
 
   ENVOY_LOG(trace, "the num of injected completion is {}", injected_completions_.size());
@@ -241,7 +251,53 @@ void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   }
 }
 
-bool IoUringImpl::hasReadyCompletions() const { return io_uring_cq_ready(&ring_) > 0; }
+void IoUringImpl::markReceiveBatch(unsigned count) {
+  receive_batch_flags_.assign(count, 0);
+  next_read_requests_.erase(next_read_requests_.begin(), next_read_requests_.end());
+  // Read fragments from independent requests may be interleaved. Find the last positive read for
+  // each request within regions bounded by operations whose callback order must be preserved.
+  for (unsigned end = count; end != 0; --end) {
+    const unsigned i = end - 1;
+    const io_uring_cqe* cqe = cqes_[i];
+    const auto* req = reinterpret_cast<const Request*>(cqe->user_data);
+    if (req == nullptr || req->type() != Request::RequestType::Read || cqe->res <= 0) {
+      next_read_requests_.erase(next_read_requests_.begin(), next_read_requests_.end());
+      continue;
+    }
+    const bool another_read = !next_read_requests_.insert(cqe->user_data).second;
+    receive_batch_flags_[i] = (cqe->flags & IORING_CQE_F_MORE) != 0 && another_read;
+  }
+  // Completion callbacks may delete terminal Requests. Retain only per-`CQE` flags across
+  // callbacks, never request identities, and never carry a deferred read across the bounded CQ
+  // snapshot.
+  next_read_requests_.erase(next_read_requests_.begin(), next_read_requests_.end());
+}
+
+void IoUringImpl::processCompletionBatch(unsigned count, const CompletionCb& completion_cb) {
+  if (enable_receive_batching_) {
+    markReceiveBatch(count);
+  }
+  for (unsigned i = 0; i < count; ++i) {
+    struct io_uring_cqe* cqe = cqes_[i];
+    auto* req = reinterpret_cast<Request*>(cqe->user_data);
+    if (req != nullptr) {
+      // Surface the `multishot` completion metadata so the read path can recycle the provided
+      // buffer and keep the request alive while the operation stays armed.
+      req->setMoreCompletions((cqe->flags & IORING_CQE_F_MORE) != 0);
+      req->setMoreReadsInBatch(enable_receive_batching_ && receive_batch_flags_[i] != 0);
+      req->setBufferId((cqe->flags & IORING_CQE_F_BUFFER)
+                           ? static_cast<int32_t>(cqe->flags >> IORING_CQE_BUFFER_SHIFT)
+                           : -1);
+    }
+    completion_cb(req, cqe->res, false);
+  }
+}
+
+bool IoUringImpl::hasReadyCompletions() const {
+  // The drained eventfd may not produce another edge for a CQ backlog or pending task work.
+  return io_uring_cq_ready(&ring_) > 0 || (io_uring_smp_load_acquire(ring_.sq.kflags) &
+                                           (IORING_SQ_CQ_OVERFLOW | IORING_SQ_TASKRUN)) != 0;
+}
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
                                          socklen_t* remote_addr_len, Request* user_data) {

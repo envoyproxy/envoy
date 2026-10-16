@@ -25,6 +25,26 @@ namespace {
   return io_uring_worker_factory != nullptr && io_uring_worker_factory->currentThreadRegistered() &&
          io_uring_worker_factory->getIoUringWorker() != std::nullopt;
 }
+#if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
+absl::Status validateIoUringOptions(
+    const envoy::extensions::network::socket_interface::v3::IoUringOptions& options) {
+  if (options.has_provided_buffer_count()) {
+    const uint32_t count = options.provided_buffer_count().value();
+    if (count < 128 || count > 4096 || (count & (count - 1)) != 0) {
+      return absl::InvalidArgumentError(
+          "io_uring provided_buffer_count must be a power of two between 128 and 4096");
+    }
+  }
+  if (options.enable_deferred_taskrun() && options.enable_submission_queue_polling()) {
+    return absl::InvalidArgumentError("io_uring deferred task work cannot be combined with SQPOLL");
+  }
+  if (options.enable_receive_batching() && !options.enable_multishot_receive()) {
+    return absl::InvalidArgumentError("io_uring receive batching requires multishot receive");
+  }
+  return absl::OkStatus();
+}
+#endif
+
 } // namespace
 
 void DefaultSocketInterfaceExtension::onWorkerThreadInitialized() {
@@ -173,6 +193,9 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
       config, context.messageValidationVisitor());
   if (message.has_io_uring_options() && Io::isIoUringSupported()) {
     const auto& options = message.io_uring_options();
+    THROW_IF_NOT_OK(validateIoUringOptions(options));
+    const uint32_t provided_buffer_count =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, provided_buffer_count, 0);
     const uint32_t write_high_watermark =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_high_watermark_bytes, 131072);
     uint32_t write_low_watermark =
@@ -186,7 +209,8 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
             options.enable_submission_queue_polling(), options.enable_multishot_receive(),
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, read_buffer_size, 8192),
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000), write_high_watermark,
-            write_low_watermark, context.threadLocal());
+            write_low_watermark, context.threadLocal(), provided_buffer_count,
+            options.enable_deferred_taskrun(), options.enable_receive_batching());
     io_uring_worker_factory_ = io_uring_worker_factory;
 
     return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_worker_factory);

@@ -5,6 +5,7 @@
 
 #include "source/common/common/logger.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "liburing.h"
 
 namespace Envoy {
@@ -28,7 +29,9 @@ class IoUringImpl : public IoUring,
                     protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
-              bool enable_multishot_receive, uint32_t multishot_buffer_size);
+              bool enable_multishot_receive, uint32_t multishot_buffer_size,
+              uint32_t provided_buffer_count = 0, bool enable_deferred_taskrun = false,
+              bool enable_receive_batching = false);
   ~IoUringImpl() override;
 
   os_fd_t registerEventfd() override;
@@ -55,12 +58,20 @@ public:
   void removeInjectedCompletion(os_fd_t fd) override;
 
 private:
+  friend class IoUringImplTestPeer;
+
+  void processCompletionBatch(unsigned count, const CompletionCb& completion_cb);
+  void markReceiveBatch(unsigned count);
+
   // Logs a warning when the completion queue has overflowed. The kernel parks the extra completions
   // in a backlog and flushes them on the next submission, so they are reaped on a later pass.
   void checkCqOverflow();
 
   struct io_uring ring_{};
   std::vector<struct io_uring_cqe*> cqes_;
+  std::vector<uint8_t> receive_batch_flags_;
+  absl::flat_hash_set<uint64_t> next_read_requests_;
+  const bool enable_receive_batching_;
   os_fd_t event_fd_{INVALID_SOCKET};
   std::list<InjectedCompletion> injected_completions_;
   uint64_t cq_overflow_count_{0};
