@@ -228,6 +228,15 @@ public:
   // variable until the logic is moved into the overload manager.
   static uint64_t acceptedSocketCount() { return global_accepted_socket_count_.load(); }
 
+  /**
+   * Rebind this socket's overload state handle, e.g. after being handed off to a different
+   * worker via connection_balance_config.exact_balance. The tracked resource is global, so any
+   * live worker's handle is equally valid for accounting purposes.
+   */
+  void setOverloadState(Server::ThreadLocalOverloadStateOptRef overload_state) {
+    overload_state_ = overload_state;
+  }
+
 private:
   static std::atomic<uint64_t> global_accepted_socket_count_;
   Server::ThreadLocalOverloadStateOptRef overload_state_;
