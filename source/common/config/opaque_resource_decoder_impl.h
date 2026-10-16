@@ -16,7 +16,7 @@ public:
 
   // Config::OpaqueResourceDecoder
   ArenaWrappedProto<Protobuf::Message> decodeResource(const Protobuf::Any& resource) override {
-    ArenaWrappedProto<Current> typed_message;
+    ArenaWrappedProto<Current> typed_message(getOptions());
     // If the Any is a synthetic empty message (e.g. because the resource field was not set in
     // Resource, this might be empty, so we shouldn't decode.
     if (!resource.type_url().empty()) {
@@ -30,6 +30,18 @@ public:
   }
 
 private:
+  // Decoded resources are ephemeral; these arena options are optimized to reduce memory allocations
+  // and memory fragmentation when decoding wire-encoded opaque resources rather than space
+  // efficiency.
+  Protobuf::ArenaOptions getOptions() const {
+    Protobuf::ArenaOptions options;
+    // Skips the default small initial arena block sizes.
+    options.start_block_size = 8 * 1024;
+    // Allows the arena block size to grow beyond the default for truly large resources.
+    options.max_block_size = 1024 * 1024;
+    return options;
+  }
+
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string name_field_;
 };
