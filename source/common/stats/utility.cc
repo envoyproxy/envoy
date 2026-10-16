@@ -184,6 +184,16 @@ Counter& counterFromStatNames(Scope& scope, const StatNameVec& elements,
   return scope.counterFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), StatName());
 }
 
+Counter& counterFromTaggedStatNames(Scope& scope, StatNameSpan base_names, StatNameTagSpan tags,
+                                    StatNameSpan names) {
+  const StatNameJoiner base_joined(base_names, scope.constSymbolTable());
+  if (tags.empty()) {
+    return scope.counterFromTaggedName(base_joined.statName(), std::nullopt, StatName());
+  }
+  const StatNameJoiner joined(names, scope.constSymbolTable());
+  return scope.counterFromTaggedName(base_joined.statName(), tags, joined.statName());
+}
+
 Gauge& gaugeFromElements(Scope& scope, const ElementVec& elements, Gauge::ImportMode import_mode,
                          StatNameTagVectorOptConstRef tags) {
   ElementVisitor visitor(scope.symbolTable(), elements);
@@ -210,6 +220,17 @@ Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, His
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
   return scope.histogramFromTaggedName(StatName(joined.get()), Scope::toTagSpan(tags), StatName(),
                                        unit);
+}
+
+Histogram& histogramFromTaggedStatNames(Scope& scope, StatNameSpan base_names,
+                                        StatNameTagSpan tags, StatNameSpan names,
+                                        Histogram::Unit unit) {
+  const StatNameJoiner base_joined(base_names, scope.constSymbolTable());
+  if (tags.empty()) {
+    return scope.histogramFromTaggedName(base_joined.statName(), std::nullopt, StatName(), unit);
+  }
+  const StatNameJoiner joined(names, scope.constSymbolTable());
+  return scope.histogramFromTaggedName(base_joined.statName(), tags, joined.statName(), unit);
 }
 
 TextReadout& textReadoutFromElements(Scope& scope, const ElementVec& elements,
