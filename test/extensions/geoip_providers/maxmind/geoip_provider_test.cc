@@ -285,7 +285,7 @@ TEST_F(GeoipProviderTest, GeoHeaderNamesListEveryConfiguredKey) {
 }
 
 // The deprecated geo_headers_to_add form, including the is_anon fallback, reports its keys too.
-TEST_F(GeoipProviderTest, GeoHeaderNamesListDeprecatedGeoHeadersToAdd) {
+TEST_F(GeoipProviderTest, DEPRECATED_FEATURE_TEST(GeoHeaderNamesListDeprecatedGeoHeadersToAdd)) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
       geo_headers_to_add:
