@@ -1384,7 +1384,8 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEn
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto BuildRequestBody = [](absl::string_view trace_id_hex, absl::string_view parent_id_hex) -> std::string {
+  auto BuildRequestBody = [](absl::string_view trace_id_hex,
+                             absl::string_view parent_id_hex) -> std::string {
     static constexpr absl::string_view kBodyTemplate =
         R"json({
             "params": {

@@ -25,12 +25,12 @@ using testing::_;
 using testing::AllOf;
 using testing::Contains;
 using testing::Key;
+using testing::Ne;
 using testing::NiceMock;
 using testing::Not;
 using testing::Pair;
 using testing::Property;
 using testing::Return;
-using testing::Ne;
 
 class McpFilterTest : public testing::Test {
 public:
