@@ -4,6 +4,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
+#include "test/common/upstream/snapshot_host_set.h"
 #include "test/integration/load_balancers/custom_lb_policy.h"
 
 namespace Envoy {
@@ -11,6 +12,12 @@ namespace Envoy {
 // ClusterImplBase
 void CustomStaticCluster::startPreInit() {
   Upstream::HostVector hosts{host_};
+  if (use_snapshot_host_set_) {
+    priority_set_.setHostSetFactory(Upstream::SnapshotHostSet::factory());
+    priority_set_.updateHostsByDelta(priority_, hosts, {}, true, std::nullopt);
+    onPreInitComplete();
+    return;
+  }
   auto hosts_ptr = std::make_shared<Upstream::HostVector>(hosts);
 
   priority_set_.updateHosts(

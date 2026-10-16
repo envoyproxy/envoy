@@ -475,6 +475,19 @@ using LocalityWeightsSharedPtr = std::shared_ptr<LocalityWeights>;
 using LocalityWeightsConstSharedPtr = std::shared_ptr<const LocalityWeights>;
 
 /**
+ * Immutable snapshot of a host set that keeps its hosts in another form than flat vectors. The
+ * main-thread host set publishes one per update, so worker host sets adopt the update without the
+ * flat vectors being built. Implementations derive Upstream::HostSetSnapshotBase.
+ */
+class PersistentHostPartitionsSnapshot {
+public:
+  virtual ~PersistentHostPartitionsSnapshot() = default;
+};
+
+using PersistentHostPartitionsSnapshotConstSharedPtr =
+    std::shared_ptr<const PersistentHostPartitionsSnapshot>;
+
+/**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
  */
@@ -505,6 +518,24 @@ public:
    * @return a shared ptr to the vector returned by healthyHosts().
    */
   virtual HealthyHostVectorConstSharedPtr healthyHostsPtr() const PURE;
+
+  /**
+   * @return the sizes of hosts(), healthyHosts(), degradedHosts() and excludedHosts(). An
+   *         implementation that keeps its hosts in another form can answer these without building
+   *         those vectors.
+   */
+  virtual size_t hostCount() const { return hosts().size(); }
+  virtual size_t healthyHostCount() const { return healthyHosts().size(); }
+  virtual size_t degradedHostCount() const { return degradedHosts().size(); }
+  virtual size_t excludedHostCount() const { return excludedHosts().size(); }
+
+  /**
+   * @return a snapshot of this set's hosts for workers to adopt, or nullptr when the flat vectors
+   *         are the current representation.
+   */
+  virtual PersistentHostPartitionsSnapshotConstSharedPtr persistentPartitions() const {
+    return nullptr;
+  }
 
   /**
    * @return all degraded hosts contained in the set at the current time. NOTE: This set is
@@ -657,6 +688,9 @@ public:
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
     HostsPerLocalityConstSharedPtr excluded_hosts_per_locality;
+    // When set, a snapshot of the source host set for workers to adopt. The flat views above are
+    // then empty.
+    PersistentHostPartitionsSnapshotConstSharedPtr persistent_partitions;
   };
 
   /**
