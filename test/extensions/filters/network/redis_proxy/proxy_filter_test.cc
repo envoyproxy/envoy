@@ -2771,6 +2771,31 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, HelloAuthExternalAuthExpir
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
+// The filter's stats carry the stat prefix as an explicit tag.
+TEST_F(RedisProxyFilterConfigTest, StatsAreTagged) {
+  const std::string yaml_string = R"EOF(
+  prefix_routes:
+    catch_all_route:
+      cluster: fake_cluster
+  stat_prefix: foo
+  settings:
+    op_timeout: 0.01s
+  )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
+      parseProtoFromYaml(yaml_string);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           time_source_, *this, server_context_);
+
+  const Stats::CounterSharedPtr downstream_cx_total =
+      TestUtility::findCounter(store_, "redis.foo.downstream_cx_total");
+  ASSERT_NE(downstream_cx_total, nullptr);
+  EXPECT_EQ("redis.downstream_cx_total", downstream_cx_total->tagExtractedName());
+  ASSERT_EQ(1U, downstream_cx_total->tags().size());
+  EXPECT_EQ("envoy.redis_prefix", downstream_cx_total->tags()[0].name_);
+  EXPECT_EQ("foo", downstream_cx_total->tags()[0].value_);
+}
+
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions
