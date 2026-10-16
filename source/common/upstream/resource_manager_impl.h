@@ -17,6 +17,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/basic_resource_impl.h"
+#include "source/common/common/callback_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -112,6 +113,10 @@ public:
 
   // Upstream::ResourceManager
   ResourceLimit& connections() override { return connections_; }
+  Common::CallbackHandlePtr addConnectionCapacityCallback(Event::Dispatcher& dispatcher,
+                                                          std::function<void()> callback) override {
+    return connections_.addCapacityCallback(dispatcher, std::move(callback));
+  }
   ResourceLimit& pendingRequests() override { return pending_requests_; }
   ResourceLimit& requests() override { return requests_; }
   ResourceLimit& retries() override { return retries_; }
@@ -119,6 +124,32 @@ public:
   uint64_t maxConnectionsPerHost() override { return max_connections_per_host_; }
 
 private:
+  class ConnectionResourceImpl : public ManagedResourceImpl {
+  public:
+    using ManagedResourceImpl::ManagedResourceImpl;
+
+    Common::CallbackHandlePtr addCapacityCallback(Event::Dispatcher& dispatcher,
+                                                  std::function<void()> callback) {
+      auto handle = callbacks_->add(dispatcher, std::move(callback));
+      // Capacity may have been released between the failed connection attempt and registration.
+      if (canCreate()) {
+        callbacks_->runCallbacks(/*coalesce=*/true);
+      }
+      return handle;
+    }
+
+    void decBy(uint64_t amount) override {
+      ManagedResourceImpl::decBy(amount);
+      if (callbacks_->size() != 0 && canCreate()) {
+        callbacks_->runCallbacks(/*coalesce=*/true);
+      }
+    }
+
+  private:
+    const std::shared_ptr<Common::ThreadSafeCallbackManager> callbacks_{
+        Common::ThreadSafeCallbackManager::create()};
+  };
+
   class RetryBudgetImpl : public ResourceLimit {
   public:
     RetryBudgetImpl(std::optional<double> budget_percent, std::optional<uint64_t> budget_interval,
@@ -272,7 +303,7 @@ private:
     std::unique_ptr<IntervalState> interval_state_;
   };
 
-  ManagedResourceImpl connections_;
+  ConnectionResourceImpl connections_;
   ManagedResourceImpl pending_requests_;
   ManagedResourceImpl requests_;
   ManagedResourceImpl connection_pools_;

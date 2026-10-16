@@ -12,6 +12,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -429,6 +430,176 @@ TEST_F(ConnPoolImplBaseTest, DumpState) {
                                "connecting_clients_.size(): 0, connecting_stream_capacity_: 0, "
                                "connecting_and_connected_stream_capacity_: 0, "
                                "num_active_streams_: 0"));
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, ConnectionCapacityReleasedByAnotherPool) {
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  max_connection_duration_opt_.reset();
+  newActiveClientAndStream();
+
+  auto other_host = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:81");
+  TestConnPoolImplBase other_pool(other_host, Upstream::ResourcePriority::Default, *dispatcher_,
+                                  nullptr, nullptr, state_, overload_manager_);
+  TestActiveClient* other_client = nullptr;
+  EXPECT_CALL(other_pool, instantiateActiveClient).WillOnce(Invoke([&]() -> ActiveClientPtr {
+    auto client = std::make_unique<NiceMock<TestActiveClient>>(other_pool, 100, 1, false);
+    client->real_host_description_ = other_host;
+    other_client = client.get();
+    return client;
+  }));
+  EXPECT_TRUE(other_pool.maybePreconnectImpl(1.0));
+  other_client->onEvent(Network::ConnectionEvent::Connected);
+
+  AttachContext queued_context;
+  auto* pending = pool_.newStreamImpl(queued_context, false);
+  EXPECT_NE(nullptr, pending);
+  EXPECT_EQ(1, clients_.size());
+  EXPECT_EQ(1, state_.pending_streams_);
+  EXPECT_FALSE(
+      cluster_->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate());
+
+  // The idle connection belongs to another host. Releasing its shared quota must
+  // let this pool progress without a new request or a local connection event.
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  other_client->onEvent(Network::ConnectionEvent::LocalClose);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(2, clients_.size());
+  if (clients_.size() == 2) {
+    EXPECT_CALL(pool_, onPoolReady(_, testing::Ref(queued_context)));
+    clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+    pending = nullptr;
+    EXPECT_EQ(0, state_.pending_streams_);
+    EXPECT_EQ(2, state_.active_streams_);
+  }
+
+  if (pending != nullptr) {
+    pending->cancel(ConnectionPool::CancelPolicy::Default);
+  }
+  for (auto* client : clients_) {
+    while (client->active_streams_ > 0) {
+      --client->active_streams_;
+      pool_.onStreamClosed(*client, false);
+    }
+  }
+  pool_.drainConnectionsImpl(DrainBehavior::DrainAndDelete);
+  dispatcher_->clearDeferredDeleteList();
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, CancelPendingStreamBeforeCapacityNotification) {
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  newActiveClientAndStream();
+  auto& connections = cluster_->resourceManager(Upstream::ResourcePriority::Default).connections();
+  connections.inc();
+  auto* pending = pool_.newStreamImpl(context_, false);
+  ASSERT_NE(nullptr, pending);
+
+  connections.dec();
+  pending->cancel(ConnectionPool::CancelPolicy::Default);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, clients_.size());
+  EXPECT_FALSE(pool_.hasPendingStreams());
+  closeStreamAndDrainClient();
+  dispatcher_->clearDeferredDeleteList();
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, DrainPoolBeforeCapacityNotification) {
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  newActiveClientAndStream();
+  auto& connections = cluster_->resourceManager(Upstream::ResourcePriority::Default).connections();
+  connections.inc();
+  auto* pending = pool_.newStreamImpl(context_, false);
+  ASSERT_NE(nullptr, pending);
+
+  connections.dec();
+  pool_.drainConnectionsImpl(DrainBehavior::DrainAndDelete);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, clients_.size());
+  EXPECT_TRUE(pool_.hasPendingStreams());
+  pending->cancel(ConnectionPool::CancelPolicy::Default);
+  closeStreamAndDrainClient();
+  dispatcher_->clearDeferredDeleteList();
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, CapacityConsumedBeforeNotification) {
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  max_connection_duration_opt_.reset();
+  newActiveClientAndStream();
+  auto& connections = cluster_->resourceManager(Upstream::ResourcePriority::Default).connections();
+  connections.inc();
+  auto* pending = pool_.newStreamImpl(context_, false);
+  ASSERT_NE(nullptr, pending);
+
+  connections.dec();
+  connections.inc();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, clients_.size());
+  EXPECT_EQ(1, state_.pending_streams_);
+  EXPECT_EQ(2, connections.count());
+
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  connections.dec();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(2, clients_.size());
+  if (clients_.size() == 2) {
+    EXPECT_CALL(pool_, onPoolReady);
+    clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+    pending = nullptr;
+    EXPECT_EQ(0, state_.pending_streams_);
+    EXPECT_EQ(2, connections.count());
+  }
+  if (pending != nullptr) {
+    pending->cancel(ConnectionPool::CancelPolicy::Default);
+  }
+  for (auto* client : clients_) {
+    while (client->active_streams_ > 0) {
+      --client->active_streams_;
+      pool_.onStreamClosed(*client, false);
+    }
+  }
+  pool_.drainConnectionsImpl(DrainBehavior::DrainAndDelete);
+  dispatcher_->clearDeferredDeleteList();
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, CapacityNotificationRuntimeGuardDisabled) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.conn_pool_wakeup_on_connection_release", "false"}});
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  newActiveClientAndStream();
+  auto& connections = cluster_->resourceManager(Upstream::ResourcePriority::Default).connections();
+  connections.inc();
+  auto* pending = pool_.newStreamImpl(context_, false);
+  ASSERT_NE(nullptr, pending);
+
+  connections.dec();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, clients_.size());
+  EXPECT_EQ(1, state_.pending_streams_);
+  EXPECT_TRUE(connections.canCreate());
+  pending->cancel(ConnectionPool::CancelPolicy::Default);
+  closeStreamAndDrainClient();
+  dispatcher_->clearDeferredDeleteList();
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, DisableRuntimeGuardBeforeCapacityNotification) {
+  TestScopedRuntime runtime;
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  newActiveClientAndStream();
+  auto& connections = cluster_->resourceManager(Upstream::ResourcePriority::Default).connections();
+  connections.inc();
+  auto* pending = pool_.newStreamImpl(context_, false);
+  ASSERT_NE(nullptr, pending);
+
+  connections.dec();
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.conn_pool_wakeup_on_connection_release", "false"}});
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(1, clients_.size());
+  EXPECT_EQ(1, state_.pending_streams_);
+  EXPECT_TRUE(connections.canCreate());
+  pending->cancel(ConnectionPool::CancelPolicy::Default);
+  closeStreamAndDrainClient();
+  dispatcher_->clearDeferredDeleteList();
 }
 
 TEST_F(ConnPoolImplBaseTest, BasicPreconnect) {
