@@ -199,4 +199,18 @@ message Vhds {
 
   // Configuration source specifier for VHDS.
   core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The xdstp resource name of a default virtual host collection to subscribe to.
+  //
+  // If the name ends in ``/*``, it indicates a ``VirtualHost`` glob collection,
+  // which is supported only in the xDS incremental protocol variants.
+  //
+  // Envoy currently supports only glob collections.
+  //
+  // When this field is specified, Envoy subscribes to the whole collection and
+  // on-demand virtual host discovery is disabled.
+  //
+  // If unspecified or empty, virtual hosts are fetched on demand under the route
+  // configuration namespace.
+  string default_resource_locator = 2;
 }

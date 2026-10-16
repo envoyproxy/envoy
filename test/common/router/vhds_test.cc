@@ -328,6 +328,66 @@ vhds:
               "vhost_vhds1" == actual_vhost_2.name());
 }
 
+TEST_F(VhdsTest, VhdsXdstpGlobCollection) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  default_resource_locator: "xdstp://test/envoy.config.route.v3.VirtualHost/my-route/*"
+  )EOF");
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              collectionSubscriptionFromUrl(_, _, _, _, _, _));
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .Times(0);
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
+  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+
+  auto vhost = buildVirtualHost("vhost1", "vhost.first");
+  const auto& added_resources = buildAddedResources({vhost});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  const Protobuf::RepeatedPtrField<std::string> removed_resources;
+  EXPECT_TRUE(factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
+                  .ok());
+
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      vhost, config_update_info->protobufConfigurationCast().virtual_hosts(0)));
+}
+
+// Verify that plain VHDS uses an on-demand subscription without a default collection.
+TEST_F(VhdsTest, VhdsWithoutDefaultCollectionUsesOnDemandSubscription) {
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
+  RouteConfigUpdatePtr config_update_info = makeReceiver();
+
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              collectionSubscriptionFromUrl(_, _, _, _, _, _))
+      .Times(0);
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce(testing::Invoke([](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                   Stats::Scope&, Envoy::Config::SubscriptionCallbacks&,
+                                   Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                   const Envoy::Config::SubscriptionOptions&) {
+        auto subscription = std::make_unique<testing::NiceMock<Envoy::Config::MockSubscription>>();
+        EXPECT_CALL(*subscription, accept(testing::UnorderedElementsAre("my_route/*")));
+        EXPECT_CALL(*subscription, start(testing::IsEmpty()));
+        return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
+      }));
+  EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
+}
+
 // verify that a VHDS update that neither adds nor removes a virtual host leaves the currently
 // published route configuration in place instead of rebuilding it
 TEST_F(VhdsTest, VhdsUpdateWithoutChangesKeepsTheRouteConfig) {

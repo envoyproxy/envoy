@@ -72,6 +72,7 @@ envoy_cc_library(
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/grpc:async_client_interface",
+        "//source/common/config:dependent_type_urls_lib",
         "//source/common/config:xds_context_params_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/memory:utils_lib",
