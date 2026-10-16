@@ -46,11 +46,8 @@ LlmBindingObject::fromFilterState(const StreamInfo::FilterState& filter_state,
   if (const auto* binding = dynamic_cast<const LlmBindingObject*>(object); binding != nullptr) {
     return binding->binding();
   }
-  // Golang's SetFilterState and the dynamic modules' bytes setter store plain strings.
-  if (const auto* text = dynamic_cast<const Router::StringAccessor*>(object); text != nullptr) {
-    return LlmBinding::parse(text->asString());
-  }
-  return absl::InvalidArgumentError("the object is not a binding");
+  return absl::InvalidArgumentError(
+      "the object is not a binding; set the key through its object factory");
 }
 
 const LlmBindingRead*

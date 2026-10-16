@@ -243,9 +243,15 @@ envoy_extension_cc_test(
         "//envoy/registry",
         "//envoy/router:string_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/filters/common/set_filter_state:filter_config_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

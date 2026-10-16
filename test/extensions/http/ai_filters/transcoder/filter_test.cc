@@ -582,10 +582,9 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
 }
 
 // A request binding tells the `TO_IR` leg where the client's path names the model and streaming
-// mode, for a dialect whose own bindings say nothing about the path. A plain string, as Golang's
-// SetFilterState leaves one, reads as the factory would build it.
+// mode, for a dialect whose own bindings say nothing about the path.
 TEST_F(TranscoderFilterTest, RequestBindingLiftsTheModelFromTheClientsPath) {
-  setInstruction(FilterStateKeys::BindingRequest, "/anthropic/{model}/{messages|stream}");
+  setBinding(FilterStateKeys::BindingRequest, "/anthropic/{model}/{messages|stream}");
 
   runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
                   R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",

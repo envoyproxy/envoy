@@ -100,8 +100,8 @@ class LlmBindingObject : public Router::StringAccessor {
 public:
   explicit LlmBindingObject(absl::string_view value);
 
-  // The binding at `key`: null when no object is set, or the error of one that does not parse. A
-  // plain string another writer left there is parsed as the factory does.
+  // The binding at `key`: null when no object is set, or the error of one that does not parse. Any
+  // other object, such as a string set without the key's object factory, is an error.
   static absl::StatusOr<LlmBindingConstSharedPtr>
   fromFilterState(const StreamInfo::FilterState& filter_state, absl::string_view key);
 
