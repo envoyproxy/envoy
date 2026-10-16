@@ -70,7 +70,8 @@ public:
     context_.server_factory_context_.dispatcher_.time_system_.reset(time_system_);
 
     ON_CALL(context_.server_factory_context_.xds_manager_,
-            subscribeToSingletonResource(_, _, _, _, testing::An<Config::SubscriptionCallbacks&>(), _, _))
+            subscribeToSingletonResource(_, _, _, _, testing::An<Config::SubscriptionCallbacks&>(),
+                                         _, _))
         .WillByDefault(Invoke(
             [this](absl::string_view resource_name,
                    OptRef<const envoy::config::core::v3::ConfigSource>, absl::string_view,
