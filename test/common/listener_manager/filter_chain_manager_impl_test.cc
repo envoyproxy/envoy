@@ -598,6 +598,7 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionHandleIsActive) {
   EXPECT_EQ(handle->filterChainName(), filter_chain_name);
   // Subscribed but not yet warmed/committed: the chain is not active.
   EXPECT_FALSE(handle->isActive());
+  EXPECT_EQ(handle->activeFilterChain(), nullptr);
 
   Init::ExpectableWatcherImpl init_watcher;
   EXPECT_CALL(init_watcher, ready());
@@ -614,10 +615,15 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionHandleIsActive) {
 
   // Committed: the chain is reported active.
   EXPECT_TRUE(handle->isActive());
+  flushFcdsTlsUpdate();
+  ASSERT_NE(handle->activeFilterChain(), nullptr);
+  EXPECT_EQ(handle->activeFilterChain().get(),
+            fcds_shared_manager->findThreadLocalFilterChain(filter_chain_name));
 
   // Last handle released, subscription torn down: the name is no longer active.
   handle.reset();
   EXPECT_FALSE(fcds_shared_manager->isFilterChainActive(filter_chain_name));
+  EXPECT_EQ(fcds_shared_manager->activeFilterChain(filter_chain_name), nullptr);
 }
 
 // Warming a batch of filter chains in one event loop iteration publishes to workers only once.

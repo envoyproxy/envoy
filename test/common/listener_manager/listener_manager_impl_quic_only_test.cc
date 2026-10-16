@@ -890,6 +890,29 @@ udp_listener_config:
 #endif
 }
 
+#if defined(ENVOY_ENABLE_QUIC)
+// Adding an address to a QUIC listener is not done in place.
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerAddressUpdateIsNotInPlace) {
+  const envoy::config::listener::v3::Listener listener_proto =
+      parseListenerFromV3Yaml(getBasicConfig());
+  auto listener = *ListenerImpl::create(listener_proto, "", *manager_, "foo", true, false, 0);
+  auto socket_factory = std::make_unique<testing::NiceMock<Network::MockListenSocketFactory>>();
+  ON_CALL(*socket_factory, localAddress())
+      .WillByDefault(
+          testing::ReturnRefOfCopy(*Network::Utility::resolveUrl("udp://127.0.0.1:1234")));
+  EXPECT_OK(listener->addSocketFactory(std::move(socket_factory)));
+
+  auto new_listener_proto = listener_proto;
+  auto* socket_address =
+      new_listener_proto.add_additional_addresses()->mutable_address()->mutable_socket_address();
+  socket_address->set_address("127.0.0.2");
+  socket_address->set_port_value(1234);
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  EXPECT_EQ(ListenerImpl::InPlaceUpdate::None,
+            listener->supportUpdateFilterChain(new_listener_proto, true));
+}
+#endif
+
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplQuicOnlyTest, ::testing::Values(false, true));
 
 } // namespace

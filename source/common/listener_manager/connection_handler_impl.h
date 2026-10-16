@@ -56,6 +56,10 @@ public:
                           const std::list<const Network::FilterChain*>& filter_chains,
                           Network::ConnectionDrainEvent drain_event) override;
   void onListenerDrain(uint64_t listener_tag, Network::ConnectionDrainEvent drain_event) override;
+  void stopListenerAddresses(
+      const Network::ListenerConfig& listener,
+      const std::vector<Network::Address::InstanceConstSharedPtr>& addresses) override;
+  void removeListenerAddresses(const Network::ListenerConfig& listener) override;
   void disableListeners() override;
   void enableListeners() override;
   void setListenerRejectFraction(UnitFloat reject_fraction) override;
@@ -105,8 +109,19 @@ private:
     Network::InternalListenerOptRef internalListener();
   };
 
+  // The listener of an address that an in place update removed, with the listener config that the
+  // update replaced.
+  struct StoppedAddressDetails {
+    const Network::ListenerConfig* replaced_listener_;
+    std::shared_ptr<PerAddressActiveListenerDetails> details_;
+  };
+
   struct ActiveListenerDetails {
     std::vector<std::shared_ptr<PerAddressActiveListenerDetails>> per_address_details_list_;
+    // The listeners of the addresses that in place updates removed. They no longer accept
+    // connections and keep the replaced listener config until removed by removeListenerAddresses()
+    // or removeListeners().
+    std::vector<StoppedAddressDetails> stopped_per_address_details_list_;
 
     using ListenerMethodFn = std::function<void(Network::ConnectionHandler::ActiveListener&)>;
 
@@ -153,6 +168,21 @@ private:
   PerAddressActiveListenerDetailsOptRef
   findPerAddressActiveListenerDetails(const ActiveListenerDetailsOptRef active_listener_details,
                                       const Network::Address::Instance& address);
+
+  Server::ThreadLocalOverloadStateOptRef overloadState(const Network::ListenerConfig& config) const;
+  void addActiveTcpListener(ActiveListenerDetails& details, Network::ListenerConfig& config,
+                            Network::ListenSocketFactory& socket_factory, Runtime::Loader& runtime,
+                            Random::RandomGenerator& random,
+                            Server::ThreadLocalOverloadStateOptRef overload_state);
+  // Adds a listener for each address of an in place updated config that has none.
+  void addActiveTcpListenersForNewAddresses(ActiveListenerDetails& details,
+                                            Network::ListenerConfig& config,
+                                            Runtime::Loader& runtime,
+                                            Random::RandomGenerator& random);
+  // Adds the entries of the address, keeping the existing entries if keep_existing_entries is true.
+  void
+  addToTcpListenerMap(const std::shared_ptr<PerAddressActiveListenerDetails>& per_address_details,
+                      bool keep_existing_entries = false);
 
   // This has a value on worker threads, and no value on the main thread.
   const std::optional<uint32_t> worker_index_;

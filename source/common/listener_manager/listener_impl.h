@@ -60,6 +60,20 @@ public:
    */
   static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                     const envoy::config::listener::v3::Listener& rhs);
+
+  /**
+   * @return true if listener message lhs and rhs are exactly the same if ignoring the filter chain
+   * and address fields.
+   */
+  static bool filterChainAndAddressOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                              const envoy::config::listener::v3::Listener& rhs);
+
+  /**
+   * @return true if listener message lhs and rhs have the same address fields, in any order of the
+   * additional addresses.
+   */
+  static bool addressesEqual(const envoy::config::listener::v3::Listener& lhs,
+                             const envoy::config::listener::v3::Listener& rhs);
 };
 
 class ListenerManagerImpl;
@@ -73,6 +87,14 @@ public:
          const std::string& listener_name, uint32_t tcp_backlog_size,
          ListenerComponentFactory::BindType bind_type,
          const Network::SocketCreationOptions& creation_options, uint32_t num_sockets);
+
+  // Creates a socket factory that uses the sockets of `socket_factory` instead of new ones, so that
+  // a listener updated in place keeps listening on the address of `socket_factory`.
+  static std::unique_ptr<ListenSocketFactoryImpl> createWithSharedSockets(
+      ListenerComponentFactory& factory, Network::ListenSocketFactory& socket_factory,
+      const Network::Socket::OptionsSharedPtr& options, const std::string& listener_name,
+      uint32_t tcp_backlog_size, ListenerComponentFactory::BindType bind_type,
+      const Network::SocketCreationOptions& creation_options, uint32_t num_sockets);
 
   // Network::ListenSocketFactory
   Network::Socket::Type socketType() const override { return socket_type_; }
@@ -109,6 +131,14 @@ private:
   ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone,
                           uint32_t tcp_backlog_size);
 
+  ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                          Network::ListenSocketFactory& socket_factory,
+                          const Network::Socket::OptionsSharedPtr& options,
+                          const std::string& listener_name, uint32_t tcp_backlog_size,
+                          ListenerComponentFactory::BindType bind_type,
+                          const Network::SocketCreationOptions& creation_options,
+                          uint32_t num_sockets);
+
   absl::StatusOr<Network::SocketSharedPtr>
   createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
                                     Network::Socket::Type socket_type, uint32_t worker_index);
@@ -124,10 +154,11 @@ private:
   ListenerComponentFactory::BindType bind_type_;
   const Network::SocketCreationOptions socket_creation_options_;
   // One socket for each worker, pre-created before the workers fetch the sockets. There are
-  // 3 different cases:
+  // 4 different cases:
   // 1) All are null when doing config validation.
   // 2) A single socket has been duplicated for each worker (no reuse_port).
   // 3) A unique socket for each worker (reuse_port).
+  // 4) The sockets of another socket factory, which an in place update of the addresses keeps.
   //
   // TODO(mattklein123): If a listener does not bind, it still has a socket. This is confusing
   // and not needed and can be cleaned up.
@@ -236,20 +267,47 @@ public:
          bool workers_started, uint64_t hash);
   ~ListenerImpl() override;
 
+  // The kind of in place update that supportUpdateFilterChain() allows.
+  enum class InPlaceUpdate { None, FilterChains, FilterChainsAndAddresses };
+
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
   // update.
   /**
-   * Execute in place filter chain update. The filter chain update is less expensive than full
-   * listener update because connections may not need to be drained.
+   * Execute in place filter chain update, which may also add and remove addresses. The filter
+   * chain update is less expensive than full listener update because connections may not need to
+   * be drained.
    */
   absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
-                             bool workers_started, uint64_t hash);
+                             const std::string& version_info, bool workers_started, uint64_t hash,
+                             InPlaceUpdate in_place_update);
   /**
    * Determine if in place filter chain update could be executed at this moment.
+   * @return the kind of in place update to the new config, or None if it must replace the entire
+   * listener.
    */
-  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& new_config,
-                                bool worker_started);
+  InPlaceUpdate supportUpdateFilterChain(const envoy::config::listener::v3::Listener& new_config,
+                                         bool worker_started);
+
+  /**
+   * @return true if this listener is an in place update that changes the addresses of the
+   * listener it updates.
+   */
+  bool inPlaceAddressUpdate() const { return in_place_address_update_; }
+
+  /**
+   * @return the socket factory whose local address is the address, or nullptr if there is none.
+   */
+  Network::ListenSocketFactory*
+  listenSocketFactory(const Network::Address::Instance& address) const;
+
+  /**
+   * @return the socket factory of `listener`, an earlier version of this listener, whose local
+   * address is the address at the index, if `listener` configures the address the same way and the
+   * sockets are still open, or nullptr.
+   */
+  Network::ListenSocketFactory* reusableSocketFactory(const ListenerImpl& listener,
+                                                      uint32_t address_index) const;
 
   /**
    * Run the callback on each filter chain that exists in this listener but not in the passed
@@ -257,6 +315,19 @@ public:
    */
   void diffFilterChain(const ListenerImpl& another_listener,
                        std::function<void(Network::DrainableFilterChain&)> callback);
+
+  /**
+   * Run the callback on each active FCDS filter chain that this listener uses but the passed
+   * listener does not.
+   */
+  void
+  diffFcdsFilterChain(const ListenerImpl& another_listener,
+                      std::function<void(Network::DrainableFilterChainSharedPtr&&)> callback) const;
+
+  /**
+   * @return the active FCDS filter chains that this listener uses.
+   */
+  absl::flat_hash_set<const Network::FilterChain*> activeFcdsFilterChains() const;
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
@@ -430,8 +501,12 @@ private:
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               absl::Status& creation_status);
+               bool in_place_address_update, absl::Status& creation_status);
+  // Determine if the in place update could also change the addresses of this listener.
+  bool supportUpdateAddresses(const envoy::config::listener::v3::Listener& new_config) const;
   // Helpers for constructor.
+  absl::Status buildAddresses(const envoy::config::listener::v3::Listener& config,
+                              std::vector<Network::Socket::OptionsSharedPtr>& address_opts_list);
   void buildAccessLog(const envoy::config::listener::v3::Listener& config);
   absl::Status buildInternalListener(const envoy::config::listener::v3::Listener& config);
   absl::Status validateConfig();
@@ -485,10 +560,12 @@ private:
   const std::string name_;
   const bool added_via_api_;
   const bool workers_started_;
-  // Note: when FCDS is enabled and filter chains change, the stored hash may become stale.
-  // We deliberately skip recomputing it for performance, since the hash is only used
-  // to decide on in-place LDS updates, and when FCDS is configured, LDS update force a full
-  // listener update anyway.
+  const bool in_place_address_update_{false};
+  // True if a filter chain only update changed fields other than the filter chains, some of which
+  // it does not apply to the sockets and the worker listeners.
+  bool has_unapplied_config_change_{false};
+  // The hash does not cover the FCDS filter chains. It is only used to skip the LDS updates that
+  // do not change the listener config.
   const uint64_t maybe_stale_hash_;
   const uint32_t tcp_backlog_size_;
   const uint32_t max_connections_to_accept_per_socket_event_;

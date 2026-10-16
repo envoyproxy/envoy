@@ -2763,6 +2763,7 @@ envoy_cc_test(
         "listener_lds_integration_test.cc",
     ],
     rbe_pool = "linux_x64_medium",
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -2799,6 +2800,7 @@ envoy_cc_test(
         "listener_fcds_integration_test.cc",
     ],
     rbe_pool = "linux_x64_medium",
+    shard_count = 4,
     tags = [
         "cpu:3",
     ],

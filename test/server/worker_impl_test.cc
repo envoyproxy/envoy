@@ -2,6 +2,7 @@
 
 #include "source/common/api/api_impl.h"
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/server/worker_impl.h"
 
 #include "test/mocks/network/mocks.h"
@@ -17,10 +18,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ElementsAre;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using testing::Optional;
+using testing::Ref;
 using testing::Return;
 
 namespace Envoy {
@@ -180,6 +184,65 @@ TEST_F(WorkerImplTest, DrainPostsToWorkerThread) {
             ci.setReady();
           }));
   worker_.onFilterChainDrain(7UL, filter_chains, Network::ConnectionDrainEvent{});
+  ci.waitReady();
+
+  worker_.stop();
+}
+
+TEST_F(WorkerImplTest, ListenerAddressesPostToWorkerThread) {
+  InSequence s;
+  std::thread::id current_thread_id = std::this_thread::get_id();
+  ConditionalInitializer ci;
+
+  NiceMock<Network::MockListenerConfig> listener;
+  EXPECT_CALL(*handler_, addListener(_, _, _, _));
+  worker_.addListener(std::nullopt, listener, [&ci]() { ci.setReady(); }, runtime_, random_);
+  worker_.start(guard_dog_, emptyCallback, std::nullopt);
+  ci.waitReady();
+
+  const Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80);
+  EXPECT_CALL(*handler_, stopListenerAddresses(Ref(listener), ElementsAre(address)))
+      .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        ci.setReady();
+      }));
+  worker_.stopListenerAddresses(listener, {address});
+  ci.waitReady();
+
+  EXPECT_CALL(*handler_, removeListenerAddresses(Ref(listener)))
+      .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        ci.setReady();
+      }));
+  worker_.removeListenerAddresses(listener);
+  ci.waitReady();
+
+  worker_.stop();
+}
+
+// A worker runs the removal of filter chains before the in place add of a later version of the
+// listener posted after it, so the removal only closes the connections accepted before that
+// version, even on a filter chain that the version uses again.
+TEST_F(WorkerImplTest, RemoveFilterChainsRunsBeforeLaterAddListener) {
+  InSequence s;
+  ConditionalInitializer ci;
+  absl::Notification later_posts_queued;
+
+  NiceMock<Network::MockListenerConfig> listener;
+  // The worker waits in the first add until both later posts are queued.
+  EXPECT_CALL(*handler_, addListener(_, _, _, _))
+      .WillOnce(
+          InvokeWithoutArgs([&later_posts_queued]() { later_posts_queued.WaitForNotification(); }));
+  worker_.addListener(std::nullopt, listener, []() {}, runtime_, random_);
+  worker_.start(guard_dog_, emptyCallback, std::nullopt);
+
+  const std::list<const Network::FilterChain*> filter_chains;
+  EXPECT_CALL(*handler_, removeFilterChains(7UL, _, _));
+  EXPECT_CALL(*handler_, addListener(Optional(7UL), _, _, _));
+  worker_.removeFilterChains(7UL, filter_chains, []() {});
+  worker_.addListener(7UL, listener, [&ci]() { ci.setReady(); }, runtime_, random_);
+  later_posts_queued.Notify();
   ci.waitReady();
 
   worker_.stop();

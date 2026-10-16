@@ -168,6 +168,18 @@ void WorkerImpl::onListenerDrain(uint64_t listener_tag, Network::ConnectionDrain
   });
 }
 
+void WorkerImpl::stopListenerAddresses(
+    const Network::ListenerConfig& listener,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& addresses) {
+  dispatcher_->post([this, &listener, addresses]() -> void {
+    handler_->stopListenerAddresses(listener, addresses);
+  });
+}
+
+void WorkerImpl::removeListenerAddresses(const Network::ListenerConfig& listener) {
+  dispatcher_->post([this, &listener]() -> void { handler_->removeListenerAddresses(listener); });
+}
+
 void WorkerImpl::threadRoutine(OptRef<GuardDog> guard_dog, const std::function<void()>& cb) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
   // The watch dog must be created after the dispatcher starts running and has post events flushed,

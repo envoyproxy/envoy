@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
@@ -72,7 +73,10 @@ public:
   virtual void decNumConnections() PURE;
 
   /**
-   * Adds a listener to the handler, optionally replacing the existing listener.
+   * Adds a listener to the handler, optionally replacing the existing listener. When replacing with
+   * a config that has more addresses than the existing listener listens on, it also adds listeners
+   * for the addresses that the existing listener does not listen on. The addresses that the new
+   * config removes must therefore be stopped by stopListenerAddresses() beforehand.
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    * @param runtime the runtime for the server.
@@ -111,7 +115,9 @@ public:
   /**
    * Notify the connections in the given filter chains that they are being drained. This is
    * intended to be invoked at the start of a filter-chain drain sequence (before the drain
-   * timer expires and connections are forcibly closed). It does not close connections.
+   * timer expires and connections are forcibly closed). It does not close connections. It also
+   * notifies the connections of the addresses that stopListenerAddresses() stopped, unless their
+   * listeners are draining already.
    * @param listener_tag supplies the tag passed to addListener().
    * @param filter_chains supplies the filter chains whose connections should be notified.
    * @param drain_event describes the drain sequence (start time and strategy).
@@ -127,6 +133,26 @@ public:
    * @param drain_event describes the drain sequence (start time and strategy).
    */
   virtual void onListenerDrain(uint64_t listener_tag, ConnectionDrainEvent drain_event) PURE;
+
+  /**
+   * Stop accepting new connections on the addresses that an in place update removed from a
+   * listener. The listeners of the addresses keep using the replaced listener config, which must
+   * outlive them, until removeListenerAddresses() or removeListeners() removes them. The next
+   * onFilterChainDrain() notifies their connections that they are being drained, and
+   * removeFilterChains() also closes their connections that use the removed filter chains.
+   * @param listener supplies the listener config that the in place update replaced.
+   * @param addresses supplies the removed addresses.
+   */
+  virtual void
+  stopListenerAddresses(const ListenerConfig& listener,
+                        const std::vector<Address::InstanceConstSharedPtr>& addresses) PURE;
+
+  /**
+   * Remove the listeners of the addresses that stopListenerAddresses() stopped for the listener
+   * config. All connections accepted on them are closed.
+   * @param listener supplies the listener config passed to stopListenerAddresses().
+   */
+  virtual void removeListenerAddresses(const ListenerConfig& listener) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.
