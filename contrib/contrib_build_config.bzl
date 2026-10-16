@@ -8,6 +8,12 @@ CONTRIB_EXTENSIONS = {
     "envoy.compression.qatzstd.compressor":                      "//contrib/qat/compression/qatzstd/compressor/source:config",
 
     #
+    # Clusters
+    #
+
+    "envoy.clusters.dns_srv":                                   "//contrib/dns_srv/clusters/source:cluster",
+
+    #
     # HTTP filters
     #
     "envoy.filters.http.checksum":                              "//contrib/checksum/filters/http/source:config",
