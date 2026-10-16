@@ -78,6 +78,7 @@ private:
   // ClusterImplBase
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
   void startPreInit() override;
+  bool hasZeroInitialFetchTimeout() const override { return zero_initial_fetch_timeout_; }
   void onAssignmentTimeout();
 
   // Returns true iff all the LEDS based localities were updated.
@@ -129,6 +130,9 @@ private:
 
   // Tracks whether a cached resource is used as the current EDS resource.
   bool using_cached_resource_{false};
+
+  // True when the EDS config source has initialFetchTimeout of 0.
+  bool zero_initial_fetch_timeout_{false};
 };
 
 using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;

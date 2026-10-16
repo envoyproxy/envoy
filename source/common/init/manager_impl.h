@@ -38,6 +38,7 @@ public:
   void initialize(const Watcher& watcher) override;
   void updateWatcher(const Watcher& watcher) override;
   void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) override;
+  uint32_t uninitializedCount() const { return count_; }
 
 private:
   // Callback function with an additional target_name parameter, decrease unready targets count by

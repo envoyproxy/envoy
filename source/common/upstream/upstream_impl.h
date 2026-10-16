@@ -1329,6 +1329,8 @@ protected:
 
   virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
 
+  virtual bool hasZeroInitialFetchTimeout() const { return false; }
+
   absl::Status parseDropOverloadConfig(
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment);
 
