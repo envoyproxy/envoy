@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
@@ -13,6 +14,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/resource_name.h"
@@ -25,6 +27,7 @@
 #include "source/common/router/scoped_config_impl.h"
 #include "source/common/stats/prefix_utility.h"
 
+#include "absl/status/status.h"
 #include "absl/strings/str_join.h"
 
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
@@ -298,33 +301,37 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
   std::vector<ScopedRouteInfoConstSharedPtr> updated_scopes;
   std::list<RdsRouteConfigProviderHelperPtr> to_be_removed_rds_providers;
+  std::vector<std::string> exception_msgs;
   for (const auto& resource : resources) {
     // Explicit copy so that we can std::move later.
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
         Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
             resource.get().resource());
     const absl::string_view scope_name = scoped_route_config.name();
-    if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
-        scope_info_iter != scoped_route_map_.end()) {
-      if (scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
-        continue;
-      }
-      // Remove the old key from scope_names_by_hash_ in case the scope key has changed. (If it
-      // hasn't, we'll just add it back anyway.)
-      if (scope_name_by_hash_.find(scope_info_iter->second->scopeKey().hash()) !=
-          scope_name_by_hash_.end()) {
-        scope_name_by_hash_.erase(scope_info_iter->second->scopeKey().hash());
-      }
+    const auto scope_info_iter = scoped_route_map_.find(scope_name);
+    if (scope_info_iter != scoped_route_map_.end() &&
+        scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
+      continue;
     }
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
     if (scoped_route_config.has_route_configuration()) {
-      RouteConfigProviderPtr route_config_provider =
-          route_config_provider_manager_.createStaticRouteConfigProvider(
-              scoped_route_config.route_configuration(), factory_context_, init_manager,
-              factory_context_.messageValidationContext().staticValidationVisitor());
-      scoped_route_info = std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
-                                                            route_config_provider->configCast());
+      TRY_ASSERT_MAIN_THREAD {
+        RouteConfigProviderPtr route_config_provider =
+            route_config_provider_manager_.createStaticRouteConfigProvider(
+                scoped_route_config.route_configuration(), factory_context_, init_manager,
+                factory_context_.messageValidationContext().staticValidationVisitor());
+        scoped_route_info = std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
+                                                              route_config_provider->configCast());
+      }
+      END_TRY
+      CATCH(const EnvoyException& e, {
+        if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_partial_acceptance")) {
+          throw;
+        }
+        exception_msgs.push_back(e.what());
+        continue;
+      });
       // If this is an update from a scoped route configuration specifying route_configuration_name
       // to one specifying route_configuration, then the RDS subscription is no longer needed. We
       // can remove the RDS config provider, but hold on to them until exiting the loop in case the
@@ -337,7 +344,11 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
       }
     } else {
       if (scoped_route_config.route_configuration_name().empty()) {
-        return absl::InvalidArgumentError("route_configuration_name is empty.");
+        if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_partial_acceptance")) {
+          return absl::InvalidArgumentError("route_configuration_name is empty.");
+        }
+        exception_msgs.push_back("route_configuration_name is empty.");
+        continue;
       }
       rds.set_route_config_name(scoped_route_config.route_configuration_name());
       std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
@@ -359,6 +370,11 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
       route_provider_by_scope_[scoped_route_info->scopeName()] =
           std::move(rds_config_provider_helper);
     }
+    if (scope_info_iter != scoped_route_map_.end()) {
+      // Remove the old key from scope_names_by_hash_ in case the scope key has changed. (If it
+      // hasn't, we'll just add it back anyway.)
+      scope_name_by_hash_.erase(scope_info_iter->second->scopeKey().hash());
+    }
     scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
     scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
     updated_scopes.push_back(scoped_route_info);
@@ -378,6 +394,17 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
       thread_local_scoped_config->addOrUpdateRoutingScopes(updated_scopes);
       return config;
     });
+  }
+  if (!exception_msgs.empty()) {
+    // Update config info (for /config_dump) and the all_scopes_ gauge to reflect the scopes
+    // that were partially accepted, while leaving config_reload_ and config_reload_time_ms_
+    // unincremented on NACK (matching CDS behavior).
+    if (!updated_scopes.empty()) {
+      setLastConfigInfo(std::optional<LastConfigInfo>({std::nullopt, version_info}));
+      setLastUpdated();
+    }
+    stats_.all_scopes_.set(scoped_route_map_.size());
+    return absl::InvalidArgumentError(absl::StrJoin(exception_msgs, ", "));
   }
   return any_applied;
 }

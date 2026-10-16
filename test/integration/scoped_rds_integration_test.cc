@@ -1,3 +1,7 @@
+#include <cstdint>
+
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
@@ -6,22 +10,28 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/config/api_version.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/scoped_rds.h"
+#include "test/integration/utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::ElementsAre;
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
 namespace Envoy {
 namespace {
 
@@ -737,6 +747,201 @@ key:
   // The version gauge should be set to xxHash64("1").
   test_server_->waitForGauge("http.config_test.scoped_rds.foo-scoped-routes.version",
                              Eq(13237225503670494420UL));
+}
+
+// Scoped RDS end to end (real Envoy server, real SRDS gRPC stream, real HTTP traffic and admin
+// config dump), verifying the fix behind envoy.reloadable_features.srds_partial_acceptance.
+//
+// A scope whose inline route points at a cluster unknown to the ClusterManager makes the SRDS push
+// that carries it fail half-way through ScopedRdsConfigSubscription::addOrUpdateScopes():
+//  * when srds_partial_acceptance is false:
+//    - the scopes processed before it are written to the main-thread scoped_route_map_ (which backs
+//      /config_dump), but the push is NACKed before they are propagated to the workers;
+//    - once the bad scope is gone, re-sending those scopes is ACKed, but they are skipped as
+//      unchanged (their hash matches the stale map entry), so the workers keep returning 404 (NR);
+//    - the scopes after it in the same push are never processed, so they are unaffected and are
+//      applied normally once re-sent.
+//  * when srds_partial_acceptance is true:
+//    - the bad scope is caught and NACKed, while both valid_scope (before it) and other_scope
+//      (after it) are written to scoped_route_map_ AND propagated to worker threads;
+//    - once the bad scope is removed, the next push is ACKed and both valid scopes continue routing
+//      traffic on the worker threads.
+class ScopedRdsPartiallyRejectedPushIntegrationTest : public ScopedRdsIntegrationTest {
+protected:
+  // A scope with an inline route configuration that routes
+  // all requests to `cluster`.
+  static std::string scope(absl::string_view name, absl::string_view cluster,
+                           absl::string_view key) {
+    return absl::Substitute(R"EOF(
+name: $0
+route_configuration:
+  name: $0_routes
+  virtual_hosts:
+    - name: integration
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: $1 }
+key:
+  fragments:
+    - string_key: $2
+)EOF",
+                            name, cluster, key);
+  }
+
+  static Http::TestRequestHeaderMapImpl requestInScope(absl::string_view scope_key) {
+    return Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                          {":path", "/"},
+                                          {":authority", "host"},
+                                          {":scheme", "http"},
+                                          {"Addr", absl::StrCat("x-foo-key=", scope_key)}};
+  }
+
+  // Expects a request in the given scope to be routed to fake upstream `backend_idx`.
+  void expectRouted(absl::string_view scope_key, uint32_t backend_idx) {
+    sendRequestAndVerifyResponse(requestInScope(scope_key), /*request_size=*/0,
+                                 Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                                 /*response_size=*/0, backend_idx);
+  }
+
+  // Expects the workers to have no route for a request in the given scope (404, NoRouteFound).
+  void expectNoRoute(absl::string_view scope_key) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = codec_client_->makeHeaderOnlyRequest(requestInScope(scope_key));
+    ASSERT_TRUE(response->waitForEndStream());
+    verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+    cleanupUpstreamAndDownstream();
+  }
+
+  // Reads the requests Envoy sent on the SRDS stream until a NACK, and returns its error message.
+  std::string waitForSrdsNack() {
+    FakeStream& stream = *scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_];
+    while (true) {
+      if (isDelta()) {
+        envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+        AssertionResult result = stream.waitForGrpcMessage(*dispatcher_, request);
+        RELEASE_ASSERT(result, result.message());
+        if (request.has_error_detail()) {
+          return request.error_detail().message();
+        }
+      } else {
+        envoy::service::discovery::v3::DiscoveryRequest request;
+        AssertionResult result = stream.waitForGrpcMessage(*dispatcher_, request);
+        RELEASE_ASSERT(result, result.message());
+        if (request.has_error_detail()) {
+          return request.error_detail().message();
+        }
+      }
+    }
+  }
+
+  // Names of the scopes that the admin /config_dump lists for the SRDS subscription. The dump is
+  // built from the main-thread scoped_route_map_, not from the config the workers route with.
+  std::vector<std::string> scopeNamesInConfigDump() {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "GET", "/config_dump?resource=dynamic_scoped_route_configs", "",
+        downstreamProtocol(), version_);
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    envoy::admin::v3::ConfigDump config_dump;
+    TestUtility::loadFromJson(response->body(), config_dump);
+    std::vector<std::string> names;
+    for (const auto& config : config_dump.configs()) {
+      const auto dynamic_configs = MessageUtil::anyConvert<
+          envoy::admin::v3::ScopedRoutesConfigDump::DynamicScopedRouteConfigs>(config);
+      if (dynamic_configs.name() != srds_config_name_) {
+        continue;
+      }
+      for (const auto& scoped_route_config : dynamic_configs.scoped_route_configs()) {
+        names.push_back(MessageUtil::anyConvert<envoy::config::route::v3::ScopedRouteConfiguration>(
+                            scoped_route_config)
+                            .name());
+      }
+    }
+    return names;
+  }
+
+  void testPartiallyRejectedSrdsPush(bool partial_acceptance);
+};
+
+void ScopedRdsPartiallyRejectedPushIntegrationTest::testPartiallyRejectedSrdsPush(
+    bool partial_acceptance) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.srds_partial_acceptance",
+                                    partial_acceptance ? "true" : "false");
+
+  // cluster_0 is a static cluster of the fixture, backed by fake upstream 0.
+  // Unrelated to the bug; only gives the server a working scope to start with.
+  const std::string init_scope = scope("init_scope", "cluster_0", "init-key");
+  const std::string valid_scope = scope("valid_scope", "cluster_0", "valid-key");
+  // Routes to a cluster that does not exist.
+  const std::string bad_scope = scope("bad_scope", "unknown_cluster", "bad-key");
+  const std::string other_scope = scope("other_scope", "cluster_0", "other-key");
+
+  // The server does not finish starting up until SRDS has answered once.
+  on_server_init_function_ = [&]() {
+    createScopedRdsStream();
+    sendSrdsResponse({init_scope}, {init_scope}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Eq(1));
+  EXPECT_THAT(scopeNamesInConfigDump(), ElementsAre("init_scope"));
+  expectRouted("init-key", /*backend_idx=*/0);
+
+  // Push 1: {valid_scope, bad_scope, other_scope} -> NACKed.
+  sendSrdsResponse({init_scope, valid_scope, bad_scope, other_scope},
+                   {valid_scope, bad_scope, other_scope}, {}, "2");
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
+                               Eq(1));
+  EXPECT_THAT(waitForSrdsNack(), HasSubstr("route: unknown cluster 'unknown_cluster'"));
+  if (partial_acceptance) {
+    // With srds_partial_acceptance enabled, both valid_scope and other_scope are added to
+    // scoped_route_map_ AND propagated to worker threads.
+    test_server_->waitForGauge("http.config_test.scoped_rds.foo-scoped-routes.all_scopes", Eq(3));
+    EXPECT_THAT(scopeNamesInConfigDump(), ElementsAre("init_scope", "other_scope", "valid_scope"));
+    expectRouted("valid-key", /*backend_idx=*/0);
+    expectRouted("other-key", /*backend_idx=*/0);
+    expectNoRoute("bad-key");
+  } else {
+    // BUG (when srds_partial_acceptance is false): valid_scope was recorded on the main thread
+    // although the push was rejected, so the config dump lists it, while none of the push's scopes
+    // reached the workers.
+    EXPECT_THAT(scopeNamesInConfigDump(), ElementsAre("init_scope", "valid_scope"));
+    expectNoRoute("valid-key");
+    expectNoRoute("other-key");
+  }
+  expectRouted("init-key", /*backend_idx=*/0);
+
+  // Push 2: bad_scope is removed and the other scopes are re-sent. ACKed.
+  sendSrdsResponse({init_scope, valid_scope, other_scope}, {valid_scope, other_scope},
+                   {"bad_scope"}, "3");
+  test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
+                               Eq(2));
+  test_server_->waitForGauge("http.config_test.scoped_rds.foo-scoped-routes.all_scopes", Eq(3));
+  EXPECT_THAT(scopeNamesInConfigDump(), ElementsAre("init_scope", "other_scope", "valid_scope"));
+  expectRouted("other-key", /*backend_idx=*/0);
+  if (partial_acceptance) {
+    expectRouted("valid-key", /*backend_idx=*/0);
+  } else {
+    // BUG (when srds_partial_acceptance is false): valid_scope was skipped as unchanged, so the
+    // workers still have no route for it.
+    expectNoRoute("valid-key");
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsPartiallyRejectedPushIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(ScopedRdsPartiallyRejectedPushIntegrationTest,
+       PartiallyRejectedSrdsPushLeavesScopesOffWorkers) {
+  testPartiallyRejectedSrdsPush(/*partial_acceptance=*/false);
+}
+
+TEST_P(ScopedRdsPartiallyRejectedPushIntegrationTest,
+       PartialAcceptanceAppliesValidScopesToWorkers) {
+  testPartiallyRejectedSrdsPush(/*partial_acceptance=*/true);
 }
 
 } // namespace

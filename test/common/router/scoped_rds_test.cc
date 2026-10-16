@@ -1,3 +1,4 @@
+#include <chrono>
 #include <string>
 
 #include "envoy/admin/v3/config_dump_shared.pb.h"
@@ -887,6 +888,288 @@ key:
                     TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "route_config");
+}
+
+class ScopedRdsPartialAcceptanceTest : public ScopedRdsTest,
+                                       public testing::WithParamInterface<bool> {
+protected:
+  bool partialAcceptanceEnabled() const { return GetParam(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(PartialAcceptance, ScopedRdsPartialAcceptanceTest, testing::Bool());
+
+// Tests a two-push scenario where an inline-RDS push partially fails validation:
+//
+// 1. A delta push carries three inline-RDS scopes, in this order: `valid_scope`, `bad_scope`
+//    (whose route points at a cluster unknown to the ClusterManager), and `other_scope`. Building
+//    `bad_scope`'s static route config throws.
+//    - When `envoy.reloadable_features.srds_partial_acceptance` is false, the exception aborts
+//      `addOrUpdateScopes()` mid-loop: `valid_scope` has already been written into the main-thread
+//      `scoped_route_map_` while `applyConfigUpdate()` is never reached (so worker threads never
+//      see it), and `other_scope` is never reached at all.
+//    - When `envoy.reloadable_features.srds_partial_acceptance` is true, the exception is caught
+//      and returned as an InvalidArgumentError (NACK), while both `valid_scope` and `other_scope`
+//      are written into `scoped_route_map_` AND propagated to worker threads.
+// 2. `bad_scope` is removed and the management server re-sends `{valid_scope, other_scope}` (ACK).
+//    - When the flag is false, `valid_scope` is skipped by the `configHash()` short-circuit in
+//      `addOrUpdateScopes()` because it is already in `scoped_route_map_`, so it remains visible
+//      in `/config_dump` but permanently absent from worker threads.
+//    - When the flag is true, both `valid_scope` and `other_scope` resolve on worker threads.
+TEST_P(ScopedRdsPartialAcceptanceTest, PartiallyFailedInlineRdsPush) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_partial_acceptance",
+                               partialAcceptanceEnabled() ? "true" : "false"}});
+
+  // "unknown_cluster" is intentionally NOT registered with the ClusterManager.
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  setup();
+
+  constexpr absl::string_view scope_tmpl = R"EOF(
+name: $0
+route_configuration:
+  name: $0_routes
+  virtual_hosts:
+    - name: virtual_host
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: $1 }
+key:
+  fragments:
+    - string_key: $2
+)EOF";
+  const auto valid_resource = parseScopedRouteConfigurationFromYaml(
+      absl::Substitute(scope_tmpl, "valid_scope", "baz", "valid-key"));
+  const auto bad_resource = parseScopedRouteConfigurationFromYaml(
+      absl::Substitute(scope_tmpl, "bad_scope", "unknown_cluster", "bad-key"));
+  const auto other_resource = parseScopedRouteConfigurationFromYaml(
+      absl::Substitute(scope_tmpl, "other_scope", "baz", "other-key"));
+
+  // Route config as seen by the worker thread (the thread-local ScopedConfigImpl).
+  auto worker_route_config = [this](absl::string_view key) {
+    return getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+        scope_key_builder_->computeScopeKey(
+            TestRequestHeaderMapImpl{{"Addr", absl::StrCat("x-foo-key;", key)}}));
+  };
+  // Scope names as reported by the admin `route_scopes` config dump.
+  auto dumped_scope_names = [this]() {
+    UniversalStringMatcher universal_matcher;
+    ProtobufTypes::MessagePtr message =
+        server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+            universal_matcher);
+    const auto& dump =
+        TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+    std::vector<std::string> names;
+    for (const auto& dynamic_config : dump.dynamic_scoped_route_configs()) {
+      for (const auto& any : dynamic_config.scoped_route_configs()) {
+        names.push_back(
+            TestUtility::anyConvert<envoy::config::route::v3::ScopedRouteConfiguration>(any)
+                .name());
+      }
+    }
+    return names;
+  };
+
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  // --- Update 1: {valid_scope, bad_scope, other_scope} -> NACK. ---
+  const auto time = std::chrono::milliseconds(1234567891234);
+  timeSystem().setSystemTime(time);
+  {
+    const auto decoded_resources =
+        TestUtility::decodeResources({valid_resource, bad_resource, other_resource});
+    if (partialAcceptanceEnabled()) {
+      const absl::Status status =
+          srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1");
+      EXPECT_FALSE(status.ok());
+      EXPECT_THAT(status.message(), testing::HasSubstr("route: unknown cluster 'unknown_cluster'"));
+    } else {
+      EXPECT_THROW_WITH_REGEX(
+          (void)srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"),
+          EnvoyException, "route: unknown cluster 'unknown_cluster'");
+    }
+  }
+  EXPECT_EQ(0UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
+  EXPECT_THAT(worker_route_config("bad-key"), IsNull());
+  if (partialAcceptanceEnabled()) {
+    // Both valid scopes must be in scoped_route_map_ AND propagated to worker threads.
+    EXPECT_EQ(2UL, all_scopes_.value());
+    EXPECT_EQ(std::chrono::time_point_cast<std::chrono::milliseconds>(provider_->lastUpdated())
+                  .time_since_epoch(),
+              time);
+    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope"), Key("other_scope")));
+    EXPECT_THAT(dumped_scope_names(), testing::ElementsAre("other_scope", "valid_scope"));
+    ASSERT_THAT(worker_route_config("valid-key"), Not(IsNull()));
+    EXPECT_EQ(worker_route_config("valid-key")->name(), "valid_scope_routes");
+    ASSERT_THAT(worker_route_config("other-key"), Not(IsNull()));
+    EXPECT_EQ(worker_route_config("other-key")->name(), "other_scope_routes");
+  } else {
+    // BUG (when flag is false): the scope processed before the bad one leaked into the main-thread
+    // map even though the push was rejected. other_scope comes after the bad one, so it was never
+    // processed, and none of the scopes were propagated to worker threads.
+    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope")));
+    EXPECT_THAT(worker_route_config("valid-key"), IsNull());
+    EXPECT_THAT(worker_route_config("other-key"), IsNull());
+  }
+
+  // --- Update 2: bad_scope removed, remaining scopes re-sent -> ACK. ---
+  {
+    Protobuf::RepeatedPtrField<std::string> removed;
+    *removed.Add() = "bad_scope";
+    const auto decoded_resources = TestUtility::decodeResources({valid_resource, other_resource});
+    EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, removed, "2"));
+  }
+  EXPECT_EQ(1UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(2UL, all_scopes_.value());
+  // Main thread and config_dump report both scopes as active.
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope"), Key("other_scope")));
+  EXPECT_THAT(dumped_scope_names(), testing::ElementsAre("other_scope", "valid_scope"));
+  ASSERT_THAT(worker_route_config("other-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("other-key")->name(), "other_scope_routes");
+  if (partialAcceptanceEnabled()) {
+    ASSERT_THAT(worker_route_config("valid-key"), Not(IsNull()));
+    EXPECT_EQ(worker_route_config("valid-key")->name(), "valid_scope_routes");
+  } else {
+    // BUG (when flag is false): valid_scope was skipped as "unchanged" and is still missing from
+    // worker threads.
+    EXPECT_THAT(worker_route_config("valid-key"), IsNull());
+  }
+}
+
+// Tests a partially failed push where the valid scopes use dynamic RDS (`route_configuration_name`)
+// and `bad_scope` is missing `route_configuration_name`:
+//
+// - When `envoy.reloadable_features.srds_partial_acceptance` is false, `addOrUpdateScopes()`
+//   creates the RDS subscription for `valid_scope` (processed before `bad_scope`) and inserts it
+//   into `scoped_route_map_`, then aborts on `bad_scope` before reaching `other_scope`. Because
+//   the `srds_initialization_continuation` cleanup still starts `valid_scope`'s RDS subscription
+//   on unwind, an RDS push for `valid_scope_routes` triggers `onRdsConfigUpdate()` and propagates
+//   `valid_scope` to worker threads, while `other_scope` (after `bad_scope`) is completely skipped.
+// - When `envoy.reloadable_features.srds_partial_acceptance` is true, both `valid_scope` and
+//   `other_scope` have their RDS subscriptions started and both propagate to worker threads once
+//   their RDS configs arrive.
+TEST_P(ScopedRdsPartialAcceptanceTest, PartiallyFailedDynamicRdsPush) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_partial_acceptance",
+                               partialAcceptanceEnabled() ? "true" : "false"}});
+
+  server_factory_context_.cluster_manager_.initializeClusters({"bluh"}, {});
+  setup();
+
+  constexpr absl::string_view rds_scope_tmpl = R"EOF(
+name: $0
+route_configuration_name: $0_routes
+key:
+  fragments:
+    - string_key: $1
+)EOF";
+  // `bad_scope` omits both `route_configuration` and `route_configuration_name`.
+  constexpr absl::string_view bad_scope_yaml = R"EOF(
+name: bad_scope
+key:
+  fragments:
+    - string_key: bad-key
+)EOF";
+  const auto valid_resource = parseScopedRouteConfigurationFromYaml(
+      absl::Substitute(rds_scope_tmpl, "valid_scope", "valid-key"));
+  const auto bad_resource = parseScopedRouteConfigurationFromYaml(std::string(bad_scope_yaml));
+  const auto other_resource = parseScopedRouteConfigurationFromYaml(
+      absl::Substitute(rds_scope_tmpl, "other_scope", "other-key"));
+
+  auto worker_route_config = [this](absl::string_view key) {
+    return getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+        scope_key_builder_->computeScopeKey(
+            TestRequestHeaderMapImpl{{"Addr", absl::StrCat("x-foo-key;", key)}}));
+  };
+  auto dumped_scope_names = [this]() {
+    UniversalStringMatcher universal_matcher;
+    ProtobufTypes::MessagePtr message =
+        server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+            universal_matcher);
+    const auto& dump =
+        TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+    std::vector<std::string> names;
+    for (const auto& dynamic_config : dump.dynamic_scoped_route_configs()) {
+      for (const auto& any : dynamic_config.scoped_route_configs()) {
+        names.push_back(
+            TestUtility::anyConvert<envoy::config::route::v3::ScopedRouteConfiguration>(any)
+                .name());
+      }
+    }
+    return names;
+  };
+
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+
+  // --- Update 1: {valid_scope, bad_scope, other_scope} -> NACK. ---
+  {
+    const auto decoded_resources =
+        TestUtility::decodeResources({valid_resource, bad_resource, other_resource});
+    const absl::Status status =
+        srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1");
+    EXPECT_FALSE(status.ok());
+    EXPECT_THAT(status.message(), testing::HasSubstr("route_configuration_name is empty."));
+  }
+  EXPECT_EQ(0UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+
+  // Deliver RDS configs for any started RDS subscriptions.
+  pushRdsConfig({"valid_scope_routes", "other_scope_routes"}, "111");
+
+  EXPECT_THAT(worker_route_config("bad-key"), IsNull());
+  if (partialAcceptanceEnabled()) {
+    // Both valid_scope and other_scope were accepted, had their RDS subscriptions started, and
+    // were propagated to worker threads upon receiving their RDS configs.
+    EXPECT_EQ(2UL, all_scopes_.value());
+    EXPECT_EQ(2UL, active_scopes_.value());
+    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope"), Key("other_scope")));
+    EXPECT_THAT(dumped_scope_names(), testing::ElementsAre("other_scope", "valid_scope"));
+    ASSERT_THAT(worker_route_config("valid-key"), Not(IsNull()));
+    EXPECT_EQ(worker_route_config("valid-key")->name(), "valid_scope_routes");
+    ASSERT_THAT(worker_route_config("other-key"), Not(IsNull()));
+    EXPECT_EQ(worker_route_config("other-key")->name(), "other_scope_routes");
+  } else {
+    // When flag is false: valid_scope (processed before bad_scope) had its RDS subscription
+    // created and started on unwind, so onRdsConfigUpdate() propagated it to worker threads even
+    // though the SRDS push was rejected and config_dump is still empty. other_scope (after
+    // bad_scope) was skipped and never received an RDS subscription.
+    EXPECT_EQ(0UL, all_scopes_.value());
+    EXPECT_EQ(1UL, active_scopes_.value());
+    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope")));
+    EXPECT_THAT(dumped_scope_names(), testing::IsEmpty());
+    ASSERT_THAT(worker_route_config("valid-key"), Not(IsNull()));
+    EXPECT_EQ(worker_route_config("valid-key")->name(), "valid_scope_routes");
+    EXPECT_THAT(worker_route_config("other-key"), IsNull());
+  }
+
+  // --- Update 2: bad_scope removed, remaining scopes re-sent -> ACK. ---
+  {
+    Protobuf::RepeatedPtrField<std::string> removed;
+    *removed.Add() = "bad_scope";
+    const auto decoded_resources = TestUtility::decodeResources({valid_resource, other_resource});
+    EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, removed, "2"));
+  }
+  pushRdsConfig({"other_scope_routes"}, "222");
+
+  EXPECT_EQ(1UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(2UL, active_scopes_.value());
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope"), Key("other_scope")));
+  EXPECT_THAT(dumped_scope_names(), testing::ElementsAre("other_scope", "valid_scope"));
+  ASSERT_THAT(worker_route_config("valid-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("valid-key")->name(), "valid_scope_routes");
+  ASSERT_THAT(worker_route_config("other-key"), Not(IsNull()));
+  EXPECT_EQ(worker_route_config("other-key")->name(), "other_scope_routes");
 }
 
 // Tests that conflict resources in the same push are detected.
