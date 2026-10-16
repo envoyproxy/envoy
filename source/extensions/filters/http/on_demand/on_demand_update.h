@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 #include "envoy/http/filter.h"
@@ -108,14 +110,14 @@ public:
 
   // Only the filter-level config has stats; per-route configs only override the behavior.
   OptRef<OnDemandFilterStats> stats() {
-    return stats_.has_value() ? OptRef<OnDemandFilterStats>(*stats_) : absl::nullopt;
+    return stats_.has_value() ? OptRef<OnDemandFilterStats>(*stats_) : std::nullopt;
   }
 
 private:
   static OnDemandFilterStats generateStats(Stats::Scope& scope, const std::string& stats_prefix);
 
   DecodeHeadersBehaviorPtr behavior_;
-  absl::optional<OnDemandFilterStats> stats_;
+  std::optional<OnDemandFilterStats> stats_;
 };
 
 using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;
