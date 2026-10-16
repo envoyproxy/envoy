@@ -291,6 +291,22 @@ Counter& counterFromStatNames(Scope& scope, const StatNameVec& names,
                               StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
+ * Creates a counter with explicit tags from spans of StatNames, mirroring
+ * Scope::counterFromTaggedName. The tag-extracted name is built from base_names (no tag
+ * values) and the flat name from names (tag values interleaved); tags carry one
+ * {tag_name, value} per interleaved value. With empty tags the joined base_names name the stat
+ * and names is ignored.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param base_names The span of StatNames without tag values.
+ * @param tags The tags of the counter.
+ * @param names The span of StatNames with tag values interleaved; ignored if tags is empty.
+ * @return A counter named using the joined names.
+ */
+Counter& counterFromTaggedStatNames(Scope& scope, StatNameSpan base_names, StatNameTagSpan tags,
+                                    StatNameSpan names);
+
+/**
  * Creates a gauge from a vector of tokens which are used to create the
  * name. The tokens can be specified as DynamicName or StatName. For
  * tokens specified as DynamicName, a dynamic StatName will be created. See
@@ -359,6 +375,21 @@ Histogram& histogramFromElements(Scope& scope, const ElementVec& elements, Histo
  */
 Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, Histogram::Unit unit,
                                   StatNameTagVectorOptConstRef tags = std::nullopt);
+
+/**
+ * Creates a histogram with explicit tags from spans of StatNames, mirroring
+ * Scope::histogramFromTaggedName. See counterFromTaggedStatNames for the parameter semantics.
+ *
+ * @param scope The scope in which to create the histogram.
+ * @param base_names The span of StatNames without tag values.
+ * @param tags The tags of the histogram.
+ * @param names The span of StatNames with tag values interleaved; ignored if tags is empty.
+ * @param unit The unit of measurement.
+ * @return A histogram named using the joined names.
+ */
+Histogram& histogramFromTaggedStatNames(Scope& scope, StatNameSpan base_names,
+                                        StatNameTagSpan tags, StatNameSpan names,
+                                        Histogram::Unit unit);
 
 /**
  * Creates a TextReadout from a vector of tokens which are used to create the
