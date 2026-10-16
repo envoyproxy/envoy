@@ -131,6 +131,7 @@ public:
   ProtoT* get() { return proto_; }
   const ProtoT* get() const { return proto_; }
   google::protobuf::Arena* arena() { return arena_.get(); }
+  google::protobuf::Arena* arena() const { return arena_.get(); }
 
   template <typename U> friend class ArenaWrappedProto;
 

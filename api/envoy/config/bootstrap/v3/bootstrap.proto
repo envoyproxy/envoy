@@ -42,7 +42,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 44]
+// [#next-free-field: 45]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -142,6 +142,17 @@ message Bootstrap {
     // The minimal value is ``5s`` and the default is ``50s``.
     google.protobuf.Duration max_cached_entry_idle_duration = 1
         [(validate.rules).duration = {gte {seconds: 5}}];
+  }
+
+  message RouteManager {
+    // Enables In-Memory Route and Virtual Host Deferral (VirtualHost Initialization Objects).
+    bool enable_deferred_virtual_host_creation = 1;
+
+    // Maximum idle duration before an instantiated virtual host is reclaimed.
+    google.protobuf.Duration virtual_host_idle_ttl = 2;
+
+    // Optional cap on total concurrently inflated virtual hosts.
+    google.protobuf.UInt32Value max_inflated_virtual_hosts = 3;
   }
 
   reserved 10, 11;
@@ -445,6 +456,9 @@ message Bootstrap {
   //
   // Defaults to ``false``.
   bool enable_worker_cpu_affinity = 43;
+
+  // Configuration for route manager and in-memory virtual host deferral.
+  RouteManager route_manager = 44;
 }
 
 // Administration interface :ref:`operations documentation
