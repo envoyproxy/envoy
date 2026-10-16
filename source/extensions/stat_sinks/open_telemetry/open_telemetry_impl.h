@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include "envoy/extensions/stat_sinks/open_telemetry/v3/open_telemetry.pb.h"
 #include "envoy/extensions/stat_sinks/open_telemetry/v3/open_telemetry.pb.validate.h"
@@ -38,6 +39,8 @@ using MetricsExportRequestPtr = std::unique_ptr<MetricsExportRequest>;
 using MetricsExportRequestSharedPtr = std::shared_ptr<MetricsExportRequest>;
 using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig;
 
+class ConversionAction;
+
 /**
  * This class helps to group data points by metric name and attributes,
  * which is necessary for creating a valid OTLP request.
@@ -59,6 +62,7 @@ public:
     }
 
     AttributesVector release() && { return std::move(sorted_attributes_); }
+    const AttributesVector& attributes() const { return sorted_attributes_; }
     bool operator==(const SortedAttributesVector& other) const {
       return sorted_attributes_ == other.sorted_attributes_;
     }
@@ -75,21 +79,29 @@ public:
                             AggregationTemporality histogram_temporality)
       : counter_temporality_(counter_temporality), histogram_temporality_(histogram_temporality) {}
 
+  // The ID of the sink-wide resource. Other resources are numbered from 1, in the order in which
+  // they are first added.
+  static constexpr uint32_t kDefaultResourceId = 0;
+
   class MetricKey {
   public:
-    MetricKey(std::string&& name, SortedAttributesVector&& sorted_attributes)
-        : name_(std::move(name)), sorted_attributes_(std::move(sorted_attributes)) {}
+    MetricKey(std::string&& name, SortedAttributesVector&& sorted_attributes,
+              uint32_t resource_id = kDefaultResourceId)
+        : name_(std::move(name)), sorted_attributes_(std::move(sorted_attributes)),
+          resource_id_(resource_id) {}
 
     bool operator==(const MetricKey& other) const {
-      return name_ == other.name_ && sorted_attributes_ == other.sorted_attributes_;
+      return resource_id_ == other.resource_id_ && name_ == other.name_ &&
+             sorted_attributes_ == other.sorted_attributes_;
     }
 
     template <typename H> friend H AbslHashValue(H h, const MetricKey& k) {
-      return H::combine(std::move(h), k.name_, k.sorted_attributes_);
+      return H::combine(std::move(h), k.resource_id_, k.name_, k.sorted_attributes_);
     }
 
     absl::string_view name() const { return name_; }
     const SortedAttributesVector& sortedAttributes() const { return sorted_attributes_; }
+    uint32_t resourceId() const { return resource_id_; }
 
     std::string releaseName() { return std::move(name_); }
     SortedAttributesVector releaseAttributes() { return std::move(sorted_attributes_); }
@@ -97,6 +109,7 @@ public:
   private:
     const std::string name_;
     SortedAttributesVector sorted_attributes_;
+    const uint32_t resource_id_;
   };
 
   struct CustomHistogram {
@@ -110,32 +123,44 @@ public:
     std::vector<double> explicit_bounds_;
   };
 
-  // Maps a unique combination of metric name and attributes to their data point.
+  // Maps a unique combination of resource, metric name and attributes to their data point.
   struct AggregationResult {
     absl::flat_hash_map<MetricKey, uint64_t> gauge_data_;
     absl::flat_hash_map<MetricKey, uint64_t> counter_data_;
     absl::flat_hash_map<MetricKey, CustomHistogram> histogram_data_;
+    // The attributes of the resources other than the sink-wide one: `resources_[i]` is the
+    // resource with ID `i + 1`.
+    std::vector<SortedAttributesVector> resources_;
   };
 
   AggregationResult releaseResult();
 
   // Adds a gauge metric data point. Aggregates by summing if a point with the
-  // same attributes exists.
-  void addGauge(std::string&& metric_name, uint64_t value, SortedAttributesVector&& attributes);
+  // same attributes exists. `resource` holds the attributes of the resource to report the point
+  // under, or is empty for the sink-wide resource.
+  void addGauge(std::string&& metric_name, uint64_t value, SortedAttributesVector&& attributes,
+                std::optional<SortedAttributesVector>&& resource = std::nullopt);
 
   // Adds a counter metric data point. Aggregates by summing if a point with the
   // same attributes exists. The provided value should already respect the configured temporality.
-  void addCounter(std::string&& metric_name, uint64_t value, SortedAttributesVector&& attributes);
+  void addCounter(std::string&& metric_name, uint64_t value, SortedAttributesVector&& attributes,
+                  std::optional<SortedAttributesVector>&& resource = std::nullopt);
 
   // Adds a histogram metric data point. Aggregates counts and sums if a point
   // with the same attributes and compatible bounds exists.
   void addHistogram(std::string&& metric_name, const Envoy::Stats::HistogramStatistics& stats,
-                    SortedAttributesVector&& attributes);
+                    SortedAttributesVector&& attributes,
+                    std::optional<SortedAttributesVector>&& resource = std::nullopt);
 
 private:
+  // Returns the ID of `resource`, assigning it a new one if it was not added before.
+  uint32_t resourceId(std::optional<SortedAttributesVector>&& resource);
+
   absl::flat_hash_map<MetricKey, uint64_t> gauge_data_;
   absl::flat_hash_map<MetricKey, uint64_t> counter_data_;
   absl::flat_hash_map<MetricKey, CustomHistogram> histogram_data_;
+  absl::flat_hash_map<SortedAttributesVector, uint32_t> resource_ids_;
+  std::vector<SortedAttributesVector> resources_;
   const AggregationTemporality counter_temporality_;
   const AggregationTemporality histogram_temporality_;
 };
@@ -144,7 +169,7 @@ private:
  * Helper class to build ExportMetricsServiceRequest objects from AggregationResult.
  * It handles the batching of data points into requests, controlled by `max_dp_` per request.
  * Once a request reaches its data point limit, it is seamlessly dispatched to the provided
- * send_callback_.
+ * send_callback_. Data points are grouped into one ResourceMetrics per resource and request.
  */
 class RequestStreamer {
 public:
@@ -157,21 +182,29 @@ public:
                   int64_t snapshot_time_ns, int64_t delta_start_time_ns,
                   int64_t cumulative_start_time_ns, bool enable_metric_aggregation);
 
-  // Adds a gauge metric data point to the streamer.
+  // Adds a gauge metric data point to the streamer. `resource` holds the attributes of the
+  // resource to report the point under, or is empty for the sink-wide resource.
   void addGauge(std::string&& name, uint64_t value,
-                MetricAggregator::SortedAttributesVector&& attributes);
+                MetricAggregator::SortedAttributesVector&& attributes,
+                std::optional<MetricAggregator::SortedAttributesVector>&& resource = std::nullopt);
 
   // Adds a counter metric data point to the streamer.
-  void addCounter(std::string&& name, uint64_t value,
-                  MetricAggregator::SortedAttributesVector&& attributes);
+  void
+  addCounter(std::string&& name, uint64_t value,
+             MetricAggregator::SortedAttributesVector&& attributes,
+             std::optional<MetricAggregator::SortedAttributesVector>&& resource = std::nullopt);
 
   // Adds a custom histogram data point to the streamer.
-  void addHistogram(std::string&& name, MetricAggregator::CustomHistogram hist,
-                    MetricAggregator::SortedAttributesVector&& attributes);
+  void
+  addHistogram(std::string&& name, MetricAggregator::CustomHistogram hist,
+               MetricAggregator::SortedAttributesVector&& attributes,
+               std::optional<MetricAggregator::SortedAttributesVector>&& resource = std::nullopt);
 
   // Adds a stats histogram data point to the streamer, converting it first.
-  void addHistogram(std::string&& name, const Envoy::Stats::HistogramStatistics& stats,
-                    MetricAggregator::SortedAttributesVector&& attributes);
+  void
+  addHistogram(std::string&& name, const Envoy::Stats::HistogramStatistics& stats,
+               MetricAggregator::SortedAttributesVector&& attributes,
+               std::optional<MetricAggregator::SortedAttributesVector>&& resource = std::nullopt);
 
   // Adds all metrics from an aggregation result to the streamer.
   void addAggregationResult(MetricAggregator::AggregationResult&& result);
@@ -180,14 +213,38 @@ public:
   void send();
 
 private:
+  // The ResourceMetrics of one resource in the current request.
+  struct ResourceSlot {
+    ::opentelemetry::proto::metrics::v1::ScopeMetrics* scope_metrics{nullptr};
+    // Maps metric name to its corresponding Metric object.
+    // The string_view key points to the name owned by the Metric object (stored in
+    // scope_metrics), ensuring zero-allocation lookups and insertions.
+    absl::flat_hash_map<absl::string_view, ::opentelemetry::proto::metrics::v1::Metric*>
+        name_to_metric;
+  };
+
   // Checks if the request limit is reached or if no request is active.
   // Sends the current request if full, and prepares a new one.
   void sendIfFullAndPrepareRequest();
   // Initializes a new MetricsExportRequest.
   void initNewRequest();
 
-  // Finds or creates a metric in the current scope metrics, using zero-allocation lookups.
-  ::opentelemetry::proto::metrics::v1::Metric* findOrCreateMetric(std::string&& name);
+  // Returns the slot of `resource` in the current request, adding its ResourceMetrics if needed.
+  // A null `resource` stands for the sink-wide resource.
+  ResourceSlot& slotFor(const MetricAggregator::SortedAttributesVector* resource);
+
+  // Finds or creates a metric in the slot's scope metrics, using zero-allocation lookups.
+  ::opentelemetry::proto::metrics::v1::Metric* findOrCreateMetric(ResourceSlot& slot,
+                                                                  std::string&& name);
+
+  // Adds data points under the resource `resource`, null for the sink-wide resource.
+  void addGaugeTo(const MetricAggregator::SortedAttributesVector* resource, std::string&& name,
+                  uint64_t value, MetricAggregator::SortedAttributesVector&& attributes);
+  void addCounterTo(const MetricAggregator::SortedAttributesVector* resource, std::string&& name,
+                    uint64_t value, MetricAggregator::SortedAttributesVector&& attributes);
+  void addHistogramTo(const MetricAggregator::SortedAttributesVector* resource, std::string&& name,
+                      MetricAggregator::CustomHistogram hist,
+                      MetricAggregator::SortedAttributesVector&& attributes);
 
   // Sets common fields (timestamp, attributes) for a data point.
   template <class PointType>
@@ -207,13 +264,10 @@ private:
   const int64_t cumulative_start_time_ns_;
 
   std::unique_ptr<MetricsExportRequest> current_request_;
-  ::opentelemetry::proto::metrics::v1::ScopeMetrics* current_scope_metrics_{nullptr};
   uint32_t dp_num_{0};
-  // Maps metric name to its corresponding Metric object.
-  // The string_view key points to the name owned by the Metric object (stored in
-  // current_scope_metrics_), ensuring zero-allocation lookups and insertions.
-  absl::flat_hash_map<absl::string_view, ::opentelemetry::proto::metrics::v1::Metric*>
-      name_to_metric_;
+  // The slots of the resources in the current request.
+  ResourceSlot default_resource_slot_;
+  absl::flat_hash_map<MetricAggregator::SortedAttributesVector, ResourceSlot> resource_slots_;
 };
 
 class OtlpOptions {
@@ -299,20 +353,26 @@ public:
 private:
   struct MetricConfig {
     bool drop_stat{false};
-    OptRef<const SinkConfig::ConversionAction> conversion_action;
+    // The conversion of the stat, or null to convert it without any customization.
+    const ConversionAction* conversion_action{nullptr};
+  };
+
+  // The data point attributes of a stat, and the resource to report it under.
+  struct StatAttributes {
+    MetricAggregator::SortedAttributesVector attributes;
+    // The attributes of the resource, or empty for the sink-wide resource.
+    std::optional<MetricAggregator::SortedAttributesVector> resource;
   };
 
 private:
   template <class StatType> MetricConfig getMetricConfig(const StatType& stat) const;
 
   template <class StatType>
-  std::string getMetricName(const StatType& stat,
-                            OptRef<const SinkConfig::ConversionAction> conversion_config) const;
+  std::string getMetricName(const StatType& stat, const ConversionAction* conversion_action) const;
 
   template <class StatType>
-  MetricAggregator::SortedAttributesVector
-  getCombinedAttributes(const StatType& stat,
-                        OptRef<const SinkConfig::ConversionAction> conversion_config) const;
+  StatAttributes getAttributes(const StatType& stat,
+                               const ConversionAction* conversion_action) const;
 
   /**
    * Processes all metrics (gauges, counters, histograms) from the snapshot and

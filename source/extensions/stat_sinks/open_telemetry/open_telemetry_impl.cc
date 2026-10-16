@@ -20,12 +20,29 @@ using HistogramDataPoint = opentelemetry::proto::metrics::v1::HistogramDataPoint
 using KeyValue = opentelemetry::proto::common::v1::KeyValue;
 
 MetricAggregator::AggregationResult MetricAggregator::releaseResult() {
-  return {std::move(gauge_data_), std::move(counter_data_), std::move(histogram_data_)};
+  resource_ids_.clear();
+  return {std::move(gauge_data_), std::move(counter_data_), std::move(histogram_data_),
+          std::move(resources_)};
+}
+
+uint32_t MetricAggregator::resourceId(std::optional<SortedAttributesVector>&& resource) {
+  if (!resource.has_value()) {
+    return kDefaultResourceId;
+  }
+  auto it = resource_ids_.find(*resource);
+  if (it != resource_ids_.end()) {
+    return it->second;
+  }
+  const uint32_t id = resources_.size() + 1;
+  resources_.push_back(*resource);
+  resource_ids_.emplace(std::move(*resource), id);
+  return id;
 }
 
 void MetricAggregator::addGauge(std::string&& metric_name, uint64_t value,
-                                SortedAttributesVector&& attributes) {
-  MetricKey key{std::move(metric_name), std::move(attributes)};
+                                SortedAttributesVector&& attributes,
+                                std::optional<SortedAttributesVector>&& resource) {
+  MetricKey key{std::move(metric_name), std::move(attributes), resourceId(std::move(resource))};
   auto it = gauge_data_.find(key);
   if (it != gauge_data_.end()) {
     it->second += value;
@@ -35,12 +52,13 @@ void MetricAggregator::addGauge(std::string&& metric_name, uint64_t value,
 }
 
 void MetricAggregator::addCounter(std::string&& metric_name, uint64_t value,
-                                  SortedAttributesVector&& attributes) {
+                                  SortedAttributesVector&& attributes,
+                                  std::optional<SortedAttributesVector>&& resource) {
   if (value == 0 && counter_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
 
-  MetricKey key{std::move(metric_name), std::move(attributes)};
+  MetricKey key{std::move(metric_name), std::move(attributes), resourceId(std::move(resource))};
   auto it = counter_data_.find(key);
 
   if (it != counter_data_.end()) {
@@ -52,13 +70,14 @@ void MetricAggregator::addCounter(std::string&& metric_name, uint64_t value,
 
 void MetricAggregator::addHistogram(std::string&& metric_name,
                                     const Envoy::Stats::HistogramStatistics& stats,
-                                    SortedAttributesVector&& attributes) {
+                                    SortedAttributesVector&& attributes,
+                                    std::optional<SortedAttributesVector>&& resource) {
   if (stats.sampleCount() == 0 &&
       histogram_temporality_ == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
 
-  MetricKey key{std::move(metric_name), std::move(attributes)};
+  MetricKey key{std::move(metric_name), std::move(attributes), resourceId(std::move(resource))};
   auto it = histogram_data_.find(key);
   if (it != histogram_data_.end()) {
     std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
@@ -111,29 +130,55 @@ void RequestStreamer::initNewRequest() {
     return;
   }
   current_request_ = std::make_unique<MetricsExportRequest>();
-  auto* rm = current_request_->add_resource_metrics();
-  for (const auto& attr : resource_attributes_) {
-    *rm->mutable_resource()->add_attributes() = attr;
-  }
-  current_scope_metrics_ = rm->add_scope_metrics();
-  name_to_metric_.clear();
+  // The ResourceMetrics of each resource is added along with the resource's first data point.
+  default_resource_slot_ = ResourceSlot{};
+  resource_slots_.clear();
   dp_num_ = 0;
 }
 
+RequestStreamer::ResourceSlot&
+RequestStreamer::slotFor(const MetricAggregator::SortedAttributesVector* resource) {
+  ASSERT(current_request_ != nullptr);
+  ResourceSlot* slot = &default_resource_slot_;
+  if (resource != nullptr) {
+    auto it = resource_slots_.find(*resource);
+    if (it == resource_slots_.end()) {
+      it = resource_slots_.emplace(*resource, ResourceSlot{}).first;
+    }
+    slot = &it->second;
+  }
+  if (slot->scope_metrics == nullptr) {
+    auto* rm = current_request_->add_resource_metrics();
+    if (resource == nullptr) {
+      for (const auto& attr : resource_attributes_) {
+        *rm->mutable_resource()->add_attributes() = attr;
+      }
+    } else {
+      for (const auto& [key, value] : resource->attributes()) {
+        auto* attr = rm->mutable_resource()->add_attributes();
+        attr->set_key(key);
+        attr->mutable_value()->set_string_value(value);
+      }
+    }
+    slot->scope_metrics = rm->add_scope_metrics();
+  }
+  return *slot;
+}
+
 ::opentelemetry::proto::metrics::v1::Metric*
-RequestStreamer::findOrCreateMetric(std::string&& name) {
+RequestStreamer::findOrCreateMetric(ResourceSlot& slot, std::string&& name) {
   if (enable_metric_aggregation_) {
-    auto it = name_to_metric_.find(name);
-    if (it != name_to_metric_.end()) {
+    auto it = slot.name_to_metric.find(name);
+    if (it != slot.name_to_metric.end()) {
       return it->second;
     }
   }
 
-  auto* m = current_scope_metrics_->add_metrics();
+  auto* m = slot.scope_metrics->add_metrics();
   m->set_name(std::move(name));
 
   if (enable_metric_aggregation_) {
-    name_to_metric_.emplace(m->name(), m);
+    slot.name_to_metric.emplace(m->name(), m);
   }
   return m;
 }
@@ -157,10 +202,11 @@ void RequestStreamer::setCommonFields(PointType* point,
   }
 }
 
-void RequestStreamer::addGauge(std::string&& name, uint64_t value,
-                               MetricAggregator::SortedAttributesVector&& attributes) {
+void RequestStreamer::addGaugeTo(const MetricAggregator::SortedAttributesVector* resource,
+                                 std::string&& name, uint64_t value,
+                                 MetricAggregator::SortedAttributesVector&& attributes) {
   sendIfFullAndPrepareRequest();
-  auto* metric = findOrCreateMetric(std::move(name));
+  auto* metric = findOrCreateMetric(slotFor(resource), std::move(name));
   auto* point = metric->mutable_gauge()->add_data_points();
   point->set_as_int(value);
   setCommonFields(point, std::move(attributes),
@@ -168,14 +214,15 @@ void RequestStreamer::addGauge(std::string&& name, uint64_t value,
   dp_num_++;
 }
 
-void RequestStreamer::addCounter(std::string&& name, uint64_t value,
-                                 MetricAggregator::SortedAttributesVector&& attributes) {
-  sendIfFullAndPrepareRequest();
+void RequestStreamer::addCounterTo(const MetricAggregator::SortedAttributesVector* resource,
+                                   std::string&& name, uint64_t value,
+                                   MetricAggregator::SortedAttributesVector&& attributes) {
   auto temp = counter_temporality_;
   if (value == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
-  auto* metric = findOrCreateMetric(std::move(name));
+  sendIfFullAndPrepareRequest();
+  auto* metric = findOrCreateMetric(slotFor(resource), std::move(name));
   if (metric->mutable_sum()->data_points_size() == 0) {
     metric->mutable_sum()->set_is_monotonic(true);
     metric->mutable_sum()->set_aggregation_temporality(temp);
@@ -186,14 +233,15 @@ void RequestStreamer::addCounter(std::string&& name, uint64_t value,
   dp_num_++;
 }
 
-void RequestStreamer::addHistogram(std::string&& name, MetricAggregator::CustomHistogram hist,
-                                   MetricAggregator::SortedAttributesVector&& attributes) {
-  sendIfFullAndPrepareRequest();
+void RequestStreamer::addHistogramTo(const MetricAggregator::SortedAttributesVector* resource,
+                                     std::string&& name, MetricAggregator::CustomHistogram hist,
+                                     MetricAggregator::SortedAttributesVector&& attributes) {
   auto temp = histogram_temporality_;
   if (hist.count_ == 0 && temp == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) {
     return;
   }
-  auto* metric = findOrCreateMetric(std::move(name));
+  sendIfFullAndPrepareRequest();
+  auto* metric = findOrCreateMetric(slotFor(resource), std::move(name));
   if (metric->mutable_histogram()->data_points_size() == 0) {
     metric->mutable_histogram()->set_aggregation_temporality(temp);
   }
@@ -211,33 +259,80 @@ void RequestStreamer::addHistogram(std::string&& name, MetricAggregator::CustomH
   dp_num_++;
 }
 
-void RequestStreamer::addHistogram(std::string&& name,
-                                   const Envoy::Stats::HistogramStatistics& stats,
-                                   MetricAggregator::SortedAttributesVector&& attributes) {
+void RequestStreamer::addGauge(std::string&& name, uint64_t value,
+                               MetricAggregator::SortedAttributesVector&& attributes,
+                               std::optional<MetricAggregator::SortedAttributesVector>&& resource) {
+  addGaugeTo(resource.has_value() ? &*resource : nullptr, std::move(name), value,
+             std::move(attributes));
+}
+
+void RequestStreamer::addCounter(
+    std::string&& name, uint64_t value, MetricAggregator::SortedAttributesVector&& attributes,
+    std::optional<MetricAggregator::SortedAttributesVector>&& resource) {
+  addCounterTo(resource.has_value() ? &*resource : nullptr, std::move(name), value,
+               std::move(attributes));
+}
+
+void RequestStreamer::addHistogram(
+    std::string&& name, MetricAggregator::CustomHistogram hist,
+    MetricAggregator::SortedAttributesVector&& attributes,
+    std::optional<MetricAggregator::SortedAttributesVector>&& resource) {
+  addHistogramTo(resource.has_value() ? &*resource : nullptr, std::move(name), std::move(hist),
+                 std::move(attributes));
+}
+
+void RequestStreamer::addHistogram(
+    std::string&& name, const Envoy::Stats::HistogramStatistics& stats,
+    MetricAggregator::SortedAttributesVector&& attributes,
+    std::optional<MetricAggregator::SortedAttributesVector>&& resource) {
   MetricAggregator::CustomHistogram custom_hist;
   custom_hist.count_ = stats.sampleCount();
   custom_hist.sum_ = stats.sampleSum();
   custom_hist.bucket_counts_ = stats.computeDisjointBuckets();
   custom_hist.bucket_counts_.push_back(stats.outOfBoundCount());
   custom_hist.explicit_bounds_ = stats.supportedBuckets();
-  addHistogram(std::move(name), std::move(custom_hist), std::move(attributes));
+  addHistogram(std::move(name), std::move(custom_hist), std::move(attributes), std::move(resource));
 }
 
 void RequestStreamer::addAggregationResult(MetricAggregator::AggregationResult&& metrics) {
+  // Group the data points by resource, so that the points of a resource are contiguous and each
+  // request has as few ResourceMetrics as possible.
+  using GaugeNode = decltype(metrics.gauge_data_)::node_type;
+  using CounterNode = decltype(metrics.counter_data_)::node_type;
+  using HistogramNode = decltype(metrics.histogram_data_)::node_type;
+  const size_t num_resources = metrics.resources_.size() + 1;
+  std::vector<std::vector<GaugeNode>> gauges(num_resources);
+  std::vector<std::vector<CounterNode>> counters(num_resources);
+  std::vector<std::vector<HistogramNode>> histograms(num_resources);
   while (!metrics.gauge_data_.empty()) {
     auto node = metrics.gauge_data_.extract(metrics.gauge_data_.begin());
-    auto& key = node.key();
-    addGauge(key.releaseName(), node.mapped(), key.releaseAttributes());
+    gauges[node.key().resourceId()].push_back(std::move(node));
   }
   while (!metrics.counter_data_.empty()) {
     auto node = metrics.counter_data_.extract(metrics.counter_data_.begin());
-    auto& key = node.key();
-    addCounter(key.releaseName(), node.mapped(), key.releaseAttributes());
+    counters[node.key().resourceId()].push_back(std::move(node));
   }
   while (!metrics.histogram_data_.empty()) {
     auto node = metrics.histogram_data_.extract(metrics.histogram_data_.begin());
-    auto& key = node.key();
-    addHistogram(key.releaseName(), std::move(node.mapped()), key.releaseAttributes());
+    histograms[node.key().resourceId()].push_back(std::move(node));
+  }
+
+  for (size_t id = 0; id < num_resources; ++id) {
+    const MetricAggregator::SortedAttributesVector* resource =
+        id == MetricAggregator::kDefaultResourceId ? nullptr : &metrics.resources_[id - 1];
+    for (auto& node : gauges[id]) {
+      auto& key = node.key();
+      addGaugeTo(resource, key.releaseName(), node.mapped(), key.releaseAttributes());
+    }
+    for (auto& node : counters[id]) {
+      auto& key = node.key();
+      addCounterTo(resource, key.releaseName(), node.mapped(), key.releaseAttributes());
+    }
+    for (auto& node : histograms[id]) {
+      auto& key = node.key();
+      addHistogramTo(resource, key.releaseName(), std::move(node.mapped()),
+                     key.releaseAttributes());
+    }
   }
 }
 
@@ -262,9 +357,10 @@ generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
 
 Matcher::MatchTreePtr<Stats::StatMatchingData>
 createMatcher(const xds::type::matcher::v3::Matcher& matcher_config,
+              const Protobuf::RepeatedPtrField<KeyValue>& resource_attributes,
               Server::Configuration::ServerFactoryContext& server_factory_context) {
   ActionValidationVisitor validation_visitor;
-  ActionContext action_context;
+  ActionContext action_context{&resource_attributes};
   Matcher::MatchTreeFactory<Stats::StatMatchingData, ActionContext> factory{
       action_context, server_factory_context, validation_visitor};
   return factory.create(matcher_config)();
@@ -282,7 +378,8 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
       stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
       enable_metric_aggregation_(sink_config.has_custom_metric_conversions()),
       resource_attributes_(generateResourceAttributes(resource)),
-      matcher_(createMatcher(sink_config.custom_metric_conversions(), server)),
+      matcher_(
+          createMatcher(sink_config.custom_metric_conversions(), resource_attributes_, server)),
       max_data_points_per_request_(sink_config.max_data_points_per_request()) {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
@@ -324,11 +421,11 @@ OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
   ASSERT(result.isComplete());
   if (result.isMatch()) {
     if (dynamic_cast<const DropAction*>(result.action().get())) {
-      return {true, {}};
+      return {true, nullptr};
     }
 
     if (const auto* match_action = dynamic_cast<const ConversionAction*>(result.action().get())) {
-      return {false, *match_action->config()};
+      return {false, match_action};
     }
 
     ENVOY_LOG(error, "Unknown action type for custom metric conversion: {}",
@@ -337,30 +434,68 @@ OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
 
   // By default, this stat will be converted to the metric without any
   // customization.
-  return {false, {}};
+  return {false, nullptr};
 }
 
 template <class StatType>
-std::string OtlpMetricsFlusherImpl::getMetricName(
-    const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config) const {
-  if (conversion_config.has_value()) {
-    return conversion_config->metric_name();
+std::string OtlpMetricsFlusherImpl::getMetricName(const StatType& stat,
+                                                  const ConversionAction* conversion_action) const {
+  if (conversion_action != nullptr) {
+    return conversion_action->config()->metric_name();
   }
   return absl::StrCat(config_->statPrefix(),
                       config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
 }
 
 template <class StatType>
-MetricAggregator::SortedAttributesVector OtlpMetricsFlusherImpl::getCombinedAttributes(
-    const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config) const {
+OtlpMetricsFlusherImpl::StatAttributes
+OtlpMetricsFlusherImpl::getAttributes(const StatType& stat,
+                                      const ConversionAction* conversion_action) const {
+  const ConversionAction::ResourceConversion* resource_conversion =
+      conversion_action != nullptr ? conversion_action->resourceConversion() : nullptr;
+
   MetricAggregator::AttributesVector attrs;
-  if (config_->emitTagsAsAttributes()) {
+  std::optional<MetricAggregator::AttributesVector> resource;
+  if (resource_conversion != nullptr) {
+    resource.emplace(resource_conversion->base_attributes.begin(),
+                     resource_conversion->base_attributes.end());
+  }
+  // Moves a tag listed by the resource conversion to the resource, overriding the base attribute
+  // with the same key. Returns false if the tag is not listed.
+  const auto move_to_resource = [&](const Stats::Tag& tag) {
+    if (resource_conversion == nullptr) {
+      return false;
+    }
+    const auto it = resource_conversion->tag_to_attribute_keys.find(tag.name_);
+    if (it == resource_conversion->tag_to_attribute_keys.end()) {
+      return false;
+    }
+    if (tag.value_.empty()) {
+      return true;
+    }
+    for (const std::string& key : it->second) {
+      auto existing = std::find_if(resource->begin(), resource->end(),
+                                   [&key](const auto& attr) { return attr.first == key; });
+      if (existing != resource->end()) {
+        existing->second = tag.value_;
+      } else {
+        resource->emplace_back(key, tag.value_);
+      }
+    }
+    return true;
+  };
+
+  const bool emit_tags_as_attributes = config_->emitTagsAsAttributes();
+  if (emit_tags_as_attributes ||
+      (resource_conversion != nullptr && !resource_conversion->tag_to_attribute_keys.empty())) {
     for (const auto& tag : stat.tags()) {
-      attrs.emplace_back(tag.name_, tag.value_);
+      if (!move_to_resource(tag) && emit_tags_as_attributes) {
+        attrs.emplace_back(tag.name_, tag.value_);
+      }
     }
   }
-  if (conversion_config.has_value()) {
-    for (const auto& attr : conversion_config->static_metric_labels()) {
+  if (conversion_action != nullptr) {
+    for (const auto& attr : conversion_action->config()->static_metric_labels()) {
       attrs.emplace_back(attr.key(), attr.value().string_value());
     }
   }
@@ -368,7 +503,12 @@ MetricAggregator::SortedAttributesVector OtlpMetricsFlusherImpl::getCombinedAttr
   // attributes are used as part of the lookup key for metric aggregation.
   std::sort(attrs.begin(), attrs.end());
 
-  return MetricAggregator::SortedAttributesVector(std::move(attrs));
+  StatAttributes result{MetricAggregator::SortedAttributesVector(std::move(attrs)), std::nullopt};
+  if (resource.has_value()) {
+    std::sort(resource->begin(), resource->end());
+    result.resource.emplace(std::move(*resource));
+  }
+  return result;
 }
 
 template <typename SinkType>
@@ -381,8 +521,9 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
       if (metric_config.drop_stat) {
         continue;
       }
+      auto [attributes, resource] = getAttributes(g, metric_config.conversion_action);
       sink.addGauge(getMetricName(g, metric_config.conversion_action), g.value(),
-                    getCombinedAttributes(g, metric_config.conversion_action));
+                    std::move(attributes), std::move(resource));
     }
   }
   for (const auto& gauge : snapshot.hostGauges()) {
@@ -390,8 +531,9 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
     if (metric_config.drop_stat) {
       continue;
     }
+    auto [attributes, resource] = getAttributes(gauge, metric_config.conversion_action);
     sink.addGauge(getMetricName(gauge, metric_config.conversion_action), gauge.value(),
-                  getCombinedAttributes(gauge, metric_config.conversion_action));
+                  std::move(attributes), std::move(resource));
   }
 
   // Process Counters
@@ -404,8 +546,9 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
         continue;
       }
       const uint64_t counter_value = report_counters_as_deltas ? counter.delta_ : c.value();
+      auto [attributes, resource] = getAttributes(c, metric_config.conversion_action);
       sink.addCounter(getMetricName(c, metric_config.conversion_action), counter_value,
-                      getCombinedAttributes(c, metric_config.conversion_action));
+                      std::move(attributes), std::move(resource));
     }
   }
   for (const auto& counter : snapshot.hostCounters()) {
@@ -414,8 +557,9 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
       continue;
     }
     const uint64_t counter_value = report_counters_as_deltas ? counter.delta() : counter.value();
+    auto [attributes, resource] = getAttributes(counter, metric_config.conversion_action);
     sink.addCounter(getMetricName(counter, metric_config.conversion_action), counter_value,
-                    getCombinedAttributes(counter, metric_config.conversion_action));
+                    std::move(attributes), std::move(resource));
   }
 
   // Process Histograms
@@ -429,8 +573,9 @@ void OtlpMetricsFlusherImpl::sinkMetrics(Stats::MetricSnapshot& snapshot, SinkTy
       }
       const Stats::HistogramStatistics& histogram_stats =
           report_histograms_as_deltas ? h.intervalStatistics() : h.cumulativeStatistics();
+      auto [attributes, resource] = getAttributes(h, metric_config.conversion_action);
       sink.addHistogram(getMetricName(h, metric_config.conversion_action), histogram_stats,
-                        getCombinedAttributes(h, metric_config.conversion_action));
+                        std::move(attributes), std::move(resource));
     }
   }
 }

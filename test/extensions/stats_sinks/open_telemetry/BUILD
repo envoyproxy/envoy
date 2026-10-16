@@ -65,6 +65,24 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "resource_conversion_integration_test",
+    srcs = ["resource_conversion_integration_test.cc"],
+    extension_names = ["envoy.stat_sinks.open_telemetry"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/access_loggers/stats:config",
+        "//source/extensions/formatter/metadata:config",
+        "//source/extensions/stat_sinks/open_telemetry:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/access_loggers/stats/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
+        "@opentelemetry-proto//:metrics_service_proto_cc",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "open_telemetry_benchmark",
     srcs = [

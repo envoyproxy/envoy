@@ -18,7 +18,9 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//source/common/matcher:matcher_lib",
         "//source/common/matcher:validation_visitor_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
+        "@opentelemetry-proto//:common_proto_cc",
     ],
 )
 
