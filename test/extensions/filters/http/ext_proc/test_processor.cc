@@ -40,6 +40,7 @@ void TestProcessor::start(const Network::Address::IpVersion ip_version, Processi
 void TestProcessor::shutdown() {
   if (server_) {
     server_->Shutdown();
+    server_->Wait();
   }
 }
 

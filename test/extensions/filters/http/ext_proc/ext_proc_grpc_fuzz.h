@@ -70,6 +70,9 @@ public:
     cleanupUpstreamAndDownstream();
     codec_client_ = nullptr;
     if (!keep_test_server) {
+      if (test_server_) {
+        test_server_.reset();
+      }
       test_processor_.shutdown();
     }
   }
@@ -261,6 +264,9 @@ fuzzExtProcRun(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestC
             ProcessingRequest req;
             if (!stream->Read(&req)) {
               return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+            }
+            if (fuzz_helper == nullptr) {
+              return grpc::Status(grpc::StatusCode::UNAVAILABLE, "fuzz_helper not ready");
             }
             bool immediate_close_grpc = false;
             ProcessingResponse resp;
