@@ -14,6 +14,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 
+struct ConnectionMetadataConfig;
+
 class DrainAwareHttpConnectionManagerConfig
     : public HttpConnectionManager::HttpConnectionManagerConfig {
 public:
@@ -25,12 +27,14 @@ public:
       Config::ConfigProviderManager* scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
       HttpConnectionManager::FilterConfigProviderManager& filter_config_provider_manager,
-      bool enable_drain_with_goaway, absl::Status& creation_status)
+      bool enable_drain_with_goaway, std::shared_ptr<ConnectionMetadataConfig> metadata_config,
+      absl::Status& creation_status)
       : HttpConnectionManager::HttpConnectionManagerConfig(
             config, context, date_provider, route_config_provider_manager,
             scoped_routes_config_provider_manager, tracer_manager, filter_config_provider_manager,
             creation_status),
-        factory_context_(context), enable_drain_with_goaway_(enable_drain_with_goaway) {}
+        factory_context_(context), enable_drain_with_goaway_(enable_drain_with_goaway),
+        metadata_config_(metadata_config) {}
 
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -48,6 +52,7 @@ protected:
 private:
   Server::Configuration::FactoryContext& factory_context_;
   const bool enable_drain_with_goaway_;
+  std::shared_ptr<ConnectionMetadataConfig> metadata_config_;
 };
 
 class DrainAwareHttpConnectionManagerFilterConfigFactory

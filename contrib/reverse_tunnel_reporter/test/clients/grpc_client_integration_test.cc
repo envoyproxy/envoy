@@ -157,8 +157,10 @@ public:
 
     auto cluster = getUpstreamCluster(localhost);
     addCluster(getHttp2Cluster(cluster), config_helper_);
-    addCluster(getRevConnCluster(enable_tenant_isolation_), config_helper_);
-
+    addCluster(metadata_key_.empty()
+                   ? getRevConnCluster(enable_tenant_isolation_)
+                   : getRevConnClusterWithMetadata(metadata_key_, enable_tenant_isolation_),
+               config_helper_);
     HttpIntegrationTest::initialize();
 
     current_config_ = ConfigHelper{version_, config_helper_.bootstrap()};
@@ -311,6 +313,9 @@ protected:
 
   ConfigHelper current_config_{version_, config_helper_.bootstrap()};
   bool enable_tenant_isolation_{false};
+  // When non-empty, initialize() installs the reverse-connection cluster with this drain metadata
+  // key on the upstream codec, so received connection-metadata triggers a redial + reporter event.
+  std::string metadata_key_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcClientIntegrationTest,
@@ -574,6 +579,178 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDuration) {
   completeReq(std::chrono::milliseconds(1000), direct_resp);
 
   completeReq(std::chrono::milliseconds((slowRouteDelay.count() + 1) * 1000), resp);
+}
+
+// Three-phase metadata drain, validated as a gradual cutover: METADATA -> soft GOAWAY /
+// shutdownNotice -> final GOAWAY, driven by max_connection_duration. The replacement tunnel is
+// redialed at drain start. The test asserts the migration is gradual by issuing a real request
+// and checking stats at each phase:
+//   (1) tunnel established, nothing closed yet (reverse_tunnel_closed == 0);
+//   (2) replacement tunnel established (established_total == 2): no GOAWAYs and no metadata yet
+//       (close_notify == 0, goaway_sent == 0, reverse_tunnel_closed == 0), traffic still flows;
+//   (3) METADATA received: the upstream codec matches the drain key and notifies the reporter
+//       (reverse_tunnel_closed == 1), but no GOAWAY yet (close_notify == 0, goaway_sent == 0);
+//   (4) soft GOAWAY received (close_notify == 1): final GOAWAY not yet (goaway_sent == 0), and
+//       new traffic routes to the replacement tunnel;
+//   (5) final GOAWAY sent (goaway_sent == 1): the replacement still serves traffic, and the
+//       request still in flight on the old tunnel completes.
+// A request is held in flight on the old tunnel from (3) onward. Without it the peer's pool closes
+// the idle old tunnel right after the soft GOAWAY, before drain_timeout, and the final GOAWAY is
+// never sent.
+TEST_P(GrpcClientIntegrationTest, ListenerDrainMetadataThreePhase) {
+  metadata_key_ = "drain_reverse_tunnel";
+  initialize();
+  makeNewServer();
+
+  // max_connection_duration=20s triggers the drain at ~20s. Phase delays are 1s/5s/10s:
+  // replacement tunnel redialed at ~20s (established_total==2), METADATA sent ~21s
+  // (reverse_tunnel_closed==1), soft GOAWAY ~25s (close_notify==1), final GOAWAY ~30s
+  // (goaway_sent==1). 20s is long enough that the request lands on a stable tunnel and the
+  // redialed tunnel (up ~20s) does not re-drain before the test observes the full cycle (it would
+  // drain at ~40s, after the test ends).
+  // The in-flight request started at ~21s must outlive the final GOAWAY at ~30s. 15s leaves ~6s
+  // of margin for slow CI machines.
+  constexpr std::chrono::seconds inFlightRequestDelay{15};
+  addListenerLds(getDownstreamListenerWithMetadata(
+      "node-1", 1, std::chrono::seconds(20), "drain_reverse_tunnel",
+      std::chrono::milliseconds(1000), std::chrono::milliseconds(5000), std::chrono::seconds(10),
+      inFlightRequestDelay));
+  waitForActiveTunnels(1);
+  validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
+
+  // Issue a /direct request through the egress listener -> reverse_connection cluster -> node-1
+  // tunnel and expect 200. completeReq asserts the status.
+  auto sendDirectRequest = [&]() {
+    auto client = makeHttpConnection(egressPort);
+    auto resp = makeClientRequest("/direct", client);
+    completeReq(std::chrono::milliseconds(1000), resp);
+  };
+
+  // Convenience aliases for the long stat names.
+  const std::string closed_total =
+      "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter."
+      "reverse_tunnel_closed_total";
+  const std::string established_total =
+      "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter."
+      "reverse_tunnel_established_total";
+  const std::string close_notify = "cluster.reverse_connection_cluster.upstream_cx_close_notify";
+  const std::string goaway_sent = "http2.goaway_sent";
+
+  // (1) Tunnel established, nothing closed yet. Baseline: the tunnel is routable.
+  EXPECT_EQ(0, test_server_->counter(closed_total)->value());
+  sendDirectRequest();
+
+  // (2) Drain starts at ~20s and redials a replacement tunnel (established_total==2). The
+  // metadata timer (1s) has not fired yet, so no GOAWAYs and no reporter close.
+  test_server_->waitForCounter(established_total, testing::Eq(2), std::chrono::milliseconds(22000));
+  EXPECT_EQ(0, test_server_->counter(close_notify)->value());
+  EXPECT_EQ(0, test_server_->counter(goaway_sent)->value());
+  EXPECT_EQ(0, test_server_->counter(closed_total)->value());
+  sendDirectRequest();
+
+  // (3) METADATA received: the upstream codec matched the drain key and notified the reporter
+  // (reverse_tunnel_closed==1). No GOAWAY yet (close_notify==0, goaway_sent==0). Reached at ~20s
+  // (after phase 2); the metadata timer fires ~1s later, so ~5s is a tight CI-safe bound.
+  test_server_->waitForCounter(closed_total, testing::Eq(1), std::chrono::milliseconds(5000));
+  EXPECT_EQ(0, test_server_->counter(close_notify)->value());
+  EXPECT_EQ(0, test_server_->counter(goaway_sent)->value());
+  sendDirectRequest();
+
+  // Hold a stream open on the old tunnel. It is still the pool's only connection here: the
+  // replacement tunnel stays parked until the pool needs a new connection after the soft GOAWAY.
+  auto in_flight_client = makeHttpConnection(egressPort);
+  auto in_flight_resp = makeClientRequest("/slow", in_flight_client);
+
+  // (4) Soft GOAWAY (shutdownNotice) received by the client: close_notify==1, final GOAWAY not
+  // yet sent (goaway_sent==0). New traffic now routes to the replacement tunnel. Reached at ~21s;
+  // the shutdown-notice timer fires ~4s later (at ~25s), so ~8s is a tight CI-safe bound.
+  test_server_->waitForCounter(close_notify, testing::Eq(1), std::chrono::milliseconds(8000));
+  EXPECT_EQ(0, test_server_->counter(goaway_sent)->value());
+  sendDirectRequest();
+
+  // (5) Final GOAWAY sent by the server: goaway_sent==1. The replacement tunnel still serves
+  // traffic. Reached at ~25s; the goaway timer fires ~5s later (at ~30s), so ~10s is a tight
+  // CI-safe bound.
+  test_server_->waitForCounter(goaway_sent, testing::Eq(1), std::chrono::milliseconds(10000));
+  test_server_->waitForGauge("envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service."
+                             "reporters.event_reporter.reverse_tunnel_unique_active",
+                             testing::Eq(1), std::chrono::milliseconds(10000));
+  sendDirectRequest();
+
+  // The stream held across the drain finishes on the old tunnel after the final GOAWAY.
+  completeReq(std::chrono::milliseconds((inFlightRequestDelay.count() + 1) * 1000), in_flight_resp);
+}
+
+// Upstream-initiated drain: the admin endpoint /reverse_tunnel/drain_clusters triggers the upstream
+// (client) codec's startGracefulDrain, which sends a stream-0 METADATA frame immediately (drain
+// key -> the downstream redials a replacement tunnel) and a final GOAWAY after drain_time (pool
+// drain, old tunnel closes). The downstream listener uses a long max_connection_duration so it does
+// NOT self-drain during the test; the only drain is the upstream admin trigger. Validated as a
+// gradual cutover:
+//   (1) tunnel established (established_total==1), nothing closed, traffic flows;
+//   (2) admin drain -> upstream sends METADATA -> downstream redials (established_total==2),
+//       no GOAWAY yet (goaway_sent==0), no close yet (reverse_tunnel_closed==0), traffic flows;
+//   (3) after drain_time -> upstream sends final GOAWAY (goaway_sent==1), the pool drains the
+//       old connection, the old tunnel closes (reverse_tunnel_closed==1), traffic flows on the
+//       replacement.
+TEST_P(GrpcClientIntegrationTest, UpstreamAdminDrainMetadata) {
+  metadata_key_ = "drain_reverse_tunnel";
+  initialize();
+  makeNewServer();
+
+  // Long max_connection_duration so the downstream does not self-drain during the test; the only
+  // drain is the upstream admin trigger. drain_time_ms=5000 -> METADATA now, final GOAWAY ~5s.
+  addListenerLds(getDownstreamListenerWithMetadata("node-1", 1, std::chrono::seconds(120)));
+  waitForActiveTunnels(1);
+  validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
+
+  auto sendDirectRequest = [&]() {
+    auto client = makeHttpConnection(egressPort);
+    auto resp = makeClientRequest("/direct", client);
+    completeReq(std::chrono::milliseconds(1000), resp);
+  };
+
+  // Convenience aliases for the long stat names. The upstream's final GOAWAY is counted by the
+  // drain-aware upstream codec stat (server-root scoped), not the per-cluster http2 codec
+  // stat, so it is unambiguous regardless of how many http2 codecs exist.
+  const std::string closed_total =
+      "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter."
+      "reverse_tunnel_closed_total";
+  const std::string established_total =
+      "envoy.extensions.reverse_tunnel.reverse_tunnel_reporting_service.reporters.event_reporter."
+      "reverse_tunnel_established_total";
+  const std::string goaway_sent = "reverse_tunnel_upstream_codec.goaway_sent";
+
+  // (1) Tunnel established, nothing closed yet. Baseline: the tunnel is routable.
+  EXPECT_EQ(0, test_server_->counter(closed_total)->value());
+  EXPECT_EQ(0, test_server_->counter(goaway_sent)->value());
+  sendDirectRequest();
+
+  // (2) Trigger the upstream-initiated drain. The upstream sends METADATA now -> the downstream
+  // redials a replacement (established_total==2). No GOAWAY yet (goaway_sent==0) and no close yet
+  // (reverse_tunnel_closed==0); traffic still flows on the old tunnel.
+  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+      test_server_->adminAddress(), "POST", "/reverse_tunnel/drain_clusters?drain_time_ms=5000", "",
+      Http::CodecType::HTTP1);
+  ASSERT_TRUE(admin_response != nullptr);
+  ASSERT_TRUE(admin_response->complete());
+  EXPECT_EQ("200", admin_response->headers().Status()->value().getStringView());
+
+  // The downstream redials as soon as it receives the drain-key METADATA (sent immediately on the
+  // admin trigger), so established_total==2 follows within ~1-2s; ~10s is a tight CI-safe bound.
+  test_server_->waitForCounter(established_total, testing::Eq(2), std::chrono::milliseconds(10000));
+  EXPECT_EQ(0, test_server_->counter(goaway_sent)->value());
+  EXPECT_EQ(0, test_server_->counter(closed_total)->value());
+  sendDirectRequest();
+
+  // (3) After drain_time (~5s) the upstream sends the final GOAWAY (goaway_sent==1), the pool
+  // drains the old connection, and the old tunnel closes (reverse_tunnel_closed==1). Traffic
+  // still flows on the replacement.
+  // GOAWAY fires at drain_time (~5s) after the admin trigger; by now the phase-2 redial has already
+  // consumed ~1-2s of that window, so ~10s (drain_time + CI margin) is a tight, meaningful bound.
+  test_server_->waitForCounter(goaway_sent, testing::Eq(1), std::chrono::milliseconds(10000));
+  test_server_->waitForCounter(closed_total, testing::Eq(1), std::chrono::milliseconds(10000));
+  sendDirectRequest();
 }
 
 TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDurationNoActiveRequest) {
