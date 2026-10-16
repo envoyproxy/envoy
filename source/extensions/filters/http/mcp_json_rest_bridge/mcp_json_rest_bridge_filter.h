@@ -15,6 +15,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/bridge_status.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
@@ -48,6 +49,13 @@ struct McpParamHeaderMapping {
   Http::LowerCaseString header_name;
   std::vector<std::string> property_path;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpParamHeader::Type type;
+};
+
+// Cache hints returned in locally served tools/list responses.
+struct ToolListCacheConfig {
+  uint64_t ttl_ms = 0;
+  absl::string_view scope =
+      Envoy::Extensions::Filters::Common::Mcp::McpConstants::CACHE_SCOPE_PUBLIC;
 };
 
 /**
@@ -84,6 +92,11 @@ public:
 
   // Returns whether local serving of tools/list is configured for the matching endpoint.
   bool toolListLocal(absl::string_view host, absl::string_view path) const;
+
+  // Returns the tools/list cache config for the matching endpoint. Returns defaults if local
+  // serving of tools/list is not configured, or if it is configured without a cache_config.
+  ToolListCacheConfig toolListLocalCacheConfig(absl::string_view host,
+                                               absl::string_view path) const;
 
   // Returns whether there is a configured endpoint matching the host and path.
   bool hasEndpoint(absl::string_view host, absl::string_view path) const;
@@ -131,6 +144,7 @@ private:
     std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
+    ToolListCacheConfig tool_list_cache_config;
   };
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
@@ -163,6 +177,11 @@ public:
   // Returns whether local serving of tools/list is configured for the matching endpoint.
   bool toolListLocal(absl::string_view host, absl::string_view path) const;
 
+  // Returns the tools/list cache config for the matching endpoint. Returns defaults if local
+  // serving of tools/list is not configured, or if it is configured without a cache_config.
+  ToolListCacheConfig toolListLocalCacheConfig(absl::string_view host,
+                                               absl::string_view path) const;
+
   // Returns whether there is a configured endpoint matching the host and path.
   bool hasEndpoint(absl::string_view host, absl::string_view path) const;
 
@@ -193,6 +212,7 @@ private:
     std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
+    ToolListCacheConfig tool_list_cache_config;
   };
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
@@ -254,7 +274,8 @@ private:
   void serveToolsListLocal(
       const nlohmann::json& json_rpc,
       const std::vector<
-          const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools);
+          const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools,
+      const ToolListCacheConfig& cache_config);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);

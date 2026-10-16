@@ -332,6 +332,144 @@ tool_config:
   }
 }
 
+TEST_F(EndpointKeyedFilteringTest, ToolListLocalCacheConfigPrecedenceAndFallbacks) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge
+      filter_proto_no_local;
+  TestUtility::loadFromYaml(R"yaml(
+tool_config:
+  tools:
+    - name: tool_no_local
+      http_rule:
+        get: "/no_local"
+  default_server_info:
+    host: "a.com"
+    path: "/mcp"
+)yaml",
+                            filter_proto_no_local);
+  ASSERT_OK_AND_ASSIGN(auto filter_config_no_local,
+                       McpJsonRestBridgeFilterConfig::create(filter_proto_no_local));
+  EXPECT_EQ(filter_config_no_local->toolListLocalCacheConfig("a.com", "/mcp").ttl_ms, 0);
+  EXPECT_EQ(filter_config_no_local->toolListLocalCacheConfig("a.com", "/mcp").scope, "public");
+  EXPECT_EQ(filter_config_no_local->toolListLocalCacheConfig("b.com", "/other").ttl_ms, 0);
+  EXPECT_EQ(filter_config_no_local->toolListLocalCacheConfig("b.com", "/other").scope, "public");
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute route_proto;
+  TestUtility::loadFromYaml(R"yaml(
+tool_config:
+  - tools:
+      - name: tool_exact_no_local
+        http_rule:
+          get: "/exact_no_local"
+    default_server_info:
+      host: "no_local.com"
+      path: "/mcp"
+  - tools:
+      - name: tool_exact_first
+        http_rule:
+          get: "/exact_first"
+    default_server_info:
+      host: "a.com"
+      path: "/mcp"
+    tool_list_local:
+      cache_config:
+        ttl: 10s
+        cache_scope: CACHE_SCOPE_PRIVATE
+  - tools:
+      - name: tool_exact_second
+        http_rule:
+          get: "/exact_second"
+    default_server_info:
+      host: "a.com"
+      path: "/mcp"
+    tool_list_local:
+      cache_config:
+        ttl: 99s
+        cache_scope: CACHE_SCOPE_PUBLIC
+  - tools:
+      - name: tool_host_only
+        http_rule:
+          get: "/host_only"
+    default_server_info:
+      host: "a.com"
+    tool_list_local:
+      cache_config:
+        ttl: 20s
+        cache_scope: CACHE_SCOPE_PUBLIC
+  - tools:
+      - name: tool_path_only
+        http_rule:
+          get: "/path_only"
+    default_server_info:
+      path: "/mcp"
+    tool_list_local:
+      cache_config:
+        ttl: 30s
+        cache_scope: CACHE_SCOPE_PRIVATE
+  - tools:
+      - name: tool_global
+        http_rule:
+          get: "/global"
+    default_server_info:
+      path: "/global_only"
+)yaml",
+                            route_proto);
+
+  ASSERT_OK_AND_ASSIGN(auto per_route_config, McpJsonRestBridgePerRouteConfig::create(route_proto));
+
+  // Exact match (a.com, /mcp) uses the first tool_list_local configured on (a.com, /mcp).
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("a.com", "/mcp").ttl_ms, 10000);
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("a.com", "/mcp").scope, "private");
+
+  // Host-only match (a.com, /other) falls back to (a.com, "").
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("a.com", "/other").ttl_ms, 20000);
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("a.com", "/other").scope, "public");
+
+  // When exact tier (no_local.com, /mcp) does not have tool_list_local, falls back to ("", /mcp).
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("no_local.com", "/mcp").ttl_ms, 30000);
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("no_local.com", "/mcp").scope, "private");
+
+  // When no matching tier has tool_list_local, returns 0 and "public".
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("unmatched.com", "/unmatched").ttl_ms, 0);
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("unmatched.com", "/unmatched").scope,
+            "public");
+}
+
+TEST_F(EndpointKeyedFilteringTest, ToolListLocalWithoutCacheConfigUsesDefaults) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge filter_proto;
+  TestUtility::loadFromYaml(R"yaml(
+tool_config:
+  tools:
+    - name: tool_local
+      http_rule:
+        get: "/local"
+  default_server_info:
+    host: "a.com"
+    path: "/mcp"
+  tool_list_local: {}
+)yaml",
+                            filter_proto);
+  ASSERT_OK_AND_ASSIGN(auto filter_config, McpJsonRestBridgeFilterConfig::create(filter_proto));
+  EXPECT_EQ(filter_config->toolListLocalCacheConfig("a.com", "/mcp").ttl_ms, 0);
+  EXPECT_EQ(filter_config->toolListLocalCacheConfig("a.com", "/mcp").scope, "public");
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute route_proto;
+  TestUtility::loadFromYaml(R"yaml(
+tool_config:
+  - tools:
+      - name: tool_local
+        http_rule:
+          get: "/local"
+    default_server_info:
+      host: "a.com"
+      path: "/mcp"
+    tool_list_local: {}
+)yaml",
+                            route_proto);
+  ASSERT_OK_AND_ASSIGN(auto per_route_config, McpJsonRestBridgePerRouteConfig::create(route_proto));
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("a.com", "/mcp").ttl_ms, 0);
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("a.com", "/mcp").scope, "public");
+}
+
 } // namespace
 } // namespace McpJsonRestBridge
 } // namespace HttpFilters
