@@ -1585,6 +1585,27 @@ TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporter) {
   factory_called = false;
   EXPECT_EQ(reporter, grpc_mux_->maybeCreateLoadStatsReporter());
   EXPECT_FALSE(factory_called);
+
+  // Updating the mux source when the reporter already exists recreates it using the new factory.
+  replaced_async_client_ = new Grpc::MockAsyncClient();
+  EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _))
+      .WillOnce(Return(&replaced_async_stream_));
+  bool new_factory_called = false;
+  auto new_lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    new_factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+  envoy::config::core::v3::ApiConfigSource empty_ads_config;
+  EXPECT_OK(grpc_mux_->updateMuxSource(
+      /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+      /*failover_async_client=*/nullptr,
+      /*scope=*/*stats_.rootScope(),
+      /*backoff_strategy=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      empty_ads_config, new_lrs_factory));
+  EXPECT_TRUE(new_factory_called);
+  EXPECT_NE(nullptr, grpc_mux_->loadStatsReporter());
 }
 
 // Ensures that the load-stats-reporter is not created if disabled.
