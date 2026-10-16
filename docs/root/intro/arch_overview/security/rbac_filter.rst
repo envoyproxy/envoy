@@ -63,18 +63,12 @@ authorization condition written in the `Common Expression Language
 clause that must be satisfied for the policy to match. For example, the following condition checks
 whether the request path starts with ``/v1/``:
 
-.. code-block:: yaml
-
-  call_expr:
-    function: startsWith
-    args:
-    - select_expr:
-       operand:
-         ident_expr:
-           name: request
-       field: path
-    - const_expr:
-       string_value: /v1/
+.. literalinclude:: _include/rbac-condition.yaml
+    :language: yaml
+    :lines: 25-35
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`rbac-condition.yaml <_include/rbac-condition.yaml>`
 
 Envoy provides a number of :ref:`request attributes <arch_overview_request_attributes>`
 for expressive policies. Most attributes are optional and provide the default
