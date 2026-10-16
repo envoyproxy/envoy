@@ -22,6 +22,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/stats.h"
 
@@ -63,6 +64,12 @@ struct TlsContext {
   CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_;
+  // When the parsed-certificate caches are enabled, these retain the shared
+  // parsed material for this context's lifetime so the process-wide caches keep
+  // the entries alive (and thus reusable by sibling contexts and the next xDS
+  // generation) rather than releasing them the moment this loader returns.
+  Extensions::TransportSockets::Tls::CertChainSharedPtr shared_cert_chain_;
+  Extensions::TransportSockets::Tls::ParsedPrivateKeySharedPtr shared_private_key_;
 
 #ifdef ENVOY_ENABLE_QUIC
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> quic_cert_;
@@ -74,9 +81,13 @@ struct TlsContext {
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }
-  absl::Status loadCertificateChain(const std::string& data, const std::string& data_path);
+  // When non-null, the cache shares the parsed material across contexts with
+  // identical PEM; null selects a per-context parse.
+  absl::Status loadCertificateChain(const std::string& data, const std::string& data_path,
+                                    Extensions::TransportSockets::Tls::CertChainCache* cache);
   absl::Status loadPrivateKey(const std::string& data, const std::string& data_path,
-                              const std::string& password, bool fips_mode);
+                              const std::string& password, bool fips_mode,
+                              Extensions::TransportSockets::Tls::PrivateKeyCache* cache);
   absl::Status loadPkcs12(const std::string& data, const std::string& data_path,
                           const std::string& password, bool fips_mode);
   absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
