@@ -74,6 +74,8 @@ public:
 
   void onStatsUpdate(const PluginSharedPtr& plugin, Envoy::Stats::MetricSnapshot& snapshot);
 
+  void updateMemoryStats();
+
   virtual std::string buildVersion() { return BUILD_VERSION_NUMBER; }
 
   uint32_t nextDnsToken() {
@@ -109,6 +111,7 @@ protected:
 
   // Lifecycle stats
   LifecycleStatsHandler lifecycle_stats_handler_;
+  uint64_t memory_size_{0};
 
   // Plugin stats
   absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;
@@ -156,10 +159,25 @@ class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
   PluginHandleSharedPtr handle;
   MonotonicTime last_load;
+  // The plugin stats and the VM memory size last reported to them from this handle.
+  StatsHandlerSharedPtr stats_handler;
+  uint64_t memory_size{0};
 
-  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr h, MonotonicTime t = {})
-      : handle(std::move(h)), last_load(t) {}
+  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr h, MonotonicTime t = {},
+                                   StatsHandlerSharedPtr s = nullptr)
+      : handle(std::move(h)), last_load(t), stats_handler(std::move(s)) {}
   PluginHandleSharedPtrThreadLocal() = default;
+  // Not copyable, so that the reported memory size is removed from the stats exactly once.
+  PluginHandleSharedPtrThreadLocal(const PluginHandleSharedPtrThreadLocal&) = delete;
+  PluginHandleSharedPtrThreadLocal& operator=(const PluginHandleSharedPtrThreadLocal&) = delete;
+  ~PluginHandleSharedPtrThreadLocal() override { updateMemorySize(0); }
+
+  void updateMemorySize(uint64_t new_size) {
+    if (stats_handler != nullptr && new_size != memory_size) {
+      stats_handler->onMemorySizeChanged(memory_size, new_size);
+      memory_size = new_size;
+    }
+  }
 };
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;

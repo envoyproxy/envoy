@@ -133,6 +133,7 @@ void Wasm::tickHandler(uint32_t root_context_id) {
   auto context = getContext(root_context_id);
   if (context) {
     context->onTick(0);
+    updateMemoryStats();
   }
   if (timer->second && period->second.count() > 0) {
     timer->second->enableTimer(period->second);
@@ -140,8 +141,20 @@ void Wasm::tickHandler(uint32_t root_context_id) {
 }
 
 Wasm::~Wasm() {
+  lifecycle_stats_handler_.onMemorySizeChanged(memory_size_, 0);
   lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
   ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
+}
+
+void Wasm::updateMemoryStats() {
+  if (isFailed() || wasm_vm()->getEngineName() == "null") {
+    return;
+  }
+  const uint64_t memory_size = wasm_vm()->getMemorySize();
+  if (memory_size != memory_size_) {
+    lifecycle_stats_handler_.onMemorySizeChanged(memory_size_, memory_size);
+    memory_size_ = memory_size;
+  }
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
@@ -410,7 +423,9 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
       cb(nullptr);
       return false;
     }
-    cb(std::static_pointer_cast<WasmHandle>(wasm));
+    auto wasm_handle = std::static_pointer_cast<WasmHandle>(wasm);
+    wasm_handle->wasm()->updateMemoryStats();
+    cb(wasm_handle);
     return true;
   };
 
@@ -482,14 +497,31 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
     // we still create PluginHandle with null WasmBase.
     return std::make_shared<PluginHandle>(nullptr, plugin);
   }
-  return std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
-      std::static_pointer_cast<WasmHandle>(base_wasm), plugin,
-      getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
-      getPluginHandleFactory()));
+  auto plugin_handle =
+      std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
+          std::static_pointer_cast<WasmHandle>(base_wasm), plugin,
+          getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
+          getPluginHandleFactory()));
+  if (plugin_handle != nullptr && plugin_handle->wasmHandle() != nullptr) {
+    plugin_handle->wasmHandle()->wasm()->updateMemoryStats();
+  }
+  return plugin_handle;
 }
 
 // Simple helper function to get the Wasm* from a WasmHandle.
 Wasm* getWasmOrNull(WasmHandleSharedPtr& h) { return h != nullptr ? h->wasm().get() : nullptr; }
+
+namespace {
+
+// Reports the memory size of the VM serving the handle to the runtime and plugin stats.
+void updatePluginMemorySize(PluginConfig::SinglePluginHandle& handle_wrapper, Wasm* wasm) {
+  if (wasm != nullptr && !wasm->isFailed() && wasm->wasm_vm()->getEngineName() != "null") {
+    wasm->updateMemoryStats();
+    handle_wrapper.updateMemorySize(wasm->wasm_vm()->getMemorySize());
+  }
+}
+
+} // namespace
 
 Wasm* PluginConfig::maybeReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper) {
   // base_wasm_ is null means the plugin is not loaded successfully. Return anyway.
@@ -555,7 +587,9 @@ std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPlug
   if (is_singleton_handle_) {
     ASSERT(absl::holds_alternative<SinglePluginHandle>(plugin_handle_));
     OptRef<SinglePluginHandle> singleton_handle = absl::get<SinglePluginHandle>(plugin_handle_);
-    return {singleton_handle, maybeReloadHandleIfNeeded(singleton_handle.ref())};
+    Wasm* wasm = maybeReloadHandleIfNeeded(singleton_handle.ref());
+    updatePluginMemorySize(singleton_handle.ref(), wasm);
+    return {singleton_handle, wasm};
   }
 
   ASSERT(absl::holds_alternative<ThreadLocalPluginHandle>(plugin_handle_));
@@ -568,7 +602,9 @@ std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPlug
     return {OptRef<SinglePluginHandle>{}, nullptr};
   }
 
-  return {plugin_handle_holder, maybeReloadHandleIfNeeded(*plugin_handle_holder)};
+  Wasm* wasm = maybeReloadHandleIfNeeded(*plugin_handle_holder);
+  updatePluginMemorySize(*plugin_handle_holder, wasm);
+  return {plugin_handle_holder, wasm};
 }
 
 PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
@@ -627,19 +663,20 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
     }
 
     if (is_singleton_handle_) {
-      plugin_handle_ = SinglePluginHandle(
+      plugin_handle_.emplace<SinglePluginHandle>(
           getOrCreateThreadLocalPlugin(base_wasm, plugin_, context.mainThreadDispatcher()),
-          context.mainThreadDispatcher().timeSource().monotonicTime());
+          context.mainThreadDispatcher().timeSource().monotonicTime(), stats_handler_);
       return;
     }
 
     auto thread_local_handle =
         ThreadLocal::TypedSlot<SinglePluginHandle>::makeUnique(context.threadLocal());
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    thread_local_handle->set([base_wasm, plugin = this->plugin_](Event::Dispatcher& dispatcher) {
+    thread_local_handle->set([base_wasm, plugin = this->plugin_,
+                              stats_handler = stats_handler_](Event::Dispatcher& dispatcher) {
       return std::make_shared<SinglePluginHandle>(
           getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher),
-          dispatcher.timeSource().monotonicTime());
+          dispatcher.timeSource().monotonicTime(), stats_handler);
     });
     plugin_handle_ = std::move(thread_local_handle);
   };
