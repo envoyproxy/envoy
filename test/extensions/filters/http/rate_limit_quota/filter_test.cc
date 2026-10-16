@@ -24,6 +24,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -59,6 +60,30 @@ enum class MatcherConfigType {
   NoMatcher,
   ValidOnNoMatchConfig,
   InvalidOnNoMatchConfig
+};
+
+// A data input factory that counts the data inputs it creates, to verify that custom_value inputs
+// are created when the configuration is loaded rather than for every request.
+class CountingDataInputFactory : public Matcher::DataInputFactory<Http::HttpMatchingData> {
+public:
+  class Input : public Matcher::DataInput<Http::HttpMatchingData> {
+  public:
+    Matcher::DataInputGetResult get(const Http::HttpMatchingData&) const override {
+      return Matcher::DataInputGetResult::CreateStringView("counted");
+    }
+  };
+
+  Matcher::DataInputFactoryCb<Http::HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+    ++create_calls_;
+    return []() { return std::make_unique<Input>(); };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::StringValue>();
+  }
+  std::string name() const override { return "test.counting_input"; }
+
+  int create_calls_{0};
 };
 
 class FilterTest : public testing::Test {
@@ -122,8 +147,8 @@ public:
 
     mock_local_client_ = new MockRateLimitClient();
     filter_ = std::make_unique<RateLimitQuotaFilter>(
-        filter_config_, context_.serverFactoryContext(), context_.messageValidationVisitor(),
-        absl::WrapUnique(mock_local_client_), config_with_hash_key, match_tree_);
+        filter_config_, context_.serverFactoryContext(), absl::WrapUnique(mock_local_client_),
+        config_with_hash_key, match_tree_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -162,10 +187,8 @@ public:
     const RateLimitOnMatchAction* match_action =
         dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
 
-    RateLimitQuotaValidationVisitor visitor = {};
     // Generate the bucket ids.
-    auto ret = match_action->generateBucketId(filter_->matchingData(),
-                                              context_.messageValidationVisitor(), visitor);
+    auto ret = match_action->generateBucketId(filter_->matchingData());
     // Asserts that the bucket id generation succeeded and then retrieve the
     // bucket ids.
     ASSERT_OK(ret);
@@ -196,6 +219,56 @@ public:
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
 };
+
+TEST_F(FilterTest, CustomValueInputsCreatedAtConfigTime) {
+  CountingDataInputFactory counting_factory;
+  Registry::InjectFactory<Matcher::DataInputFactory<Http::HttpMatchingData>> inject_factory(
+      counting_factory);
+  const std::string matcher_yaml = R"EOF(
+  matcher_list:
+    matchers:
+      predicate:
+        single_predicate:
+          input:
+            name: envoy.matching.inputs.request_headers
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: environment
+          value_match:
+            exact: staging
+      on_match:
+        action:
+          name: rate_limit_quota
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+            bucket_id_builder:
+              bucket_id_builder:
+                "counted":
+                    custom_value:
+                      name: test.counting_input
+                      typed_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+            reporting_interval: 60s
+  )EOF";
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  addMatcherConfig(matcher);
+  createFilter();
+  // The input is created once, when the action is created from the configuration.
+  EXPECT_EQ(1, counting_factory.create_calls_);
+
+  buildCustomHeader({{"environment", "staging"}});
+  for (int i = 0; i < 2; ++i) {
+    auto match_result = filter_->requestMatching(default_headers_);
+    ASSERT_OK(match_result);
+    const auto& match_action = match_result.value()->getTyped<RateLimitOnMatchAction>();
+    auto bucket_id = match_action.generateBucketId(filter_->matchingData());
+    ASSERT_OK(bucket_id);
+    EXPECT_EQ("counted", bucket_id->bucket().at("counted"));
+  }
+  // Generating bucket ids for requests does not create any more inputs.
+  EXPECT_EQ(1, counting_factory.create_calls_);
+}
 
 TEST_F(FilterTest, EmptyMatcherConfig) {
   addMatcherConfig(MatcherConfigType::Empty);
@@ -286,10 +359,8 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   const RateLimitOnMatchAction* match_action =
       dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
 
-  RateLimitQuotaValidationVisitor visitor = {};
   // Generate the bucket ids.
-  auto ret = match_action->generateBucketId(filter_->matchingData(),
-                                            context_.messageValidationVisitor(), visitor);
+  auto ret = match_action->generateBucketId(filter_->matchingData());
   // Bucket id generation is expected to fail, which is due to no support for
   // dynamic id generation (i.e., via custom_value with for on_no_match case.
   EXPECT_THAT(ret, HasStatusMessage("Failed to generate the id from custom value config."));
@@ -986,9 +1057,9 @@ bucket_matchers:
       Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
   mock_local_client_ = new MockRateLimitClient();
-  filter_ = std::make_unique<RateLimitQuotaFilter>(
-      filter_config_, context_.serverFactoryContext(), context_.messageValidationVisitor(),
-      absl::WrapUnique(mock_local_client_), config_with_hash_key, match_tree_);
+  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_.serverFactoryContext(),
+                                                   absl::WrapUnique(mock_local_client_),
+                                                   config_with_hash_key, match_tree_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
   // Build headers that match the config
@@ -1161,9 +1232,9 @@ matcher_list:
       Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
   mock_local_client_ = new MockRateLimitClient();
-  filter_ = std::make_unique<RateLimitQuotaFilter>(
-      filter_config_, context_.serverFactoryContext(), context_.messageValidationVisitor(),
-      absl::WrapUnique(mock_local_client_), config_with_hash_key, match_tree_);
+  filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_.serverFactoryContext(),
+                                                   absl::WrapUnique(mock_local_client_),
+                                                   config_with_hash_key, match_tree_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
   // Build headers that match the config
