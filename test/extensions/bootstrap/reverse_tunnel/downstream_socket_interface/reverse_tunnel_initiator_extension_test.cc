@@ -199,6 +199,12 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, MaintainIntervalOverride) {
   EXPECT_EQ(custom_extension->maintainIntervalMs(), 5000);
 }
 
+TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelSetupTimeHistogramName) {
+  auto custom_extension = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
+  EXPECT_EQ(custom_extension->tunnel_setup_time_.name(),
+            "test_scope.reverse_connections.tunnel_setup_time");
+}
+
 TEST_F(ReverseTunnelInitiatorExtensionTest, AdditionalHeadersDefaults) {
   EXPECT_TRUE(extension_->handshakeAdditionalHeaders().empty());
 }
