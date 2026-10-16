@@ -24,6 +24,11 @@ namespace HttpFilters {
 namespace Mcp {
 namespace {
 
+using ::testing::AllOf;
+using ::testing::IsEmpty;
+using ::testing::Ne;
+using ::testing::Not;
+
 class McpFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public HttpIntegrationTest {
 public:
@@ -1310,8 +1315,12 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersInjected) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Test that tracing headers and the request body are correctly rewritten when
-// `propagate_trace_context.reparent_active_span` is enabled.
+// Test that when `propagate_trace_context.reparent_active_span` is enabled:
+//   1. Tracing headers are rewritten based on the incoming request body.
+//   2. The emitted OpenTelemetry span is a direct child of the request body's
+//      traceparent.
+//   3. The outgoing request body's tracing info is rewritten such that upstream
+//      spans will descend from the aforementioned OpenTelemetry span.
 TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEnabled) {
   using envoy::config::trace::v3::OpenTelemetryConfig;
   using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
@@ -1323,12 +1332,14 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEn
     trace_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
     trace_cluster->set_name("trace-receiver");
 
-    // Set a short flush interval so spans are exported quickly.
     auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
     layer->set_name("test_otel_static_layer");
     Protobuf::Struct runtime_config;
+    // Set the flush interval to a value longer than we expect this test to run.
+    // This prevents spans from being exported when a timer fires.
     (*runtime_config.mutable_fields())["tracing.opentelemetry.flush_interval_ms"].set_number_value(
-        5);
+        60 * 60 * 1000);
+    // Flush each span immediately.
     (*runtime_config.mutable_fields())["tracing.opentelemetry.min_flush_spans"].set_number_value(1);
     *layer->mutable_static_layer() = runtime_config;
   });
@@ -1372,20 +1383,25 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEn
   )EOF");
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  // SPELLCHECKER(off)
-  const std::string request_body = R"({
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "test",
-      "_meta": {
-        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
-        "tracestate": "rojo=00f067aa0ba902b7",
-        "baggage": "userId=alice"
-      }
-    }
-  })";
-  // SPELLCHECKER(on)
+
+  auto BuildRequestBody = [](absl::string_view trace_id_hex, absl::string_view parent_id_hex) -> std::string {
+    static constexpr absl::string_view kBodyTemplate =
+        R"json({
+            "params": {
+              "name": "test",
+              "_meta": {
+                "baggage": "userId=alice",
+                "traceparent": "00-$0-$1-01",
+                "tracestate": "rojo=00f067aa0ba902b7"
+              }
+            },
+            "jsonrpc": "2.0",
+            "method": "tools/call"
+          })json";
+    return absl::Substitute(kBodyTemplate, trace_id_hex, parent_id_hex);
+  };
+  static constexpr absl::string_view kTraceId = "4bf92f3577b34da6a3ce929d0e0e4736";
+  static constexpr absl::string_view kIncomingBodyParentId = "00f067aa0ba902b7";
 
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1395,16 +1411,16 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEn
                                      {"content-type", "application/json"},
                                      {"accept", "application/json"},
                                      {"accept", "text/event-stream"}},
-      request_body);
+      BuildRequestBody(kTraceId, kIncomingBodyParentId));
 
   waitForNextUpstreamRequest();
   auto tp = upstream_request_->headers().get(Http::LowerCaseString("traceparent"));
   ASSERT_FALSE(tp.empty());
-  // The traceparent header should have a modified parent ID.
+  // The traceparent header's parent ID should have been modified.
   EXPECT_NE(tp[0]->value().getStringView(),
-            "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01");
+            absl::StrCat("00-", kTraceId, "-", kIncomingBodyParentId, "-01"));
   EXPECT_THAT(tp[0]->value().getStringView(),
-              testing::MatchesRegex("00-4bf92f3577b34da6a3ce929d0e0e4736-[0-9a-f-A-F]{16}-01"));
+              testing::MatchesRegex(absl::StrCat("00-", kTraceId, "-[0-9a-f-A-F]{16}-01")));
 
   auto ts = upstream_request_->headers().get(Http::LowerCaseString("tracestate"));
   ASSERT_FALSE(ts.empty());
@@ -1437,10 +1453,10 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEn
     ASSERT_EQ(export_request.resource_spans(0).scope_spans_size(), 1);
     ASSERT_EQ(export_request.resource_spans(0).scope_spans(0).spans_size(), 1);
     span = export_request.resource_spans(0).scope_spans(0).spans(0);
-    EXPECT_EQ(absl::BytesToHexString(span.trace_id()), "4bf92f3577b34da6a3ce929d0e0e4736");
-    EXPECT_EQ(absl::BytesToHexString(span.parent_span_id()), "00f067aa0ba902b7");
-    EXPECT_NE(absl::BytesToHexString(span.span_id()), "");
-    EXPECT_NE(absl::BytesToHexString(span.span_id()), "00f067aa0ba902b7");
+    EXPECT_EQ(absl::BytesToHexString(span.trace_id()), kTraceId);
+    EXPECT_EQ(absl::BytesToHexString(span.parent_span_id()), kIncomingBodyParentId);
+    EXPECT_THAT(absl::BytesToHexString(span.span_id()),
+                AllOf(Not(IsEmpty()), Ne(kIncomingBodyParentId)));
     EXPECT_EQ(
         span.flags() & opentelemetry::proto::trace::v1::SpanFlags::SPAN_FLAGS_TRACE_FLAGS_MASK, 1);
     EXPECT_TRUE(span.flags() &
@@ -1454,29 +1470,15 @@ TEST_P(McpFilterIntegrationTest, TracingHeadersAndBodyRewrittenWhenReparentingEn
 
   // Capture the rewritten request body. Its traceparent should have a parent ID
   // equal to the exported span's ID.
-  Protobuf::Struct body;
-  TestUtility::loadFromJson(upstream_request_->body().toString(), body);
+  Protobuf::Struct rewritten_body;
+  TestUtility::loadFromJson(upstream_request_->body().toString(), rewritten_body);
 
   Protobuf::Struct want_body;
-  // SPELLCHECKER(off)
-  TestUtility::loadFromJson(absl::Substitute(
-                                R"json({
-            "params": {
-              "name": "test",
-              "_meta": {
-                "baggage": "userId=alice",
-                "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-$0-01",
-                "tracestate": "rojo=00f067aa0ba902b7"
-              }
-            },
-            "jsonrpc": "2.0",
-            "method": "tools/call"
-          })json",
-                                absl::BytesToHexString(span.span_id())),
-                            want_body);
-  // SPELLCHECKER(on)
+  TestUtility::loadFromJson(
+      BuildRequestBody(kTraceId, /*parent_id_hex=*/absl::BytesToHexString(span.span_id())),
+      want_body);
 
-  EXPECT_THAT(body, ProtoEq(want_body));
+  EXPECT_THAT(rewritten_body, ProtoEq(want_body));
 }
 
 // Test that tracing headers are NOT injected when disabled.
