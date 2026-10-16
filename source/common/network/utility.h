@@ -409,19 +409,24 @@ public:
                                              netns_fd, errorDetails(errno)));
     }
 
+    // Restore the original network namespace when leaving this scope, whether the callback returns
+    // normally or throws. Callers higher up the stack may catch an exception thrown by the callback
+    // (for example an exception raised while binding a listener) and continue running, so an
+    // exception must not leave this thread stranded in the target network namespace.
+    Cleanup restore_netns([&og_netns_fd, &netns_fd]() {
+      const auto restore_result =
+          Api::LinuxOsSysCallsSingleton().get().setns(og_netns_fd, CLONE_NEWNET);
+
+      // If we cannot jump back into the original network namespace, this is an unrecoverable
+      // error. It would leave the current thread in another network namespace indefinitely, so we
+      // cannot continue running in that state.
+      RELEASE_ASSERT(restore_result.return_value_ == 0,
+                     fmt::format("failed to restore original netns (fd={}): {}", netns_fd,
+                                 errorDetails(errno)));
+    });
+
     // Calling function from the specified network namespace.
     auto result = std::forward<Func>(f)();
-
-    // Restore the original network namespace before returning the function result.
-    setns_result = Api::LinuxOsSysCallsSingleton().get().setns(og_netns_fd, CLONE_NEWNET);
-
-    // If we cannot jump back into the original network namespace, this is an unrecoverable error.
-    // It would leave the current thread in another network namespace indefinitely, so we cannot
-    // continue running in that state.
-    RELEASE_ASSERT(
-        setns_result.return_value_ == 0,
-        fmt::format("failed to restore original netns (fd={}): {}", netns_fd, errorDetails(errno)));
-
     return result;
   }
 
