@@ -201,6 +201,7 @@ envoy_cc_library(
     hdrs = ["symbol_table.h"],
     deps = [
         ":recent_lookups_lib",
+        "//envoy/stats:tag_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:mem_block_builder_lib",
         "//source/common/common:minimal_logger_lib",

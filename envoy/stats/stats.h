@@ -25,6 +25,11 @@ class StatName;
 class SymbolTable;
 
 /**
+ * Ephemeral cache for decoding StatName instances into std::string.
+ */
+class StatNameStringCache;
+
+/**
  * General interface for all stats objects.
  *
  * Note: some methods must match those in `PrimitiveMetricMetadata` because stats sinks
@@ -51,6 +56,12 @@ public:
    * Returns a vector of configurable tags to identify this Metric.
    */
   virtual TagVector tags() const PURE;
+
+  /**
+   * Returns a vector of configurable tags to identify this Metric, using the provided cache
+   * to avoid repeated string decoding.
+   */
+  virtual TagVector tags(StatNameStringCache&) const { return tags(); }
 
   /**
    * See a more detailed description in tagExtractedStatName(), which is the
