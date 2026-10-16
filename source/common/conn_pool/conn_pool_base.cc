@@ -1,5 +1,6 @@
 #include "source/common/conn_pool/conn_pool_base.h"
 
+#include "envoy/common/resource.h"
 #include "envoy/server/overload/load_shed_point.h"
 
 #include "source/common/common/assert.h"
@@ -23,7 +24,8 @@ uint64_t currentUnusedCapacity(const std::list<ActiveClientPtr>& connecting_clie
 }
 
 PendingStreamQueuePtr createPendingStreamQueue(
-    const OptRef<const Upstream::ClusterInfo::PendingRqQueuePolicy> queue_policy) {
+    const OptRef<const Upstream::ClusterInfo::PendingRqQueuePolicy> queue_policy,
+    ResourceLimit& pending_requests) {
   if (!queue_policy.has_value()) {
     return std::make_unique<Extensions::QueuePolicy::FifoQueue<PendingStream>>();
   }
@@ -32,7 +34,8 @@ PendingStreamQueuePtr createPendingStreamQueue(
   // load time, so no factory lookup or proto translation is needed here.
   auto& factory = *queue_policy->factory_;
   auto queue = factory.createQueuePolicy(*queue_policy->config_, queue_policy->stat_prefix_,
-                                         ProtobufMessage::getStrictValidationVisitor());
+                                         ProtobufMessage::getStrictValidationVisitor(),
+                                         [&pending_requests]() { return pending_requests.max(); });
   RELEASE_ASSERT(queue.ok(), queue.status().ToString());
   return std::move(*queue);
 }
@@ -73,7 +76,9 @@ ConnPoolImplBase::ConnPoolImplBase(
     Upstream::ClusterConnectivityState& state, Server::OverloadManager& overload_manager)
     : host_(host), priority_(priority), dispatcher_(dispatcher), socket_options_(options),
       transport_socket_options_(transport_socket_options), cluster_connectivity_state_(state),
-      pending_stream_queue_(createPendingStreamQueue(host_->cluster().pendingRqQueuePolicy())),
+      pending_stream_queue_(
+          createPendingStreamQueue(host_->cluster().pendingRqQueuePolicy(),
+                                   host_->cluster().resourceManager(priority_).pendingRequests())),
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })),
       create_new_connection_load_shed_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().ConnectionPoolNewConnection)),
@@ -95,8 +100,7 @@ size_t ConnPoolImplBase::pendingStreamCount() const { return pending_streams_.si
 
 PendingStreamPtr ConnPoolImplBase::popPendingStream() {
   ASSERT(!pending_streams_.empty());
-  PendingStream& stream = pending_stream_queue_->peek();
-  pending_stream_queue_->pop();
+  PendingStream& stream = pending_stream_queue_->pop();
   PendingStreamPtr pending_stream = stream.removeFromList(pending_streams_);
   ASSERT(pending_streams_.size() == pending_stream_queue_->size());
   return pending_stream;
@@ -473,16 +477,15 @@ void ConnPoolImplBase::scheduleOnUpstreamReady() {
 
 void ConnPoolImplBase::onUpstreamReady() {
   while (hasPendingStreams() && !ready_clients_.empty()) {
-    PendingStream& stream = pending_stream_queue_->peek();
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
-    // FIFO pending streams are pulled from the front, where the oldest stream is stored.
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
       PendingStreamPtr pending_stream = popPendingStream();
       cluster_connectivity_state_.decrPendingStreams(1);
       updateQueueOverloadedGauge();
       attachStreamToClient(*client, pending_stream->context());
     } else {
+      PendingStream& stream = pending_stream_queue_->peek();
       attachStreamToClient(*client, stream.context());
       cluster_connectivity_state_.decrPendingStreams(1);
       removePendingStream(stream);

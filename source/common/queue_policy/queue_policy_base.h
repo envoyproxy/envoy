@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+#include <functional>
 #include <memory>
 
 #include "envoy/common/time.h"
@@ -37,8 +39,9 @@ public:
   virtual const ItemType& peek() const PURE;
   virtual ItemType& peek() PURE;
 
-  // Removes the next item from the queue without destroying it.
-  virtual void pop() PURE;
+  // Removes and returns the next item from the queue without destroying it. The caller retains
+  // ownership of the returned item.
+  virtual ItemType& pop() PURE;
 
   // Removes a specific item from the queue without destroying it.
   virtual void remove(ItemType& item) PURE;
@@ -53,6 +56,9 @@ public:
 
 template <class ItemType> using QueuePolicyUniquePtr = std::unique_ptr<QueueBase<ItemType>>;
 
+// Returns the current maximum queue size used to resolve relative queue policy configuration.
+using MaxQueueSizeFn = std::function<uint64_t()>;
+
 /**
  * Implemented by each queue policy and registered via Registry::registerFactory() or the
  * convenience class RegisterFactory.
@@ -66,11 +72,13 @@ public:
    * @param config supplies the configuration for the queue policy.
    * @param stat_prefix prefix for stat logging
    * @param validation_visitor validation visitor for config validation.
+   * @param max_queue_size returns the current maximum queue size.
    * @return the queue policy unique pointer or an error status.
    */
   virtual absl::StatusOr<QueuePolicyUniquePtr<ItemType>>
   createQueuePolicy(const Protobuf::Message& config, const std::string& stat_prefix,
-                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                    MaxQueueSizeFn max_queue_size) PURE;
 
   std::string category() const override { return "envoy.queue_policy"; }
 };

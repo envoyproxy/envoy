@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package envoy.extensions.queue_policy.adaptive_lifo.v3;
+
+import "envoy/type/v3/percent.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.queue_policy.adaptive_lifo.v3";
+option java_outer_classname = "AdaptiveLifoProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/queue_policy/adaptive_lifo/v3;adaptive_lifov3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Adaptive LIFO Queue Policy]
+// [#extension: envoy.queue_policy.adaptive_lifo]
+
+// Configuration for the adaptive LIFO pending requests queue policy. Watermarks are percentages of
+// the priority-specific ``max_pending_requests`` circuit breaker limit. Each connection pool uses
+// the resulting values as thresholds for its own pending request queue.
+//
+// Requests are dequeued in FIFO order until the queue size reaches the high watermark. Requests
+// are then dequeued in LIFO order until the queue size reaches or falls below the low watermark.
+message AdaptiveLifoQueuePolicyConfig {
+  // Percentage of the circuit breaker limit at which the queue switches from FIFO to LIFO
+  // ordering. This must be greater than zero and greater than ``low_watermark``.
+  type.v3.Percent high_watermark = 1 [(validate.rules).message = {required: true}];
+
+  // Percentage of the circuit breaker limit at or below which the queue switches from LIFO back to
+  // FIFO ordering. This may be zero and must be less than ``high_watermark``.
+  type.v3.Percent low_watermark = 2 [(validate.rules).message = {required: true}];
+}

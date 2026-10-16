@@ -108,9 +108,11 @@ public:
   const PendingStream& peek() const override { return *items_.back(); }
   PendingStream& peek() override { return *items_.back(); }
 
-  void pop() override {
+  PendingStream& pop() override {
     ASSERT(!items_.empty());
+    PendingStream& item = *items_.back();
     items_.pop_back();
+    return item;
   }
 
   bool isOverloaded() const override { return items_.size() > 1; }
@@ -138,7 +140,8 @@ public:
 
   absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<PendingStream>>
   createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
-                    ProtobufMessage::ValidationVisitor&) override {
+                    ProtobufMessage::ValidationVisitor&,
+                    Extensions::QueuePolicy::MaxQueueSizeFn) override {
     stat_prefix_ = stat_prefix;
     return std::make_unique<TestPendingStreamQueue>();
   }

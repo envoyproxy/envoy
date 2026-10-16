@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_library(
     name = "queue_policy_base_lib",
     hdrs = [
+        "adaptive_lifo_queue.h",
         "fifo_queue_policy.h",
         "queue_policy_base.h",
     ],

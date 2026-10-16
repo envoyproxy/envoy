@@ -7131,7 +7131,8 @@ public:
 
   absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
   createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
-                    ProtobufMessage::ValidationVisitor&) override {
+                    ProtobufMessage::ValidationVisitor&,
+                    Extensions::QueuePolicy::MaxQueueSizeFn) override {
     stat_prefix_ = stat_prefix;
     return absl::InvalidArgumentError("queue policy creation failed");
   }
@@ -7148,7 +7149,8 @@ public:
 
   absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
   createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
-                    ProtobufMessage::ValidationVisitor&) override {
+                    ProtobufMessage::ValidationVisitor&,
+                    Extensions::QueuePolicy::MaxQueueSizeFn) override {
     stat_prefix_ = stat_prefix;
     return std::make_unique<Extensions::QueuePolicy::FifoQueue<ConnectionPool::PendingStream>>();
   }
