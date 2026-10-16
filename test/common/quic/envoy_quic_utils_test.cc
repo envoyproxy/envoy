@@ -212,6 +212,7 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   EXPECT_TRUE(quic_config.ClientRequestedIndependentOptions(quic::Perspective::IS_CLIENT).empty());
   EXPECT_EQ(quic::QuicTime::Delta::FromSeconds(quic::kMaximumIdleTimeoutSecs),
             quic_config.IdleNetworkTimeout());
+  EXPECT_FALSE(quic_config.SupportsReliableStreamReset());
 
   // Test converting values.
   config.mutable_max_concurrent_streams()->set_value(2);
@@ -245,6 +246,14 @@ TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
   config.mutable_enable_scone()->set_value(false);
   convertQuicConfig(config, quic_config);
   EXPECT_FALSE(quic_config.parse_scone_packets());
+
+  config.mutable_enable_reliable_stream_reset()->set_value(true);
+  convertQuicConfig(config, quic_config);
+  EXPECT_TRUE(quic_config.SupportsReliableStreamReset());
+
+  config.mutable_enable_reliable_stream_reset()->set_value(false);
+  convertQuicConfig(config, quic_config);
+  EXPECT_FALSE(quic_config.SupportsReliableStreamReset());
 }
 
 TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
