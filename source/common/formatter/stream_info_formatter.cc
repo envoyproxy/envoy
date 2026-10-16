@@ -163,8 +163,10 @@ MetadataFormatter::format(const Context&, const StreamInfo::StreamInfo& stream_i
 Protobuf::Value MetadataFormatter::formatValue(const Context&,
                                                const StreamInfo::StreamInfo& stream_info) const {
   auto metadata = get_func_(stream_info);
-  return formatMetadataValue((metadata != nullptr) ? *metadata
-                                                   : envoy::config::core::v3::Metadata());
+  if (metadata == nullptr) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return formatMetadataValue(*metadata);
 }
 
 bool MetadataFormatter::formatTo(std::string& sink, const Context& context,

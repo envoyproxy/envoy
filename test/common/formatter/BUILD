@@ -123,10 +123,12 @@ envoy_cc_benchmark_binary(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
+        "//source/common/protobuf:utility_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
+        "@abseil-cpp//absl/strings",
         "@benchmark",
     ],
 )
