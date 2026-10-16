@@ -150,7 +150,7 @@ OnDemandFilterConfig::OnDemandFilterConfig(
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     absl::Status& creation_status, Stats::Scope& scope, const std::string& stats_prefix)
     : OnDemandFilterConfig(proto_config, cm, validation_visitor, creation_status) {
-  stats_ = generateStats(scope, stats_prefix);
+  stats_.emplace(generateStats(scope, stats_prefix));
 }
 
 OnDemandFilterConfig::OnDemandFilterConfig(
