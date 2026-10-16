@@ -181,7 +181,7 @@ public:
     span_.set_trace_state(std::string{tracestate});
   }
 
-  absl::string_view getTracestate() const { return span_.trace_state(); }
+  std::string getTracestate() const override { return span_.trace_state(); }
 
   /**
    * Sets a span attribute.

@@ -1012,6 +1012,8 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
           Tracing::HttpTraceContext trace_context(*headers);
           active_span.updateParent(trace_context);
 
+          const std::string new_tracestate = active_span.getTracestate();
+
           decoder_callbacks_->addDecodedData(data, /*streaming_filter=*/true);
 
           Buffer::Instance* decoding_buffer = nullptr;
@@ -1019,8 +1021,8 @@ Http::FilterDataStatus McpFilter::completeParsing(Buffer::Instance& data) {
               [&decoding_buffer](Buffer::Instance& b) { decoding_buffer = &b; });
           ASSERT(decoding_buffer != nullptr);
 
-          if (absl::Status status =
-                  JsonPathParser::rewriteTraceparent(*decoding_buffer, new_parent_id);
+          if (absl::Status status = JsonPathParser::rewriteTraceContext(
+                  *decoding_buffer, new_parent_id, new_tracestate);
               !status.ok()) {
             ENVOY_LOG_EVERY_POW_2(warn, "MCP filter failed to rewrite traceparent: {}",
                                   status.ToString());

@@ -2192,7 +2192,7 @@ TEST_F(McpJsonParserTest, RewriteTraceparentPreservesLargeNumericToken) {
   Buffer::OwnedImpl buffer;
   buffer.add(kJson);
 
-  ASSERT_OK(McpJsonParser::rewriteTraceparent(buffer, kNewParentId));
+  ASSERT_OK(McpJsonParser::rewriteTraceContext(buffer, kNewParentId, /*new_tracestate=*/""));
 
   std::string rewritten_json = buffer.toString();
   EXPECT_THAT(rewritten_json,
@@ -2227,7 +2227,7 @@ TEST_F(McpJsonParserTest, RewriteTraceparentSuccessAcrossMultipleBufferSlices) {
   buffer.appendSliceForTest(kJsonChunk2);
   EXPECT_EQ(buffer.sliceCount(), 2);
 
-  ASSERT_OK(McpJsonParser::rewriteTraceparent(buffer, kNewParentId));
+  ASSERT_OK(McpJsonParser::rewriteTraceContext(buffer, kNewParentId, /*new_tracestate=*/""));
 
   std::string rewritten_json = buffer.toString();
   EXPECT_THAT(rewritten_json,
@@ -2243,7 +2243,7 @@ TEST_F(McpJsonParserTest, RewriteTraceparentEmptyParentIdIsNoOp) {
   Buffer::OwnedImpl buffer;
   buffer.add(kJson);
 
-  ASSERT_OK(McpJsonParser::rewriteTraceparent(buffer, ""));
+  ASSERT_OK(McpJsonParser::rewriteTraceContext(buffer, "", ""));
   EXPECT_EQ(buffer.toString(), kJson);
 }
 
@@ -2258,7 +2258,8 @@ TEST_F(McpJsonParserTest, RewriteTraceparentInvalidValueReturnsError) {
   Buffer::OwnedImpl buffer;
   buffer.add(kJson);
 
-  ASSERT_THAT(McpJsonParser::rewriteTraceparent(buffer, kNewParentId), Not(IsOk()));
+  ASSERT_THAT(McpJsonParser::rewriteTraceContext(buffer, kNewParentId, /*new_tracestate=*/""),
+              Not(IsOk()));
 }
 
 TEST_F(McpJsonParserTest, RewriteTraceparentInvalidJsonReturnsError) {
@@ -2271,7 +2272,8 @@ TEST_F(McpJsonParserTest, RewriteTraceparentInvalidJsonReturnsError) {
   Buffer::OwnedImpl buffer;
   buffer.add(kJson);
 
-  ASSERT_THAT(McpJsonParser::rewriteTraceparent(buffer, kNewParentId), Not(IsOk()));
+  ASSERT_THAT(McpJsonParser::rewriteTraceContext(buffer, kNewParentId, /*new_tracestate=*/""),
+              Not(IsOk()));
 }
 
 } // namespace

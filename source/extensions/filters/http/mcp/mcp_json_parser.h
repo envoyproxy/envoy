@@ -291,9 +291,12 @@ public:
   // Reset parser for reuse
   void reset();
 
-  // Rewrites the MCP request body's `params._meta.traceparent` value with
-  // `new_parent_id`. No-op when `new_parent_id` is empty.
-  static absl::Status rewriteTraceparent(Buffer::Instance& body, absl::string_view new_parent_id);
+  // Rewrites the MCP request body's `params._meta.traceparent` and
+  // `params._meta.tracestate` values with `new_parent_id` and `new_tracestate`
+  // respectively. No-op when either `new_parent_id` or `new_tracestate` is
+  // empty.
+  static absl::Status rewriteTraceContext(Buffer::Instance& body, absl::string_view new_parent_id,
+                                          absl::string_view new_tracestate);
 
 private:
   McpParserConfig config_;

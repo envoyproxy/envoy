@@ -98,13 +98,16 @@ void Span::updateParent(const Tracing::TraceContext& trace_context) {
   setParentId(context->spanId());
 
   // TODO: Determine whether to merge tracestates (somehow) rather than overwriting.
-  const absl::string_view incoming_tracestate = context->tracestate();
-  if (!incoming_tracestate.empty()) {
-    if (!getTracestate().empty()) {
-      ENVOY_LOG_EVERY_POW_2(warn, "Overwriting non-empty tracestate");
-    }
-    setTracestate(incoming_tracestate);
+  absl::InlinedVector<absl::string_view, 2> tracestate_pieces;
+  if (!context->tracestate().empty()) {
+    tracestate_pieces.push_back(context->tracestate());
   }
+  const std::string tracestate = getTracestate();
+  if (!tracestate.empty() &&
+      absl::c_find(tracestate_pieces, tracestate) == tracestate_pieces.end()) {
+    tracestate_pieces.push_back(tracestate);
+  }
+  setTracestate(absl::StrJoin(tracestate_pieces, ","));
 
   if (use_parent_decision_) {
     setSampled(context->sampled());
