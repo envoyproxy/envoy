@@ -374,12 +374,17 @@ TEST_F(VhdsTest, VhdsWithoutDefaultCollectionUsesOnDemandSubscription) {
   EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
               collectionSubscriptionFromUrl(_, _, _, _, _, _))
       .Times(0);
-  EXPECT_CALL(
-      factory_context_.cluster_manager_.subscription_factory_,
-      subscriptionFromConfigSource(
-          _, _, _, _, _, testing::Truly([](const Envoy::Config::SubscriptionOptions& options) {
-            return !options.use_namespace_matching_;
-          })));
+  EXPECT_CALL(factory_context_.cluster_manager_.subscription_factory_,
+              subscriptionFromConfigSource(_, _, _, _, _, _))
+      .WillOnce(testing::Invoke([](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                   Stats::Scope&, Envoy::Config::SubscriptionCallbacks&,
+                                   Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                   const Envoy::Config::SubscriptionOptions&) {
+        auto subscription = std::make_unique<testing::NiceMock<Envoy::Config::MockSubscription>>();
+        EXPECT_CALL(*subscription, accept(testing::UnorderedElementsAre("my_route/*")));
+        EXPECT_CALL(*subscription, start(testing::IsEmpty()));
+        return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
+      }));
   EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
 }
 
