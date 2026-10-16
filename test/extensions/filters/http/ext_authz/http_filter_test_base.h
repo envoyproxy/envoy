@@ -55,7 +55,7 @@ constexpr char FilterConfigName[] = "ext_authz_filter";
 inline FilterConfigPerRoute
 makePerRoute(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config) {
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigPerRoute per_route(config, creation_status);
+  FilterConfigPerRoute per_route(config, nullptr, creation_status);
   EXPECT_OK(creation_status);
   return per_route;
 }

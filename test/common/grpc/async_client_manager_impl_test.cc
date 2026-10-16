@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/http/header_evaluator.h"
 
 #include "source/common/api/api_impl.h"
 #include "source/common/event/dispatcher_impl.h"
@@ -13,6 +14,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
@@ -63,7 +65,7 @@ TEST_F(RawAsyncClientCacheTest, CacheEvictionMilliseconds) {
   initialize(std::chrono::milliseconds(50000));
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service);
+  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service, nullptr);
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_->setCache(config_with_hash_key, foo_client);
   waitForSeconds(49);
@@ -81,7 +83,7 @@ TEST_F(RawAsyncClientCacheTest, CacheEvictionWithSeconds) {
   initialize(std::chrono::seconds(20));
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service);
+  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service, nullptr);
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_->setCache(config_with_hash_key, foo_client);
   waitForSeconds(19);
@@ -101,26 +103,26 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   for (int i = 1; i <= 50; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service, nullptr);
     client_cache_->setCache(config_with_hash_key, foo_client);
   }
   waitForSeconds(20);
   for (int i = 51; i <= 100; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service, nullptr);
     client_cache_->setCache(config_with_hash_key, foo_client);
   }
   waitForSeconds(30);
   // Cache entries created 50s before have expired.
   for (int i = 1; i <= 50; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service, nullptr);
     EXPECT_EQ(client_cache_->getCache(config_with_hash_key).get(), nullptr);
   }
   // Cache entries 30s before haven't expired.
   for (int i = 51; i <= 100; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service, nullptr);
     EXPECT_EQ(client_cache_->getCache(config_with_hash_key).get(), foo_client.get());
   }
 }
@@ -132,7 +134,7 @@ TEST_F(RawAsyncClientCacheTest, GetExpiredButNotEvictedCacheEntry) {
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
-  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service);
+  GrpcServiceConfigWithHashKey config_with_hash_key(foo_service, nullptr);
   client_cache_->setCache(config_with_hash_key, foo_client);
   time_system_.advanceTimeAsyncImpl(std::chrono::seconds(50));
   // Cache entry hasn't been evicted because it is accessed before timer fire.
@@ -176,7 +178,7 @@ TEST_F(RawAsyncClientCacheTestBusyLoop, MultipleCacheEntriesEvictionBusyLoop) {
   // two entries are added to the cache
   for (int i = 1; i <= 2; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
-    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service);
+    GrpcServiceConfigWithHashKey config_with_hash_key(grpc_service, nullptr);
     client_cache_->setCache(config_with_hash_key, foo_client);
   }
   // waiting for 49.2 secs to make sure that for the entry which is not accessed, time to expire is
@@ -186,14 +188,14 @@ TEST_F(RawAsyncClientCacheTestBusyLoop, MultipleCacheEntriesEvictionBusyLoop) {
   // Access first cache entry to so that evictEntriesAndResetEvictionTimer() gets called.
   // Since we are getting first entry, access time of first entry will be updated to current time.
   grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(1));
-  GrpcServiceConfigWithHashKey config_with_hash_key_1(grpc_service);
+  GrpcServiceConfigWithHashKey config_with_hash_key_1(grpc_service, nullptr);
   EXPECT_EQ(client_cache_->getCache(config_with_hash_key_1).get(), foo_client.get());
 
   // Verifying that though the time to expire for second entry ~0.8 sec, it is considered as expired
   // to avoid the busy loop which could happen if timer gets enabled with 0(0.8 rounded off to 0)
   // duration.
   grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(2));
-  GrpcServiceConfigWithHashKey config_with_hash_key_2(grpc_service);
+  GrpcServiceConfigWithHashKey config_with_hash_key_2(grpc_service, nullptr);
   EXPECT_EQ(client_cache_->getCache(config_with_hash_key_2).get(), nullptr);
 }
 
@@ -236,7 +238,49 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return(absl::OkStatus()));
-  ASSERT_OK(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false));
+  ASSERT_OK(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr));
+}
+
+// Stands in for a service's initial metadata parsed by parseGrpcServiceInitialMetadata().
+class NoopHeaderEvaluator : public Http::HeaderEvaluator {
+public:
+  void evaluateHeaders(Http::HeaderMap&, const Formatter::Context&,
+                       const StreamInfo::StreamInfo&) const override {}
+};
+
+// A gRPC service that configures formatters, created without its initial metadata having been
+// parsed with them, logs a warning since the formatters are unavailable.
+// Note: this is the only test that may expect the warning, since it is rate limited per process.
+TEST_F(AsyncClientManagerImplTest, WarnsWhenInitialMetadataNotParsed) {
+  initialize();
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  grpc_service.add_formatters()->set_name("envoy.formatter.test");
+  EXPECT_LOG_CONTAINS(
+      "warn", "gRPC service 'foo' configures formatters, but its consumer did not parse",
+      ASSERT_OK(async_client_manager_->factoryForGrpcService(grpc_service, scope_, true, nullptr)));
+}
+
+// No warning when the parsed initial metadata is provided.
+TEST_F(AsyncClientManagerImplTest, NoWarningWhenInitialMetadataParsed) {
+  initialize();
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  grpc_service.add_formatters()->set_name("envoy.formatter.test");
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn", "configures formatters",
+      ASSERT_OK(async_client_manager_->factoryForGrpcService(
+          grpc_service, scope_, true, std::make_shared<const NoopHeaderEvaluator>())));
+}
+
+// No warning when the service configures no formatters.
+TEST_F(AsyncClientManagerImplTest, NoWarningWithoutFormatters) {
+  initialize();
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn", "configures formatters",
+      ASSERT_OK(async_client_manager_->factoryForGrpcService(grpc_service, scope_, true, nullptr)));
 }
 
 TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
@@ -246,10 +290,12 @@ TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
   envoy::config::core::v3::GrpcService grpc_service_c;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("bar");
 
-  GrpcServiceConfigWithHashKey config_with_hash_key_a = GrpcServiceConfigWithHashKey(grpc_service);
-  GrpcServiceConfigWithHashKey config_with_hash_key_b = GrpcServiceConfigWithHashKey(grpc_service);
+  GrpcServiceConfigWithHashKey config_with_hash_key_a =
+      GrpcServiceConfigWithHashKey(grpc_service, nullptr);
+  GrpcServiceConfigWithHashKey config_with_hash_key_b =
+      GrpcServiceConfigWithHashKey(grpc_service, nullptr);
   GrpcServiceConfigWithHashKey config_with_hash_key_c =
-      GrpcServiceConfigWithHashKey(grpc_service_c);
+      GrpcServiceConfigWithHashKey(grpc_service_c, nullptr);
   EXPECT_TRUE(config_with_hash_key_a == config_with_hash_key_b);
   EXPECT_FALSE(config_with_hash_key_a == config_with_hash_key_c);
 
@@ -271,16 +317,16 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithSecondsConfig) {
   initialize(aync_manager_config);
 
   RawAsyncClientSharedPtr foo_client_0 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   RawAsyncClientSharedPtr foo_client_1 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   EXPECT_EQ(foo_client_0.get(), foo_client_1.get());
 
   time_system_.advanceTimeAndRun(std::chrono::seconds(19), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
   RawAsyncClientSharedPtr foo_client_2 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   EXPECT_EQ(foo_client_1.get(), foo_client_2.get());
 
   // Here we want to test behavior with a specific sequence of events, where each timer
@@ -291,7 +337,7 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithSecondsConfig) {
   }
 
   RawAsyncClientSharedPtr foo_client_3 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   EXPECT_NE(foo_client_2.get(), foo_client_3.get());
 }
 
@@ -307,16 +353,16 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithMilliConfig) {
   initialize(aync_manager_config);
 
   RawAsyncClientSharedPtr foo_client_0 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   RawAsyncClientSharedPtr foo_client_1 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   EXPECT_EQ(foo_client_0.get(), foo_client_1.get());
 
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(29999), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
   RawAsyncClientSharedPtr foo_client_2 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   EXPECT_EQ(foo_client_1.get(), foo_client_2.get());
 
   // Here we want to test behavior with a specific sequence of events, where each timer
@@ -327,7 +373,7 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheWithMilliConfig) {
   }
 
   RawAsyncClientSharedPtr foo_client_3 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   EXPECT_NE(foo_client_2.get(), foo_client_3.get());
 }
 
@@ -338,15 +384,15 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCache) {
 
   // Use cache when runtime is enabled.
   RawAsyncClientSharedPtr foo_client0 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   RawAsyncClientSharedPtr foo_client1 =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   EXPECT_EQ(foo_client0.get(), foo_client1.get());
 
   // Get a different raw async client with different cluster config.
   grpc_service.mutable_envoy_grpc()->set_cluster_name("bar");
   RawAsyncClientSharedPtr bar_client =
-      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true).value();
+      async_client_manager_->getOrCreateRawAsyncClient(grpc_service, scope_, true, nullptr).value();
   EXPECT_NE(foo_client1.get(), bar_client.get());
 }
 
@@ -357,9 +403,10 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](absl::string_view) {
     return absl::InvalidArgumentError("failure");
   }));
-  EXPECT_EQ(
-      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
-      "failure");
+  EXPECT_EQ(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr)
+                .status()
+                .message(),
+            "failure");
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
@@ -369,12 +416,14 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
 #ifdef ENVOY_GOOGLE_GRPC
-  EXPECT_NE(nullptr,
-            async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).value());
+  EXPECT_NE(
+      nullptr,
+      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr).value());
 #else
-  EXPECT_EQ(
-      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
-      "Google C++ gRPC client is not linked");
+  EXPECT_EQ(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr)
+                .status()
+                .message(),
+            "Google C++ gRPC client is not linked");
 #endif
 }
 
@@ -389,13 +438,15 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
   metadata.set_value("value");
 
 #ifdef ENVOY_GOOGLE_GRPC
-  EXPECT_EQ(
-      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
-      "Illegal characters in gRPC initial metadata header key: illegalcharacter;.");
+  EXPECT_EQ(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr)
+                .status()
+                .message(),
+            "Illegal characters in gRPC initial metadata header key: illegalcharacter;.");
 #else
-  EXPECT_EQ(
-      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
-      "Google C++ gRPC client is not linked");
+  EXPECT_EQ(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr)
+                .status()
+                .message(),
+            "Google C++ gRPC client is not linked");
 #endif
 }
 
@@ -410,12 +461,14 @@ TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
   metadata.set_value("value");
 
 #ifdef ENVOY_GOOGLE_GRPC
-  EXPECT_NE(nullptr,
-            async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).value());
+  EXPECT_NE(
+      nullptr,
+      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr).value());
 #else
-  EXPECT_EQ(
-      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
-      "Google C++ gRPC client is not linked");
+  EXPECT_EQ(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr)
+                .status()
+                .message(),
+            "Google C++ gRPC client is not linked");
 #endif
 }
 
@@ -430,13 +483,15 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInValue) {
   metadata.set_value("NonAsciValue.भारत");
 
 #ifdef ENVOY_GOOGLE_GRPC
-  EXPECT_EQ(
-      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
-      "Illegal ASCII value for gRPC initial metadata header key: legal-key.");
+  EXPECT_EQ(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr)
+                .status()
+                .message(),
+            "Illegal ASCII value for gRPC initial metadata header key: legal-key.");
 #else
-  EXPECT_EQ(
-      async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
-      "Google C++ gRPC client is not linked");
+  EXPECT_EQ(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false, nullptr)
+                .status()
+                .message(),
+            "Google C++ gRPC client is not linked");
 #endif
 }
 
@@ -446,7 +501,8 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownSkipClusterCheck) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   EXPECT_CALL(cm_, checkActiveStaticCluster(_)).Times(0);
-  ASSERT_OK(async_client_manager_->factoryForGrpcService(grpc_service, scope_, true).status());
+  ASSERT_OK(
+      async_client_manager_->factoryForGrpcService(grpc_service, scope_, true, nullptr).status());
 }
 
 } // namespace

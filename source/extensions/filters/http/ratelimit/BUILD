@@ -60,6 +60,7 @@ envoy_cc_extension(
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
     ],
 )

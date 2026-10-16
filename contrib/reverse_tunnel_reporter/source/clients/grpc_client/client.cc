@@ -50,7 +50,8 @@ void GrpcClient::onServerInitialized(ReverseTunnelReporterWithState* reporter) {
   }
 
   auto result = context_.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      grpc_service, thread_local_cluster->info()->statsScope(), false);
+      grpc_service, thread_local_cluster->info()->statsScope(), false,
+      /*initial_metadata=*/nullptr);
   if (!result.ok()) {
     ENVOY_LOG(error, "GrpcClient: failed to create gRPC async client: {}",
               result.status().message());

@@ -82,7 +82,7 @@ protected:
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, kMessageTimeout, kMaxMessageTimeoutMs,
                                              *stats_store_.rootScope(), "", false, builder,
-                                             factory_context_, creation_status);
+                                             factory_context_, nullptr, creation_status);
     ASSERT_OK(creation_status);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);

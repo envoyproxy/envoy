@@ -118,7 +118,7 @@ public:
   void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
     Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-        Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
+        Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server(), nullptr);
 
     mock_local_client_ = new MockRateLimitClient();
     filter_ = std::make_unique<RateLimitQuotaFilter>(
@@ -983,7 +983,7 @@ bucket_matchers:
 
   filter_config_ = std::make_shared<FilterConfig>(config);
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
+      Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server(), nullptr);
 
   mock_local_client_ = new MockRateLimitClient();
   filter_ = std::make_unique<RateLimitQuotaFilter>(
@@ -1158,7 +1158,7 @@ matcher_list:
 
   filter_config_ = std::make_shared<FilterConfig>(config);
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-      Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
+      Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server(), nullptr);
 
   mock_local_client_ = new MockRateLimitClient();
   filter_ = std::make_unique<RateLimitQuotaFilter>(

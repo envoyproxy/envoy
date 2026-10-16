@@ -53,6 +53,7 @@ envoy_cc_extension(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
     ],

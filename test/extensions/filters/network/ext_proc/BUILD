@@ -47,6 +47,7 @@ envoy_extension_cc_test(
     srcs = ["ext_proc_test.cc"],
     extension_names = ["envoy.filters.network.ext_proc"],
     deps = [
+        "//envoy/http:header_evaluator",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",

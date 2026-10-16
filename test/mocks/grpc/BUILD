@@ -16,6 +16,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/grpc:async_client_interface",
         "//envoy/grpc:async_client_manager_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/grpc:typed_async_client_lib",
         "//test/mocks/http:http_mocks",

@@ -233,8 +233,9 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterSingleton) {
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
-              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                          Grpc::GrpcServiceInitialMetadataSharedPtr) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
         EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<Grpc::MockAsyncClient>();
@@ -311,8 +312,9 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
     EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
     EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
     EXPECT_CALL(cm_.async_client_manager_,
-                factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+                factoryForGrpcService(ProtoEq(expected_grpc_service), _, _, _))
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                            Grpc::GrpcServiceInitialMetadataSharedPtr) {
           auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
           EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
             return std::make_unique<Grpc::MockAsyncClient>();
@@ -338,8 +340,9 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
     // A factory will only be created for the primary source, because the
     // failover source is only supported for ADS.
     EXPECT_CALL(cm_.async_client_manager_,
-                factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+                factoryForGrpcService(ProtoEq(expected_grpc_service), _, _, _))
+        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                            Grpc::GrpcServiceInitialMetadataSharedPtr) {
           auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
           EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
             return std::make_unique<Grpc::MockAsyncClient>();
@@ -508,8 +511,9 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcSubscription) {
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
-              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                          Grpc::GrpcServiceInitialMetadataSharedPtr) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
         EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
@@ -687,8 +691,9 @@ TEST_F(SubscriptionFactoryTest, AutoTransportIsAllowed) {
 
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
-              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+              factoryForGrpcService(ProtoEq(expected_grpc_service), _, _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                          Grpc::GrpcServiceInitialMetadataSharedPtr) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
         EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();

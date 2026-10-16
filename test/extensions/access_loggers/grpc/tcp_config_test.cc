@@ -54,8 +54,9 @@ public:
 
     if (cluster_name == good_cluster) {
       EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-                  factoryForGrpcService(_, _, _))
-          .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+                  factoryForGrpcService(_, _, _, _))
+          .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                              Grpc::GrpcServiceInitialMetadataSharedPtr) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
           }));
       AccessLog::InstanceSharedPtr instance =
@@ -90,8 +91,9 @@ TEST_F(TcpGrpcAccessLogConfigTest, CustomTagFormatterRespectsCommandParsers) {
   TestUtility::jsonConvert(tcp_grpc_access_log_, *message_);
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-              factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+              factoryForGrpcService(_, _, _, _))
+      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                          Grpc::GrpcServiceInitialMetadataSharedPtr) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 
@@ -108,7 +110,8 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type));
+               Common::GrpcAccessLoggerType logger_type,
+               Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata));
 };
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081
@@ -122,10 +125,10 @@ TEST(TcpGrpcAccessLog, TlsLifetimeCheck) {
     envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config;
     config.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _, _))
         .WillOnce([](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                          common_config,
-                     Common::GrpcAccessLoggerType type) {
+                     Common::GrpcAccessLoggerType type, Grpc::GrpcServiceInitialMetadataSharedPtr) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
           std::ignore = std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;
@@ -133,7 +136,8 @@ TEST(TcpGrpcAccessLog, TlsLifetimeCheck) {
     // Set tls callback in the TcpGrpcAccessLog constructor,
     // but it is not called yet since we have defer_data_ = true.
     const auto access_log =
-        std::make_unique<TcpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config, tls, logger_cache);
+        std::make_unique<TcpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config, tls, logger_cache,
+                                           Formatter::CommandParserPtrVector{}, nullptr);
     // Intentionally make access_log die earlier in this scope to simulate the situation where the
     // creator has been deleted yet the tls callback is not called yet.
   }

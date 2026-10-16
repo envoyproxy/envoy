@@ -62,7 +62,7 @@ struct ExtAuthzStats {
 class Config {
 public:
   Config(const FilterConfig& config, Stats::Scope& scope,
-         Server::Configuration::ServerFactoryContext& context);
+         Server::Configuration::GenericFactoryContext& context);
 
   const ExtAuthzStats& stats() const { return stats_; }
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -79,7 +79,7 @@ private:
   }
   static Grpc::AsyncClientFactoryPtr
   createAsyncClientFactory(const FilterConfig& config, Stats::Scope& scope,
-                           Server::Configuration::ServerFactoryContext& context);
+                           Server::Configuration::GenericFactoryContext& context);
 
   const Stats::ScopeSharedPtr stats_scope_;
   const ExtAuthzStats stats_;

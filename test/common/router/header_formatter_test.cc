@@ -1218,6 +1218,28 @@ TEST(HeaderParserTest, ConfigureWithCommandParsers) {
   EXPECT_EQ("Bearer TestFormatter", header_map.get_("x-secret"));
 }
 
+TEST(HeaderParserTest, ConfigureHeaderValueWithCommandParsers) {
+  Formatter::CommandParserPtrVector command_parsers;
+  command_parsers.push_back(std::make_unique<Envoy::Formatter::TestCommandParser>());
+
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> to_add;
+  auto* header = to_add.Add();
+  header->set_key("x-secret");
+  header->set_value("Bearer %COMMAND_EXTENSION()%");
+
+  HeaderParserPtr parser =
+      HeaderParser::configure(to_add, HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD,
+                              command_parsers)
+          .value();
+
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  parser->evaluateHeaders(header_map, stream_info);
+
+  EXPECT_TRUE(header_map.has("x-secret"));
+  EXPECT_EQ("Bearer TestFormatter", header_map.get_("x-secret"));
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

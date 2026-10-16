@@ -34,7 +34,7 @@ public:
     auto& factory_context = context_.server_factory_context_;
 
     EXPECT_CALL(factory_context.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
+                factoryForGrpcService(_, _, _, _))
         .WillOnce(Return(ByMove(std::move(mock_client_factory))));
 
     EXPECT_CALL(factory_context.thread_local_.dispatcher_, createTimer_(_))

@@ -27,8 +27,12 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
   RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(sink_config));
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
+  auto initial_metadata_or_error =
+      server.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadataForServer(
+          grpc_service);
+  RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
   auto client_or_error = server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      grpc_service, server.scope(), false);
+      grpc_service, server.scope(), false, std::move(*initial_metadata_or_error));
   RETURN_IF_NOT_OK_REF(client_or_error.status());
   std::shared_ptr<GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                       envoy::service::metrics::v3::StreamMetricsResponse>>

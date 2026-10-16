@@ -119,10 +119,12 @@ Config::Config(
         return *status;
       }()) {}
 
-NetworkExtProcFilter::NetworkExtProcFilter(ConfigConstSharedPtr config,
-                                           ExternalProcessorClientPtr&& client)
+NetworkExtProcFilter::NetworkExtProcFilter(
+    ConfigConstSharedPtr config, ExternalProcessorClientPtr&& client,
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
     : config_(config), stats_(config->stats()), client_(std::move(client)),
-      config_with_hash_key_(config_->grpcService()), downstream_callbacks_(*this) {}
+      config_with_hash_key_(config_->grpcService(), std::move(parsed_grpc_initial_metadata)),
+      downstream_callbacks_(*this) {}
 
 NetworkExtProcFilter::~NetworkExtProcFilter() { closeStream(); }
 

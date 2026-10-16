@@ -243,8 +243,9 @@ public:
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
         logger_cache_(async_client_manager_, scope_, tls_, server_context_),
         grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true, _))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                Grpc::GrpcServiceInitialMetadataSharedPtr) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
@@ -273,7 +274,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   config.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
   grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
     resource:
@@ -330,7 +331,7 @@ values:
   *config.mutable_resource_attributes() = keyValueList;
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
   grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
     resource:
@@ -376,8 +377,9 @@ public:
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
         logger_cache_(async_client_manager_, scope_, tls_, server_context_),
         grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, false) {
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true, _))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                Grpc::GrpcServiceInitialMetadataSharedPtr) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
@@ -406,7 +408,7 @@ TEST_F(GrpcAccessLoggerDisableBuiltinImplTest, WithoutResourceAttributes) {
   config.set_disable_builtin_labels(true);
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
   grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
     resource:
@@ -451,7 +453,7 @@ values:
   *config.mutable_resource_attributes() = keyValueList;
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
   grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
     resource:
@@ -486,8 +488,9 @@ public:
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
         logger_cache_(async_client_manager_, scope_, tls_, server_context_),
         grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true, _))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                Grpc::GrpcServiceInitialMetadataSharedPtr) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
@@ -518,7 +521,7 @@ TEST_F(GrpcAccessLoggerTopLevelLogNameTest, TopLevelLogNamePreferred) {
   config.mutable_common_config()->mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
   // Verify that top_level_log_name is used, not common_config_log_name.
   grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
@@ -558,8 +561,9 @@ public:
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
         logger_cache_(async_client_manager_, scope_, tls_, server_context_),
         grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true, _))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                Grpc::GrpcServiceInitialMetadataSharedPtr) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
@@ -594,7 +598,7 @@ TEST_F(GrpcAccessLoggerResourceDetectorsTest, ResourceDetectorsPopulated) {
   TestEnvironment::setEnvVar("OTEL_RESOURCE_ATTRIBUTES", "service.name=my-service", 1);
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
 
   grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:

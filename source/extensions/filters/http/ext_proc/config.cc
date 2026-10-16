@@ -5,6 +5,7 @@
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -77,10 +78,23 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& server_context,
-    ProtobufMessage::ValidationVisitor&) {
+    ProtobufMessage::ValidationVisitor& validator) {
+  Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata;
+  if (proto_config.has_overrides() && proto_config.overrides().has_grpc_service()) {
+    Server::GenericFactoryContextImpl generic_context(server_context, validator);
+    auto initial_metadata_or_error =
+        server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+            proto_config.overrides().grpc_service(), generic_context);
+    RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+    parsed_grpc_initial_metadata = std::move(*initial_metadata_or_error);
+  }
+  auto grpc_initial_metadata_layer_or_error =
+      createGrpcInitialMetadataLayer(proto_config.overrides().grpc_initial_metadata());
+  RETURN_IF_NOT_OK_REF(grpc_initial_metadata_layer_or_error.status());
   return std::make_shared<FilterConfigPerRoute>(
       proto_config, Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context),
-      server_context);
+      server_context, std::move(parsed_grpc_initial_metadata),
+      std::move(*grpc_initial_metadata_layer_or_error));
 }
 
 absl::StatusOr<Http::FilterFactoryCb>
@@ -96,12 +110,22 @@ ExternalProcessingFilterConfig::createHttpFilterFactoryFromProtoTyped(
   const uint32_t max_message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, max_message_timeout, DefaultMaxMessageTimeoutMs);
   Stats::Scope& scope = extra_context.scopeOr(context);
+  Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata;
+  if (proto_config.has_grpc_service()) {
+    Server::GenericFactoryContextImpl generic_context(
+        context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+    auto initial_metadata_or_error =
+        context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+            proto_config.grpc_service(), generic_context);
+    RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+    parsed_grpc_initial_metadata = std::move(*initial_metadata_or_error);
+  }
   absl::Status config_creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms, scope,
       extra_context.stats_prefix, extra_context.is_upstream,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context,
-      config_creation_status);
+      std::move(parsed_grpc_initial_metadata), config_creation_status);
   RETURN_IF_NOT_OK_REF(config_creation_status);
   if (proto_config.has_grpc_service()) {
     return [filter_config = std::move(filter_config),

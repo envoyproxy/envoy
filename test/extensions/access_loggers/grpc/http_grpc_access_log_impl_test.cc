@@ -45,7 +45,8 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type));
+               Common::GrpcAccessLoggerType logger_type,
+               Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata));
 };
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081
@@ -59,18 +60,19 @@ TEST(HttpGrpcAccessLog, TlsLifetimeCheck) {
     envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config;
     config.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _, _))
         .WillOnce([](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                          common_config,
-                     Common::GrpcAccessLoggerType type) {
+                     Common::GrpcAccessLoggerType type, Grpc::GrpcServiceInitialMetadataSharedPtr) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
           std::ignore = std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;
         });
     // Set tls callback in the HttpGrpcAccessLog constructor,
     // but it is not called yet since we have defer_data_ = true.
-    const auto access_log = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter},
-                                                                config, tls, logger_cache);
+    const auto access_log =
+        std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config, tls, logger_cache,
+                                            Formatter::CommandParserPtrVector{}, nullptr);
     // Intentionally make access_log die earlier in this scope to simulate the situation where the
     // creator has been deleted yet the tls callback is not called yet.
   }
@@ -88,17 +90,19 @@ public:
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   Common::GrpcAccessLoggerType logger_type) {
+                   Common::GrpcAccessLoggerType logger_type,
+                   Grpc::GrpcServiceInitialMetadataSharedPtr) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
             });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
-                                                      logger_cache_);
+                                                      logger_cache_,
+                                                      Formatter::CommandParserPtrVector{}, nullptr);
   }
 
   void initWithCommandParsers(const std::vector<Formatter::CommandParserPtr>& command_parsers) {
@@ -109,17 +113,18 @@ public:
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
     config_.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   Common::GrpcAccessLoggerType logger_type) {
+                   Common::GrpcAccessLoggerType logger_type,
+                   Grpc::GrpcServiceInitialMetadataSharedPtr) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;
             });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
-                                                      logger_cache_, command_parsers);
+                                                      logger_cache_, command_parsers, nullptr);
   }
 
   void expectLog(const std::string& expected_log_entry_yaml) {

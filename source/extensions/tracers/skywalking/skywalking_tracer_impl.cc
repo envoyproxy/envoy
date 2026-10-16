@@ -34,10 +34,16 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
   loadConfig(proto_config.client_config(), context.serverFactoryContext());
   tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
   auto& factory_context = context.serverFactoryContext();
-  tls_slot_ptr_->set([proto_config, &factory_context, this](Event::Dispatcher& dispatcher) {
+  auto grpc_initial_metadata = THROW_OR_RETURN_VALUE(
+      factory_context.clusterManager()
+          .grpcAsyncClientManager()
+          .parseGrpcServiceInitialMetadataForServer(proto_config.grpc_service()),
+      Grpc::GrpcServiceInitialMetadataSharedPtr);
+  tls_slot_ptr_->set([proto_config, &factory_context, this,
+                      grpc_initial_metadata](Event::Dispatcher& dispatcher) {
     auto factory_or_error =
         factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
-            proto_config.grpc_service(), factory_context.scope(), true);
+            proto_config.grpc_service(), factory_context.scope(), true, grpc_initial_metadata);
     THROW_IF_NOT_OK_REF(factory_or_error.status());
     TracerPtr tracer = std::make_unique<Tracer>(std::make_unique<TraceSegmentReporter>(
         std::move(factory_or_error.value()), dispatcher, factory_context.api().randomGenerator(),

@@ -42,8 +42,9 @@ public:
 
     if (cluster_name == good_cluster) {
       EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-                  factoryForGrpcService(_, _, _))
-          .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+                  factoryForGrpcService(_, _, _, _))
+          .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                              Grpc::GrpcServiceInitialMetadataSharedPtr) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
           }));
       AccessLog::InstanceSharedPtr instance =

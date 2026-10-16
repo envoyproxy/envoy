@@ -131,7 +131,7 @@ public:
     ON_CALL(*cluster_info_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
 
     ON_CALL(cm_, grpcAsyncClientManager()).WillByDefault(ReturnRef(manager_));
-    ON_CALL(manager_, getOrCreateRawAsyncClient(_, _, _))
+    ON_CALL(manager_, getOrCreateRawAsyncClient(_, _, _, _))
         .WillByDefault(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(async_client_)));
   }
 
@@ -690,7 +690,7 @@ TEST_F(GrpcClientTest, ClusterNotFoundLogsAndReturns) {
 TEST_F(GrpcClientTest, ClientCreationFailureLogsAndReturns) {
   GrpcClient client{context_, config_};
 
-  EXPECT_CALL(manager_, getOrCreateRawAsyncClient(_, _, _))
+  EXPECT_CALL(manager_, getOrCreateRawAsyncClient(_, _, _, _))
       .WillOnce(Return(absl::InvalidArgumentError("Bad Karma")));
 
   client.onServerInitialized(&mock_reporter_);

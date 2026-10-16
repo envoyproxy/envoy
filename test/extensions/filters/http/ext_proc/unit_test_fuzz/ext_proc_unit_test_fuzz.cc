@@ -104,7 +104,7 @@ DEFINE_PROTO_FUZZER(
     absl::Status creation_status = absl::OkStatus();
     config = std::make_shared<ExternalProcessing::FilterConfig>(
         proto_config, std::chrono::milliseconds(200), 200, *stats_store.rootScope(), "", false,
-        builder, mocks.factory_context_, creation_status);
+        builder, mocks.factory_context_, nullptr, creation_status);
     if (!creation_status.ok()) {
       ENVOY_LOG_MISC(debug, "Error creating ext_proc filter config: {}", creation_status.message());
       return;

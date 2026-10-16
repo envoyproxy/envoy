@@ -604,12 +604,15 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Event::Dispatcher& dispatcher) override {
-    auto client = THROW_OR_RETURN_VALUE(
-        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
-            .value()
-            ->createUncachedRawAsyncClient(),
-        Grpc::RawAsyncClientPtr);
+               Event::Dispatcher& dispatcher,
+               Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata) override {
+    auto client =
+        THROW_OR_RETURN_VALUE(async_client_manager_
+                                  .factoryForGrpcService(config.grpc_service(), scope_, true,
+                                                         std::move(parsed_grpc_initial_metadata))
+                                  .value()
+                                  ->createUncachedRawAsyncClient(),
+                              Grpc::RawAsyncClientPtr);
     return std::make_shared<MockGrpcAccessLoggerImpl>(std::move(client), config, dispatcher, scope_,
                                                       "mock_access_log_prefix.",
                                                       mockMethodDescriptor(), true);
@@ -623,8 +626,9 @@ public:
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;
     async_client_ = new Grpc::MockAsyncClient;
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true, _))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                Grpc::GrpcServiceInitialMetadataSharedPtr) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
@@ -647,25 +651,30 @@ TEST_F(GrpcAccessLoggerCacheTest, Deduplication) {
 
   expectClientCreation();
   MockGrpcAccessLoggerImpl::SharedPtr logger1 =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
-  EXPECT_EQ(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
+  EXPECT_EQ(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr));
 
   // Do not deduplicate different types of logger
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP, nullptr));
 
   // Changing log name leads to another logger.
   config.set_log_name("log-2");
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr));
 
   config.set_log_name("log-1");
-  EXPECT_EQ(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
+  EXPECT_EQ(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr));
 
   // Changing cluster name leads to another logger.
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
   expectClientCreation();
-  EXPECT_NE(logger1, logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
+  EXPECT_NE(logger1,
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr));
 }
 
 } // namespace

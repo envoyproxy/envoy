@@ -39,14 +39,17 @@ MockAsyncClientFactory::MockAsyncClientFactory() {
 MockAsyncClientFactory::~MockAsyncClientFactory() = default;
 
 MockAsyncClientManager::MockAsyncClientManager() {
-  ON_CALL(*this, getOrCreateRawAsyncClient(_, _, _)).WillByDefault(Return(nullptr));
-  ON_CALL(*this, factoryForGrpcService(_, _, _))
-      .WillByDefault(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-        return std::make_unique<testing::NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
+  ON_CALL(*this, getOrCreateRawAsyncClient(_, _, _, _)).WillByDefault(Return(nullptr));
+  ON_CALL(*this, factoryForGrpcService(_, _, _, _)).WillByDefault(Invoke([] {
+    return std::make_unique<testing::NiceMock<Grpc::MockAsyncClientFactory>>();
+  }));
   ON_CALL(*this, getOrCreateRawAsyncClientWithHashKey(_, _, _)).WillByDefault(Invoke([] {
     return std::make_shared<testing::NiceMock<Grpc::MockAsyncClient>>();
   }));
+  ON_CALL(*this, parseGrpcServiceInitialMetadata(_, _))
+      .WillByDefault(Return(GrpcServiceInitialMetadataSharedPtr(nullptr)));
+  ON_CALL(*this, parseGrpcServiceInitialMetadataForServer(_))
+      .WillByDefault(Return(GrpcServiceInitialMetadataSharedPtr(nullptr)));
 }
 
 MockAsyncClientManager::~MockAsyncClientManager() = default;

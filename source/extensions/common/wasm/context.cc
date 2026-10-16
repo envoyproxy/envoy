@@ -954,8 +954,10 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
+  // The service is chosen at request time on a worker thread, so its initial metadata can't be
+  // parsed on the main thread.
   auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      service_proto, *envoyWasm()->scope_, true /* skip_cluster_check */);
+      service_proto, *envoyWasm()->scope_, true /* skip_cluster_check */, nullptr);
   if (!client_or_error.status().ok()) {
     return WasmResult::BadArgument;
   }
@@ -1003,8 +1005,10 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
+  // The service is chosen at request time on a worker thread, so its initial metadata can't be
+  // parsed on the main thread.
   auto client_or_error = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-      service_proto, *envoyWasm()->scope_, true /* skip_cluster_check */);
+      service_proto, *envoyWasm()->scope_, true /* skip_cluster_check */, nullptr);
   if (!client_or_error.status().ok()) {
     return WasmResult::BadArgument;
   }
