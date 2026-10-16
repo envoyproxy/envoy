@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/event/dispatcher.h"
@@ -48,7 +49,49 @@ GradientControllerConfig::GradientControllerConfig(
       fixed_value_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().fixed_value()))),
       min_rtt_buffer_pct_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25)) {
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25)),
+      min_latency_delta_(Protobuf::util::TimeUtil::DurationToMicroseconds(
+          proto_config.min_rtt_calc_params().min_latency_delta())),
+      ewma_enabled_(proto_config.baseline_mode() ==
+                    envoy::extensions::filters::http::adaptive_concurrency::v3::
+                        GradientControllerConfig::EWMA),
+      ewma_half_life_(
+          proto_config.ewma_baseline().has_half_life()
+              ? std::chrono::microseconds(Protobuf::util::TimeUtil::DurationToMicroseconds(
+                    proto_config.ewma_baseline().half_life()))
+              : std::chrono::seconds(300)),
+      ewma_warmup_windows_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.ewma_baseline(), warmup_windows, 10)),
+      ewma_initial_concurrency_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto_config.ewma_baseline(), initial_concurrency, min_concurrency_limit_)) {
+
+  if (ewmaEnabled()) {
+    if (sample_rtt_calc_interval_ < std::chrono::milliseconds(1)) {
+      creation_status = absl::InvalidArgumentError(
+          "adaptive_concurrency: EWMA requires `concurrency_update_interval` >= 1ms");
+      return;
+    }
+    const auto& params = proto_config.min_rtt_calc_params();
+    if (params.has_interval() || params.has_fixed_value() || params.has_request_count() ||
+        params.has_jitter() || proto_config.has_sample_aggregate_percentile()) {
+      creation_status =
+          absl::InvalidArgumentError("adaptive_concurrency: EWMA does not accept probe controls or "
+                                     "`sample_aggregate_percentile`");
+      return;
+    }
+    if (min_concurrency_limit_ > max_concurrency_limit_ ||
+        ewma_initial_concurrency_ < min_concurrency_limit_ ||
+        ewma_initial_concurrency_ > max_concurrency_limit_) {
+      creation_status = absl::InvalidArgumentError("adaptive_concurrency: EWMA requires minimum "
+                                                   "limit <= initial_concurrency <= maximum limit");
+    }
+    return;
+  }
+  if (proto_config.has_ewma_baseline()) {
+    creation_status = absl::InvalidArgumentError(
+        "adaptive_concurrency: `ewma_baseline` requires explicit EWMA mode");
+    return;
+  }
 
   if (min_rtt_calc_interval_ < std::chrono::milliseconds(1) &&
       fixed_value_ <= std::chrono::milliseconds::zero()) {
@@ -67,7 +110,10 @@ GradientController::GradientController(GradientControllerConfig config,
       concurrency_limit_(config_.isMinRTTSamplingEnabled() ? config_.minRTTCalcConcurrency()
                                                            : config_.minConcurrencyLimit()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
-  min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
+  if (!config_.ewmaEnabled()) {
+    min_rtt_calc_timer_ =
+        dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
+  }
 
   sample_reset_timer_ = dispatcher_.createTimer([this]() -> void {
     if (inMinRTTSamplingWindow()) {
@@ -85,7 +131,13 @@ GradientController::GradientController(GradientControllerConfig config,
     sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   });
 
-  if (isMinRTTSamplingEnabled()) {
+  if (config_.ewmaEnabled()) {
+    min_rtt_ = std::chrono::nanoseconds::zero();
+    ewma_window_start_ = time_source_.monotonicTime();
+    updateConcurrencyLimit(
+        std::max(config_.minConcurrencyLimit(),
+                 std::min(config_.maxConcurrencyLimit(), config_.ewmaInitialConcurrency())));
+  } else if (isMinRTTSamplingEnabled()) {
     enterMinRTTSamplingWindow();
   } else {
     min_rtt_ = config_.fixedValue();
@@ -170,11 +222,46 @@ void GradientController::resetSampleWindow() {
   // The sampling window must not be reset while sampling for the new minRTT value.
   ASSERT(!inMinRTTSamplingWindow());
 
+  if (config_.ewmaEnabled()) {
+    resetEwmaWindow();
+    return;
+  }
+
   if (hist_sample_count(latency_sample_hist_.get()) == 0) {
     return;
   }
 
   sample_rtt_ = processLatencySamplesAndClear();
+  stats_.sample_rtt_msecs_.set(
+      std::chrono::duration_cast<std::chrono::milliseconds>(sample_rtt_).count());
+  updateConcurrencyLimit(calculateNewLimit());
+}
+
+void GradientController::resetEwmaWindow() {
+  const auto now = time_source_.monotonicTime();
+  const auto elapsed = now - ewma_window_start_;
+  ewma_window_start_ = now;
+  if (ewma_window_count_ == 0) {
+    return;
+  }
+
+  // Retain fractional estimates between updates and keep zero-duration samples finite.
+  const double sample_ns = std::max(1.0, ewma_window_mean_us_) * 1000.0;
+  sample_rtt_ = std::chrono::nanoseconds(static_cast<int64_t>(sample_ns));
+  ewma_window_count_ = 0;
+  ewma_window_mean_us_ = 0;
+  if (ewma_warmup_count_ < config_.ewmaWarmupWindows()) {
+    ++ewma_warmup_count_;
+    ewma_baseline_ns_ += (sample_ns - ewma_baseline_ns_) / ewma_warmup_count_;
+  } else {
+    const double alpha =
+        -std::expm1(-std::log(2.0) * std::chrono::duration<double>(elapsed).count() /
+                    std::chrono::duration<double>(config_.ewmaHalfLife()).count());
+    ewma_baseline_ns_ += alpha * (sample_ns - ewma_baseline_ns_);
+  }
+  min_rtt_ = std::chrono::nanoseconds(static_cast<int64_t>(ewma_baseline_ns_));
+  stats_.min_rtt_msecs_.set(
+      std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
   stats_.sample_rtt_msecs_.set(
       std::chrono::duration_cast<std::chrono::milliseconds>(sample_rtt_).count());
   updateConcurrencyLimit(calculateNewLimit());
@@ -195,7 +282,10 @@ uint32_t GradientController::calculateNewLimit() {
   // This prevents extreme changes in the concurrency limit between each sample
   // window.
   const auto buffered_min_rtt = min_rtt_.count() + min_rtt_.count() * config_.minRTTBufferPercent();
-  const double raw_gradient = static_cast<double>(buffered_min_rtt) / sample_rtt_.count();
+  const double min_rtt_with_delta =
+      min_rtt_.count() +
+      std::chrono::duration<double, std::nano>(config_.minLatencyDelta()).count();
+  const double raw_gradient = std::max(buffered_min_rtt, min_rtt_with_delta) / sample_rtt_.count();
   const double gradient = std::max<double>(0.5, std::min<double>(2.0, raw_gradient));
 
   // Scale the value by 1000 when reporting it to maintain the granularity of its details
@@ -243,7 +333,7 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   ASSERT(num_rq_outstanding_.load() > 0);
   --num_rq_outstanding_;
 
-  if (rq_send_time < min_rtt_epoch_) {
+  if (!config_.ewmaEnabled() && rq_send_time < min_rtt_epoch_) {
     // Disregard samples from requests started in the previous minRTT window.
     return;
   }
@@ -254,6 +344,11 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   synchronizer_.syncPoint("pre_hist_insert");
   {
     absl::MutexLock ml(sample_mutation_mtx_);
+    if (config_.ewmaEnabled()) {
+      ++ewma_window_count_;
+      ewma_window_mean_us_ += (rq_latency.count() - ewma_window_mean_us_) / ewma_window_count_;
+      return;
+    }
     hist_insert(latency_sample_hist_.get(), rq_latency.count(), 1);
     updateMinRTT();
   }
@@ -268,6 +363,10 @@ void GradientController::updateConcurrencyLimit(const uint32_t new_limit) {
   const auto old_limit = concurrency_limit_.load();
   concurrency_limit_.store(new_limit);
   stats_.concurrency_limit_.set(concurrency_limit_.load());
+
+  if (config_.ewmaEnabled()) {
+    return;
+  }
 
   if (!inMinRTTSamplingWindow() && old_limit == config_.minConcurrencyLimit() &&
       new_limit == config_.minConcurrencyLimit()) {
