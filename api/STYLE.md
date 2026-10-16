@@ -109,7 +109,51 @@ In addition, the following conventions should be followed:
 * If a field is going to contain raw bytes rather than a human-readable string, the field should
   be of type `bytes` instead of `string`.
 
-* Proto fields should be sorted logically, not by field number.
+* Proto fields should be sorted logically, not by field number. Keep tightly coupled fields
+  next to each other.
+
+* When a new field supersedes an existing one, the new field should take precedence and clients
+  must not reject a resource that sets both. This lets a management server send a single resource
+  that both old and new clients accept. Do not add `oneof` to new fields; enforce mutual exclusion
+  in code if needed. Bootstrap-only configuration may be stricter, since a rejection there is
+  visible at startup. This applies to old and new spellings of the same setting; fields with
+  genuinely contradictory meanings should be rejected at config load rather than silently ignored.
+
+* Boolean fields should enable rather than disable behavior, with the simpler behavior as the
+  default. Avoid names that use implementation terminology or repeat context implied by the
+  enclosing message.
+
+* Group fields that only make sense together into a message, and use the presence of that message
+  to mean "enabled", so that invalid combinations cannot be expressed. Do not add wrapper messages
+  that carry no additional meaning.
+
+* Keep units consistent with similar fields (e.g. `_kb` limits). A `google.protobuf.Duration` can be
+  negative, so bound it with `validate.rules`.
+
+* New API packages should use `v3`, not `v3alpha`. Use the `work_in_progress` annotations above
+  for APIs whose semantics are still settling.
+
+## Documenting fields
+
+The API comments are the specification for control plane authors and for xDS clients other than
+Envoy, so they need to be precise. For every new field, the comment should state:
+
+* The default behavior when the field is unset, and what zero, empty or negative values mean.
+* Units, and the exact format of the content (for example, what bytes a `DataSource` holds).
+* What happens when a limit is reached or the feature fails.
+* How the field interacts with other fields, including precedence between scopes (e.g. route,
+  virtual host and cluster, or per-route and filter level config).
+* Any notable performance cost, such as buffering or added latency.
+* A link to the defining specification for any external concept.
+
+Describe behavior in terms of "the client" or "the data plane" unless it is genuinely Envoy
+specific, and keep implementation details (class names, factory context, etc.) out of comments.
+
+Comments are rendered by `protodoc` as reStructuredText, not Markdown. Use double backticks for
+literal values, header names and status codes, `:ref:` for cross-references and `.. note::` or
+`.. attention::` blocks for callouts (preceded by a blank line). Write full sentences ending with a
+period. Do not repeat units implied by the type (e.g. "in seconds" on a `Duration`). See also
+the [documentation guidelines](CONTRIBUTING.md#documentation-guidelines).
 
 ## Package organization
 
