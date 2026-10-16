@@ -1,5 +1,7 @@
 #include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
+#include <algorithm>
+
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
@@ -66,7 +68,6 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
-  UNREFERENCED_PARAMETER(descriptor_statuses);
   UNREFERENCED_PARAMETER(response_headers_to_add);
   UNREFERENCED_PARAMETER(request_headers_to_add);
 
@@ -77,6 +78,14 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   state_ = State::Complete;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
+
+  if (descriptor_statuses != nullptr &&
+      std::any_of(descriptor_statuses->begin(), descriptor_statuses->end(),
+                  [](const auto& descriptor_status) {
+                    return descriptor_status.shadow_over_limit();
+                  })) {
+    cluster_->statsScope().counterFromStatName(stat_names.shadow_over_limit_).inc();
+  }
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:

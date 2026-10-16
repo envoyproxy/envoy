@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <iterator>
 #include <string>
@@ -107,7 +108,7 @@ void Filter::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
-                      Filters::Common::RateLimit::DescriptorStatusListPtr&&,
+                      Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&, const std::string&,
                       Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
@@ -117,6 +118,14 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   status_ = Status::Complete;
   config_->stats().active_.dec();
+
+  if (descriptor_statuses != nullptr &&
+      std::any_of(descriptor_statuses->begin(), descriptor_statuses->end(),
+                  [](const auto& descriptor_status) {
+                    return descriptor_status.shadow_over_limit();
+                  })) {
+    config_->stats().shadow_over_limit_.inc();
+  }
 
   switch (status) {
   case Filters::Common::RateLimit::LimitStatus::OK:

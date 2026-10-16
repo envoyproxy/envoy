@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ratelimit/ratelimit.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -236,6 +237,14 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
     callbacks_->streamInfo().setDynamicMetadata(config_->metadataNamespace(), *dynamic_metadata);
+  }
+
+  if (descriptor_statuses != nullptr &&
+      std::any_of(descriptor_statuses->begin(), descriptor_statuses->end(),
+                  [](const auto& descriptor_status) {
+                    return descriptor_status.shadow_over_limit();
+                  })) {
+    cluster_->statsScope().counterFromStatName(stat_names.shadow_over_limit_).inc();
   }
 
   switch (status) {
