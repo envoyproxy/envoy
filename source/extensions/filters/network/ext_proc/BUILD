@@ -60,6 +60,7 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/network:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
