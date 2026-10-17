@@ -119,6 +119,76 @@ TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeOverrideByCallerOptions)
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
+// Validates that the HTTP stream keeps the async client default buffer limit when
+// retry_buffer_limit_bytes is not configured.
+TEST_F(EnvoyAsyncClientImplTest, RetryBufferLimitNotSetByDefault) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+            EXPECT_FALSE(opts.buffer_limit_.has_value());
+            return nullptr;
+          }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that retry_buffer_limit_bytes is used as the buffer limit of streams and unary
+// requests.
+TEST_F(EnvoyAsyncClientImplTest, RetryBufferLimitFromConfig) {
+  config.mutable_envoy_grpc()->mutable_retry_buffer_limit_bytes()->set_value(1024 * 1024);
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
+
+  EXPECT_CALL(http_client_, start(_, _))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+            EXPECT_TRUE(opts.buffer_body_for_retry);
+            EXPECT_NE(opts.parsed_retry_policy, nullptr);
+            EXPECT_TRUE(opts.buffer_limit_.has_value());
+            EXPECT_EQ(opts.buffer_limit_.value_or(0), 1024U * 1024U);
+            return nullptr;
+          }));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> stream_callbacks;
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, stream_callbacks,
+                          Http::AsyncClient::StreamOptions().setBufferBodyForRetry(true));
+  EXPECT_EQ(grpc_stream, nullptr);
+
+  NiceMock<MockAsyncRequestCallbacks<helloworld::HelloReply>> request_callbacks;
+  NiceMock<Tracing::MockSpan> active_span;
+  EXPECT_CALL(active_span, spawnChild_(_, _, _))
+      .WillOnce(Return(new NiceMock<Tracing::MockSpan>()));
+  helloworld::HelloRequest request_msg;
+  auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, request_callbacks,
+                                          active_span, Http::AsyncClient::RequestOptions());
+  EXPECT_EQ(grpc_request, nullptr);
+}
+
+// Validates that a per-stream buffer limit set by the caller takes precedence over
+// retry_buffer_limit_bytes.
+TEST_F(EnvoyAsyncClientImplTest, RetryBufferLimitOverriddenByCallerOptions) {
+  config.mutable_envoy_grpc()->mutable_retry_buffer_limit_bytes()->set_value(1024 * 1024);
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+            EXPECT_TRUE(opts.buffer_limit_.has_value());
+            EXPECT_EQ(opts.buffer_limit_.value_or(0), 2048U);
+            return nullptr;
+          }));
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                         Http::AsyncClient::StreamOptions().setBufferLimit(2048));
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validates that the host header is the cluster name in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;

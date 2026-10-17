@@ -57,8 +57,10 @@ AsyncClientImpl::AsyncClientImpl(const envoy::config::core::v3::GrpcService& con
                                  absl::Status& creation_status)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
-      skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()), cm_(context.clusterManager()),
-      remote_cluster_name_(config.envoy_grpc().cluster_name()),
+      skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()),
+      retry_buffer_limit_bytes_(
+          PROTOBUF_GET_OPTIONAL_WRAPPED(config.envoy_grpc(), retry_buffer_limit_bytes)),
+      cm_(context.clusterManager()), remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(context.timeSource()) {
   auto parser_or_error = Router::HeaderParser::configure(
       config.initial_metadata(),
@@ -128,6 +130,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
   if (!options.retry_policy.has_value() && options.parsed_retry_policy == nullptr &&
       parent_.retryPolicy() != nullptr) {
     options_.setRetryPolicy(parent_.retryPolicy());
+  }
+
+  // Apply parent retry buffer limit if no per-stream override.
+  if (!options.buffer_limit_.has_value() && parent_.retry_buffer_limit_bytes_.has_value()) {
+    options_.setBufferLimit(*parent_.retry_buffer_limit_bytes_);
   }
 
   // Apply parent `skip_envoy_headers_` setting from configuration, if no per-stream
