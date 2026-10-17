@@ -4686,6 +4686,93 @@ TEST(PrioritySet, Extend) {
   EXPECT_EQ(2, membership_changes);
 }
 
+// applyHealthTransition matches a full partitionHosts pass for every health change and locality.
+TEST(HostSetImplHealthTransition, MatchesFullPartition) {
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
+  HostSharedPtr h0 = makeTestHost(info, "tcp://10.0.0.1:80", zone_a);
+  HostSharedPtr h1 = makeTestHost(info, "tcp://10.0.0.2:80", zone_a);
+  HostSharedPtr h2 = makeTestHost(info, "tcp://10.0.0.3:80", zone_b);
+  auto hosts = std::make_shared<HostVector>(HostVector{h0, h1, h2});
+  auto hosts_per_locality =
+      std::make_shared<HostsPerLocalityImpl>(std::vector<HostVector>{{h0, h1}, {h2}}, false);
+
+  PrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+  priority_set.updateHosts(0, HostSetImpl::partitionHosts(hosts, hosts_per_locality), nullptr,
+                           *hosts, {}, std::nullopt, std::nullopt);
+  const HostSet& host_set = *priority_set.hostSetsPerPriority()[0];
+
+  const auto addresses = [](const HostVector& hosts) {
+    std::vector<std::string> out;
+    out.reserve(hosts.size());
+    for (const auto& host : hosts) {
+      out.push_back(host->address()->asString());
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+  };
+  // Assert the incremental transition for `host` equals a full re-partition, then commit it so
+  // the next transition builds on the updated set, exactly as production does.
+  const auto expect_matches = [&](const HostSharedPtr& host) {
+    auto incremental = HostSetImpl::applyHealthTransition(host_set, host);
+    auto oracle = HostSetImpl::partitionHosts(hosts, hosts_per_locality);
+    EXPECT_EQ(addresses(incremental.healthy_hosts->get()), addresses(oracle.healthy_hosts->get()));
+    EXPECT_EQ(addresses(incremental.degraded_hosts->get()),
+              addresses(oracle.degraded_hosts->get()));
+    EXPECT_EQ(addresses(incremental.excluded_hosts->get()),
+              addresses(oracle.excluded_hosts->get()));
+    ASSERT_EQ(incremental.healthy_hosts_per_locality->get().size(),
+              oracle.healthy_hosts_per_locality->get().size());
+    for (size_t b = 0; b < oracle.healthy_hosts_per_locality->get().size(); ++b) {
+      EXPECT_EQ(addresses(incremental.healthy_hosts_per_locality->get()[b]),
+                addresses(oracle.healthy_hosts_per_locality->get()[b]));
+      EXPECT_EQ(addresses(incremental.degraded_hosts_per_locality->get()[b]),
+                addresses(oracle.degraded_hosts_per_locality->get()[b]));
+      EXPECT_EQ(addresses(incremental.excluded_hosts_per_locality->get()[b]),
+                addresses(oracle.excluded_hosts_per_locality->get()[b]));
+    }
+    priority_set.updateHosts(0, std::move(incremental), nullptr, {}, {}, std::nullopt,
+                             std::nullopt);
+  };
+
+  h1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC); // Healthy -> Unhealthy, zone A.
+  expect_matches(h1);
+  h2->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC); // Healthy -> Degraded, zone B.
+  expect_matches(h2);
+  // Awaiting its first active check: unhealthy and excluded, zone A.
+  h0->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  h0->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+  expect_matches(h0);
+  h1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC); // Unhealthy -> Healthy, zone A.
+  expect_matches(h1);
+}
+
+// A health change for a host the set does not hold re-partitions the set rather than adding it.
+TEST(HostSetImplHealthTransition, HostNotInSetFallsBackToFullPartition) {
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostSharedPtr h0 = makeTestHost(info, "tcp://10.0.0.1:80");
+  HostSharedPtr h1 = makeTestHost(info, "tcp://10.0.0.2:80");
+  HostSharedPtr stray = makeTestHost(info, "tcp://10.0.0.3:80");
+  auto hosts = std::make_shared<HostVector>(HostVector{h0, h1});
+
+  PrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+  priority_set.updateHosts(0, HostSetImpl::partitionHosts(hosts, HostsPerLocalityImpl::empty()),
+                           nullptr, *hosts, {}, std::nullopt, std::nullopt);
+  const HostSet& host_set = *priority_set.hostSetsPerPriority()[0];
+
+  const auto params = HostSetImpl::applyHealthTransition(host_set, stray);
+  EXPECT_EQ(*hosts, *params.hosts);
+  EXPECT_EQ(*hosts, params.healthy_hosts->get());
+  EXPECT_TRUE(params.degraded_hosts->get().empty());
+  EXPECT_TRUE(params.excluded_hosts->get().empty());
+}
+
 // Adds 100 hosts to P0 and 50 hosts to P1.
 class TestMultiPriorityBatchUpdateCb : public PrioritySet::BatchUpdateCb {
 public:
