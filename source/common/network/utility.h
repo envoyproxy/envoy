@@ -391,7 +391,7 @@ public:
       return absl::InternalError(fmt::format("failed to open netns file {}: {}", curr_netns_file,
                                              errorDetails(og_netns_fd_result.errno_)));
     }
-    Cleanup cleanup_og_fd([&og_netns_fd, &posix]() { posix.close(og_netns_fd); });
+    Cleanup cleanup_og_fd([og_netns_fd, &posix]() { posix.close(og_netns_fd); });
 
     // Open the fd for the network namespace we want the socket in.
     auto netns_fd_result = posix.open(netns, O_RDONLY);
@@ -400,7 +400,7 @@ public:
       return absl::InternalError(fmt::format("failed to open netns file {}: {}", netns,
                                              errorDetails(netns_fd_result.errno_)));
     }
-    Cleanup cleanup_netns_fd([&posix, &netns_fd]() { posix.close(netns_fd); });
+    Cleanup cleanup_netns_fd([&posix, netns_fd]() { posix.close(netns_fd); });
 
     // Change the network namespace of this thread.
     auto setns_result = Api::LinuxOsSysCallsSingleton().get().setns(netns_fd, CLONE_NEWNET);
@@ -410,7 +410,7 @@ public:
     }
 
     // Restore the original network namespace even if `f` throws.
-    Cleanup restore_og_netns([&og_netns_fd, &netns_fd]() {
+    Cleanup restore_og_netns([og_netns_fd, netns_fd]() {
       const auto restore_result =
           Api::LinuxOsSysCallsSingleton().get().setns(og_netns_fd, CLONE_NEWNET);
 
