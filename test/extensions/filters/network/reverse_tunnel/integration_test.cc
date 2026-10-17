@@ -218,7 +218,8 @@ typed_config:
     return request;
   }
 
-  void runEndToEndReverseConnectionHandshakeScenario();
+  void runEndToEndReverseConnectionHandshakeScenario(bool drain_at_end = true);
+  void drainReverseTunnelListenersAndAwaitStop();
   void addDrainingAwareReverseConnectionHcmListener(uint32_t reverse_connection_count = 1);
   void completeReverseTunnelHandshake(FakeRawConnection& connection) const;
   void startHttp2Session(FakeRawConnection& connection) const;
@@ -385,7 +386,8 @@ void ReverseTunnelFilterIntegrationTest::logHttp2Frames(absl::string_view label,
   }
 }
 
-void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeScenario() {
+void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeScenario(
+    bool drain_at_end) {
   const uint32_t upstream_port = GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
   const std::string loopback_addr =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
@@ -419,6 +421,7 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
 
     auto* rc_listener = bootstrap.mutable_static_resources()->add_listeners();
     rc_listener->set_name("reverse_connection_listener");
+    rc_listener->set_stat_prefix("reverse_conn_listener");
     auto* rc_address = rc_listener->mutable_address()->mutable_socket_address();
     rc_address->set_address("rc://e2e-node:e2e-cluster:e2e-tenant@upstream_cluster:1");
     rc_address->set_port_value(0);
@@ -454,6 +457,12 @@ void ReverseTunnelFilterIntegrationTest::runEndToEndReverseConnectionHandshakeSc
 
   test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
 
+  if (drain_at_end) {
+    drainReverseTunnelListenersAndAwaitStop();
+  }
+}
+
+void ReverseTunnelFilterIntegrationTest::drainReverseTunnelListenersAndAwaitStop() {
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
   EXPECT_TRUE(admin_response->complete());
@@ -679,6 +688,23 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshakeCus
   downstream_handshake_request_path_ = "/custom/reverse";
   upstream_request_path_ = downstream_handshake_request_path_;
   runEndToEndReverseConnectionHandshakeScenario();
+}
+
+TEST_P(ReverseTunnelFilterIntegrationTest, AdminTunnelsEndpointListsEstablishedConnection) {
+  DISABLE_IF_ADMIN_DISABLED;
+  runEndToEndReverseConnectionHandshakeScenario(/*drain_at_end=*/false);
+
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Ge(1));
+
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reverse_tunnel/tunnels", "",
+                                         Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain", response->headers().getContentTypeValue());
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 1\n", response->body());
+
+  drainReverseTunnelListenersAndAwaitStop();
 }
 
 TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseConnections) {
