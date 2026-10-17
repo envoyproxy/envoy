@@ -2959,7 +2959,8 @@ TEST_F(ClusterManagerImplTest,
   EXPECT_TRUE(cds_paused);
   EXPECT_FALSE(cds_resumed);
 
-  // Normal cluster finishes warming. CDS should resume even though no_wait_cluster is still warming.
+  // Normal cluster finishes warming. CDS should resume even though no_wait_cluster is still
+  // warming.
   normal_init_cb();
   EXPECT_TRUE(cds_resumed);
 }

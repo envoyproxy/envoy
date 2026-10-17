@@ -1024,8 +1024,8 @@ void ClusterManagerImpl::updateCdsPause(const ClusterData& cluster_data) {
   if (!cluster_data.cluster_->info()->waitForWarmOnInit()) {
     cds_pauses_.erase(name);
   } else if (!cds_pauses_.contains(name)) {
-    cds_pauses_.emplace(name,
-                        xds_manager_.pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()));
+    cds_pauses_.emplace(
+        name, xds_manager_.pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()));
   }
 }
 
