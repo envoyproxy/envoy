@@ -4,6 +4,8 @@ package envoy.extensions.filters.network.reverse_tunnel.v3;
 
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.reverse_tunnel.v3";
@@ -19,6 +21,27 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // agents can detect drain and re-establish connections gracefully.
 // [#extension: envoy.filters.network.reverse_tunnel_drain_aware_http_connection_manager]
 
+message DrainConnectionMetadata {
+  // The metadata key to send on the connection metadata.
+  // For simplicity the value is set to "true" always.
+  // Default key is "drain_reverse_tunnel".
+  string metadata_key = 1;
+
+  // The duration to wait before sending the metadata frame, after a replacement
+  // tunnel has been dialed. Default is 2 seconds.
+  // Must be strictly less than ``shutdown_notice_delay`` and ``hcm_config.drain_timeout``
+  // (default 5 seconds, when the final GOAWAY is sent). If delay >= shutdown_notice_delay or
+  // delay >= drain_timeout, a later signal can win and the peer may never see the metadata.
+  google.protobuf.Duration delay = 2;
+
+  // The duration to wait before sending the soft GOAWAY (shutdownNotice), after the metadata
+  // frame. This tells the peer to stop starting NEW streams on this tunnel so they route to the
+  // dialing replacement; in-flight streams continue uninterrupted. Default is 3 seconds.
+  // Must be strictly greater than ``delay`` and strictly less than ``hcm_config.drain_timeout``
+  // (default 5 seconds, when the final GOAWAY is sent).
+  google.protobuf.Duration shutdown_notice_delay = 3;
+}
+
 // Configuration for the drain-aware HTTP Connection Manager.
 // All HCM fields are forwarded verbatim; the only difference is that this
 // filter registers a listener-drain callback and emits a GOAWAY before the
@@ -30,6 +53,11 @@ message DrainAwareHttpConnectionManager {
   // When true, a peer-initiated GOAWAY on a reverse tunnel makes the initiator drop the draining
   // tunnel and dial a replacement, so capacity is restored before the old tunnel closes while its
   // in-flight streams finish. Default false, so the behavior is opt-in and unconfigured listeners
-  // are unaffected.
+  // are unaffected. Required when ``drain_connection_metadata`` is set.
   bool enable_drain_with_goaway = 2;
+
+  // Connection metadata sent during drain so the peer can migrate off this tunnel.
+  // Requires ``enable_drain_with_goaway`` and
+  // ``hcm_config.http2_protocol_options.allow_metadata``.
+  DrainConnectionMetadata drain_connection_metadata = 3;
 }
