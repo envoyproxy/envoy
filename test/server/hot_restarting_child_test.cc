@@ -6,16 +6,19 @@
 #include "source/server/hot_restarting_parent.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/listener_manager.h"
 #include "test/server/hot_restart_udp_forwarding_test_helper.h"
 #include "test/server/utility.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::DoAll;
 using testing::Eq;
 using testing::Return;
@@ -73,6 +76,35 @@ public:
       return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
     });
   }
+  // The wire form of a message as one datagram: uint64 'length' then the serialized proto.
+  static std::string serialize(const envoy::HotRestartMessage& message) {
+    std::string serialized;
+    RELEASE_ASSERT(message.SerializeToString(&serialized), "");
+    uint64_t length = htobe64(serialized.size());
+    std::string wire(reinterpret_cast<const char*>(&length), sizeof(length));
+    return wire + serialized;
+  }
+  // Copies as much of `wire` as fits into the receive buffer of `msg`, as a datagram would.
+  static Api::SysCallSizeResult deliver(std::string& wire, msghdr* msg) {
+    msg->msg_control = nullptr;
+    msg->msg_controllen = 0;
+    msg->msg_flags = 0;
+    RELEASE_ASSERT(msg->msg_iovlen == 1, "");
+    size_t sz = std::min(wire.size(), msg->msg_iov[0].iov_len);
+    wire.copy(static_cast<char*>(msg->msg_iov[0].iov_base), sz);
+    wire = wire.substr(sz);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(sz), 0};
+  }
+  static Api::SysCallSizeResult wouldBlock() { return Api::SysCallSizeResult{-1, EAGAIN}; }
+  static envoy::HotRestartMessage::Request::RequestCase requestCase(const msghdr* msg) {
+    envoy::HotRestartMessage sent;
+    RELEASE_ASSERT(msg->msg_iov[0].iov_len > sizeof(uint64_t), "");
+    RELEASE_ASSERT(
+        sent.ParseFromArray(static_cast<uint8_t*>(msg->msg_iov[0].iov_base) + sizeof(uint64_t),
+                            msg->msg_iov[0].iov_len - sizeof(uint64_t)),
+        "");
+    return sent.request().request_case();
+  }
   Api::MockOsSysCalls& os_sys_calls_;
   Event::FileReadyCb udp_file_ready_callback_;
   sockaddr_un child_address_udp_forwarding_;
@@ -91,6 +123,8 @@ public:
     });
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(4);
     EXPECT_CALL(os_sys_calls_, close(_)).Times(4);
+    // Send/receive timeouts are set on each socket at bind time.
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, SOL_SOCKET, _, _, _)).Times(AnyNumber());
     fake_parent_ = std::make_unique<FakeHotRestartingParent>(os_sys_calls_, 0, 0, socket_path_);
     hot_restarting_child_ = std::make_unique<HotRestartingChild>(
         0, 1, socket_path_, 0, skipHotRestartOnNoParent(), skipParentStats());
@@ -110,13 +144,38 @@ public:
     if (!hotRestartIsSkipped()) {
       EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, Event::FileReadyType::Read))
           .WillOnce(DoAll(SaveArg<1>(&fake_parent_->udp_file_ready_callback_), Return(nullptr)));
+      // The timer that retries the terminate request and waits for the parent's exit.
+      parent_exit_timer_ = new testing::NiceMock<Event::MockTimer>(&dispatcher_);
     }
     hot_restarting_child_->initialize(dispatcher_);
   }
   void TearDown() override { hot_restarting_child_.reset(); }
+  // The terminate request is accepted, and the parent's exit is seen on the next tick (its socket
+  // refuses the probe): the drains complete then.
+  void terminateParentAndWaitForItsExit() {
+    testing::InSequence s;
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+      EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+                envoy::HotRestartMessage::Request::kTerminate);
+      return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+    });
+    EXPECT_CALL(*parent_exit_timer_,
+                enableTimer(HotRestartingChild::PARENT_EXIT_PROBE_INTERVAL, _));
+    hot_restarting_child_->sendParentTerminateRequest();
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+      EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+                envoy::HotRestartMessage::Request::kTestConnection);
+      return Api::SysCallSizeResult{-1, ECONNREFUSED};
+    });
+    parent_exit_timer_->invokeCallback();
+  }
+  static Api::SysCallSizeResult sendAccepted(const msghdr* msg) {
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  }
   std::string socket_path_ = testDomainSocketName();
   Api::MockOsSysCalls os_sys_calls_;
   Event::MockDispatcher dispatcher_;
+  testing::NiceMock<Event::MockTimer>* parent_exit_timer_{};
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   std::unique_ptr<FakeHotRestartingParent> fake_parent_;
   std::unique_ptr<HotRestartingChild> hot_restarting_child_;
@@ -156,8 +215,7 @@ TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalled) {
                                                        callback2.AsStdFunction());
   EXPECT_CALL(callback1, Call());
   EXPECT_CALL(callback2, Call());
-  fake_parent_->expectParentTerminateMessages();
-  hot_restarting_child_->sendParentTerminateRequest();
+  terminateParentAndWaitForItsExit();
 }
 
 TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlreadyDrained) {
@@ -165,14 +223,180 @@ TEST_F(HotRestartingChildTest, ParentDrainedCallbacksAreCalledImmediatelyWhenAlr
   auto test_listener_addr2 = *Network::Utility::resolveUrl("udp://127.0.0.1:1235");
   testing::MockFunction<void()> callback1;
   testing::MockFunction<void()> callback2;
-  fake_parent_->expectParentTerminateMessages();
-  hot_restarting_child_->sendParentTerminateRequest();
+  terminateParentAndWaitForItsExit();
   EXPECT_CALL(callback1, Call());
   EXPECT_CALL(callback2, Call());
   hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
                                                        callback1.AsStdFunction());
   hot_restarting_child_->registerParentDrainedCallback(test_listener_addr2,
                                                        callback2.AsStdFunction());
+}
+
+// The drained callbacks unpause the inherited UDP listeners, which the parent's workers keep
+// reading until the parent stops. They run once the parent's socket refuses a probe, i.e. the
+// parent has exited, not when the terminate request is sent.
+TEST_F(HotRestartingChildTest, DrainsCompleteOnlyAfterParentHasExited) {
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  testing::MockFunction<void()> callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       callback.AsStdFunction());
+  EXPECT_CALL(callback, Call()).Times(0);
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int flags) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kTerminate);
+    EXPECT_EQ(flags & MSG_DONTWAIT, 0);
+    return sendAccepted(msg);
+  });
+  EXPECT_CALL(*parent_exit_timer_, enableTimer(HotRestartingChild::PARENT_EXIT_PROBE_INTERVAL, _));
+  hot_restarting_child_->sendParentTerminateRequest();
+  // A callback registered while the parent is exiting waits too.
+  testing::MockFunction<void()> late_callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       late_callback.AsStdFunction());
+  EXPECT_CALL(late_callback, Call()).Times(0);
+
+  // The parent is still there: the probe is accepted, without blocking, and the wait goes on.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int flags) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kTestConnection);
+    EXPECT_EQ(flags & MSG_DONTWAIT, MSG_DONTWAIT);
+    return sendAccepted(msg);
+  });
+  EXPECT_CALL(*parent_exit_timer_, enableTimer(HotRestartingChild::PARENT_EXIT_PROBE_INTERVAL, _));
+  parent_exit_timer_->invokeCallback();
+  testing::Mock::VerifyAndClearExpectations(&callback);
+  testing::Mock::VerifyAndClearExpectations(&late_callback);
+
+  // The parent has exited: the probe is refused and the drains complete.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, ECONNREFUSED};
+  });
+  EXPECT_CALL(callback, Call());
+  EXPECT_CALL(late_callback, Call());
+  EXPECT_LOG_CONTAINS("info", "hot restart parent has exited",
+                      parent_exit_timer_->invokeCallback());
+}
+
+// A parent whose socket is full when asked to terminate is asked again on every tick, without
+// blocking, until the request is accepted; then its exit is awaited as usual.
+TEST_F(HotRestartingChildTest, ResendsTerminateWhileParentSocketIsFull) {
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  testing::MockFunction<void()> callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       callback.AsStdFunction());
+  EXPECT_CALL(callback, Call()).Times(0);
+  // The blocking send times out: the parent is not reading its socket.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  hot_restarting_child_->sendParentTerminateRequest();
+  EXPECT_TRUE(HotRestartUdpForwardingTestHelper(*hot_restarting_child_).parentTerminated());
+
+  // Still full: the request is retried without waiting.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int flags) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kTerminate);
+    EXPECT_EQ(flags & MSG_DONTWAIT, MSG_DONTWAIT);
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  parent_exit_timer_->invokeCallback();
+  // Accepted now.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kTerminate);
+    return sendAccepted(msg);
+  });
+  EXPECT_LOG_CONTAINS("info", "hot restart parent received the terminate request on a retry",
+                      parent_exit_timer_->invokeCallback());
+  testing::Mock::VerifyAndClearExpectations(&callback);
+
+  // From then on its exit is probed for.
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kTestConnection);
+    return Api::SysCallSizeResult{-1, ECONNREFUSED};
+  });
+  EXPECT_CALL(callback, Call());
+  parent_exit_timer_->invokeCallback();
+}
+
+// A parent that does not exit in time cannot keep the listeners paused: the wait is capped.
+TEST_F(HotRestartingChildTest, DrainsCompleteAtTheCapIfParentLingers) {
+  HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
+      .setParentExitWaitCap(std::chrono::milliseconds(0));
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  testing::MockFunction<void()> callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       callback.AsStdFunction());
+  EXPECT_CALL(callback, Call()).Times(0);
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    return sendAccepted(msg);
+  });
+  hot_restarting_child_->sendParentTerminateRequest();
+  testing::Mock::VerifyAndClearExpectations(&callback);
+
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    return sendAccepted(msg);
+  });
+  EXPECT_CALL(callback, Call());
+  EXPECT_CALL(*parent_exit_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_LOG_CONTAINS("warning", "hot restart parent has not exited",
+                      parent_exit_timer_->invokeCallback());
+}
+
+// A parent that never accepts the terminate request keeps running: at the cap the child says so
+// loudly and takes over the listeners anyway.
+TEST_F(HotRestartingChildTest, DrainsCompleteAtTheCapIfTerminateIsNeverAccepted) {
+  HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
+      .setParentExitWaitCap(std::chrono::milliseconds(0));
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  testing::MockFunction<void()> callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       callback.AsStdFunction());
+  EXPECT_CALL(callback, Call()).Times(0);
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  hot_restarting_child_->sendParentTerminateRequest();
+  testing::Mock::VerifyAndClearExpectations(&callback);
+
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  EXPECT_CALL(callback, Call());
+  EXPECT_LOG_CONTAINS("error", "did not accept the terminate request",
+                      parent_exit_timer_->invokeCallback());
+}
+
+// A parent that is already gone when asked to terminate needs no wait.
+TEST_F(HotRestartingChildTest, DrainsCompleteImmediatelyIfParentIsAlreadyGone) {
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  testing::MockFunction<void()> callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       callback.AsStdFunction());
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, ECONNREFUSED};
+  });
+  EXPECT_CALL(*parent_exit_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(callback, Call());
+  hot_restarting_child_->sendParentTerminateRequest();
+}
+
+// With the runtime guard off the drains complete when the terminate request is sent, as before.
+TEST_F(HotRestartingChildTest, DrainsCompleteAtOnceWhenWaitingForParentExitIsDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.hot_restart_wait_for_parent_exit", "false"}});
+  auto test_listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  testing::MockFunction<void()> callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr,
+                                                       callback.AsStdFunction());
+  EXPECT_CALL(callback, Call());
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    return sendAccepted(msg);
+  });
+  EXPECT_CALL(*parent_exit_timer_, enableTimer(_, _)).Times(0);
+  hot_restarting_child_->sendParentTerminateRequest();
 }
 
 TEST_F(HotRestartingChildTest, ParentStopAcceptingLatchesOnDrainRequest) {
@@ -285,6 +509,275 @@ TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
               deliver(worker_index, IsUdpWith(test_listener_addr, test_remote_addr, udp_contents,
                                               packet_timestamp)));
   EXPECT_LOG_NOT_CONTAINS("error", "", fake_parent_->sendUdpForwardingMessage(msg));
+}
+
+// The hot restart deadlock: the parent forwards UDP packets to the child from its main thread
+// and blocks when the child's socket is full; the child's main thread waits for the parent's
+// reply (here: to a stats request) without reading forwarded packets. Each main thread then waits
+// on the other forever. This models the parent's side of the dependency in the recvmsg mock: the
+// stats reply is only available on the main socket once the forwarded packet has been read from
+// the udp forwarding socket. Without the fix, the child never reads it while waiting.
+class HotRestartingChildWaitingForParentTest : public HotRestartingChildTest {
+public:
+  void SetUp() override {
+    HotRestartingChildTest::SetUp();
+    helper_ = std::make_unique<HotRestartUdpForwardingTestHelper>(*hot_restarting_child_);
+    HotRestartUdpForwardingTestHelper(*hot_restarting_child_)
+        .registerUdpForwardingListener(
+            test_listener_addr_,
+            std::dynamic_pointer_cast<Network::UdpListenerConfig>(mock_udp_listener_config_));
+    envoy::HotRestartMessage forwarded;
+    auto* packet = forwarded.mutable_request()->mutable_forwarded_udp_packet();
+    packet->set_local_addr(Network::Utility::urlFromDatagramAddress(*test_listener_addr_));
+    packet->set_peer_addr(Network::Utility::urlFromDatagramAddress(*test_remote_addr_));
+    packet->set_worker_index(worker_index_);
+    packet->set_payload(udp_contents_);
+    packet->set_receive_time_epoch_microseconds(packet_timestamp_);
+    forwarded_wire_ = FakeHotRestartingParent::serialize(forwarded);
+    envoy::HotRestartMessage stats_reply;
+    (*stats_reply.mutable_reply()->mutable_stats()->mutable_gauges())["parent.gauge"] = 7;
+    stats_reply_wire_ = FakeHotRestartingParent::serialize(stats_reply);
+  }
+  void expectPacketDelivered() {
+    EXPECT_CALL(*mock_udp_listener_config_,
+                listenerWorkerRouter(WhenDynamicCastTo<const Network::Address::Ipv4Instance&>(
+                    Eq(dynamic_cast<const Network::Address::Ipv4Instance&>(*test_listener_addr_)))))
+        .WillOnce(ReturnRef(mock_worker_router_));
+    EXPECT_CALL(mock_worker_router_,
+                deliver(worker_index_, IsUdpWith(test_listener_addr_, test_remote_addr_,
+                                                 udp_contents_, packet_timestamp_)));
+  }
+  // recvmsg: the forwarded packet is waiting on the udp forwarding socket; the stats reply becomes
+  // readable on the main socket only after the forwarded packet has been read.
+  void parentRepliesOnlyAfterForwardIsRead() {
+    EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).WillRepeatedly([this](int fd, msghdr* msg, int) {
+      if (fd == helper_->udpForwardingSocketFd()) {
+        if (forwarded_wire_.empty()) {
+          return FakeHotRestartingParent::wouldBlock();
+        }
+        forward_read_ = true;
+        return FakeHotRestartingParent::deliver(forwarded_wire_, msg);
+      }
+      EXPECT_EQ(fd, helper_->mainSocketFd());
+      if (!forward_read_ || stats_reply_wire_.empty()) {
+        main_socket_polls_++;
+        return FakeHotRestartingParent::wouldBlock();
+      }
+      return FakeHotRestartingParent::deliver(stats_reply_wire_, msg);
+    });
+  }
+  void parentNeverReplies() {
+    EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).WillRepeatedly([this](int, msghdr*, int) {
+      main_socket_polls_++;
+      return FakeHotRestartingParent::wouldBlock();
+    });
+  }
+
+  std::unique_ptr<HotRestartUdpForwardingTestHelper> helper_;
+  std::shared_ptr<Network::MockUdpListenerConfig> mock_udp_listener_config_ =
+      std::make_shared<Network::MockUdpListenerConfig>();
+  Network::MockUdpListenerWorkerRouter mock_worker_router_;
+  Network::Address::InstanceConstSharedPtr test_listener_addr_ =
+      *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  Network::Address::InstanceConstSharedPtr test_remote_addr_ =
+      *Network::Utility::resolveUrl("udp://127.0.0.1:4321");
+  const uint32_t worker_index_ = 3;
+  const uint64_t packet_timestamp_ = 987654321;
+  const std::string udp_contents_ = "beep boop";
+  std::string forwarded_wire_;
+  std::string stats_reply_wire_;
+  bool forward_read_ = false;
+  uint64_t main_socket_polls_ = 0;
+};
+
+TEST_F(HotRestartingChildWaitingForParentTest, ServicesUdpForwardingWhileWaitingForParentStats) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg), envoy::HotRestartMessage::Request::kStats);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  parentRepliesOnlyAfterForwardIsRead();
+  expectPacketDelivered();
+
+  std::unique_ptr<envoy::HotRestartMessage> reply = hot_restarting_child_->getParentStats();
+  ASSERT_NE(reply, nullptr);
+  EXPECT_EQ(reply->reply().stats().gauges().at("parent.gauge"), 7);
+  EXPECT_TRUE(forward_read_);
+  // The reply was not available on the first read of the main socket.
+  EXPECT_GE(main_socket_polls_, 1);
+  EXPECT_FALSE(helper_->parentUnresponsive());
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest,
+       ServicesUdpForwardingWhileWaitingForParentListenSocket) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kPassListenSocket);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  // The (wrong-typed) stats reply stands in for the parent's reply here: what matters is that the
+  // wait reads the forwarded packet before the reply arrives and then returns.
+  parentRepliesOnlyAfterForwardIsRead();
+  expectPacketDelivered();
+
+  EXPECT_EQ(hot_restarting_child_->duplicateParentListenSocket("udp://127.0.0.1:5678", 0, ""), -1);
+  EXPECT_TRUE(forward_read_);
+  EXPECT_FALSE(helper_->parentUnresponsive());
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffAfterReplyTimeout) {
+  helper_->setParentReplyTimeout(std::chrono::milliseconds(0));
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  parentNeverReplies();
+  testing::MockFunction<void()> drained_callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr_,
+                                                       drained_callback.AsStdFunction());
+
+  EXPECT_LOG_CONTAINS("error", "hot restart parent is unresponsive (no reply within 0ms)",
+                      EXPECT_EQ(hot_restarting_child_->getParentStats(), nullptr));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  // Unresponsive is not gone: the parent may still be serving, so the drains stay pending until
+  // the parent is asked to terminate.
+  EXPECT_FALSE(helper_->parentTerminated());
+
+  // No further request waits on the parent (no sendmsg/recvmsg expectations remain to be met).
+  EXPECT_EQ(hot_restarting_child_->getParentStats(), nullptr);
+  EXPECT_EQ(hot_restarting_child_->duplicateParentListenSocket("udp://127.0.0.1:5678", 0, ""), -1);
+  EXPECT_EQ(hot_restarting_child_->sendParentAdminShutdownRequest(), std::nullopt);
+
+  // The terminate request is still sent, and the drains complete once the parent has exited.
+  EXPECT_CALL(drained_callback, Call());
+  terminateParentAndWaitForItsExit();
+  EXPECT_TRUE(helper_->parentTerminated());
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, CompletesDrainsWhenProbeFindsParentGone) {
+  helper_->setParentProbeInterval(std::chrono::milliseconds(0));
+  {
+    testing::InSequence s;
+    // The stats request goes out; the liveness probe is refused: the parent's socket is gone.
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+      EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+                envoy::HotRestartMessage::Request::kStats);
+      return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+    });
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+      EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+                envoy::HotRestartMessage::Request::kTestConnection);
+      return Api::SysCallSizeResult{-1, ECONNREFUSED};
+    });
+  }
+  parentNeverReplies();
+  testing::MockFunction<void()> drained_callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr_,
+                                                       drained_callback.AsStdFunction());
+
+  EXPECT_CALL(drained_callback, Call());
+  EXPECT_LOG_CONTAINS("error", "hot restart parent is gone",
+                      EXPECT_EQ(hot_restarting_child_->getParentStats(), nullptr));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_TRUE(helper_->parentTerminated());
+
+  // Nothing more is sent to a parent that is gone, terminate included.
+  hot_restarting_child_->sendParentTerminateRequest();
+  EXPECT_EQ(hot_restarting_child_->getParentStats(), nullptr);
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffWhenProbeTimesOut) {
+  helper_->setParentProbeInterval(std::chrono::milliseconds(0));
+  {
+    testing::InSequence s;
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+      return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+    });
+    // The probe's blocking send times out: the parent is not draining its socket.
+    EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+      return Api::SysCallSizeResult{-1, EAGAIN};
+    });
+  }
+  parentNeverReplies();
+  testing::MockFunction<void()> drained_callback;
+  hot_restarting_child_->registerParentDrainedCallback(test_listener_addr_,
+                                                       drained_callback.AsStdFunction());
+
+  EXPECT_LOG_CONTAINS("error", "hot restart parent is unresponsive (its socket is full",
+                      EXPECT_EQ(hot_restarting_child_->getParentStats(), nullptr));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffWhenRequestSendTimesOut) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  EXPECT_LOG_CONTAINS("error", "the stats request could not be sent",
+                      EXPECT_EQ(hot_restarting_child_->getParentStats(), nullptr));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffWhenListenSocketRequestCannotBeSent) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  EXPECT_LOG_CONTAINS(
+      "error", "the listen socket request could not be sent",
+      EXPECT_EQ(hot_restarting_child_->duplicateParentListenSocket("udp://127.0.0.1:5678", 0, ""),
+                -1));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+  // Written off: later requests do not try the parent again.
+  EXPECT_EQ(hot_restarting_child_->duplicateParentListenSocket("udp://127.0.0.1:5678", 0, ""), -1);
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffWhenAdminShutdownCannotBeSent) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  });
+  EXPECT_LOG_CONTAINS("error", "the admin shutdown request could not be sent",
+                      EXPECT_FALSE(hot_restarting_child_->sendParentAdminShutdownRequest()));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+}
+
+TEST_F(HotRestartingChildWaitingForParentTest, AdminShutdownWithoutReplyReturnsNothing) {
+  helper_->setParentReplyTimeout(std::chrono::milliseconds(0));
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg),
+              envoy::HotRestartMessage::Request::kShutdownAdmin);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  parentNeverReplies();
+  EXPECT_LOG_CONTAINS("error", "hot restart parent is unresponsive (no reply within 0ms)",
+                      EXPECT_FALSE(hot_restarting_child_->sendParentAdminShutdownRequest()));
+  EXPECT_TRUE(helper_->parentUnresponsive());
+  EXPECT_FALSE(helper_->parentTerminated());
+}
+
+// A forwarded packet that cannot be handled while waiting is logged, and the wait goes on to the
+// parent's reply.
+TEST_F(HotRestartingChildWaitingForParentTest, LogsErrorServicingForwardedUdpWhileWaiting) {
+  envoy::HotRestartMessage bad;
+  auto* packet = bad.mutable_request()->mutable_forwarded_udp_packet();
+  packet->set_local_addr("udp://127.0.0.1:1234");
+  packet->set_peer_addr("/tmp/domainsocket");
+  packet->set_payload("hello");
+  forwarded_wire_ = FakeHotRestartingParent::serialize(bad);
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  parentRepliesOnlyAfterForwardIsRead();
+  EXPECT_CALL(mock_worker_router_, deliver(_, _)).Times(0);
+
+  std::unique_ptr<envoy::HotRestartMessage> reply;
+  EXPECT_LOG_CONTAINS("error",
+                      "error servicing forwarded udp packets while waiting for the hot restart "
+                      "parent",
+                      reply = hot_restarting_child_->getParentStats());
+  ASSERT_NE(reply, nullptr);
+  EXPECT_EQ(reply->reply().stats().gauges().at("parent.gauge"), 7);
+  EXPECT_FALSE(helper_->parentUnresponsive());
 }
 
 // A parent that does not send the listener address is matched on the packet's destination,

@@ -72,6 +72,19 @@ public:
   void mergeParentStats(Stats::Store& stats_store,
                         const envoy::HotRestartMessage::Reply::Stats& stats_proto);
 
+  // How long a request waits for the parent's reply before the parent is written off as
+  // unresponsive; see waitForParentReply().
+  static constexpr std::chrono::milliseconds PARENT_REPLY_TIMEOUT{30000};
+  // How often, while waiting for a reply, the parent's socket is probed to detect that the parent
+  // is gone (which a datagram socket does not otherwise report to the receiver).
+  static constexpr std::chrono::milliseconds PARENT_PROBE_INTERVAL{1000};
+  // After the terminate request: how often the child retries delivering it while the parent's
+  // socket is full, and then checks whether the parent has exited.
+  static constexpr std::chrono::milliseconds PARENT_EXIT_PROBE_INTERVAL{50};
+  // How long the child keeps the inherited UDP listeners paused waiting for the parent to receive
+  // the terminate request and exit, before taking them over regardless.
+  static constexpr std::chrono::milliseconds PARENT_EXIT_WAIT_CAP{2000};
+
 protected:
   absl::Status onSocketEventUdpForwarding();
   // Delivers a packet forwarded by the parent to the listener bound to `listener_address`, or to
@@ -84,10 +97,39 @@ protected:
 
 private:
   bool abortDueToFailedParentConnection();
+  // Waits for the parent's reply to the request just sent on the main stream. The wait is not a
+  // plain blocking receive: forwarded UDP packets keep being serviced meanwhile, since the parent
+  // forwards them from its main thread and stalls there when our socket is full -- the same main
+  // thread that has to produce the reply. It is bounded by PARENT_REPLY_TIMEOUT and by liveness
+  // probes every PARENT_PROBE_INTERVAL. Returns nullptr when no reply came, after writing the
+  // parent off (see onParentUnreachable) so no later request waits on it or consumes its late
+  // reply.
+  std::unique_ptr<envoy::HotRestartMessage> waitForParentReply();
+  // Stops all further request/reply exchanges with the parent: stats are no longer merged, new
+  // listeners bind their own sockets, and the parent is still told to terminate at the end of
+  // the drain period (that request needs no reply).
+  void onParentUnreachable(absl::string_view reason);
+  // The parent is definitely gone (its socket refuses our datagrams): there is nothing left to
+  // drain from, so complete the drains as sendParentTerminateRequest() would.
+  void onParentGone(absl::string_view reason);
+  // Runs every PARENT_EXIT_PROBE_INTERVAL after the terminate request until the parent has exited
+  // or PARENT_EXIT_WAIT_CAP has passed: resends the request while it has not been delivered, then
+  // probes for the parent's exit. Completes the drains at the end.
+  void onParentExitTimer();
   friend class HotRestartUdpForwardingTestHelper;
   absl::Mutex registry_mu_;
   const int restart_epoch_;
   bool parent_terminated_;
+  // Set once the parent failed to answer a request in time; see onParentUnreachable().
+  bool parent_unresponsive_{false};
+  std::chrono::milliseconds parent_reply_timeout_{PARENT_REPLY_TIMEOUT};
+  std::chrono::milliseconds parent_probe_interval_{PARENT_PROBE_INTERVAL};
+  std::chrono::milliseconds parent_exit_probe_interval_{PARENT_EXIT_PROBE_INTERVAL};
+  std::chrono::milliseconds parent_exit_wait_cap_{PARENT_EXIT_WAIT_CAP};
+  Event::TimerPtr parent_exit_timer_;
+  // Whether the parent's socket has accepted the terminate request.
+  bool terminate_delivered_{false};
+  std::chrono::steady_clock::time_point parent_exit_wait_start_; // NO_CHECK_FORMAT(real_time)
   bool parent_drained_ ABSL_GUARDED_BY(registry_mu_);
   const bool skip_hot_restart_on_no_parent_;
   const bool skip_parent_stats_;

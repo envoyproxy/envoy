@@ -28,6 +28,9 @@ Server related statistics are rooted at *server.* with following statistics:
   seconds_until_first_ocsp_response_expiring, Gauge, Number of seconds until the next OCSP response being managed will expire
   hot_restart_epoch, Gauge, Current hot restart epoch -- an integer passed via command line flag ``--restart-epoch`` usually indicating generation.
   hot_restart_generation, Gauge, Current hot restart generation -- like hot_restart_epoch but computed automatically by incrementing from parent.
+  hot_restart_udp_forwarding_datagrams, Counter, Datagrams of UDP packets this (parent) instance forwarded to its hot restart child while draining.
+  hot_restart_udp_forwarding_retries, Counter, Times forwarding to the hot restart child found the child's socket full and was retried shortly after.
+  hot_restart_udp_forwarding_dropped, Counter, Forwarded UDP datagrams dropped because the forwarding queue was full or the hot restart child was gone.
   initialization_time_ms, Histogram, Total time taken for Envoy initialization in milliseconds. This is the time from server start-up until the worker threads are ready to accept new connections
   debug_assertion_failures, Counter, Number of debug assertion failures detected in a release build if compiled with ``--define log_debug_assert_in_release=enabled`` or zero otherwise
   envoy_bug_failures, Counter, Number of Envoy bug failures detected in a release build. File or report the issue if this increments as this may be serious.

@@ -60,8 +60,37 @@ HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch,
 void HotRestartingParent::sendHotRestartMessage(envoy::HotRestartMessage&& msg) {
   ASSERT(dispatcher_.has_value());
   dispatcher_->post([this, msg = std::move(msg)]() {
-    udp_forwarding_rpc_stream_.sendHotRestartMessage(child_address_udp_forwarding_, std::move(msg));
+    if (!udp_forwarding_rpc_stream_.queueHotRestartMessage(child_address_udp_forwarding_, msg)) {
+      udp_forwarding_dropped_->inc();
+      ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(5),
+                         "hot restart udp forwarding queue is full ({} bytes in {} datagrams); "
+                         "dropping forwarded packets",
+                         udp_forwarding_rpc_stream_.sendQueueBytes(),
+                         udp_forwarding_rpc_stream_.sendQueueDatagrams());
+      return;
+    }
+    flushUdpForwarding();
   });
+}
+
+void HotRestartingParent::flushUdpForwarding() {
+  const uint64_t queued_before = udp_forwarding_rpc_stream_.sendQueueDatagrams();
+  const bool flushed = udp_forwarding_rpc_stream_.flushSendQueue();
+  const uint64_t queued_after = udp_forwarding_rpc_stream_.sendQueueDatagrams();
+  if (flushed) {
+    // Either everything went, or the stream dropped its queue on a fatal send error.
+    udp_forwarding_datagrams_->add(queued_before - queued_after -
+                                   udp_forwarding_rpc_stream_.lastFlushDropped());
+    udp_forwarding_dropped_->add(udp_forwarding_rpc_stream_.lastFlushDropped());
+    return;
+  }
+  udp_forwarding_datagrams_->add(queued_before - queued_after);
+  udp_forwarding_retries_->inc();
+  // The child's socket is full; retry once it has had a moment to drain it. After shutdown()
+  // there is no timer any more: whatever is still queued is dropped with the stream.
+  if (udp_forwarding_retry_timer_ != nullptr) {
+    udp_forwarding_retry_timer_->enableTimer(UDP_FORWARDING_RETRY_INTERVAL);
+  }
 }
 
 // Network::NonDispatchedUdpPacketHandler
@@ -93,6 +122,15 @@ void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Inst
         return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  udp_forwarding_retry_timer_ = dispatcher.createTimer([this]() { flushUdpForwarding(); });
+  // As with hotRestartGeneration(): created once, here, with dynamic names.
+  Stats::Scope& scope = *server.stats().rootScope();
+  udp_forwarding_datagrams_ = &Stats::Utility::counterFromElements(
+      scope, {Stats::DynamicName("server.hot_restart_udp_forwarding_datagrams")});
+  udp_forwarding_retries_ = &Stats::Utility::counterFromElements(
+      scope, {Stats::DynamicName("server.hot_restart_udp_forwarding_retries")});
+  udp_forwarding_dropped_ = &Stats::Utility::counterFromElements(
+      scope, {Stats::DynamicName("server.hot_restart_udp_forwarding_dropped")});
   dispatcher_ = dispatcher;
   internal_ = std::make_unique<Internal>(&server, *this);
 }
@@ -152,7 +190,10 @@ void HotRestartingParent::onSocketEvent() {
   }
 }
 
-void HotRestartingParent::shutdown() { socket_event_.reset(); }
+void HotRestartingParent::shutdown() {
+  socket_event_.reset();
+  udp_forwarding_retry_timer_.reset();
+}
 
 HotRestartingParent::Internal::Internal(Server::Instance* server,
                                         HotRestartMessageSender& udp_sender)
