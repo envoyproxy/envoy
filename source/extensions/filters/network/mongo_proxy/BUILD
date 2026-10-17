@@ -80,6 +80,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
+        "//source/common/stats:symbol_table_lib",
         "//source/extensions/filters/common/fault:fault_config_lib",
         "//source/extensions/filters/network:well_known_names",
     ],
@@ -92,8 +93,10 @@ envoy_cc_library(
     deps = [
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/config:well_known_names",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

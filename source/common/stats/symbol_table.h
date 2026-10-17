@@ -33,6 +33,7 @@ class StatNameSet;
 using StatNameSetPtr = std::unique_ptr<StatNameSet>;
 using StatNameTag = std::pair<StatName, StatName>;
 using StatNameTagSpan = absl::Span<const StatNameTag>;
+using StatNameSpan = absl::Span<const StatName>;
 
 /**
  * Holds a range of indexes indicating which parts of a stat-name are
