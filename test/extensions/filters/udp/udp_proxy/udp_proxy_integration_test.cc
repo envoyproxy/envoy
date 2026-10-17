@@ -22,6 +22,22 @@ using testing::Ge;
 namespace Envoy {
 namespace {
 
+bool dualStackUdpIsBindable() {
+  const auto address = Network::Test::getAnyAddress(Network::Address::IpVersion::v6, true);
+  auto& syscalls = Api::OsSysCallsSingleton::get();
+  const auto fd = syscalls.socket(AF_INET6, SOCK_DGRAM, 0).return_value_;
+  if (!SOCKET_VALID(fd)) {
+    return false;
+  }
+  const int v6only = 0;
+  const bool supported =
+      syscalls.setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)).return_value_ ==
+          0 &&
+      syscalls.bind(fd, address->sockAddr(), address->sockAddrLen()).return_value_ == 0;
+  syscalls.close(fd);
+  return supported;
+}
+
 class UdpReverseFilter : public Network::UdpListenerReadFilter {
 public:
   UdpReverseFilter(Network::UdpReadFilterCallbacks& callbacks) : UdpListenerReadFilter(callbacks) {}
@@ -325,6 +341,30 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address);
+}
+
+TEST_P(UdpProxyIntegrationTest, DualStackListenerRepliesToIpv4Client) {
+  if (version_ != Network::Address::IpVersion::v4) {
+    GTEST_SKIP() << "This regression requires an IPv4 client and upstream.";
+  }
+  if (!dualStackUdpIsBindable()) {
+    GTEST_SKIP() << "An IPv6 UDP socket with IPV6_V6ONLY=0 cannot bind [::]:0.";
+  }
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* address = bootstrap.mutable_static_resources()
+                        ->mutable_listeners(0)
+                        ->mutable_address()
+                        ->mutable_socket_address();
+    address->set_address("::");
+    address->set_ipv4_compat(true);
+  });
+  setup(1);
+  const auto listener_address =
+      *Network::Utility::resolveUrl(fmt::format("udp://127.0.0.1:{}", lookupPort("listener_0")));
+  // This helper checks both payloads, the IPv4 reply endpoint and transmit counters.
+  // The reply uses the original IPv6 listener fd and the normalized IPv4 peer.
+  requestResponseWithListenerAddress(*listener_address);
+  EXPECT_EQ(0, test_server_->counter("udp.foo.downstream_sess_tx_errors")->value());
 }
 
 TEST_P(UdpProxyIntegrationTest, UpstreamBindConfigSourceAddress) {
