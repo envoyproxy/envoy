@@ -132,6 +132,9 @@ public:
               (const absl::flat_hash_set<std::string>& update_to_these_names));
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const absl::flat_hash_set<std::string>& add_these_names));
+  MOCK_METHOD(void, requestOnDemandUpdate,
+              (const absl::flat_hash_set<std::string>& add_these_names,
+               const absl::flat_hash_set<std::string>& remove_these_names));
   MOCK_METHOD(void, accept, (const absl::flat_hash_set<std::string>& patterns));
 };
 

@@ -100,14 +100,17 @@ public:
   AddedRemoved updateWatchInterest(Watch* watch,
                                    const absl::flat_hash_set<std::string>& update_to_these_names);
 
-  // Additive counterpart to updateWatchInterest(): adds 'resources_to_add' to the watch's interest
-  // without disturbing the names it already watches. Returns, in added_, the names that are new
-  // across the entire subscription (the caller should subscribe to these); removed_ is always
-  // empty. A name of the form "<prefix>/*" registers a suffix-glob interest: the watch will then
-  // receive every resource named "<prefix>/<id>". This is how a watch can accept resources that
-  // were not named at addWatch() time (e.g. on-demand or VHDS virtual hosts).
-  AddedRemoved appendWatchInterest(Watch* watch,
-                                   const absl::flat_hash_set<std::string>& resources_to_add);
+  // Incremental counterpart to updateWatchInterest(): adds 'resources_to_add' and/or removes
+  // 'resources_to_remove' from the watch's interest without disturbing the remaining names it
+  // already watches. Returns, in added_, the names that are new across the entire subscription (the
+  // caller should subscribe to these) and, in removed_, the names that no watch is interested in
+  // anymore (the caller should unsubscribe from these). A name of the form "<prefix>/*" registers a
+  // suffix-glob interest: the watch will then receive every resource named "<prefix>/<id>". This is
+  // how a watch can accept resources that were not named at addWatch() time (e.g. on-demand or VHDS
+  // virtual hosts).
+  AddedRemoved
+  appendWatchInterest(Watch* watch, const absl::flat_hash_set<std::string>& resources_to_add,
+                      const absl::flat_hash_set<std::string>& resources_to_remove = {});
 
   // Declares the routing-acceptance patterns for the given watch (replacing any previously declared
   // patterns). These are evaluated FIRST and take precedence: a watch that has declared any accept

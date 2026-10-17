@@ -42,6 +42,23 @@ TEST_P(DeltaSubscriptionImplTest, UpdateResourcesCausesRequest) {
   subscription_->updateResourceInterest({"name4"});
 }
 
+TEST_P(DeltaSubscriptionImplTest, RequestOnDemandUpdate) {
+  startSubscription({"name1", "name2"});
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({"name3"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->requestOnDemandUpdate({"name3"});
+  EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({"name4"}, {"name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->requestOnDemandUpdate({"name4"}, {"name3"});
+  EXPECT_TRUE(statsAre(3, 0, 0, 0, 0, 0, 0, ""));
+
+  expectSendMessage({}, {"name4"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
+  subscription_->requestOnDemandUpdate({}, {"name4"});
+  EXPECT_TRUE(statsAre(4, 0, 0, 0, 0, 0, 0, ""));
+}
+
 // Checks that after a pause(), no requests are sent until resume().
 // Also demonstrates the collapsing of subscription interest updates into a single
 // request. (This collapsing happens any time multiple updates arrive before a request

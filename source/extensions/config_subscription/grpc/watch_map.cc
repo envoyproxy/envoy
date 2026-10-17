@@ -138,18 +138,28 @@ WatchMap::updateWatchInterest(Watch* watch,
 
 AddedRemoved
 WatchMap::appendWatchInterest(Watch* watch,
-                              const absl::flat_hash_set<std::string>& resources_to_add) {
+                              const absl::flat_hash_set<std::string>& resources_to_add,
+                              const absl::flat_hash_set<std::string>& resources_to_remove) {
   absl::flat_hash_set<std::string> newly_added_to_watch;
   for (const auto& name : resources_to_add) {
-    if (watch->resource_names_.insert(name).second) {
+    if (!resources_to_remove.contains(name) && watch->resource_names_.insert(name).second) {
       newly_added_to_watch.insert(name);
+    }
+  }
+
+  absl::flat_hash_set<std::string> newly_removed_from_watch;
+  for (const auto& name : resources_to_remove) {
+    if (watch->resource_names_.erase(name) > 0) {
+      newly_removed_from_watch.insert(name);
     }
   }
 
   updateWildcardWatches(watch);
 
   absl::flat_hash_set<std::string> added_resources = findAdditions(newly_added_to_watch, watch);
-  return {std::move(added_resources), {}};
+  absl::flat_hash_set<std::string> removed_resources =
+      findRemovals(newly_removed_from_watch, watch);
+  return {std::move(added_resources), std::move(removed_resources)};
 }
 
 void WatchMap::accept(Watch* watch, const absl::flat_hash_set<std::string>& patterns) {

@@ -822,6 +822,19 @@ TEST(WatchMapTest, AppendWatchInterest) {
     expectDeltaUpdate(callbacks, expected_resources, {}, "version1");
     doDeltaUpdate(watch_map, updated_resources, {}, "version1");
   }
+  {
+    // Appending Dave while removing Bob and an untracked name (Eve) reports Dave in added_ and Bob
+    // in removed_.
+    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {"dave"}, {"bob", "eve"});
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"dave"}), added_removed.added_);
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"bob"}), added_removed.removed_);
+  }
+  {
+    // Removing Carol without adding anything reports Carol in removed_.
+    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {}, {"carol"});
+    EXPECT_TRUE(added_removed.added_.empty());
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"carol"}), added_removed.removed_);
+  }
 }
 
 // accept() registers glob interest that affects routing only: the watch receives

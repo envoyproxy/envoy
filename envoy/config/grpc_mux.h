@@ -67,6 +67,16 @@ public:
   virtual void append(const absl::flat_hash_set<std::string>& resources) PURE;
 
   /**
+   * Modifies the set of resources the watch is interested in by adding and/or removing resources,
+   * without disturbing the remaining resources it already watches. This updates BOTH the
+   * watch-level routing and the subscription sent to the management server.
+   * @param resources_to_add set of resource names to additionally watch for and subscribe to.
+   * @param resources_to_remove set of resource names to stop watching and unsubscribe from.
+   */
+  virtual void append(const absl::flat_hash_set<std::string>& resources_to_add,
+                      const absl::flat_hash_set<std::string>& resources_to_remove) = 0;
+
+  /**
    * Declares the resource-name patterns this watch ACCEPTS for routing. This affects routing ONLY
    * and never changes the subscription sent to the management server (that is driven solely by
    * update()/append()).

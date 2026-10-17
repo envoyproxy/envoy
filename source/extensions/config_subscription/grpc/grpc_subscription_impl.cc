@@ -66,12 +66,19 @@ void GrpcSubscriptionImpl::updateResourceInterest(
 }
 
 void GrpcSubscriptionImpl::requestOnDemandUpdate(
-    const absl::flat_hash_set<std::string>& for_update) {
-  // Additionally add the on-demand resources to this subscription's watch. This updates both the
-  // watch-map routing (so the response is delivered to our callbacks) and the subscription sent to
-  // the management server (so it is fetched). Without the watch-map update, a resource that was not
-  // named at start() time would match no watch and its update would be silently dropped.
-  watch_->append(for_update);
+    const absl::flat_hash_set<std::string>& add_these_names) {
+  requestOnDemandUpdate(add_these_names, {});
+}
+
+void GrpcSubscriptionImpl::requestOnDemandUpdate(
+    const absl::flat_hash_set<std::string>& add_these_names,
+    const absl::flat_hash_set<std::string>& remove_these_names) {
+  // Additionally add/remove the on-demand resources on this subscription's watch. This updates both
+  // the watch-map routing (so the response is delivered to our callbacks) and the subscription sent
+  // to the management server (so it is fetched/unsubscribed). Without the watch-map update, a
+  // resource that was not named at start() time would match no watch and its update would be
+  // silently dropped.
+  watch_->append(add_these_names, remove_these_names);
   stats_.update_attempt_.inc();
 }
 
