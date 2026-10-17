@@ -6015,6 +6015,159 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseWithErrorBeforeClient) {
   ASSERT_EQ("400", response->headers().getStatusValue());
 }
 
+// The tests below cover an H/1 upstream that completes its response before the request is complete,
+// on an upstream connection that a previous request completed on, with
+// allow_multiplexed_upstream_half_close enabled. The upstream codec must reset the stream as it
+// does on a fresh connection. Otherwise the router keeps a request encoder that the connection pool
+// frees, and the late request body or the downstream close uses it.
+TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientOnReusedH1UpstreamWithLateBody) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  initialize();
+
+  // Complete a request so that the upstream connection is idle in the pool and is reused.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto first = codec_client_->makeRequestWithBody(default_request_headers_, 5);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(first->waitForEndStream());
+
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    codec_client_->close();
+    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+    ASSERT_TRUE(tcp_client->write(
+        "POST / HTTP/1.1\r\nHost: sni.lyft.com\r\ncontent-length: 5\r\n\r\n", false, false));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    // H/1 upstream always causes the stream to be closed if it responds before downstream.
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    tcp_client->waitForData("\r\n\r\n", false);
+    EXPECT_THAT(tcp_client->data(), testing::StartsWith("HTTP/1.1 200 OK\r\n"));
+    ASSERT_TRUE(tcp_client->write("hello", false, false));
+    tcp_client->waitForDisconnect();
+  } else {
+    auto encoder_decoder =
+        codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "sni.lyft.com"},
+                                                                   {"content-length", "5"}});
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    // Envoy may have reset the downstream stream after the upstream reset. The client only
+    // processes that reset while it waits, so the encoder is still valid if no reset was seen.
+    if (!response->reset()) {
+      codec_client_->sendData(*request_encoder_, 5, true);
+    }
+    ASSERT_TRUE(response->waitForReset());
+  }
+  fake_upstream_connection_.reset();
+
+  // Envoy is still serving requests.
+  IntegrationCodecClientPtr client = makeHttpConnection(lookupPort("http"));
+  auto response = client->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  client->close();
+}
+
+// Same as above, but the downstream closes the connection instead of sending the request body.
+TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientOnReusedH1UpstreamWithDownstreamClose) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  initialize();
+
+  // Complete a request so that the upstream connection is idle in the pool and is reused.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto first = codec_client_->makeRequestWithBody(default_request_headers_, 5);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(first->waitForEndStream());
+
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    codec_client_->close();
+    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+    ASSERT_TRUE(tcp_client->write(
+        "POST / HTTP/1.1\r\nHost: sni.lyft.com\r\ncontent-length: 5\r\n\r\n", false, false));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    tcp_client->waitForData("\r\n\r\n", false);
+    EXPECT_THAT(tcp_client->data(), testing::StartsWith("HTTP/1.1 200 OK\r\n"));
+    tcp_client->waitForDisconnect();
+    tcp_client->close();
+  } else {
+    auto encoder_decoder =
+        codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "sni.lyft.com"},
+                                                                   {"content-length", "5"}});
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    ASSERT_TRUE(response->waitForReset());
+    codec_client_->close();
+  }
+  fake_upstream_connection_.reset();
+
+  // Envoy is still serving requests.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Positive control for the tests above: complete requests keep reusing the H/1 upstream connection
+// with allow_multiplexed_upstream_half_close enabled.
+TEST_P(ProtocolIntegrationTest, CompleteRequestsReuseH1UpstreamWithHalfCloseEnabled) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (int i = 0; i < 3; ++i) {
+    auto response = codec_client_->makeRequestWithBody(default_request_headers_, 5);
+    if (i == 0) {
+      waitForNextUpstreamRequest();
+    } else {
+      ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    }
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_TRUE(fake_upstream_connection_->connected());
+}
+
 // Same as above but with data sent after the error response.
 // Note the behavior is the same as when the allow_multiplexed_upstream_half_close is false.
 TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedResponseData) {

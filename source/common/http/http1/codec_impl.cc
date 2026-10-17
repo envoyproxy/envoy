@@ -1494,6 +1494,8 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   pending_response_.emplace(*this, std::move(bytes_meter_before_stream_),
                             response_decoder.createResponseDecoderHandle());
   pending_response_done_ = false;
+  // encode_complete_ describes the request of this stream, not an earlier one on the connection.
+  encode_complete_ = false;
   return pending_response_.value().encoder_;
 }
 
