@@ -1,6 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/common/key_value/v3/config.pb.validate.h"
+#include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -46,7 +48,9 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig
 )EOF",
                                            filename);
-    config_helper_.prependFilter(filter);
+    if (!use_upstream_filter_) {
+      config_helper_.prependFilter(filter);
+    }
 
     // Set resource tracking on connection pools so we can explicitly check when
     // they're created and torn down.
@@ -81,6 +85,31 @@ typed_config:
             MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(protocol_options);
         http_protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(false);
         std::ignore = protocol_options.PackFrom(http_protocol_options);
+      });
+    }
+
+    if (use_upstream_filter_) {
+      // Add the filter to the cluster's upstream HTTP filter chain, ahead of the
+      // upstream codec, which must stay last.
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+        ConfigHelper::HttpProtocolOptions protocol_options =
+            MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+                (*cluster->mutable_typed_extension_protocol_options())
+                    ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+        auto* alt_svc = protocol_options.add_http_filters();
+        alt_svc->set_name("envoy.filters.http.alternate_protocols_cache");
+        std::ignore = alt_svc->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig::
+                default_instance());
+        auto* upstream_codec = protocol_options.add_http_filters();
+        upstream_codec->set_name("envoy.filters.http.upstream_codec");
+        std::ignore = upstream_codec->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
+                default_instance());
+        std::ignore = (*cluster->mutable_typed_extension_protocol_options())
+                          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                              .PackFrom(protocol_options);
       });
     }
 
@@ -153,6 +182,9 @@ typed_config:
   bool write_alt_svc_to_file_ = false;
   // If this is set to true, the upstream host has a hostname and the cluster sets `auto_host_sni`.
   bool auto_host_sni_ = false;
+  // If this is set to true, the filter runs in the cluster's upstream HTTP filter
+  // chain instead of the downstream HTTP filter chain.
+  bool use_upstream_filter_ = false;
 };
 
 TEST_P(FilterIntegrationTest, AltSvc) {
@@ -220,6 +252,42 @@ TEST_P(FilterIntegrationTest, AltSvcWithAutoHostSni) {
       sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0, 1);
   checkSimpleRequestSuccess(0, 0, response2.get());
   EXPECT_EQ("upstream.lyft.com", upstreamSni());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
+}
+
+TEST_P(FilterIntegrationTest, AltSvcUpstreamFilter) {
+  use_upstream_filter_ = true;
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},       {":path", "/test/long/url"},
+      {":scheme", "http"},       {":authority", "sni.lyft.com"},
+      {"x-lyft-user-id", "123"}, {"x-forwarded-for", "10.0.0.1"}};
+  int port = fake_upstreams_[1]->localAddress()->ip()->port();
+  std::string alt_svc = absl::StrCat("h3=\":", port, "\"; ma=86400");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"alt-svc", alt_svc}};
+
+  // First request goes over HTTP/2 and the upstream response's Alt-Svc is cached by the
+  // upstream filter.
+  auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                response_size, 0, timeout);
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
+
+  // Close the HTTP/2 connection so it will not be reused.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http2_total", Eq(1));
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Eq(1));
+  fake_upstream_connection_.reset();
+
+  // Second request should go over HTTP/3 because of the cached Alt-Svc information.
+  auto response2 = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
+                                                 response_size, 1, timeout);
+  checkSimpleRequestSuccess(request_size, response_size, response2.get());
   test_server_->waitForCounter("cluster.cluster_0.upstream_cx_http3_total", Eq(1));
 }
 
