@@ -163,7 +163,7 @@ absl::Status XdsManagerImpl::initialize(const envoy::config::bootstrap::v3::Boot
 
   subscription_factory_ = std::make_unique<SubscriptionFactoryImpl>(
       local_info_, main_thread_dispatcher_, *cm_, validation_context_.dynamicValidationVisitor(),
-      api_, server_, xds_resources_delegate, xds_config_tracker);
+      api_, server_, *this, xds_resources_delegate, xds_config_tracker);
   return absl::OkStatus();
 }
 

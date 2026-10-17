@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -318,7 +320,11 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       graceful_grpc_close_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_graceful_grpc_close")),
       allow_content_length_header_(config.allow_content_length_header()),
-      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)) {
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)),
+      max_streamed_body_chunk_size_(
+          config.has_max_streamed_body_chunk_size()
+              ? std::make_optional(config.max_streamed_body_chunk_size().value())
+              : std::nullopt) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -666,6 +672,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(
       emit_client_span_(config.overrides().has_emit_client_span()
                             ? std::optional<bool>(config.overrides().emit_client_span().value())
                             : std::nullopt),
+      max_streamed_body_chunk_size_(
+          config.overrides().has_max_streamed_body_chunk_size()
+              ? std::make_optional(config.overrides().max_streamed_body_chunk_size().value())
+              : std::nullopt),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
 
@@ -702,6 +712,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       emit_client_span_(more_specific.emitClientSpan().has_value()
                             ? more_specific.emitClientSpan()
                             : less_specific.emitClientSpan()),
+      max_streamed_body_chunk_size_(more_specific.maxStreamedBodyChunkSize().has_value()
+                                        ? more_specific.maxStreamedBodyChunkSize()
+                                        : less_specific.maxStreamedBodyChunkSize()),
       processing_request_modifier_factory_cb_(
           more_specific.processing_request_modifier_factory_cb_
               ? more_specific.processing_request_modifier_factory_cb_
@@ -1005,19 +1018,11 @@ FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffe
     break;
   }
 
-  ProcessingRequest req = setupBodyChunk(state, data, end_stream);
-  if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
-    state.enqueueStreamingChunk(data, end_stream);
-  } else {
-    // For FULL_DUPLEX_STREAMED mode, just drain the data.
-    data.drain(data.length());
-  }
   // If the current state is HeadersCallback, stays in that state.
-  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
-  } else {
-    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
-  }
+  auto cb_state = state.callbackState() == ProcessorState::CallbackState::HeadersCallback
+                      ? ProcessorState::CallbackState::HeadersCallback
+                      : ProcessorState::CallbackState::StreamedBodyCallback;
+  sendStreamedBodyChunk(state, data, cb_state, end_stream);
   return state.getBodyCallbackResultInStreamedMode(end_stream);
 }
 
@@ -1465,6 +1470,37 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
                              new_state, true);
   sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
+}
+
+void Filter::sendStreamedBodyChunk(ProcessorState& state, Buffer::Instance& data,
+                                   ProcessorState::CallbackState new_state, bool end_stream) {
+  if (!max_streamed_body_chunk_size_.has_value() ||
+      data.length() < *max_streamed_body_chunk_size_) {
+    auto req = setupBodyChunk(state, data, end_stream);
+    if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
+      state.enqueueStreamingChunk(data, end_stream);
+    } else {
+      // For FULL_DUPLEX_STREAMED mode, just drain the data.
+      data.drain(data.length());
+    }
+    sendBodyChunk(state, new_state, req);
+    return;
+  }
+
+  while (data.length() > 0) {
+    const uint64_t chunk_length =
+        std::min(static_cast<uint64_t>(*max_streamed_body_chunk_size_), data.length());
+    Buffer::OwnedImpl chunk_buffer;
+    // Incrementally drain data buffer.
+    chunk_buffer.move(data, chunk_length);
+    const bool chunk_end_stream = (data.length() == 0) ? end_stream : false;
+
+    auto req = setupBodyChunk(state, chunk_buffer, chunk_end_stream);
+    if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
+      state.enqueueStreamingChunk(chunk_buffer, chunk_end_stream);
+    }
+    sendBodyChunk(state, new_state, req);
+  }
 }
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
@@ -2334,6 +2370,12 @@ void Filter::mergePerRouteConfig() {
     ENVOY_STREAM_LOG(trace, "Setting new emitClientSpan from per-route configuration",
                      *decoder_callbacks_);
     emit_client_span_ = merged_config->emitClientSpan().value();
+  }
+
+  if (merged_config->maxStreamedBodyChunkSize().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting new maxStreamedBodyChunkSize from per-route configuration",
+                     *decoder_callbacks_);
+    max_streamed_body_chunk_size_ = merged_config->maxStreamedBodyChunkSize().value();
   }
 
   if (merged_config->hasProcessingRequestModifierConfig()) {
