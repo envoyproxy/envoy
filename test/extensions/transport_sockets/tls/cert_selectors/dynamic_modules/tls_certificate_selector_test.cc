@@ -396,13 +396,13 @@ TEST_F(DynamicModuleTlsCertificateSelectorTest, FindTlsContextIsNotImplemented) 
                "not implemented");
 }
 
-TEST_F(DynamicModuleTlsCertificateSelectorTest, DefaultLetsEnvoySelectByServerName) {
+TEST_F(DynamicModuleTlsCertificateSelectorTest, PassThroughLetsEnvoySelectByServerName) {
   initializeDownstream("tls_certificate_selector_dynamic");
   // The module serves the first certificate for this name, which Envoy would not select.
   EXPECT_EQ(&server_context_->getTlsContexts()[0], selectDownstream("lyft2.com").selected_ctx);
   EXPECT_EQ(&server_context_->getTlsContexts()[1], selectDownstream("www.lyft2.com").selected_ctx);
   EXPECT_EQ(1U, counterValue("dynamicmodulescustom.selected.outcome.configured"));
-  EXPECT_EQ(1U, counterValue("dynamicmodulescustom.selected.outcome.default"));
+  EXPECT_EQ(1U, counterValue("dynamicmodulescustom.selected.outcome.passthrough"));
 }
 
 TEST_F(DynamicModuleTlsCertificateSelectorTest, DynamicCertificatesNotAllowed) {
@@ -883,7 +883,7 @@ TEST_F(DynamicModuleTlsCertificateSelectorTest, UpstreamSelectsCertificateByServ
   EXPECT_FALSE(result.staple);
 }
 
-TEST_F(DynamicModuleTlsCertificateSelectorTest, UpstreamDefaultServesFirstCertificate) {
+TEST_F(DynamicModuleTlsCertificateSelectorTest, UpstreamPassThroughServesFirstCertificate) {
   UpstreamTlsContext tls_context;
   addCertificate(*tls_context.mutable_common_tls_context(), "server");
   addCertificate(*tls_context.mutable_common_tls_context(), "server2");
@@ -1198,7 +1198,7 @@ TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest, DownstreamFactoryCr
   ASSERT_TRUE(factory.ok());
   EXPECT_TRUE((*factory)->onConfigUpdate().ok());
 
-  // The selector serves the Default outcome with the default certificate selection.
+  // The selector serves the PassThrough outcome with the default certificate selection.
   auto selector = (*factory)->create(*server_context_);
   ASSERT_EQ(1, SSL_set_tlsext_host_name(ssl_.get(), "www.lyft2.com"));
   SSL_CLIENT_HELLO client_hello{};

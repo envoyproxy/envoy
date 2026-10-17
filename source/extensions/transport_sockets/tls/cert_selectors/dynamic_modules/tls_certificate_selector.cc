@@ -453,6 +453,12 @@ DynamicModuleTlsCertificateSelector::selectCertificate(TlsCertificateSelectionCo
   envoy_dynamic_module_type_module_buffer certificate_name = {nullptr, 0};
   switch (
       config_->on_select_(in_module_selector_, &context, &certificate_index, &certificate_name)) {
+  case envoy_dynamic_module_type_tls_certificate_selector_status_PassThrough:
+    if (default_selector_ != nullptr) {
+      return default_selector_->selectTlsContext(*context.client_hello, std::move(cb));
+    }
+    // Without a custom selector, an upstream TLS context uses its first certificate.
+    return serveTlsContext(tls_contexts_.front(), client_ocsp_capable, ocsp_staple_policy_);
   case envoy_dynamic_module_type_tls_certificate_selector_status_Configured:
     if (certificate_index >= tls_contexts_.size()) {
       ENVOY_LOG(debug,
@@ -466,12 +472,6 @@ DynamicModuleTlsCertificateSelector::selectCertificate(TlsCertificateSelectionCo
   case envoy_dynamic_module_type_tls_certificate_selector_status_Dynamic:
     return config_->selectDynamicCertificate({certificate_name.ptr, certificate_name.length},
                                              client_ocsp_capable, std::move(cb));
-  case envoy_dynamic_module_type_tls_certificate_selector_status_Default:
-    if (default_selector_ != nullptr) {
-      return default_selector_->selectTlsContext(*context.client_hello, std::move(cb));
-    }
-    // Without a custom selector, an upstream TLS context uses its first certificate.
-    return serveTlsContext(tls_contexts_.front(), client_ocsp_capable, ocsp_staple_policy_);
   case envoy_dynamic_module_type_tls_certificate_selector_status_Failed:
     break;
   }

@@ -13335,19 +13335,24 @@ typedef void* envoy_dynamic_module_type_tls_certificate_selector_config_schedule
 /**
  * envoy_dynamic_module_type_tls_certificate_selector_status is returned by
  * envoy_dynamic_module_on_tls_certificate_selector_select to report which certificate Envoy uses.
+ *
+ * There is no 1:1 C++ enum. Envoy maps this onto Ssl::SelectionResult::SelectionStatus in
+ * envoy/ssl/handshaker.h after it serves the chosen certificate: Configured and PassThrough become
+ * Success or Failed, Dynamic becomes Pending when the handshake waits for a certificate the module
+ * has not provided yet and Success or Failed otherwise, and Failed becomes Failed.
  */
 typedef enum envoy_dynamic_module_type_tls_certificate_selector_status {
+  // Let Envoy select the certificate as it does without a custom selector. For a downstream TLS
+  // context this is DefaultTlsCertificateSelector, which matches the server name and the key type,
+  // and for an upstream TLS context it is the first configured certificate.
+  envoy_dynamic_module_type_tls_certificate_selector_status_PassThrough = 0,
   // Envoy uses the configured certificate at certificate_index.
-  envoy_dynamic_module_type_tls_certificate_selector_status_Configured = 0,
+  envoy_dynamic_module_type_tls_certificate_selector_status_Configured = 1,
   // Envoy uses the dynamic certificate named by certificate_name. When the module has not provided
   // it yet, the handshake waits for it if the module implements
   // envoy_dynamic_module_on_tls_certificate_selector_config_certificate_requested, and fails
   // otherwise. When allow_dynamic_certificates is not set, the handshake fails.
-  envoy_dynamic_module_type_tls_certificate_selector_status_Dynamic = 1,
-  // Envoy selects the certificate as it does without a custom selector. For a downstream TLS
-  // context it matches the server name and the key type, and for an upstream TLS context it uses
-  // the first configured certificate.
-  envoy_dynamic_module_type_tls_certificate_selector_status_Default = 2,
+  envoy_dynamic_module_type_tls_certificate_selector_status_Dynamic = 2,
   // Envoy fails the handshake.
   envoy_dynamic_module_type_tls_certificate_selector_status_Failed = 3,
 } envoy_dynamic_module_type_tls_certificate_selector_status;

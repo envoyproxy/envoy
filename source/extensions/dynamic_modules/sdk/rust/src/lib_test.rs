@@ -4857,7 +4857,7 @@ fn test_tls_certificate_selector_new_and_destroy() {
       &self,
       _context: &tls_certificate_selector::TlsCertificateSelectionContext,
     ) -> tls_certificate_selector::TlsCertificateSelection {
-      tls_certificate_selector::TlsCertificateSelection::Default
+      tls_certificate_selector::TlsCertificateSelection::PassThrough
     }
   }
 
@@ -4901,6 +4901,13 @@ fn test_tls_certificate_selector_selections() {
   use tls_certificate_selector::TlsCertificateSelection;
   let context_envoy_ptr = std::ptr::null_mut();
 
+  let (status, ..) =
+    select_with_tls_certificate_selector(TlsCertificateSelection::PassThrough, context_envoy_ptr);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::PassThrough
+  );
+
   let (status, certificate_index, _) =
     select_with_tls_certificate_selector(TlsCertificateSelection::Configured(1), context_envoy_ptr);
   assert_eq!(
@@ -4919,13 +4926,6 @@ fn test_tls_certificate_selector_selections() {
     abi::envoy_dynamic_module_type_tls_certificate_selector_status::Dynamic
   );
   assert_eq!(certificate_name, b"dynamic.lyft.com");
-
-  let (status, ..) =
-    select_with_tls_certificate_selector(TlsCertificateSelection::Default, context_envoy_ptr);
-  assert_eq!(
-    status,
-    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Default
-  );
 
   let (status, ..) =
     select_with_tls_certificate_selector(TlsCertificateSelection::Failed, context_envoy_ptr);
@@ -4947,7 +4947,7 @@ fn test_tls_certificate_selector_context_reads_the_handshake() {
       let Some(server_name) = context.get_requested_server_name() else {
         assert!(context.get_client_hello_extension(16).is_none());
         assert!(context.get_filter_state("tenant").is_none());
-        return tls_certificate_selector::TlsCertificateSelection::Default;
+        return tls_certificate_selector::TlsCertificateSelection::PassThrough;
       };
       assert_eq!(server_name.as_slice(), b"www.lyft.com");
       assert_eq!(
@@ -4974,7 +4974,7 @@ fn test_tls_certificate_selector_context_reads_the_handshake() {
     ),
     (
       std::ptr::null_mut(),
-      abi::envoy_dynamic_module_type_tls_certificate_selector_status::Default,
+      abi::envoy_dynamic_module_type_tls_certificate_selector_status::PassThrough,
     ),
   ] {
     let mut certificate_index = 0;

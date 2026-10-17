@@ -221,10 +221,10 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, FailedSelectionFailsH
   test_server_->waitForCounter(listenerStatPrefix("ssl.connection_error"), testing::Ge(1));
 }
 
-TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, DefaultLetsEnvoySelect) {
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, PassThroughLetsEnvoySelect) {
   initializeWithDynamicCertificates({});
   expectServedCertificate("www.lyft.com", TEST_SERVER_ECDSA_CERT_HASH);
-  waitForModuleCounter("selected.outcome.default", 1);
+  waitForModuleCounter("selected.outcome.passthrough", 1);
 }
 
 TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, ServesPrefetchedDynamicCertificate) {

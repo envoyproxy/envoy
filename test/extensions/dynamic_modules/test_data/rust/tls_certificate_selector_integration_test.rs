@@ -261,7 +261,7 @@ impl TlsCertificateSelector for DynamicSelector {
       .map(|server_name| String::from_utf8_lossy(server_name.as_slice()).into_owned());
     let (selection, outcome) = match server_name {
       Some(server_name) if server_name.starts_with("www.") => {
-        (TlsCertificateSelection::Default, "default")
+        (TlsCertificateSelection::PassThrough, "passthrough")
       },
       Some(server_name) => (TlsCertificateSelection::Dynamic(server_name), "dynamic"),
       None => (TlsCertificateSelection::Failed, "failed"),

@@ -260,8 +260,8 @@ class DynamicModuleTlsCertificateSelector : public Ssl::TlsCertificateSelector,
                                             public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
   /**
-   * @param default_selector serves the Default outcome of a downstream TLS context, or is nullptr
-   * for an upstream TLS context.
+   * @param default_selector serves the PassThrough outcome of a downstream TLS context, or is
+   * nullptr for an upstream TLS context.
    */
   DynamicModuleTlsCertificateSelector(
       DynamicModuleTlsCertificateSelectorConfigSharedPtr config,

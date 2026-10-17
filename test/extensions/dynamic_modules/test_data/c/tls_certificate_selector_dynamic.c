@@ -124,8 +124,8 @@ envoy_dynamic_module_on_tls_certificate_selector_select(
     status = envoy_dynamic_module_type_tls_certificate_selector_status_Dynamic;
     outcome = module_buffer("dynamic");
   } else if (has_prefix(server_name, "www.")) {
-    status = envoy_dynamic_module_type_tls_certificate_selector_status_Default;
-    outcome = module_buffer("default");
+    status = envoy_dynamic_module_type_tls_certificate_selector_status_PassThrough;
+    outcome = module_buffer("passthrough");
   } else {
     *certificate_index = 0;
     status = envoy_dynamic_module_type_tls_certificate_selector_status_Configured;

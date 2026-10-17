@@ -116,14 +116,14 @@ impl TlsCertificateSelectionContext {
 /// [`TlsCertificateSelector::select`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TlsCertificateSelection {
+  /// Let Envoy select the certificate as it does without a custom selector.
+  PassThrough,
   /// Use the configured certificate at this index of the slice passed to
   /// [`TlsCertificateSelectorConfig::new_selector`]. An index out of range fails the handshake.
   Configured(usize),
   /// Use the dynamic certificate of this name. When the module has not provided it yet, the
   /// handshake waits for the answer to [`TlsCertificateSelectorConfig::on_certificate_requested`].
   Dynamic(String),
-  /// Let Envoy select the certificate as it does without a custom selector.
-  Default,
   /// Fail the handshake.
   Failed,
 }
@@ -813,6 +813,9 @@ ffi_export! {
     let selector = unsafe { &*(selector_module_ptr as *const Box<dyn TlsCertificateSelector>) };
     let context = unsafe { TlsCertificateSelectionContext::new(context_envoy_ptr) };
     match selector.select(&context) {
+      TlsCertificateSelection::PassThrough => {
+        abi::envoy_dynamic_module_type_tls_certificate_selector_status::PassThrough
+      },
       TlsCertificateSelection::Configured(index) => {
         unsafe { *certificate_index = index };
         abi::envoy_dynamic_module_type_tls_certificate_selector_status::Configured
@@ -824,9 +827,6 @@ ffi_export! {
           unsafe { *certificate_name = bytes_to_module_buffer(buffer.as_slice()) };
         });
         abi::envoy_dynamic_module_type_tls_certificate_selector_status::Dynamic
-      },
-      TlsCertificateSelection::Default => {
-        abi::envoy_dynamic_module_type_tls_certificate_selector_status::Default
       },
       TlsCertificateSelection::Failed => {
         abi::envoy_dynamic_module_type_tls_certificate_selector_status::Failed
