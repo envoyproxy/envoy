@@ -46,11 +46,12 @@ elif [[ "$task" == registry ]]; then
         's#^common --registry=https://raw\.githubusercontent\.com/envoyproxy/bazel-registry/([0-9a-f]+)$#\1#p' \
         .bazelrc | cut -c1-7)
 elif [[ "$task" == lockfiles ]]; then
-    if [[ -z "$(git status --porcelain -- ':(glob)**/MODULE.bazel.lock')" ]]; then
+    lockfile_pathspecs=(':(glob)**/MODULE.bazel.lock' Cargo.lock Cargo.Bazel.envoy.lock)
+    if [[ -z "$(git status --porcelain -- "${lockfile_pathspecs[@]}")" ]]; then
         echo 'Lockfiles are in sync, nothing to do' >&2
         OUTPUT=in-sync
     else
-        OUTPUT=$(git diff -- ':(glob)**/MODULE.bazel.lock' | sha256sum | cut -c1-7)
+        OUTPUT=$(git diff -- "${lockfile_pathspecs[@]}" | sha256sum | cut -c1-7)
     fi
 else
     OUTPUT=$(git diff -U0 -- ':(glob)**/MODULE.bazel' \

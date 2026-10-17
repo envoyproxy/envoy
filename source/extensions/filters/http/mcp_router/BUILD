@@ -46,8 +46,7 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
-        "//source/common/config:datasource_lib",
-        "//source/extensions/filters/common/mcp:filter_state_lib",
+        "//source/extensions/filters/common/mcp:constants_lib",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:variant",
         "@envoy_api//envoy/extensions/clusters/mcp_multicluster/v3:pkg_cc_proto",
@@ -108,6 +107,7 @@ envoy_cc_extension(
     deps = [
         ":mcp_router_lib",
         "//envoy/registry",
+        "//source/common/config:datasource_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/mcp_router/v3:pkg_cc_proto",
     ],

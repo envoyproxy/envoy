@@ -71,7 +71,6 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/stats:stats_interface",
-        "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
@@ -92,6 +91,7 @@ envoy_cc_library(
     hdrs = ["mongo_stats.h"],
     deps = [
         "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
     ],

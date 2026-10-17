@@ -598,6 +598,53 @@ TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
   EXPECT_EQ(bridge_->injected_.toString(), chunk + chunk + chunk);
 }
 
+// The terminal write is the store's commit signal. When the last data write has
+// already drained the backlog before endStream() arrives, the manager still
+// issues one zero-length write carrying end_stream, and replay waits for it.
+TEST_F(BufferManagerTest, EndStreamAfterDrainedBacklogIssuesTerminalWrite) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+  drain();
+
+  manager_->endStream();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), 0));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk);
+}
+
+// endStream() while a data write is in flight folds end_stream into the
+// follow-up write; no extra terminal write is issued afterwards.
+TEST_F(BufferManagerTest, EndStreamDuringInFlightWriteIsWrittenOnce) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame);
+  manager_->endStream();
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), 0));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+  EXPECT_TRUE(replay_done_);
+}
+
 // When the chain we replay into is backed up before replay starts, no data is
 // injected until the back-pressure is released.
 TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
@@ -757,8 +804,10 @@ TEST_F(BufferManagerTest, ResumeSkipsReadWhileOneInFlight) {
   manager_->endStream();
   replayAll();
 
-  // Run just the write completion: replay starts and posts its first read (now in
+  // Run the data write completion, then the zero-length terminal write it
+  // triggers: replay starts after the second and posts its first read (now in
   // flight, not yet completed).
+  runOnePosted();
   runOnePosted();
 
   // A watermark cycle schedules a resume while the read is still in flight.

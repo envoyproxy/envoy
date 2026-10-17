@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/scope_tracker.h"
@@ -108,6 +109,13 @@ public:
    * @return const std::string& the name that identifies this dispatcher.
    */
   virtual const std::string& name() PURE;
+
+  /**
+   * Returns the id of the worker this dispatcher services ("worker_<id>" dispatchers), or
+   * std::nullopt for any other dispatcher (e.g. the main thread's).
+   * @return std::optional<uint32_t> the id of the worker this dispatcher services.
+   */
+  virtual std::optional<uint32_t> workerId() const PURE;
 
   /**
    * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
