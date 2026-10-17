@@ -8,6 +8,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
@@ -46,9 +47,11 @@ public:
   SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context)
       : spiffe_data_(std::make_shared<SpiffeData>()), stats_(stats),
         time_source_(context.timeSource()) {};
-  SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                  Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
-                  absl::Status& creation_status);
+  SPIFFEValidator(
+      const Envoy::Ssl::CertificateValidationContextConfig* config,
+      const envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig& message,
+      SslStats& stats, Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
+      absl::Status& creation_status);
 
   ~SPIFFEValidator() override = default;
 
@@ -94,6 +97,8 @@ private:
 
   void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);
 
+  bool allow_optional_client_certificate_{false};
+  bool require_client_certificate_{true};
   bool allow_expired_certificate_{false};
   bool suppress_client_ca_list_{false};
 
