@@ -61,6 +61,7 @@ public:
     udp_listener_config_ = std::make_unique<NiceMock<Network::MockUdpListenerConfig>>(2);
     ON_CALL(conn_handler_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     EXPECT_CALL(conn_handler_, statPrefix()).WillRepeatedly(ReturnRef(listener_stat_prefix_));
+    EXPECT_CALL(conn_handler_, workerId()).WillRepeatedly(Return(std::nullopt));
 
     listen_socket_ =
         std::make_shared<Network::UdpListenSocket>(local_address_, nullptr, /*bind*/ true);
