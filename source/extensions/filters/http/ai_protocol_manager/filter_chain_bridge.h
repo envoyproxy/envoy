@@ -77,13 +77,33 @@ public:
   void onUnrecoverableError() override;
 
   // Http::DownstreamWatermarkCallbacks (replay side: downstream back-pressure).
-  void onAboveWriteBufferHighWatermark() override { onAboveReplayWatermark(); }
-  void onBelowWriteBufferLowWatermark() override { onBelowReplayWatermark(); }
+  // The filter manager delivers pauseSource()/resumeSource() back to this
+  // subscriber inside the same call. Those echoes are not downstream
+  // back-pressure and must not pause replay: replay is what drains the bytes
+  // charged to the ingest watermark, so pausing it here would deadlock.
+  void onAboveWriteBufferHighWatermark() override {
+    if (!in_source_transition_) {
+      onAboveReplayWatermark();
+    }
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    if (!in_source_transition_) {
+      onBelowReplayWatermark();
+    }
+  }
 
 private:
   // FilterChainBridge
-  void pauseSource() override { encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark(); }
-  void resumeSource() override { encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark(); }
+  void pauseSource() override {
+    in_source_transition_ = true;
+    encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark();
+    in_source_transition_ = false;
+  }
+  void resumeSource() override {
+    in_source_transition_ = true;
+    encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark();
+    in_source_transition_ = false;
+  }
   void unsubscribeReplayWatermarks() override {
     decoder_callbacks_.removeDownstreamWatermarkCallbacks(*this);
   }
@@ -91,6 +111,8 @@ private:
   Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
   Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
   AiProtocolManagerStats& stats_;
+  // Set while pauseSource()/resumeSource() run, to recognize their echoes.
+  bool in_source_transition_{false};
 };
 
 } // namespace AiProtocolManager
