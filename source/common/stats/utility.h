@@ -387,9 +387,8 @@ Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, His
  * @param unit The unit of measurement.
  * @return A histogram named using the joined names.
  */
-Histogram& histogramFromTaggedStatNames(Scope& scope, StatNameSpan base_names,
-                                        StatNameTagSpan tags, StatNameSpan names,
-                                        Histogram::Unit unit);
+Histogram& histogramFromTaggedStatNames(Scope& scope, StatNameSpan base_names, StatNameTagSpan tags,
+                                        StatNameSpan names, Histogram::Unit unit);
 
 /**
  * Creates a TextReadout from a vector of tokens which are used to create the

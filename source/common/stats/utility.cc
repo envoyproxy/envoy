@@ -222,9 +222,8 @@ Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, His
                                        unit);
 }
 
-Histogram& histogramFromTaggedStatNames(Scope& scope, StatNameSpan base_names,
-                                        StatNameTagSpan tags, StatNameSpan names,
-                                        Histogram::Unit unit) {
+Histogram& histogramFromTaggedStatNames(Scope& scope, StatNameSpan base_names, StatNameTagSpan tags,
+                                        StatNameSpan names, Histogram::Unit unit) {
   const StatNameJoiner base_joined(base_names, scope.constSymbolTable());
   if (tags.empty()) {
     return scope.histogramFromTaggedName(base_joined.statName(), std::nullopt, StatName(), unit);
