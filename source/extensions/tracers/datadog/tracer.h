@@ -57,11 +57,13 @@ public:
    * @param thread_local_slot_allocator slot allocator for installing a
    * thread-local instance of the tracer
    * @param time_source clocks used for calculating HTTP request timeouts
+   * @param delegate_sampling allow the Datadog sampler to decide when Envoy samples a trace
    */
   explicit Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                   const datadog::tracing::TracerConfig& config,
                   Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-                  ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source);
+                  ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source,
+                  bool delegate_sampling = false);
 
   struct ThreadLocalTracer : public ThreadLocal::ThreadLocalObject {
     /**
@@ -103,9 +105,9 @@ public:
    * @param operation_name the Datadog "resource name" to associate with the span.
    * See comments in the implementation for more information.
    * @param tracing_decision the sampling decision made in advance by Envoy for
-   * this trace. If the decision is to drop the trace, then this tracer will
-   * honor that decision. If the decision is to keep the trace, then this tracer
-   * will apply its own sampling logic, which might keep or drop the trace.
+   * this trace. If delegate_sampling is enabled, a keep decision allows the
+   * Datadog sampler to decide; otherwise the Envoy decision is applied directly.
+   * Sampling decisions extracted from incoming context take precedence.
    */
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const StreamInfo::StreamInfo& stream_info,
@@ -117,6 +119,7 @@ private:
                                              const datadog::tracing::SpanConfig& span_config,
                                              const datadog::tracing::DictReader& reader);
 
+  const bool delegate_sampling_;
   TracerStats tracer_stats_;
   ThreadLocal::TypedSlotPtr<ThreadLocalTracer> thread_local_slot_;
 };
