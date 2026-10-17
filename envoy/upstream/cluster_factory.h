@@ -12,6 +12,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
@@ -30,6 +31,10 @@
 #include "envoy/upstream/outlier_detection.h"
 
 namespace Envoy {
+namespace Network {
+class DnsResolverFactory;
+} // namespace Network
+
 namespace Upstream {
 
 /**
@@ -61,6 +66,18 @@ public:
    * @return Network::DnsResolverSharedPtr the dns resolver for the server.
    */
   virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
+
+  /**
+   * Returns the DNS resolver for a cluster that configures its own resolver. The returned resolver
+   * may be one that is already in use by another cluster configured identically, rather than a
+   * newly created one.
+   *
+   * @param dns_resolver_factory the factory resolved from typed_dns_resolver_config.
+   * @param typed_dns_resolver_config the cluster's resolver configuration.
+   */
+  virtual absl::StatusOr<Network::DnsResolverSharedPtr> sharedDnsResolver(
+      Network::DnsResolverFactory& dns_resolver_factory,
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) PURE;
 
   /**
    * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.
