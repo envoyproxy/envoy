@@ -61,6 +61,7 @@ public:
     EXPECT_CALL(conn_handler_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(conn_handler_, numConnections()).Times(testing::AnyNumber());
     EXPECT_CALL(conn_handler_, statPrefix()).WillRepeatedly(ReturnRef(listener_stat_prefix_));
+    EXPECT_CALL(conn_handler_, workerId()).WillRepeatedly(Return(std::nullopt));
     listener_filter_matcher_ = std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>();
   }
 

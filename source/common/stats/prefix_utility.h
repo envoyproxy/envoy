@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <optional>
+
 #include "envoy/stats/stats.h"
 #include "envoy/stats/tag.h"
 
@@ -37,6 +40,23 @@ namespace Stats {
 TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
                                absl::string_view base_name, TagStringViewSpan tags = {},
                                absl::string_view name = {});
+
+/**
+ * Creates the prefix of the stats of a thread. A worker thread contributes the envoy.worker_id
+ * tag and its tag-extracted prefix keeps a literal 'worker.' segment in place of the thread name
+ * ('<prefix>worker.<suffix>'); any other thread name stays a plain, untagged segment.
+ *
+ * @param symbol_table the symbol table used to pre-encode the names and tags.
+ * @param prefix empty or '.' suffixed parent prefix, e.g. "listener_manager.".
+ * @param worker_id the thread's worker id (Event::Dispatcher::workerId()); std::nullopt when the
+ *        thread is not a worker.
+ * @param thread_name the thread (dispatcher) name, e.g. "worker_0" or "main_thread"; may be empty
+ *        only when worker_id is empty.
+ * @param suffix empty or '.' suffixed suffix, e.g. "dispatcher.".
+ */
+TaggedStatName workerStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
+                                std::optional<uint32_t> worker_id, absl::string_view thread_name,
+                                absl::string_view suffix = {});
 
 } // namespace Stats
 } // namespace Envoy

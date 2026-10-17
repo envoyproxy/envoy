@@ -1,5 +1,7 @@
 #include "source/common/stats/prefix_utility.h"
 
+#include <cstdint>
+#include <initializer_list>
 #include <optional>
 #include <string>
 
@@ -81,6 +83,27 @@ TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view pref
   }
   const std::string base = absl::StrCat(base_prefix, base_name);
   return {symbol_table, base, merged_tags, tagged};
+}
+
+TaggedStatName workerStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
+                                std::optional<uint32_t> worker_id, absl::string_view thread_name,
+                                absl::string_view suffix) {
+  if (!worker_id.has_value()) {
+    // Not a worker thread: the thread name stays a plain segment of the untagged prefix.
+    return {symbol_table,
+            thread_name.empty() ? absl::StrCat(prefix, suffix)
+                                : absl::StrCat(prefix, thread_name, ".", suffix),
+            {},
+            {}};
+  }
+
+  ASSERT(!thread_name.empty());
+  const std::string worker_id_value = absl::StrCat(*worker_id);
+  const TagStringView tag{Envoy::Config::TagNames::get().WORKER_ID, worker_id_value};
+  return {symbol_table,
+          absl::StrCat(prefix, "worker.", suffix),
+          {tag},
+          absl::StrCat(prefix, thread_name, ".", suffix)};
 }
 
 } // namespace Stats

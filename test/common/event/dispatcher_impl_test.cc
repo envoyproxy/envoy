@@ -1573,6 +1573,51 @@ TEST(DispatcherWorkerIdTest, ParsedFromNameOnce) {
   EXPECT_FALSE(api->allocateDispatcher("main_thread")->workerId().has_value());
 }
 
+TEST(DispatcherImplStatsTest, WorkerStatsAreTagged) {
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Stats::IsolatedStoreImpl store;
+  Stats::Scope& scope = *store.rootScope();
+  // The stats are created on the dispatcher's thread: run each dispatcher once to get there.
+  auto initialize = [&](Dispatcher& dispatcher, const std::optional<std::string>& prefix) {
+    dispatcher.initializeStats(scope, prefix);
+    dispatcher.run(Dispatcher::RunType::NonBlock);
+  };
+  // Looks a histogram up by its flat name.
+  auto histogram = [&](const std::string& name) -> Stats::Histogram& {
+    return scope.histogramFromString(name, Stats::Histogram::Unit::Microseconds);
+  };
+
+  DispatcherPtr worker = api->allocateDispatcher("worker_3");
+  initialize(*worker, std::nullopt);
+  const Stats::Histogram& worker_loop = histogram("worker_3.dispatcher.loop_duration_us");
+  EXPECT_EQ("worker.dispatcher.loop_duration_us", worker_loop.tagExtractedName());
+  EXPECT_THAT(tags_of(worker_loop),
+              testing::UnorderedElementsAre(testing::Pair("envoy.worker_id", "3")));
+  EXPECT_EQ("worker.dispatcher.poll_delay_us",
+            histogram("worker_3.dispatcher.poll_delay_us").tagExtractedName());
+
+  // An explicit prefix replaces the dispatcher's name entirely.
+  DispatcherPtr main_thread = api->allocateDispatcher("main_thread");
+  initialize(*main_thread, "server.");
+  const Stats::Histogram& main_loop = histogram("server.dispatcher.loop_duration_us");
+  EXPECT_EQ("server.dispatcher.loop_duration_us", main_loop.tagExtractedName());
+  EXPECT_TRUE(main_loop.tags().empty());
+
+  DispatcherPtr other = api->allocateDispatcher("test_thread");
+  initialize(*other, std::nullopt);
+  const Stats::Histogram& other_loop = histogram("test_thread.dispatcher.loop_duration_us");
+  EXPECT_EQ("test_thread.dispatcher.loop_duration_us", other_loop.tagExtractedName());
+  EXPECT_TRUE(other_loop.tags().empty());
+}
+
 } // namespace
 } // namespace Event
 } // namespace Envoy
