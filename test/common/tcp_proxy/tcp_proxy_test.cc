@@ -1698,8 +1698,124 @@ TEST_P(TcpProxyTest, IdleTimerDisabledDownstreamClose) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Tests that the idle timer is disabled when the upstream connection is closed.
-TEST_P(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
+// Tests that the idle timer stays armed after the upstream closes, so it bounds the FlushWrite
+// close of a downstream that stops reading.
+TEST_P(TcpProxyTest, IdleTimerBoundsFlushAfterUpstreamRemoteClose) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  bool timer_destroyed = false;
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  idle_timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  setup(1, config);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+
+  // A real FlushWrite close stays in Closing until the write buffer drains, so don't raise
+  // LocalClose here.
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return());
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  ASSERT_FALSE(timer_destroyed) << "upstream close must not destroy the idle timer";
+  EXPECT_TRUE(idle_timer->enabled_) << "idle timer must stay armed during the flush";
+
+  // The downstream never reads, so no bytes are sent and the idle timer fires.
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(*idle_timer, disableTimer());
+  idle_timer->invokeCallback();
+  EXPECT_EQ(1U, config_->stats().idle_timeout_.value());
+  EXPECT_TRUE(timer_destroyed);
+}
+
+// Same as IdleTimerBoundsFlushAfterUpstreamRemoteClose, for an upstream LocalClose (e.g. the
+// upstream buffer high watermark timeout), which takes the same FlushWrite path.
+TEST_P(TcpProxyTest, IdleTimerBoundsFlushAfterUpstreamLocalClose) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  bool timer_destroyed = false;
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  idle_timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  setup(1, config);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return());
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+  ASSERT_FALSE(timer_destroyed) << "upstream close must not destroy the idle timer";
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(*idle_timer, disableTimer());
+  idle_timer->invokeCallback();
+  EXPECT_EQ(1U, config_->stats().idle_timeout_.value());
+}
+
+// Tests that write progress on the downstream during the post-upstream-close flush keeps
+// re-arming the idle timer, so a slow but still-reading downstream is not cut off.
+TEST_P(TcpProxyTest, IdleTimerResetByDownstreamProgressAfterUpstreamClose) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  bool timer_destroyed = false;
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  idle_timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  setup(1, config);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return());
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  ASSERT_FALSE(timer_destroyed) << "upstream close must not destroy the idle timer";
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _)).Times(2);
+  filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
+  filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
+  EXPECT_EQ(0U, config_->stats().idle_timeout_.value());
+
+  // The flush completes and the downstream connection closes.
+  EXPECT_CALL(*idle_timer, disableTimer());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
+// Tests that the idle timer is disabled once the post-upstream-close flush completes and the
+// downstream closes, even though upstream_ is already gone at that point.
+TEST_P(TcpProxyTest, IdleTimerDisabledWhenFlushCompletesAfterUpstreamClose) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  bool timer_destroyed = false;
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  idle_timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  setup(1, config);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .WillOnce(Return());
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  ASSERT_FALSE(timer_destroyed);
+
+  // The flush completes and the downstream connection closes.
+  EXPECT_CALL(*idle_timer, disableTimer());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+  EXPECT_TRUE(timer_destroyed) << "downstream close must destroy the idle timer";
+  EXPECT_EQ(0U, config_->stats().idle_timeout_.value());
+}
+
+// Tests that the idle timer is disabled when an upstream RST is propagated to the downstream,
+// since AbortReset closes the downstream immediately.
+TEST_P(TcpProxyTest, IdleTimerDisabledOnUpstreamReset) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
@@ -1709,7 +1825,13 @@ TEST_P(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
+  auto upstream_info = upstream_connections_.at(0)->stream_info_.upstreamInfo();
+  EXPECT_CALL(*dynamic_cast<StreamInfo::MockUpstreamInfo*>(upstream_info.get()),
+              upstreamDetectedCloseType())
+      .WillRepeatedly(testing::Return(StreamInfo::DetectedCloseType::RemoteReset));
+
   EXPECT_CALL(*idle_timer, disableTimer());
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::AbortReset));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
