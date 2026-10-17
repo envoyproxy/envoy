@@ -1040,8 +1040,9 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   dispatcher_->clearDeferredDeleteList();
 }
 
-// Regression test: a second createWasm while a remote fetch is in_progress must return false
-// with exactly one cb(nullptr) call — not fall through to the empty-code path.
+// A second createWasm for the same remote code while a fetch is in progress must not fail the
+// config: it fetches the code itself, and a failure of that fetch must not overwrite code that a
+// concurrent fetch has already cached.
 TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
   if (std::get<0>(GetParam()) == "null") {
     return;
@@ -1070,13 +1071,18 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
   vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_cluster("example_com");
   vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->mutable_timeout()->set_seconds(
       5);
+  vm_config->mutable_code()
+      ->mutable_remote()
+      ->mutable_retry_policy()
+      ->mutable_num_retries()
+      ->set_value(0);
 
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info_);
 
-  WasmHandleSharedPtr wasm_handle;
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
 
+  // The first fetch succeeds, every later one fails.
   int http_fetch_count = 0;
   cluster_manager.initializeThreadLocalClusters({"example_com"});
   EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
@@ -1085,43 +1091,120 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
       .WillRepeatedly(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            ++http_fetch_count;
+            const bool success = http_fetch_count++ == 0;
             Http::ResponseMessagePtr response(
                 new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
+                    new Http::TestResponseHeaderMapImpl{{":status", success ? "200" : "503"}}}));
+            if (success) {
+              response->body().add(code);
+            }
             callbacks.onSuccess(request, std::move(response));
             return nullptr;
           }));
 
-  Init::TargetHandlePtr init_target_handle;
-  EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
-    init_target_handle = target.createHandle("test");
+  std::vector<Init::TargetHandlePtr> init_target_handles;
+  EXPECT_CALL(init_manager, add(_)).Times(2).WillRepeatedly(Invoke([&](const Init::Target& target) {
+    init_target_handles.push_back(target.createHandle("test"));
   }));
 
-  // First createWasm: cache miss, sets in_progress = true (fetch deferred until init).
-  bool first_ret = createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
-                              lifecycle_notifier_, remote_data_provider_,
-                              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
-  EXPECT_TRUE(first_ret);
+  // First createWasm: cache miss, the fetch is deferred until init.
+  WasmHandleSharedPtr first_handle;
+  RemoteAsyncDataProviderPtr first_provider;
+  EXPECT_TRUE(createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                         lifecycle_notifier_, first_provider,
+                         [&first_handle](const WasmHandleSharedPtr& w) { first_handle = w; }));
 
-  // Second createWasm with the same sha256 while in_progress = true.
-  int race_cb_count = 0;
-  bool second_ret = createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
-                               lifecycle_notifier_, remote_data_provider_,
-                               [&race_cb_count](const WasmHandleSharedPtr& w) {
-                                 ++race_cb_count;
-                                 EXPECT_EQ(w, nullptr);
-                               });
-  EXPECT_FALSE(second_ret);
-  EXPECT_EQ(race_cb_count, 1);
+  // Second createWasm with the same sha256 while the first fetch is in progress.
+  int second_cb_count = 0;
+  WasmHandleSharedPtr second_handle;
+  RemoteAsyncDataProviderPtr second_provider;
+  EXPECT_TRUE(createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                         lifecycle_notifier_, second_provider, [&](const WasmHandleSharedPtr& w) {
+                           ++second_cb_count;
+                           second_handle = w;
+                         }));
+  EXPECT_EQ(second_cb_count, 0);
   EXPECT_EQ(http_fetch_count, 0);
+  ASSERT_EQ(init_target_handles.size(), 2);
 
-  // Complete the first fetch via the init target.
-  EXPECT_CALL(init_watcher, ready());
-  init_target_handle->initialize(init_watcher);
-  EXPECT_NE(wasm_handle, nullptr);
-  EXPECT_EQ(http_fetch_count, 1);
+  // The first fetch succeeds.
+  EXPECT_CALL(init_watcher, ready()).Times(2);
+  init_target_handles[0]->initialize(init_watcher);
+  EXPECT_NE(first_handle, nullptr);
+
+  // The second fetch fails, but still gets the code cached by the first one.
+  init_target_handles[1]->initialize(init_watcher);
+  EXPECT_EQ(http_fetch_count, 2);
+  EXPECT_EQ(second_cb_count, 1);
+  EXPECT_NE(second_handle, nullptr);
+
+  // The failed fetch did not poison the cache.
+  WasmHandleSharedPtr third_handle;
+  RemoteAsyncDataProviderPtr third_provider;
+  EXPECT_TRUE(createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                         lifecycle_notifier_, third_provider,
+                         [&third_handle](const WasmHandleSharedPtr& w) { third_handle = w; }));
+  EXPECT_NE(third_handle, nullptr);
+  EXPECT_EQ(http_fetch_count, 2);
+
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->clearDeferredDeleteList();
+}
+
+// With nack_on_code_cache_miss, a createWasm while a fetch is in progress fails immediately.
+TEST_P(WasmCommonTest, RemoteCodeInProgressNackOnCacheMiss) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  vm_config->set_nack_on_code_cache_miss(true);
+  // A sha256 not used by any other test so that the static code cache starts empty.
+  vm_config->mutable_code()->mutable_remote()->set_sha256(std::string(64, 'a'));
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(
+      "http://example.com/in_progress_nack.wasm");
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_cluster("example_com");
+  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->mutable_timeout()->set_seconds(
+      5);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info_);
+
+  // Keep the first fetch pending.
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+  Http::AsyncClient::Callbacks* fetch_callbacks = nullptr;
+  cluster_manager.initializeThreadLocalClusters({"example_com"});
+  EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
+      .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            fetch_callbacks = &callbacks;
+            return &request;
+          }));
+
+  int cb_count = 0;
+  auto cb = [&cb_count](const WasmHandleSharedPtr& w) {
+    ++cb_count;
+    EXPECT_EQ(w, nullptr);
+  };
+  EXPECT_FALSE(createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                          lifecycle_notifier_, remote_data_provider_, cb));
+  EXPECT_EQ(cb_count, 1);
+  EXPECT_FALSE(createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+                          lifecycle_notifier_, remote_data_provider_, cb));
+  EXPECT_EQ(cb_count, 2);
+
+  // Complete the pending fetch so that it is cleaned up.
+  ASSERT_NE(fetch_callbacks, nullptr);
+  fetch_callbacks->onSuccess(
+      request, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                   new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+  EXPECT_EQ(cb_count, 2);
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher_->clearDeferredDeleteList();
