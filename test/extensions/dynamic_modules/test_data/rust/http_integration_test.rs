@@ -139,6 +139,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     })),
     "http_config_scheduler" => {
       let shared_status = Arc::new(AtomicBool::new(false));
+      let scheduled_events = envoy_filter_config
+        .define_gauge("config_scheduled_events")
+        .unwrap();
       let scheduler = envoy_filter_config.new_scheduler();
 
       // Spawn a thread to simulate async work.
@@ -150,6 +153,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 
       Some(Box::new(ConfigSchedulerConfig {
         shared_status,
+        scheduled_events,
         thread_handle: Some(thread_handle),
       }))
     },
@@ -370,6 +374,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UseSelfAfterTeardownFilter {
 
 struct ConfigSchedulerConfig {
   shared_status: Arc<AtomicBool>,
+  scheduled_events: EnvoyGaugeId,
   thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -388,9 +393,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ConfigSchedulerConfig {
     })
   }
 
-  fn on_scheduled(&self, event_id: u64) {
+  fn on_scheduled(&self, envoy_config: &mut EnvoyHttpFilterConfigImpl, event_id: u64) {
     if event_id == 1 {
       self.shared_status.store(true, Ordering::SeqCst);
+      // Emitted from the scheduled event itself, with no stream involved.
+      envoy_config
+        .increase_gauge(self.scheduled_events, 1)
+        .unwrap();
     }
   }
 }

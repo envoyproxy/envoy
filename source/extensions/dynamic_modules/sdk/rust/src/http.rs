@@ -33,9 +33,11 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
   /// This is called when the new event is scheduled via the
   /// [`EnvoyHttpFilterConfigScheduler::commit`] for this [`HttpFilterConfig`].
   ///
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object,
+  ///   for example to emit the metrics defined on it.
   /// * `event_id` is the ID of the event that was scheduled with
   ///   [`EnvoyHttpFilterConfigScheduler::commit`] to distinguish multiple scheduled events.
-  fn on_scheduled(&self, _event_id: u64) {}
+  fn on_scheduled(&self, _envoy_config: &mut EnvoyHttpFilterConfigImpl, _event_id: u64) {}
 
   /// This is called when an HTTP callout initiated via
   /// [`EnvoyHttpFilterConfig::send_http_callout`] completes.
@@ -4749,13 +4751,18 @@ ffi_export! {
   /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
   /// by the Envoy dynamic module ABI.
   unsafe fn envoy_dynamic_module_on_http_filter_config_scheduled(
-    _envoy_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    envoy_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
     config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
     event_id: u64,
   ) {
     let config = config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
     let config = &**config;
-    config.on_scheduled(event_id);
+    config.on_scheduled(
+      &mut EnvoyHttpFilterConfigImpl {
+        raw_ptr: envoy_config_ptr,
+      },
+      event_id,
+    );
   }
 }
 

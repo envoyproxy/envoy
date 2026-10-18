@@ -239,6 +239,41 @@ fn test_envoy_dynamic_module_on_http_filter_config_destroy() {
 }
 
 #[test]
+fn test_envoy_dynamic_module_on_http_filter_config_scheduled() {
+  // The hook receives the config object the event was scheduled on, so it can emit the metrics
+  // defined on it.
+  static SCHEDULED: std::sync::Mutex<Vec<(usize, u64)>> = std::sync::Mutex::new(Vec::new());
+  struct TestHttpFilterConfig;
+  impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TestHttpFilterConfig {
+    fn on_scheduled(&self, envoy_config: &mut EnvoyHttpFilterConfigImpl, event_id: u64) {
+      SCHEDULED
+        .lock()
+        .unwrap()
+        .push((envoy_config.raw_ptr as usize, event_id));
+    }
+  }
+
+  let new_fn: NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl> =
+    |_, _, _| Some(Box::new(TestHttpFilterConfig));
+  let config_ptr = envoy_dynamic_module_on_http_filter_config_new_impl(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: std::ptr::null_mut(),
+    },
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  // Only handed on, never dereferenced.
+  let envoy_config_ptr = 0x1234 as abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr;
+
+  unsafe {
+    envoy_dynamic_module_on_http_filter_config_scheduled(envoy_config_ptr, config_ptr, 7);
+    envoy_dynamic_module_on_http_filter_config_destroy(config_ptr);
+  }
+  assert_eq!(*SCHEDULED.lock().unwrap(), vec![(0x1234, 7)]);
+}
+
+#[test]
 // This tests the round-trip of the envoy_dynamic_module_on_http_filter_new_impl and
 // envoy_dynamic_module_on_http_filter_destroy.
 fn test_envoy_dynamic_module_on_http_filter_new_destroy() {

@@ -1570,6 +1570,8 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
     auto status = status_header[0]->value().getStringView();
 
     if (status == "true") {
+      // The scheduled event also emitted a metric through the filter config.
+      test_server_->waitForGauge("dynamicmodulescustom.config_scheduled_events", testing::Eq(1));
       return;
     }
     absl::SleepFor(absl::Milliseconds(100));
