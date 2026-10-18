@@ -208,8 +208,10 @@ public:
   }
 
   void expectReloadStats(const absl::string_view& db_type, const uint32_t reload_success_count = 0,
-                         const uint32_t reload_error_count = 0) {
+                         const uint32_t reload_error_count = 0,
+                         const uint32_t load_error_count = 0) {
     const DbFileStats& stats = GeoipProviderPeer::dbFileStats(provider_, db_type);
+    EXPECT_EQ(stats.db_load_error_.value(), load_error_count);
     EXPECT_EQ(stats.db_reload_success_.value(), reload_success_count);
     EXPECT_EQ(stats.db_reload_error_.value(), reload_error_count);
   }
@@ -1004,6 +1006,63 @@ TEST_F(GeoipProviderTest, GeoDbPathDoesNotExist) {
       geo_field_keys:
         city: "x-geo-city"
     city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data_atc/GeoLite2-City-Test.mmdb"
+  )EOF";
+  EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
+                          "Unable to open Maxmind database file");
+}
+
+TEST_F(GeoipProviderTest, AllowsMissingDatabaseAndLoadsItWhenItAppears) {
+  const std::string missing_db_path = TestEnvironment::temporaryPath("missing-city.mmdb");
+  const std::string config_yaml = absl::StrFormat(R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        city: "x-geo-city"
+    city_db_path: "%s"
+    allow_missing_database: true
+  )EOF",
+                                                  missing_db_path);
+  EXPECT_LOG_CONTAINS("warning", "Starting without Maxmind database city_db",
+                      initializeProvider(config_yaml, cb_added_nullopt));
+  expectReloadStats("city_db", 0, 0, 1);
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
+  Geolocation::LookupRequest lookup_request{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillOnce(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_request), std::move(lookup_cb_std));
+  EXPECT_TRUE(captured_lookup_response_.empty());
+  expectStats("city_db", 1, 0, 1);
+
+  TestEnvironment::writeStringToFileForTest(
+      missing_db_path,
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(default_city_db_path)));
+  {
+    absl::ReaderMutexLock guard(mutex_);
+    ASSERT_EQ(1, on_changed_cbs_.size());
+    EXPECT_OK(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo));
+  }
+  expectReloadStats("city_db", 1, 0, 1);
+
+  captured_lookup_response_.clear();
+  remote_address = Network::Utility::parseInternetAddressNoThrow("81.2.69.144");
+  Geolocation::LookupRequest second_lookup_request{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> second_lookup_cb;
+  auto second_lookup_cb_std = second_lookup_cb.AsStdFunction();
+  EXPECT_CALL(second_lookup_cb, Call(_)).WillOnce(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(second_lookup_request), std::move(second_lookup_cb_std));
+  EXPECT_EQ("London", captured_lookup_response_["x-geo-city"]);
+  expectStats("city_db", 2, 1, 1);
+}
+
+TEST_F(GeoipProviderTest, AllowMissingDatabaseRejectsInvalidDatabase) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        city: "x-geo-city"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/libmaxminddb-offset-integer-overflow.mmdb"
+    allow_missing_database: true
   )EOF";
   EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
                           "Unable to open Maxmind database file");

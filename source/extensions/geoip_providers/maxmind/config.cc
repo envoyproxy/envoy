@@ -32,8 +32,8 @@ std::string driverKey(const ConfigProto& proto_config, const std::string& stat_p
 
 // Key that identifies one database file. The type is one of a fixed set of tokens that contain no
 // separator, so the first separator always ends it and no path can be confused with another.
-std::string dbFileKey(GeoDbType db_type, const std::string& db_path) {
-  return absl::StrCat(dbTypeName(db_type), "|", db_path);
+std::string dbFileKey(GeoDbType db_type, const std::string& db_path, bool allow_missing_database) {
+  return absl::StrCat(dbTypeName(db_type), "|", db_path, "|", allow_missing_database);
 }
 
 } // namespace
@@ -94,25 +94,27 @@ private:
     }
 
     DbFileProviders db_file_providers;
-    db_file_providers.city_db_ =
-        getDbFileProvider(GeoDbType::City, proto_config.city_db_path(), context);
-    db_file_providers.isp_db_ =
-        getDbFileProvider(GeoDbType::Isp, proto_config.isp_db_path(), context);
-    db_file_providers.anon_db_ =
-        getDbFileProvider(GeoDbType::Anon, proto_config.anon_db_path(), context);
-    db_file_providers.asn_db_ =
-        getDbFileProvider(GeoDbType::Asn, proto_config.asn_db_path(), context);
-    db_file_providers.country_db_ =
-        getDbFileProvider(GeoDbType::Country, proto_config.country_db_path(), context);
+    const bool allow_missing_database = proto_config.allow_missing_database();
+    db_file_providers.city_db_ = getDbFileProvider(GeoDbType::City, proto_config.city_db_path(),
+                                                   allow_missing_database, context);
+    db_file_providers.isp_db_ = getDbFileProvider(GeoDbType::Isp, proto_config.isp_db_path(),
+                                                  allow_missing_database, context);
+    db_file_providers.anon_db_ = getDbFileProvider(GeoDbType::Anon, proto_config.anon_db_path(),
+                                                   allow_missing_database, context);
+    db_file_providers.asn_db_ = getDbFileProvider(GeoDbType::Asn, proto_config.asn_db_path(),
+                                                  allow_missing_database, context);
+    db_file_providers.country_db_ = getDbFileProvider(
+        GeoDbType::Country, proto_config.country_db_path(), allow_missing_database, context);
     return db_file_providers;
   }
 
   DbFileProviderSharedPtr getDbFileProvider(GeoDbType db_type, const std::string& db_path,
+                                            bool allow_missing_database,
                                             Server::Configuration::ServerFactoryContext& context) {
     if (db_path.empty()) {
       return nullptr;
     }
-    const std::string key = dbFileKey(db_type, db_path);
+    const std::string key = dbFileKey(db_type, db_path, allow_missing_database);
     auto it = db_file_providers_.find(key);
     if (it != db_file_providers_.end()) {
       DbFileProviderSharedPtr db_file_provider = it->second.lock();
@@ -124,8 +126,9 @@ private:
     // away, so drop the expired entries before adding another one.
     absl::erase_if(db_file_providers_, [](const auto& entry) { return entry.second.expired(); });
 
-    DbFileProviderSharedPtr db_file_provider = std::make_shared<DbFileProvider>(
-        context.mainThreadDispatcher(), db_file_stats_scope_, db_type, db_path);
+    DbFileProviderSharedPtr db_file_provider =
+        std::make_shared<DbFileProvider>(context.mainThreadDispatcher(), db_file_stats_scope_,
+                                         db_type, db_path, allow_missing_database);
     db_file_providers_[key] = db_file_provider;
     return db_file_provider;
   }

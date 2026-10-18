@@ -64,6 +64,8 @@ public:
   // so the HTTP filter can remove them from a request without per-request conversions.
   absl::Span<const Http::LowerCaseString> fieldKeyNames() const { return field_key_names_; }
 
+  bool allowMissingDatabase() const { return allow_missing_database_; }
+
   void incLookupError(absl::string_view maxmind_db_type) {
     incCounter(
         stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".lookup_error"), unknown_hit_));
@@ -86,6 +88,7 @@ private:
   std::array<std::optional<std::string>, enumToInt(GeoField::Count)> field_keys_;
   // The configured output keys as a list, for callers that need all of them at once.
   std::vector<Http::LowerCaseString> field_key_names_;
+  const bool allow_missing_database_;
 
   Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNameSetPtr stat_name_set_;
@@ -114,6 +117,7 @@ using MaxmindDbSharedPtr = std::shared_ptr<MaxmindDb>;
  * All stats describing a single Maxmind database file. @see stats_macros.h
  */
 #define ALL_MAXMIND_DB_FILE_STATS(COUNTER, GAUGE)                                                  \
+  COUNTER(db_load_error)                                                                           \
   COUNTER(db_reload_error)                                                                         \
   COUNTER(db_reload_success)                                                                       \
   GAUGE(db_build_epoch, Accumulate)
@@ -127,13 +131,12 @@ struct DbFileStats {
 class DbFileProvider : public Logger::Loggable<Logger::Id::geolocation> {
 public:
   DbFileProvider(Event::Dispatcher& dispatcher, Stats::ScopeSharedPtr scope, GeoDbType db_type,
-                 const std::string& db_path);
+                 const std::string& db_path, bool allow_missing_database);
 
   // The database type this file was configured as.
   GeoDbType dbType() const { return db_type_; }
 
-  // The currently loaded database. Null only if the file failed to load, which cannot happen
-  // before the constructor returns.
+  // The currently loaded database. Null when a missing database is allowed but has not appeared.
   MaxmindDbSharedPtr db() const ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
 
 private:
@@ -144,6 +147,7 @@ private:
   absl::Status onMaxmindDbUpdate(const std::string& db_path);
   void updateDb(MaxmindDbSharedPtr db) ABSL_LOCKS_EXCLUDED(mmdb_mutex_);
 
+  void incDbLoadError() { stats_.db_load_error_.inc(); }
   void incDbReloadSuccess() { stats_.db_reload_success_.inc(); }
   void incDbReloadError() { stats_.db_reload_error_.inc(); }
   void setDbBuildEpoch(const uint64_t value) { stats_.db_build_epoch_.set(value); }

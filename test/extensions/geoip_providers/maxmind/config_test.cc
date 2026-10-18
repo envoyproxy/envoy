@@ -648,6 +648,33 @@ TEST_F(MaxmindProviderConfigTest, ReusesDbFileProviderForSameDbPath) {
             dbFileProviderOf(other_driver, GeoDbType::City));
 }
 
+TEST_F(MaxmindProviderConfigTest, DoesNotShareMissingDbWithStrictConfig) {
+  const auto provider_config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        city: "x-geo-city"
+    city_db_path: %s
+    allow_missing_database: %s
+  )EOF";
+  const std::string missing_db_path = TestEnvironment::temporaryPath("missing-city.mmdb");
+  MaxmindProviderConfig permissive_config;
+  TestUtility::loadFromYaml(
+      absl::StrFormat(provider_config_yaml, missing_db_path, "true"), permissive_config);
+  MaxmindProviderConfig strict_config;
+  TestUtility::loadFromYaml(absl::StrFormat(provider_config_yaml, missing_db_path, "false"),
+                            strict_config);
+
+  MaxmindProviderFactory factory;
+  EXPECT_LOG_CONTAINS(
+      "warning", "Starting without Maxmind database city_db",
+      EXPECT_NE(factory.createGeoipProviderDriver(permissive_config, "maxmind",
+                                                  server_factory_context_),
+                nullptr));
+  EXPECT_THROW_WITH_REGEX(
+      factory.createGeoipProviderDriver(strict_config, "maxmind", server_factory_context_),
+      EnvoyException, "Unable to open Maxmind database file");
+}
+
 TEST_F(MaxmindProviderConfigTest, SharesDbFilesBetweenPartiallyOverlappingConfigs) {
   // Sharing is per file rather than per set of files, so a provider that adds a database to
   // another provider's configuration still reuses the file they have in common.
