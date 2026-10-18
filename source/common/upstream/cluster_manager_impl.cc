@@ -863,6 +863,8 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   ClusterDataPtr new_data = std::move(warming_it->second);
   warming_clusters_.erase(warming_it);
   ClusterDataPtr old_active = std::exchange(active_clusters_[cluster_name], std::move(new_data));
+  // Post the CDS pause release to the next event loop iteration.
+  dispatcher_.post([this, cluster_name] { cds_pauses_.erase(cluster_name); });
   // old_active is destroyed here, after both maps are consistent.
 }
 
@@ -905,6 +907,9 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
     removed = true;
     init_helper_.removeCluster(*existing_warming_cluster->second);
     warming_clusters_.erase(existing_warming_cluster);
+    dispatcher_.post([this, cluster_name = std::string(cluster_name)] {
+      cds_pauses_.erase(cluster_name);
+    });
     ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
   }
 
@@ -1039,11 +1044,6 @@ void ClusterManagerImpl::updateClusterCounts() {
   // Once all blocking clusters are warmed up, CDS is resumed and ACK is sent to ADS, providing
   // a signal to ADS to proceed with RDS updates.
   //
-  // Release handles for clusters that are no longer warming. Iterates every entry in cds_pauses_
-  // and removes any whose cluster name is no longer in warming_clusters_. Run unconditionally so
-  // handles are dropped promptly even if shutdown_ is already set. Cost is O(|cds_pauses_|).
-  absl::erase_if(cds_pauses_,
-                 [this](const auto& entry) { return !warming_clusters_.contains(entry.first); });
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }
