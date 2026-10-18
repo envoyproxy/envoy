@@ -2,6 +2,7 @@
 
 #include <atomic>
 
+#include "envoy/common/time.h"
 #include "envoy/network/parent_drained_callback_registrar.h"
 #include "envoy/server/instance.h"
 
@@ -114,6 +115,8 @@ private:
   bool parent_unresponsive_{false};
   std::chrono::milliseconds parent_reply_timeout_{PARENT_REPLY_TIMEOUT};
   std::chrono::milliseconds parent_probe_interval_{PARENT_PROBE_INTERVAL};
+  // The main dispatcher's time source, set by initialize(); waitForParentReply() measures with it.
+  TimeSource* time_source_{};
   bool parent_drained_ ABSL_GUARDED_BY(registry_mu_);
   const bool skip_hot_restart_on_no_parent_;
   const bool skip_parent_stats_;

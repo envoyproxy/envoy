@@ -124,6 +124,46 @@ TEST_F(HotRestartingBaseTest, BlockingReceiveReturnsNothingOnTimeout) {
   EXPECT_TRUE(base_.socketIsNonBlocking());
 }
 
+// With a send timeout set on the socket, a signal interrupts a blocking sendmsg() with EINTR
+// even for handlers installed with SA_RESTART. The send is retried instead of asserting.
+TEST_F(HotRestartingBaseTest, SendMsgRetriesWhenInterruptedBySignal) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t, const msghdr*, int) { return Api::SysCallSizeResult{-1, EINTR}; }))
+      .WillOnce(Invoke([&](os_fd_t, const msghdr* msg, int) {
+        return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+      }));
+
+  std::string dst_path = "/tmp/dst";
+  sockaddr_un sun;
+  sun.sun_family = AF_UNIX;
+  StringUtil::strlcpy(&sun.sun_path[1], dst_path.data(), dst_path.size());
+  sun.sun_path[0] = '\0';
+
+  HotRestartMessage request;
+  request.mutable_request()->mutable_stats();
+
+  EXPECT_TRUE(base_.sendMessage(sun, request));
+  EXPECT_TRUE(base_.socketIsNonBlocking());
+}
+
+// Likewise, a blocking recvmsg() interrupted by a signal returns no message, as on the receive
+// timeout, instead of asserting.
+TEST_F(HotRestartingBaseTest, BlockingReceiveReturnsNothingWhenInterruptedBySignal) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Invoke([&](os_fd_t, msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EINTR};
+  }));
+
+  EXPECT_EQ(base_.receiveBlocking(), nullptr);
+  EXPECT_TRUE(base_.socketIsNonBlocking());
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

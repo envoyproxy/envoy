@@ -164,7 +164,12 @@ RpcStream::SendResult RpcStream::sendHotRestartMessageImpl(sockaddr_un& address,
     int rc = 0;
     bool sent = false;
     for (int attempt = 0; attempt < SENDMSG_MAX_RETRIES; attempt++) {
-      auto result = os_sys_calls.sendmsg(domain_socket_, &message, 0);
+      // With a send timeout set on the socket, a signal interrupts the call with EINTR even when
+      // its handler asks for restarts (see signal(7)): retry it.
+      Api::SysCallSizeResult result;
+      do {
+        result = os_sys_calls.sendmsg(domain_socket_, &message, 0);
+      } while (result.return_value_ == -1 && result.errno_ == EINTR);
       rc = result.return_value_;
       saved_errno = result.errno_;
 
@@ -346,10 +351,12 @@ std::unique_ptr<HotRestartMessage> RpcStream::receiveHotRestartMessage(Blocking 
     message.msg_controllen = CMSG_SPACE(sizeof(int));
 
     const Api::SysCallSizeResult recv_result = os_sys_calls.recvmsg(domain_socket_, &message, 0);
-    if (recv_result.return_value_ == -1 && recv_result.errno_ == SOCKET_ERROR_AGAIN) {
-      // Non-blocking: out of data. Blocking: RECEIVE_TIMEOUT_SLICE elapsed without data. Either
-      // way, hand control back to the caller; any partial message stays buffered for the next
-      // call.
+    if (recv_result.return_value_ == -1 &&
+        (recv_result.errno_ == SOCKET_ERROR_AGAIN || recv_result.errno_ == EINTR)) {
+      // Non-blocking: out of data. Blocking: RECEIVE_TIMEOUT_SLICE elapsed without data, or a
+      // signal interrupted the wait (with a receive timeout set on the socket the call is not
+      // restarted, see signal(7)). Either way, hand control back to the caller; any partial
+      // message stays buffered for the next call.
       if (block == Blocking::Yes) {
         RELEASE_ASSERT(fcntl(domain_socket_, F_SETFL, O_NONBLOCK) != -1,
                        fmt::format("Set domain socket nonblocking failed, errno = {}", errno));

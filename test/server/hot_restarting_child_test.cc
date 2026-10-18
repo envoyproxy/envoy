@@ -432,6 +432,32 @@ TEST_F(HotRestartingChildWaitingForParentTest,
   EXPECT_FALSE(helper_->parentUnresponsive());
 }
 
+// A signal that interrupts the wait for the parent's reply (e.g. the SIGUSR1 a hot restart
+// wrapper forwards to reopen logs) does not end the wait: the reply is still received.
+TEST_F(HotRestartingChildWaitingForParentTest, KeepsWaitingForParentReplyWhenInterruptedBySignal) {
+  EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+    EXPECT_EQ(FakeHotRestartingParent::requestCase(msg), envoy::HotRestartMessage::Request::kStats);
+    return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+  });
+  bool interrupted = false;
+  EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).WillRepeatedly([&](int fd, msghdr* msg, int) {
+    if (fd == helper_->udpForwardingSocketFd()) {
+      return FakeHotRestartingParent::wouldBlock();
+    }
+    if (!interrupted) {
+      interrupted = true;
+      return Api::SysCallSizeResult{-1, EINTR};
+    }
+    return FakeHotRestartingParent::deliver(stats_reply_wire_, msg);
+  });
+
+  std::unique_ptr<envoy::HotRestartMessage> reply = hot_restarting_child_->getParentStats();
+  ASSERT_NE(reply, nullptr);
+  EXPECT_EQ(reply->reply().stats().gauges().at("parent.gauge"), 7);
+  EXPECT_TRUE(interrupted);
+  EXPECT_FALSE(helper_->parentUnresponsive());
+}
+
 TEST_F(HotRestartingChildWaitingForParentTest, WritesParentOffAfterReplyTimeout) {
   helper_->setParentReplyTimeout(std::chrono::milliseconds(0));
   EXPECT_CALL(os_sys_calls_, sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
