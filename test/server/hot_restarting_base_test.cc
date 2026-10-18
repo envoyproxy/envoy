@@ -84,7 +84,7 @@ TEST_F(HotRestartingBaseTest, SendMsgRetrySucceedsEventually) {
 // undersized allocation) — see #45872.
 TEST_F(HotRestartingBaseTest, OversizedLengthPrefixDropped) {
   int fds[2];
-  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM, 0, fds));
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0, fds));
 
   RpcStream stream(0);
   stream.domain_socket_ = fds[0];
@@ -102,7 +102,7 @@ TEST_F(HotRestartingBaseTest, OversizedLengthPrefixDropped) {
 // next legitimate datagram still parses.
 TEST_F(HotRestartingBaseTest, OversizedLengthPrefixDroppedThenNormalMessageParses) {
   int fds[2];
-  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM, 0, fds));
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0, fds));
 
   RpcStream stream(0);
   stream.domain_socket_ = fds[0];
@@ -127,7 +127,7 @@ TEST_F(HotRestartingBaseTest, OversizedLengthPrefixDroppedThenNormalMessageParse
 // caller expects a reply, and the receive must restore O_NONBLOCK on its way out.
 TEST_F(HotRestartingBaseTest, OversizedLengthPrefixDroppedBlockingReturnsNextMessage) {
   int fds[2];
-  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM, 0, fds));
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0, fds));
 
   RpcStream stream(0);
   stream.domain_socket_ = fds[0];
