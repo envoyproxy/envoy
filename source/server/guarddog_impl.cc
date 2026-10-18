@@ -21,7 +21,9 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 #include "source/server/watchdog_impl.h"
 
 #include "absl/synchronization/mutex.h"
@@ -143,7 +145,7 @@ void GuardDogImpl::step() {
       if (delta > miss_timeout_) {
         if (!watched_dog->miss_alerted_) {
           watchdog_miss_counter_.inc();
-          watched_dog->miss_counter_.inc();
+          watched_dog->stats_.watchdog_miss_.inc();
           watched_dog->last_alert_time_ = last_checkin;
           watched_dog->miss_alerted_ = true;
           miss_threads.emplace_back(tid, last_checkin);
@@ -152,7 +154,7 @@ void GuardDogImpl::step() {
       if (delta > megamiss_timeout_) {
         if (!watched_dog->megamiss_alerted_) {
           watchdog_megamiss_counter_.inc();
-          watched_dog->megamiss_counter_.inc();
+          watched_dog->stats_.watchdog_mega_miss_.inc();
           watched_dog->last_alert_time_ = last_checkin;
           watched_dog->megamiss_alerted_ = true;
           mega_miss_threads.emplace_back(tid, last_checkin);
@@ -262,17 +264,19 @@ void GuardDogImpl::invokeGuardDogActions(
   }
 }
 
+namespace {
+WatchDogStats generateStats(Stats::Scope& scope, absl::string_view thread_name) {
+  // server.(worker_<id>.)watchdog_*: a worker thread contributes the envoy.worker_id tag; any
+  // other thread name (the main thread) stays a plain segment.
+  const auto prefix = Stats::workerStatPrefix(scope.symbolTable(), "server.", thread_name);
+  Stats::LiteScopeHelper helper(scope, prefix.baseName(), prefix.tags(), prefix.name());
+  return {ALL_WATCHDOG_STATS(POOL_COUNTER(helper))};
+}
+} // namespace
+
 GuardDogImpl::WatchedDog::WatchedDog(Stats::Scope& stats_scope, const std::string& thread_name,
                                      const WatchDogImplSharedPtr& watch_dog)
-    : dog_(watch_dog),
-      miss_counter_(stats_scope.counterFromStatName(
-          Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_miss", thread_name),
-                                        stats_scope.symbolTable())
-              .statName())),
-      megamiss_counter_(stats_scope.counterFromStatName(
-          Stats::StatNameManagedStorage(fmt::format("server.{}.watchdog_mega_miss", thread_name),
-                                        stats_scope.symbolTable())
-              .statName())) {}
+    : dog_(watch_dog), stats_(generateStats(stats_scope, thread_name)) {}
 
 } // namespace Server
 } // namespace Envoy

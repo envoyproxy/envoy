@@ -478,6 +478,8 @@ public:
   Network::Address::InstanceConstSharedPtr local_address_{
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
+  // A worker thread's dispatcher, for the handler of PerWorkerListenerStatsAreTagged.
+  NiceMock<Event::MockDispatcher> worker_dispatcher_{"worker_1"};
   std::list<TestListenerPtr> listeners_;
   std::unique_ptr<MockConnectionHandlerImpl> handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
@@ -2807,6 +2809,40 @@ TEST_F(ConnectionHandlerTest, HotRestartShutdownUdpListenerKeepsListening) {
 TEST_F(ConnectionHandlerTest, WorkerId) {
   EXPECT_EQ(handler_->workerId(), 0);
   EXPECT_FALSE(MockConnectionHandlerImpl(dispatcher_, std::nullopt).workerId().has_value());
+}
+
+TEST_F(ConnectionHandlerTest, PerWorkerListenerStatsAreTagged) {
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  handler_ = std::make_unique<MockConnectionHandlerImpl>(worker_dispatcher_, 1);
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener = addListener(1, true, false, "test_listener", listener);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  const Stats::CounterSharedPtr cx_total =
+      TestUtility::findCounter(stats_store_, "worker_1.downstream_cx_total");
+  ASSERT_NE(cx_total, nullptr);
+  EXPECT_EQ("worker.downstream_cx_total", cx_total->tagExtractedName());
+  EXPECT_THAT(tags_of(*cx_total),
+              testing::UnorderedElementsAre(testing::Pair("envoy.worker_id", "1")));
+  const Stats::GaugeSharedPtr cx_active =
+      TestUtility::findGauge(stats_store_, "worker_1.downstream_cx_active");
+  ASSERT_NE(cx_active, nullptr);
+  EXPECT_EQ("worker.downstream_cx_active", cx_active->tagExtractedName());
+  EXPECT_THAT(tags_of(*cx_active),
+              testing::UnorderedElementsAre(testing::Pair("envoy.worker_id", "1")));
+
+  // The stats of the listener itself are untouched.
+  const Stats::CounterSharedPtr listener_cx_total =
+      TestUtility::findCounter(stats_store_, "downstream_cx_total");
+  ASSERT_NE(listener_cx_total, nullptr);
+  EXPECT_TRUE(listener_cx_total->tags().empty());
 }
 
 } // namespace

@@ -816,6 +816,43 @@ TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
 }
 #endif
 
+TEST_P(GuardDogMissTest, WatchdogStatsAreTagged) {
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  initGuardDog(stats_store_, config_miss_);
+  // The worker id comes from the thread name.
+  auto worker_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "worker_1",
+                                               mock_dispatcher_);
+  auto main_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(), "main_thread",
+                                             mock_dispatcher_);
+
+  const Stats::CounterSharedPtr worker_miss =
+      TestUtility::findCounter(stats_store_, "server.worker_1.watchdog_miss");
+  ASSERT_NE(worker_miss, nullptr);
+  EXPECT_EQ("server.worker.watchdog_miss", worker_miss->tagExtractedName());
+  EXPECT_THAT(tags_of(*worker_miss),
+              testing::UnorderedElementsAre(testing::Pair("envoy.worker_id", "1")));
+  const Stats::CounterSharedPtr worker_mega_miss =
+      TestUtility::findCounter(stats_store_, "server.worker_1.watchdog_mega_miss");
+  ASSERT_NE(worker_mega_miss, nullptr);
+  EXPECT_EQ("server.worker.watchdog_mega_miss", worker_mega_miss->tagExtractedName());
+
+  const Stats::CounterSharedPtr main_miss =
+      TestUtility::findCounter(stats_store_, "server.main_thread.watchdog_miss");
+  ASSERT_NE(main_miss, nullptr);
+  EXPECT_EQ("server.main_thread.watchdog_miss", main_miss->tagExtractedName());
+  EXPECT_TRUE(main_miss->tags().empty());
+
+  guard_dog_->stopWatching(worker_dog);
+  guard_dog_->stopWatching(main_dog);
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

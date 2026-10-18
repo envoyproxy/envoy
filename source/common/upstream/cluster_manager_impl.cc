@@ -38,6 +38,8 @@
 #include "source/common/router/router.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
+#include "source/common/stats/utility.h"
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
@@ -553,8 +555,12 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
 ThreadLocalClusterManagerStats
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::generateStats(Stats::Scope& scope,
                                                                  const std::string& thread_name) {
-  const std::string final_prefix = absl::StrCat("thread_local_cluster_manager.", thread_name);
-  return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE_PREFIX(scope, final_prefix))};
+  // thread_local_cluster_manager.(worker_<id>.)*: a worker thread contributes the
+  // envoy.worker_id tag; any other thread name (the main thread) stays a plain segment.
+  const auto prefix =
+      Stats::workerStatPrefix(scope.symbolTable(), "thread_local_cluster_manager.", thread_name);
+  Stats::LiteScopeHelper helper(scope, prefix.baseName(), prefix.tags(), prefix.name());
+  return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE(helper))};
 }
 
 absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {

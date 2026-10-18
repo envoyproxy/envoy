@@ -307,5 +307,6 @@ envoy_cc_library(
         "//envoy/stats:tag_interface",
         "//source/common/common:assert_lib",
         "//source/common/config:well_known_names",
+        "@abseil-cpp//absl/strings",
     ],
 )
