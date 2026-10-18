@@ -178,6 +178,9 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
 
   const Stats::StatName entity_type_name =
       stats_->getBuiltin(entity_type, stats_->unknown_entity_type_);
+  // The entity is emitted as the tag of its type: an operation or a table.
+  const Stats::StatName entity_tag =
+      entity_type == "operation" ? stats_->operation_tag_ : stats_->table_tag_;
   const Stats::StatName entity_name = dynamic.add(entity);
 
   // TODO(jmarantz): Consider using a similar mechanism to common/http/codes.cc
@@ -185,18 +188,19 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
   const Stats::StatName total_name = dynamic.add(absl::StrCat("upstream_rq_total_", status));
   const Stats::StatName time_name = dynamic.add(absl::StrCat("upstream_rq_time_", status));
 
-  stats_->incCounter({entity_type_name, entity_name, stats_->upstream_rq_total_});
+  stats_->incEntityCounter(entity_type_name, entity_tag, entity_name, stats_->upstream_rq_total_);
   const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
-  stats_->incCounter({entity_type_name, entity_name, total_group});
-  stats_->incCounter({entity_type_name, entity_name, total_name});
+  stats_->incEntityCounter(entity_type_name, entity_tag, entity_name, total_group);
+  stats_->incEntityCounter(entity_type_name, entity_tag, entity_name, total_name);
 
-  stats_->recordHistogram({entity_type_name, entity_name, stats_->upstream_rq_time_},
-                          Stats::Histogram::Unit::Milliseconds, latency.count());
+  stats_->recordEntityHistogram(entity_type_name, entity_tag, entity_name,
+                                stats_->upstream_rq_time_, Stats::Histogram::Unit::Milliseconds,
+                                latency.count());
   const Stats::StatName time_group = stats_->upstream_rq_time_groups_[group_index];
-  stats_->recordHistogram({entity_type_name, entity_name, time_group},
-                          Stats::Histogram::Unit::Milliseconds, latency.count());
-  stats_->recordHistogram({entity_type_name, entity_name, time_name},
-                          Stats::Histogram::Unit::Milliseconds, latency.count());
+  stats_->recordEntityHistogram(entity_type_name, entity_tag, entity_name, time_group,
+                                Stats::Histogram::Unit::Milliseconds, latency.count());
+  stats_->recordEntityHistogram(entity_type_name, entity_tag, entity_name, time_name,
+                                Stats::Histogram::Unit::Milliseconds, latency.count());
 }
 
 void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
@@ -205,8 +209,7 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
     Stats::StatNameDynamicStorage storage(unprocessed_table, stats_->symbolTable());
-    stats_->incCounter(
-        {stats_->error_, storage.statName(), stats_->batch_failure_unprocessed_keys_});
+    stats_->incTableErrorCounter(storage.statName(), stats_->batch_failure_unprocessed_keys_);
   }
 }
 
@@ -215,12 +218,12 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
 
   if (!error_type.empty()) {
     Stats::StatNameDynamicPool dynamic(stats_->symbolTable());
-    if (table_descriptor_.table_name.empty()) {
-      stats_->incCounter({stats_->error_, stats_->no_table_, dynamic.add(error_type)});
-    } else {
-      stats_->incCounter(
-          {stats_->error_, dynamic.add(table_descriptor_.table_name), dynamic.add(error_type)});
-    }
+    // Legacy tag extraction does not distinguish the 'no_table' placeholder from a table name,
+    // so it is tagged as one here too.
+    const Stats::StatName table = table_descriptor_.table_name.empty()
+                                      ? stats_->no_table_
+                                      : dynamic.add(table_descriptor_.table_name);
+    stats_->incTableErrorCounter(table, dynamic.add(error_type));
   } else {
     stats_->incCounter({stats_->empty_response_body_});
   }

@@ -17,8 +17,8 @@ absl::StatusOr<Http::FilterFactoryCb> DynamoFilterConfig::createHttpFilterFactor
     const envoy::extensions::filters::http::dynamo::v3::Dynamo&,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  auto stats =
-      std::make_shared<DynamoStats>(extra_context.scopeOr(context), extra_context.stats_prefix);
+  auto stats = std::make_shared<DynamoStats>(extra_context.statsPrefixScopeOr(context),
+                                             extra_context.statsPrefixOr());
   return [&context, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         std::make_shared<Dynamo::DynamoFilter>(context.runtime(), stats, context.timeSource()));
