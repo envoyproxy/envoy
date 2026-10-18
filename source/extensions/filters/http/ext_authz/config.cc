@@ -25,12 +25,13 @@ absl::StatusOr<Http::FilterFactoryCb> ExtAuthzFilterConfig::createHttpFilterFact
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
-  // Like the router, this filter charges response code stats to the scope it is given, under names
-  // of their own rather than under its stat prefix, so that scope stays the server's one and the
-  // prefix of the filter chain is carried in the stat prefix instead.
-  const auto filter_config =
-      std::make_shared<FilterConfig>(proto_config, server_context.scope(),
-                                     extra_context.stats_prefix, server_context, creation_status);
+  // Like the router, this filter charges response code stats to the server scope, under names of
+  // their own rather than under its stat prefix. Its own stats live under the stats prefix, so they
+  // go in the prefixed scope when the filter chain provides one (the prefix is then part of the
+  // scope's name and statsPrefixOr() is empty) and under the stats prefix otherwise.
+  const auto filter_config = std::make_shared<FilterConfig>(
+      proto_config, server_context.scope(), extra_context.statsPrefixScopeOr(server_context),
+      extra_context.statsPrefixOr(), server_context, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   // The callback is created in main thread and executed in worker thread, variables except factory
   // context must be captured by value into the callback.

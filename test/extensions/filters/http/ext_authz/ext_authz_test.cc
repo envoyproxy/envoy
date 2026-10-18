@@ -1363,8 +1363,8 @@ TEST_P(HttpFilterTestParam, DEPRECATED_FEATURE_TEST(DuplicateAllowedHeadersConfi
   )EOF",
                             proto_config);
   absl::Status creation_status = absl::OkStatus();
-  FilterConfig filter_config(proto_config, *stats_store_.rootScope(), "ext_authz_prefix",
-                             factory_context_, creation_status);
+  FilterConfig filter_config(proto_config, *stats_store_.rootScope(), *stats_store_.rootScope(),
+                             "ext_authz_prefix", factory_context_, creation_status);
   EXPECT_THAT(creation_status, HasStatus(absl::StatusCode::kInvalidArgument,
                                          "Invalid duplicate configuration for allowed_headers."));
 }
@@ -3197,6 +3197,54 @@ TEST_F(ResponseHeaderLimitTest, EncodeHeadersToOverwriteIfExistsExceedsSizeLimit
                                                    /*max_headers_count=*/9999);
 
   runTest(response_headers, response);
+}
+
+TEST_F(HttpFilterTest, StatsAreTagged) {
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+  TestUtility::loadFromYaml(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  stat_prefix: waf
+  )EOF",
+                            proto_config);
+  absl::Status creation_status = absl::OkStatus();
+  FilterConfig config(proto_config, *stats_store_.rootScope(), *stats_store_.rootScope(),
+                      "http.hcm.", factory_context_, creation_status);
+  ASSERT_OK(creation_status);
+
+  // The filter's stat prefix stays a segment of the flat names and is the stats' only own tag; the
+  // stats prefix is joined verbatim.
+  EXPECT_EQ("http.hcm.ext_authz.waf.ok", config.stats().ok_.name());
+  EXPECT_EQ("http.hcm.ext_authz.ok", config.stats().ok_.tagExtractedName());
+  ASSERT_EQ(1U, config.stats().ok_.tags().size());
+  EXPECT_EQ("envoy.ext_authz_prefix", config.stats().ok_.tags()[0].name_);
+  EXPECT_EQ("waf", config.stats().ok_.tags()[0].value_);
+
+  // The cluster stats are charged to the scope of the upstream cluster, here the root scope.
+  config.incCounter(*stats_store_.rootScope(), config.ext_authz_denied_);
+  const Stats::CounterSharedPtr denied =
+      TestUtility::findCounter(stats_store_, "ext_authz.waf.denied");
+  ASSERT_NE(denied, nullptr);
+  EXPECT_EQ(1U, denied->value());
+  EXPECT_EQ("ext_authz.denied", denied->tagExtractedName());
+  ASSERT_EQ(1U, denied->tags().size());
+  EXPECT_EQ("envoy.ext_authz_prefix", denied->tags()[0].name_);
+  EXPECT_EQ("waf", denied->tags()[0].value_);
+
+  // Without a stat prefix of its own, the stats carry no tags.
+  proto_config.clear_stat_prefix();
+  FilterConfig plain_config(proto_config, *stats_store_.rootScope(), *stats_store_.rootScope(),
+                            "http.hcm.", factory_context_, creation_status);
+  ASSERT_OK(creation_status);
+  EXPECT_EQ("http.hcm.ext_authz.ok", plain_config.stats().ok_.name());
+  EXPECT_EQ("http.hcm.ext_authz.ok", plain_config.stats().ok_.tagExtractedName());
+  EXPECT_TRUE(plain_config.stats().ok_.tags().empty());
+  plain_config.incCounter(*stats_store_.rootScope(), plain_config.ext_authz_ok_);
+  const Stats::CounterSharedPtr ok = TestUtility::findCounter(stats_store_, "ext_authz.ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ("ext_authz.ok", ok->tagExtractedName());
+  EXPECT_TRUE(ok->tags().empty());
 }
 
 } // namespace

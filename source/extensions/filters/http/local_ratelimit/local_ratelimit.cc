@@ -11,8 +11,10 @@
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/http/codes.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
 
 #include "absl/strings/str_cat.h"
@@ -142,8 +144,15 @@ FilterConfig::requestAllowed(absl::Span<const RateLimit::Descriptor> request_des
 }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = prefix + ".http_local_rate_limit";
-  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  // (<stat_prefix>.)http_local_rate_limit.<stat>: the stats are named after the filter's own stat
+  // prefix rather than the one of the filter chain, and that prefix is their tag.
+  const Stats::TagStringView tag{Envoy::Config::TagNames::get().LOCAL_HTTP_RATELIMIT_PREFIX,
+                                 prefix};
+  Stats::LiteScopeHelper helper(scope, "http_local_rate_limit",
+                                prefix.empty() ? Stats::TagStringViewSpan()
+                                               : Stats::TagStringViewSpan{tag},
+                                absl::StrCat(prefix, ".http_local_rate_limit"));
+  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER(helper))};
 }
 
 bool FilterConfig::enabled() const {

@@ -130,16 +130,17 @@ public:
   TimeSource& timeSource() { return time_source_; }
 
   void incDelays(Stats::StatName downstream_cluster) {
-    incCounter(downstream_cluster, delays_injected_);
+    incCounter(downstream_cluster, delays_injected_, delays_injected_base_);
   }
 
   void incAborts(Stats::StatName downstream_cluster) {
-    incCounter(downstream_cluster, aborts_injected_);
+    incCounter(downstream_cluster, aborts_injected_, aborts_injected_base_);
   }
 
 private:
   static FaultFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
-  void incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name);
+  void incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name,
+                  Stats::StatName base_name);
 
   const FaultSettings settings_;
   Runtime::Loader& runtime_;
@@ -149,7 +150,13 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName aborts_injected_;
   const Stats::StatName delays_injected_;
-  const Stats::StatName stats_prefix_; // Includes ".fault".
+  const Stats::StatName stats_prefix_; // Includes "fault".
+  // The tag the downstream cluster is emitted as on the per-cluster stats.
+  const Stats::StatName downstream_cluster_tag_;
+  // The tag-extracted names of the per-cluster stats, pre-joined once so that charging a stat
+  // only joins the full name with the dynamic cluster segment.
+  const Stats::StatName aborts_injected_base_;
+  const Stats::StatName delays_injected_base_;
 };
 
 using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;

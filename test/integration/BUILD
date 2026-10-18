@@ -1588,6 +1588,7 @@ envoy_cc_test_library(
     hdrs = [
         "server.h",
         "ssl_utility.h",
+        "tagged_stats_test_util.h",
         "utility.h",
     ],
     data = ["//test/common/runtime:filesystem_test_data"],
@@ -1614,8 +1615,10 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
