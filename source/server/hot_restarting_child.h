@@ -2,6 +2,7 @@
 
 #include <atomic>
 
+#include "envoy/common/time.h"
 #include "envoy/network/parent_drained_callback_registrar.h"
 #include "envoy/server/instance.h"
 
@@ -129,7 +130,9 @@ private:
   Event::TimerPtr parent_exit_timer_;
   // Whether the parent's socket has accepted the terminate request.
   bool terminate_delivered_{false};
-  std::chrono::steady_clock::time_point parent_exit_wait_start_; // NO_CHECK_FORMAT(real_time)
+  MonotonicTime parent_exit_wait_start_;
+  // The main dispatcher's time source, set by initialize(); waitForParentReply() measures with it.
+  TimeSource* time_source_{};
   bool parent_drained_ ABSL_GUARDED_BY(registry_mu_);
   const bool skip_hot_restart_on_no_parent_;
   const bool skip_parent_stats_;

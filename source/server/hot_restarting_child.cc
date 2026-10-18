@@ -94,6 +94,7 @@ bool HotRestartingChild::abortDueToFailedParentConnection() {
 }
 
 void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
+  time_source_ = &dispatcher.timeSource();
   if (abortDueToFailedParentConnection()) {
     ENVOY_LOG(warn, "hot restart sendmsg() connection refused, falling back to regular restart");
     absl::MutexLock lock(registry_mu_);
@@ -167,9 +168,9 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address,
 }
 
 std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
-  // A monotonic clock, so that a step of the wall clock cannot move the deadline. This runs before
-  // the server and its time system exist, hence the direct use.
-  const auto start = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+  // A monotonic clock, so that a step of the wall clock cannot move the deadline.
+  ASSERT(time_source_ != nullptr);
+  const MonotonicTime start = time_source_->monotonicTime();
   auto next_probe = start + parent_probe_interval_;
   while (true) {
     // Returns after RECEIVE_TIMEOUT_SLICE without data, so the loop below runs regularly.
@@ -186,7 +187,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::waitForParentReply() {
                          "parent: {}",
                          status.message());
     }
-    const auto now = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+    const MonotonicTime now = time_source_->monotonicTime();
     if (now - start >= parent_reply_timeout_) {
       onParentUnreachable(fmt::format("no reply within {}ms", parent_reply_timeout_.count()));
       return nullptr;
@@ -244,7 +245,7 @@ void HotRestartingChild::onParentExitTimer() {
     terminate_delivered_ = true;
   }
   const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::steady_clock::now() - parent_exit_wait_start_); // NO_CHECK_FORMAT(real_time)
+      time_source_->monotonicTime() - parent_exit_wait_start_);
   if (waited >= parent_exit_wait_cap_) {
     if (terminate_delivered_) {
       ENVOY_LOG(warn,
@@ -395,7 +396,7 @@ void HotRestartingChild::sendParentTerminateRequest() {
       allDrainsImplicitlyComplete();
     } else {
       terminate_delivered_ = sent == RpcStream::SendResult::Sent;
-      parent_exit_wait_start_ = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+      parent_exit_wait_start_ = time_source_->monotonicTime();
       parent_exit_timer_->enableTimer(parent_exit_probe_interval_);
     }
   }
