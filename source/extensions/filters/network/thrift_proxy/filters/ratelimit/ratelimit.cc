@@ -80,10 +80,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
   if (descriptor_statuses != nullptr &&
-      std::any_of(descriptor_statuses->begin(), descriptor_statuses->end(),
-                  [](const auto& descriptor_status) {
-                    return descriptor_status.shadow_over_limit();
-                  })) {
+      std::any_of(
+          descriptor_statuses->begin(), descriptor_statuses->end(),
+          [](const auto& descriptor_status) { return descriptor_status.shadow_over_limit(); })) {
     cluster_->statsScope().counterFromStatName(stat_names.shadow_over_limit_).inc();
   }
 

@@ -400,8 +400,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithShadowModeDescriptor) {
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited))
       .Times(0);
-  auto descriptor_statuses =
-      std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  auto descriptor_statuses = std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
   (*descriptor_statuses)[1].set_shadow_over_limit(true);
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
                                std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);
@@ -864,8 +863,7 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithShadowModeDescriptor) {
               setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
-  auto descriptor_statuses =
-      std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  auto descriptor_statuses = std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
   (*descriptor_statuses)[1].set_shadow_over_limit(true);
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit,
                                std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);

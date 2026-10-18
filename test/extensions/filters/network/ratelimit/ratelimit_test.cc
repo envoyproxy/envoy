@@ -173,8 +173,7 @@ TEST_F(RateLimitFilterTest, ShadowModeDescriptor) {
 
   EXPECT_CALL(filter_callbacks_, continueReading());
   EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
-  auto descriptor_statuses =
-      std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  auto descriptor_statuses = std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
   (*descriptor_statuses)[1].set_shadow_over_limit(true);
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
                                std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);

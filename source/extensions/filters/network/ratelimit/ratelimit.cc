@@ -120,10 +120,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   config_->stats().active_.dec();
 
   if (descriptor_statuses != nullptr &&
-      std::any_of(descriptor_statuses->begin(), descriptor_statuses->end(),
-                  [](const auto& descriptor_status) {
-                    return descriptor_status.shadow_over_limit();
-                  })) {
+      std::any_of(
+          descriptor_statuses->begin(), descriptor_statuses->end(),
+          [](const auto& descriptor_status) { return descriptor_status.shadow_over_limit(); })) {
     config_->stats().shadow_over_limit_.inc();
   }
 
