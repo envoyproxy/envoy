@@ -51,8 +51,7 @@ protected:
   }
 
   void setupThreadLocalSlot() {
-    thread_local_registry_ =
-        std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    thread_local_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, *extension_);
     tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
     thread_local_.setDispatcher(&dispatcher_);
     tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
@@ -62,7 +61,7 @@ protected:
 
   void setupAnotherThreadLocalSlot() {
     another_thread_local_registry_ =
-        std::make_shared<UpstreamSocketThreadLocal>(another_dispatcher_, extension_.get());
+        std::make_shared<UpstreamSocketThreadLocal>(another_dispatcher_, *extension_);
   }
 
   ReverseTunnelAcceptor& globalAcceptor() {
@@ -137,6 +136,21 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetStatsScope) {
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, OnWorkerThreadInitialized) {
   extension_->onWorkerThreadInitialized();
+  auto* registry = extension_->getLocalRegistry();
+  EXPECT_NE(registry, nullptr);
+
+  extension_->onServerInitialized(server_);
+  EXPECT_EQ(extension_->getLocalRegistry(), registry);
+  EXPECT_EQ(socket_interface_->getExtension(), extension_.get());
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, DestructorClearsSocketInterfaceExtension) {
+  auto socket_interface = std::make_unique<ReverseTunnelAcceptor>(context_);
+  auto extension =
+      std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface, context_, config_);
+  EXPECT_EQ(socket_interface->getExtension(), extension.get());
+  extension.reset();
+  EXPECT_EQ(socket_interface->getExtension(), nullptr);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, OnServerInitializedSetsExtensionReference) {
@@ -221,7 +235,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStat
 
   // Set up thread local slot so aggregate metrics can be initialized.
   auto no_stats_registry =
-      std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, no_stats_extension.get());
+      std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, *no_stats_extension);
   auto no_stats_tls_slot =
       ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
   thread_local_.setDispatcher(&dispatcher_);

@@ -193,7 +193,7 @@ public:
     // Create a thread local registry for upstream with the dispatcher.
     upstream_thread_local_registry_ =
         std::make_shared<ReverseConnection::UpstreamSocketThreadLocal>(dispatcher_,
-                                                                       upstream_extension_.get());
+                                                                       *upstream_extension_);
 
     upstream_tls_slot_ =
         ThreadLocal::TypedSlot<ReverseConnection::UpstreamSocketThreadLocal>::makeUnique(
