@@ -235,8 +235,9 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
       return;
     }
 
-    std::vector<DecodedResourcePtr> decoded_resources;
     OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
+    Protobuf::Arena batch_arena(resource_decoder.arenaOptions());
+    std::vector<DecodedResourcePtr> decoded_resources;
     std::string version_info;
     for (const auto& resource : resources) {
       if (version_info.empty()) {
@@ -247,7 +248,7 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
 
       TRY_ASSERT_MAIN_THREAD {
         decoded_resources.emplace_back(
-            std::make_unique<DecodedResourceImpl>(resource_decoder, resource));
+            std::make_unique<DecodedResourceImpl>(resource_decoder, resource, batch_arena));
       }
       END_TRY
       CATCH(const EnvoyException& e,
@@ -411,8 +412,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
   TRY_ASSERT_MAIN_THREAD {
-    std::vector<DecodedResourcePtr> resources;
     OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
+    Protobuf::Arena batch_arena(resource_decoder.arenaOptions());
+    std::vector<DecodedResourcePtr> resources;
 
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
@@ -424,7 +426,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
 
       auto decoded_resource = THROW_OR_RETURN_VALUE(
-          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info()),
+          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info(),
+                                            batch_arena),
           DecodedResourceImplPtr);
 
       if (!isHeartbeatResource(type_url, *decoded_resource)) {

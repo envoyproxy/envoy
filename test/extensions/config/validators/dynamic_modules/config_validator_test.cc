@@ -83,28 +83,28 @@ public:
     return typed_config;
   }
 
-  static Envoy::Config::DecodedResourcePtr clusterResource(absl::string_view name,
-                                                           absl::string_view version) {
-    auto cluster = std::make_unique<envoy::config::cluster::v3::Cluster>();
+  Envoy::Config::DecodedResourcePtr clusterResource(absl::string_view name,
+                                                    absl::string_view version) {
+    auto cluster = Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena_);
     cluster->set_name(std::string(name));
     return std::make_unique<Envoy::Config::DecodedResourceImpl>(
         std::move(cluster), std::string(name), std::vector<std::string>{}, std::string(version));
   }
 
-  static Envoy::Config::DecodedResourcePtr payloadlessClusterResource(absl::string_view name,
-                                                                      absl::string_view version) {
+  Envoy::Config::DecodedResourcePtr payloadlessClusterResource(absl::string_view name,
+                                                               absl::string_view version) {
     Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::cluster::v3::Cluster> decoder(
         ProtobufMessage::getStrictValidationVisitor(), "name");
     envoy::service::discovery::v3::Resource resource;
     resource.set_name(std::string(name));
     resource.set_version(std::string(version));
-    return std::make_unique<Envoy::Config::DecodedResourceImpl>(decoder, resource);
+    return std::make_unique<Envoy::Config::DecodedResourceImpl>(decoder, resource, arena_);
   }
 
   // Builds a resource carrying aliases and a TTL, so tests can prove those envelope fields cross
   // the ABI.
-  static Envoy::Config::DecodedResourcePtr envelopeResource(absl::string_view name,
-                                                            absl::string_view version) {
+  Envoy::Config::DecodedResourcePtr envelopeResource(absl::string_view name,
+                                                     absl::string_view version) {
     Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::cluster::v3::Cluster> decoder(
         ProtobufMessage::getStrictValidationVisitor(), "name");
     envoy::service::discovery::v3::Resource resource;
@@ -113,9 +113,10 @@ public:
     resource.add_aliases("alias_0");
     resource.add_aliases("alias_1");
     resource.mutable_ttl()->set_seconds(5);
-    return std::make_unique<Envoy::Config::DecodedResourceImpl>(decoder, resource);
+    return std::make_unique<Envoy::Config::DecodedResourceImpl>(decoder, resource, arena_);
   }
 
+  Protobuf::Arena arena_;
   const std::string cluster_type_url_{
       Envoy::Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()};
   const std::string module_path_{TestEnvironment::substitute(

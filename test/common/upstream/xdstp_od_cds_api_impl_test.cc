@@ -122,8 +122,10 @@ TEST_F(XdstpOdCdsApiImplTest, SuccessfulClusterAddition) {
   const std::string version = "v1";
   EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(cluster), version, false));
 
+  Protobuf::Arena arena;
   Config::DecodedResourceImpl decoded_resource(
-      std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), "fake_cluster", {}, version);
+      Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena, cluster),
+      "fake_cluster", {}, version);
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
 
@@ -152,8 +154,10 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterRemoval) {
   const std::string version = "v1";
   EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(cluster), version, false));
 
+  Protobuf::Arena arena;
   Config::DecodedResourceImpl decoded_resource(
-      std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), "fake_cluster", {}, version);
+      Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena, cluster),
+      "fake_cluster", {}, version);
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
 
@@ -222,8 +226,10 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterUpdate) {
   const std::string version = "v1";
   EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(cluster), version, false));
 
+  Protobuf::Arena arena;
   Config::DecodedResourceImpl decoded_resource(
-      std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), "fake_cluster", {}, version);
+      Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena, cluster),
+      "fake_cluster", {}, version);
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
 
@@ -242,8 +248,8 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterUpdate) {
   EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(updated_cluster), version2, false));
 
   Config::DecodedResourceImpl decoded_resource2(
-      std::make_unique<envoy::config::cluster::v3::Cluster>(updated_cluster), "fake_cluster", {},
-      version2);
+      Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena, updated_cluster),
+      "fake_cluster", {}, version2);
   std::vector<Config::DecodedResourceRef> resources2;
   resources2.emplace_back(decoded_resource2);
 
@@ -295,8 +301,10 @@ TEST_F(XdstpOdCdsApiImplTest, MultipleSubscriptions) {
                                                                               cluster_name1));
   const std::string version = "v1";
   EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(cluster), version, false));
+  Protobuf::Arena arena;
   Config::DecodedResourceImpl decoded_resource(
-      std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), cluster_name1, {}, version);
+      Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena, cluster),
+      cluster_name1, {}, version);
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
   EXPECT_OK(callbacks1->onConfigUpdate(resources, version));
@@ -329,8 +337,10 @@ TEST_F(XdstpOdCdsApiImplTest, ClusterRemovalViaDeltaUpdate) {
                                                                               cluster_name));
   const std::string version = "v1";
   EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(cluster), version, false));
+  Protobuf::Arena arena;
   Config::DecodedResourceImpl decoded_resource(
-      std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), cluster_name, {}, version);
+      Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena, cluster),
+      cluster_name, {}, version);
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
   EXPECT_OK(odcds_callbacks_->onConfigUpdate(resources, version));

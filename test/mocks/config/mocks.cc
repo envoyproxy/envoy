@@ -61,7 +61,9 @@ MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() = default;
 MockSubscriptionCallbacks::MockSubscriptionCallbacks() = default;
 MockSubscriptionCallbacks::~MockSubscriptionCallbacks() = default;
 
-MockOpaqueResourceDecoder::MockOpaqueResourceDecoder() = default;
+MockOpaqueResourceDecoder::MockOpaqueResourceDecoder() {
+  ON_CALL(*this, arenaOptions()).WillByDefault(ReturnRef(arena_options_));
+}
 MockOpaqueResourceDecoder::~MockOpaqueResourceDecoder() = default;
 
 MockUntypedConfigUpdateCallbacks::MockUntypedConfigUpdateCallbacks() = default;

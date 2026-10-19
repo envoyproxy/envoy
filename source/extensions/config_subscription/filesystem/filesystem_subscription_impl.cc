@@ -172,7 +172,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   const auto* reflection = collection_message->GetReflection();
   const uint32_t num_entries =
       reflection->FieldSize(*collection_message, collection_entries_field_descriptor);
-  DecodedResourcesWrapper decoded_resources;
+  DecodedResourcesWrapper decoded_resources(resource_decoder_->arenaOptions());
   for (uint32_t i = 0; i < num_entries; ++i) {
     xds::core::v3::CollectionEntry collection_entry;
     collection_entry.MergeFrom(reflection->GetRepeatedMessage(
@@ -180,7 +180,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
     // TODO(htuch): implement indirect collection entries.
     if (collection_entry.has_inline_entry()) {
       decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(
-          *resource_decoder_, collection_entry.inline_entry()));
+          *resource_decoder_, collection_entry.inline_entry(), *decoded_resources.arena_));
     }
   }
   *config_update = std::move(owned_resource_message);

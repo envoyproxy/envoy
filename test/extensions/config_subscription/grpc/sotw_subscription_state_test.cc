@@ -147,7 +147,15 @@ protected:
       std::ignore = response.add_resources()->PackFrom(resource(resource_name));
     }
     EXPECT_CALL(callbacks_,
-                onConfigUpdate(An<const std::vector<DecodedResourcePtr>&>(), version_info));
+                onConfigUpdate(An<const std::vector<DecodedResourcePtr>&>(), version_info))
+        .WillOnce(Invoke([](const std::vector<DecodedResourcePtr>& resources, const std::string&) {
+          for (size_t i = 0; i < resources.size(); ++i) {
+            EXPECT_NE(resources[i]->resource().GetArena(), nullptr);
+            if (i > 0) {
+              EXPECT_EQ(resources[i]->resource().GetArena(), resources[0]->resource().GetArena());
+            }
+          }
+        }));
     return state_->handleResponse(response);
   }
 

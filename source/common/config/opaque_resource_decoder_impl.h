@@ -2,7 +2,6 @@
 
 #include "envoy/config/subscription.h"
 
-#include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -12,11 +11,13 @@ template <typename Current> class OpaqueResourceDecoderImpl : public Config::Opa
 public:
   OpaqueResourceDecoderImpl(ProtobufMessage::ValidationVisitor& validation_visitor,
                             absl::string_view name_field)
-      : validation_visitor_(validation_visitor), name_field_(name_field) {}
+      : validation_visitor_(validation_visitor), name_field_(name_field),
+        arena_options_(defaultArenaOptions()) {}
 
   // Config::OpaqueResourceDecoder
-  ArenaWrappedProto<Protobuf::Message> decodeResource(const Protobuf::Any& resource) override {
-    ArenaWrappedProto<Current> typed_message(getOptions());
+  Protobuf::Arena::UniquePtr<Protobuf::Message> decodeResource(const Protobuf::Any& resource,
+                                                               Protobuf::Arena& arena) override {
+    auto typed_message = Protobuf::Arena::MakeUnique<Current>(&arena);
     // If the Any is a synthetic empty message (e.g. because the resource field was not set in
     // Resource, this might be empty, so we shouldn't decode.
     if (!resource.type_url().empty()) {
@@ -29,11 +30,13 @@ public:
     return MessageUtil::getStringField(resource, name_field_);
   }
 
+  const Protobuf::ArenaOptions& arenaOptions() const override { return arena_options_; }
+
 private:
   // Decoded resources are ephemeral; these arena options are optimized to reduce memory allocations
   // and memory fragmentation when decoding wire-encoded opaque resources rather than space
   // efficiency.
-  Protobuf::ArenaOptions getOptions() const {
+  static Protobuf::ArenaOptions defaultArenaOptions() {
     Protobuf::ArenaOptions options;
     // Skips the default small initial arena block sizes.
     options.start_block_size = 8 * 1024;
@@ -44,6 +47,7 @@ private:
 
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string name_field_;
+  const Protobuf::ArenaOptions arena_options_;
 };
 
 } // namespace Config
