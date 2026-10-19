@@ -861,7 +861,7 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsWildcardUpgradeOnReconnect) {
 
 // End-to-end regression guard for on-demand VHDS after the switch to accept()-based routing: two
 // requests to two DIFFERENT unknown virtual hosts each trigger an on-demand VHDS fetch (via
-// requestOnDemandUpdate()/append()), and both must be routed and resolved. VHDS declares
+// requestOnDemandUpdate()/update()), and both must be routed and resolved. VHDS declares
 // accept("my_route/*") for routing, so on-demand virtual-host names under that route configuration
 // are delivered to the subscription and the requests succeed.
 TEST_P(OnDemandVhdsIntegrationTest, VhdsTwoOnDemandVirtualHostsRouteResponses) {

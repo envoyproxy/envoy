@@ -224,7 +224,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
 }
 
 template <class S, class F, class RQ, class RS>
-void GrpcMuxImpl<S, F, RQ, RS>::appendWatch(
+void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(
     const std::string& type_url, Watch* watch,
     const absl::flat_hash_set<std::string>& resources_to_add,
     const absl::flat_hash_set<std::string>& resources_to_remove,
@@ -233,12 +233,12 @@ void GrpcMuxImpl<S, F, RQ, RS>::appendWatch(
   auto& sub = subscriptionStateFor(type_url);
   // Additionally update the watch-map routing, then subscribe/unsubscribe to whatever changed
   // across the whole subscription. This keeps the watch map and the subscription consistent.
-  auto added_removed = watchMapFor(type_url).appendWatchInterest(
+  auto added_removed = watchMapFor(type_url).updateWatchInterest(
       watch, effectiveResources(resources_to_add, options),
       effectiveResources(resources_to_remove, options));
   if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
     ENVOY_LOG(debug,
-              "GrpcMuxImpl::appendWatch calling onResourceUnsubscribed for "
+              "GrpcMuxImpl::updateWatch calling onResourceUnsubscribed for "
               "{} resources",
               added_removed.removed_.size());
     for (absl::string_view resource : added_removed.removed_) {

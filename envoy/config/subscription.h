@@ -259,7 +259,7 @@ public:
    * Creates a discovery request for resources.
    * @param add_these_names resource ids for inclusion in the discovery request.
    */
-  virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) = 0;
+  virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) PURE;
 
   /**
    * Creates a discovery request for resources to be added and/or removed.
@@ -268,7 +268,7 @@ public:
    */
   virtual void
   requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names,
-                        const absl::flat_hash_set<std::string>& remove_these_names) = 0;
+                        const absl::flat_hash_set<std::string>& remove_these_names) PURE;
 
   /**
    * Declares the resource-name patterns this subscription ACCEPTS for routing. This affects routing

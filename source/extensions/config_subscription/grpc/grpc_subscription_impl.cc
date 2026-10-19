@@ -78,7 +78,7 @@ void GrpcSubscriptionImpl::requestOnDemandUpdate(
   // to the management server (so it is fetched/unsubscribed). Without the watch-map update, a
   // resource that was not named at start() time would match no watch and its update would be
   // silently dropped.
-  watch_->append(add_these_names, remove_these_names);
+  watch_->update(add_these_names, remove_these_names);
   stats_.update_attempt_.inc();
 }
 

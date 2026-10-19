@@ -137,7 +137,7 @@ WatchMap::updateWatchInterest(Watch* watch,
 }
 
 AddedRemoved
-WatchMap::appendWatchInterest(Watch* watch,
+WatchMap::updateWatchInterest(Watch* watch,
                               const absl::flat_hash_set<std::string>& resources_to_add,
                               const absl::flat_hash_set<std::string>& resources_to_remove) {
   absl::flat_hash_set<std::string> newly_added_to_watch;

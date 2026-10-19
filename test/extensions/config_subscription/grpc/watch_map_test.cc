@@ -777,9 +777,9 @@ TEST(WatchMapTest, OnConfigUpdateUsingSuffixGlobs) {
   }
 }
 
-// appendWatchInterest() adds to a watch's interest without disturbing the names it already
-// watches, and only reports names that are new across the whole subscription in added_.
-TEST(WatchMapTest, AppendWatchInterest) {
+// updateWatchInterest(add, remove) adds to a watch's interest without disturbing the names it
+// already watches, and only reports names that are new across the whole subscription in added_.
+TEST(WatchMapTest, IncrementalUpdateWatchInterest) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -794,14 +794,14 @@ TEST(WatchMapTest, AppendWatchInterest) {
     EXPECT_TRUE(added_removed.removed_.empty());
   }
   {
-    // Appending Bob keeps Alice and reports only Bob as new to the subscription.
-    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {"bob"});
+    // Adding Bob keeps Alice and reports only Bob as new to the subscription.
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {"bob"}, {});
     EXPECT_EQ(absl::flat_hash_set<std::string>({"bob"}), added_removed.added_);
     EXPECT_TRUE(added_removed.removed_.empty());
   }
   {
-    // Appending an already-watched name (Alice) plus a new one (Carol) reports only Carol.
-    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {"alice", "carol"});
+    // Adding an already-watched name (Alice) plus a new one (Carol) reports only Carol.
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {"alice", "carol"}, {});
     EXPECT_EQ(absl::flat_hash_set<std::string>({"carol"}), added_removed.added_);
     EXPECT_TRUE(added_removed.removed_.empty());
   }
@@ -823,15 +823,15 @@ TEST(WatchMapTest, AppendWatchInterest) {
     doDeltaUpdate(watch_map, updated_resources, {}, "version1");
   }
   {
-    // Appending Dave while removing Bob and an untracked name (Eve) reports Dave in added_ and Bob
+    // Adding Dave while removing Bob and an untracked name (Eve) reports Dave in added_ and Bob
     // in removed_.
-    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {"dave"}, {"bob", "eve"});
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {"dave"}, {"bob", "eve"});
     EXPECT_EQ(absl::flat_hash_set<std::string>({"dave"}), added_removed.added_);
     EXPECT_EQ(absl::flat_hash_set<std::string>({"bob"}), added_removed.removed_);
   }
   {
     // Removing Carol without adding anything reports Carol in removed_.
-    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {}, {"carol"});
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {}, {"carol"});
     EXPECT_TRUE(added_removed.added_.empty());
     EXPECT_EQ(absl::flat_hash_set<std::string>({"carol"}), added_removed.removed_);
   }

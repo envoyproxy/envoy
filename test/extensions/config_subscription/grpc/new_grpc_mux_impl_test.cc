@@ -669,17 +669,17 @@ TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
 
   // Additionally add "z" to the watch: it is both subscribed on the wire and routed to this watch.
   expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"z"}});
-  foo_sub->append({"z"});
+  foo_sub->update({"z"}, {});
 
   expectSendMessage(
       {.type_url = "foo", .resource_names_subscribe = {"w"}, .resource_names_unsubscribe = {"z"}});
-  foo_sub->append({"w"}, {"z"});
+  foo_sub->update({"w"}, {"z"});
 
   expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"w"}});
-  foo_sub->append({}, {"w"});
+  foo_sub->update({}, {"w"});
 
   // Unsubscribing from a resource that is not subscribed should not trigger a discovery request.
-  foo_sub->append({}, {"non_existent"});
+  foo_sub->update({}, {"non_existent"});
 
   expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}});
 }
@@ -1198,20 +1198,20 @@ TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnDemandUnsubscribed) {
   grpc_mux_->start();
 
   expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x"}});
-  foo_sub->append({"x"});
+  foo_sub->update({"x"}, {});
 
   EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "x"));
   EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "non_existent")).Times(0);
   expectSendMessage({.type_url = type_url,
                      .resource_names_subscribe = {"y"},
                      .resource_names_unsubscribe = {"x"}});
-  foo_sub->append({"y"}, {"x", "non_existent"});
+  foo_sub->update({"y"}, {"x", "non_existent"});
 
   // Unsubscribing on-demand from a watched resource ("w") should notify the tracker once,
   // and destroying the watch afterwards should not notify a second time for "w".
   EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "w"));
   expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"w"}});
-  foo_sub->append({}, {"w"});
+  foo_sub->update({}, {"w"});
 
   EXPECT_CALL(config_tracker_, onResourceUnsubscribed(type_url, "y"));
   expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"y"}});

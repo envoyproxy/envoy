@@ -1905,12 +1905,11 @@ TEST_P(GrpcMuxImplTest, ShutdownPreventsSending) {
   auto bar_sub = grpc_mux_->addWatch("bar", {"z"}, callbacks_, resource_decoder_, {});
 }
 
-TEST_P(GrpcMuxImplTest, WatchAppendDoesNothing) {
+TEST_P(GrpcMuxImplTest, IncrementalWatchUpdateDoesNothing) {
   setup();
   auto foo_sub = grpc_mux_->addWatch("foo", {"x"}, callbacks_, resource_decoder_, {});
   // Should not throw or crash on the legacy SOTW mux.
-  foo_sub->append({"z"});
-  foo_sub->append({"z"}, {"y"});
+  foo_sub->update({"z"}, {"y"});
 }
 
 } // namespace

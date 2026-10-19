@@ -339,7 +339,7 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   }
 }
 
-void NewGrpcMuxImpl::appendWatch(const std::string& type_url, Watch* watch,
+void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                                  const absl::flat_hash_set<std::string>& resources_to_add,
                                  const absl::flat_hash_set<std::string>& resources_to_remove,
                                  const SubscriptionOptions& options) {
@@ -349,7 +349,7 @@ void NewGrpcMuxImpl::appendWatch(const std::string& type_url, Watch* watch,
                  fmt::format("Watch of {} has no subscription to update.", type_url));
   // Additionally update the watch-map routing, then subscribe/unsubscribe to whatever changed
   // across the whole subscription. This keeps watch_interest_ and the subscription consistent.
-  auto added_removed = sub->second->watch_map_.appendWatchInterest(
+  auto added_removed = sub->second->watch_map_.updateWatchInterest(
       watch, effectiveResources(resources_to_add, options),
       effectiveResources(resources_to_remove, options));
   if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
