@@ -1,5 +1,6 @@
 #include <chrono>
 #include <initializer_list>
+#include <vector>
 
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/event/scaled_range_timer_manager.h"
@@ -145,6 +146,7 @@ public:
                         Server::Configuration::ResourceMonitorFactoryContext& context) override {
     auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher());
     monitor_ = monitor.get();
+    monitors_.push_back(monitor.get());
     return monitor;
   }
 
@@ -155,6 +157,7 @@ public:
   std::string name() const override { return name_; }
 
   FakeResourceMonitor* monitor_{nullptr}; // not owned
+  std::vector<FakeResourceMonitor*> monitors_;
   const std::string name_;
 };
 
@@ -785,6 +788,63 @@ TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
                           "Duplicate resource monitor .*");
+}
+
+TEST_F(OverloadManagerImplTest, MultipleResourceMonitorsOfSameTypeWithDifferentNames) {
+  const std::string config = R"EOF(
+    refresh_interval:
+      seconds: 1
+    resource_monitors:
+      - name: "custom_monitor_one"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+      - name: "custom_monitor_two"
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+    actions:
+      - name: "envoy.overload_actions.stop_accepting_requests"
+        triggers:
+          - name: "custom_monitor_one"
+            threshold:
+              value: 0.9
+          - name: "custom_monitor_two"
+            threshold:
+              value: 0.5
+  )EOF";
+
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(config));
+  manager->start();
+
+  ASSERT_EQ(2, factory1_.monitors_.size());
+  auto* monitor1 = factory1_.monitors_[0];
+  auto* monitor2 = factory1_.monitors_[1];
+
+  Stats::Gauge& pressure1 =
+      stats_.gauge("overload.custom_monitor_one.pressure", Stats::Gauge::ImportMode::NeverImport);
+  Stats::Gauge& pressure2 =
+      stats_.gauge("overload.custom_monitor_two.pressure", Stats::Gauge::ImportMode::NeverImport);
+
+  const OverloadActionState& action_state = manager->getThreadLocalOverloadState().getState(
+      "envoy.overload_actions.stop_accepting_requests");
+
+  // Set monitor1 to 0.2 and monitor2 to 0.4. Neither exceeds threshold.
+  monitor1->setPressure(0.2);
+  monitor2->setPressure(0.4);
+  timer_cb_();
+
+  EXPECT_EQ(20, pressure1.value());
+  EXPECT_EQ(40, pressure2.value());
+  EXPECT_FALSE(action_state.isSaturated());
+
+  // Set monitor2 to 0.6. It exceeds custom_monitor_two's 0.5 threshold,
+  // saturating the action.
+  monitor2->setPressure(0.6);
+  timer_cb_();
+
+  EXPECT_EQ(20, pressure1.value());
+  EXPECT_EQ(60, pressure2.value());
+  EXPECT_TRUE(action_state.isSaturated());
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateProactiveResourceMonitor) {
