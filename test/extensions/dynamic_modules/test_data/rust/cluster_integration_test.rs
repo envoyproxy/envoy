@@ -280,6 +280,7 @@ impl Cluster for AsyncHostSelectionCluster {
     Some(Box::new(AsyncHostSelectionLb {
       hosts: self.hosts.clone(),
       select_by_header: !self.logical_hostnames.is_empty(),
+      completion_threads: Vec::new(),
     }))
   }
 }
@@ -302,6 +303,17 @@ impl AsyncCompletionTask {
 struct AsyncHostSelectionLb {
   hosts: SharedHostList,
   select_by_header: bool,
+  completion_threads: Vec<std::thread::JoinHandle<()>>,
+}
+
+// A completion thread runs module code until it has exited, so it must not outlive the module.
+// Envoy destroys every load balancer before it can unload the module, so join the threads here.
+impl Drop for AsyncHostSelectionLb {
+  fn drop(&mut self) {
+    for thread in self.completion_threads.drain(..) {
+      let _ = thread.join();
+    }
+  }
 }
 
 impl ClusterLb for AsyncHostSelectionLb {
@@ -338,7 +350,9 @@ impl ClusterLb for AsyncHostSelectionLb {
     };
     // Spawn a background thread to complete the host selection asynchronously.
     // The ABI implementation posts the completion to the correct worker thread.
-    std::thread::spawn(move || task.run());
+    self
+      .completion_threads
+      .push(std::thread::spawn(move || task.run()));
     HostSelectionResult::AsyncPending(Box::new(AsyncHandle {
       cancelled: Arc::new(AtomicBool::new(false)),
     }))
