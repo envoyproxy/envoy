@@ -3,7 +3,6 @@ thresholds:
   per_directory: 96.6
 
 directories:
-  source/common/config: 96.5
   source/common: 96.4
   source/common/api: 94.9  # some syscalls require sandboxing
   source/common/api/posix: 94.6  # setns requires Linux CAP_NET_ADMIN privileges, no tests for set/getrlimit syscalls errors

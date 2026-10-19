@@ -151,6 +151,16 @@ TEST_F(SubscriptionFactoryTest, SingletonSubscriptionFromConfigSource) {
   sub->start();
 }
 
+TEST_F(SubscriptionFactoryTest, SingletonSubscriptionFromConfigSourceError) {
+  envoy::config::core::v3::ConfigSource config;
+  auto result = subscription_factory_.subscriptionFromConfigSource(
+      config, Config::TestTypeUrl::get().ClusterLoadAssignment, *stats_store_.rootScope(),
+      "foo_resource", singleton_callbacks_, resource_decoder_, {});
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr(
+                  "Missing config source specifier in envoy::config::core::v3::ConfigSource"));
+}
 // Exercise the path of subscription creation when no factory exists.
 TEST_F(SubscriptionFactoryTest, NoFactoryForSubscription) {
   // Temporarily remove the config mux factories.
