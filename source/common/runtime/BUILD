@@ -10,6 +10,18 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "extensible_runtime_lib",
+    srcs = ["extensible_runtime.cc"],
+    hdrs = ["extensible_runtime.h"],
+    deps = [
+        ":runtime_features_lib",
+        "//envoy/runtime:extensible_runtime_interface",
+        "//source/common/singleton:threadsafe_singleton",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "runtime_keys_lib",
     srcs = [
         "runtime_keys.cc",

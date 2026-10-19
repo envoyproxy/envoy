@@ -124,3 +124,90 @@ encountered during request processing will be recorded in the ``envoy.breaking_c
 filter state and included in the access log. If the flag is disabled, no breaking changes are
 recorded in filter state.
 
+.. _arch_overview_runtime_extensible_runtime:
+
+Extensible runtime
+------------------
+
+Envoy's built-in ``Runtime::runtimeFeatureEnabled`` evaluates each runtime guard as a single
+process-wide boolean flag. Extensible runtime allows replacing that lookup with a custom
+``ExtensibleRuntime::Provider`` extension, enabling deployments to back runtime guards with their own
+feature management or experimentation systems and incorporate connection or request context into flag
+decisions.
+
+Example use cases include:
+
+* **Progressive rollouts**: Gradually enable a change across a fraction of traffic rather than
+  toggling a flag on or off for the entire Envoy process at once.
+* **Traffic targeting and client exemptions**: Enable a change only for specific traffic (such as a
+  route, listener, or tenant), or exempt affected clients from a breaking change without disabling
+  the flag across the entire proxy.
+* **Live traffic testing**: Enable or disable a runtime guard on individual test connections or
+  requests to verify a code path in production before rolling it out broadly.
+
+To use extensible runtime:
+
+1. Implement :repo:`ExtensibleRuntime::Provider <envoy/runtime/extensible_runtime.h>` and
+   :repo:`ExtensibleRuntime::ProviderFactory <envoy/runtime/extensible_runtime.h>`, and register the
+   factory under the ``envoy.extensible_runtime`` category:
+
+   .. code-block:: cpp
+
+      class MyProvider : public ExtensibleRuntime::Provider {
+      public:
+        bool runtimeFeatureEnabled(absl::string_view feature) const override {
+          // Evaluate feature without connection or stream context.
+        }
+
+        bool runtimeFeatureEnabled(absl::string_view feature,
+                                   const StreamInfo::StreamInfo& stream_info) const override {
+          // Evaluate feature using connection or stream context from stream_info.
+        }
+      };
+
+      class MyProviderFactory : public ExtensibleRuntime::ProviderFactory {
+      public:
+        std::string name() const override { return "custom.extensible_runtime.my_provider"; }
+
+        ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+          return std::make_unique<my_org::extensible_runtime::v3::MyProviderConfig>();
+        }
+
+        ExtensibleRuntime::ProviderPtr createProvider(const Protobuf::Message& config) override {
+          return std::make_unique<MyProvider>(config);
+        }
+      };
+
+      REGISTER_FACTORY(MyProviderFactory, ExtensibleRuntime::ProviderFactory);
+
+2. Configure :ref:`extensible_runtime
+   <envoy_v3_api_field_config.bootstrap.v3.LayeredRuntime.extensible_runtime>` in
+   :ref:`LayeredRuntime <envoy_v3_api_msg_config.bootstrap.v3.LayeredRuntime>`:
+
+   .. code-block:: yaml
+
+      layered_runtime:
+        extensible_runtime:
+          name: custom.extensible_runtime.my_provider
+          typed_config:
+            "@type": type.googleapis.com/my_org.extensible_runtime.v3.MyProviderConfig
+
+3. Query feature flags in code using :repo:`source/common/runtime/extensible_runtime.h`:
+
+   .. code-block:: cpp
+
+      // Without connection or stream context:
+      if (ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature")) {
+        // ...
+      }
+
+      // With connection or stream context:
+      if (ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature",
+                                                   stream_info)) {
+        // ...
+      }
+
+   When :ref:`extensible_runtime
+   <envoy_v3_api_field_config.bootstrap.v3.LayeredRuntime.extensible_runtime>` is configured, these
+   calls delegate to the configured ``ExtensibleRuntime::Provider``; when unset, they fall back to
+   ``Runtime::runtimeFeatureEnabled(feature)``.

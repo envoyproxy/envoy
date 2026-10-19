@@ -13,11 +13,13 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//envoy/runtime:extensible_runtime_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:callback_impl_lib",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
