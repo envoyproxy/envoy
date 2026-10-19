@@ -1,6 +1,6 @@
 load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
-load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_static_library", "rust_test")
-load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_dynamic_module_prefix_symbols")
+load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_test")
+load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_rust_static_module")
 
 _WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
 
@@ -29,23 +29,13 @@ def test_program(name):
     )
 
     _static_name = name + "_static"
-    _static_lib_name = name + "_static_lib"
-
-    rust_static_library(
-        name = _static_lib_name,
+    envoy_rust_static_module(
+        name = _static_name,
+        module_name = _static_name,
         srcs = srcs,
         edition = "2021",
         crate_root = name + ".rs",
-        deps = [
-            "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
-        ],
         rustc_flags = _RUSTC_FLAGS,
-    )
-
-    envoy_dynamic_module_prefix_symbols(
-        name = _static_name,
-        module_name = _static_name,
-        archive = ":" + _static_lib_name,
     )
 
     rust_clippy(

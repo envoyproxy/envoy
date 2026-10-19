@@ -1,3 +1,4 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps", "crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
@@ -6,12 +7,28 @@ load(
     "envoy_extension_package",
 )
 load("//bazel:toolchains.bzl", "LLVM_MAJOR")
+load(":symbol_prefix.bzl", "symbol_prefix_env")
 
 licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
 exports_files(["Cargo.toml"])
+
+string_flag(
+    name = "symbol_prefix",
+    build_setting_default = "",
+)
+
+config_setting(
+    name = "unprefixed",
+    flag_values = {":symbol_prefix": ""},
+)
+
+symbol_prefix_env(
+    name = "symbol_prefix_env",
+    prefix = ":symbol_prefix",
+)
 
 # abi/abi.h is a symlink, which git may check out as a plain text file on Windows.
 # Point the build script at the original header instead.
@@ -36,6 +53,7 @@ cargo_build_script(
         "@platforms//os:windows": _WINDOWS_ENV,
         "//conditions:default": {},
     }),
+    build_script_env_files = [":symbol_prefix_env"],
     data = [
         ":abi/abi.h",
     ] + select({
@@ -66,8 +84,16 @@ cargo_build_script(
 rust_library(
     name = "envoy_proxy_dynamic_modules_rust_sdk",
     srcs = glob(["src/**/*.rs"]),
+    # Generated compile data makes rules_rust rebase the crate root into the
+    # configuration's output directory. Its crate hash must differ per prefix,
+    # isolating Rust-mangled factory state as well as the exported C hooks.
+    compile_data = [":symbol_prefix_env"],
     edition = "2021",
     deps = crate_deps(["smallvec"]) + [":build_script"],
+    alwayslink = select({
+        ":unprefixed": False,
+        "//conditions:default": True,
+    }),
 )
 
 # Test-only target with mock support enabled via the `mock` feature.

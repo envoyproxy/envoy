@@ -1,6 +1,66 @@
 """Bazel rules for building Envoy dynamic modules."""
 
 load("@rules_cc//cc:defs.bzl", "cc_import")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+_SYMBOL_PREFIX = str(Label("//source/extensions/dynamic_modules/sdk/rust:symbol_prefix"))
+
+def _symbol_prefix_transition_impl(_settings, attr):
+    return {_SYMBOL_PREFIX: attr.module_name + "_"}
+
+_symbol_prefix_transition = transition(
+    implementation = _symbol_prefix_transition_impl,
+    inputs = [],
+    outputs = [_SYMBOL_PREFIX],
+)
+
+def _rust_static_module_impl(ctx):
+    module = ctx.attr.module[0]
+    return [module[CcInfo], DefaultInfo(files = module[DefaultInfo].files)]
+
+_rust_static_module = rule(
+    implementation = _rust_static_module_impl,
+    attrs = {
+        "module": attr.label(cfg = _symbol_prefix_transition, providers = [CcInfo]),
+        "module_name": attr.string(mandatory = True),
+        "_allowlist_function_transition": attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
+        ),
+    },
+)
+
+def envoy_rust_static_module(name, module_name, deps = [], tags = [], visibility = None, **kwargs):
+    """Builds an in-binary Rust module with its own prefixed SDK.
+
+    The transition configures both the module and its SDK with the same prefix.
+    Both are always-linked rlibs: unlike a Rust staticlib, these do not bundle a
+    private copy of std/compiler_builtins, and retain rules_rust's transitive CcInfo.
+    Rust's export_name handles platform-specific C symbol decoration.
+
+    Args:
+        name: C++-compatible target name. The Rust target is <name>_lib.
+        module_name: Module name used by the static module loader.
+        deps: Rust dependencies, in addition to the SDK.
+        tags: Tags forwarded to both targets.
+        visibility: Visibility of the C++-compatible target.
+        **kwargs: Arguments forwarded to rust_library.
+    """
+    rust_library(
+        name = name + "_lib",
+        alwayslink = True,
+        deps = [Label("//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk")] + deps,
+        tags = tags,
+        **kwargs
+    )
+    _rust_static_module(
+        name = name,
+        module = ":" + name + "_lib",
+        module_name = module_name,
+        tags = tags,
+        testonly = kwargs.get("testonly", False),
+        visibility = visibility,
+    )
 
 def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], **kwargs):
     """Renames envoy_dynamic_module_on_* symbols in a pre-built static archive.
@@ -13,8 +73,8 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
     bazel/exported_symbols.txt, making them available for dlsym(RTLD_DEFAULT, ...)
     lookup.
 
-    This rule is language-independent: the archive may come from cc_library,
-    rust_static_library, or any other rule that produces a static archive.
+    Use this rule for C/C++ archives. Rust modules must use envoy_rust_static_module
+    instead so they share the toolchain's Rust runtime with other Rust code.
 
     Args:
         name: Bazel target name.
