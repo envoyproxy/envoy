@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message OpenTelemetryConfig {
   // Trace context formats that can be extracted from downstream requests and injected into
   // upstream requests.
@@ -141,4 +141,8 @@ message OpenTelemetryConfig {
   // Each format may be listed at most once. If not specified, the default is ``[TRACE_CONTEXT]``.
   repeated TraceContextFormat outgoing_trace_context = 12
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+
+  // Specifies whether `Span::updateParent()` should rerun the sampler with the
+  // new trace context.
+  google.protobuf.BoolValue resample_on_update_parent = 13;
 }
