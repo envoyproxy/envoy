@@ -199,22 +199,6 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
   return factory->create(data);
 }
 
-absl::StatusOr<std::unique_ptr<SingletonSubscription>>
-SubscriptionFactoryImpl::subscriptionOverAdsGrpcMux(
-    GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
-    absl::string_view type_url, Stats::Scope& scope, absl::string_view resource_name,
-    SingletonSubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
-    const SubscriptionOptions& options) {
-  auto adapter = std::make_unique<SingletonSubscriptionCallbacksAdapter>(callbacks);
-  absl::StatusOr<SubscriptionPtr> sub_or_error = subscriptionOverAdsGrpcMux(
-      ads_grpc_mux, config, type_url, scope, *adapter, resource_decoder, options);
-  if (!sub_or_error.ok()) {
-    return sub_or_error.status();
-  }
-  return std::make_unique<SingletonSubscriptionImpl>(std::move(sub_or_error.value()), resource_name,
-                                                     std::move(adapter));
-}
-
 absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const xds::core::v3::ResourceLocator& collection_locator,
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,

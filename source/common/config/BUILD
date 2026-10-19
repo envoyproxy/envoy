@@ -359,6 +359,7 @@ envoy_cc_library(
     hdrs = ["xds_manager_impl.h"],
     deps = [
         ":null_grpc_mux_lib",
+        ":singleton_subscription_adapter_lib",
         ":subscription_factory_lib",
         ":utility_lib",
         "//envoy/config:xds_manager_interface",

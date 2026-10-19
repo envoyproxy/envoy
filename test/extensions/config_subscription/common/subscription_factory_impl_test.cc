@@ -83,17 +83,6 @@ public:
                                  std::unique_ptr<SingletonSubscription>);
   }
 
-  std::unique_ptr<SingletonSubscription>
-  singletonSubscriptionOverAdsGrpcMux(GrpcMuxSharedPtr grpc_mux,
-                                      const envoy::config::core::v3::ConfigSource& config,
-                                      absl::string_view resource_name) {
-    return THROW_OR_RETURN_VALUE(
-        subscription_factory_.subscriptionOverAdsGrpcMux(
-            grpc_mux, config, Config::TestTypeUrl::get().ClusterLoadAssignment,
-            *stats_store_.rootScope(), resource_name, singleton_callbacks_, resource_decoder_, {}),
-        std::unique_ptr<SingletonSubscription>);
-  }
-
   SubscriptionPtr
   collectionSubscriptionFromUrl(const std::string& xds_url,
                                 const envoy::config::core::v3::ConfigSource& config) {
@@ -160,18 +149,6 @@ TEST_F(SubscriptionFactoryTest, SingletonSubscriptionFromConfigSource) {
   auto sub = singletonSubscriptionFromConfigSource(config, "foo_resource");
   EXPECT_NE(sub, nullptr);
   sub->start();
-}
-
-TEST_F(SubscriptionFactoryTest, SingletonSubscriptionOverAdsGrpcMux) {
-  envoy::config::core::v3::ConfigSource config;
-  auto* api_config_source = config.mutable_api_config_source();
-  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
-  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
-
-  auto non_cm_ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
-  auto sub = singletonSubscriptionOverAdsGrpcMux(non_cm_ads_mux, config, "foo_resource");
-  EXPECT_NE(sub, nullptr);
 }
 
 // Exercise the path of subscription creation when no factory exists.
