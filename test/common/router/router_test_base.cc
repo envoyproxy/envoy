@@ -58,7 +58,7 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   route_stat_names_ = std::make_unique<RouteStatNames>(stats_store_.symbolTable());
   Stats::StatNameManagedStorage vhost_stat_name("fake_vhost", stats_store_.symbolTable());
   route_stats_context_impl_ = std::make_unique<RouteStatsContextImpl>(
-      *stats_store_.rootScope(), *route_stat_names_, vhost_stat_name.statName(), "fake_route");
+      stats_store_.rootScope(), *route_stat_names_, vhost_stat_name.statName(), "fake_route");
   ON_CALL(callbacks_.route_->route_entry_, routeStatsContext())
       .WillByDefault(Return(RouteStatsContextOptRef(*route_stats_context_impl_)));
 }

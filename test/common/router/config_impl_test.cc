@@ -20,6 +20,8 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 
@@ -12924,6 +12926,87 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(334U, route->requestBodyBufferLimit());
+}
+
+TEST_F(RouteMatcherTest, StatsAreTagged) {
+  // The fixture's isolated store deliberately drops scope tags, so the tags are only observable
+  // with a real store in explicit-tags mode.
+  Stats::AllocatorImpl allocator(factory_context_.store_.symbolTable());
+  Stats::ThreadLocalStoreImpl store(allocator);
+  store.setUseExplicitTags(true);
+  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(*store.rootScope()));
+
+  // The tags of a stat as (name, value) pairs.
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: www2
+    stat_prefix: "foo_prefix"
+  virtual_clusters:
+  - name: ride_request
+    headers:
+    - name: ":path"
+      string_match:
+        prefix: "/rides"
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  ASSERT_TRUE(creation_status_.ok()) << creation_status_.message();
+
+  // A configured virtual cluster.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/rides", "POST");
+    const RouteConstSharedPtr route = config.route(headers, 0).route;
+    const Stats::Counter& counter =
+        route->virtualHost().virtualCluster(headers)->stats().upstream_rq_total_;
+    EXPECT_EQ("vhost.www2.vcluster.ride_request.upstream_rq_total", counter.name());
+    EXPECT_EQ("vhost.vcluster.upstream_rq_total", counter.tagExtractedName());
+    EXPECT_THAT(tags_of(counter),
+                UnorderedElementsAre(testing::Pair("envoy.virtual_host", "www2"),
+                                     testing::Pair("envoy.virtual_cluster", "ride_request")));
+  }
+
+  // The catch-all virtual cluster.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/other", "GET");
+    const RouteConstSharedPtr route = config.route(headers, 0).route;
+    const Stats::Counter& counter =
+        route->virtualHost().virtualCluster(headers)->stats().upstream_rq_total_;
+    EXPECT_EQ("vhost.www2.vcluster.other.upstream_rq_total", counter.name());
+    EXPECT_EQ("vhost.vcluster.upstream_rq_total", counter.tagExtractedName());
+    EXPECT_THAT(tags_of(counter),
+                UnorderedElementsAre(testing::Pair("envoy.virtual_host", "www2"),
+                                     testing::Pair("envoy.virtual_cluster", "other")));
+  }
+
+  // The route stats.
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    const RouteStatsContextOptRef route_stats =
+        config.route(headers, 0)->routeEntry()->routeStatsContext();
+    ASSERT_TRUE(route_stats.has_value());
+    const Stats::Counter& counter = route_stats->stats().upstream_rq_retry_;
+    EXPECT_EQ("vhost.www2.route.foo_prefix.upstream_rq_retry", counter.name());
+    EXPECT_EQ("vhost.route.upstream_rq_retry", counter.tagExtractedName());
+    EXPECT_THAT(tags_of(counter), UnorderedElementsAre(testing::Pair("envoy.virtual_host", "www2"),
+                                                       testing::Pair("envoy.route", "foo_prefix")));
+  }
 }
 
 } // namespace

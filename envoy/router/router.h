@@ -641,13 +641,13 @@ using ShadowPolicyPtr = std::shared_ptr<ShadowPolicy>;
  * Struct definition for all virtual cluster stats. @see stats_macro.h
  */
 MAKE_STAT_NAMES_STRUCT(VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
-MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
+MAKE_STATS_STRUCT_LITE(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUSTER_STATS);
 
 /**
  * Struct definition for all route level stats. @see stats_macro.h
  */
 MAKE_STAT_NAMES_STRUCT(RouteStatNames, ALL_ROUTE_STATS);
-MAKE_STATS_STRUCT(RouteStats, RouteStatNames, ALL_ROUTE_STATS);
+MAKE_STATS_STRUCT_LITE(RouteStats, RouteStatNames, ALL_ROUTE_STATS);
 
 /**
  * RouteStatsContext defines config needed to generate all route level stats.
@@ -682,7 +682,8 @@ public:
 
   static VirtualClusterStats generateStats(Stats::Scope& scope,
                                            const VirtualClusterStatNames& stat_names) {
-    return {stat_names, scope};
+    Stats::LiteScopeHelper helper(scope);
+    return {stat_names, helper};
   }
 };
 
