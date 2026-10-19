@@ -174,6 +174,36 @@ TEST_F(SubscriptionFactoryTest, SingletonSubscriptionOverAdsGrpcMux) {
   EXPECT_NE(sub, nullptr);
 }
 
+TEST_F(SubscriptionFactoryTest, SingletonSubscriptionFromConfigSourceError) {
+  envoy::config::core::v3::ConfigSource config;
+  auto result = subscription_factory_.subscriptionFromConfigSource(
+      config, Config::TestTypeUrl::get().ClusterLoadAssignment, *stats_store_.rootScope(),
+      "foo_resource", singleton_callbacks_, resource_decoder_, {});
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr(
+                  "Missing config source specifier in envoy::config::core::v3::ConfigSource"));
+}
+
+TEST_F(SubscriptionFactoryTest, SingletonSubscriptionOverAdsGrpcMuxError) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+
+  const std::string empty_node_name;
+  EXPECT_CALL(local_info_, nodeName()).WillOnce(ReturnRef(empty_node_name));
+
+  GrpcMuxSharedPtr non_cm_ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  auto result = subscription_factory_.subscriptionOverAdsGrpcMux(
+      non_cm_ads_mux, config, Config::TestTypeUrl::get().ClusterLoadAssignment,
+      *stats_store_.rootScope(), "foo_resource", singleton_callbacks_, resource_decoder_, {});
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("node 'id' and 'cluster' are required"));
+}
+
 // Exercise the path of subscription creation when no factory exists.
 TEST_F(SubscriptionFactoryTest, NoFactoryForSubscription) {
   // Temporarily remove the config mux factories.
