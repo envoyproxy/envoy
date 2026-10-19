@@ -572,10 +572,10 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
   }
 }
 
-/// Converts label name or value strings to module buffers for a labeled metric call.
+/// Converts strings to module buffers for labeled metric calls and metadata paths.
 ///
-/// The result is a `SmallVec` inlined for the common case of a few labels, so the typical one to
-/// four labels need no heap allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
+/// The result is a `SmallVec` inlined for the common case of one to four strings, avoiding a heap
+/// allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
 /// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
 pub(crate) fn strs_to_module_buffers(
   strs: &[&str],

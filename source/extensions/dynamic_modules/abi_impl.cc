@@ -2790,6 +2790,43 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_list_bool, false
           envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
           envoy_dynamic_module_type_module_buffer, size_t, bool*)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_string, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_buffer*, size_t,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_number, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_buffer*, size_t, double*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_bool, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_buffer*, size_t, bool*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_list_size, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_buffer*, size_t, size_t*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_list_string, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_buffer*, size_t, size_t,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_list_number, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_buffer*, size_t, size_t, double*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_get_metadata_nested_list_bool, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr,
+          envoy_dynamic_module_type_metadata_source, envoy_dynamic_module_type_module_buffer,
+          const envoy_dynamic_module_type_module_buffer*, size_t, size_t, bool*)
+
 // DNS resolver callbacks.
 WEAK_STUB_VOID(envoy_dynamic_module_callback_dns_resolve_complete,
                envoy_dynamic_module_type_dns_resolver_envoy_ptr, uint64_t,

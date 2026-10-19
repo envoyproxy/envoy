@@ -1,11 +1,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <set>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include "envoy/common/logger.h"
 #include "envoy/extensions/transport_sockets/tls/v3/secret.pb.h"
@@ -1597,6 +1600,165 @@ TEST(ABIImpl, metadata_string_batch) {
       &filter, envoy_dynamic_module_type_metadata_source_Dynamic, {ns.data(), ns.size()},
       {"num", 3}, &result_buffer));
   EXPECT_EQ(absl::string_view(result_buffer.ptr, result_buffer.length), "str");
+}
+
+TEST(ABIImpl, NestedMetadata) {
+  Stats::SymbolTableImpl symbol_table;
+  DynamicModuleHttpFilter filter{nullptr, symbol_table, 0};
+  const absl::string_view namespace_name = "envoy.filters.http.jwt_authn";
+  const envoy_dynamic_module_type_module_buffer ns = {namespace_name.data(), namespace_name.size()};
+  const auto source = envoy_dynamic_module_type_metadata_source_Dynamic;
+  auto make_path = [](std::initializer_list<absl::string_view> keys) {
+    std::vector<envoy_dynamic_module_type_module_buffer> path;
+    for (auto key : keys) {
+      path.push_back({key.data(), key.size()});
+    }
+    return path;
+  };
+  double number = -1;
+  bool boolean = true;
+  size_t size = 99;
+  envoy_dynamic_module_type_envoy_buffer str = {"sentinel", 8};
+
+  // Every failure must leave the output arguments untouched.
+  auto expect_failure = [&](const std::vector<envoy_dynamic_module_type_module_buffer>& path) {
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+        &filter, source, ns, path.data(), path.size(), &str));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+        &filter, source, ns, path.data(), path.size(), &number));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+        &filter, source, ns, path.data(), path.size(), &boolean));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+        &filter, source, ns, path.data(), path.size(), &size));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
+        &filter, source, ns, path.data(), path.size(), 0, &str));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_number(
+        &filter, source, ns, path.data(), path.size(), 0, &number));
+    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_bool(
+        &filter, source, ns, path.data(), path.size(), 0, &boolean));
+    EXPECT_EQ(number, -1);
+    EXPECT_TRUE(boolean);
+    EXPECT_EQ(size, 99);
+    EXPECT_EQ(absl::string_view(str.ptr, str.length), "sentinel");
+  };
+  expect_failure({});
+  expect_failure(make_path({"claims", "sub"})); // No callbacks.
+
+  testing::StrictMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  testing::StrictMock<StreamInfo::MockStreamInfo> stream_info;
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(callbacks, dispatcher()).WillRepeatedly(testing::ReturnRef(callbacks.dispatcher_));
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+  expect_failure(make_path({"claims", "sub"})); // Missing namespace.
+
+  TestUtility::loadFromJson(R"EOF({
+    "claims": {
+      "sub": "user-123", "exp": 123, "active": false,
+      "profile": {"role.name": "admin", "": "empty-key"},
+      "values": ["admin", 42, false, {}, null, []],
+      "empty": [], "null": null
+    },
+    "claims.sub": "literal", "top": "top-level", "": "empty-key"
+  })EOF",
+                            (*metadata.mutable_filter_metadata())["envoy.filters.http.jwt_authn"]);
+
+  for (const auto& keys :
+       {make_path({"claims"}), make_path({"claims", "null"}), make_path({"missing"}),
+        make_path({"missing", "sub"}), make_path({"claims", "missing"}),
+        make_path({"claims", "sub", "child"}), make_path({"claims", "values", "0"}),
+        make_path({"claims", "null", "child"})}) {
+    expect_failure(keys);
+  }
+  expect_failure({});
+
+  auto path = make_path({"claims", "sub"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, source, ns, path.data(), path.size(), &str));
+  EXPECT_EQ(absl::string_view(str.ptr, str.length), "user-123");
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+      &filter, source, ns, path.data(), path.size(), &number));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+      &filter, source, ns, path.data(), path.size(), &boolean));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+      &filter, source, ns, path.data(), path.size(), &size));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
+      &filter, source, ns, path.data(), path.size(), 0, &str));
+
+  path = make_path({"claims", "exp"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+      &filter, source, ns, path.data(), path.size(), &number));
+  EXPECT_EQ(number, 123);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, source, ns, path.data(), path.size(), &str));
+  path = make_path({"claims", "active"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+      &filter, source, ns, path.data(), path.size(), &boolean));
+  EXPECT_FALSE(boolean);
+
+  for (const auto& entry : std::vector<
+           std::pair<std::vector<envoy_dynamic_module_type_module_buffer>, absl::string_view>>{
+           {make_path({"claims", "profile", "role.name"}), "admin"},
+           {make_path({"claims", "profile", ""}), "empty-key"},
+           {make_path({"claims.sub"}), "literal"},
+           {make_path({"top"}), "top-level"},
+           {make_path({""}), "empty-key"}}) {
+    EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+        &filter, source, ns, entry.first.data(), entry.first.size(), &str));
+    EXPECT_EQ(absl::string_view(str.ptr, str.length), entry.second);
+  }
+
+  path = make_path({"claims", "values"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+      &filter, source, ns, path.data(), path.size(), &size));
+  EXPECT_EQ(size, 6);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
+      &filter, source, ns, path.data(), path.size(), 0, &str));
+  EXPECT_EQ(absl::string_view(str.ptr, str.length), "admin");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_number(
+      &filter, source, ns, path.data(), path.size(), 1, &number));
+  EXPECT_EQ(number, 42);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_bool(
+      &filter, source, ns, path.data(), path.size(), 2, &boolean));
+  EXPECT_FALSE(boolean);
+
+  for (size_t index : {size_t{0}, size_t{1}, size_t{2}, size_t{3}, size_t{4}, size_t{5}, size_t{6},
+                       std::numeric_limits<size_t>::max()}) {
+    if (index != 0) {
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
+          &filter, source, ns, path.data(), path.size(), index, &str));
+    }
+    if (index != 1) {
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_number(
+          &filter, source, ns, path.data(), path.size(), index, &number));
+    }
+    if (index != 2) {
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_bool(
+          &filter, source, ns, path.data(), path.size(), index, &boolean));
+    }
+  }
+
+  path = make_path({"claims", "empty"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+      &filter, source, ns, path.data(), path.size(), &size));
+  EXPECT_EQ(size, 0);
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
+      &filter, source, ns, path.data(), path.size(), 0, &str));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(&filter, source, ns,
+                                                                             nullptr, 0, &str));
+
+  // Nested traversal applies to route metadata as well as dynamic metadata.
+  auto route = std::make_shared<testing::StrictMock<Router::MockRoute>>();
+  route->metadata_ = metadata;
+  EXPECT_CALL(stream_info, route())
+      .WillRepeatedly(testing::Return(OptRef<const Router::Route>(*route)));
+  EXPECT_CALL(*route, metadata()).WillRepeatedly(testing::ReturnRef(route->metadata_));
+  path = make_path({"claims", "sub"});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, envoy_dynamic_module_type_metadata_source_Route, ns, path.data(), path.size(),
+      &str));
+  EXPECT_EQ(absl::string_view(str.ptr, str.length), "user-123");
 }
 
 TEST(ABIImpl, metadata_list) {

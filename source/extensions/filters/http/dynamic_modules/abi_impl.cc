@@ -408,6 +408,45 @@ getMetadataValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_pt
   return &key_metadata->second;
 }
 
+// Resolve literal struct keys without interpreting dots or list indices in path components.
+const Protobuf::Value*
+getMetadataValueByPath(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+                       envoy_dynamic_module_type_metadata_source metadata_source,
+                       envoy_dynamic_module_type_module_buffer ns,
+                       const envoy_dynamic_module_type_module_buffer* path, size_t path_length) {
+  if (path_length == 0) {
+    return nullptr;
+  }
+  const auto* value = getMetadataValue(filter_envoy_ptr, metadata_source, ns, path[0]);
+  for (size_t i = 1; i < path_length; ++i) {
+    if (value == nullptr || !value->has_struct_value()) {
+      return nullptr;
+    }
+    const auto& fields = value->struct_value().fields();
+    const auto it = fields.find(absl::string_view(path[i].ptr, path[i].length));
+    if (it == fields.end()) {
+      return nullptr;
+    }
+    value = &it->second;
+  }
+  return value;
+}
+
+const Protobuf::Value*
+getMetadataListItemByPath(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+                          envoy_dynamic_module_type_metadata_source metadata_source,
+                          envoy_dynamic_module_type_module_buffer ns,
+                          const envoy_dynamic_module_type_module_buffer* path, size_t path_length,
+                          size_t index) {
+  const auto* value =
+      getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
+  if (value == nullptr || !value->has_list_value() ||
+      index >= static_cast<size_t>(value->list_value().values_size())) {
+    return nullptr;
+  }
+  return &value->list_value().values(index);
+}
+
 /**
  * Helper to get the metadata list value from the metadata namespace.
  *
@@ -1631,6 +1670,106 @@ bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
     return false;
   }
   *result = item.bool_value();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_nested_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, const envoy_dynamic_module_type_module_buffer* path,
+    size_t path_length, envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto* value =
+      getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
+  if (value == nullptr || !value->has_string_value()) {
+    return false;
+  }
+  const auto& str = value->string_value();
+  *result = {str.data(), str.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_nested_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, const envoy_dynamic_module_type_module_buffer* path,
+    size_t path_length, double* result) {
+  const auto* value =
+      getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
+  if (value == nullptr || !value->has_number_value()) {
+    return false;
+  }
+  *result = value->number_value();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, const envoy_dynamic_module_type_module_buffer* path,
+    size_t path_length, bool* result) {
+  const auto* value =
+      getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
+  if (value == nullptr || !value->has_bool_value()) {
+    return false;
+  }
+  *result = value->bool_value();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, const envoy_dynamic_module_type_module_buffer* path,
+    size_t path_length, size_t* result) {
+  const auto* value =
+      getMetadataValueByPath(filter_envoy_ptr, metadata_source, ns, path, path_length);
+  if (value == nullptr || !value->has_list_value()) {
+    return false;
+  }
+  *result = value->list_value().values_size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, const envoy_dynamic_module_type_module_buffer* path,
+    size_t path_length, size_t index, envoy_dynamic_module_type_envoy_buffer* result) {
+  const auto* value =
+      getMetadataListItemByPath(filter_envoy_ptr, metadata_source, ns, path, path_length, index);
+  if (value == nullptr || !value->has_string_value()) {
+    return false;
+  }
+  const auto& str = value->string_value();
+  *result = {str.data(), str.size()};
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_nested_list_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, const envoy_dynamic_module_type_module_buffer* path,
+    size_t path_length, size_t index, double* result) {
+  const auto* value =
+      getMetadataListItemByPath(filter_envoy_ptr, metadata_source, ns, path, path_length, index);
+  if (value == nullptr || !value->has_number_value()) {
+    return false;
+  }
+  *result = value->number_value();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_metadata_nested_list_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns, const envoy_dynamic_module_type_module_buffer* path,
+    size_t path_length, size_t index, bool* result) {
+  const auto* value =
+      getMetadataListItemByPath(filter_envoy_ptr, metadata_source, ns, path, path_length, index);
+  if (value == nullptr || !value->has_bool_value()) {
+    return false;
+  }
+  *result = value->bool_value();
   return true;
 }
 
