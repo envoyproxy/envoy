@@ -7,6 +7,7 @@
 #include "source/common/config/decoded_resource_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -333,7 +334,13 @@ void WatchMap::onConfigUpdate(
   // resources the watch map is interested in. Reserve the correct amount of
   // space for the vector for the good case.
   decoded_resources.reserve(added_resources.size());
+  const bool remove_resource_aliases =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_remove_resource_aliases");
   for (const auto* r : added_resources) {
+    if (remove_resource_aliases && r->has_resource() && !r->aliases().empty()) {
+      auto& aliases = resource_aliases_[r->name()];
+      aliases.insert(r->aliases().begin(), r->aliases().end());
+    }
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r->name());
     // If there are no watches, then we don't need to decode. If there are watches, they should all
     // be for the same resource type, so we can just use the callbacks of the first watch to decode.
@@ -351,6 +358,21 @@ void WatchMap::onConfigUpdate(
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r);
     for (const auto& interested_watch : interested_in_r) {
       *per_watch_removed[interested_watch].Add() = r;
+    }
+    if (remove_resource_aliases) {
+      if (auto alias_it = resource_aliases_.find(r); alias_it != resource_aliases_.end()) {
+        for (const auto& alias : alias_it->second) {
+          if (auto interest_it = watch_interest_.find(alias);
+              interest_it != watch_interest_.end()) {
+            for (auto* watch : interest_it->second) {
+              watch->resource_names_.erase(alias);
+              updateWildcardWatches(watch);
+            }
+            watch_interest_.erase(interest_it);
+          }
+        }
+        resource_aliases_.erase(alias_it);
+      }
     }
   }
 

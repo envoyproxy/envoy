@@ -198,6 +198,11 @@ private:
   // accept every resource named "P/...".
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> accept_prefix_watches_;
 
+  // Maps a resource name to the aliases associated with that resource when it was added/updated.
+  // When the resource is removed by the management server, its aliases are also removed from watch
+  // interest.
+  absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> resource_aliases_;
+
   const std::string type_url_;
   CustomConfigValidators* config_validators_;
   EdsResourcesCacheOptRef eds_resources_cache_;

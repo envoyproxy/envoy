@@ -13,6 +13,7 @@
 #include "source/common/config/resource_name.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -174,12 +175,19 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   const bool removed = removeVhosts(*vhosts_after_this_update, removed_resources);
   const bool updated = updateVhosts(*vhosts_after_this_update, added_vhosts);
 
+  const bool remove_resource_aliases =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_remove_resource_aliases");
   const bool vhosts_changed = removed || updated || !added_resource_ids.empty();
   if (!vhosts_changed) {
     // Nothing to rebuild, so the currently published route configuration stays in place. An update
     // that is still warming up is deliberately left alone. This update still carried no resource
     // ids, so record that, otherwise the ids of the previous update would be resolved against a
     // later publish.
+    if (remove_resource_aliases) {
+      for (const auto& removed_resource : removed_resources) {
+        requested_vhds_resource_ids_.erase(removed_resource);
+      }
+    }
     resource_ids_in_last_update_ = std::move(added_resource_ids);
     return false;
   }
@@ -197,12 +205,15 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // before the update is published, because publishing runs the on-demand VHDS callbacks against
   // resourceIdsInLastVhdsUpdate().
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
+  if (remove_resource_aliases) {
+    for (const auto& removed_resource : removed_resources) {
+      requested_vhds_resource_ids_.erase(removed_resource);
+    }
+  }
   // Only ids that were explicitly requested on demand enter the answered cache. The server may
   // name a resource or attach aliases Envoy never asked for; Envoy holds no subscription
   // interest in those, so nothing guarantees pushes for them after a stream reconnect, and
   // answering them locally later would serve permanently stale data without ever subscribing.
-  // TODO(wbpcode): also take the removed_resources into account for marking requested VHDS resource
-  // IDs as answered.
   for (absl::string_view resource_id : added_resource_ids) {
     if (auto it = requested_vhds_resource_ids_.find(resource_id);
         it != requested_vhds_resource_ids_.end()) {

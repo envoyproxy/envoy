@@ -67,12 +67,14 @@ public:
 
   /**
    * @return whether the given resource id was requested on demand from the current VHDS
-   * subscription and received back in an update that has already been published. When this
-   * returns true, the published route configuration is the authoritative answer for the id,
-   * including a "doesn't exist" answer that the server gave with an empty resource: a requested
-   * id is part of the delta subscription interest, which is re-sent when the stream reconnects,
-   * so the server pushes a new update on its own if the virtual host appears, changes or goes
-   * away later. Ids the server volunteered without a request are deliberately never reported as
+   * subscription, received back in an update that has already been published, and not subsequently
+   * removed. When this returns true, the published route configuration is the authoritative answer
+   * for the id, including a "doesn't exist" answer that the server gave with an empty resource: a
+   * requested id is part of the delta subscription interest, which is re-sent when the stream
+   * reconnects, so the server pushes a new update on its own if the virtual host appears or changes
+   * later. When a resource is removed by the server, its name and aliases are removed from the
+   * delta subscription and evicted from the answered cache so a future request re-subscribes on
+   * demand. Ids the server volunteered without a request are deliberately never reported as
    * answered, because no subscription guarantees further pushes for them. Returns false while an
    * update is still warming, because the published configuration may not reflect the server's
    * answer for the id yet.

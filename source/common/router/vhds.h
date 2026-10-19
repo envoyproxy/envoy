@@ -22,6 +22,8 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_set.h"
 
 namespace Envoy {
@@ -84,6 +86,7 @@ private:
   Init::TargetImpl init_target_;
   const Envoy::Config::ResourceTypeHelper<envoy::config::route::v3::VirtualHost>
       resource_type_helper_;
+  absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> resource_aliases_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

@@ -822,6 +822,38 @@ TEST(WatchMapTest, AppendWatchInterest) {
     expectDeltaUpdate(callbacks, expected_resources, {}, "version1");
     doDeltaUpdate(watch_map, updated_resources, {}, "version1");
   }
+  {
+    // A resource added with an alias has its alias removed from watch interest when the resource
+    // is removed, allowing a subsequent appendWatchInterest() for that alias to report it in
+    // added_.
+    watch_map.accept(watch, {"prefix/*"});
+    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {"prefix/alias"});
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"prefix/alias"}), added_removed.added_);
+
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla;
+    cla.set_cluster_name("prefix/resource");
+    envoy::service::discovery::v3::Resource resource;
+    resource.set_name("prefix/resource");
+    resource.set_version("version2");
+    resource.add_aliases("prefix/alias");
+    std::ignore = resource.mutable_resource()->PackFrom(cla);
+    std::vector<const envoy::service::discovery::v3::Resource*> added_resources{&resource};
+    expectDeltaUpdate(callbacks, {cla}, {}, "version2");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added_resources), {}, "version2");
+
+    // While the resource is present, re-appending the alias is a no-op.
+    EXPECT_TRUE(watch_map.appendWatchInterest(watch, {"prefix/alias"}).added_.empty());
+
+    // Removing the resource also removes its alias from watch interest.
+    Protobuf::RepeatedPtrField<std::string> removed;
+    *removed.Add() = "prefix/resource";
+    expectDeltaUpdate(callbacks, {}, {"prefix/resource"}, "version3");
+    watch_map.onConfigUpdate({}, removed, "version3");
+
+    // A subsequent on-demand append for the alias reports it as newly added again.
+    added_removed = watch_map.appendWatchInterest(watch, {"prefix/alias"});
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"prefix/alias"}), added_removed.added_);
+  }
 }
 
 // accept() registers glob interest that affects routing only: the watch receives

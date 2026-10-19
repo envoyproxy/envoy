@@ -1607,9 +1607,9 @@ TEST_F(RdsVhdsOnDemandTest, AnsweredAliasCacheDisabled) {
   rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
 }
 
-// A virtual host that answered an alias and was later removed by the server stays answered: the
-// published configuration now answers that the virtual host doesn't exist, so a repeated request
-// is answered locally with 'false' instead of going back to the server.
+// A virtual host that answered an alias and was later removed by the server has its alias
+// evicted from the answered cache as well as the delta subscription, so a repeated request goes
+// back to the server to re-subscribe on demand.
 TEST_F(RdsVhdsOnDemandTest, RemovedAnsweredVirtualHostIsAnsweredLocallyWithFalse) {
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = setupWithVhds();
   ASSERT_NE(nullptr, vhds_callbacks);
@@ -1639,8 +1639,24 @@ TEST_F(RdsVhdsOnDemandTest, RemovedAnsweredVirtualHostIsAnsweredLocallyWithFalse
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_nothing_added.refvec_, removed_resources, "3"));
 
-  // A repeated request for 'bar.com' is answered locally with 'false': the subscription to the
-  // alias stays, so the server pushes an update on its own if the virtual host comes back.
+  // A repeated request for 'bar.com' goes back to the server because removing the virtual host
+  // also removes subscription interest in its aliases.
+  EXPECT_CALL(vhdsSubscription(),
+              requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo_route_config/bar.com"}));
+  EXPECT_CALL(mock_callback_, Call(_)).Times(0);
+  rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);
+  ::testing::Mock::VerifyAndClearExpectations(&vhdsSubscription());
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  // With vhds_remove_resource_aliases disabled, removing a virtual host leaves its alias in the
+  // answered cache, so a subsequent request is answered locally with false.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.vhds_remove_resource_aliases", "false"}});
+  EXPECT_CALL(mock_callback_, Call(true));
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_vhds_resources.refvec_, {}, "4"));
+  ::testing::Mock::VerifyAndClearExpectations(&mock_callback_);
+
+  EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_nothing_added.refvec_, removed_resources, "5"));
   EXPECT_CALL(vhdsSubscription(), requestOnDemandUpdate(_)).Times(0);
   EXPECT_CALL(mock_callback_, Call(false));
   rds_->requestVirtualHostsUpdate("bar.com", local_thread_dispatcher_, callback_holder_);

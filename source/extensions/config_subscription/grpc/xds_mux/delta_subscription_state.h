@@ -47,6 +47,7 @@ private:
   bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) const;
   void handleGoodResponse(envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
+  void removeResourceAliases(const std::string& resource_name);
 
   class ResourceState {
   public:
@@ -97,6 +98,8 @@ private:
   // Used for storing resources that we lost interest in, but could
   // also be a part of wildcard subscription.
   absl::node_hash_map<std::string, std::string> ambiguous_resource_state_;
+  // Maps a resource name to the aliases associated with that resource when it was added/updated.
+  absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> resource_aliases_;
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};

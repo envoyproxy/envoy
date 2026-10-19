@@ -410,15 +410,29 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsAccumulateAcrossUpdates) {
   EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("my_route/unknown.com"));
   EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
 
-  // Removing the virtual host doesn't withdraw the answer: the published configuration now
-  // answers that the virtual host doesn't exist, and the subscription to the id stays, so the
-  // server pushes an update on its own if the virtual host comes back.
+  // Removing the virtual host withdraws the answer for the removed resource and its aliases,
+  // because removing a resource also removes its subscription interest, so a subsequent request
+  // must re-subscribe on demand. Other answered ids remain cached.
   const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> nothing_added;
   const auto decoded_nothing_added =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_nothing_added.refvec_, buildRemovedResources({"vhost1"}), "4"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("my_route/unknown.com"));
+
+  // Verify that removing a resource by name also withdraws the answered state for its aliases.
+  config_update_info->updateOnDemand("my_route/vhost2.com");
+  auto aliased_resources = buildAddedResources({buildVirtualHost("vhost2", "vhost2.com")});
+  aliased_resources.Mutable(0)->add_aliases("my_route/vhost2.com");
+  const auto decoded_aliased_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(aliased_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_aliased_resources.refvec_, {}, "5"));
+  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("my_route/vhost2.com"));
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_nothing_added.refvec_, buildRemovedResources({"vhost2"}), "6"));
+  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("my_route/vhost2.com"));
 }
 
 // verify that accumulated answers don't survive the VHDS subscription they came from: a changed
