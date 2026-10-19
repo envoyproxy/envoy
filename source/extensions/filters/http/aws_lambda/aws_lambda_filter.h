@@ -88,23 +88,27 @@ public:
   virtual bool payloadPassthrough() const PURE;
   virtual InvocationMode invocationMode() const PURE;
   virtual const std::string& hostRewrite() const PURE;
+  virtual bool preserveOriginalPathAndMethod() const PURE;
   virtual Extensions::Common::Aws::Signer& signer() PURE;
 };
 
 class FilterSettingsImpl : public FilterSettings {
 public:
   FilterSettingsImpl(const Arn& arn, InvocationMode mode, bool payload_passthrough,
-                     const std::string& host_rewrite, Extensions::Common::Aws::SignerPtr&& signer,
+                     const std::string& host_rewrite, bool preserve_original_path_and_method,
+                     Extensions::Common::Aws::SignerPtr&& signer,
                      Event::Dispatcher& main_dispatcher)
       : arn_(arn), invocation_mode_(mode), payload_passthrough_(payload_passthrough),
-        host_rewrite_(host_rewrite), main_dispatcher_(main_dispatcher), signer_(std::move(signer)) {
-  }
+        host_rewrite_(host_rewrite),
+        preserve_original_path_and_method_(preserve_original_path_and_method),
+        main_dispatcher_(main_dispatcher), signer_(std::move(signer)) {}
   ~FilterSettingsImpl() override;
 
   const Arn& arn() const override { return arn_; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
   InvocationMode invocationMode() const override { return invocation_mode_; }
   const std::string& hostRewrite() const override { return host_rewrite_; }
+  bool preserveOriginalPathAndMethod() const override { return preserve_original_path_and_method_; }
   Extensions::Common::Aws::Signer& signer() override { return *signer_; }
 
 private:
@@ -112,6 +116,7 @@ private:
   InvocationMode invocation_mode_;
   bool payload_passthrough_;
   const std::string host_rewrite_;
+  const bool preserve_original_path_and_method_;
   Event::Dispatcher& main_dispatcher_;
   Extensions::Common::Aws::SignerPtr signer_;
 };

@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_lambda]
 
 // AWS Lambda filter config
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_lambda.v2alpha.Config";
@@ -112,6 +112,28 @@ message Config {
   //
   // When applied, all headers that start with ``x-amzn`` and headers ``foo`` and ``bar`` will be signed and all other headers will be excluded from signing except required headers.
   repeated type.matcher.v3.StringMatcher match_included_headers = 8;
+
+  // When true, the filter records the request's original ``:path`` and ``:method`` into the
+  // ``x-envoy-original-path`` and ``x-envoy-original-method`` headers before rewriting them to the
+  // Lambda Invoke API target. This makes the downstream path available to access logs and to the
+  // ``http.url`` span attribute, which would otherwise report the Invoke API path for every
+  // Lambda-backed route.
+  //
+  // A header that is already present is left untouched, so a path recorded by an earlier rewrite
+  // (for example :ref:`prefix_rewrite
+  // <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`) is not replaced.
+  //
+  // Defaults to false, in which case neither header is written.
+  //
+  // .. note::
+  //     Both headers are added before the request is signed, so with the default matcher
+  //     configuration they are covered by the SigV4 signature. They are forwarded to the Lambda
+  //     endpoint either way: :ref:`match_excluded_headers
+  //     <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.match_excluded_headers>`
+  //     and :ref:`match_included_headers
+  //     <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.match_included_headers>`
+  //     control what is signed, not what is sent.
+  bool preserve_original_path_and_method = 9;
 }
 
 // AWS Lambda Credentials config.

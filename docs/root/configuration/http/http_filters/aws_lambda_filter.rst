@@ -139,6 +139,26 @@ An example with the Lambda metadata applied to a weighted-cluster:
     :linenos:
     :caption: :download:`aws-lambda-typed-filter.yaml <_include/aws-lambda-typed-filter.yaml>`
 
+Observability
+-------------
+The filter rewrites the request's ``:path`` to the Lambda Invoke API target and its ``:method`` to
+``POST``. Access logs and tracing spans are produced after that rewrite, so by default every
+Lambda-backed route is logged and traced as ``/2015-03-31/functions/<arn>/invocations``.
+
+Setting :ref:`preserve_original_path_and_method
+<envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.preserve_original_path_and_method>`
+records the downstream values in ``x-envoy-original-path`` and ``x-envoy-original-method`` before
+the rewrite. The ``%REQ(X-ENVOY-ORIGINAL-PATH)%`` access log operator and the ``http.url`` span
+attribute then report the path the client requested.
+
+Both headers are added before the request is signed, so under the default matcher configuration
+they form part of the SigV4 signature. They are sent to the Lambda endpoint regardless:
+:ref:`match_excluded_headers
+<envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.match_excluded_headers>` and
+:ref:`match_included_headers
+<envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.match_included_headers>` govern
+which headers are signed, not which are forwarded.
+
 Configuration as an upstream HTTP filter
 ----------------------------------------
 SigV4 or SigV4A request signatures are calculated using the HTTP host, URL and payload as input. Depending on the configuration, Envoy may modify one or more of

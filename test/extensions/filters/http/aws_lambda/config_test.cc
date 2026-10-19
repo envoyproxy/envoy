@@ -79,7 +79,8 @@ arn: "arn:aws:lambda:region:424242:function:fun"
     auto filter = std::static_pointer_cast<Filter>(stream_filter);
     const auto& settings = filter->settingsForTest();
     return settings.payloadPassthrough() == false &&
-           settings.invocationMode() == InvocationMode::Synchronous;
+           settings.invocationMode() == InvocationMode::Synchronous &&
+           settings.preserveOriginalPathAndMethod() == false;
   };
 
   EXPECT_CALL(filter_callbacks, addStreamFilter(Truly(has_expected_settings)));
@@ -526,6 +527,54 @@ TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithIncludedHeaders) {
                                            ProtobufMessage::getStrictValidationVisitor())
           .value();
   ASSERT_NE(route_specific_config_ptr, nullptr);
+}
+
+TEST(AwsLambdaFilterConfigTest, ConfigWithPreserveOriginalPathAndMethod) {
+  const std::string yaml = R"EOF(
+arn: "arn:aws:lambda:region:424242:function:fun"
+preserve_original_path_and_method: true
+  )EOF";
+
+  LambdaConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  auto has_expected_settings = [](std::shared_ptr<Envoy::Http::StreamFilter> stream_filter) {
+    auto filter = std::static_pointer_cast<Filter>(stream_filter);
+    return filter->settingsForTest().preserveOriginalPathAndMethod();
+  };
+
+  EXPECT_CALL(filter_callbacks, addStreamFilter(Truly(has_expected_settings)));
+  cb(filter_callbacks);
+}
+
+TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithPreserveOriginalPathAndMethod) {
+  const std::string yaml = R"EOF(
+  invoke_config:
+    arn: "arn:aws:lambda:region:424242:function:fun"
+    preserve_original_path_and_method: true
+  )EOF";
+
+  LambdaPerRouteConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AwsLambdaFilterFactory factory;
+
+  auto route_specific_config_ptr =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getStrictValidationVisitor())
+          .value();
+  ASSERT_NE(route_specific_config_ptr, nullptr);
+  auto filter_settings_ptr =
+      std::static_pointer_cast<const FilterSettings>(route_specific_config_ptr);
+  EXPECT_TRUE(filter_settings_ptr->preserveOriginalPathAndMethod());
 }
 
 } // namespace
