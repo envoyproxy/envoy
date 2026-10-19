@@ -4,6 +4,7 @@
 #include "envoy/network/exception.h"
 
 #include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -660,6 +661,30 @@ TEST_P(TcpListenerImplTest, LoadShedPointRejectDeallocatesGlobalConnectionResour
   client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// Regression test for the cross-thread UAF fixed in ActiveTcpListener::onAcceptWorker(): after
+// setOverloadState() rebinds a socket's overload state handle, deallocation on destruction must
+// go through the new handle only, never the original one.
+TEST(AcceptedSocketImplTest, SetOverloadStateRebindsDeallocationTarget) {
+  testing::NiceMock<Server::MockThreadLocalOverloadState> original_state;
+  testing::NiceMock<Server::MockThreadLocalOverloadState> rebound_state;
+
+  EXPECT_CALL(original_state, tryDeallocateResource(_, _)).Times(0);
+  EXPECT_CALL(rebound_state,
+              tryDeallocateResource(
+                  Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1))
+      .WillOnce(Return(true));
+
+  Address::InstanceConstSharedPtr address(new Address::Ipv4Instance("127.0.0.1", 10001));
+
+  auto socket = std::make_unique<AcceptedSocketImpl>(
+      std::make_unique<testing::NiceMock<Network::MockIoHandle>>(), address, address,
+      Server::ThreadLocalOverloadStateOptRef(original_state),
+      /*track_global_cx_limit_in_overload_manager=*/true);
+
+  socket->setOverloadState(Server::ThreadLocalOverloadStateOptRef(rebound_state));
+  socket.reset(); // Should deallocate through rebound_state only.
 }
 
 TEST_P(TcpListenerImplTest, EachQueuedConnectionShouldQueryTheLoadShedPoint) {

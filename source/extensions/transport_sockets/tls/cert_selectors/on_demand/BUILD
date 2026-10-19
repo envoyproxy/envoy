@@ -22,6 +22,7 @@ envoy_cc_extension(
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_lib",
         "//source/extensions/filters/network/set_filter_state:config",
+        "//source/extensions/transport_sockets/tls/cert_selectors/common:async_context_lib",
         "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/cert_selectors/on_demand_secret/v3:pkg_cc_proto",
     ],

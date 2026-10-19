@@ -121,6 +121,36 @@ TEST(McpJsonRestBridgeFilterPerRouteConfigTest, PerRouteConfigDuplicateToolNames
                                    HasSubstr("Duplicate tool name: my_tool")));
 }
 
+TEST(McpJsonRestBridgeFilterPerRouteConfigTest, PerRouteConfigDuplicateEndpointConfigs) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_config;
+  TestUtility::loadFromYaml(R"EOF(
+    tool_config:
+      - tools:
+          - name: "tool_1"
+            http_rule: { get: "/foo" }
+        default_server_info:
+          host: "example.com"
+          path: "/mcp"
+      - tools:
+          - name: "tool_2"
+            http_rule: { get: "/bar" }
+        default_server_info:
+          host: "example.com"
+          path: "/mcp"
+  )EOF",
+                            per_route_config);
+
+  McpJsonRestBridgeFilterConfigFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> config_or =
+      factory.createRouteSpecificFilterConfig(per_route_config, context,
+                                              ProtobufMessage::getNullValidationVisitor());
+  EXPECT_THAT(config_or,
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Duplicate endpoint config for host/path: example.com, /mcp")));
+}
+
 TEST(McpJsonRestBridgeFilterConfigTest, InvalidMaxSupportedProtocolVersion) {
   McpJsonRestBridgeFilterConfigFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;

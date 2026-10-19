@@ -14,7 +14,6 @@ namespace Mcp {
 namespace McpConstants {
 // Metadata namespace constants
 constexpr absl::string_view McpfilterNamespace = "envoy.filters.http.mcp";
-constexpr absl::string_view LegacyMetadataNamespace = "mcp_proxy";
 
 // JSON-RPC constants
 constexpr absl::string_view JSONRPC_VERSION = "2.0";
