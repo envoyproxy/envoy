@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/schedulable_cb.h"
@@ -22,6 +23,7 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
+#include "source/common/config/resource_type_helper.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/listener_manager/fcds_api.h"
 #include "source/common/listener_manager/filter_chain_factory_context_callback.h"
@@ -107,6 +109,10 @@ struct FilterChainActionFactoryContext {
   FcdsClientCallbacks& fcds_callbacks_;
   const envoy::config::core::v3::ConfigSource& fcds_config_source_;
   Init::Manager& init_manager_;
+  // Optional sink: each FCDS subscription handle created while building the matcher is recorded
+  // here so the owning FilterChainManagerImpl can report its (routable) FCDS chains by name. Null
+  // when unused (e.g. no FCDS).
+  std::vector<FcdsSubscriptionHandleSharedPtr>* fcds_handles_sink_ = nullptr;
 };
 
 using FilterChainsByMatcher = absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch,
@@ -218,6 +224,7 @@ public:
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket& socket,
                                               const StreamInfo::StreamInfo& info) const override;
+  std::vector<absl::string_view> filterChainNames() const override;
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
@@ -419,6 +426,11 @@ private:
   // Matcher selecting the filter chain name.
   Matcher::MatchTreePtr<Network::MatchingData> matcher_;
 
+  // FCDS subscription handles created for matcher_ (one per matcher-referenced FCDS chain). A chain
+  // is routable via this listener only if its name is here (the matcher references it); used by
+  // filterChainNames() to report active, routable FCDS chains.
+  std::vector<FcdsSubscriptionHandleSharedPtr> fcds_handles_;
+
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
 
@@ -465,6 +477,11 @@ public:
   virtual ~FcdsSubscriptionHandle() = default;
   virtual const Network::FilterChain* filterChain() PURE;
   virtual FcdsClientCallbacks& callbacks() PURE;
+  // Name of the FCDS filter chain this handle subscribes to.
+  virtual absl::string_view filterChainName() const PURE;
+  // True when the subscribed chain is committed (active) in the shared manager, using the same
+  // active-state test that publishes the worker TLS set.
+  virtual bool isActive() const PURE;
 };
 using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
 
@@ -503,6 +520,10 @@ public:
   // Unsubscribes a listener from FCDS distribution.
   void unsubscribe(const std::string& filter_chain_name, FcdsSubscriptionHandle& handle);
 
+  // True if the named subscription's committed (active) filter chain is present, using the same
+  // active-state test that updateTlsState() publishes to workers. Main-thread only.
+  bool isFilterChainActive(const std::string& filter_chain_name) const;
+
   // FilterChainUpdateCallbacks
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
@@ -518,6 +539,8 @@ private:
   ThreadLocal::TypedSlotPtr<ThreadLocalState> tls_slot_;
   Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
   Stats::ScopeSharedPtr scope_;
+  // Shared by all FCDS subscriptions so the resource decoder is built once.
+  const Config::ResourceTypeHelper<FilterChainProto> resource_type_helper_;
   struct SubscriptionState {
     std::unique_ptr<FcdsApiImpl> api_;
     absl::flat_hash_set<FcdsSubscriptionHandle*> handles_;
@@ -531,6 +554,9 @@ private:
 
   // Coalesces thread local filter chain updates within a single event loop iteration.
   Event::SchedulableCallbackPtr tls_update_cb_;
+
+  // Pauses filter chain discovery requests while a thread local publish is pending.
+  Config::ScopedResume xds_pause_;
 };
 
 } // namespace Server

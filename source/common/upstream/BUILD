@@ -54,6 +54,7 @@ envoy_cc_library(
         "//envoy/config:subscription_interface",
         "//envoy/protobuf:message_validator_interface",
         "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:resource_type_helper_lib",
@@ -101,6 +102,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
+        "//source/common/config:dependent_type_urls_lib",
         "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
@@ -252,6 +254,19 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/upstream:host_utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "host_lookup_map_lib",
+    hdrs = ["host_lookup_map.h"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:macros",
+        "//source/common/common:persistent_hash_map_lib",
+        "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/hash",
+        "@abseil-cpp//absl/strings:string_view",
     ],
 )
 
@@ -480,6 +495,7 @@ envoy_cc_library(
         "upstream_impl.h",
     ],
     deps = [
+        ":host_lookup_map_lib",
         ":load_balancer_context_base_lib",
         ":locality_pool_lib",
         ":resource_manager_lib",
@@ -522,6 +538,7 @@ envoy_cc_library(
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
+        "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

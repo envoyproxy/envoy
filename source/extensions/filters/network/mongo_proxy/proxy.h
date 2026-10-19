@@ -13,8 +13,6 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -45,41 +43,6 @@ public:
 using MongoRuntimeConfig = ConstSingleton<MongoRuntimeConfigKeys>;
 
 /**
- * All mongo proxy stats. @see stats_macros.h
- */
-#define ALL_MONGO_PROXY_STATS(COUNTER, GAUGE, HISTOGRAM)                                           \
-  COUNTER(cx_destroy_local_with_active_rq)                                                         \
-  COUNTER(cx_destroy_remote_with_active_rq)                                                        \
-  COUNTER(cx_drain_close)                                                                          \
-  COUNTER(decoding_error)                                                                          \
-  COUNTER(delays_injected)                                                                         \
-  COUNTER(op_command)                                                                              \
-  COUNTER(op_command_reply)                                                                        \
-  COUNTER(op_get_more)                                                                             \
-  COUNTER(op_insert)                                                                               \
-  COUNTER(op_kill_cursors)                                                                         \
-  COUNTER(op_query)                                                                                \
-  COUNTER(op_query_await_data)                                                                     \
-  COUNTER(op_query_exhaust)                                                                        \
-  COUNTER(op_query_multi_get)                                                                      \
-  COUNTER(op_query_no_cursor_timeout)                                                              \
-  COUNTER(op_query_no_max_time)                                                                    \
-  COUNTER(op_query_scatter_get)                                                                    \
-  COUNTER(op_query_tailable_cursor)                                                                \
-  COUNTER(op_reply)                                                                                \
-  COUNTER(op_reply_cursor_not_found)                                                               \
-  COUNTER(op_reply_query_failure)                                                                  \
-  COUNTER(op_reply_valid_cursor)                                                                   \
-  GAUGE(op_query_active, Accumulate)
-
-/**
- * Struct definition for all mongo proxy stats. @see stats_macros.h
- */
-struct MongoProxyStats {
-  ALL_MONGO_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
-
-/**
  * Access logger for mongo messages.
  */
 class AccessLog {
@@ -106,8 +69,7 @@ class ProxyFilter : public Network::Filter,
                     public Network::ConnectionCallbacks,
                     Logger::Loggable<Logger::Id::mongo> {
 public:
-  ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-              AccessLogSharedPtr access_log,
+  ProxyFilter(Runtime::Loader& runtime, AccessLogSharedPtr access_log,
               const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
               const Network::DrainDecision& drain_decision,
               Server::Configuration::ServerFactoryContext& server_context, TimeSource& time_system,
@@ -169,12 +131,6 @@ private:
 
   using ActiveQueryPtr = std::unique_ptr<ActiveQuery>;
 
-  MongoProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return MongoProxyStats{ALL_MONGO_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                                 POOL_GAUGE_PREFIX(scope, prefix),
-                                                 POOL_HISTOGRAM_PREFIX(scope, prefix))};
-  }
-
   // Increment counters related to queries. 'names' is passed by non-const
   // reference so the implementation can mutate it without copying, though it
   // always restores it to its prior state prior to return.
@@ -195,8 +151,13 @@ private:
   void delayInjectionTimerCallback();
   void tryInjectDelay();
 
+  // Declared first so it is destroyed last: stats_ references the MongoProxyStats it owns, and
+  // other members (e.g. active_query_list_) touch stats_ from their destructors.
+  MongoStatsSharedPtr mongo_stats_;
   std::unique_ptr<Decoder> decoder_;
-  MongoProxyStats stats_;
+  // References the per-configuration stats owned by the shared MongoStats, which is kept alive
+  // by mongo_stats_.
+  MongoProxyStats& stats_;
   Runtime::Loader& runtime_;
   const Network::DrainDecision& drain_decision_;
   Server::Configuration::ServerFactoryContext& server_context_;
@@ -219,7 +180,6 @@ private:
   Event::TimerPtr drain_close_timer_;
   TimeSource& time_source_;
   const bool emit_dynamic_metadata_;
-  MongoStatsSharedPtr mongo_stats_;
 
 protected:
   const uint32_t max_bson_depth_;

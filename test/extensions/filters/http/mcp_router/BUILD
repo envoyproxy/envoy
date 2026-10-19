@@ -1,10 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -12,10 +12,11 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "session_codec_fuzz_test",
     srcs = ["session_codec_fuzz_test.cc"],
     corpus = "session_codec_corpus",
+    extension_names = ["envoy.filters.http.mcp_router"],
     deps = [
         "//source/extensions/filters/http/mcp_router:session_codec_lib",
         "//test/test_common:utility_lib",

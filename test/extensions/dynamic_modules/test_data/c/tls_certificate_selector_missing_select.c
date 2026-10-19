@@ -1,0 +1,44 @@
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "source/extensions/dynamic_modules/abi/abi.h"
+
+// TLS certificate selector module that omits the mandatory select hook, so loading it fails.
+
+envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
+  return envoy_dynamic_modules_abi_version;
+}
+
+static int config_dummy = 0;
+
+envoy_dynamic_module_type_tls_certificate_selector_config_module_ptr
+envoy_dynamic_module_on_tls_certificate_selector_config_new(
+    envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config,
+    bool is_upstream) {
+  (void)config_envoy_ptr;
+  (void)name;
+  (void)config;
+  (void)is_upstream;
+  return &config_dummy;
+}
+
+void envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+    envoy_dynamic_module_type_tls_certificate_selector_config_module_ptr config_module_ptr) {
+  (void)config_module_ptr;
+}
+
+envoy_dynamic_module_type_tls_certificate_selector_module_ptr
+envoy_dynamic_module_on_tls_certificate_selector_new(
+    envoy_dynamic_module_type_tls_certificate_selector_config_module_ptr config_module_ptr,
+    const envoy_dynamic_module_type_envoy_buffer* certificates, size_t certificates_count) {
+  (void)certificates;
+  (void)certificates_count;
+  return config_module_ptr;
+}
+
+void envoy_dynamic_module_on_tls_certificate_selector_destroy(
+    envoy_dynamic_module_type_tls_certificate_selector_module_ptr selector_module_ptr) {
+  (void)selector_module_ptr;
+}

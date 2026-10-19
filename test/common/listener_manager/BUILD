@@ -150,7 +150,9 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/config:resource_name_lib",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/common/network:addr_family_aware_socket_option_lib",
@@ -209,6 +211,7 @@ envoy_cc_test(
     srcs = ["fcds_api_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/config:resource_type_helper_lib",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/config:config_mocks",
@@ -218,6 +221,7 @@ envoy_cc_test(
         "//test/mocks/server:listener_component_factory_mocks",
         "//test/mocks/server:listener_manager_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

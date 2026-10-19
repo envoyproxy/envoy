@@ -57,8 +57,7 @@ template <class F> CAPIStatus envoyGoFilterProcessStateHandlerWrapper(void* s, c
     return CAPIStatus::CAPINotInGo;
   }
   auto req = static_cast<HttpRequestInternal*>(state->req);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
+  if (auto filter = req->weakFilter().lock()) {
     return f(filter, *state);
   }
   return CAPIStatus::CAPIFilterIsGone;
@@ -66,8 +65,7 @@ template <class F> CAPIStatus envoyGoFilterProcessStateHandlerWrapper(void* s, c
 
 template <class F> CAPIStatus envoyGoFilterHandlerWrapper(void* r, const F& f) {
   auto req = reinterpret_cast<HttpRequestInternal*>(r);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
+  if (auto filter = req->weakFilter().lock()) {
     // Though it's memory safe without this limitation.
     // But it's not a good idea to run Go code after continue back to Envoy C++,
     // so, add this limitation.
@@ -81,8 +79,7 @@ template <class F> CAPIStatus envoyGoFilterHandlerWrapper(void* r, const F& f) {
 
 template <class F> CAPIStatus envoyGoConfigHandlerWrapper(void* c, const F& fc) {
   auto config = reinterpret_cast<httpConfigInternal*>(c);
-  auto weak_filter_config = config->weakFilterConfig();
-  if (auto filter_config = weak_filter_config.lock()) {
+  if (auto filter_config = config->weakFilterConfig().lock()) {
     return fc(filter_config);
   }
   return CAPIStatus::CAPIFilterIsGone;
@@ -308,8 +305,7 @@ void envoyGoFilterHttpFinalize(void* r, int reason) {
   // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize
   // phase of the go object.
   auto req = reinterpret_cast<HttpRequestInternal*>(r);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
+  if (auto filter = req->weakFilter().lock()) {
     // Finalize must happens after onDestory, that means Filter is marked as destroyed.
     // When filter is still existing, it could happens in very low rate, since Golang GC
     // finalizer delays execution.

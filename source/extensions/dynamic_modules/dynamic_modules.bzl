@@ -56,16 +56,17 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
     # Use llvm-objcopy from the Envoy-managed LLVM toolchain to rename symbols in
     # the static archive. The shell command selects the first non-PIC .a file from
     # the archive target's outputs (cc_library may produce both .a and .pic.a);
-    # falls back to any .a if all archives are PIC-suffixed.
+    # falls back to any .a if all archives are PIC-suffixed. On Windows, cc_library
+    # produces a .lib archive instead.
     #
     # NOTE: The case statement is kept outside $() command substitution for
     # compatibility with bash 3.2 (macOS default), which cannot parse case
     # pattern delimiters inside $().
     archive_select_cmd = (
         "ARCH=\"\"; " +
-        "for f in $(SRCS); do case $$f in *.pic.a) continue;; *.a) ARCH=$$f; break;; esac; done; " +
+        "for f in $(SRCS); do case $$f in *.pic.a) continue;; *.a|*.lib) ARCH=$$f; break;; esac; done; " +
         "[ -z \"$$ARCH\" ] && " +
-        "for f in $(SRCS); do case $$f in *.a) ARCH=$$f; break;; esac; done; "
+        "for f in $(SRCS); do case $$f in *.a|*.lib) ARCH=$$f; break;; esac; done; "
     )
     native.genrule(
         name = renamed_name,

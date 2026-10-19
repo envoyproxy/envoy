@@ -1510,7 +1510,7 @@ TEST_P(Http2CodecImplTest, ConnectionMetadataLargeVec) {
   driveToCompletion();
 }
 
-TEST_P(Http2CodecImplTest, ConnectionMetadataHasEnvoyBugWhenNotAllowed) {
+TEST_P(Http2CodecImplTest, ConnectionMetadataIsDroppedWhenNotAllowed) {
   allow_metadata_ = false;
   initialize();
 
@@ -1518,9 +1518,10 @@ TEST_P(Http2CodecImplTest, ConnectionMetadataHasEnvoyBugWhenNotAllowed) {
   MetadataMap metadata_map = {{"key", "value"}};
   metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
 
-  EXPECT_ENVOY_BUG(client_->encodeMetadata(metadata_vector),
-                   "metadata not allowed on this connection");
+  EXPECT_LOG_CONTAINS("debug", "metadata not allowed on this connection",
+                      client_->encodeMetadata(metadata_vector));
   driveToCompletion();
+  EXPECT_EQ(client_stats_store_.counter("http2.metadata_dropped").value(), 1);
 }
 
 TEST_P(Http2CodecImplTest, ConnectionMetadataEmptyMapIsIgnored) {

@@ -628,6 +628,12 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
+  // Called when the drain sequence the connection was notified of (see onDrain()) is about to end
+  // and the connection has to be drained without waiting for a response to decide on.
+  void onProactiveDrainTimeout();
+  // Resets the upgraded and CONNECT streams of a drained connection. Unlike ordinary requests they
+  // are not expected to complete on their own before the end of the drain sequence.
+  void resetTunnelingStreams();
   Tracing::Tracer& tracer() { return *config_->tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
                             StreamInfo::CoreResponseFlag response_flag);
@@ -637,6 +643,8 @@ private:
                          std::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
   void sendGoAwayAndClose(bool graceful = false);
+  void incIdleConnectionsStat();
+  void decIdleConnectionsStat();
 
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than
@@ -669,7 +677,7 @@ private:
   const Network::DrainDecision& drain_close_;
   // Set when the connection is notified of a drain sequence via onDrain(). Carries the drain start
   // time and strategy so the drain-close decision can be computed at the connection level (see
-  // shouldDrainClose()).
+  // shouldDrainClose()). Only set when use_connection_event_drain_ is enabled.
   std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
@@ -680,6 +688,12 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
+  // Armed in onDrain() to fire at a random point near the end of the drain sequence, so that a
+  // connection that sent no response in the meantime is still drained before it is torn down.
+  Event::TimerPtr proactive_drain_timer_;
+  // Set once proactive_drain_timer_ has fired. From then on tunneling streams are reset as soon as
+  // the connection is closing, see resetTunnelingStreams().
+  bool proactive_drain_{false};
   // When set to true, add Connection:close response header to nudge downstream client to reconnect.
   bool soft_drain_http1_{false};
   Random::RandomGenerator& random_generator_;
@@ -738,10 +752,6 @@ private:
   // request was incomplete at response completion, the stream is reset.
 
   const bool allow_upstream_half_close_{};
-  // Whether to call checkForDeferredClose() when zombie streams complete.
-  // This fixes a potential FD leak where connections with zombie streams in draining state
-  // would not be properly closed.
-  const bool close_connection_on_zombie_stream_complete_{};
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};

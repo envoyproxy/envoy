@@ -772,6 +772,16 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     return;
   }
 
+  if (redirect_config_ != nullptr && !redirect_config_->prefix_rewrite_redirect_.empty() &&
+      path_matcher_ != nullptr) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.disallow_redirect_prefix_rewrite_with_path_match_policy")) {
+      creation_status =
+          absl::InvalidArgumentError("Cannot use redirect.prefix_rewrite with path_match_policy");
+      return;
+    }
+  }
+
   if (route.route().has_regex_rewrite()) {
     auto rewrite_spec = route.route().regex_rewrite();
     regex_rewrite_ = THROW_OR_RETURN_VALUE(

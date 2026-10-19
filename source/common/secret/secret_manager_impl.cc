@@ -159,6 +159,30 @@ GenericSecretConfigProviderSharedPtr SecretManagerImpl::findOrCreateGenericSecre
                                                 init_manager, warm);
 }
 
+namespace {
+
+template <class SecretType>
+void appendActiveSecretNames(const std::vector<std::shared_ptr<SecretType>>& providers,
+                             std::vector<absl::string_view>& names) {
+  for (const auto& provider : providers) {
+    // A provider whose secret has not yet been delivered is warming, not active.
+    if (provider->secret() != nullptr) {
+      names.push_back(provider->secretData().resource_name_);
+    }
+  }
+}
+
+} // namespace
+
+std::vector<absl::string_view> SecretManagerImpl::dynamicActiveSecretNames() const {
+  std::vector<absl::string_view> names;
+  appendActiveSecretNames(certificate_providers_.allSecretProviders(), names);
+  appendActiveSecretNames(validation_context_providers_.allSecretProviders(), names);
+  appendActiveSecretNames(session_ticket_keys_providers_.allSecretProviders(), names);
+  appendActiveSecretNames(generic_secret_providers_.allSecretProviders(), names);
+  return names;
+}
+
 ProtobufTypes::MessagePtr
 SecretManagerImpl::dumpSecretConfigs(const Matchers::StringMatcher& name_matcher) {
   auto config_dump = std::make_unique<envoy::admin::v3::SecretsConfigDump>();

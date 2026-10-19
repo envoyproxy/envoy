@@ -251,6 +251,7 @@ envoy_cc_test(
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",

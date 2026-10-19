@@ -846,11 +846,16 @@ int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
 
 int StreamHandleWrapper::luaConnectionStreamInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
+  const auto* connection = callbacks_.connection();
+  if (connection == nullptr) {
+    lua_pushnil(state);
+    return 1;
+  }
   if (connection_stream_info_wrapper_.get() != nullptr) {
     connection_stream_info_wrapper_.pushStack();
   } else {
     connection_stream_info_wrapper_.reset(
-        ConnectionStreamInfoWrapper::create(state, callbacks_.connection()->streamInfo()), true);
+        ConnectionStreamInfoWrapper::create(state, connection->streamInfo()), true);
   }
   return 1;
 }
