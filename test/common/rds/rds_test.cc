@@ -26,6 +26,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -164,7 +165,9 @@ TEST_F(RdsConfigUpdateReceiverTest, EmptyRouteConfig) {
   EXPECT_TRUE(config_update_->configInfo().has_value());
   EXPECT_EQ("", config_update_->configInfo().value().name_);
   EXPECT_EQ("empty_version", config_update_->configInfo().value().version_);
-  EXPECT_EQ("", config_update_->configInfo().value().serialized_config_);
+  Protobuf::Any expected_any;
+  MessageUtil::packFrom(expected_any, empty_config);
+  EXPECT_TRUE(TestUtility::protoEqual(expected_any, config_update_->configInfo().value().config_));
   EXPECT_EQ(time1, config_update_->lastUpdated());
 }
 

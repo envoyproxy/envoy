@@ -110,10 +110,10 @@ private:
   std::string update_id_;
 };
 
-// The state of one route configuration: the serialized wire-format bytes, route config name,
+// The state of one route configuration: the route config Any, route config name,
 // the parsed configuration and the bookkeeping that goes with them.
 struct WarmingConfigState {
-  std::optional<std::string> serialized_route_config_proto_;
+  std::optional<Protobuf::Any> route_config_any_;
   std::string route_config_name_;
   ConfigConstSharedPtr config_;
   std::string version_info_;
@@ -122,7 +122,7 @@ struct WarmingConfigState {
   SystemTime last_updated_;
 
   void clear() {
-    serialized_route_config_proto_.reset();
+    route_config_any_.reset();
     route_config_name_.clear();
     config_.reset();
     version_info_.clear();
@@ -175,7 +175,7 @@ public:
 private:
   friend class Envoy::Router::RouteConfigUpdateReceiverImpl;
 
-  void updateState(std::string serialized_route_config_proto, std::string route_config_name,
+  void updateState(Protobuf::Any route_config_any, std::string route_config_name,
                    std::optional<uint64_t> hash, absl::string_view version_info,
                    ConfigConstSharedPtr config,
                    std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id);
@@ -186,7 +186,7 @@ private:
   ProtoTraits& proto_traits_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   TimeSource& time_source_;
-  std::string serialized_route_config_proto_;
+  Protobuf::Any route_config_any_;
   std::string route_config_name_;
   uint64_t last_config_hash_{0ull};
   SystemTime last_updated_;

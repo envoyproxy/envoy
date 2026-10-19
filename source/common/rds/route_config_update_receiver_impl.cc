@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "source/common/protobuf/utility.h"
 #include "source/common/rds/util.h"
 
 namespace Envoy {
@@ -71,14 +72,15 @@ void RouteConfigUpdateReceiverImpl::updateConfig(const Protobuf::Message& route_
       config_traits_.createConfig(route_config_proto, factory_context_, *update_init_manager,
                                   false /* not validate unknown cluster */);
 
-  std::string serialized_proto = route_config_proto.SerializeAsString();
-  updateState(std::move(serialized_proto), std::move(route_config_name), hash, version_info,
+  Protobuf::Any route_config_any;
+  MessageUtil::packFrom(route_config_any, route_config_proto);
+  updateState(std::move(route_config_any), std::move(route_config_name), hash, version_info,
               std::move(config), std::move(update_init_manager), std::move(update_id));
 }
 
 void RouteConfigUpdateReceiverImpl::updateState(
-    std::string serialized_route_config_proto, std::string route_config_name,
-    std::optional<uint64_t> hash, absl::string_view version_info, ConfigConstSharedPtr config,
+    Protobuf::Any route_config_any, std::string route_config_name, std::optional<uint64_t> hash,
+    absl::string_view version_info, ConfigConstSharedPtr config,
     std::unique_ptr<Init::ManagerImpl> update_init_manager, std::string update_id) {
   // Abort a previous warming update first to ensure the init watcher will never be notified when
   // destroying the previous configuration.
@@ -88,7 +90,7 @@ void RouteConfigUpdateReceiverImpl::updateState(
     warmer_.abortWarming();
   }
 
-  warming_state_.serialized_route_config_proto_ = std::move(serialized_route_config_proto);
+  warming_state_.route_config_any_ = std::move(route_config_any);
   warming_state_.route_config_name_ = std::move(route_config_name);
   warming_state_.config_ = std::move(config);
   // If previously, there was a pending RDS update that contains a hash. And then a new VHDS
@@ -125,8 +127,8 @@ void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
   // Mark that we have received at least one valid route configuration update.
   initialized_ = true;
 
-  if (warming_state_.serialized_route_config_proto_.has_value()) {
-    serialized_route_config_proto_ = std::move(*warming_state_.serialized_route_config_proto_);
+  if (warming_state_.route_config_any_.has_value()) {
+    route_config_any_ = std::move(*warming_state_.route_config_any_);
     route_config_name_ = std::move(warming_state_.route_config_name_);
     config_ = std::move(warming_state_.config_);
     // Only update the last config hash if it was set in the warming state.
@@ -134,8 +136,7 @@ void RouteConfigUpdateReceiverImpl::onConfigWarmed() {
       last_config_hash_ = warming_state_.last_config_hash_.value();
     }
     last_updated_ = warming_state_.last_updated_;
-    config_info_.emplace(RouteConfigProvider::ConfigInfo{serialized_route_config_proto_,
-                                                         route_config_name_,
+    config_info_.emplace(RouteConfigProvider::ConfigInfo{route_config_any_, route_config_name_,
                                                          std::move(warming_state_.version_info_)});
   }
   // Defensively clear the warming state.

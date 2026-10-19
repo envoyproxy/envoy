@@ -46,10 +46,7 @@ RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name
       }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(provider->configInfo().value().version_);
-      dynamic_config->mutable_route_config()->set_type_url(
-          TypeUtil::descriptorFullNameToTypeUrl(proto_traits_.resourceType()));
-      dynamic_config->mutable_route_config()->set_value(
-          provider->configInfo().value().serialized_config_);
+      *dynamic_config->mutable_route_config() = provider->configInfo().value().config_;
       TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
     }
@@ -61,10 +58,7 @@ RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name
       continue;
     }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
-    static_config->mutable_route_config()->set_type_url(
-        TypeUtil::descriptorFullNameToTypeUrl(proto_traits_.resourceType()));
-    static_config->mutable_route_config()->set_value(
-        provider->configInfo().value().serialized_config_);
+    *static_config->mutable_route_config() = provider->configInfo().value().config_;
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *static_config->mutable_last_updated());
   }

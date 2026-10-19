@@ -102,7 +102,7 @@ vhds:
   routeConfiguration(const RouteConfigUpdateReceiver& receiver) {
     envoy::config::route::v3::RouteConfiguration route_config;
     if (receiver.configInfo().has_value()) {
-      EXPECT_TRUE(route_config.ParseFromString(receiver.configInfo().value().serialized_config_));
+      EXPECT_OK(MessageUtil::unpackTo(receiver.configInfo().value().config_, route_config));
     }
     return route_config;
   }

@@ -1181,8 +1181,7 @@ virtual_hosts:
   // So this means that both provider have same subscription.
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
             &dynamic_cast<RdsRouteConfigProviderImpl&>(*provider2).subscription());
-  EXPECT_EQ(&provider_->configInfo().value().serialized_config_,
-            &provider2->configInfo().value().serialized_config_);
+  EXPECT_EQ(&provider_->configInfo().value().config_, &provider2->configInfo().value().config_);
 
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds2;
   rds2.set_route_config_name("foo_route_config");
