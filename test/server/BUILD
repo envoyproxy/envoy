@@ -417,8 +417,10 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:logger",
+        "//envoy/runtime:extensible_runtime_interface",
         "//source/common/common:notification_lib",
         "//source/common/http:codes_lib",
+        "//source/common/runtime:extensible_runtime_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/stats:symbol_table_lib",
@@ -443,6 +445,7 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/config:config_mocks",
         "//test/mocks/config:xds_manager_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:hot_restart_mocks",

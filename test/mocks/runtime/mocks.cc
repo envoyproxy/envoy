@@ -33,4 +33,16 @@ MockOverrideLayer::MockOverrideLayer() = default;
 MockOverrideLayer::~MockOverrideLayer() = default;
 
 } // namespace Runtime
+
+namespace ExtensibleRuntime {
+
+MockProvider::MockProvider() = default;
+
+MockProvider::~MockProvider() = default;
+
+MockProviderFactory::MockProviderFactory() = default;
+
+MockProviderFactory::~MockProviderFactory() = default;
+
+} // namespace ExtensibleRuntime
 } // namespace Envoy

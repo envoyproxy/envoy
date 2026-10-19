@@ -10,6 +10,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/xds_config_tracker.h"
 #include "envoy/network/exception.h"
+#include "envoy/runtime/extensible_runtime.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/fatal_action_config.h"
 
@@ -20,6 +21,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/extensible_runtime.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/symbol_table.h"
@@ -36,6 +38,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/config/xds_manager.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -1310,6 +1313,47 @@ TEST_P(ServerInstanceImplTest, RtdsOverAdsShutdown) {
       startTestServer("test/server/test_data/server/runtime_bootstrap_rtds_ads.yaml", false);
   server_->shutdown();
   server_thread->join();
+}
+
+// Verify that extensible_runtime in layered_runtime is initialized on startup and cleared on
+// destruction.
+TEST_P(ServerInstanceImplTest, BootstrapExtensibleRuntime) {
+  NiceMock<ExtensibleRuntime::MockProviderFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  });
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy.extensible_runtime.test"));
+
+  EXPECT_CALL(mock_factory, createProvider(_)).WillOnce([](const Protobuf::Message& config) {
+    const auto* proto =
+        Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
+    EXPECT_NE(nullptr, proto);
+    EXPECT_EQ(proto->a(), "foo");
+    auto mock_provider = std::make_unique<NiceMock<ExtensibleRuntime::MockProvider>>();
+    EXPECT_CALL(*mock_provider,
+                runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"))
+        .WillOnce(Return(true));
+    return mock_provider;
+  });
+
+  Registry::InjectFactory<ExtensibleRuntime::ProviderFactory> registered_factory(mock_factory);
+
+  options_.config_yaml_ = R"EOF(
+layered_runtime:
+  extensible_runtime:
+    name: envoy.extensible_runtime.test
+    typed_config:
+      "@type": type.googleapis.com/test.common.config.DummyConfig
+      a: foo
+)EOF";
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  EXPECT_TRUE(
+      ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  server_.reset();
+  EXPECT_EQ(nullptr, ExtensibleRuntime::ProviderSingleton::getExisting());
+  EXPECT_FALSE(
+      ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 }
 
 // Validate invalid runtime in bootstrap is rejected.

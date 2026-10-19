@@ -18,6 +18,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
+#include "envoy/runtime/extensible_runtime.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
@@ -44,6 +45,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/extensible_runtime.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/runtime/runtime_keys.h"
 #include "source/common/signal/fatal_error_handler.h"
@@ -135,6 +137,8 @@ InstanceBase::~InstanceBase() {
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
   ENVOY_LOG(debug, "shut down dispatcher");
+
+  ExtensibleRuntime::ProviderSingleton::clear();
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
@@ -688,6 +692,20 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // runtime keys (e.g. RuntimeUInt64).
   runtime_ = component_factory.createRuntime(*this, initial_config);
   validation_context_.setRuntime(runtime());
+
+  if (bootstrap_.layered_runtime().has_extensible_runtime()) {
+    const auto& extensible_runtime = bootstrap_.layered_runtime().extensible_runtime();
+    auto& factory =
+        Config::Utility::getAndCheckFactory<ExtensibleRuntime::ProviderFactory>(extensible_runtime);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        extensible_runtime.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    extensible_runtime_ = factory.createProvider(*config);
+    if (extensible_runtime_ != nullptr) {
+      ExtensibleRuntime::ProviderSingleton::clear();
+      ExtensibleRuntime::ProviderSingleton::initialize(extensible_runtime_.get());
+    }
+  }
 
   // Initialize the overload manager early so other modules can register for actions.
   auto overload_manager_or_error = createOverloadManager();

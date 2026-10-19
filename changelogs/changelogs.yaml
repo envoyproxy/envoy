@@ -208,6 +208,8 @@ areas:
     title: reverse_tunnel
   router:
     title: router
+  runtime:
+    title: runtime
 
   safe_regex:
     title: safe_regex

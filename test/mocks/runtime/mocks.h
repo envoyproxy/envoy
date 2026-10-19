@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/runtime/extensible_runtime.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -10,6 +11,7 @@
 #include "test/mocks/stats/mocks.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -86,4 +88,32 @@ public:
 };
 
 } // namespace Runtime
+
+namespace ExtensibleRuntime {
+
+class MockProvider : public Provider {
+public:
+  MockProvider();
+  ~MockProvider() override;
+
+  MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view feature), (const, override));
+  MOCK_METHOD(bool, perConnectionRuntimeFeatureEnabled,
+              (absl::string_view feature, StreamInfo::StreamInfo& stream_info), (const, override));
+  MOCK_METHOD(bool, perRequestRuntimeFeatureEnabled,
+              (absl::string_view feature, StreamInfo::StreamInfo& stream_info), (const, override));
+  MOCK_METHOD(void, recordBehaviorChange,
+              (absl::string_view feature, StreamInfo::StreamInfo& stream_info), (const, override));
+};
+
+class MockProviderFactory : public ProviderFactory {
+public:
+  MockProviderFactory();
+  ~MockProviderFactory() override;
+
+  MOCK_METHOD(ProviderPtr, createProvider, (const Protobuf::Message& config), (override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
+  MOCK_METHOD(std::string, name, (), (const, override));
+};
+
+} // namespace ExtensibleRuntime
 } // namespace Envoy

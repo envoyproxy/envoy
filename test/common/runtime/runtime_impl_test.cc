@@ -1,15 +1,19 @@
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/runtime/extensible_runtime.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/config/runtime_utility.h"
+#include "source/common/runtime/extensible_runtime.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
@@ -18,7 +22,9 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
@@ -38,6 +44,7 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::MockFunction;
 using testing::NiceMock;
+using testing::Ref;
 using testing::Return;
 
 namespace Envoy {
@@ -915,6 +922,59 @@ TEST(NoRuntime, DefaultIntValues) {
       EXPECT_EQ(0x1230000ABCDULL,
                 getInteger("envoy.reloadable_features.test_int_feature_default", 0x1230000ABCDULL)),
       "requested an unsupported integer");
+}
+
+TEST(ExtensibleRuntimeTest, DefaultFallbackWithoutProvider) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_EQ(nullptr, ExtensibleRuntime::ProviderSingleton::getExisting());
+
+  EXPECT_FALSE(
+      ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_TRUE(
+      ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+
+  EXPECT_FALSE(ExtensibleRuntime::perConnectionRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_false", stream_info));
+  EXPECT_TRUE(ExtensibleRuntime::perConnectionRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_true", stream_info));
+
+  EXPECT_FALSE(ExtensibleRuntime::perRequestRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_false", stream_info));
+  EXPECT_TRUE(ExtensibleRuntime::perRequestRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_true", stream_info));
+
+  // No-op when no provider is registered.
+  ExtensibleRuntime::recordBehaviorChange("envoy.reloadable_features.test_feature_true",
+                                          stream_info);
+}
+
+TEST(ExtensibleRuntimeTest, DelegatesToRegisteredProvider) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto provider = std::make_unique<NiceMock<ExtensibleRuntime::MockProvider>>();
+  ExtensibleRuntime::MockProvider* provider_ptr = provider.get();
+  ScopedInjectableLoader<ExtensibleRuntime::Provider> scoped_provider(std::move(provider));
+
+  EXPECT_CALL(*provider_ptr, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(
+      ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  EXPECT_CALL(*provider_ptr, perConnectionRuntimeFeatureEnabled(
+                                 "envoy.reloadable_features.test_feature_false", Ref(stream_info)))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(ExtensibleRuntime::perConnectionRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_false", stream_info));
+
+  EXPECT_CALL(*provider_ptr, perRequestRuntimeFeatureEnabled(
+                                 "envoy.reloadable_features.test_feature_true", Ref(stream_info)))
+      .WillOnce(Return(false));
+  EXPECT_FALSE(ExtensibleRuntime::perRequestRuntimeFeatureEnabled(
+      "envoy.reloadable_features.test_feature_true", stream_info));
+
+  EXPECT_CALL(*provider_ptr, recordBehaviorChange("envoy.reloadable_features.test_feature_true",
+                                                  Ref(stream_info)));
+  ExtensibleRuntime::recordBehaviorChange("envoy.reloadable_features.test_feature_true",
+                                          stream_info);
 }
 
 // Test RTDS layer(s).
