@@ -1835,6 +1835,7 @@ envoy_cc_test_library(
     name = "websocket_handshake_test_utility_lib",
     hdrs = ["websocket_handshake_test_utility.h"],
     deps = [
+        "//envoy/http:codec_interface",
         "//envoy/http:header_map_interface",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",

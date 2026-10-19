@@ -97,8 +97,7 @@ void WebsocketWithCompressorIntegrationTest::validateUpgradeRequestHeaders(
   }
 
   removeGeneratedWebSocketKey(proxied_request_headers, original_request_headers,
-                              upstreamProtocol() == Http::CodecType::HTTP1 ||
-                                  downstreamProtocol() == Http::CodecType::HTTP1);
+                              downstreamProtocol(), upstreamProtocol());
   commonValidate(proxied_request_headers, original_request_headers);
   proxied_request_headers.removeRequestId();
 

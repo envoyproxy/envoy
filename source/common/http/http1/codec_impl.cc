@@ -93,6 +93,12 @@ StatefulHeaderKeyFormatterPtr statefulFormatterFromSettings(const Http::Http1Set
   return nullptr;
 }
 
+bool hasValidWebsocketHandshake(const ResponseHeaderMap& headers, absl::string_view websocket_key) {
+  const auto accept_headers = headers.get(Http::Headers::get().SecWebSocketAccept);
+  return Utility::isWebSocketUpgradeRequest(headers) && accept_headers.size() == 1 &&
+         accept_headers[0]->value().getStringView() == WebSocket::computeAccept(websocket_key);
+}
+
 constexpr size_t CRLF_SIZE = 2;
 
 } // namespace
@@ -144,7 +150,8 @@ void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           std::optional<uint64_t> status, bool end_stream,
-                                          bool bodiless_request) {
+                                          bool bodiless_request,
+                                          absl::string_view generated_websocket_key) {
   HeaderKeyFormatterOptConstRef formatter(headers.formatter());
   if (!formatter.has_value()) {
     formatter = connection_.formatter();
@@ -172,8 +179,8 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
         return HeaderMap::Iterate::Continue;
       });
 
-  if (!generated_websocket_key_.empty()) {
-    encodeFormattedHeader(header_values.SecWebSocketKey.get(), generated_websocket_key_, formatter);
+  if (!generated_websocket_key.empty()) {
+    encodeFormattedHeader(header_values.SecWebSocketKey.get(), generated_websocket_key, formatter);
   }
 
   if (headers.ContentLength()) {
@@ -443,7 +450,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     is_response_to_connect_request_ = false;
   }
 
-  encodeHeadersBase(headers, std::make_optional<uint64_t>(numeric_status), end_stream, false);
+  encodeHeadersBase(headers, std::make_optional<uint64_t>(numeric_status), end_stream, false, {});
 }
 
 static constexpr absl::string_view REQUEST_POSTFIX = " HTTP/1.1\r\n";
@@ -481,7 +488,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     // parse the protocol.
     disableChunkEncoding();
 
-    // RFC 8441 extended CONNECT has no Sec-WebSocket-Key, but RFC 6455 requires one for HTTP/1.1.
+    // RFC 6455 requires a Sec-WebSocket-Key on HTTP/1.1 upgrades, but requests may arrive without
+    // one, e.g. when converted from an RFC 8441 extended CONNECT (which has no key).
     if (Utility::isWebSocketUpgradeRequest(headers) &&
         headers.get(header_values.SecWebSocketKey).empty() &&
         Runtime::runtimeFeatureEnabled(
@@ -510,7 +518,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   }
 
   encodeHeadersBase(headers, std::nullopt, end_stream,
-                    HeaderUtility::requestShouldHaveNoBody(headers));
+                    HeaderUtility::requestShouldHaveNoBody(headers), generated_websocket_key_);
   return okStatus();
 }
 
@@ -1603,13 +1611,6 @@ Envoy::StatusOr<CallbackResult> ClientConnectionImpl::onHeadersCompleteBase() {
   // Here we deal with cases where the response cannot have a body by returning
   // CallbackResult::NoBody, but http_parser does not deal with it for us.
   return cannotHaveBody() ? CallbackResult::NoBody : CallbackResult::Success;
-}
-
-bool ClientConnectionImpl::hasValidWebsocketHandshake(const ResponseHeaderMap& headers,
-                                                      absl::string_view websocket_key) {
-  const auto accept_headers = headers.get(Http::Headers::get().SecWebSocketAccept);
-  return Utility::isWebSocketUpgradeRequest(headers) && accept_headers.size() == 1 &&
-         accept_headers[0]->value().getStringView() == WebSocket::computeAccept(websocket_key);
 }
 
 bool ClientConnectionImpl::upgradeAllowed() const {

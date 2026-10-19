@@ -846,9 +846,9 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
   // The HTTP/1 upstream will observe the upgrade headers and needs to respond with 101
   // HTTP/2 and HTTP/3 upstreams need to respond to extended CONNECT with 200
   upstream_request_->encodeHeaders(
-      withWebSocketAccept(upstream_request_->headers(), upstreamProtocol() == Http::CodecType::HTTP1
-                                                            ? h1_upgrade_response
-                                                            : default_response_headers_),
+      upstreamProtocol() == Http::CodecType::HTTP1
+          ? withWebSocketAccept(upstream_request_->headers(), h1_upgrade_response)
+          : default_response_headers_,
       false);
 
   // Wait for them to arrive downstream.

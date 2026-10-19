@@ -96,7 +96,8 @@ public:
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, std::optional<uint64_t> status,
-                         bool end_stream, bool bodiless_request);
+                         bool end_stream, bool bodiless_request,
+                         absl::string_view generated_websocket_key);
   void encodeTrailersBase(const HeaderMap& headers);
 
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
@@ -108,7 +109,6 @@ protected:
   bool is_tcp_tunneling_ : 1 = false;
   bool is_response_to_head_request_ : 1 = false;
   bool is_response_to_connect_request_ : 1 = false;
-  std::string generated_websocket_key_;
 
 private:
   /**
@@ -208,6 +208,7 @@ public:
 private:
   bool upgrade_request_{};
   bool head_request_{};
+  std::string generated_websocket_key_;
 };
 
 /**
@@ -623,8 +624,6 @@ private:
   }
   Status onMessageBeginBase() override { return okStatus(); }
   Envoy::StatusOr<CallbackResult> onHeadersCompleteBase() override;
-  static bool hasValidWebsocketHandshake(const ResponseHeaderMap& headers,
-                                         absl::string_view websocket_key);
   bool upgradeAllowed() const override;
   void onBody(Buffer::Instance& data) override;
   CallbackResult onMessageCompleteBase() override;
