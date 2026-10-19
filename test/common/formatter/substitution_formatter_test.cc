@@ -21,6 +21,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/version/version.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/common/formatter/formatter_test_utility.h"
@@ -7031,6 +7032,14 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterWithOtherCommands) {
 
   std::string result = formatter.format({&request_headers}, stream_info);
   EXPECT_EQ("protocol=HTTP/1.1 host=sni.example.com", result);
+}
+
+TEST(SubstitutionFormatterTest, EnvoyVersionFormatter) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  StreamInfoFormatter version_format("ENVOY_VERSION");
+  EXPECT_EQ(VersionInfo::version(), formatForTest(version_format, {}, stream_info));
+  EXPECT_THAT(formatValueForTest(version_format, {}, stream_info),
+              ProtoEq(ValueUtil::stringValue(VersionInfo::version())));
 }
 } // namespace
 } // namespace Formatter
