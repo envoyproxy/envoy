@@ -911,6 +911,23 @@ func (h *dymHttpFilterHandle) SetTypedMetadata(metadataNamespace string, seriali
 	runtime.KeepAlive(serializedAny)
 }
 
+func (h *dymHttpFilterHandle) GetTypedMetadata(source shared.MetadataSourceType, metadataNamespace string) (shared.UnsafeEnvoyBuffer, shared.UnsafeEnvoyBuffer, bool) {
+	var typeURLView C.envoy_dynamic_module_type_envoy_buffer
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	found := C.envoy_dynamic_module_callback_http_get_typed_metadata(
+		h.hostPluginPtr,
+		(C.envoy_dynamic_module_type_metadata_source)(source),
+		stringToModuleBuffer(metadataNamespace),
+		&typeURLView,
+		&valueView,
+	)
+	runtime.KeepAlive(metadataNamespace)
+	if !bool(found) {
+		return shared.UnsafeEnvoyBuffer{}, shared.UnsafeEnvoyBuffer{}, false
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(typeURLView), envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
 func (h *dymHttpFilterHandle) GetAttributeNumber(
 	attributeID shared.AttributeID,
 ) (float64, bool) {
@@ -963,17 +980,47 @@ func (h *dymHttpFilterHandle) GetAttributeBool(
 }
 
 func (h *dymHttpFilterHandle) GetTimingInfo() shared.TimingInfo {
-	var info C.envoy_dynamic_module_type_timing_info
+	var info C.envoy_dynamic_module_type_timing_info_v2
 	C.envoy_dynamic_module_callback_http_get_timing_info(h.hostPluginPtr, &info)
 	return shared.TimingInfo{
-		StartTimeUnixNs:               int64(info.start_time_unix_ns),
-		RequestCompleteDurationNs:     int64(info.request_complete_duration_ns),
-		FirstUpstreamTxByteSentNs:     int64(info.first_upstream_tx_byte_sent_ns),
-		LastUpstreamTxByteSentNs:      int64(info.last_upstream_tx_byte_sent_ns),
-		FirstUpstreamRxByteReceivedNs: int64(info.first_upstream_rx_byte_received_ns),
-		LastUpstreamRxByteReceivedNs:  int64(info.last_upstream_rx_byte_received_ns),
-		FirstDownstreamTxByteSentNs:   int64(info.first_downstream_tx_byte_sent_ns),
-		LastDownstreamTxByteSentNs:    int64(info.last_downstream_tx_byte_sent_ns),
+		StartTimeUnixNs:                       int64(info.start_time_unix_ns),
+		DownstreamConnectionBeginNs:           int64(info.downstream_connection_begin_ns),
+		DownstreamHandshakeStartNs:            int64(info.downstream_handshake_start_ns),
+		DownstreamHandshakeCompleteNs:         int64(info.downstream_handshake_complete_ns),
+		LastDownstreamHeaderRxByteReceivedNs:  int64(info.last_downstream_header_rx_byte_received_ns),
+		LastDownstreamRxByteReceivedNs:        int64(info.last_downstream_rx_byte_received_ns),
+		UpstreamConnectStartNs:                int64(info.upstream_connect_start_ns),
+		UpstreamConnectCompleteNs:             int64(info.upstream_connect_complete_ns),
+		UpstreamHandshakeCompleteNs:           int64(info.upstream_handshake_complete_ns),
+		FirstUpstreamTxByteSentNs:             int64(info.first_upstream_tx_byte_sent_ns),
+		LastUpstreamTxByteSentNs:              int64(info.last_upstream_tx_byte_sent_ns),
+		FirstUpstreamRxByteReceivedNs:         int64(info.first_upstream_rx_byte_received_ns),
+		FirstUpstreamRxBodyByteReceivedNs:     int64(info.first_upstream_rx_body_byte_received_ns),
+		LastUpstreamRxByteReceivedNs:          int64(info.last_upstream_rx_byte_received_ns),
+		FirstDownstreamTxByteSentNs:           int64(info.first_downstream_tx_byte_sent_ns),
+		LastDownstreamTxByteSentNs:            int64(info.last_downstream_tx_byte_sent_ns),
+		LastDownstreamAckReceivedNs:           int64(info.last_downstream_ack_received_ns),
+		RequestCompleteDurationNs:             int64(info.request_complete_duration_ns),
+		DownstreamConnectionEndNs:             int64(info.downstream_connection_end_ns),
+		HasStartTime:                          bool(info.has_start_time),
+		HasDownstreamConnectionBegin:          bool(info.has_downstream_connection_begin),
+		HasDownstreamHandshakeStart:           bool(info.has_downstream_handshake_start),
+		HasDownstreamHandshakeComplete:        bool(info.has_downstream_handshake_complete),
+		HasLastDownstreamHeaderRxByteReceived: bool(info.has_last_downstream_header_rx_byte_received),
+		HasLastDownstreamRxByteReceived:       bool(info.has_last_downstream_rx_byte_received),
+		HasUpstreamConnectStart:               bool(info.has_upstream_connect_start),
+		HasUpstreamConnectComplete:            bool(info.has_upstream_connect_complete),
+		HasUpstreamHandshakeComplete:          bool(info.has_upstream_handshake_complete),
+		HasFirstUpstreamTxByteSent:            bool(info.has_first_upstream_tx_byte_sent),
+		HasLastUpstreamTxByteSent:             bool(info.has_last_upstream_tx_byte_sent),
+		HasFirstUpstreamRxByteReceived:        bool(info.has_first_upstream_rx_byte_received),
+		HasFirstUpstreamRxBodyByteReceived:    bool(info.has_first_upstream_rx_body_byte_received),
+		HasLastUpstreamRxByteReceived:         bool(info.has_last_upstream_rx_byte_received),
+		HasFirstDownstreamTxByteSent:          bool(info.has_first_downstream_tx_byte_sent),
+		HasLastDownstreamTxByteSent:           bool(info.has_last_downstream_tx_byte_sent),
+		HasLastDownstreamAckReceived:          bool(info.has_last_downstream_ack_received),
+		HasRequestComplete:                    bool(info.has_request_complete),
+		HasDownstreamConnectionEnd:            bool(info.has_downstream_connection_end),
 	}
 }
 
@@ -1021,6 +1068,19 @@ func (h *dymHttpFilterHandle) SetFilterState(key string, value []byte) {
 	runtime.KeepAlive(value)
 }
 
+func (h *dymHttpFilterHandle) SetFilterStateValue(key string, value []byte, lifeSpan shared.FilterStateLifeSpan, streamSharing shared.FilterStateStreamSharing) bool {
+	ret := C.envoy_dynamic_module_callback_http_set_filter_state_value(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		bytesToModuleBuffer(value),
+		C.envoy_dynamic_module_type_filter_state_life_span(lifeSpan),
+		C.envoy_dynamic_module_type_filter_state_stream_sharing(streamSharing),
+	)
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(value)
+	return bool(ret)
+}
+
 func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool {
 	ret := C.envoy_dynamic_module_callback_http_set_filter_state_typed(
 		h.hostPluginPtr,
@@ -1029,6 +1089,15 @@ func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool
 	)
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)
+	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) HasFilterState(key string) bool {
+	ret := C.envoy_dynamic_module_callback_http_has_filter_state(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+	)
+	runtime.KeepAlive(key)
 	return bool(ret)
 }
 
@@ -1297,6 +1366,21 @@ func (h *dymHttpFilterHandle) GetClusterHostCounts(priority uint32) (shared.Clus
 func (h *dymHttpFilterHandle) GetUpstreamRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_http_get_upstream_remote_address(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
+func (h *dymHttpFilterHandle) GetDownstreamDirectRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
 		h.hostPluginPtr,
 		&valueView,
 	)

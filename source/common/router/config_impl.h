@@ -633,6 +633,11 @@ class RouteTracingImpl : public RouteTracing {
 public:
   explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
 
+  // Builds a RouteTracingImpl, returning an error instead of throwing when an operation formatter
+  // is invalid, so a caller that must not throw can validate the configuration.
+  static absl::StatusOr<std::unique_ptr<RouteTracingImpl>>
+  create(const envoy::config::route::v3::Tracing& tracing);
+
   // RouteTracing
   const envoy::type::v3::FractionalPercent& getClientSampling() const override;
   const envoy::type::v3::FractionalPercent& getRandomSampling() const override;

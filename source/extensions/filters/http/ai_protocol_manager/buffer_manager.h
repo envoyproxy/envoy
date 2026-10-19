@@ -375,6 +375,8 @@ private:
   // True once endStream() has been called; gates flushing the batched backlog (the
   // tail is written even if it is below WriteFlushThreshold).
   bool end_stream_seen_{false};
+  // True once a write carrying end_stream has been issued.
+  bool end_stream_flushed_{false};
   // True once cancelReplay() has been called. Permanent: disables all subsequent replay attempts.
   bool replay_cancelled_{false};
   // True once replay() has been requested by the caller and not yet started.

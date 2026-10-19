@@ -278,6 +278,7 @@ enum class DetectedCloseType {
 struct LocalCloseReasonValues {
   const std::string DeferredCloseOnDrainedConnection = "deferred_close_on_drained_connection";
   const std::string IdleTimeoutOnConnection = "on_idle_timeout";
+  const std::string DrainDeadlineOnConnection = "on_drain_deadline";
   const std::string CloseForConnectRequestOrTcpTunneling =
       "close_for_connect_request_or_tcp_tunneling";
   const std::string Http2PingTimeout = "http2_ping_timeout";

@@ -107,3 +107,17 @@ TEST(StackTest, FOO) {
 }
 
 #endif // BSSL_COMPAT
+
+TEST(StackTest, last) {
+  EXPECT_EQ(nullptr, sk_FOO_last(nullptr));
+
+  bssl::UniquePtr<STACK_OF(FOO)> sk{sk_FOO_new_null()};
+  ASSERT_TRUE(sk);
+  EXPECT_EQ(nullptr, sk_FOO_last(sk.get()));
+
+  ASSERT_TRUE(bssl::PushToStack(sk.get(), FOO_new(1)));
+  EXPECT_EQ(1, *sk_FOO_last(sk.get()));
+
+  ASSERT_TRUE(bssl::PushToStack(sk.get(), FOO_new(2)));
+  EXPECT_EQ(2, *sk_FOO_last(sk.get()));
+}

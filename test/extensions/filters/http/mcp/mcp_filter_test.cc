@@ -1011,6 +1011,122 @@ TEST_F(McpFilterTest, NonStringProtocolVersionMetaRejects) {
   EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
 }
 
+constexpr absl::string_view kTasksGetWithEmptyClientCapabilities =
+    R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})";
+constexpr absl::string_view kTasksGetWithoutClientCapabilities =
+    R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})";
+
+class McpFilterClientCapabilitiesTest : public McpFilterTest {
+protected:
+  void setupNewSpecRejectMode(
+      envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source) {
+    envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+    proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+    proto_config.set_attribute_source(attribute_source);
+    proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+    config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+    filter_ = std::make_unique<McpFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  static Http::TestRequestHeaderMapImpl newSpecHeaders(absl::string_view method,
+                                                       absl::string_view name = "") {
+    Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                           {"content-type", "application/json"},
+                                           {"accept", "application/json"},
+                                           {"accept", "text/event-stream"},
+                                           {"mcp-protocol-version", "2026-07-28"},
+                                           {"mcp-method", std::string(method)}};
+    if (!name.empty()) {
+      headers.addCopy("mcp-name", std::string(name));
+    }
+    return headers;
+  }
+
+  void expectMissingClientCapabilitiesReply() {
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _))
+        .WillOnce([](Http::Code, absl::string_view body,
+                     std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                     const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+          EXPECT_THAT(body, HasSubstr("\"jsonrpc\":\"2.0\""));
+          EXPECT_THAT(body, HasSubstr("\"code\":-32602"));
+          EXPECT_THAT(body, HasSubstr("io.modelcontextprotocol/clientCapabilities"));
+          EXPECT_THAT(body, HasSubstr("\"id\":1"));
+
+          Http::TestResponseHeaderMapImpl response_headers;
+          modify_headers(response_headers);
+          EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
+                    response_headers.getContentTypeValue());
+        });
+  }
+};
+
+TEST_F(McpFilterClientCapabilitiesTest, BodyModeAcceptsEmptyClientCapabilities) {
+  setupNewSpecRejectMode(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  auto headers = newSpecHeaders("tasks/get", "task-123");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(kTasksGetWithEmptyClientCapabilities);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterClientCapabilitiesTest, BodyModeRejectsMissingClientCapabilities) {
+  setupNewSpecRejectMode(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  auto headers = newSpecHeaders("tasks/get", "task-123");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  expectMissingClientCapabilitiesReply();
+  Buffer::OwnedImpl buffer(kTasksGetWithoutClientCapabilities);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
+}
+
+TEST_F(McpFilterClientCapabilitiesTest, HeadersModeRejectsMissingClientCapabilities) {
+  setupNewSpecRejectMode(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+  auto headers = newSpecHeaders("tasks/get", "task-123");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  expectMissingClientCapabilitiesReply();
+  Buffer::OwnedImpl buffer(kTasksGetWithoutClientCapabilities);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterClientCapabilitiesTest, HeadersModeAcceptsClientCapabilities) {
+  setupNewSpecRejectMode(envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
+  auto headers = newSpecHeaders("tasks/get", "task-123");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
+        EXPECT_EQ("tasks/get", metadata.fields().at("method").string_value());
+        EXPECT_EQ(
+            "task-123",
+            metadata.fields().at("params").struct_value().fields().at("taskId").string_value());
+      });
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(kTasksGetWithEmptyClientCapabilities);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+TEST_F(McpFilterClientCapabilitiesTest, NotificationDoesNotRequireClientCapabilities) {
+  setupNewSpecRejectMode(envoy::extensions::filters::http::mcp::v3::Mcp::BODY);
+  auto headers = newSpecHeaders("notifications/cancelled");
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1}})");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
 TEST_F(McpFilterTest, NewSpecBodyRejectsMissingMethodHeader) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);

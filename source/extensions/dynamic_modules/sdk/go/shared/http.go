@@ -90,6 +90,26 @@ const (
 	HttpFilterStreamResetReasonLocalRefusedStreamReset
 )
 
+// FilterStateLifeSpan specifies the lifespan of a filter state entry. Corresponds to
+// envoy_dynamic_module_type_filter_state_life_span.
+type FilterStateLifeSpan uint32
+
+const (
+	FilterStateLifeSpanFilterChain FilterStateLifeSpan = iota
+	FilterStateLifeSpanRequest
+	FilterStateLifeSpanConnection
+)
+
+// FilterStateStreamSharing specifies the upstream connection sharing option of a filter state
+// entry. Corresponds to envoy_dynamic_module_type_filter_state_stream_sharing.
+type FilterStateStreamSharing uint32
+
+const (
+	FilterStateStreamSharingNone FilterStateStreamSharing = iota
+	FilterStateStreamSharingSharedWithUpstreamConnection
+	FilterStateStreamSharingSharedWithUpstreamConnectionOnce
+)
+
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
 // valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
 // because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
@@ -180,6 +200,11 @@ type HttpFilterHandle interface {
 	// google.protobuf.Any is a no-op.
 	SetTypedMetadata(metadataNamespace string, serializedAny []byte)
 
+	// GetTypedMetadata retrieves the type URL and serialized message payload from typed metadata.
+	// The returned buffers are owned by Envoy and are valid until the end of the current event hook
+	// unless a setter modifies the metadata. Empty fields are valid results.
+	GetTypedMetadata(source MetadataSourceType, metadataNamespace string) (typeURL, value UnsafeEnvoyBuffer, found bool)
+
 	// GetMetadataKeys retrieves all keys in the given metadata namespace.
 	// Returns list of keys in the namespace, or nil if the namespace does not exist.
 	// NOTE: The memory of underlying data may not be managed by Go GC. So you should
@@ -241,6 +266,10 @@ type HttpFilterHandle interface {
 	// SetFilterState sets the serialized filter state value of the stream.
 	SetFilterState(key string, value []byte)
 
+	// SetFilterStateValue sets the serialized filter state value of the stream with the given
+	// lifespan and upstream connection sharing options.
+	SetFilterStateValue(key string, value []byte, lifeSpan FilterStateLifeSpan, streamSharing FilterStateStreamSharing) bool
+
 	// SetFilterStateTyped sets the typed filter state value stored under the given key. The key
 	// MUST match a registered ObjectFactory; the bytes are passed to createFromBytes on that
 	// factory. This is the form required for interop with built-in Envoy filters that read filter
@@ -273,6 +302,10 @@ type HttpFilterHandle interface {
 	// NOTE: The memory of the underlying data may not be managed by Go GC. Copy the data if you
 	// need to keep it past the current callback.
 	GetFilterStateTyped(key string) (UnsafeEnvoyBuffer, bool)
+
+	// HasFilterState checks whether a filter state entry with the given key exists, regardless of
+	// its type. Unlike the getter methods, this does not read or serialize the stored object.
+	HasFilterState(key string) bool
 
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
@@ -373,6 +406,11 @@ type HttpFilterHandle interface {
 	// selected upstream host address. The buffer is owned by Envoy and is valid until the current
 	// event hook returns.
 	GetUpstreamRemoteAddress() (UnsafeEnvoyBuffer, bool)
+
+	// GetDownstreamDirectRemoteAddress returns the downstream socket peer address, including
+	// the port, before XFF processing. Returns an empty buffer and false if unavailable.
+	// The buffer is owned by Envoy and is valid until the current event hook returns.
+	GetDownstreamDirectRemoteAddress() (UnsafeEnvoyBuffer, bool)
 
 	// GetUpstreamHostsAttempted returns the upstream host addresses in attempt order. The buffers
 	// are owned by Envoy and are valid until the current event hook returns.

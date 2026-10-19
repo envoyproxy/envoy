@@ -4,16 +4,16 @@ build-image:
   repo: docker.io/envoyproxy/envoy-build
   repo-gcr: gcr.io/envoy-ci/envoy-build
   # default ci caching (ci)
-  sha: 0fa203f090138434505a5f1269a8d2bb4a47b885facb4ef5e6dc0c9f861d2aba
-  sha-ci: 0fa203f090138434505a5f1269a8d2bb4a47b885facb4ef5e6dc0c9f861d2aba
-  sha-devtools: 7cbfd3c61439d510f5e21fcca6b08fcd6616b1d13ebd85d7550ecf4bfd8e3d23
-  sha-docker: b5fd90b42869e24c22110f4bd925ad30c30e8410d6cad2d5203ced628dd3dfdf
-  sha-gcc: 990d51067b5d2c23988a058a653605983216a6fe128feecd44d389e60a83b54e
-  sha-mobile: f5b988fc8b80be5c0e439981d681fe2a25afef147b397d5d8799a6eb0274cd67
-  sha-worker: 382f86d26825767ce9cf68dd168e23728863792af1b81f73afcb14a38a586016
+  sha: 0ec8c3295229234f5a5663b858d9e217fd409e2eba22afe7a9c6e4f634bd7ea8
+  sha-ci: 0ec8c3295229234f5a5663b858d9e217fd409e2eba22afe7a9c6e4f634bd7ea8
+  sha-devtools: c7f99061218bdd4ab3da8548826fccd20596545e62f2e825d031b935abfd965a
+  sha-docker: dfdbc6de8a85d0e7269073475a94936a2a690ceff2e48d550fe2cbdd58ad7a2b
+  sha-gcc: 66e7359c8dcc148ce12d0828e9547d7f29900b788b22b4c804dab664f724ad35
+  sha-mobile: ab4cb76a32f7fae2e3bfdfe1f1fd632897baa952334a5f9805107ed5f1233687
+  sha-worker: c531dd07f0755d990167f6d495f6b199ad399f8ca660887785b022da2d5b3031
   # TODO: remove this dupe (currently used by ci request handler)
-  mobile-sha: f5b988fc8b80be5c0e439981d681fe2a25afef147b397d5d8799a6eb0274cd67
-  tag: v0.2.3
+  mobile-sha: ab4cb76a32f7fae2e3bfdfe1f1fd632897baa952334a5f9805107ed5f1233687
+  tag: v0.2.4
 
 config:
   envoy:
@@ -160,6 +160,7 @@ checks:
     on-run:
     - release
     - verify
+    - docs
     required: true
 
 run:
@@ -179,6 +180,10 @@ run:
   check-build:
     paths:
     - "**/*"
+  docs:
+    paths:
+    - "**/*"
+    push: paths
   check-build-openssl:
     paths:
     - "**/*"
@@ -196,6 +201,7 @@ run:
     - bazel/**/*
     - .bazelrc
     - ci/do_ci.sh
+    - ci/bazel_fun.sh
   check-coverage:
     paths:
     - "**/*"
@@ -357,6 +363,7 @@ run:
     - .github/dependabot.yml
     - .github/workflows/_precheck_deps.yml
     - ci/do_ci.sh
+    - ci/bazel_fun.sh
     - VERSION.txt
     - bazel/BUILD
     - tools/dependency/*

@@ -21,13 +21,28 @@ Envoy is built against the BoringSSL API. The compat layer lets it run on OpenSS
 3. **Mapping functions** (`source/*.c` or `source/*.cc`) implement each exposed BoringSSL
    function by calling the `ossl_`-prefixed OpenSSL equivalent.
 
+4. **Patched BoringSSL sources and tests** (`patch/crypto/**`, `patch/ssl/**`) work like the
+   headers: a few BoringSSL `.cc` files (`patched_bssl_sources` in `BUILD`) and BoringSSL's
+   own unit tests (`test/BUILD`) are copied and selectively uncommented. For each file,
+   `<file>.patch` (if present) is applied first with `patch`, then `<file>.sh` (if present)
+   runs. A file with neither is entirely commented out. See `bazel/rules.bzl`.
+
+The BoringSSL sources come from the `@boringssl-source` repo
+(`bazel-envoy/external/boringssl-source+/`), **not** `@boringssl`. OpenSSL headers come
+from `bazel-envoy/external/openssl+/include/openssl/`.
+
 ## Key files to modify
 
 | File | Purpose |
 |------|---------|
 | `patch/include/openssl/<header>.h.sh` | Controls which symbols from BoringSSL's `<header>.h` are exposed |
+| `patch/<path>.sh` / `patch/<path>.patch` | Patch a BoringSSL source or test file (e.g. `crypto/bytestring/cbs.cc`, `crypto/x509/x509_test.cc`) |
 | `BUILD` | The `mapping_func_filegroup` list — every exposed function must be listed here |
 | `source/<function>.c` or `.cc` | Handwritten mapping when auto-generation won't work |
+| `test/test_*.cc` | Compat-specific unit tests (e.g. `test/test_stack.cc`) |
+
+`compat/openssl/` is excluded from `check_format` (`tools/code_format/config.yaml`), so
+follow the style of neighbouring files rather than running `clang-format`.
 
 ## How to add a missing function
 
@@ -116,23 +131,85 @@ since OpenSSL will never produce these BoringSSL-specific error codes.
 
 If a constant must exist but its value collides with another constant's value (e.g.,
 `ERR_R_OVERFLOW` aliased to `ERR_R_INTERNAL_ERROR`), give it a unique value. Check
-OpenSSL's range for the constant family in `bazel-envoy/external/openssl/include/openssl/`
+OpenSSL's range for the constant family in `bazel-envoy/external/openssl+/include/openssl/`
 and pick a value above the highest used one.
+
+## Adapting to upstream refactors in BoringSSL
+
+Not every failure is a missing symbol. BoringSSL often renames or moves code, which breaks
+the patch scripts themselves (they match on BoringSSL's text). Common cases:
+
+- **A helper moved to another file / internal header** (e.g. `add_decimal` in `cbs.cc`
+  became `bssl::cbb_add_decimal_ascii` in `cbb.cc`, declared in `crypto/bytestring/internal.h`).
+  Internal headers are usually commented out, so uncomment the new definition and add a
+  forward declaration with `--sed` in the patch scripts that use it.
+- **A template/class was reworked** (e.g. `StackAllocated` became traits based, with
+  `BORINGSSL_MAKE_STACK_TRAITS`). Uncomment the new pieces, including the matching
+  specializations in other headers (e.g. `BORINGSSL_MAKE_STACK_TRAITS(CBB, ...)` in
+  `bytestring.h`).
+- **A `.patch` hunk no longer applies** (context changed). Apply the hunk by hand to the
+  new source, then regenerate with `diff -u` (keep the `a/<file>` / `b/<file>` headers).
+- **A test uses new constants or helpers** (e.g. `kTestCertSerial`). Uncomment them in the
+  test's `.sh`. Tests skipped with `--uncomment-gtest-func-skip` must still compile, so
+  BoringSSL-only constants they reference still need a definition.
 
 ## uncomment.sh — common options
 
 | Option | Effect |
 |--------|--------|
-| `--uncomment-func-decl <name>` | Uncomment a function declaration |
+| `--comment` | Comment out the whole file (always first) |
+| `-h` | Uncomment header boilerplate: preprocessor directives, `extern "C"`, `BSSL_NAMESPACE_*` |
+| `--uncomment-func-decl <name>` | Uncomment an `OPENSSL_EXPORT` function declaration |
+| `--uncomment-func-impl <name>` | Uncomment a function definition (ends at `}` in column 0) |
+| `--uncomment-static-func-impl <name>` | Same, for `static` functions |
 | `--uncomment-macro '<pattern>'` | Uncomment a `#define` (keeps BoringSSL's value) |
 | `--uncomment-macro-redef '<pattern>'` | Redefine macro to use OpenSSL's value via `ossl_` prefix |
 | `--uncomment-enum <name>` | Uncomment an enum definition |
 | `--uncomment-struct <name>` | Uncomment a struct definition |
+| `--uncomment-class <name>` | Uncomment a class definition |
+| `--uncomment-using <name>` | Uncomment a `using` alias |
 | `--uncomment-typedef <name>` | Uncomment a typedef |
 | `--uncomment-typedef-redef <name>` | Redefine a typedef to use OpenSSL's type |
-| `--uncomment-regex '<pattern>'` | Uncomment lines matching a regex |
-| `--uncomment-regex-range '<start>' '<end>'` | Uncomment a multi-line block |
+| `--uncomment-regex '<re>' ['<re>' ...]` | One regex: uncomment every matching line. Several: uncomment the first run of consecutive lines matching them in order |
+| `--uncomment-regex-range '<start>' '<end>'` | Uncomment from the first `<start>` match to the next `<end>` match |
+| `--uncomment-gtest-func <suite> <name>` | Uncomment a BoringSSL test |
+| `--uncomment-gtest-func-skip <suite> <name>` | Same, but `GTEST_SKIP()` it under `BSSL_COMPAT` |
+| `--comment-regex '<re>'` | Re-comment lines matching a regex |
 | `--sed '<expression>'` | Run an arbitrary sed expression on the file |
+
+Patterns are matched against the commented-out text (`// ` prefix is added implicitly), using
+basic regex syntax (`\s`, `\(...\)`, `\|`). An error like `Failed to locate first pattern` or
+`Error while processing option ...` means the BoringSSL text no longer matches.
+
+## Validating patch scripts without a full build
+
+Patch scripts are plain bash, so they can be checked against the new BoringSSL sources in
+seconds. Run this from `compat/openssl/` after the new `@boringssl-source` has been fetched;
+it reports every script or `.patch` that fails, not just the first one bazel hits:
+
+```bash
+S=$(bazel info output_base)/external/boringssl-source+
+T=$(mktemp -d)
+for p in $(git ls-files patch | grep '\.sh$' | sed 's%^patch/%%'); do
+  f=${p%.sh}
+  [ -f "$S/$f" ] || { echo "MISSING SRC: $f"; continue; }
+  mkdir -p "$T/$(dirname $f)"; cp "$S/$f" "$T/$f"; chmod +w "$T/$f"
+  if [ -f "patch/$f.patch" ]; then
+    patch -s -f "$T/$f" "patch/$f.patch" -o "$T/$f.p" >/dev/null 2>&1 || echo "PATCH FAIL: $f"
+    mv "$T/$f.p" "$T/$f"
+  fi
+  out=$(PATH="$PWD/tools:$PATH" bash "patch/$p" "$T/$f" 2>&1) || echo "FAIL $f: $out"
+done
+echo "output in $T"
+```
+
+`MISSING SRC` entries are stale scripts for files that no longer exist upstream; they only
+matter if the file is still referenced in `BUILD` or `test/BUILD`. This catches script
+breakage only. Compile errors (missing declarations, etc.) still need a bazel build.
+
+To see what changed upstream, diff the affected files against the previous BoringSSL
+version (the old version is in the `MODULE.bazel` diff of the bump commit), e.g.
+`https://raw.githubusercontent.com/google/boringssl/<old-version>/<path>`.
 
 ## Inspecting generated output
 
@@ -156,23 +233,31 @@ Check the `ossl.h` struct to see which OpenSSL functions are available as functi
 
 ## Typical workflow for fixing build errors after a dep bump
 
-1. **Read the errors.** Group them by type: undeclared functions, undeclared constants,
-   duplicate case values.
+1. **Run the patch-script validation loop above** and fix all script/`.patch` failures
+   first. Diff against the previous BoringSSL version to understand each change.
 
-2. **For each undeclared function:**
-   - Check if it exists in BoringSSL (`bazel-envoy/external/boringssl/include/openssl/`)
-   - Check if it exists in OpenSSL (`bazel-envoy/external/openssl/include/openssl/`)
+2. **Read the compile errors.** Group them by type: undeclared functions, undeclared
+   constants, duplicate case values. Errors pointing at a BoringSSL macro expansion (e.g.
+   `DEFINE_STACK_OF` calling a new `OPENSSL_sk_last`) usually mean a new function that every
+   expansion of that macro now needs.
+
+3. **For each undeclared function:**
+   - Check if it exists in BoringSSL (`bazel-envoy/external/boringssl-source+/include/openssl/`)
+   - Check if it exists in OpenSSL (`bazel-envoy/external/openssl+/include/openssl/`)
    - Add `--uncomment-func-decl` to the patch script + entry in BUILD
-   - If OpenSSL's semantics differ, write a handwritten source file
+   - If OpenSSL's semantics differ, or it has no OpenSSL equivalent, write a handwritten
+     source file (and a test in `test/`)
 
-3. **For each undeclared constant:**
+4. **For each undeclared constant:**
    - Check if it exists in both BoringSSL and OpenSSL
    - If yes: use `--uncomment-macro-redef` in the patch script
    - If BoringSSL-only: append a `#ifndef`/`#define` with a collision-free value
 
-4. **For duplicate case values:**
+5. **For duplicate case values:**
    - Identify which constants share the same numeric value
    - Give the BoringSSL-only constant a unique value outside both libraries' ranges
 
-5. **Build and iterate** — new symbols may trigger further missing-symbol errors as
-   more code becomes reachable.
+6. **Build and iterate.** New symbols may trigger further missing-symbol errors as
+   more code becomes reachable. Build both Envoy (`--config=openssl`) and the compat tests
+   (`//compat/openssl/test:utests-bssl-compat`), since the tests compile patched BoringSSL
+   test files that Envoy itself does not use.

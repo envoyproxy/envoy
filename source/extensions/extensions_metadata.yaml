@@ -82,6 +82,13 @@ envoy.access_loggers.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.access_loggers.wasm.v3.WasmAccessLog
+envoy.ai_protocol_manager.external_buffer.in_memory:
+  categories:
+  - envoy.ai_protocol_manager.external_buffer
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.ai_protocol_manager.external_buffer.in_memory.v3.InMemory
 envoy.bootstrap.internal_listener:
   categories:
   - envoy.bootstrap
@@ -725,6 +732,13 @@ envoy.filters.http.original_src:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.original_src.v3.OriginalSrc
+envoy.filters.http.priority_load_shed:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.priority_load_shed.v3.PriorityLoadShed
 envoy.filters.http.proto_message_extraction:
   categories:
   - envoy.filters.http
@@ -1382,6 +1396,13 @@ envoy.matching.matchers.dynamic_modules:
   status: alpha
   type_urls:
   - envoy.extensions.matching.input_matchers.dynamic_modules.v3.DynamicModuleMatcher
+envoy.matching.matchers.uri_template:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.matching.input_matchers.uri_template.v3.UriTemplate
 envoy.path.match.uri_template.uri_template_matcher:
   categories:
   - envoy.path.match
@@ -1674,6 +1695,13 @@ envoy.tls.cert_validator.spiffe:
   - envoy.tls.cert_validator
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tls.handshakers.dynamic_modules:
+  categories:
+  - envoy.tls_handshakers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.tls.handshakers.dynamic_modules.v3.DynamicModuleTlsHandshaker
 envoy.tracers.dynamic_modules:
   categories:
   - envoy.tracers
@@ -2558,6 +2586,14 @@ envoy.filters.http.dynamic_modules:
   status_upstream: stable
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+envoy.tls.certificate_selectors.dynamic_modules:
+  categories:
+  - envoy.tls.certificate_selectors
+  - envoy.tls.upstream_certificate_selectors
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3.DynamicModuleTlsCertificateSelector
 envoy.tls.certificate_selectors.on_demand_secret:
   categories:
   - envoy.tls.certificate_selectors

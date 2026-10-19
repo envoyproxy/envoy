@@ -348,6 +348,18 @@ enum class SocketOptionState : uint32_t {
 
 enum class SocketDirection : uint32_t { Upstream, Downstream };
 
+enum class FilterStateLifeSpan : uint32_t {
+  FilterChain = 0,
+  Request = 1,
+  Connection = 2,
+};
+
+enum class FilterStateStreamSharing : uint32_t {
+  None = 0,
+  SharedWithUpstreamConnection = 1,
+  SharedWithUpstreamConnectionOnce = 2,
+};
+
 struct ClusterHostCounts {
   uint64_t total;
   uint64_t healthy;
@@ -355,19 +367,31 @@ struct ClusterHostCounts {
 };
 
 /**
- * A snapshot of stream timing information. The request start time is a Unix timestamp in
- * nanoseconds. All other fields are durations from the monotonic request start time. Unavailable
- * values are -1.
+ * Stream timing from Envoy. start_time_unix_ns is a Unix timestamp in nanoseconds; all other fields
+ * are nanosecond offsets from the monotonic request start. Unavailable values are std::nullopt;
+ * zero is valid. Connection and handshake offsets can be negative when the connection predates the
+ * request.
  */
 struct TimingInfo {
-  int64_t start_time_unix_ns;
-  int64_t request_complete_duration_ns;
-  int64_t first_upstream_tx_byte_sent_ns;
-  int64_t last_upstream_tx_byte_sent_ns;
-  int64_t first_upstream_rx_byte_received_ns;
-  int64_t last_upstream_rx_byte_received_ns;
-  int64_t first_downstream_tx_byte_sent_ns;
-  int64_t last_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> start_time_unix_ns;
+  std::optional<int64_t> downstream_connection_begin_ns;
+  std::optional<int64_t> downstream_handshake_start_ns;
+  std::optional<int64_t> downstream_handshake_complete_ns;
+  std::optional<int64_t> last_downstream_header_rx_byte_received_ns;
+  std::optional<int64_t> last_downstream_rx_byte_received_ns;
+  std::optional<int64_t> upstream_connect_start_ns;
+  std::optional<int64_t> upstream_connect_complete_ns;
+  std::optional<int64_t> upstream_handshake_complete_ns;
+  std::optional<int64_t> first_upstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_upstream_tx_byte_sent_ns;
+  std::optional<int64_t> first_upstream_rx_byte_received_ns;
+  std::optional<int64_t> first_upstream_rx_body_byte_received_ns;
+  std::optional<int64_t> last_upstream_rx_byte_received_ns;
+  std::optional<int64_t> first_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_downstream_tx_byte_sent_ns;
+  std::optional<int64_t> last_downstream_ack_received_ns;
+  std::optional<int64_t> request_complete_duration_ns;
+  std::optional<int64_t> downstream_connection_end_ns;
 };
 
 class ChildSpan;
@@ -472,6 +496,16 @@ public:
    * @return The bool value if found, otherwise nullopt.
    */
   virtual std::optional<bool> getMetadataBool(std::string_view ns, std::string_view key) = 0;
+
+  /**
+   * Retrieves the type URL and serialized message payload of typed dynamic metadata.
+   * The returned views are valid until the end of the current event hook unless a setter modifies
+   * the metadata.
+   * @param ns The typed metadata namespace.
+   * @return The type URL and payload if found, otherwise nullopt. Empty fields are valid results.
+   */
+  virtual std::optional<std::pair<std::string_view, std::string_view>>
+  getTypedMetadata(std::string_view ns) = 0;
 
   /**
    * Retrieves all keys in a metadata namespace.
@@ -629,6 +663,19 @@ public:
   virtual void setFilterState(std::string_view key, std::string_view value) = 0;
 
   /**
+   * Sets the serialized filter state value of the stream with the given lifespan and upstream
+   * sharing options.
+   * @param key The filter state key.
+   * @param value The filter state value.
+   * @param life_span The lifespan of the filter state entry.
+   * @param stream_sharing The upstream sharing option of the filter state entry.
+   * @return true if the value was stored successfully.
+   */
+  virtual bool setFilterStateValue(std::string_view key, std::string_view value,
+                                   FilterStateLifeSpan life_span,
+                                   FilterStateStreamSharing stream_sharing) = 0;
+
+  /**
    * Retrieves a string attribute value.
    * @param id The attribute ID.
    * @return Pair of string view and bool indicating if attribute was found.
@@ -741,6 +788,14 @@ public:
   virtual bool setFilterStateTyped(std::string_view key, std::string_view value) = 0;
 
   /**
+   * Checks whether a filter state entry with the given key exists, regardless of its type. Unlike
+   * the getter methods, this does not read or serialize the stored object.
+   * @param key The filter state key.
+   * @return true if the key exists.
+   */
+  virtual bool hasFilterState(std::string_view key) = 0;
+
+  /**
    * Returns the worker index assigned to the current filter instance.
    */
   virtual uint32_t getWorkerIndex() = 0;
@@ -792,6 +847,12 @@ public:
    * differ from AttributeId::UpstreamAddress, which exposes the selected upstream host address.
    */
   virtual std::optional<std::string_view> getUpstreamRemoteAddress() = 0;
+
+  /**
+   * Retrieves the downstream socket peer address, including the port, before XFF processing.
+   * Returns std::nullopt if unavailable. The buffer is valid until the current event hook returns.
+   */
+  virtual std::optional<std::string_view> getDownstreamDirectRemoteAddress() = 0;
 
   /**
    * Retrieves the upstream host addresses attempted for the current request in attempt order.

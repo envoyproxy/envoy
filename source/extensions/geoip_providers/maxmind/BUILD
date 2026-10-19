@@ -46,6 +46,7 @@ envoy_cc_library(
     deps = [
         "//bazel/deps:maxmind_linux_darwin",
         "//envoy/geoip:geoip_provider_driver_interface",
+        "//envoy/http:header_map_interface",
         "//envoy/stats:stats_macros",
         "//source/common/common:enum_to_int",
         "//source/common/common:thread_synchronizer_lib",

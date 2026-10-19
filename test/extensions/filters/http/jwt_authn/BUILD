@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_cc_library",
     "envoy_cc_mock",
     "envoy_package",
@@ -8,6 +7,7 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -239,10 +239,11 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "jwt_authn_fuzz_test",
     srcs = ["jwt_authn_fuzz_test.cc"],
     corpus = "jwt_authn_corpus",
+    extension_names = ["envoy.filters.http.jwt_authn"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":jwt_authn_fuzz_proto_cc_proto",
