@@ -863,8 +863,7 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   ClusterDataPtr new_data = std::move(warming_it->second);
   warming_clusters_.erase(warming_it);
   ClusterDataPtr old_active = std::exchange(active_clusters_[cluster_name], std::move(new_data));
-  // Post the CDS pause release to the next event loop iteration.
-  dispatcher_.post([this, cluster_name] { cds_pauses_.erase(cluster_name); });
+  cds_pauses_.erase(cluster_name);
   // old_active is destroyed here, after both maps are consistent.
 }
 
@@ -907,9 +906,7 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
     removed = true;
     init_helper_.removeCluster(*existing_warming_cluster->second);
     warming_clusters_.erase(existing_warming_cluster);
-    dispatcher_.post([this, cluster_name = std::string(cluster_name)] {
-      cds_pauses_.erase(cluster_name);
-    });
+    cds_pauses_.erase(cluster_name);
     ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
   }
 

@@ -802,12 +802,14 @@ TEST_P(AdsIntegrationTest, CdsKeepEdsAfterWarmingFailure) {
   // Avoid sending an EDS update, and wait for EDS update timeout (that results in
   // a cluster update without resources).
   test_server_->waitForCounter("cluster.cluster_0.init_fetch_timeout", Ge(1));
+  // CDS pause is released synchronously when warming completes, so the CDS ACK arrives
+  // before the EDS re-subscribe triggered by the init_fetch_timeout.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}));
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     // Expect another EDS request after the previous one wasn't answered and timed out.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                         {"cluster_0"}, {}, {}));
   }
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}));
 
   // Envoy uses the cached resource.
   test_server_->waitForCounter("cluster.cluster_0.assignment_use_cached", Ge(1));
@@ -933,13 +935,16 @@ TEST_P(AdsIntegrationTest, DoubleClustersCachedLoadAssignment) {
   test_server_->waitForCounter("cluster.cluster_0.init_fetch_timeout", Ge(1));
 
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-    // Expect another EDS request after the previous one wasn't answered and timed out.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
-                                        {"same_eds"}, {}, {}));
+    // Clusters time out independently: cluster_0's EDS re-subscribe is queued before cluster_1
+    // releases the last CDS pause handle, then cluster_1's EDS re-subscribe follows.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                         {"same_eds"}, {}, {}));
   }
   EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}));
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
+                                        {"same_eds"}, {}, {}));
+  }
 
   // Envoy uses the cached resource.
   test_server_->waitForCounter("cluster.cluster_0.assignment_use_cached", Ge(1));
