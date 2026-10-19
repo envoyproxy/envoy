@@ -48,7 +48,10 @@ envoy_cc_test(
     },
     deps = [
         "//envoy/common:logger",
+        "//envoy/runtime:extensible_runtime_interface",
         "//source/common/config:decoded_resource_lib",
+        "//source/common/protobuf",
+        "//source/common/runtime:extensible_runtime_lib",
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -63,6 +66,7 @@ envoy_cc_test(
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration:integration_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/server:listener_factory_context_mocks",
