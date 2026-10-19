@@ -441,7 +441,7 @@ Http::FilterDataStatus AiProtocolManagerFilter::decodeData(Buffer::Instance& dat
     }
   }
 
-  decode_manager_->onData(data);
+  decode_manager_->onData(data, end_stream);
   if (end_stream) {
     finalizeDecode(/*has_trailers=*/false);
   }
