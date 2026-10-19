@@ -6,6 +6,7 @@
 
 #include "test/mocks/network/connection.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -439,6 +440,20 @@ TEST(ProxyProtocolHeaderTest, LowLevelGenerateV2HeaderRejectsOverflow) {
         EXPECT_EQ(buff.length() - 16, advertised_len);
       },
       "v2 PROXY protocol header length would overflow uint16_t");
+}
+
+TEST(ProxyProtocolHeaderTest, MissingAddrsDoesNotCrash) {
+  Buffer::OwnedImpl buf;
+  Network::ProxyProtocolData no_dst{
+      Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4), nullptr};
+  Network::ProxyProtocolData no_src{
+      nullptr, Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)};
+  EXPECT_ENVOY_BUG(
+      { generateV2Header(no_dst, buf, false, {}, {}); },
+      "Missing or incorrect dest IP in proxy_proto_data_");
+  EXPECT_ENVOY_BUG(
+      { generateV2Header(no_src, buf, false, {}, {}); },
+      "Missing or incorrect source IP in proxy_proto_data_");
 }
 
 } // namespace

@@ -1201,10 +1201,6 @@ TEST_F(ProxyProtocolTest, V2CombinedPrecedenceHostConfigPassthrough) {
 // Each level (host, config, pass-through) overrides TLVs with the same key from a lower level, but
 // duplicates within a level are allowed.
 TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs", "true"}});
-
   auto src_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
   auto dst_addr = Network::Address::InstanceConstSharedPtr(
@@ -1388,80 +1384,60 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
   EXPECT_EQ(resp.bytes_processed_, expected.size());
 }
 
-// Test verifies that duplicate TLVs within the config and host metadata are properly handled. No
-// duplicate TLVs are allowed.
-TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDuplicatesAllowed) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs", "false"}});
-
+// Test verifies that multiple pass-through TLVs with the same type are all forwarded, and that
+// INCLUDE filtering still applies when duplicates are present.
+TEST_F(ProxyProtocolTest, V2DuplicatePassThroughTLVsWithIncludeFilter) {
   auto src_addr =
-      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
-  auto dst_addr = Network::Address::InstanceConstSharedPtr(
-      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+
+  constexpr uint8_t included_tlv = 0x5;
+  constexpr uint8_t excluded_tlv = 0x6;
+
+  // These are the downstream over-the-wire TLVs. Both values for 0x5 are passed through in order,
+  // and 0x6 is dropped because it is not in the INCLUDE list.
   Network::ProxyProtocolTLVVector tlv_vector{
-      Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}},
-      Network::ProxyProtocolTLV{0x5, {'d'}}, // This is a duplicate and will be removed.
-      Network::ProxyProtocolTLV{0x6, {'a'}}, // This is not passed through.
+      {included_tlv, {'a'}},
+      {excluded_tlv, {'d'}},
+      {included_tlv, {'b', 'c'}},
   };
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
+
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
           "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
           std::optional<Network::ProxyProtocolData>(proxy_proto_data));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
-      ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
+      ->setLocalAddress(*Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
-      ->setRemoteAddress(*Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080"));
+      ->setRemoteAddress(*Network::Utility::resolveUrl("tcp://3.3.3.3:80"));
 
-  auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  const std::string metadata_key =
-      Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
+  const std::vector<uint8_t> expected{
+      // Signature.
+      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a,
+      // Version/command, family/protocol (IPv4/STREAM), length (12 + 9 bytes).
+      0x21, 0x11, 0x00, 0x15,
+      // Source address, destination address, source port, destination port.
+      0x01, 0x02, 0x03, 0x04, 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x02, 0x01,
+      // TLVs.
+      included_tlv, 0x00, 0x01, 'a', included_tlv, 0x00, 0x02, 'b', 'c'};
 
-  PerHostConfig host_metadata_config;
-  auto host_added_tlvs = host_metadata_config.add_added_tlvs();
-  host_added_tlvs->set_type(0x98);
-  host_added_tlvs->set_value("d1");
-  auto duplicate_host_entry = host_metadata_config.add_added_tlvs();
-  duplicate_host_entry->set_type(0x98);
-  duplicate_host_entry->set_value("d2"); // Last duplicate value
-  Protobuf::Any typed_metadata;
-  std::ignore = typed_metadata.PackFrom(host_metadata_config);
-  metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
-  EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(metadata));
-  transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
-
-  absl::flat_hash_set<uint8_t> pass_through_tlvs{0x5};
-  // The output buffer will include the host TLVs before the config TLVs.
-  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
-      {0x98, {'d', '1'}},
-      {0x96, {'b', 'a', 'r'}},
-      {0x97, {'b', 'a', 'z'}},
-  };
-  Buffer::OwnedImpl expected_buff{};
-  EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false,
-                                                      pass_through_tlvs, custom_tlvs));
-
-  // Configure duplicate TLVs in the configuration.
   ProxyProtocolConfig config;
-  config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
-  config.mutable_pass_through_tlvs()->add_tlv_type(0x5);
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
-  auto tlv = config.add_added_tlvs();
-  tlv->set_type(0x96);
-  tlv->set_value("bar");
-  auto duplicate_tlv_entry = config.add_added_tlvs();
-  duplicate_tlv_entry->set_type(0x96);
-  duplicate_tlv_entry->set_value("baz"); // Last duplicate value for type 0x96
-  auto unique_tlv_entry = config.add_added_tlvs();
-  unique_tlv_entry->set_type(0x97);
-  unique_tlv_entry->set_value("baz");
+  config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+  config.mutable_pass_through_tlvs()->add_tlv_type(included_tlv);
   initialize(config, socket_options);
 
-  EXPECT_CALL(io_handle_, write(BufferString(expected_buff.toString())))
+  EXPECT_CALL(io_handle_, write(_))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
-        auto length = buffer.length();
+        const auto length = buffer.length();
+
+        // Compare as hex encoded to make errors easier to read.
+        EXPECT_EQ(Hex::encode(absl::Span<const uint8_t>(
+                      reinterpret_cast<const uint8_t*>(buffer.linearize(length)), buffer.length())),
+                  Hex::encode(expected));
+
         buffer.drain(length);
         return {length, Api::IoError::none()};
       }));
@@ -1469,7 +1445,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperlyNoDup
   EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
 
   auto resp = proxy_protocol_socket_->doWrite(msg, false);
-  EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
+  EXPECT_EQ(resp.bytes_processed_, expected.size());
 }
 
 // Test handles edge case where the well-known host metadata namespace is present, but the
