@@ -68,9 +68,10 @@ void callSampler(SamplerSharedPtr sampler, const StreamInfo::StreamInfo& stream_
 
 Span::Span(const std::string& name, const StreamInfo::StreamInfo& stream_info,
            SystemTime start_time, Envoy::TimeSource& time_source, Tracer& parent_tracer,
-           OTelSpanKind span_kind, bool use_local_decision)
+           OTelSpanKind span_kind, bool use_local_decision, bool resample_on_update_parent)
     : stream_info_(stream_info), parent_tracer_(parent_tracer), time_source_(time_source),
-      use_local_decision_(use_local_decision) {
+      use_local_decision_(use_local_decision),
+      resample_on_update_parent_(resample_on_update_parent) {
   span_ = ::opentelemetry::proto::trace::v1::Span();
 
   span_.set_kind(span_kind);
@@ -106,6 +107,13 @@ void Span::updateParent(const Tracing::TraceContext& trace_context, bool preserv
   // it's non-empty. This might clobber the sampler-selected tracestate.
   if (!context->tracestate().empty()) {
     setTracestate(context->tracestate());
+  }
+
+  if (resample_on_update_parent_) {
+    SamplerSharedPtr sampler = parent_tracer_.sampler();
+    callSampler(sampler, stream_info_,
+                /*span_context=*/*context,
+                /*new_span=*/*this, std::string(name()), trace_context);
   }
 }
 
@@ -313,10 +321,11 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
                uint64_t max_cache_size, bool set_instrumentation_scope,
-               TraceContextFormats outgoing_trace_context)
+               bool resample_on_update_parent, TraceContextFormats outgoing_trace_context)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
       max_cache_size_(max_cache_size), set_instrumentation_scope_(set_instrumentation_scope),
+      resample_on_update_parent_(resample_on_update_parent),
       outgoing_trace_context_(std::move(outgoing_trace_context)) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
@@ -417,8 +426,9 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   const bool use_local_decision = sampler_ == nullptr;
 
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
-  auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
-                                         *this, span_kind, use_local_decision);
+  auto new_span =
+      std::make_unique<Span>(operation_name, stream_info, start_time, time_source_, *this,
+                             span_kind, use_local_decision, resample_on_update_parent_);
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
   new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
@@ -447,7 +457,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
 
   // Create a new span and populate details from the span context.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
-                                         *this, span_kind, false);
+                                         *this, span_kind, false, resample_on_update_parent_);
   new_span->setPreserveHeaders(preserve_headers);
   new_span->setParentContextIsRemote(parent_context.isRemote());
   new_span->setTraceId(parent_context.traceId());

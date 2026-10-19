@@ -207,6 +207,9 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
   const bool set_instrumentation_scope =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, set_instrumentation_scope, true);
 
+  const bool resample_on_update_parent =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config, resample_on_update_parent, false);
+
   std::shared_ptr<const envoy::config::core::v3::HttpService> http_service;
   std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator;
   if (opentelemetry_config.has_http_service()) {
@@ -220,9 +223,10 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
       opentelemetry_config.outgoing_trace_context(), "outgoing_trace_context");
 
   // Create the tracer in Thread Local Storage.
-  tls_slot_ptr_->set([http_service, max_cache_size, set_instrumentation_scope, &factory_context,
-                      this, resource_ptr, sampler, headers_applicator, grpc_client_factory,
-                      custom_exporter_factory, shared_unpacked_config, worker_factory_context,
+  tls_slot_ptr_->set([http_service, max_cache_size, set_instrumentation_scope,
+                      resample_on_update_parent, &factory_context, this, resource_ptr, sampler,
+                      headers_applicator, grpc_client_factory, custom_exporter_factory,
+                      shared_unpacked_config, worker_factory_context,
                       outgoing_trace_context](Event::Dispatcher& dispatcher) {
     OpenTelemetryTraceExporterPtr exporter;
     if (grpc_client_factory != nullptr) {
@@ -257,7 +261,8 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
         factory_context.runtime(), dispatcher, tracing_stats_, resource_ptr, sampler,
-        max_cache_size, set_instrumentation_scope, outgoing_trace_context);
+        max_cache_size, set_instrumentation_scope, resample_on_update_parent,
+        outgoing_trace_context);
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }

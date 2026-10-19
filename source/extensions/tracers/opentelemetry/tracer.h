@@ -46,6 +46,7 @@ public:
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
          SamplerSharedPtr sampler, uint64_t max_cache_size, bool set_instrumentation_scope = true,
+         bool resample_on_update_parent = false,
          TraceContextFormats outgoing_trace_context = {
              envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT});
 
@@ -68,6 +69,8 @@ public:
                              OptRef<const Tracing::TraceContext> trace_context,
                              OTelSpanKind span_kind, bool preserve_headers = false);
 
+  SamplerSharedPtr sampler() const { return sampler_; }
+
 private:
   /**
    * Enables the span-flushing timer.
@@ -89,6 +92,7 @@ private:
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
   const bool set_instrumentation_scope_{true};
+  const bool resample_on_update_parent_{false};
   const TraceContextFormats outgoing_trace_context_;
 };
 
@@ -100,7 +104,7 @@ class Span : Logger::Loggable<Logger::Id::tracing>, public Tracing::Span {
 public:
   Span(const std::string& name, const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
        Envoy::TimeSource& time_source, Tracer& parent_tracer, OTelSpanKind span_kind,
-       bool use_local_decision = false);
+       bool use_local_decision = false, bool resample_on_update_parent = false);
 
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
@@ -216,6 +220,7 @@ private:
   Envoy::TimeSource& time_source_;
   bool sampled_;
   bool use_local_decision_{false};
+  bool resample_on_update_parent_{false};
   bool parent_context_is_remote_{false};
   bool preserve_headers_{false};
 };
