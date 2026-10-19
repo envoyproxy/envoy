@@ -1570,13 +1570,20 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
     auto status = status_header[0]->value().getStringView();
 
     if (status == "true") {
-      // The scheduled event also emitted a metric through the filter config.
-      test_server_->waitForGauge("dynamicmodulescustom.config_scheduled_events", testing::Eq(1));
       return;
     }
     absl::SleepFor(absl::Milliseconds(100));
   }
   FAIL() << "Config was not updated in time";
+}
+
+// A scheduled event emits a metric through the filter config, with no stream involved.
+TEST_P(DynamicModulesIntegrationTest, ConfigSchedulerEmitsMetric) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the scheduled event metric is only in the rust test module";
+  }
+  initializeFilter("http_config_scheduler");
+  test_server_->waitForGauge("dynamicmodulescustom.config_scheduled_events", testing::Eq(1));
 }
 
 // Test buffer limit callbacks for non-terminal filters.
