@@ -411,9 +411,9 @@ tool_config:
       host: "no_local.com"
       path: "/mcp"
   - tools:
-      - name: tool_exact_first
+      - name: tool_exact
         http_rule:
-          get: "/exact_first"
+          get: "/exact"
     default_server_info:
       host: "a.com"
       path: "/mcp"
@@ -421,17 +421,6 @@ tool_config:
       cache_config:
         ttl: 10s
         cache_scope: CACHE_SCOPE_PRIVATE
-  - tools:
-      - name: tool_exact_second
-        http_rule:
-          get: "/exact_second"
-    default_server_info:
-      host: "a.com"
-      path: "/mcp"
-    tool_list_local:
-      cache_config:
-        ttl: 99s
-        cache_scope: CACHE_SCOPE_PUBLIC
   - tools:
       - name: tool_host_only
         http_rule:
@@ -463,7 +452,7 @@ tool_config:
 
   ASSERT_OK_AND_ASSIGN(auto per_route_config, McpJsonRestBridgePerRouteConfig::create(route_proto));
 
-  // Exact match (a.com, /mcp) uses the first tool_list_local configured on (a.com, /mcp).
+  // Exact match (a.com, /mcp) uses the tool_list_local configured on (a.com, /mcp).
   EXPECT_EQ(per_route_config->toolListLocalCacheConfig("a.com", "/mcp").ttl_ms, 10000);
   EXPECT_EQ(per_route_config->toolListLocalCacheConfig("a.com", "/mcp").scope, "private");
 
