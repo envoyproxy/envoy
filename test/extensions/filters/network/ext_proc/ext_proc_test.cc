@@ -108,7 +108,8 @@ public:
   // Create a config with metadata options
   envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor
   createConfigWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
-                                  const std::vector<std::string>& typed_namespaces) {
+                                  const std::vector<std::string>& typed_namespaces,
+                                  std::optional<bool> send_once = std::nullopt) {
     envoy::extensions::filters::network::ext_proc::v3::NetworkExternalProcessor config;
     config.set_failure_mode_allow(false);
     config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
@@ -124,14 +125,19 @@ public:
       forwarding_namespaces->add_typed(ns);
     }
 
+    if (send_once.has_value()) {
+      metadata_options->mutable_send_once()->set_value(send_once.value());
+    }
+
     return config;
   }
 
   // Set up a new filter with metadata options
   void recreateFilterWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
-                                         const std::vector<std::string>& typed_namespaces) {
+                                         const std::vector<std::string>& typed_namespaces,
+                                         std::optional<bool> send_once = std::nullopt) {
     auto filter_config = std::make_shared<Config>(
-        createConfigWithMetadataOptions(untyped_namespaces, typed_namespaces), scope_);
+        createConfigWithMetadataOptions(untyped_namespaces, typed_namespaces, send_once), scope_);
     auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
     client_ = client.get();
     filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
@@ -713,6 +719,23 @@ TEST_F(NetworkExtProcFilterTest, UntypedMetadataForwarding) {
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  auto response = std::make_unique<ProcessingResponse>();
+  response->mutable_read_data()->set_data("test");
+  filter_->onReceiveMessage(std::move(response));
+
+  // By default (send_once = false), subsequent chunks also include metadata.
+  Buffer::OwnedImpl data2("test2");
+  EXPECT_CALL(*stream_ptr, send(_, false))
+      .WillOnce(testing::Invoke(
+          [](envoy::service::network_ext_proc::v3::ProcessingRequest&& request, bool) {
+            EXPECT_TRUE(request.has_metadata());
+            EXPECT_THAT(request.metadata().filter_metadata(),
+                        UnorderedElementsAre(
+                            Pair("test-namespace",
+                                 HasStructFields(Contains(IsStructString("key1", "value1"))))));
+          }));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
 }
 
 // Test typed metadata forwarding
@@ -1790,6 +1813,54 @@ TEST_F(NetworkExtProcFilterTest, ConnectionAttributesSentOnlyOnce) {
   });
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
+}
+
+TEST_F(NetworkExtProcFilterTest, MetadataForwardingSentOnlyOnce) {
+  recreateFilterWithMetadataOptions({"untyped-ns"}, {}, true);
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  // First chunk is sent before matching dynamic metadata is populated.
+  Buffer::OwnedImpl data1("chunk1");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_FALSE(req.has_metadata());
+  });
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data1, false));
+
+  auto response1 = std::make_unique<ProcessingResponse>();
+  response1->mutable_read_data()->set_data("chunk1");
+  filter_->onReceiveMessage(std::move(response1));
+
+  // Populate dynamic metadata before the second chunk.
+  addDynamicMetadata("untyped-ns", "key1", "value1");
+
+  // Second chunk should include the metadata since it has not been sent yet.
+  Buffer::OwnedImpl data2("chunk2");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_TRUE(req.has_metadata());
+    EXPECT_THAT(
+        req.metadata().filter_metadata(),
+        Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
+  });
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
+
+  auto response2 = std::make_unique<ProcessingResponse>();
+  response2->mutable_read_data()->set_data("chunk2");
+  filter_->onReceiveMessage(std::move(response2));
+
+  // Subsequent chunk should NOT include metadata since it was already sent once.
+  Buffer::OwnedImpl data3("chunk3");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_FALSE(req.has_metadata());
+  });
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data3, false));
 }
 
 } // namespace
