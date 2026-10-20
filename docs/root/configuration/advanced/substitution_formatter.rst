@@ -1621,6 +1621,9 @@ Current supported substitution commands include:
 ``%HOSTNAME%``
   The system hostname.
 
+``%ENVOY_VERSION%``
+  The version string of the Envoy binary, including the repository revision and the build type.
+
 ``%LOCAL_REPLY_BODY%``
   The body text for the requests rejected by the Envoy.
 

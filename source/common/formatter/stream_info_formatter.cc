@@ -10,6 +10,7 @@
 #include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
+#include "source/common/version/version.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
@@ -2810,6 +2811,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                          return std::nullopt;
                                        }
                                        return absl::string_view(*hostname);
+                                     });
+                               }}},
+                             {"ENVOY_VERSION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo&)
+                                         -> std::optional<absl::string_view> {
+                                       // Static storage that lives for the process lifetime.
+                                       return absl::string_view(VersionInfo::version());
                                      });
                                }}},
                              {"FILTER_CHAIN_NAME",
