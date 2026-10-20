@@ -134,5 +134,45 @@ TEST(GrpcContextTest, resolveDynamicServiceAndMethodWithDotReplaced) {
   EXPECT_FALSE(context.resolveDynamicServiceAndMethodWithDotReplaced(path));
 }
 
+// The service and method are explicit tags of the request stats.
+TEST(GrpcContextTest, StatsAreTagged) {
+  NiceMock<Upstream::MockClusterInfo> cluster;
+  Stats::TestUtil::TestSymbolTable symbol_table;
+  Stats::StatNamePool pool(*symbol_table);
+  Context::RequestStatNames request_names{pool.add("service"), pool.add("method")};
+  ContextImpl context(*symbol_table);
+
+  context.chargeStat(cluster, Context::Protocol::Grpc, request_names, true);
+  context.chargeUpstreamStat(cluster, request_names, std::chrono::milliseconds(42));
+
+  auto expect_tags = [](const Stats::Counter& counter, const std::string& tag_extracted_name) {
+    EXPECT_EQ(tag_extracted_name, counter.tagExtractedName())
+        << " for stat '" << counter.name() << "'";
+    ASSERT_EQ(2U, counter.tags().size());
+    EXPECT_EQ("envoy.grpc_bridge_service", counter.tags()[0].name_);
+    EXPECT_EQ("service", counter.tags()[0].value_);
+    EXPECT_EQ("envoy.grpc_bridge_method", counter.tags()[1].name_);
+    EXPECT_EQ("method", counter.tags()[1].value_);
+  };
+
+  const Stats::CounterSharedPtr success =
+      TestUtility::findCounter(cluster.stats_store_, "grpc.service.method.success");
+  ASSERT_NE(success, nullptr);
+  expect_tags(*success, "grpc.success");
+
+  const Stats::CounterSharedPtr total =
+      TestUtility::findCounter(cluster.stats_store_, "grpc.service.method.total");
+  ASSERT_NE(total, nullptr);
+  expect_tags(*total, "grpc.total");
+
+  // Stats without a service and method have no tags.
+  context.chargeStat(cluster, Context::Protocol::Grpc, {}, true);
+  const Stats::CounterSharedPtr untagged =
+      TestUtility::findCounter(cluster.stats_store_, "grpc.success");
+  ASSERT_NE(untagged, nullptr);
+  EXPECT_EQ("grpc.success", untagged->tagExtractedName());
+  EXPECT_TRUE(untagged->tags().empty());
+}
+
 } // namespace Grpc
 } // namespace Envoy
