@@ -5,6 +5,7 @@
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 
 namespace Envoy {
@@ -18,16 +19,25 @@ public:
   struct OverloadState : public ThreadLocalOverloadState {
     OverloadState(Event::Dispatcher& dispatcher, bool permissive)
         : dispatcher_(dispatcher), permissive_(permissive) {}
-    const OverloadActionState& getState(const std::string&) override { return inactive_; }
+    const OverloadActionState& getState(const std::string&) override {
+      ASSERT(dispatcher_.isThreadSafe());
+      return inactive_;
+    }
     bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override {
+      ASSERT(dispatcher_.isThreadSafe());
       return permissive_;
     }
     bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override {
+      ASSERT(dispatcher_.isThreadSafe());
       return permissive_;
     }
-    bool isResourceMonitorEnabled(OverloadProactiveResourceName) override { return false; }
+    bool isResourceMonitorEnabled(OverloadProactiveResourceName) override {
+      ASSERT(dispatcher_.isThreadSafe());
+      return false;
+    }
     ProactiveResourceMonitorOptRef
     getProactiveResourceMonitorForTest(OverloadProactiveResourceName) override {
+      ASSERT(dispatcher_.isThreadSafe());
       return makeOptRefFromPtr<ProactiveResourceMonitor>(nullptr);
     }
     Event::Dispatcher& dispatcher_;

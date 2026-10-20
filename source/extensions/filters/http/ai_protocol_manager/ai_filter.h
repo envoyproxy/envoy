@@ -19,6 +19,7 @@
 #include "source/common/coroutine/task.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_response.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
 #include "absl/functional/any_invocable.h"
@@ -94,9 +95,21 @@ using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string detail
 // The response path has one coroutine per response shape: encodeSSE() and encodeUnary(). SSE
 // frames are small in practice, so a filter is given a whole frame at a time. Large frames that
 // do not fit the HTTP stream window are offloaded to the external buffer.
+// The stream's bindings an AI filter applies.
+struct BindingUse {
+  // The client's: the filter reads the request's path under it.
+  bool request{false};
+  // The backend's: the filter renders the request's path and body under it.
+  bool response{false};
+};
+
 class AiFilter {
 public:
   virtual ~AiFilter() = default;
+
+  // The bindings the filter applies. A binding the route declares that no filter of the chain
+  // applies is counted, since nothing else shows it is ignored.
+  virtual BindingUse bindingUse() const { return {}; }
 
   // Invoked when an AI request arrives.
   // Returns absl::OkStatus() on normal completion, or an error status on failure.
@@ -140,6 +153,11 @@ struct AiFilterContext {
   uint64_t request_payload_bytes{0};
   // Route-declared response/backend wire API; Unspecified when the route named none.
   LLMProtocol response_protocol = LLMProtocol::Unspecified;
+  // How the route's clients and its backend carry their APIs on HTTP; null when the route names
+  // none, and the request's when filter state names an API other than the route's. The
+  // envoy.ai.binding.request and envoy.ai.binding.response filter state objects replace them.
+  LlmBindingConstSharedPtr request_binding{};
+  LlmBindingConstSharedPtr response_binding{};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.

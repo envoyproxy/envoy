@@ -17,11 +17,13 @@ namespace {
 
 constexpr absl::string_view HTTP_PREFIX = "http.";
 constexpr absl::string_view CLUSTER_PREFIX = "cluster.";
+constexpr absl::string_view THRIFT_PREFIX = "thrift.";
 constexpr absl::string_view REDIS_PREFIX = "redis.";
 
 // Extracts the parent prefix's single tag: "http.<x>." -> {HTTP_CONN_MANAGER_PREFIX, x},
-// "cluster.<x>." -> {CLUSTER_NAME, x}, "redis.<x>." -> {REDIS_PREFIX, x}, anything else -> none.
-// The trailing dot is stripped first. `prefix` must outlive the returned value.
+// "cluster.<x>." -> {CLUSTER_NAME, x}, "thrift.<x>." -> {THRIFT_PREFIX, x}, "redis.<x>." ->
+// {REDIS_PREFIX, x}, anything else -> none. The trailing dot is stripped first. `prefix` must
+// outlive the returned value.
 std::optional<TagStringView> extractParentTag(absl::string_view prefix) {
   if (!absl::EndsWith(prefix, ".")) {
     return std::nullopt;
@@ -39,6 +41,10 @@ std::optional<TagStringView> extractParentTag(absl::string_view prefix) {
   if (absl::StartsWith(prefix, REDIS_PREFIX)) {
     return TagStringView{Envoy::Config::TagNames::get().REDIS_PREFIX,
                          prefix.substr(REDIS_PREFIX.size())};
+  }
+  if (absl::StartsWith(prefix, THRIFT_PREFIX)) {
+    return TagStringView{Envoy::Config::TagNames::get().THRIFT_PREFIX,
+                         prefix.substr(THRIFT_PREFIX.size())};
   }
   return std::nullopt;
 }

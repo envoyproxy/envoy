@@ -1,5 +1,7 @@
 #include <chrono>
 #include <optional>
+#include <string>
+#include <utility>
 
 #include "envoy/http/header_map.h"
 
@@ -221,6 +223,54 @@ TEST_F(DatadogAgentHttpClientTest, RequestBody) {
   EXPECT_TRUE(result) << result.error();
   EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
   EXPECT_EQ(0, stats_.reports_failed_.value());
+}
+
+TEST_F(DatadogAgentHttpClientTest, EmptyRequestBody) {
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([this](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(0, message->body().length());
+            return &request_;
+          }));
+
+  // `~AgentHTTPClient()` will cancel the request since we don't finish it here.
+  EXPECT_CALL(request_, cancel());
+
+  const auto ignore = [](auto&&...) {};
+  datadog::tracing::Expected<void> result = client_.post(
+      url_, ignore, "", ignore, ignore, time_.monotonicTime() + std::chrono::seconds(1));
+  EXPECT_TRUE(result) << result.error();
+}
+
+TEST_F(DatadogAgentHttpClientTest, LargeRequestBodyIsNotCopied) {
+  // The request body takes over the memory of the `body` argument, even when it
+  // is larger than a buffer slice.
+  std::string body(64 * 1024, 'x');
+  body.back() = 'y';
+  const std::string expected_body = body;
+  const void* const body_data = body.data();
+
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([this, &expected_body, body_data](
+                     Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(expected_body, message->body().toString());
+            const Buffer::RawSliceVector slices = message->body().getRawSlices();
+            EXPECT_EQ(1, slices.size());
+            EXPECT_EQ(body_data, slices.front().mem_);
+            return &request_;
+          }));
+
+  // `~AgentHTTPClient()` will cancel the request since we don't finish it here.
+  EXPECT_CALL(request_, cancel());
+
+  const auto ignore = [](auto&&...) {};
+  datadog::tracing::Expected<void> result =
+      client_.post(url_, ignore, std::move(body), ignore, ignore,
+                   time_.monotonicTime() + std::chrono::seconds(1));
+  EXPECT_TRUE(result) << result.error();
 }
 
 TEST_F(DatadogAgentHttpClientTest, OnResponse200) {
@@ -562,7 +612,8 @@ TEST_F(DatadogAgentHttpClientTest, SendCalculatedTimeoutIsNegative) {
   const auto ignore = [](auto&&...) {};
   const auto deadline = time_.monotonicTime() + std::chrono::seconds(1);
   time_.setMonotonicTime(deadline + std::chrono::seconds(1));
-  datadog::tracing::Expected<void> result = client.post(url_, ignore, "", ignore, ignore, deadline);
+  datadog::tracing::Expected<void> result =
+      client.post(url_, ignore, "payload", ignore, ignore, deadline);
   ASSERT_FALSE(result);
   EXPECT_EQ(datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE, result.error().code);
   EXPECT_EQ(1, stats_.reports_dropped_.value());

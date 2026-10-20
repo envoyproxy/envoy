@@ -41,13 +41,14 @@ concurrency:
 
 jobs:
   docs-archive:
+    # Untrusted release requests validate metadata only and never receive archive credentials.
     if: >-
       (inputs.trusted || !fromJSON(inputs.request).request.version.dev)
       && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
     permissions:
       contents: read
     secrets:
-      gcp-key: ${{ inputs.trusted && secrets.gcp-docs-archive-key || secrets.gcp-key }}
+      gcp-key: ${{ inputs.trusted && secrets.gcp-docs-archive-key || '' }}
     uses: ./.github/workflows/_upload_gcs.yml
     with:
       artifacts: '["docs"]'
@@ -55,6 +56,29 @@ jobs:
       layout: version
       request: ${{ inputs.request }}
       trusted: ${{ inputs.trusted }}
+
+  chain:
+    # Post-release automation (reopen branch, create next release PR).
+    if: >-
+      !cancelled()
+      && inputs.trusted
+      && fromJSON(inputs.request).run.release
+      && !fromJSON(inputs.request).request.version.dev
+      && needs.docs-archive.result == 'success'
+      && (vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy')
+    needs:
+    - docs-archive
+    uses: ./.github/workflows/_release_chain.yml
+    secrets:
+      ENVOY_CI_PUBLISH_APP_ID: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    with:
+      target-branch: ${{ fromJSON(inputs.request).request.target-branch }}
+      version: >-
+        ${{ format('{0}.{1}.{2}',
+            fromJSON(inputs.request).request.version.major,
+            fromJSON(inputs.request).request.version.minor,
+            fromJSON(inputs.request).request.version.patch) }}
 
   sign:
     secrets:
@@ -123,7 +147,8 @@ jobs:
   website:
     # Tell envoy-website to rebuild: on main pushes (dev) once docs are built, on release
     # pushes once the github release and docs archive have completed.
-    # docs-archive may now be a dry-run on dev pushes; failures still block dispatch.
+    # docs-archive is a credentialed dry-run on trusted dev pushes; failures still block dispatch.
+    # Untrusted runs never receive archive credentials or dispatch a website rebuild.
     if: >-
       !cancelled()
       && inputs.trusted
