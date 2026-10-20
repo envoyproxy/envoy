@@ -383,6 +383,33 @@ typed_config:
     initialize();
   }
 
+  // Declares route 0 an OpenAI chat-completions AI endpoint, which is what
+  // builds both filter chain bridges, and installs the filter downstream.
+  void initializeDeclaredAiRoute() {
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          envoy::config::route::v3::Route ai_route;
+          TestUtility::loadFromYaml(R"EOF(
+typed_per_filter_config:
+  envoy.filters.http.ai_protocol_manager:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
+    request:
+      llm_protocol: OPENAI_CHAT_COMPLETIONS
+)EOF",
+                                    ai_route);
+          hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->MergeFrom(
+              ai_route);
+        });
+    config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.ai_protocol_manager
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+  request_handling: {}
+)EOF");
+    initialize();
+  }
+
   Http::TestRequestHeaderMapImpl requestHeaders() {
     return Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                           {":path", "/v1/chat/completions"},
@@ -473,28 +500,7 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, UpstreamFilterJsonTokenUsage) {
 TEST_P(AiProtocolManagerResponseIntegrationTest, ResponseOverBufferLimitCompletes) {
   // A large upstream limit lets one read exceed the ingest watermark.
   config_helper_.setBufferLimits(1024 * 1024, 1024);
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        envoy::config::route::v3::Route ai_route;
-        TestUtility::loadFromYaml(R"EOF(
-typed_per_filter_config:
-  envoy.filters.http.ai_protocol_manager:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
-    request:
-      llm_protocol: OPENAI_CHAT_COMPLETIONS
-)EOF",
-                                  ai_route);
-        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->MergeFrom(
-            ai_route);
-      });
-  config_helper_.prependFilter(R"EOF(
-name: envoy.filters.http.ai_protocol_manager
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-  request_handling: {}
-)EOF");
-  initialize();
+  initializeDeclaredAiRoute();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
