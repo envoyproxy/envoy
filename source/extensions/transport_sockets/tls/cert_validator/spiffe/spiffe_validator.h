@@ -45,7 +45,7 @@ class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secre
 public:
   SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context)
       : spiffe_data_(std::make_shared<SpiffeData>()), stats_(stats),
-        time_source_(context.timeSource()) {};
+        time_source_(context.timeSource()), builtin_stat_names_(getTlsBuiltinStatNames(context)) {};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                   Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
                   absl::Status& creation_status);
@@ -102,6 +102,7 @@ private:
   std::vector<SanMatcherPtr> subject_alt_name_matchers_;
   SslStats& stats_;
   TimeSource& time_source_;
+  const std::shared_ptr<TlsBuiltinStatNames> builtin_stat_names_;
   using SpiffeTrustBundles = Config::DataSource::ProviderSingleton<SpiffeData>;
   std::shared_ptr<SpiffeTrustBundles> bundle_map_;
   Config::DataSource::DataSourceProviderSharedPtr<SpiffeData> bundle_provider_;

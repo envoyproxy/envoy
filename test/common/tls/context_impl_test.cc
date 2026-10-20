@@ -2005,7 +2005,7 @@ public:
         pool_(scope.symbolTable()), fallback_(pool_.add("fallback")) {}
 
   void incCounter(absl::string_view name, absl::string_view value) {
-    ContextImpl::incCounter(pool_.add(name), value, fallback_);
+    ContextImpl::incCounter(pool_.add(name), pool_.add("test.tag"), value, fallback_);
   }
 
   Stats::StatNamePool pool_;
@@ -2049,6 +2049,11 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
         store_.findCounterByString(absl::StrCat("ssl.ciphers.", cipher));
     ASSERT_TRUE(stat.has_value());
     EXPECT_EQ(1, stat->value());
+    // The value is an explicit tag of the stat and leaves the tag-extracted name.
+    EXPECT_EQ("ssl.ciphers", stat->tagExtractedName());
+    ASSERT_EQ(1U, stat->tags().size());
+    EXPECT_EQ("test.tag", stat->tags()[0].name_);
+    EXPECT_EQ(cipher, stat->tags()[0].value_);
   }
 
   // Incrementing a stat for a random unknown cipher does not work. A
@@ -2172,8 +2177,14 @@ common_tls_context:
   uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
-  EXPECT_TRUE(gauge_opt.has_value());
+  ASSERT_TRUE(gauge_opt.has_value());
   EXPECT_EQ(gauge_opt->value(), expected_expiry);
+
+  // The certificate name is an explicit tag of the gauge and leaves the tag-extracted name.
+  EXPECT_EQ("ssl.certificate.expiration_unix_time_seconds", gauge_opt->tagExtractedName());
+  ASSERT_EQ(1U, gauge_opt->tags().size());
+  EXPECT_EQ("envoy.tls_certificate", gauge_opt->tags()[0].name_);
+  EXPECT_EQ(actual_cert_name, gauge_opt->tags()[0].value_);
 }
 
 TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
@@ -2209,8 +2220,14 @@ common_tls_context:
   uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
-  EXPECT_TRUE(gauge_opt.has_value());
+  ASSERT_TRUE(gauge_opt.has_value());
   EXPECT_EQ(gauge_opt->value(), expected_expiry);
+
+  // The certificate name is an explicit tag of the gauge and leaves the tag-extracted name.
+  EXPECT_EQ("ssl.certificate.expiration_unix_time_seconds", gauge_opt->tagExtractedName());
+  ASSERT_EQ(1U, gauge_opt->tags().size());
+  EXPECT_EQ("envoy.tls_certificate", gauge_opt->tags()[0].name_);
+  EXPECT_EQ(actual_cert_name, gauge_opt->tags()[0].value_);
 }
 
 // Certificate-level min > context max produces an effective range that can never negotiate.

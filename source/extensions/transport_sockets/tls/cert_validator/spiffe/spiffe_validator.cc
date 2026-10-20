@@ -145,7 +145,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                  SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Stats::Scope& scope, absl::Status& creation_status)
-    : stats_(stats), time_source_(context.timeSource()) {
+    : stats_(stats), time_source_(context.timeSource()),
+      builtin_stat_names_(getTlsBuiltinStatNames(context)) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
   suppress_client_ca_list_ = config->suppressClientCaList();
@@ -517,7 +518,8 @@ void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope,
     // Add underscore between cert name and index to avoid collisions
     std::string cert_name_with_idx = absl::StrCat(cert_name, "_", idx);
 
-    Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(scope, cert_name_with_idx);
+    Stats::Gauge& expiration_gauge =
+        createCertificateExpirationGauge(scope, cert_name_with_idx, *builtin_stat_names_);
     expiration_gauge.set(Utility::getExpirationUnixTime(cert.get()).count());
 
     idx++;

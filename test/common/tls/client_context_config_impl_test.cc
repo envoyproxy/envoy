@@ -390,7 +390,9 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  Stats::IsolatedStoreImpl store;
+  // The store must share the server's symbol table: the context stats use the server-wide
+  // pre-encoded builtin stat names, as every scope shares one symbol table in production.
+  Stats::IsolatedStoreImpl store{factory_context_.server_context_.serverScope().symbolTable()};
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
