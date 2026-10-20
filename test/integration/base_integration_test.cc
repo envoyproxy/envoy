@@ -92,6 +92,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   config_helper_.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void { bootstrap.clear_admin(); });
 #endif
+  upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>(
+      server_factory_context_.serverScope().symbolTable());
 }
 
 BaseIntegrationTest::~BaseIntegrationTest() = default;
@@ -168,7 +170,7 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, server_factory_context_.serverScope());
+        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -637,8 +639,6 @@ void BaseIntegrationTest::createXdsUpstream() {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
 
-    upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>(
-        server_factory_context_.serverScope().symbolTable());
     auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager_, *upstream_stats_store_->rootScope());
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
