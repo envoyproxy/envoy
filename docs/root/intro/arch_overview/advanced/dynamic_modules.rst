@@ -56,6 +56,29 @@ There are a few design goals for the dynamic modules:
 2. **Ease of Use**: The SDK should provide a high-level API that abstracts the details of the Envoy internals.
 3. **Flexibility**: The dynamic modules should be able to implement any functionality that can be implemented by the built-in C++ extensions without performance penalty. This is work in progress and many features are not yet available.
 
+Built-in Rust modules
+---------------------
+
+Rust dynamic modules linked into the Envoy binary must use ``envoy_rust_static_module`` from
+:repo:`dynamic_modules.bzl <source/extensions/dynamic_modules/dynamic_modules.bzl>`, not
+``rust_static_library``. The macro links the module and its SDK as always-linked Rust libraries
+(rlibs), preserving transitive Rust dependencies so the binary shares one toolchain-provided Rust
+runtime. A Rust staticlib bundles its own copy of that runtime and conflicts with other Rust code,
+such as the wasmtime engine or another built-in module.
+
+The SDK's intentionally empty ``rust_runtime`` staticlib provides the allocator shim and std
+runtime exactly once. It is the only Rust staticlib in the binary; all other Rust code linked
+into Envoy, including engines such as wasmtime, must be rlibs. The macro links this shared
+runtime without applying the module's symbol-prefix transition so Bazel deduplicates it.
+
+The macro's ``module_name`` must match the name passed to the static module loader. It configures
+a separate SDK instance whose exported hooks are named ``<module_name>_envoy_dynamic_module_on_*``.
+The SDK's init macros use the same prefix in the module crate. Hand-written ABI hooks must use
+``#[export_name = envoy_proxy_dynamic_modules_rust_sdk::__export_name!("envoy_dynamic_module_on_...")]``
+instead of ``#[no_mangle]``. Rust handles platform-specific symbol decoration, including the
+leading underscore on macOS. Shared modules and ordinary Cargo SDK builds keep unprefixed hook
+names by default.
+
 HTTP stream timing
 ------------------
 
