@@ -7,6 +7,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -202,6 +203,23 @@ delay: 0s
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onData(buffer, false));
   synchronizer().signal("increment_pre_cas");
   t1.join();
+}
+
+// The filter's stats carry the stat prefix as an explicit tag.
+TEST_F(ConnectionLimitFilterTest, StatsAreTagged) {
+  initialize(R"EOF(
+stat_prefix: connection_limit_stats
+max_connections: 1
+delay: 0.2s
+)EOF");
+
+  const Stats::CounterSharedPtr limited_connections = TestUtility::findCounter(
+      stats_store_, "connection_limit.connection_limit_stats.limited_connections");
+  ASSERT_NE(limited_connections, nullptr);
+  EXPECT_EQ("connection_limit.limited_connections", limited_connections->tagExtractedName());
+  ASSERT_EQ(1U, limited_connections->tags().size());
+  EXPECT_EQ("envoy.connection_limit_prefix", limited_connections->tags()[0].name_);
+  EXPECT_EQ("connection_limit_stats", limited_connections->tags()[0].value_);
 }
 
 } // namespace ConnectionLimitFilter
