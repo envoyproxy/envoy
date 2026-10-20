@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package envoy.extensions.http.ai_filters.model_router.v3;
+
+import "envoy/type/ai/v3/llm_binding.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.ai_filters.model_router.v3";
+option java_outer_classname = "ModelRouterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ai_filters/model_router/v3;model_routerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Model Router AI filter]
+// ModelRouter AI filter :ref:`configuration overview
+// <config_http_filters_ai_protocol_manager_ai_filters>`.
+// [#extension: envoy.http.ai_filters.model_router]
+
+message Provider {
+  string name = 1;
+
+  type.ai.v3.LLMProtocol llm_protocol = 2 [(validate.rules).enum = {defined_only: true}];
+
+  string host_and_port = 3;
+
+  type.ai.v3.LLMBinding binding = 4;
+}
+
+message Model {
+  string name = 1;
+
+  // Refers to the Provider.name
+  string provider = 2;
+
+  string model = 3;
+
+  string api_key = 4;
+}
+
+message RoutingTarget {
+  // Refers to the Model.name
+  string model = 1;
+}
+
+message RoutingEntry {
+  // Refers to the model name in the user request.
+  string requested_model = 1;
+
+  repeated RoutingTarget targets = 2;
+}
+
+message ModelRouter {
+  repeated Provider providers = 1;
+
+  repeated Model models = 2;
+
+  repeated RoutingEntry routes = 3;
+}

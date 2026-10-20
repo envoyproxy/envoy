@@ -459,7 +459,9 @@
 /*/extensions/filters/http/ai_protocol_manager @penguingao @botengyao @tyxia
 # AI filters (run by the AI Protocol Manager)
 /*/extensions/http/ai_filters/common @botengyao @penguingao
+/*/extensions/http/ai_filters/model_router @botengyao @penguingao @rblaze
 /*/extensions/http/ai_filters/request_info @botengyao @penguingao
+/*/extensions/http/ai_filters/route_selector @botengyao @penguingao @rblaze
 /*/extensions/http/ai_filters/schema_validation @botengyao @penguingao
 /*/extensions/http/ai_filters/transcoder @botengyao @penguingao @ginama18
 # HTTP body size limit filter

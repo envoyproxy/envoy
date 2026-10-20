@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package envoy.data.ai.v3;
+
+import "envoy/type/ai/v3/llm_binding.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.data.ai.v3";
+option java_outer_classname = "RoutesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/ai/v3;aiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#next-free-field: 6]
+message LlmRoute {
+  // The route's wire API.
+  type.ai.v3.LLMProtocol llm_protocol = 1;
+
+  // The model.
+  string model = 2;
+
+  // API endpoint
+  string host_and_port = 3;
+
+  // How to rewrite URL path
+  type.ai.v3.LLMBinding binding = 4;
+
+  // Authorization header for this model.
+  string api_key = 5;
+}
+
+message LlmRoutes {
+  repeated LlmRoute routes = 1;
+}
