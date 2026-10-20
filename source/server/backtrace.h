@@ -73,11 +73,11 @@ public:
   static absl::string_view addrMapping(bool setup = false);
 
   /**
-   * Directs the output of logTrace() to directly stderr rather than the
+   * Directs the output of logFault() and logTrace() directly to stderr rather than the
    * logging infrastructure.
    *
-   * This is intended for coverage tests, where we enable trace logs, but send
-   * them to /dev/null to avoid accumulating too much data in CI.
+   * This is used in fatal signal handlers to bypass the logger mutex, and in coverage
+   * tests where logs are sent to /dev/null to avoid accumulating too much data in CI.
    *
    * @param log_to_stderr Whether to log to stderr or the logging system.
    */
@@ -132,6 +132,11 @@ public:
    */
   void logTrace() {
     if (log_to_stderr_) {
+      std::cerr << "Backtrace (use tools/stack_decode.py to get line numbers):\n"
+                << "Envoy version: " << VersionInfo::version() << "\n";
+      if (!addrMapping().empty()) {
+        std::cerr << "Address mapping: " << addrMapping() << "\n";
+      }
       printTrace(std::cerr);
       return;
     }
@@ -170,6 +175,11 @@ public:
   }
 
   void logFault(const char* signame, const void* addr) {
+    if (log_to_stderr_) {
+      std::cerr << "[backtrace] Caught " << signame << ", suspect faulting address " << addr
+                << "\n";
+      return;
+    }
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 

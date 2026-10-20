@@ -43,6 +43,11 @@ const char* signalDescription(int sig) {
 constexpr int SignalAction::FATAL_SIGS[];
 
 void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
+  // The logger mutex may be held on this thread (a crash inside logging or a FatalAction
+  // raising another signal), or inherited locked across fork() in death tests. Neither
+  // backtrace may route through spdlog/absl::Mutex in the handler.
+  BackwardsTrace::setLogToStderr(true);
+  Coroutine::Backtrace::setLogToStderr(true);
   BackwardsTrace tracer;
 
   tracer.logFault(signalDescription(sig), info->si_addr);
