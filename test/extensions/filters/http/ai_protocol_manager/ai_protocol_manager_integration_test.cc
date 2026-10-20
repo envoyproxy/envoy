@@ -517,6 +517,28 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, ResponseOverBufferLimitComplete
   EXPECT_EQ(body, response->body());
 }
 
+// A request over the downstream buffer limit on an AI route pauses the client
+// while it is ingested, and replay still delivers it whole.
+TEST_P(AiProtocolManagerResponseIntegrationTest, RequestOverBufferLimitCompletes) {
+  config_helper_.setBufferLimits(1024 * 1024, 1024);
+  initializeDeclaredAiRoute();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string request = R"({"model":"gpt-4o","messages":[{"role":"user","content":")" +
+                              std::string(64 * 1024, 'x') + R"("}]})";
+  auto response = codec_client_->makeRequestWithBody(requestHeaders(), request);
+  waitForNextUpstreamRequest();
+  // Compared as JSON: re-serializing the request does not keep key order.
+  EXPECT_THAT(upstream_request_->body().toString(), JsonStringEq(request));
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // The ingest pause actually engaged, so the test is not passing vacuously.
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               testing::Ge(1));
+}
+
 // Retries with the upstream installation: each attempt runs its own filter
 // instance, but only the winning attempt's response streams to completion, so
 // the published usage comes from the winner only (the failed attempt is a
