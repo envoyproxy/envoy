@@ -12,11 +12,9 @@
 
 namespace Envoy {
 
-namespace {
-
 // Unlike `strsignal()`, `sigdescr_np()` returns static storage without allocating, so it is
 // async-signal-safe even when the fatal signal originates inside the allocator.
-const char* signalDescription(int sig) {
+const char* SignalAction::signalDescription(int sig) {
 #if defined(__GLIBC__) && ((__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 32))
   const char* desc = sigdescr_np(sig);
   return desc != nullptr ? desc : "Unknown signal";
@@ -38,8 +36,6 @@ const char* signalDescription(int sig) {
 #endif
 }
 
-} // namespace
-
 constexpr int SignalAction::FATAL_SIGS[];
 
 void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
@@ -50,7 +46,7 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
   Coroutine::Backtrace::setLogToStderr(true);
   BackwardsTrace tracer;
 
-  tracer.logFault(signalDescription(sig), info->si_addr);
+  tracer.logFault(SignalAction::signalDescription(sig), info->si_addr);
   if (context != nullptr) {
     tracer.captureFrom(context);
   } else {

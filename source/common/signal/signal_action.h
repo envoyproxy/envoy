@@ -71,6 +71,15 @@ public:
    */
   static void sigHandler(int sig, siginfo_t* info, void* context);
 
+  /**
+   * Async-signal-safe description of a fatal signal. Unlike `strsignal()`,
+   * returns static storage without allocating, so it is safe to call from
+   * the signal handler even when the fault originates inside the allocator.
+   *
+   * Public so that it can be exercised directly from a test.
+   */
+  static const char* signalDescription(int sig);
+
 private:
   static size_t computeAltStackSize(size_t page) {
     size_t min_size = MINSIGSTKSZ;
