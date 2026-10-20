@@ -680,6 +680,178 @@ static void bmEncodingSizeBytes_ClzMixed(benchmark::State& state) {
 }
 BENCHMARK(bmEncodingSizeBytes_ClzMixed);
 
+// ---------------------------------------------------------------------------
+// StatNameStringCache vs Uncached decode micro-benchmarks
+// ---------------------------------------------------------------------------
+
+static std::vector<Envoy::Stats::StatNameTag> prepareStatNameTags(Envoy::Stats::StatNamePool& pool,
+                                                                  uint32_t num_tags = 2000) {
+  const std::vector<absl::string_view> tag_names = {
+      "cluster_name", "response_code", "response_flags", "route_name",  "service_zone",
+      "ssl_cipher",   "ssl_version",   "http_status",    "grpc_status", "retry_count",
+  };
+  const std::vector<absl::string_view> tag_values = {
+      "cluster_1", "cluster_2", "cluster_3", "cluster_4", "cluster_5",     "200",       "400",
+      "401",       "403",       "404",       "500",       "502",           "503",       "504",
+      "none",      "zone_a",    "zone_b",    "zone_c",    "route_default", "route_api",
+  };
+  std::vector<Envoy::Stats::StatNameTag> tags;
+  tags.reserve(num_tags);
+  for (uint32_t i = 0; i < num_tags; ++i) {
+    auto name = pool.add(tag_names[i % tag_names.size()]);
+    auto val = pool.add(tag_values[(i * 7 + 3) % tag_values.size()]);
+    tags.emplace_back(name, val);
+  }
+  return tags;
+}
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmDecodeStatNames_Uncached(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = prepareNames(pool, 2000, 4);
+
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    auto str = symbol_table.toString(names[index++ % names.size()]);
+    benchmark::DoNotOptimize(str);
+  }
+}
+BENCHMARK(bmDecodeStatNames_Uncached);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmDecodeStatNames_Cached(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatName> names = prepareNames(pool, 2000, 4);
+  Envoy::Stats::StatNameStringCache cache(&symbol_table);
+  for (const auto& name : names) {
+    cache.decode(name);
+  }
+
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const auto& str = cache.decode(names[index++ % names.size()]);
+    benchmark::DoNotOptimize(str);
+  }
+}
+BENCHMARK(bmDecodeStatNames_Cached);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmDecodeTags_Uncached(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatNameTag> tags = prepareStatNameTags(pool, 2000);
+
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const auto& tag = tags[index++ % tags.size()];
+    Envoy::Stats::Tag decoded{symbol_table.toString(tag.first), symbol_table.toString(tag.second)};
+    benchmark::DoNotOptimize(decoded);
+  }
+}
+BENCHMARK(bmDecodeTags_Uncached);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmDecodeTags_Cached(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatNameTag> tags = prepareStatNameTags(pool, 2000);
+  Envoy::Stats::StatNameStringCache cache(&symbol_table);
+  for (const auto& tag : tags) {
+    cache.decode(tag.first);
+    cache.decode(tag.second);
+  }
+
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const auto& tag = tags[index++ % tags.size()];
+    Envoy::Stats::Tag decoded = cache.decodeTag(tag.first, tag.second);
+    benchmark::DoNotOptimize(decoded);
+  }
+}
+BENCHMARK(bmDecodeTags_Cached);
+
+// Simulates a full flush tick of 2000 metric tags, measuring the cold miss overhead
+// followed by amortized warm cache hits against uncached decoding.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmDecodeFlushSimulation_Uncached(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatNameTag> tags = prepareStatNameTags(pool, 2000);
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    for (const auto& tag : tags) {
+      Envoy::Stats::Tag decoded{symbol_table.toString(tag.first),
+                                symbol_table.toString(tag.second)};
+      benchmark::DoNotOptimize(decoded);
+    }
+  }
+}
+BENCHMARK(bmDecodeFlushSimulation_Uncached);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmDecodeFlushSimulation_Cached(benchmark::State& state) {
+  Envoy::Stats::SymbolTableImpl symbol_table;
+  Envoy::Stats::StatNamePool pool(symbol_table);
+  const std::vector<Envoy::Stats::StatNameTag> tags = prepareStatNameTags(pool, 2000);
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    Envoy::Stats::StatNameStringCache cache(&symbol_table);
+    for (const auto& tag : tags) {
+      Envoy::Stats::Tag decoded = cache.decodeTag(tag.first, tag.second);
+      benchmark::DoNotOptimize(decoded);
+    }
+  }
+}
+BENCHMARK(bmDecodeFlushSimulation_Cached);
+
+struct SharedDecodeData {
+  SharedDecodeData() : pool_(symbol_table_) { names_ = prepareNames(pool_, 2000, 4); }
+  Envoy::Stats::SymbolTableImpl symbol_table_;
+  Envoy::Stats::StatNamePool pool_;
+  std::vector<Envoy::Stats::StatName> names_;
+};
+
+static SharedDecodeData& getSharedDecodeData() {
+  static auto* data = new SharedDecodeData();
+  return *data;
+}
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmDecodeStatNames_UncachedThreads(benchmark::State& state) {
+  auto& data = getSharedDecodeData();
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    auto str = data.symbol_table_.toString(data.names_[index++ % data.names_.size()]);
+    benchmark::DoNotOptimize(str);
+  }
+}
+BENCHMARK(bmDecodeStatNames_UncachedThreads)->Threads(1)->Threads(4)->Threads(8);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void bmDecodeStatNames_CachedThreads(benchmark::State& state) {
+  auto& data = getSharedDecodeData();
+  Envoy::Stats::StatNameStringCache cache(&data.symbol_table_);
+  for (const auto& name : data.names_) {
+    cache.decode(name);
+  }
+  uint32_t index = 0;
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    const auto& str = cache.decode(data.names_[index++ % data.names_.size()]);
+    benchmark::DoNotOptimize(str);
+  }
+}
+BENCHMARK(bmDecodeStatNames_CachedThreads)->Threads(1)->Threads(4)->Threads(8);
+
 // Compares the three ways to assemble a temporary joined stat-name:
 //
 //   join()            -- the original: always a heap allocation, ownership returned.

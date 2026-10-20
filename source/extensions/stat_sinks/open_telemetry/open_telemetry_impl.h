@@ -312,7 +312,8 @@ private:
   template <class StatType>
   MetricAggregator::SortedAttributesVector
   getCombinedAttributes(const StatType& stat,
-                        OptRef<const SinkConfig::ConversionAction> conversion_config) const;
+                        OptRef<const SinkConfig::ConversionAction> conversion_config,
+                        Stats::StatNameStringCache& cache) const;
 
   /**
    * Processes all metrics (gauges, counters, histograms) from the snapshot and

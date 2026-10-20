@@ -110,19 +110,20 @@ public:
 private:
   void flushCounter(io::prometheus::client::MetricFamily& metrics_family,
                     const Stats::MetricSnapshot::CounterSnapshot& counter_snapshot,
-                    int64_t snapshot_time_ms) const;
+                    int64_t snapshot_time_ms, Stats::StatNameStringCache& cache) const;
   void flushGauge(io::prometheus::client::MetricFamily& metrics_family, const Stats::Gauge& gauge,
-                  int64_t snapshot_time_ms) const;
+                  int64_t snapshot_time_ms, Stats::StatNameStringCache& cache) const;
   void flushHistogram(io::prometheus::client::MetricFamily& metrics_family,
-                      const Stats::ParentHistogram& envoy_histogram,
-                      int64_t snapshot_time_ms) const;
+                      const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time_ms,
+                      Stats::StatNameStringCache& cache) const;
   void flushSummary(io::prometheus::client::MetricFamily& metrics_family,
-                    const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time_ms) const;
+                    const Stats::ParentHistogram& envoy_histogram, int64_t snapshot_time_ms,
+                    Stats::StatNameStringCache& cache) const;
 
   io::prometheus::client::Metric*
   populateMetricsFamily(io::prometheus::client::MetricFamily& metrics_family,
                         io::prometheus::client::MetricType type, int64_t snapshot_time_ms,
-                        const Stats::Metric& metric) const;
+                        const Stats::Metric& metric, Stats::StatNameStringCache& cache) const;
 
   const bool report_counters_as_deltas_;
   const bool emit_labels_;

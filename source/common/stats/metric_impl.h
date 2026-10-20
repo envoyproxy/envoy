@@ -27,6 +27,7 @@ public:
   StatName statName() const;
   std::string name(const SymbolTable& symbol_table) const;
   TagVector tags(const SymbolTable& symbol_table) const;
+  TagVector tags(const SymbolTable& symbol_table, StatNameStringCache& cache) const;
   StatName tagExtractedStatName() const;
   void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const;
   void clear(SymbolTable& symbol_table) { stat_names_.clear(symbol_table); }
@@ -88,6 +89,9 @@ public:
       : MetricImpl(StatName(), StatName(), {}, symbol_table) {}
 
   TagVector tags() const override { return helper_.tags(constSymbolTable()); }
+  TagVector tags(StatNameStringCache& cache) const override {
+    return helper_.tags(constSymbolTable(), cache);
+  }
   StatName statName() const override { return helper_.statName(); }
   StatName tagExtractedStatName() const override { return helper_.tagExtractedStatName(); }
   void iterateTagStatNames(const Metric::TagStatNameIterFn& fn) const override {

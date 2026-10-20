@@ -77,6 +77,7 @@ envoy_cc_test(
         "//source/common/stats:allocator_lib",
         "//source/common/stats:utility_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -196,6 +197,7 @@ envoy_cc_test(
         "//test/common/memory:memory_test_utility_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/hash:hash_testing",

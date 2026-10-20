@@ -211,6 +211,7 @@ public:
   std::string name() const override { return counter_->name(); }
   StatName statName() const override { return counter_->statName(); }
   TagVector tags() const override { return counter_->tags(); }
+  TagVector tags(Stats::StatNameStringCache& cache) const override { return counter_->tags(cache); }
   std::string tagExtractedName() const override { return counter_->tagExtractedName(); }
   void iterateTagStatNames(const TagStatNameIterFn& fn) const override {
     counter_->iterateTagStatNames(fn);

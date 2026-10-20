@@ -12,6 +12,8 @@
 namespace Envoy {
 namespace Stats {
 
+class StatNameStringCache;
+
 /**
  * Primitive, low-memory-overhead counter with incrementing and latching capabilities. Each
  * increment is added both to a global counter as well as periodic counter. Calling latch()
@@ -69,6 +71,7 @@ public:
   const std::string& tagExtractedName() const { return tag_extracted_name_; }
   const std::string& name() const { return name_; }
   const Stats::TagVector& tags() const { return tags_; }
+  const Stats::TagVector& tags(StatNameStringCache&) const { return tags_; }
 
   // Returns the current tags, leaves tags_ in an unknown state.
   Stats::TagVector getAndClearTags() { return std::move(tags_); }
