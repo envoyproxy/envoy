@@ -146,7 +146,7 @@ TEST_F(FilesystemSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
 TEST_F(FilesystemSubscriptionImplTest, RequestOnDemandNotImplemented) {
   EXPECT_ENVOY_BUG(subscription_.requestOnDemandUpdate({"cluster0"}),
                    "unexpected request for on demand update");
-  EXPECT_ENVOY_BUG(subscription_.requestOnDemandUpdate({"cluster0"}, {"cluster1"}),
+  EXPECT_ENVOY_BUG(subscription_.update({"cluster0"}, {"cluster1"}),
                    "unexpected request for on demand update");
 }
 

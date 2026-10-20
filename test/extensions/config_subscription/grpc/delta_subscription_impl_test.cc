@@ -51,11 +51,11 @@ TEST_P(DeltaSubscriptionImplTest, RequestOnDemandUpdate) {
   EXPECT_TRUE(statsAre(2, 0, 0, 0, 0, 0, 0, ""));
 
   expectSendMessage({"name4"}, {"name3"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-  subscription_->requestOnDemandUpdate({"name4"}, {"name3"});
+  subscription_->update({"name4"}, {"name3"});
   EXPECT_TRUE(statsAre(3, 0, 0, 0, 0, 0, 0, ""));
 
   expectSendMessage({}, {"name4"}, Grpc::Status::WellKnownGrpcStatus::Ok, "", {});
-  subscription_->requestOnDemandUpdate({}, {"name4"});
+  subscription_->update({}, {"name4"});
   EXPECT_TRUE(statsAre(4, 0, 0, 0, 0, 0, 0, ""));
 }
 

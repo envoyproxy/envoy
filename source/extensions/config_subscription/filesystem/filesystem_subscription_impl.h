@@ -42,8 +42,8 @@ public:
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
-  void requestOnDemandUpdate(const absl::flat_hash_set<std::string>&,
-                             const absl::flat_hash_set<std::string>&) override {
+  void update(const absl::flat_hash_set<std::string>&,
+              const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
   }
   void accept(const absl::flat_hash_set<std::string>&) override {}

@@ -159,6 +159,14 @@ WatchMap::updateWatchInterest(Watch* watch,
   absl::flat_hash_set<std::string> added_resources = findAdditions(newly_added_to_watch, watch);
   absl::flat_hash_set<std::string> removed_resources =
       findRemovals(newly_removed_from_watch, watch);
+  // Remove cached resource that are no longer relevant.
+  if (eds_resources_cache_.has_value()) {
+    for (const auto& resource_name : removed_resources) {
+      // This may pass a resource_name that is not in the cache, for example
+      // if the resource contents has never arrived.
+      eds_resources_cache_->removeResource(resource_name);
+    }
+  }
   return {std::move(added_resources), std::move(removed_resources)};
 }
 
