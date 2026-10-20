@@ -1,0 +1,2 @@
+Added mutable ``ShouldDrainConnectionUponCompletion`` attribute for dynamic module HTTP filters. Setting this attribute will
+initiate graceful draining (connection:close for H/1 and GOAWAY for H/2) of the connection when request completes.
