@@ -17,16 +17,23 @@ public:
     ASSERT(low_watermark < high_watermark);
   }
 
-  bool isOverloaded() const override {
+  void add(ItemType& item, QueueItemMetadata metadata) override {
+    ListQueueBase<ItemType>::add(item, metadata);
     updateMode();
-    return lifo_mode_;
   }
 
+  void remove(ItemType& item) override {
+    ListQueueBase<ItemType>::remove(item);
+    updateMode();
+  }
+
+  bool isOverloaded() const override { return lifo_mode_; }
+
 protected:
-  bool shouldDequeueFromBack() const override { return isOverloaded(); }
+  bool shouldDequeueFromBack() const override { return lifo_mode_; }
 
 private:
-  void updateMode() const {
+  void updateMode() {
     if (lifo_mode_) {
       if (this->size() <= low_watermark_) {
         lifo_mode_ = false;
@@ -38,7 +45,7 @@ private:
 
   const uint32_t high_watermark_;
   const uint32_t low_watermark_;
-  mutable bool lifo_mode_{false};
+  bool lifo_mode_{false};
 };
 
 } // namespace QueuePolicy

@@ -147,6 +147,31 @@ TEST(AdaptiveLifoQueueTest, ThresholdOneUsesLifoUntilEmpty) {
   EXPECT_TRUE(queue.empty());
 }
 
+TEST(AdaptiveLifoQueueTest, DrainAndRefillResetsLifoMode) {
+  TestQueueItem first(1);
+  TestQueueItem second(2);
+  TestQueueItem third(3);
+  TestQueueItem fourth(4);
+  TestQueueItem fifth(5);
+  AdaptiveLifoQueue<TestQueueItem> queue(3, 0);
+
+  queue.add(first, {MonotonicTime{}});
+  queue.add(second, {MonotonicTime{}});
+  queue.add(third, {MonotonicTime{}});
+  EXPECT_TRUE(queue.isOverloaded());
+
+  EXPECT_EQ(queue.pop().value(), 3);
+  EXPECT_EQ(queue.pop().value(), 2);
+  EXPECT_EQ(queue.pop().value(), 1);
+
+  // Do not query the empty queue before refilling it.
+  queue.add(fourth, {MonotonicTime{}});
+  queue.add(fifth, {MonotonicTime{}});
+  EXPECT_FALSE(queue.isOverloaded());
+  EXPECT_EQ(queue.pop().value(), 4);
+  EXPECT_EQ(queue.pop().value(), 5);
+}
+
 class AdaptiveLifoQueueFactoryTest : public testing::Test {
 protected:
   absl::StatusOr<QueuePolicyUniquePtr<TestQueueItem>>
