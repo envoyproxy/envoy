@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
@@ -154,6 +155,12 @@ public:
    * @return the stat prefix used for per-handler stats.
    */
   virtual const std::string& statPrefix() const PURE;
+
+  /**
+   * @return the id of the worker this handler runs on, or std::nullopt when the handler is not
+   *         owned by a worker thread.
+   */
+  virtual std::optional<uint32_t> workerId() const PURE;
 
   /**
    * Close idle HTTP connections.

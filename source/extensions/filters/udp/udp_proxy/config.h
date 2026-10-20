@@ -5,6 +5,8 @@
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/config/well_known_names.h"
+#include "source/common/stats/utility.h"
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 namespace Envoy {
@@ -140,6 +142,9 @@ public:
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const override {
     return upstream_socket_config_;
   }
+  Network::UdpPacketWriterFactory* upstreamPacketWriterFactory() const override {
+    return upstream_packet_writer_factory_.get();
+  }
   const AccessLog::InstanceSharedPtrVector& sessionAccessLogs() const override {
     return session_access_logs_;
   }
@@ -175,9 +180,13 @@ public:
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
                                                Stats::Scope& scope) {
-    const auto final_prefix = absl::StrCat("udp.", stat_prefix);
-    return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                           POOL_GAUGE_PREFIX(scope, final_prefix))};
+    // udp.(<stat_prefix>.)*: the stat prefix is a tag of the stats.
+    const Stats::TagStringView tag{Envoy::Config::TagNames::get().UDP_PREFIX, stat_prefix};
+    Stats::LiteScopeHelper helper(scope, "udp",
+                                  stat_prefix.empty() ? Stats::TagStringViewSpan()
+                                                      : Stats::TagStringViewSpan{tag},
+                                  absl::StrCat("udp.", stat_prefix));
+    return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
   }
 
   std::shared_ptr<UdpSessionFilterConfigProviderManager>
@@ -195,6 +204,7 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
+  Network::UdpPacketWriterFactoryPtr upstream_packet_writer_factory_;
   AccessLog::InstanceSharedPtrVector session_access_logs_;
   AccessLog::InstanceSharedPtrVector proxy_access_logs_;
   UdpTunnelingConfigPtr tunneling_config_;

@@ -329,6 +329,7 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   // Wait for the connection to be fully established.
   test_server_->waitForCounter("http.config_test.downstream_cx_http3_total", Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(1));
 
   // 2. Send a request and wait for the response to complete.
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
@@ -339,6 +340,7 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(1));
 
   // At this point, the EnvoyQuicServerSession should have added itself to the
   // EnvoyQuicDispatcher's idle list.
@@ -358,6 +360,7 @@ TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   // Check that the close reason was correct (this stat is incremented in
   // EnvoyQuicDispatcher)
   test_server_->waitForCounter("http.config_test.downstream_cx_destroy", Ge(1));
+  test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(0));
 
   codec_client_->close();
 
@@ -438,11 +441,21 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP2) {
+    test_server_->waitForGauge("http.config_test.downstream_cx_http2_idle", Eq(0));
+  } else if (GetParam().downstream_protocol == Http::CodecType::HTTP3) {
+    test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(0));
+  }
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
 
   // At this point, the connection should be idle but still open.
   ASSERT_TRUE(codec_client_->connected());
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP2) {
+    test_server_->waitForGauge("http.config_test.downstream_cx_http2_idle", Eq(1));
+  } else if (GetParam().downstream_protocol == Http::CodecType::HTTP3) {
+    test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(1));
+  }
 
   // Set the load so the timer is reduced but not to the minimum value.
   updateResource(0.8);
@@ -474,6 +487,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpConnections) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
     EXPECT_TRUE(codec_client_->sawGoAway());
+    if (GetParam().downstream_protocol == Http::CodecType::HTTP2) {
+      test_server_->waitForGauge("http.config_test.downstream_cx_http2_idle", Eq(0));
+    } else if (GetParam().downstream_protocol == Http::CodecType::HTTP3) {
+      test_server_->waitForGauge("http.config_test.downstream_cx_http3_idle", Eq(0));
+    }
   }
   codec_client_->close();
 }

@@ -1,3 +1,0 @@
-Fixed incorrect realm value in BasicAuth filter. Added a realm field to the basic_auth HTTP filter,
-allowing browsers to correctly cache credentials across paths. When unset, the previous behavior is
-preserved, the realm is derived from the request URI.

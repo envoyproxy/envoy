@@ -15,6 +15,7 @@
 
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -50,7 +51,7 @@ public:
         http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
         subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_,
-                              /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
+                              xds_manager_, /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
                               /*xds_config_tracker=*/XdsConfigTrackerOptRef()) {
     ON_CALL(cm_, adsMux()).WillByDefault(Return(nullptr));
   }
@@ -94,6 +95,7 @@ public:
   NiceMock<Server::MockInstance> server_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  NiceMock<MockXdsManager> xds_manager_;
   SubscriptionFactoryImpl subscription_factory_;
 };
 

@@ -124,10 +124,11 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats,
     bool use_bootstrap_node_metadata,
-    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto,
-    bool use_admin_server) {
+    std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto, bool use_admin_server,
+    Server::HotRestart* hot_restart) {
   IntegrationTestServerPtr server{std::make_unique<IntegrationTestServerImpl>(
       time_system, api, config_path, use_real_stats, std::move(config_proto))};
+  server->hot_restart_ = hot_restart;
   if (server_ready_function != nullptr) {
     server->setOnServerReadyCb(server_ready_function);
   }
@@ -319,7 +320,9 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_admin_server) {
   {
     Init::ManagerImpl init_manager{"Server"};
-    Server::HotRestartNopImpl restarter;
+    Server::HotRestartNopImpl nop_restarter;
+    Server::HotRestart& restarter =
+        hotRestartForTest() != nullptr ? *hotRestartForTest() : nop_restarter;
     ThreadLocal::InstanceImpl tls;
     Stats::ThreadLocalStoreImpl stat_store(*stats_allocator_);
     std::unique_ptr<ProcessContext> process_context;

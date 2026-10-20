@@ -115,16 +115,20 @@ Cluster::~Cluster() {
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.
-  std::unique_ptr<Upstream::HostVector> hosts_added;
+  Upstream::HostVector hosts_added;
+  Upstream::HostVector hosts_removed;
   dns_cache_->iterateHostMap(
       [&](absl::string_view host, const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
-        absl::Status status = addOrUpdateHost(host, info, hosts_added);
+        absl::Status status = addOrUpdateHost(host, info, hosts_added, hosts_removed);
         if (!status.ok()) {
           ENVOY_LOG(warn, "Failed to add host from cache: {}", status.message());
         }
       });
-  if (hosts_added) {
-    updatePriorityState(*hosts_added, {});
+  // The host map starts empty and the cache iteration keys are unique, so no host can be
+  // replaced here.
+  ASSERT(hosts_removed.empty());
+  if (!hosts_added.empty()) {
+    updatePriorityState(hosts_added, hosts_removed);
   }
   onPreInitComplete();
 }
@@ -269,7 +273,7 @@ bool Cluster::ClusterInfo::checkIdle() {
 absl::Status Cluster::addOrUpdateHost(
     absl::string_view host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-    std::unique_ptr<Upstream::HostVector>& hosts_added) {
+    Upstream::HostVector& hosts_added, Upstream::HostVector& hosts_removed) {
   Upstream::LogicalHostSharedPtr emplaced_host;
   {
     absl::WriterMutexLock lock{host_map_lock_};
@@ -282,35 +286,47 @@ absl::Status Cluster::addOrUpdateHost(
     // future.
     const auto host_map_it = host_map_.find(host);
     if (host_map_it != host_map_.end()) {
-      // If we only have an address change, we can do that swap inline without any other updates.
-      // The appropriate R/W locking is in place to allow this. The details of this locking are:
-      //  - Hosts are not thread local, they are global.
-      //  - We take a read lock when reading the address and a write lock when changing it.
-      //  - Address updates are very rare.
-      //  - Address reads are only done when a connection is being made and a "real" host
-      //    description is created or the host is queried via the admin endpoint. Both of
-      //    these operations are relatively rare and the read lock is held for a short period
-      //    of time.
-      //
-      // TODO(mattklein123): Right now the dynamic forward proxy / DNS cache works similar to how
-      //                     logical DNS works, meaning that we only store a single address per
-      //                     resolution. It would not be difficult to also expose strict DNS
-      //                     semantics, meaning the cache would expose multiple addresses and the
-      //                     cluster would create multiple logical hosts based on those addresses.
-      //                     We will leave this is a follow up depending on need.
       ASSERT(host_info == host_map_it->second.shared_host_info_);
-      ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
-      host_map_it->second.logical_host_->setNewAddresses(
-          host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
-      return absl::OkStatus();
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.dfp_cluster_replace_host_on_address_change")) {
+        // If we only have an address change, we can do that swap inline without any other updates.
+        // The appropriate R/W locking is in place to allow this. The details of this locking are:
+        //  - Hosts are not thread local, they are global.
+        //  - We take a read lock when reading the address and a write lock when changing it.
+        //  - Address updates are very rare.
+        //  - Address reads are only done when a connection is being made and a "real" host
+        //    description is created or the host is queried via the admin endpoint. Both of
+        //    these operations are relatively rare and the read lock is held for a short period
+        //    of time.
+        //
+        // TODO(mattklein123): Right now the dynamic forward proxy / DNS cache works similar to how
+        //                     logical DNS works, meaning that we only store a single address per
+        //                     resolution. It would not be difficult to also expose strict DNS
+        //                     semantics, meaning the cache would expose multiple addresses and the
+        //                     cluster would create multiple logical hosts based on those addresses.
+        //                     We will leave this is a follow up depending on need.
+        ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
+        host_map_it->second.logical_host_->setNewAddresses(
+            host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
+        return absl::OkStatus();
+      }
+      ENVOY_LOG(debug, "replacing dfproxy cluster host '{}' on address change", host);
+    } else {
+      ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
     }
 
-    ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
     auto host_or_error = Upstream::LogicalHost::create(
         info(), std::string{host}, host_info->address(), host_info->addressList(),
         dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr);
     RETURN_IF_NOT_OK_REF(host_or_error.status());
 
+    if (host_map_it != host_map_.end()) {
+      // Publish the replaced host as removed so that workers drain its connection pools. The
+      // replacement is only done after the new host is successfully created, so a creation
+      // failure leaves the existing host in place.
+      hosts_removed.emplace_back(host_map_it->second.logical_host_);
+      host_map_.erase(host_map_it);
+    }
     emplaced_host =
         host_map_
             .try_emplace(host, host_info,
@@ -319,10 +335,7 @@ absl::Status Cluster::addOrUpdateHost(
   }
 
   ASSERT(emplaced_host);
-  if (hosts_added == nullptr) {
-    hosts_added = std::make_unique<Upstream::HostVector>();
-  }
-  hosts_added->emplace_back(emplaced_host);
+  hosts_added.emplace_back(emplaced_host);
   return absl::OkStatus();
 }
 
@@ -331,11 +344,11 @@ absl::Status Cluster::onDnsHostAddOrUpdate(
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_LOG(debug, "Adding host info for {}", host);
 
-  std::unique_ptr<Upstream::HostVector> hosts_added;
-  RETURN_IF_NOT_OK(addOrUpdateHost(host, host_info, hosts_added));
-  if (hosts_added != nullptr) {
-    ASSERT(!hosts_added->empty());
-    updatePriorityState(*hosts_added, {});
+  Upstream::HostVector hosts_added;
+  Upstream::HostVector hosts_removed;
+  RETURN_IF_NOT_OK(addOrUpdateHost(host, host_info, hosts_added, hosts_removed));
+  if (!hosts_added.empty() || !hosts_removed.empty()) {
+    updatePriorityState(hosts_added, hosts_removed);
   }
   return absl::OkStatus();
 }

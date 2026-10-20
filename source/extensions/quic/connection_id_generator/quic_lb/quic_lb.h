@@ -52,6 +52,8 @@ public:
                            const quic::ParsedQuicVersion& version) override;
   uint8_t ConnectionIdLength(uint8_t first_byte) const override;
 
+  bool IsEncrypted() const override { return false; }
+
   std::optional<quic::QuicConnectionId> appendRoutingId(quic::QuicConnectionId& new_connection_id);
 
 private:

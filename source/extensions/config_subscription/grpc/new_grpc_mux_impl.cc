@@ -51,9 +51,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
                 return absl::OkStatus();
               })),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
-      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_ &&
-                            Runtime::runtimeFeatureEnabled(
-                                "envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node")),
+      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
   AllMuxes::get().insert(this);
 }

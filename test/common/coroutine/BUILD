@@ -29,6 +29,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         ":manual_executor_lib",
+        "//source/common/coroutine:backtrace_lib",
         "//source/common/coroutine:context_lib",
         "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:leaf_awaitable_lib",

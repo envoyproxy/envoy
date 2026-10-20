@@ -165,9 +165,10 @@ void WatcherImpl::issueFirstRead(ULONG_PTR param) {
 void WatcherImpl::endDirectoryWatch(Network::IoHandle& io_handle, HANDLE event_handle) {
   const BOOL rc = ::SetEvent(event_handle);
   ASSERT(rc);
-  // let libevent know that a ReadDirectoryChangesW call returned
+  // Let libevent know that a ReadDirectoryChangesW call returned. onDirectoryEvent() treats a 0
+  // byte as this notification; any other byte means a queued callback is ready to run.
   Buffer::OwnedImpl buffer;
-  constexpr absl::string_view data{"a"};
+  constexpr absl::string_view data{"\0", 1};
   buffer.add(data);
   auto result = io_handle.write(buffer);
   RELEASE_ASSERT(result.return_value_ == 1,
