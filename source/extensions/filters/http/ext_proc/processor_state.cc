@@ -122,14 +122,8 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
     modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
                      buffered_chunk.length());
-    auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-    if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
-      // Move the current buffer into the queue for remote processing and clear the buffered data.
-      enqueueStreamingChunk(buffered_chunk, end_stream);
-    } else {
-      buffered_chunk.drain(buffered_chunk.length());
-    }
-    filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
+    filter_.sendStreamedBodyChunk(*this, buffered_chunk,
+                                  ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
   }
   if (queueBelowLowLimit()) {
     clearWatermark();
@@ -274,6 +268,21 @@ absl::Status ProcessorState::handleHeaderContinue() {
 }
 
 absl::Status ProcessorState::handleCompleteBodyAvailable() {
+  if (filter_.maxStreamedBodyChunkSize().has_value() &&
+      (body_mode_ == ProcessingMode::STREAMED ||
+       body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED)) {
+    // When max_streamed_body_chunk_size is configured in streamed modes, always split and send
+    // any buffered data via sendBufferedDataInStreamedMode (which respects
+    // max_streamed_body_chunk_size and uses StreamedBodyCallback).
+    sendBufferedDataInStreamedMode(trailers_ == nullptr);
+    if (callback_state_ == CallbackState::Idle) {
+      // No body chunks are in flight (e.g., headers followed directly by trailers with no body,
+      // or all body chunks already completed while send_body_without_waiting_for_header_response
+      // was enabled), so proceed to handle trailers and cleanup now.
+      return handleTrailersAndCleanup();
+    }
+    return absl::OkStatus();
+  }
   if (callback_state_ == CallbackState::Idle) {
     // If we get here, then all the body data came in before the header message
     // was complete, and the server wants the body. It doesn't matter whether the
@@ -839,9 +848,8 @@ bool DecodingProcessorState::handleStandaloneModeOverride(
       modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
       ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filterCallbacks(),
                        buffered_chunk.length());
-      auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-      buffered_chunk.drain(buffered_chunk.length());
-      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::HeadersCallback, req);
+      filter_.sendStreamedBodyChunk(*this, buffered_chunk,
+                                    ProcessorState::CallbackState::HeadersCallback, end_stream);
     }
 
     if (trailers_ != nullptr) {
