@@ -10,7 +10,7 @@ startup --host_jvm_args=-Xmx3g
 #############################################################################
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/ee78b234a48e3aecb194d3fe5fe93a44334e8486
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/aabc9d88be5fc79db006d80437b9dadbb2b4bf84
 
 common --noincompatible_disallow_empty_glob
 
