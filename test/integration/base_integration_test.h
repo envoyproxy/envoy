@@ -614,7 +614,6 @@ protected:
     listeners_bound_timeout_ms_ = duration;
   }
 
-  std::unique_ptr<Stats::Store> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and
@@ -670,6 +669,7 @@ protected:
   std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_storage_;
   Extensions::TransportSockets::Tls::ContextManagerImpl& context_manager_;
 
+  std::unique_ptr<Stats::Store> upstream_stats_store_;
   // The fake upstreams_ are created using the context_manager, so make sure
   // they are destroyed before it is.
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
