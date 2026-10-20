@@ -1543,7 +1543,7 @@ ffi_export! {
 #[macro_export]
 macro_rules! declare_access_logger {
   ($config_type:ty) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       fn __single_access_logger_factory(
         ctx: &$crate::access_log::ConfigContext,

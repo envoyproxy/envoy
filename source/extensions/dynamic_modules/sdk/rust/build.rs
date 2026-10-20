@@ -117,6 +117,24 @@ fn main() {
 
   let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
+  // Bake the prefix into the exported macro: env! inside its body would read the
+  // consuming crate's environment instead of the SDK's environment.
+  println!("cargo:rerun-if-env-changed=ENVOY_DYNAMIC_MODULE_SYMBOL_PREFIX");
+  let prefix = env::var("ENVOY_DYNAMIC_MODULE_SYMBOL_PREFIX").unwrap_or_default();
+  std::fs::write(
+    out_path.join("export_name.rs"),
+    format!(
+      r#"
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __export_name_impl {{
+  ($name:expr) => {{ concat!({prefix:?}, $name) }};
+}}
+"#
+    ),
+  )
+  .expect("Couldn't write export naming macro");
+
   let bindings = bindgen::Builder::default()
     .header(abi_header.to_str().unwrap())
     .clang_args(bazel_clang_args())
