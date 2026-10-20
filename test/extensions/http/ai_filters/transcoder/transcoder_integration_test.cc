@@ -178,7 +178,8 @@ public:
   }
 
   // The request went out to `path` in the client's project and region, with the route's
-  // credential and `body`.
+  // credential and `body`. Vertex AI takes the Anthropic API's version in the body, so the header
+  // Envoy's own Anthropic binding writes does not apply to a Vertex AI binding, nor to Gemini's.
   void expectUpstreamRequest(absl::string_view path, const nlohmann::json& body) {
     const Http::RequestHeaderMap& headers = upstream_request_->headers();
     EXPECT_EQ(headers.getMethodValue(), "POST");
@@ -186,6 +187,7 @@ public:
     EXPECT_EQ(headers.getHostValue(), "us-east5-aiplatform.googleapis.com");
     EXPECT_THAT(headers, ContainsHeader("authorization", AccessToken));
     EXPECT_THAT(headers, ContainsHeader("x-vertex-location", "us-east5"));
+    EXPECT_TRUE(headers.get(Http::LowerCaseString("anthropic-version")).empty());
     EXPECT_EQ(nlohmann::json::parse(upstream_body_), body);
   }
 

@@ -1,11 +1,13 @@
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 
 #include "test/test_common/status_utility.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
@@ -42,18 +44,48 @@ LlmBindingConstSharedPtr parseOk(absl::string_view text) {
   return binding.ok() ? *binding : nullptr;
 }
 
-std::optional<LlmBindingRead> read(const LlmBindingConstSharedPtr& binding, absl::string_view path,
-                                   nlohmann::json& body,
-                                   const LlmBindingConstSharedPtr& api_binding = nullptr) {
-  return readClientPath(binding, api_binding, {}, path, body);
+// The request's headers, for a test that has some; a request without any by default.
+using Headers = absl::flat_hash_map<std::string, std::string>;
+HeaderLookup lookup(const Headers& headers = {}) {
+  return [headers](absl::string_view name) -> std::optional<std::string> {
+    const auto found = headers.find(name);
+    return found == headers.end() ? std::nullopt : std::make_optional(found->second);
+  };
 }
 
-absl::StatusOr<std::optional<std::string>> write(const LlmBinding& binding,
-                                                 const LlmBindingRead* arrived,
-                                                 nlohmann::json& body,
-                                                 const LlmBinding* api_binding = nullptr) {
+std::optional<LlmBindingRead> read(const LlmBindingConstSharedPtr& binding, absl::string_view path,
+                                   nlohmann::json& body,
+                                   const LlmBindingConstSharedPtr& api_binding = nullptr,
+                                   const Headers& headers = {}) {
+  return readClientPath(binding, api_binding, {}, path, body, lookup(headers));
+}
+
+absl::StatusOr<std::optional<std::string>>
+write(const LlmBinding& binding, const LlmBindingRead* arrived, nlohmann::json& body,
+      const LlmBinding* api_binding = nullptr, std::vector<HeaderMutation>* headers = nullptr,
+      const Headers& sent = {}) {
   bool unresolved = false;
-  return writeRequest(binding, api_binding, arrived, body, unresolved);
+  std::vector<HeaderMutation> discarded;
+  return writeRequest(binding, api_binding, arrived, body, lookup(sent),
+                      headers != nullptr ? *headers : discarded, unresolved);
+}
+
+// `headers` as `name: value` lines, with `name` alone for a removal, for one-line comparisons.
+std::vector<std::string> describe(const std::vector<HeaderMutation>& headers) {
+  std::vector<std::string> lines;
+  for (const HeaderMutation& header : headers) {
+    lines.push_back(header.value.has_value() ? absl::StrCat(header.name, ": ", *header.value)
+                                             : header.name);
+  }
+  return lines;
+}
+
+// As `write`, reporting `unresolved`, for the tests about whose fault a failure is.
+absl::StatusOr<std::optional<std::string>> writeUnresolved(const LlmBinding& binding,
+                                                           const LlmBindingRead* arrived,
+                                                           nlohmann::json& body, bool& unresolved) {
+  std::vector<HeaderMutation> discarded;
+  return writeRequest(binding, nullptr, arrived, body, lookup(), discarded, unresolved);
 }
 
 TEST(LlmBindingParseTest, ConvertsEveryValueKind) {
@@ -95,12 +127,44 @@ TEST(LlmBindingParseTest, RejectsWhatCannotBeApplied) {
            R"({"uri_pattern": "/v1/{model}/{rest=**}"})",
            R"({"mutations": [{"value": "x"}]})",
            R"({"mutations": [{"body_field": ""}]})",
-           R"({"mutations": [{"header": "x-a", "value": "b"}]})",
+           R"({"mutations": [{"header": ""}]})",
+           // Headers Envoy frames itself, and the pseudo-headers.
+           R"({"mutations": [{"header": ":path", "value": "/x"}]})",
+           R"({"mutations": [{"header": "host", "value": "h"}]})",
+           R"({"mutations": [{"header": "content-length", "value": "0"}]})",
+           R"({"mutations": [{"header": "transfer-encoding"}]})",
+           // Header names are matched lower-case.
+           R"({"mutations": [{"header": "Anthropic-Version", "value": "v"}]})",
+           // A header's value is text.
+           R"({"mutations": [{"header": "x-a", "value": 1}]})",
+           R"({"mutations": [{"header": "x-a", "value": {"k": "v"}}]})",
            R"({"mutations": [{"body_field": "a", "keep": true}]})",
            "{not json",
        }) {
     EXPECT_THAT(LlmBinding::parse(text), HasStatusCode(absl::StatusCode::kInvalidArgument)) << text;
   }
+}
+
+TEST(LlmBindingParseTest, ConvertsHeaderMutations) {
+  const LlmBindingConstSharedPtr binding = parseOk(R"({"mutations": [
+    {"header": "anthropic-version", "value": "2023-06-01", "keep_existing": true},
+    {"header": "x-tenant", "value": "{project}"},
+    {"header": "x-drop"},
+    {"body_field": "model"}
+  ]})");
+  ASSERT_NE(binding, nullptr);
+  const std::vector<LlmBinding::Mutation>& mutations = binding->mutations();
+  ASSERT_EQ(mutations.size(), 4);
+  EXPECT_TRUE(mutations[0].isHeader());
+  EXPECT_EQ(mutations[0].header, "anthropic-version");
+  EXPECT_EQ(*mutations[0].value, "2023-06-01");
+  EXPECT_TRUE(mutations[0].keep_existing);
+  EXPECT_EQ(*mutations[1].value, "{project}");
+  EXPECT_FALSE(mutations[2].value.has_value());
+  EXPECT_FALSE(mutations[3].isHeader());
+  // Removing a header named `model` is not removing the body's model.
+  EXPECT_TRUE(binding->removesModel());
+  EXPECT_FALSE(parseOk(R"({"mutations": [{"header": "model"}]})")->removesModel());
 }
 
 // A YAML block scalar leaves a newline after the value.
@@ -240,17 +304,19 @@ TEST(LlmBindingReadTest, ReadsTheClientPathUnderTheFirstBindingThatMatches) {
       "/v1/projects/p/locations/l/publishers/google/models/g:generateContent";
 
   nlohmann::json body = nlohmann::json::object();
-  std::optional<LlmBindingRead> arrived = readClientPath(nullptr, own, clients, vertex_path, body);
+  std::optional<LlmBindingRead> arrived =
+      readClientPath(nullptr, own, clients, vertex_path, body, lookup());
   ASSERT_TRUE(arrived.has_value());
   EXPECT_EQ(arrived->binding, vertex);
-  arrived = readClientPath(nullptr, own, clients, "/v1beta/models/g:generateContent", body);
+  arrived =
+      readClientPath(nullptr, own, clients, "/v1beta/models/g:generateContent", body, lookup());
   ASSERT_TRUE(arrived.has_value());
   EXPECT_EQ(arrived->binding, own);
-  EXPECT_FALSE(readClientPath(nullptr, own, clients, "/v1/messages", body).has_value());
+  EXPECT_FALSE(readClientPath(nullptr, own, clients, "/v1/messages", body, lookup()).has_value());
 
   const LlmBindingConstSharedPtr gateway = parseOk("/gw/{model}");
-  EXPECT_FALSE(readClientPath(gateway, own, clients, vertex_path, body).has_value());
-  EXPECT_EQ(readClientPath(gateway, own, clients, "/gw/m", body)->model, "m");
+  EXPECT_FALSE(readClientPath(gateway, own, clients, vertex_path, body, lookup()).has_value());
+  EXPECT_EQ(readClientPath(gateway, own, clients, "/gw/m", body, lookup())->model, "m");
 }
 
 // `{model}` is the body's; every other variable is the client's path's, even when the body has a
@@ -273,7 +339,7 @@ TEST(LlmBindingWriteTest, RendersTheModelFromTheBodyAndTheRestFromThePath) {
     nlohmann::json bad = nlohmann::json::parse(R"({"stream": false})");
     bad["model"] = nlohmann::json::parse(model);
     bool unresolved = true;
-    EXPECT_THAT(writeRequest(*binding, nullptr, &arrived, bad, unresolved),
+    EXPECT_THAT(writeUnresolved(*binding, &arrived, bad, unresolved),
                 HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("model id")))
         << model;
     EXPECT_FALSE(unresolved) << model;
@@ -295,7 +361,7 @@ TEST(LlmBindingWriteTest, FlagsAValueTheClientsPathDidNotHold) {
                                     absl::string_view message) {
     nlohmann::json body = nlohmann::json::parse(R"({"model": "m"})");
     bool unresolved = false;
-    EXPECT_THAT(writeRequest(binding, nullptr, from, body, unresolved),
+    EXPECT_THAT(writeUnresolved(binding, from, body, unresolved),
                 HasStatus(absl::StatusCode::kFailedPrecondition, HasSubstr(message)));
     EXPECT_TRUE(unresolved) << message;
   };
@@ -308,7 +374,7 @@ TEST(LlmBindingWriteTest, FlagsAValueTheClientsPathDidNotHold) {
 
   nlohmann::json body = nlohmann::json::parse(R"({"model": "m"})");
   bool unresolved = true;
-  EXPECT_THAT(writeRequest(*vertex, nullptr, &arrived, body, unresolved), IsOk());
+  EXPECT_THAT(writeUnresolved(*vertex, &arrived, body, unresolved), IsOk());
   EXPECT_FALSE(unresolved);
 }
 
@@ -403,6 +469,96 @@ TEST(LlmBindingWriteTest, EditsOnlyAnObjectBody) {
   nlohmann::json array = nlohmann::json::array();
   ASSERT_THAT(write(*binding, nullptr, array), IsOk());
   EXPECT_EQ(array, nlohmann::json::array());
+}
+
+// The Anthropic API's own binding: a header beside the body, which the engine hands back to the
+// caller rather than writing itself.
+constexpr absl::string_view AnthropicApi = R"({
+  "uri_pattern": "/v1/messages",
+  "mutations": [{"header": "anthropic-version", "value": "2023-06-01", "keep_existing": true}]
+})";
+
+TEST(LlmBindingHeaderTest, WritesTheHeadersBesideTheBody) {
+  const LlmBindingConstSharedPtr binding = parseOk(R"({
+    "uri_pattern": "/gw/{model}",
+    "mutations": [
+      {"header": "anthropic-version", "value": "2023-06-01"},
+      {"header": "x-model", "value": "{model}-{project}"},
+      {"header": "x-client-key"},
+      {"body_field": "tenant", "value": "{project}"}
+    ]
+  })");
+  const LlmBindingRead arrived{nullptr, "", {{"project", "acme"}}, {}, {}};
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "m"})");
+  std::vector<HeaderMutation> headers;
+  ASSERT_THAT(write(*binding, &arrived, body, nullptr, &headers), IsOkAndHolds("/gw/m"));
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("anthropic-version: 2023-06-01",
+                                                        "x-model: m-acme", "x-client-key"));
+  EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m", "tenant": "acme"})"));
+}
+
+// `keep_existing` on a header is decided against the request's headers, which the caller lends.
+TEST(LlmBindingHeaderTest, KeepsAHeaderTheRequestHas) {
+  const LlmBindingConstSharedPtr binding = parseOk(AnthropicApi);
+  nlohmann::json body = nlohmann::json::object();
+  std::vector<HeaderMutation> headers;
+  ASSERT_THAT(write(*binding, nullptr, body, nullptr, &headers, {{"anthropic-version", "2024"}}),
+              IsOkAndHolds("/v1/messages"));
+  EXPECT_TRUE(headers.empty());
+  ASSERT_THAT(write(*binding, nullptr, body, nullptr, &headers), IsOkAndHolds("/v1/messages"));
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("anthropic-version: 2023-06-01"));
+}
+
+// A header the arrived binding writes is the provider's: recorded on the way in for the caller to
+// take out, and given back only when the request leaves in the same binding.
+TEST(LlmBindingHeaderTest, TheSameBindingRestoresTheClientsHeader) {
+  const LlmBindingConstSharedPtr anthropic = parseOk(AnthropicApi);
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "m"})");
+  const std::optional<LlmBindingRead> arrived =
+      read(anthropic, "/v1/messages", body, nullptr, {{"anthropic-version", "2024-01-01"}});
+  ASSERT_TRUE(arrived.has_value());
+  EXPECT_THAT(arrived->written_headers,
+              ::testing::ElementsAre(::testing::Pair("anthropic-version", "2024-01-01")));
+  EXPECT_EQ(body["model"], "m");
+
+  // Back out in the same binding, after the caller took the header out: the client's value.
+  std::vector<HeaderMutation> headers;
+  ASSERT_THAT(write(*anthropic, &*arrived, body, nullptr, &headers), IsOkAndHolds("/v1/messages"));
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("anthropic-version: 2024-01-01"));
+
+  // Out in another binding that writes the same header: that binding's value.
+  const LlmBindingConstSharedPtr gateway = parseOk(
+      R"({"uri_pattern": "/gw", "mutations": [{"header": "anthropic-version", "value": "gw"}]})");
+  headers.clear();
+  ASSERT_THAT(write(*gateway, &*arrived, body, nullptr, &headers), IsOkAndHolds("/gw"));
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("anthropic-version: gw"));
+
+  // A client that sent no such header has nothing recorded, and gets the binding's default.
+  body = nlohmann::json::parse(R"({"model": "m"})");
+  const std::optional<LlmBindingRead> bare = read(anthropic, "/v1/messages", body);
+  ASSERT_TRUE(bare.has_value());
+  EXPECT_TRUE(bare->written_headers.empty());
+  headers.clear();
+  ASSERT_THAT(write(*anthropic, &*bare, body, nullptr, &headers), IsOk());
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("anthropic-version: 2023-06-01"));
+}
+
+// A header edit is handed back whatever the body is; a failure hands back none.
+TEST(LlmBindingHeaderTest, HeadersDoNotDependOnTheBody) {
+  const LlmBindingConstSharedPtr binding = parseOk(AnthropicApi);
+  nlohmann::json array = nlohmann::json::array();
+  std::vector<HeaderMutation> headers;
+  ASSERT_THAT(write(*binding, nullptr, array, nullptr, &headers), IsOk());
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("anthropic-version: 2023-06-01"));
+
+  const LlmBindingConstSharedPtr needs_project = parseOk(R"({"mutations": [
+    {"header": "x-a", "value": "a"}, {"header": "x-tenant", "value": "{project}"}
+  ]})");
+  nlohmann::json body = nlohmann::json::object();
+  headers.clear();
+  EXPECT_THAT(write(*needs_project, nullptr, body, nullptr, &headers),
+              HasStatusCode(absl::StatusCode::kFailedPrecondition));
+  EXPECT_TRUE(headers.empty());
 }
 
 } // namespace

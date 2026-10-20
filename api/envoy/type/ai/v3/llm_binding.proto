@@ -19,8 +19,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: LLM binding]
 
 // How a provider carries an :ref:`LLMProtocol <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` on
-// HTTP, where that differs from the API's own: the request path, and edits to the request body.
-// The API itself -- its schemas, stream events and usage -- does not change.
+// HTTP, where that differs from the API's own: the request path, and edits to the request body
+// and headers. The API itself -- its schemas, stream events and usage -- does not change.
 //
 // Claude on Vertex AI:
 //
@@ -31,25 +31,44 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   - { body_field: model }
 //   - { body_field: anthropic_version, value: vertex-2023-10-16, keep_existing: true }
 //
+// The Anthropic API itself, which Envoy defines as the binding of ``ANTHROPIC_MESSAGES``:
+//
+// .. code-block:: yaml
+//
+//   uri_pattern: "/v1/messages"
+//   mutations:
+//   - { header: anthropic-version, value: "2023-06-01", keep_existing: true }
+//
 // On the way out, the path is rendered from the request and the mutations are applied in order.
 // On the way in, the model and streaming mode the path names are written into the body and the
-// body fields the mutations write are removed, so the API's own document is transcoded.
+// body fields and headers the mutations write are removed, so the API's own document is
+// transcoded.
 message LLMBinding {
-  // One edit to the request body: a field is written, or removed when ``value`` is unset or null.
+  // One edit to the request: a body field or a header is written, or removed when ``value`` is
+  // unset or null.
   message Mutation {
     oneof target {
       option (validate.required) = true;
 
       // A top-level member of the request body.
       string body_field = 1 [(validate.rules).string = {min_len: 1}];
+
+      // A request header, by name. For a header the provider's API requires alongside the body,
+      // such as Anthropic's ``anthropic-version``. ``value`` must be a string. Pseudo-headers
+      // (``:path`` is ``uri_pattern``'s), ``host``, ``content-length`` and ``transfer-encoding``
+      // are not accepted. Credentials do not belong here: a binding is configuration, not a
+      // secret.
+      string header = 4
+          [(validate.rules).string =
+               {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
     }
 
     // The value to write. In a string, ``{name}`` is replaced by a value of the request:
     // ``{model}`` by the body's model, any other name by a path variable the client's path holds,
-    // such as ``{project}``. When unset or null, the field is removed.
+    // such as ``{project}``. When unset or null, the field or header is removed.
     google.protobuf.Value value = 2;
 
-    // Write ``value`` only where the field is absent, rather than replace it.
+    // Write ``value`` only where the field or header is absent, rather than replace it.
     bool keep_existing = 3;
   }
 
@@ -63,7 +82,8 @@ message LLMBinding {
   // API's own path is used.
   string uri_pattern = 1;
 
-  // Edits to the request body, applied in order. When empty, the API's own edits apply, such as
-  // removing ``model`` and ``stream`` for Gemini.
+  // Edits to the request body and headers, applied in order. When empty, the API's own edits
+  // apply, such as removing ``model`` and ``stream`` for Gemini, or adding ``anthropic-version``
+  // for Anthropic.
   repeated Mutation mutations = 2;
 }
