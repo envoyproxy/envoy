@@ -167,6 +167,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FileWatcherRust) {
 // This test verifies that the Rust bootstrap extension can register a custom admin HTTP endpoint
 // and respond to admin requests.
 TEST_P(DynamicModulesBootstrapIntegrationTest, AdminHandlerRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   EXPECT_LOG_CONTAINS(
       "info", "Admin handler registered: true",
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_admin_handler_test"));
