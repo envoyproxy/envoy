@@ -442,7 +442,7 @@ ffi_export! {
 #[macro_export]
 macro_rules! declare_upstream_http_tcp_bridge_init_functions {
   ($f:ident, $new_bridge_config_fn:expr) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
