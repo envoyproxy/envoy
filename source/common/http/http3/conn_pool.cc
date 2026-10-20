@@ -13,6 +13,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/upstream_impl.h"
 
+#include "quiche/quic/platform/api/quic_hostname_utils.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http3 {
@@ -45,20 +47,25 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
       100);
 }
 
-const Envoy::Ssl::ClientContextConfig&
-getConfig(Network::UpstreamTransportSocketFactory& transport_socket_factory) {
-  ASSERT(transport_socket_factory.clientContextConfig().has_value());
-  return transport_socket_factory.clientContextConfig().value();
-}
-
-std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                Upstream::HostConstSharedPtr host) {
-  return options && options->serverNameOverride().has_value()
-             ? options->serverNameOverride().value()
-             : getConfig(host->transportSocketFactory()).serverNameIndication();
-}
-
 } // namespace
+
+std::string effectiveSni(const Network::TransportSocketOptionsConstSharedPtr& options,
+                         const Upstream::HostDescription& host) {
+  if (options && options->serverNameOverride().has_value()) {
+    return options->serverNameOverride().value();
+  }
+  const Network::UpstreamTransportSocketFactory& factory = host.transportSocketFactory();
+  OptRef<const Envoy::Ssl::ClientContextConfig> config = factory.clientContextConfig();
+  const std::string& hostname = host.hostname();
+  // QUICHE does not send an invalid SNI but still verifies the certificate against it, so an
+  // invalid hostname such as an IP address falls back to the configured SNI.
+  if (config.has_value() && config->autoHostServerNameIndication() &&
+      quic::QuicHostnameUtils::IsValidSNI(hostname) &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_upstream_auto_host_sni")) {
+    return hostname;
+  }
+  return std::string(factory.defaultServerNameIndication());
+}
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
@@ -117,17 +124,19 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
-    OptRef<PoolConnectResultCallback> connect_callback, Http::PersistentQuicInfo& quic_info,
+    OptRef<PoolConnectResultCallback> connect_callback, Http::PersistentQuicInfoPtr quic_info,
     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
     Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs)
     : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
                             random_generator, state, client_fn, codec_fn, protocol,
                             overload_manager, {}, nullptr),
-      quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
-      server_id_(sni(transport_socket_options, host),
+      quic_info_(std::dynamic_pointer_cast<Quic::PersistentQuicInfoImpl>(std::move(quic_info))),
+      server_id_(effectiveSni(transport_socket_options, *host),
                  static_cast<uint16_t>(host_->address()->ip()->port())),
       connect_callback_(connect_callback), attempt_happy_eyeballs_(attempt_happy_eyeballs),
-      network_observer_registry_(network_observer_registry) {}
+      network_observer_registry_(network_observer_registry) {
+  ASSERT(quic_info_ != nullptr);
+}
 
 void Http3ConnPoolImpl::onConnected(Envoy::ConnectionPool::ActiveClient&) {
   if (connect_callback_ != std::nullopt) {
@@ -163,7 +172,7 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
       address, socketOptions(), makeOptRefFromPtr(transport_options.get()));
 
   return Quic::createQuicNetworkConnection(
-      quic_info_, std::move(crypto_config), server_id_, dispatcher(), address,
+      *quic_info_, std::move(crypto_config), server_id_, dispatcher(), address,
       upstream_local_address.address_, quic_stat_names, rtt_cache, scope,
       upstream_local_address.socket_options_, transport_options, connection_id_generator_,
       host_->transportSocketFactory(), network_observer_registry_.ptr());
@@ -177,7 +186,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Upstream::ClusterConnectivityState& state, Quic::QuicStatNames& quic_stat_names,
                  OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope,
                  OptRef<PoolConnectResultCallback> connect_callback,
-                 Http::PersistentQuicInfo& quic_info,
+                 Http::PersistentQuicInfoPtr quic_info,
                  OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
                  Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs) {
   return std::make_unique<Http3ConnPoolImpl>(
@@ -219,7 +228,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             auto_connect);
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info,
+      std::vector<Protocol>{Protocol::Http3}, connect_callback, std::move(quic_info),
       network_observer_registry, overload_manager, attempt_happy_eyeballs);
 }
 

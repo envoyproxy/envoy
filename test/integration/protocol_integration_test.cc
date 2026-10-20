@@ -2125,6 +2125,35 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxying104) {
   testEnvoyProxying1xx(false, false, false, "104");
 }
 
+// Regression test: response_headers_to_remove must be applied to proxied
+// upstream 1xx responses, not just the final response.
+TEST_P(ProtocolIntegrationTest, RouteResponseHeaderPolicyAppliedTo1xx) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.response_headers_to_remove_on_1xx",
+                                    "true");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.set_proxy_100_continue(true);
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_response_headers_to_remove(
+            "x-upstream-remove");
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encode1xxHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "103"}, {"x-upstream-remove", "leak"}});
+  response->waitFor1xxHeaders();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  ASSERT_NE(nullptr, response->informationalHeaders());
+  EXPECT_TRUE(
+      response->informationalHeaders()->get(Http::LowerCaseString("x-upstream-remove")).empty());
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
   if (GetParam().upstream_protocol != Http::CodecType::HTTP1 ||
       GetParam().downstream_protocol != Http::CodecType::HTTP1) {

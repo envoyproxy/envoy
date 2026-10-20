@@ -26,6 +26,7 @@ using testing::AtLeast;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
+using testing::SaveArg;
 
 namespace Envoy {
 namespace Network {
@@ -457,8 +458,9 @@ public:
   }
   void setup() {
     io_handle_ = &useHotRestartSocket(registrar_);
-    // File event should be created listening to no events (i.e. disabled).
-    EXPECT_CALL(*io_handle_, createFileEvent_(_, _, _, 0));
+    // File event should be created listening to no events (i.e. disabled). Keep its callback so a
+    // test can inject an event on the paused listener.
+    EXPECT_CALL(*io_handle_, createFileEvent_(_, _, _, 0)).WillOnce(SaveArg<1>(&file_event_cb_));
     // Parent drained callback should be registered when the listener is created.
     // We capture the callback so we can simulate "drain complete".
     EXPECT_CALL(registrar_, registerParentDrainedCallback(_, _))
@@ -474,6 +476,7 @@ protected:
   MockParentDrainedCallbackRegistrar registrar_;
   MockIoHandle* io_handle_;
   absl::AnyInvocable<void()> parent_drained_callback_;
+  Event::FileReadyCb file_event_cb_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, HotRestartedUdpListenerImplTest,
@@ -535,6 +538,31 @@ TEST_P(HotRestartedUdpListenerImplTest, EndingParentDrainedWhileDisabledShouldNo
               enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
   listener_->enable();
   testing::Mock::VerifyAndClearExpectations(io_handle_);
+}
+
+/**
+ * A read event injected on the paused listener (activateRead(), which the QUIC listener uses to
+ * process the handshakes it buffered from packets the parent forwarded) runs the read-ready
+ * callback but must not read the socket: the socket is the parent's to read until the parent is
+ * gone, and anything dequeued here would belong to the parent's connections.
+ */
+TEST_P(HotRestartedUdpListenerImplTest, InjectedReadWhilePausedDoesNotReadTheSocket) {
+  setup();
+  ASSERT_TRUE(file_event_cb_ != nullptr);
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  // No read of any kind, and no re-arming of the read event.
+  EXPECT_CALL(*io_handle_, supportsMmsg()).Times(0);
+  EXPECT_CALL(*io_handle_, activateFileEvents(_)).Times(0);
+  EXPECT_TRUE(file_event_cb_(Event::FileReadyType::Read).ok());
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  testing::Mock::VerifyAndClearExpectations(&listener_callbacks_);
+
+  // Once the parent is gone the listener starts reading as usual.
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  EXPECT_CALL(*io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_P(HotRestartedUdpListenerImplTest,

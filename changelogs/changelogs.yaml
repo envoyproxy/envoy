@@ -98,6 +98,8 @@ areas:
   dynamic_modules:
     title: dynamic_modules
 
+  ecds:
+    title: ecds
   ext_authz:
     title: ext_authz
   ext_proc:

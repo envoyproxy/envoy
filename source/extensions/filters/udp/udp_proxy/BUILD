@@ -66,8 +66,10 @@ envoy_cc_extension(
         ":udp_proxy_filter_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/config:well_known_names",
         "//source/common/filter:config_discovery_lib",
         "//source/common/formatter:substitution_format_string_lib",
+        "//source/common/stats:utility_lib",
         "@envoy_api//envoy/extensions/filters/udp/udp_proxy/v3:pkg_cc_proto",
     ],
 )

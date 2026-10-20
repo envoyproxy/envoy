@@ -470,7 +470,7 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const));
   MOCK_METHOD(Network::SocketSharedPtr, getListenSocket, (uint32_t));
   MOCK_METHOD(bool, reusePort, (), (const));
-  MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
+  MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (uint32_t), (const));
   MOCK_METHOD(void, closeAllSockets, ());
   MOCK_METHOD(absl::Status, doFinalPreWorkerInit, ());
 };
@@ -593,6 +593,7 @@ public:
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
+  MOCK_METHOD(std::optional<uint32_t>, workerId, (), (const));
   MOCK_METHOD(void, closeIdleHttpConnections, (bool), (override));
 
   uint64_t num_handler_connections_{};

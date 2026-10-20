@@ -189,12 +189,11 @@ ConnectionManagerListenerStats
 ConnectionManagerImpl::generateListenerStats(absl::string_view stat_prefix, Stats::Scope& scope) {
   // These live in the listener's scope, so the 'http.<stat_prefix>.' prefix is part of the stat
   // name rather than of the scope and has to be supplied to every stat.
-  const Stats::TaggedStatName prefix(scope.symbolTable(), HttpBaseStatPrefix,
-                                     {httpStatPrefixTag(stat_prefix)},
-                                     httpFlatStatPrefix(stat_prefix));
+  Stats::LiteScopeHelper helper(scope, HttpBaseStatPrefix, {httpStatPrefixTag(stat_prefix)},
+                                httpFlatStatPrefix(stat_prefix));
   return {CONN_MAN_LISTENER_STATS(
-      POOL_COUNTER_TAGGED(scope, prefix),
-      POOL_COUNTER_RESPONSE_CODE_CLASS(scope, prefix.baseName(), prefix.tags(), prefix.name()))};
+      POOL_COUNTER(helper), POOL_COUNTER_RESPONSE_CODE_CLASS(scope, helper.basePrefix(),
+                                                             helper.tags(), helper.prefix()))};
 }
 
 ConnectionManagerImpl::ConnectionManagerImpl(
@@ -234,9 +233,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       use_connection_event_drain_(
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
-      close_connection_on_zombie_stream_complete_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http1_close_connection_on_zombie_stream_complete")) {
+          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -340,6 +337,9 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
       stats_.named_.downstream_cx_http3_active_.dec();
     } else {
       stats_.named_.downstream_cx_http1_active_.dec();
+    }
+    if (streams_.empty()) {
+      decIdleConnectionsStat();
     }
   }
 
@@ -477,6 +477,9 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   stream.filter_manager_.destroyFilters();
 
   dispatcher_->deferredDelete(stream.removeFromList(streams_));
+  if (streams_.empty()) {
+    incIdleConnectionsStat();
+  }
 
   // The response_encoder should never be dangling (unless we're destroying a
   // stream we are recreating) as the codec level stream will either outlive the
@@ -556,6 +559,9 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->filter_manager_.aboveHighWatermark());
+  if (streams_.empty()) {
+    decIdleConnectionsStat();
+  }
   LinkedList::moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
@@ -589,16 +595,40 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   case Protocol::Http3:
     stats_.named_.downstream_cx_http3_total_.inc();
     stats_.named_.downstream_cx_http3_active_.inc();
+    stats_.named_.downstream_cx_http3_idle_.inc();
     break;
   case Protocol::Http2:
     stats_.named_.downstream_cx_http2_total_.inc();
     stats_.named_.downstream_cx_http2_active_.inc();
+    stats_.named_.downstream_cx_http2_idle_.inc();
     break;
   case Protocol::Http11:
   case Protocol::Http10:
     stats_.named_.downstream_cx_http1_total_.inc();
     stats_.named_.downstream_cx_http1_active_.inc();
     break;
+  }
+}
+
+void ConnectionManagerImpl::incIdleConnectionsStat() {
+  if (!codec_) {
+    return;
+  }
+  if (codec_->protocol() == Protocol::Http2) {
+    stats_.named_.downstream_cx_http2_idle_.inc();
+  } else if (codec_->protocol() == Protocol::Http3) {
+    stats_.named_.downstream_cx_http3_idle_.inc();
+  }
+}
+
+void ConnectionManagerImpl::decIdleConnectionsStat() {
+  if (!codec_) {
+    return;
+  }
+  if (codec_->protocol() == Protocol::Http2) {
+    stats_.named_.downstream_cx_http2_idle_.dec();
+  } else if (codec_->protocol() == Protocol::Http3) {
+    stats_.named_.downstream_cx_http3_idle_.dec();
   }
 }
 
@@ -2403,9 +2433,7 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
     // closed. doEndStream() call that created the zombie may have set
     // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
     // connection at that time because streams_ wasn't empty yet.
-    if (connection_manager_.close_connection_on_zombie_stream_complete_) {
-      connection_manager_.checkForDeferredClose(skip_delay);
-    }
+    connection_manager_.checkForDeferredClose(skip_delay);
   }
 }
 
@@ -2424,9 +2452,7 @@ void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
     // closed. doEndStream() call that created the zombie may have set
     // drain_state_ to Closing, but checkForDeferredClose() couldn't close the
     // connection at that time because streams_ wasn't empty yet.
-    if (connection_manager_.close_connection_on_zombie_stream_complete_) {
-      connection_manager_.checkForDeferredClose(skip_delay);
-    }
+    connection_manager_.checkForDeferredClose(skip_delay);
   }
 }
 

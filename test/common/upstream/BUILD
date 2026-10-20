@@ -188,8 +188,10 @@ envoy_cc_test(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:xds_resource_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:od_cds_api_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -364,6 +366,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",

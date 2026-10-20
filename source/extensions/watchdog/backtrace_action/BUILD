@@ -14,11 +14,13 @@ envoy_cc_library(
     srcs = ["backtrace_action.cc"],
     hdrs = ["backtrace_action.h"],
     deps = [
+        "//envoy/common:logger",
         "//envoy/common:time_interface",
         "//envoy/event:timer_interface",
         "//envoy/server:guarddog_config_interface",
         "//envoy/stats:stats_macros",
         "//envoy/thread:thread_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:thread_impl_lib_posix",
         "//source/common/protobuf:utility_lib",
         "//source/common/signal:non_fatal_signal_handler_lib",

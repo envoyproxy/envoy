@@ -1,14 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     data = [
@@ -20,6 +23,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:lb_no_choose_host",
         "//test/extensions/dynamic_modules/test_data/c:lb_round_robin",
     ],
+    extension_names = ["envoy.load_balancing_policies.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/upstream:upstream_lib",

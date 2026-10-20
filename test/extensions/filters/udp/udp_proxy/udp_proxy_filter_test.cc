@@ -3136,6 +3136,40 @@ TEST(TunnelingConfigImplTest, InvalidBackoffConfig) {
       "max_backoff_interval must be greater or equal to base_backoff_interval");
 }
 
+// The stats carry the stat prefix as an explicit tag.
+TEST_F(UdpProxyFilterTest, StatsAreTagged) {
+  // The tags of a stat as (name, value) pairs.
+  const auto tags_of = [](const Stats::Metric& metric) {
+    std::vector<std::pair<std::string, std::string>> tags;
+    for (const Stats::Tag& tag : metric.tags()) {
+      tags.emplace_back(tag.name_, tag.value_);
+    }
+    return tags;
+  };
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+    )EOF"));
+
+  const Stats::Counter& total = config_->stats().downstream_sess_total_;
+  EXPECT_EQ("udp.foo.downstream_sess_total", total.name());
+  EXPECT_EQ("udp.downstream_sess_total", total.tagExtractedName());
+  EXPECT_THAT(tags_of(total),
+              testing::UnorderedElementsAre(testing::Pair("envoy.udp_prefix", "foo")));
+  const Stats::Gauge& active = config_->stats().downstream_sess_active_;
+  EXPECT_EQ("udp.foo.downstream_sess_active", active.name());
+  EXPECT_EQ("udp.downstream_sess_active", active.tagExtractedName());
+  EXPECT_THAT(tags_of(active),
+              testing::UnorderedElementsAre(testing::Pair("envoy.udp_prefix", "foo")));
+}
+
 } // namespace
 } // namespace UdpProxy
 } // namespace UdpFilters

@@ -32,6 +32,7 @@ pub mod network;
 pub mod route_specifier;
 pub mod stats_sink;
 pub mod timing;
+pub mod tls_certificate_selector;
 pub mod tracer;
 pub mod transport_socket;
 pub mod udp_listener;
@@ -97,6 +98,9 @@ pub fn log_ffi_panic(function_name: &str, payload: Box<dyn Any + Send>) {
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
+// bindgen derives `PartialEq` on system header structs that hold function pointers, such as
+// `__darwin_pthread_handler_rec` on macOS.
+#[allow(unpredictable_function_pointer_comparisons)]
 pub mod abi {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -810,6 +814,8 @@ macro_rules! declare_network_filter_init_functions {
 /// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
 ///   mutations
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
+/// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
+///   selectors
 ///
 /// # Examples
 ///
@@ -1063,6 +1069,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HEADER_FORMATTER_CONFIG_FUNCTION,
       $fn,
       "NEW_HEADER_FORMATTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register tls_certificate_selector : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION"
     );
   };
 }
@@ -1971,6 +1984,30 @@ macro_rules! declare_cert_validator_init_functions {
     }
   };
 }
+
+// =============================================================================
+// TLS Certificate Selector
+// =============================================================================
+
+/// The function signature for creating a new TLS certificate selector configuration.
+///
+/// The `name` is the value of `selector_name` from the `dynamic_modules` TLS certificate selector
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw bytes from the `selector_config` field. `is_upstream` is true when the configuration
+/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics and provides
+/// the dynamic certificates. Returning `None` causes Envoy to reject the TLS context configuration.
+pub type NewTlsCertificateSelectorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    is_upstream: bool,
+    envoy_config: std::sync::Arc<dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig>,
+  ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig>>;
+
+/// Global function for creating TLS certificate selector configurations.
+pub static NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION: OnceLock<
+  NewTlsCertificateSelectorConfigFunction,
+> = OnceLock::new();
 
 // =============================================================================
 // Config Validator
