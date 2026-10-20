@@ -1,7 +1,7 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps", "crate_deps")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
-load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_static_library", "rust_test")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_extension_package",
@@ -14,6 +14,16 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 exports_files(["Cargo.toml"])
+
+# Provides the Rust allocator shim (__rust_alloc etc) and std runtime exactly
+# once in the final C++ link. All other in-binary Rust code must be rlibs
+# (see envoy_rust_static_module in dynamic_modules.bzl).
+rust_static_library(
+    name = "rust_runtime",
+    srcs = ["runtime.rs"],
+    edition = "2021",
+    visibility = ["//visibility:public"],
+)
 
 string_flag(
     name = "symbol_prefix",

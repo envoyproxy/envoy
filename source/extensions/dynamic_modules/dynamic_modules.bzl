@@ -1,6 +1,7 @@
 """Bazel rules for building Envoy dynamic modules."""
 
 load("@rules_cc//cc:defs.bzl", "cc_import")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_rust//rust:defs.bzl", "rust_library")
 
@@ -17,7 +18,10 @@ _symbol_prefix_transition = transition(
 
 def _rust_static_module_impl(ctx):
     module = ctx.attr.module[0]
-    return [module[CcInfo], DefaultInfo(files = module[DefaultInfo].files)]
+    cc_info = cc_common.merge_cc_infos(
+        cc_infos = [module[CcInfo], ctx.attr._rust_runtime[CcInfo]],
+    )
+    return [cc_info, DefaultInfo(files = module[DefaultInfo].files)]
 
 _rust_static_module = rule(
     implementation = _rust_static_module_impl,
@@ -26,6 +30,10 @@ _rust_static_module = rule(
         "module_name": attr.string(mandatory = True),
         "_allowlist_function_transition": attr.label(
             default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
+        ),
+        "_rust_runtime": attr.label(
+            default = Label("//source/extensions/dynamic_modules/sdk/rust:rust_runtime"),
+            providers = [CcInfo],
         ),
     },
 )
@@ -36,6 +44,8 @@ def envoy_rust_static_module(name, module_name, deps = [], tags = [], visibility
     The transition configures both the module and its SDK with the same prefix.
     Both are always-linked rlibs: unlike a Rust staticlib, these do not bundle a
     private copy of std/compiler_builtins, and retain rules_rust's transitive CcInfo.
+    The SDK's rust_runtime staticlib supplies the allocator shim and std once.
+    It is shared without the prefix transition; all other in-binary Rust code must be rlibs.
     Rust's export_name handles platform-specific C symbol decoration.
 
     Args:

@@ -119,5 +119,8 @@ rust_doc_test(
 rust_clippy(
     name = "rust_sdk_clippy",
     tags = ["nocoverage"],
-    deps = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
+    deps = [
+        "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+        "//source/extensions/dynamic_modules/sdk/rust:rust_runtime",
+    ],
 )
