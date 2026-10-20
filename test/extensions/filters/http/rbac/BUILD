@@ -67,6 +67,8 @@ envoy_extension_cc_test(
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/common/matcher:ip_range_matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",

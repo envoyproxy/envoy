@@ -16,7 +16,11 @@ envoy_cc_library(
     deps = [
         ":engine_lib",
         "//envoy/stats:stats_macros",
+        "//source/common/config:well_known_names",
         "//source/common/singleton:const_singleton",
+        "//source/common/stats:utility_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
