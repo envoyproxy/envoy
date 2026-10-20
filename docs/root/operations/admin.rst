@@ -1028,3 +1028,11 @@ modify different aspects of the server:
 .. http:post:: /reopen_logs
 
   Triggers reopen of all access logs. Behavior is similar to SIGUSR1 handling.
+
+.. http:get:: /reverse_tunnel/tunnels
+
+  Lists the active reverse tunnels registered by the downstream reverse-tunnel initiator
+  (``envoy.bootstrap.reverse_tunnel.downstream_socket_interface``). The response is
+  ``text/plain``, with one ``<node>:<cluster>:<tenant>: <count>`` line per source identifier,
+  where ``<count>`` is the number of active tunnels for that identifier.
+

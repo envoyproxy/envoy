@@ -397,6 +397,13 @@ public:
     return config_.handshake_headers;
   }
 
+  std::string connectionInfo() const {
+    return fmt::format("{}:{}:{}", config_.src_node_id, config_.src_cluster_id,
+                       config_.src_tenant_id);
+  }
+
+  size_t numActiveTunnels() const { return child_io_handles_.size(); }
+
   /**
    * @return the handshake response deadline applied to each dial attempt.
    */
