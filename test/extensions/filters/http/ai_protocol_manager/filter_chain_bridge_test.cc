@@ -244,6 +244,37 @@ TEST_F(EncoderFilterChainBridgeEchoTest, GenuineDownstreamWatermarkStillPausesRe
   EXPECT_EQ(handler_.resumed_, 1);
 }
 
+// A pause nested inside our own resume keeps the echoes balanced, so replay
+// is never paused.
+TEST_F(EncoderFilterChainBridgeEchoTest, PauseNestedInResumeStaysBalanced) {
+  bridge_->addUnacked(200);
+  ON_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark())
+      .WillByDefault(Invoke([this] {
+        bridge_->addUnacked(200);
+        subscriber_->onBelowWriteBufferLowWatermark();
+      }));
+
+  bridge_->releaseUnacked(200);
+  EXPECT_TRUE(bridge_->ingestPaused());
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 0);
+}
+
+// A genuine downstream high during our own pause still pauses replay.
+TEST_F(EncoderFilterChainBridgeEchoTest, GenuineWatermarkDuringOwnPauseCounts) {
+  ON_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark())
+      .WillByDefault(Invoke([this] {
+        subscriber_->onAboveWriteBufferHighWatermark();
+        subscriber_->onAboveWriteBufferHighWatermark();
+      }));
+
+  bridge_->addUnacked(200);
+  EXPECT_TRUE(bridge_->replayPaused());
+  bridge_->onBelowWriteBufferLowWatermark();
+  EXPECT_FALSE(bridge_->replayPaused());
+  EXPECT_EQ(handler_.resumed_, 1);
+}
+
 // On the response path the error is surfaced through the encoder callbacks'
 // sendLocalReply (best-effort, since the response may already be in flight).
 TEST_F(EncoderFilterChainBridgeTest, UnrecoverableErrorSendsLocalReply) {

@@ -77,32 +77,32 @@ public:
   void onUnrecoverableError() override;
 
   // Http::DownstreamWatermarkCallbacks (replay side: downstream back-pressure).
-  // The filter manager delivers pauseSource()/resumeSource() back to this
-  // subscriber inside the same call. Those echoes are not downstream
-  // back-pressure and must not pause replay: replay is what drains the bytes
-  // charged to the ingest watermark, so pausing it here would deadlock.
+  // pauseSource()/resumeSource() echo back here synchronously; pausing replay
+  // on them deadlocks ingest, since replay is what drains it.
   void onAboveWriteBufferHighWatermark() override {
-    if (!in_source_transition_) {
-      onAboveReplayWatermark();
+    if (own_highs_ > 0) {
+      --own_highs_;
+      return;
     }
+    onAboveReplayWatermark();
   }
   void onBelowWriteBufferLowWatermark() override {
-    if (!in_source_transition_) {
-      onBelowReplayWatermark();
+    if (own_lows_ > 0) {
+      --own_lows_;
+      return;
     }
+    onBelowReplayWatermark();
   }
 
 private:
   // FilterChainBridge
   void pauseSource() override {
-    in_source_transition_ = true;
+    ++own_highs_;
     encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark();
-    in_source_transition_ = false;
   }
   void resumeSource() override {
-    in_source_transition_ = true;
+    ++own_lows_;
     encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark();
-    in_source_transition_ = false;
   }
   void unsubscribeReplayWatermarks() override {
     decoder_callbacks_.removeDownstreamWatermarkCallbacks(*this);
@@ -111,8 +111,9 @@ private:
   Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
   Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
   AiProtocolManagerStats& stats_;
-  // Set while pauseSource()/resumeSource() run, to recognize their echoes.
-  bool in_source_transition_{false};
+  // Echoes owed for our own pauseSource()/resumeSource() calls.
+  uint32_t own_highs_{0};
+  uint32_t own_lows_{0};
 };
 
 } // namespace AiProtocolManager
