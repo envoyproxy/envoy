@@ -539,6 +539,35 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, RequestOverBufferLimitCompletes
                                testing::Ge(1));
 }
 
+// A client that stops reading mid-response holds the response back through the
+// encode bridge, and the response completes once the client reads again.
+TEST_P(AiProtocolManagerResponseIntegrationTest, ResponseResumesAfterClientBackPressure) {
+  config_helper_.setBufferLimits(1024, 1024);
+  initializeDeclaredAiRoute();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(requestHeaders());
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(
+      *request_encoder_, R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})", true);
+  waitForNextUpstreamRequest();
+
+  request_encoder_->getStream().readDisable(true);
+  const std::string body =
+      R"({"id":"chatcmpl-1","pad":")" + std::string(1024 * 1024, 'x') + R"("})";
+  upstream_request_->encodeHeaders(responseHeaders("application/json"), false);
+  upstream_request_->encodeData(body, true);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               testing::Ge(1));
+  EXPECT_FALSE(response->complete());
+
+  request_encoder_->getStream().readDisable(false);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(body, response->body());
+}
+
 // Retries with the upstream installation: each attempt runs its own filter
 // instance, but only the winning attempt's response streams to completion, so
 // the published usage comes from the winner only (the failed attempt is a
