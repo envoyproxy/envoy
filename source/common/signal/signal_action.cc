@@ -3,6 +3,7 @@
 #include <sys/mman.h>
 
 #include <csignal>
+#include <cstring>
 
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/backtrace.h"
@@ -11,12 +12,40 @@
 
 namespace Envoy {
 
+namespace {
+
+// Unlike strsignal(), sigdescr_np() returns static storage without allocating, so it is
+// async-signal-safe even when the fatal signal originates inside the allocator.
+const char* signalDescription(int sig) {
+#if defined(__GLIBC__) && ((__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 32))
+  const char* desc = sigdescr_np(sig);
+  return desc != nullptr ? desc : "Unknown signal";
+#else
+  switch (sig) {
+  case SIGSEGV:
+    return "Segmentation fault";
+  case SIGBUS:
+    return "Bus error";
+  case SIGFPE:
+    return "Floating point exception";
+  case SIGILL:
+    return "Illegal instruction";
+  case SIGABRT:
+    return "Aborted";
+  default:
+    return "Unknown signal";
+  }
+#endif
+}
+
+} // namespace
+
 constexpr int SignalAction::FATAL_SIGS[];
 
 void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
   BackwardsTrace tracer;
 
-  tracer.logFault(strsignal(sig), info->si_addr);
+  tracer.logFault(signalDescription(sig), info->si_addr);
   if (context != nullptr) {
     tracer.captureFrom(context);
   } else {
