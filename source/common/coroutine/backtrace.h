@@ -50,7 +50,8 @@ public:
    */
   void logTrace() {
     if (log_to_stderr_) {
-      printTrace(std::cerr);
+      std::cerr << "Coroutine Backtrace:\n";
+      printTrace(std::cerr, true);
       return;
     }
 
@@ -78,12 +79,13 @@ public:
     });
   }
 
-  void printTrace(std::ostream& os) {
+  void printTrace(std::ostream& os, bool log_prefix = false) {
     visitTrace([&](int index, const char* symbol, const void* address) {
+      os << (log_prefix ? "[backtrace] [stderr] #" : "#") << index << (log_prefix ? ": " : " ");
       if (symbol != nullptr) {
-        os << "#" << index << " " << symbol << " [" << address << "]\n";
+        os << symbol << " [" << address << "]\n";
       } else {
-        os << "#" << index << " [" << address << "]\n";
+        os << "[" << address << "]\n";
       }
     });
   }

@@ -928,8 +928,8 @@ TEST(BacktraceClassTest, DumpsTraceToStderr) {
       testing::internal::CaptureStderr();
       tracer.logTrace();
       const std::string output = testing::internal::GetCapturedStderr();
-      EXPECT_THAT(output, StartsWith("#0 "));
-      EXPECT_THAT(output, HasSubstr("#3 "));
+      EXPECT_THAT(output, StartsWith("Coroutine Backtrace:\n[backtrace] [stderr] #0: "));
+      EXPECT_THAT(output, HasSubstr("[backtrace] [stderr] #3: "));
       EXPECT_THAT(recording.messages(), IsEmpty());
     }
     Backtrace::setSingleLine(save_single_line);

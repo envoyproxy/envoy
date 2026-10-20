@@ -74,7 +74,7 @@ TEST(Backward, TraceToStderr) {
   expected << "Backtrace (use tools/stack_decode.py to get line numbers):\n"
            << "Envoy version: " << VersionInfo::version() << "\n";
   if (!BackwardsTrace::addrMapping().empty()) {
-    expected << "Address mapping: " << BackwardsTrace::addrMapping() << "\n";
+    expected << "[backtrace] [stderr] Address mapping: " << BackwardsTrace::addrMapping() << "\n";
   }
   for (bool single_line : {false, true}) {
     BackwardsTrace::setSingleLine(single_line);
@@ -83,7 +83,7 @@ TEST(Backward, TraceToStderr) {
     tracer.logTrace();
     const std::string output = testing::internal::GetCapturedStderr();
     EXPECT_THAT(output, testing::StartsWith(expected.str()));
-    EXPECT_THAT(output, testing::HasSubstr("#0 "));
+    EXPECT_THAT(output, testing::HasSubstr("[backtrace] [stderr] #0: "));
     EXPECT_THAT(recording.messages(), testing::IsEmpty());
   }
   BackwardsTrace::setSingleLine(save_single_line);

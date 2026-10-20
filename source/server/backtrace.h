@@ -135,9 +135,9 @@ public:
       std::cerr << "Backtrace (use tools/stack_decode.py to get line numbers):\n"
                 << "Envoy version: " << VersionInfo::version() << "\n";
       if (!addrMapping().empty()) {
-        std::cerr << "Address mapping: " << addrMapping() << "\n";
+        std::cerr << "[backtrace] [stderr] Address mapping: " << addrMapping() << "\n";
       }
-      printTrace(std::cerr);
+      printTrace(std::cerr, true);
       return;
     }
 
@@ -183,12 +183,13 @@ public:
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 
-  void printTrace(std::ostream& os) {
+  void printTrace(std::ostream& os, bool log_prefix = false) {
     visitTrace([&](int index, const char* symbol, void* address) {
+      os << (log_prefix ? "[backtrace] [stderr] #" : "#") << index << (log_prefix ? ": " : " ");
       if (symbol != nullptr) {
-        os << "#" << index << " " << symbol << " [" << address << "]\n";
+        os << symbol << " [" << address << "]\n";
       } else {
-        os << "#" << index << " [" << address << "]\n";
+        os << "[" << address << "]\n";
       }
     });
   }
