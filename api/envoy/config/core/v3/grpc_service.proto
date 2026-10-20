@@ -73,19 +73,27 @@ message GrpcService {
     // Default to false.
     bool skip_envoy_headers = 5;
 
-    // Maximum number of request bytes buffered per stream so that the request can be replayed on
-    // a retry, when :ref:`retry_policy <envoy_v3_api_field_config.core.v3.GrpcService.retry_policy>`
-    // or a caller-provided retry policy is set. For a streaming call this counts every message
-    // sent on the stream so far. Once a request exceeds this limit it is no longer retried, and the
-    // upstream cluster's ``retry_or_shadow_abandoned`` counter is incremented.
+    // How many bytes each stream can buffer internally. This is the buffer limit of the
+    // underlying Envoy HTTP async client stream, and it has two effects:
     //
-    // Set this above the largest request, or the largest amount of data sent on a stream before
-    // it is established, that should still be retried. Up to this many bytes per stream can be
-    // held in memory until the stream completes.
+    // * Retries: when
+    //   :ref:`retry_policy <envoy_v3_api_field_config.core.v3.GrpcService.retry_policy>` or a
+    //   caller-provided retry policy is set, the request is buffered so that it can be replayed on
+    //   a retry. For a streaming call this counts every message sent until the upstream sends
+    //   response headers (initial metadata). Once the buffered data exceeds this limit, the
+    //   request is no longer retried and the upstream cluster's ``retry_or_shadow_abandoned``
+    //   counter is incremented. Up to this many bytes per stream can be held in memory until the
+    //   stream completes.
+    // * Flow control: this is the high watermark for data buffered before the upstream stream is
+    //   ready to accept it. Above it, the stream reports that it is above its write buffer high
+    //   watermark, and callers that check this, such as the streaming gRPC access loggers, stop
+    //   sending on the stream. It also triggers the sidestream watermark callbacks, which
+    //   ext_proc uses to push back on the downstream.
     //
     // A per-stream buffer limit set by the caller takes precedence over this value. If not set,
     // the default buffer limit of the Envoy HTTP async client, 64 KiB, is used.
-    google.protobuf.UInt32Value retry_buffer_limit_bytes = 6 [(validate.rules).uint32 = {gt: 0}];
+    google.protobuf.UInt32Value per_stream_buffer_limit_bytes = 6
+        [(validate.rules).uint32 = {gt: 0}];
   }
 
   // [#next-free-field: 11]

@@ -426,9 +426,9 @@ public:
     if (retry_policy_.has_value()) {
       *config.mutable_retry_policy() = *retry_policy_;
     }
-    if (retry_buffer_limit_bytes_ != 0) {
-      config.mutable_envoy_grpc()->mutable_retry_buffer_limit_bytes()->set_value(
-          retry_buffer_limit_bytes_);
+    if (per_stream_buffer_limit_bytes_ != 0) {
+      config.mutable_envoy_grpc()->mutable_per_stream_buffer_limit_bytes()->set_value(
+          per_stream_buffer_limit_bytes_);
     }
 
     fillServiceWideInitialMetadata(config);
@@ -652,8 +652,8 @@ public:
   Network::ClientConnectionPtr client_connection_;
   bool skip_envoy_headers_{false};
   std::optional<envoy::config::core::v3::RetryPolicy> retry_policy_;
-  // Envoy gRPC retry buffer limit, 0 means the field is not set.
-  uint32_t retry_buffer_limit_bytes_{0};
+  // Envoy gRPC per-stream buffer limit, 0 means the field is not set.
+  uint32_t per_stream_buffer_limit_bytes_{0};
   bool send_internal_header_stream_option_{true};
   bool send_xff_header_stream_option_{true};
   bool buffer_body_for_retry_stream_option_{false};

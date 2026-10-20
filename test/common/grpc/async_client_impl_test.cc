@@ -120,8 +120,8 @@ TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeOverrideByCallerOptions)
 }
 
 // Validates that the HTTP stream keeps the async client default buffer limit when
-// retry_buffer_limit_bytes is not configured.
-TEST_F(EnvoyAsyncClientImplTest, RetryBufferLimitNotSetByDefault) {
+// per_stream_buffer_limit_bytes is not configured.
+TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitNotSetByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   EXPECT_CALL(http_client_, start(_, _))
       .WillOnce(
@@ -135,10 +135,10 @@ TEST_F(EnvoyAsyncClientImplTest, RetryBufferLimitNotSetByDefault) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
-// Validates that retry_buffer_limit_bytes is used as the buffer limit of streams and unary
+// Validates that per_stream_buffer_limit_bytes is used as the buffer limit of streams and unary
 // requests.
-TEST_F(EnvoyAsyncClientImplTest, RetryBufferLimitFromConfig) {
-  config.mutable_envoy_grpc()->mutable_retry_buffer_limit_bytes()->set_value(1024 * 1024);
+TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitFromConfig) {
+  config.mutable_envoy_grpc()->mutable_per_stream_buffer_limit_bytes()->set_value(1024 * 1024);
   grpc_client_ = *AsyncClientImpl::create(config, context_);
 
   EXPECT_CALL(http_client_, start(_, _))
@@ -170,9 +170,9 @@ TEST_F(EnvoyAsyncClientImplTest, RetryBufferLimitFromConfig) {
 }
 
 // Validates that a per-stream buffer limit set by the caller takes precedence over
-// retry_buffer_limit_bytes.
-TEST_F(EnvoyAsyncClientImplTest, RetryBufferLimitOverriddenByCallerOptions) {
-  config.mutable_envoy_grpc()->mutable_retry_buffer_limit_bytes()->set_value(1024 * 1024);
+// per_stream_buffer_limit_bytes.
+TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitOverriddenByCallerOptions) {
+  config.mutable_envoy_grpc()->mutable_per_stream_buffer_limit_bytes()->set_value(1024 * 1024);
   grpc_client_ = *AsyncClientImpl::create(config, context_);
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;

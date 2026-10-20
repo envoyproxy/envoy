@@ -736,7 +736,7 @@ public:
     return EnvoyGrpcClientIntegrationParamTest::clientType();
   }
 
-  void initializeWithRetry(uint32_t retry_buffer_limit_bytes) {
+  void initializeWithRetry(uint32_t per_stream_buffer_limit_bytes) {
     ON_CALL(server_factory_context_.runtime_loader_.snapshot_,
             featureEnabled("upstream.use_retry", 100))
         .WillByDefault(Return(true));
@@ -746,7 +746,7 @@ public:
     *retry_policy.mutable_retry_back_off()->mutable_base_interval() =
         Protobuf::util::TimeUtil::MillisecondsToDuration(10);
     retry_policy_ = retry_policy;
-    retry_buffer_limit_bytes_ = retry_buffer_limit_bytes;
+    per_stream_buffer_limit_bytes_ = per_stream_buffer_limit_bytes;
     buffer_body_for_retry_stream_option_ = true;
     initialize();
   }
@@ -773,7 +773,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EnvoyGrpcRetryBufferLimitTest,
                          EnvoyGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Validate that a stream that sent more than the default buffer limit is retried with the complete
-// message when retry_buffer_limit_bytes is above the amount sent.
+// message when per_stream_buffer_limit_bytes is above the amount sent.
 TEST_P(EnvoyGrpcRetryBufferLimitTest, StreamRetriedWithinRetryBufferLimit) {
   initializeWithRetry(1024 * 1024);
   helloworld::HelloRequest request_msg;
@@ -794,8 +794,8 @@ TEST_P(EnvoyGrpcRetryBufferLimitTest, StreamRetriedWithinRetryBufferLimit) {
   EXPECT_EQ(0U, trafficStats().retry_or_shadow_abandoned_.value());
 }
 
-// Validate that without retry_buffer_limit_bytes, a stream that sent more than the default buffer
-// limit gives up on retries and the upstream failure is returned.
+// Validate that without per_stream_buffer_limit_bytes, a stream that sent more than the default
+// buffer limit gives up on retries and the upstream failure is returned.
 TEST_P(EnvoyGrpcRetryBufferLimitTest, StreamNotRetriedAboveDefaultBufferLimit) {
   initializeWithRetry(0);
   helloworld::HelloRequest request_msg;
