@@ -14,7 +14,7 @@ namespace Envoy {
 
 namespace {
 
-// Unlike strsignal(), sigdescr_np() returns static storage without allocating, so it is
+// Unlike `strsignal()`, `sigdescr_np()` returns static storage without allocating, so it is
 // async-signal-safe even when the fatal signal originates inside the allocator.
 const char* signalDescription(int sig) {
 #if defined(__GLIBC__) && ((__GLIBC__ > 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 32))

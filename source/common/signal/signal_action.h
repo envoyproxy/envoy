@@ -95,8 +95,8 @@ private:
    * Use this many bytes for the alternate signal handling stack.
    *
    * Sized with headroom for nested signal delivery and the handler's backtrace
-   * and formatting work. The runtime _SC_SIGSTKSZ value accounts for larger
-   * signal frames on platforms such as aarch64 with SVE; MINSIGSTKSZ is used
+   * and formatting work. The runtime `_SC_SIGSTKSZ` value accounts for larger
+   * signal frames on platforms such as aarch64 with `SVE`; `MINSIGSTKSZ` is used
    * as a fallback where the runtime value is unavailable. The size is a
    * multiple of page size (although signalstack will do alignment as needed).
    *
