@@ -487,7 +487,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                                                                        force_refresh, *cancelable);
   switch (result.status_) {
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache:
-    return {nullptr, result.host_info_.has_value() ? result.host_info_.value()->details() : ""};
+    return cluster->selectHostFromResolvedEntry(hostname, result.host_info_.value_or(nullptr));
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading:
     // Here the DFP kicks off an async lookup. The DFPHostSelectionHandle will
     // call onLoadDnsCacheComplete and onAsyncHostSelection unless the
@@ -509,6 +509,19 @@ Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::st
     return cluster->findHostByName(host);
   }
   return nullptr;
+}
+
+Upstream::HostSelectionResponse Cluster::selectHostFromResolvedEntry(
+    const std::string& host,
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) const {
+  if (host_info && host_info->address()) {
+    auto selected_host = findHostByName(host);
+    if (!selected_host) {
+      ENVOY_LOG(debug, "resolved host {} has an address but no selectable cluster host", host);
+    }
+    return {std::move(selected_host), host_info->details()};
+  }
+  return {nullptr, host_info ? host_info->details() : "no_host"};
 }
 
 Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) const {
