@@ -1,5 +1,5 @@
 {
-  "checksum": "792ea2b52b48604852c3cdbb40721f654a56672970375dd10f40223e15edb6bd",
+  "checksum": "381dbb62ff203d83f038d485e1da1d113a7a9618cb865d993867264e73881640",
   "conditions": {
     "aarch64-apple-darwin": [
       "aarch64-apple-darwin"
@@ -1258,6 +1258,7 @@
         ],
         "edition": "2021"
       },
+      "library_target_name": "envoy_dynamic_modules_builtin_extensions",
       "license": "Apache-2.0",
       "license_ids": [
         "Apache-2.0"
@@ -1265,7 +1266,14 @@
       "name": "envoy-dynamic-modules-builtin-extensions",
       "package_url": "https://github.com/envoyproxy/envoy",
       "repository": null,
-      "targets": [],
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "envoy_dynamic_modules_builtin_extensions",
+            "crate_root": "lib.rs"
+          }
+        }
+      ],
       "version": "0.1.0"
     },
     "envoy-proxy-dynamic-modules-rust-sdk 0.1.0": {

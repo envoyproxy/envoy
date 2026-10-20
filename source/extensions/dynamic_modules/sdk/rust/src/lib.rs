@@ -5,6 +5,10 @@
 #![allow(dead_code)]
 #![allow(clippy::unnecessary_cast)]
 
+include!(concat!(env!("OUT_DIR"), "/export_name.rs"));
+#[doc(hidden)]
+pub use __export_name_impl as __export_name;
+
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
@@ -694,7 +698,7 @@ macro_rules! ffi_export {
     on_panic = $default:expr $(;)?
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -708,7 +712,7 @@ macro_rules! ffi_export {
     on_panic = $default:expr $(;)?
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub unsafe extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -721,7 +725,7 @@ macro_rules! ffi_export {
     fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub extern "C" fn $name($($arg: $arg_ty),*) {
       let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -733,7 +737,7 @@ macro_rules! ffi_export {
     unsafe fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub unsafe extern "C" fn $name($($arg: $arg_ty),*) {
       let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -2036,7 +2040,7 @@ pub static NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewConfigValidatorConf
 #[macro_export]
 macro_rules! declare_config_validator_init_functions {
   ($f:ident, $new_config_validator_config_fn:expr) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
