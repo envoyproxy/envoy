@@ -167,6 +167,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, FileWatcherRust) {
 // This test verifies that the Rust bootstrap extension can register a custom admin HTTP endpoint
 // and respond to admin requests.
 TEST_P(DynamicModulesBootstrapIntegrationTest, AdminHandlerRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   EXPECT_LOG_CONTAINS(
       "info", "Admin handler registered: true",
       initializeWithBootstrapExtension(testDataDir("rust"), "bootstrap_admin_handler_test"));
@@ -335,6 +336,7 @@ typed_config:
 // Verifies a Rust bootstrap extension can enumerate active resource names by kind via
 // active_resource_names() and check that a set of expected names is present.
 TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   // Name the default listener's filter chain so the module observes it by name.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -358,6 +360,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesRust) {
 // the shared FCDS manager, not the listener's inline FilterChainManager. It must still be observed
 // (this fails when the accessor only reads inline chains).
 TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesFcdsRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   // A file-based FCDS resource carrying one filter chain named `fc_a` (HCM -> cluster_0).
   const std::string fcds_yaml = R"EOF(
 version_info: "1"
@@ -418,6 +421,7 @@ resources:
 // the module no longer reports it, while the static cluster remains. Guards the "drained resource
 // disappears from the getter" path.
 TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesClusterRemovalRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   const std::string cds_with = R"EOF(
 version_info: "1"
 resources:
@@ -526,6 +530,7 @@ transport_socket:
 // `cluster_tsm_a` carries {m1, m2} and `cluster_tsm_b` carries {m1}, so only m1 (present in both)
 // is reported.
 TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchIntersectionRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_a", {"m1", "m2"});
     addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_b", {"m1"});
@@ -542,6 +547,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchIn
 // A cluster with no transport socket matches does not empty the intersection: `cluster_tsm_a`
 // carries {m1, m2} and `cluster_tsm_bare` carries none, so both m1 and m2 remain reported.
 TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchEmptyClusterRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_a", {"m1", "m2"});
     addClusterWithTransportSocketMatches(bootstrap, "cluster_tsm_bare", {});
@@ -558,6 +564,7 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchEm
 // matched cluster. A dynamic cluster is delivered with {m1, m2}; rewriting it to carry only {m1}
 // shrinks the reported set to {m1}, so m2 is no longer reported.
 TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesTransportSocketMatchRemovalRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   const std::string cds_two_matches = R"EOF(
 version_info: "1"
 resources:
@@ -633,6 +640,7 @@ resources:
 // A filter chain is reported only while it is committed in an active listener. `fc_a` is delivered
 // via FCDS and observed; removing it from the FCDS resource set drops it from the reported names.
 TEST_P(DynamicModulesBootstrapIntegrationTest, ConfigNamesFcdsRemovalRust) {
+  DISABLE_IF_ADMIN_DISABLED;
   const std::string fcds_with_fc_a = R"EOF(
 version_info: "1"
 resources:

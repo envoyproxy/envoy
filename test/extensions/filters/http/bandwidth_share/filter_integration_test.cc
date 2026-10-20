@@ -318,6 +318,7 @@ TEST_F(BandwidthShareIntegrationTest, ResetWhileResponseBytesBufferedCleansStats
 }
 
 TEST_F(BandwidthShareIntegrationTest, RuntimeLimitChangesApplyToNewStreams) {
+  DISABLE_IF_ADMIN_DISABLED;
   config_helper_.addRuntimeOverride("bandwidth_share.runtime_request_kbps", "0");
   initializeFilter(runtimeControlledRequestFilter());
   const std::string request_bytes_pending =
