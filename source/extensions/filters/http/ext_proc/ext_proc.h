@@ -276,8 +276,6 @@ public:
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
-  std::optional<uint32_t> maxStreamedBodyChunkSize() const { return max_streamed_body_chunk_size_; }
-
   bool observabilityMode() const { return observability_mode_; }
 
   const std::chrono::milliseconds& deferredCloseTimeout() const { return deferred_close_timeout_; }
@@ -447,7 +445,6 @@ private:
 
   const bool allow_content_length_header_ = false;
   const bool emit_client_span_ = true;
-  const std::optional<uint32_t> max_streamed_body_chunk_size_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -501,8 +498,6 @@ public:
 
   const std::optional<bool>& emitClientSpan() const { return emit_client_span_; }
 
-  std::optional<uint32_t> maxStreamedBodyChunkSize() const { return max_streamed_body_chunk_size_; }
-
   bool hasProcessingRequestModifierConfig() const {
     return processing_request_modifier_factory_cb_ != nullptr;
   }
@@ -530,7 +525,6 @@ private:
   const std::optional<const std::vector<std::string>> typed_cluster_metadata_forwarding_namespaces_;
   const std::optional<bool> failure_mode_allow_;
   const std::optional<bool> emit_client_span_;
-  const std::optional<uint32_t> max_streamed_body_chunk_size_;
 
   const std::function<std::unique_ptr<ProcessingRequestModifier>()>
       processing_request_modifier_factory_cb_;
@@ -575,8 +569,7 @@ public:
         processing_request_modifier_(config->createProcessingRequestModifier()),
         on_processing_response_(config->createOnProcessingResponse()),
         failure_mode_allow_(config->failureModeAllow()),
-        emit_client_span_(config->emitClientSpan()),
-        max_streamed_body_chunk_size_(config->maxStreamedBodyChunkSize()) {}
+        emit_client_span_(config->emitClientSpan()) {}
 
   const FilterConfig& config() const { return *config_; }
   const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
@@ -623,9 +616,6 @@ public:
   setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
   void sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState new_state,
                      envoy::service::ext_proc::v3::ProcessingRequest& req);
-  void sendStreamedBodyChunk(ProcessorState& state, Buffer::Instance& data,
-                             ProcessorState::CallbackState new_state, bool end_stream);
-  std::optional<uint32_t> maxStreamedBodyChunkSize() const { return max_streamed_body_chunk_size_; }
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
                     bool observability_mode = false);
@@ -788,8 +778,6 @@ private:
 
   // Whether to emit client-side spans for external processing requests.
   bool emit_client_span_{true};
-
-  std::optional<uint32_t> max_streamed_body_chunk_size_;
 };
 
 extern std::string responseCaseToString(
