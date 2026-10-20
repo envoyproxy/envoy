@@ -22,8 +22,7 @@ public:
   // QueuePolicyFactory
   absl::StatusOr<QueuePolicyUniquePtr<ItemType>>
   createQueuePolicy(const Protobuf::Message& config, const std::string& stat_prefix,
-                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                    MaxQueueSizeFn) override {
+                    ProtobufMessage::ValidationVisitor& validation_visitor) override {
     return createQueuePolicyTyped(
         MessageUtil::downcastAndValidate<
             const envoy::extensions::queue_policy::fifo::v3::FifoQueuePolicyConfig&>(

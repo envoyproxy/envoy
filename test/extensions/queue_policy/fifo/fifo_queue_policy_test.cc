@@ -91,8 +91,7 @@ TEST_F(FifoQueueFactoryTest, CanConstructFactory) {
 TEST_F(FifoQueueFactoryTest, CreateQueuePolicyReturnsValidPtr) {
   FifoQueuePolicyConfig config;
   auto result = factory_.createQueuePolicy(config, "test_prefix",
-                                           ProtobufMessage::getStrictValidationVisitor(),
-                                           []() -> uint64_t { return 1024; });
+                                           ProtobufMessage::getStrictValidationVisitor());
   EXPECT_TRUE(result.ok());
   EXPECT_NE(result.value(), nullptr);
 }

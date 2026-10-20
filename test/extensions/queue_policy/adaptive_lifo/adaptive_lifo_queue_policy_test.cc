@@ -31,7 +31,7 @@ TEST(AdaptiveLifoQueueTest, SwitchesBetweenFifoAndLifo) {
   TestQueueItem second(2);
   TestQueueItem third(3);
   TestQueueItem fourth(4);
-  AdaptiveLifoQueue<TestQueueItem> queue(75, 25, []() -> uint64_t { return 4; });
+  AdaptiveLifoQueue<TestQueueItem> queue(3, 1);
 
   queue.add(first, {MonotonicTime{}});
   queue.add(second, {MonotonicTime{}});
@@ -67,7 +67,7 @@ TEST(AdaptiveLifoQueueTest, ForEachUsesCurrentDequeueOrder) {
   TestQueueItem first(1);
   TestQueueItem second(2);
   TestQueueItem third(3);
-  AdaptiveLifoQueue<TestQueueItem> queue(75, 25, []() -> uint64_t { return 4; });
+  AdaptiveLifoQueue<TestQueueItem> queue(3, 1);
   queue.add(first, {MonotonicTime{}});
   queue.add(second, {MonotonicTime{}});
 
@@ -99,7 +99,7 @@ TEST(AdaptiveLifoQueueTest, ForEachTracksDequeueOrderAcrossModeChange) {
     items.emplace_back(value);
   }
 
-  AdaptiveLifoQueue<TestQueueItem> queue(100, 75, []() -> uint64_t { return 8; });
+  AdaptiveLifoQueue<TestQueueItem> queue(8, 6);
   for (TestQueueItem& item : items) {
     queue.add(item, {MonotonicTime{}});
   }
@@ -118,7 +118,7 @@ TEST(AdaptiveLifoQueueTest, ForEachTracksDequeueOrderAcrossModeChange) {
 TEST(AdaptiveLifoQueueTest, ForEachStopsEarly) {
   TestQueueItem first(1);
   TestQueueItem second(2);
-  AdaptiveLifoQueue<TestQueueItem> queue(100, 50, []() -> uint64_t { return 2; });
+  AdaptiveLifoQueue<TestQueueItem> queue(2, 1);
   queue.add(first, {MonotonicTime{}});
   queue.add(second, {MonotonicTime{}});
 
@@ -133,7 +133,7 @@ TEST(AdaptiveLifoQueueTest, ForEachStopsEarly) {
 TEST(AdaptiveLifoQueueTest, ThresholdOneUsesLifoUntilEmpty) {
   TestQueueItem first(1);
   TestQueueItem second(2);
-  AdaptiveLifoQueue<TestQueueItem> queue(50, 0, []() -> uint64_t { return 2; });
+  AdaptiveLifoQueue<TestQueueItem> queue(1, 0);
 
   queue.add(first, {MonotonicTime{}});
   EXPECT_TRUE(queue.isOverloaded());
@@ -150,10 +150,9 @@ TEST(AdaptiveLifoQueueTest, ThresholdOneUsesLifoUntilEmpty) {
 class AdaptiveLifoQueueFactoryTest : public testing::Test {
 protected:
   absl::StatusOr<QueuePolicyUniquePtr<TestQueueItem>>
-  createQueue(const AdaptiveLifoQueuePolicyConfig& config, uint64_t max_queue_size = 4) {
+  createQueue(const AdaptiveLifoQueuePolicyConfig& config) {
     return factory_.createQueuePolicy(config, "test_prefix",
-                                      ProtobufMessage::getStrictValidationVisitor(),
-                                      [max_queue_size]() { return max_queue_size; });
+                                      ProtobufMessage::getStrictValidationVisitor());
   }
 
   AdaptiveLifoQueueFactory<TestQueueItem> factory_;
@@ -161,8 +160,8 @@ protected:
 
 TEST_F(AdaptiveLifoQueueFactoryTest, CreatesConfiguredQueue) {
   AdaptiveLifoQueuePolicyConfig config;
-  config.mutable_high_watermark()->set_value(75);
-  config.mutable_low_watermark()->set_value(25);
+  config.set_high_watermark(3);
+  config.set_low_watermark(1);
   auto result = createQueue(config);
   ASSERT_TRUE(result.ok());
   EXPECT_NE(result.value(), nullptr);
@@ -170,30 +169,22 @@ TEST_F(AdaptiveLifoQueueFactoryTest, CreatesConfiguredQueue) {
 }
 
 TEST_F(AdaptiveLifoQueueFactoryTest, RejectsInvalidWatermarkRelationships) {
-  const std::vector<std::pair<double, double>> invalid_watermarks = {{0, 0}, {50, 50}, {40, 50}};
+  const std::vector<std::pair<uint32_t, uint32_t>> invalid_watermarks = {{2, 2}, {1, 2}};
 
   for (const auto& [high_watermark, low_watermark] : invalid_watermarks) {
     AdaptiveLifoQueuePolicyConfig config;
-    config.mutable_high_watermark()->set_value(high_watermark);
-    config.mutable_low_watermark()->set_value(low_watermark);
+    config.set_high_watermark(high_watermark);
+    config.set_low_watermark(low_watermark);
     auto result = createQueue(config);
     ASSERT_FALSE(result.ok());
     EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(result.status().message(),
-              "adaptive LIFO high_watermark must be greater than zero and low_watermark must be "
-              "less than high_watermark");
+              "adaptive LIFO low_watermark must be less than high_watermark");
   }
 }
 
 TEST_F(AdaptiveLifoQueueFactoryTest, RejectsMissingWatermarks) {
   AdaptiveLifoQueuePolicyConfig config;
-  EXPECT_THROW(static_cast<void>(createQueue(config)), ProtoValidationException);
-}
-
-TEST_F(AdaptiveLifoQueueFactoryTest, RejectsPercentageAboveOneHundred) {
-  AdaptiveLifoQueuePolicyConfig config;
-  config.mutable_high_watermark()->set_value(101);
-  config.mutable_low_watermark()->set_value(50);
   EXPECT_THROW(static_cast<void>(createQueue(config)), ProtoValidationException);
 }
 
