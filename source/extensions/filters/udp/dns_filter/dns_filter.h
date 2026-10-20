@@ -10,8 +10,10 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/radix_tree.h"
 #include "source/common/config/config_provider_impl.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
@@ -110,9 +112,13 @@ public:
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
-    const auto final_prefix = absl::StrCat("dns_filter.", stat_prefix);
-    return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                 POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
+    // dns_filter.(<stat_prefix>.)*: the stat prefix is a tag of the stats.
+    const Stats::TagStringView tag{Envoy::Config::TagNames::get().DNS_FILTER_PREFIX, stat_prefix};
+    Stats::LiteScopeHelper helper(scope, "dns_filter",
+                                  stat_prefix.empty() ? Stats::TagStringViewSpan{}
+                                                      : Stats::TagStringViewSpan{tag},
+                                  absl::StrCat("dns_filter.", stat_prefix));
+    return {ALL_DNS_FILTER_STATS(POOL_COUNTER(helper), POOL_HISTOGRAM(helper))};
   }
 
   bool loadServerConfig(
