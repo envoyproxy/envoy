@@ -398,7 +398,7 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
   if (!exception_msgs.empty()) {
     // Update config info (for /config_dump) and the all_scopes_ gauge to reflect the scopes
     // that were partially accepted, while leaving config_reload_ and config_reload_time_ms_
-    // unincremented on NACK (matching CDS behavior).
+    // unchanged on NACK (matching CDS behavior).
     if (!updated_scopes.empty()) {
       setLastConfigInfo(std::optional<LastConfigInfo>({std::nullopt, version_info}));
       setLastUpdated();

@@ -756,15 +756,16 @@ key:
 // that carries it fail half-way through ScopedRdsConfigSubscription::addOrUpdateScopes():
 //  * when srds_partial_acceptance is false:
 //    - the scopes processed before it are written to the main-thread scoped_route_map_ (which backs
-//      /config_dump), but the push is NACKed before they are propagated to the workers;
-//    - once the bad scope is gone, re-sending those scopes is ACKed, but they are skipped as
-//      unchanged (their hash matches the stale map entry), so the workers keep returning 404 (NR);
+//      /config_dump), but the push is rejected before they are propagated to the workers;
+//    - once the bad scope is gone, re-sending those scopes is acked, but they are skipped as
+//      unchanged (their hash matches the stale map entry), so the workers keep returning 404
+//      (NoRouteFound);
 //    - the scopes after it in the same push are never processed, so they are unaffected and are
 //      applied normally once re-sent.
 //  * when srds_partial_acceptance is true:
-//    - the bad scope is caught and NACKed, while both valid_scope (before it) and other_scope
+//    - the bad scope is caught and rejected, while both valid_scope (before it) and other_scope
 //      (after it) are written to scoped_route_map_ AND propagated to worker threads;
-//    - once the bad scope is removed, the next push is ACKed and both valid scopes continue routing
+//    - once the bad scope is removed, the next push is acked and both valid scopes continue routing
 //      traffic on the worker threads.
 class ScopedRdsPartiallyRejectedPushIntegrationTest : public ScopedRdsIntegrationTest {
 protected:
@@ -890,7 +891,7 @@ void ScopedRdsPartiallyRejectedPushIntegrationTest::testPartiallyRejectedSrdsPus
   EXPECT_THAT(scopeNamesInConfigDump(), ElementsAre("init_scope"));
   expectRouted("init-key", /*backend_idx=*/0);
 
-  // Push 1: {valid_scope, bad_scope, other_scope} -> NACKed.
+  // Push 1: {valid_scope, bad_scope, other_scope} -> rejected.
   sendSrdsResponse({init_scope, valid_scope, bad_scope, other_scope},
                    {valid_scope, bad_scope, other_scope}, {}, "2");
   test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_rejected",
@@ -914,7 +915,7 @@ void ScopedRdsPartiallyRejectedPushIntegrationTest::testPartiallyRejectedSrdsPus
   }
   expectRouted("init-key", /*backend_idx=*/0);
 
-  // Push 2: bad_scope is removed and the other scopes are re-sent. ACKed.
+  // Push 2: bad_scope is removed and the other scopes are re-sent. acked.
   sendSrdsResponse({init_scope, valid_scope, other_scope}, {valid_scope, other_scope},
                    {"bad_scope"}, "3");
   test_server_->waitForCounter("http.config_test.scoped_rds.foo-scoped-routes.update_success",
