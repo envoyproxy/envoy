@@ -107,6 +107,7 @@ StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& 
     return;
   }
   evict_on_flush_ = evict_interval_ms / flush_interval_.count();
+  eviction_interval_runtime_key_ = bootstrap.stats_eviction_interval_runtime_key();
 }
 
 absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,

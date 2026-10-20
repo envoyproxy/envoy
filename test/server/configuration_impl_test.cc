@@ -239,6 +239,21 @@ TEST_F(ConfigurationImplTest, Eviction) {
   EXPECT_EQ(3, config.statsConfig().evictOnFlush());
 }
 
+TEST_F(ConfigurationImplTest, EvictionRuntimeKey) {
+  std::string json = R"EOF(
+  {
+    "stats_flush_interval": "0.500s",
+    "stats_eviction_interval_runtime_key": "stats.eviction_interval_ms"
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  MainImpl config;
+  EXPECT_OK(config.initialize(bootstrap, server_, cluster_manager_factory_));
+  EXPECT_EQ(0, config.statsConfig().evictOnFlush());
+  EXPECT_EQ("stats.eviction_interval_ms", config.statsConfig().evictionIntervalRuntimeKey());
+}
+
 TEST_F(ConfigurationImplTest, EvictionNotMultiple) {
   std::string json = R"EOF(
   {
