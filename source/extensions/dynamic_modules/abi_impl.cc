@@ -360,6 +360,93 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_cert_validator_get_filter_state, f
           envoy_dynamic_module_type_cert_validator_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*)
 
+// ---------------------- TLS Certificate Selector callbacks ------------------------
+// These are weak symbols that provide default stub implementations. The actual implementation is
+// provided in the TLS certificate selector dynamic module extension when it is used.
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_tls_certificate_selector_get_requested_server_name,
+          false, envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_tls_certificate_selector_get_client_hello_extension,
+          false, envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr, uint16_t,
+          envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_tls_certificate_selector_get_filter_state, false,
+          envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_envoy_buffer*)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate,
+          false, envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate,
+               envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+               envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(envoy_dynamic_module_type_metrics_result,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter,
+          envoy_dynamic_module_type_metrics_result_MetricNotFound,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+          size_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_metrics_result,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_increment_counter,
+          envoy_dynamic_module_type_metrics_result_MetricNotFound,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr, size_t,
+          envoy_dynamic_module_type_module_buffer*, size_t, uint64_t)
+
+WEAK_STUB(envoy_dynamic_module_type_metrics_result,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_gauge,
+          envoy_dynamic_module_type_metrics_result_MetricNotFound,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+          size_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_metrics_result,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_set_gauge,
+          envoy_dynamic_module_type_metrics_result_MetricNotFound,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr, size_t,
+          envoy_dynamic_module_type_module_buffer*, size_t, uint64_t)
+
+WEAK_STUB(envoy_dynamic_module_type_metrics_result,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_increment_gauge,
+          envoy_dynamic_module_type_metrics_result_MetricNotFound,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr, size_t,
+          envoy_dynamic_module_type_module_buffer*, size_t, uint64_t)
+
+WEAK_STUB(envoy_dynamic_module_type_metrics_result,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_decrement_gauge,
+          envoy_dynamic_module_type_metrics_result_MetricNotFound,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr, size_t,
+          envoy_dynamic_module_type_module_buffer*, size_t, uint64_t)
+
+WEAK_STUB(envoy_dynamic_module_type_metrics_result,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_histogram,
+          envoy_dynamic_module_type_metrics_result_MetricNotFound,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer*, size_t,
+          size_t*)
+
+WEAK_STUB(envoy_dynamic_module_type_metrics_result,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_record_histogram_value,
+          envoy_dynamic_module_type_metrics_result_MetricNotFound,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr, size_t,
+          envoy_dynamic_module_type_module_buffer*, size_t, uint64_t)
+
+WEAK_STUB(envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new, nullptr,
+          envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_commit,
+               envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr,
+               uint64_t)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_delete,
+               envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr)
+
 // ---------------------- Config Validator callbacks ------------------------
 // These are weak symbols that provide default stub implementations. The actual implementation is
 // provided in the config validator dynamic module extension when it is used.

@@ -515,6 +515,28 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "http.rbac.policy.shadow_denied",
                          {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
 
+  // RBAC Network Filter Rules Prefix and Per-Policy Prefix
+  Tag rbac_rules_prefix;
+  rbac_rules_prefix.name_ = tag_names.RBAC_RULES_PREFIX;
+  rbac_rules_prefix.value_ = "shadow_prefix";
+  regex_tester.testRegex("my_rbac_prefix.rbac.shadow_prefix.shadow_allowed", "rbac.shadow_allowed",
+                         {rbac_prefix, rbac_rules_prefix});
+  regex_tester.testRegex("my_rbac_prefix.rbac.policy.my_rbac_policy.denied", "rbac.policy.denied",
+                         {rbac_prefix, rbac_policy_name});
+  regex_tester.testRegex("my_rbac_prefix.rbac.shadow_prefix.policy.my_rbac_policy.shadow_denied",
+                         "rbac.policy.shadow_denied",
+                         {rbac_prefix, rbac_rules_prefix, rbac_policy_name});
+
+  // RBAC Upstream HTTP Filter Per-Policy Prefix
+  Tag rbac_cluster_name;
+  rbac_cluster_name.name_ = tag_names.CLUSTER_NAME;
+  rbac_cluster_name.value_ = "fake_cluster";
+  regex_tester.testRegex("cluster.fake_cluster.rbac.policy.my_rbac_policy.denied",
+                         "cluster.rbac.policy.denied", {rbac_cluster_name, rbac_policy_name});
+  regex_tester.testRegex("cluster.fake_cluster.rbac.prefix.policy.my_rbac_policy.shadow_denied",
+                         "cluster.rbac.prefix.policy.shadow_denied",
+                         {rbac_cluster_name, rbac_policy_name});
+
   // Proxy Protocol stat prefix
   Tag proxy_protocol_prefix;
   proxy_protocol_prefix.name_ = tag_names.PROXY_PROTOCOL_PREFIX;

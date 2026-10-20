@@ -12,6 +12,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -250,6 +251,47 @@ TEST(AiProtocolManagerConfigTest, RouteConfigResponseFallsBackToRequestProtocol)
                                         testing::Property(&RouteConfig::effectiveResponseProtocol,
                                                           LLMProtocol::OpenAiResponses))));
   }
+}
+
+// A route's bindings are parsed when the configuration loads, so one that cannot apply is rejected
+// there rather than on each request.
+TEST(AiProtocolManagerConfigTest, RouteBindingsAreCheckedWhenTheConfigLoads) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  AiProtocolManagerFilterConfigFactory factory;
+  const auto create = [&](const std::string& yaml) {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
+        proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    return factory.createRouteSpecificFilterConfig(proto_config, context,
+                                                   ProtobufMessage::getNullValidationVisitor());
+  };
+
+  const auto route_config = create(R"EOF(
+request:
+  llm_protocol: ANTHROPIC_MESSAGES
+  binding: {uri_pattern: "/gateway/{model}/{messages|messages-stream}"}
+response:
+  llm_protocol: GEMINI_GENERATE_CONTENT
+  binding: {uri_pattern: "/v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}"}
+)EOF");
+  ASSERT_TRUE(route_config.ok()) << route_config.status();
+  const auto* typed = dynamic_cast<const RouteConfig*>(route_config->get());
+  ASSERT_NE(typed, nullptr);
+  ASSERT_NE(typed->requestBinding(), nullptr);
+  EXPECT_EQ(typed->requestBinding()->pattern()->source(),
+            "/gateway/{model}/{messages|messages-stream}");
+  ASSERT_NE(typed->responseBinding(), nullptr);
+
+  EXPECT_THAT(
+      create("request: {llm_protocol: ANTHROPIC_MESSAGES, binding: {uri_pattern: '/v1/{model'}}"),
+      StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                               testing::HasSubstr("request.binding")));
+  EXPECT_THAT(create("response: {binding: {uri_pattern: '/v1/{model}'}}"),
+              StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                       testing::HasSubstr("response.binding needs")));
+  EXPECT_THAT(create("request: {llm_protocol: OPENAI_CHAT_COMPLETIONS}")->get(),
+              testing::WhenDynamicCastTo<const RouteConfig*>(
+                  testing::Property(&RouteConfig::requestBinding, testing::IsNull())));
 }
 
 // The route config proto the factory hands the config subsystem is the per-route

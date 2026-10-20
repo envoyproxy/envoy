@@ -44,6 +44,7 @@ envoy_extension_cc_test(
         "//test/mocks/geoip:geoip_mocks",
         "//test/mocks/http:http_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/geoip/v3:pkg_cc_proto",
     ],
 )

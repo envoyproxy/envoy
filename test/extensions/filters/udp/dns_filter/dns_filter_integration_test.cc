@@ -1,5 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
@@ -288,7 +290,23 @@ listener_filters:
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(listener_1);
     });
 
+    initialize();
+  }
+
+  // Whether the stats store derives tags with the explicit-tags logic rather than the legacy
+  // tag-extraction rules. Both modes must produce identical stat names, tag-extracted names and
+  // tags, so the two IP versions run the server in different modes.
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    // The mode is read during server initialization, before the runtime loader exists, so it has
+    // to be set directly rather than with addRuntimeOverride().
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
     BaseIntegrationTest::initialize();
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->useExplicitTags(), explicitTags());
   }
 
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address,
@@ -514,6 +532,23 @@ TEST_P(DnsFilterIntegrationTest, WildcardLookupTest) {
 
   EXPECT_EQ(3, response_ctx_->answers_.size());
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+}
+
+// The stat prefix is an explicit tag of the stats in both stats modes.
+TEST_P(DnsFilterIntegrationTest, StatsAreTagged) {
+  setup(0);
+
+  const auto queries = test_server_->counter("dns_filter.my_prefix.downstream_rx_queries");
+  ASSERT_NE(queries.get(), nullptr);
+  EXPECT_EQ("dns_filter.downstream_rx_queries", queries->tagExtractedName());
+  EXPECT_THAT(queries->tags(), testing::UnorderedElementsAreArray(
+                                   Stats::TagVector{{"envoy.dns_filter_prefix", "my_prefix"}}));
+
+  const auto latency = test_server_->histogram("dns_filter.my_prefix.downstream_rx_query_latency");
+  ASSERT_NE(latency.get(), nullptr);
+  EXPECT_EQ("dns_filter.downstream_rx_query_latency", latency->tagExtractedName());
+  EXPECT_THAT(latency->tags(), testing::UnorderedElementsAreArray(
+                                   Stats::TagVector{{"envoy.dns_filter_prefix", "my_prefix"}}));
 }
 
 } // namespace

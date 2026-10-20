@@ -312,6 +312,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
                        ? std::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : std::nullopt),
       local_info_(context.localInfo()), cm_stats_(generateStats(*stats_.rootScope())),
+      odcds_discovery_stats_(generateOdCdsDiscoveryStats(*stats_.rootScope())),
       init_helper_(xds_manager_,
                    [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
       time_source_(context.timeSource()), dispatcher_(context.mainThreadDispatcher()),
@@ -544,6 +545,10 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
   const std::string final_prefix = "cluster_manager.";
   return {ALL_CLUSTER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
+}
+
+OdCdsDiscoveryStats ClusterManagerImpl::generateOdCdsDiscoveryStats(Stats::Scope& scope) {
+  return {ALL_ODCDS_DISCOVERY_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.odcds."))};
 }
 
 ThreadLocalClusterManagerStats
@@ -1262,7 +1267,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   const bool enable_batch_aware_update =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
 
-  pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
+  if (pending_cluster_creations_.erase(cm_cluster.cluster().info()->name()) != 0) {
+    odcds_discovery_stats_.discovery_success_.inc();
+  }
 
   const UnitFloat drop_overload = cm_cluster.cluster().dropOverload();
   const std::string drop_category = cm_cluster.cluster().dropCategory();
@@ -1784,6 +1791,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
     }
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
     // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
+    odcds_discovery_stats_.discovery_attempt_.inc();
     odcds->updateOnDemand(name);
     // Setup the discovery timeout timer to avoid keeping callbacks indefinitely.
     auto timer = dispatcher_.createTimer([this, name] { notifyExpiredDiscovery(name); });
@@ -1819,7 +1827,17 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
     // notifies the cluster manager about it.
     return;
   }
-  // Let all the worker threads know that the discovery timed out.
+  switch (status) {
+  case ClusterDiscoveryStatus::Available:
+    break;
+  case ClusterDiscoveryStatus::Missing:
+    odcds_discovery_stats_.discovery_missing_.inc();
+    break;
+  case ClusterDiscoveryStatus::Timeout:
+    odcds_discovery_stats_.discovery_timeout_.inc();
+    break;
+  }
+  // Let all worker threads know how the discovery completed.
   tls_.runOnAllThreads(
       [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         ENVOY_LOG(
@@ -2443,7 +2461,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache, coptions,
-        quic_stat_names_, *stats_.rootScope(), *quic_info, network_observer_registry,
+        quic_stat_names_, *stats_.rootScope(), quic_info, network_observer_registry,
         context_.overloadManager());
 #else
     (void)quic_info;
@@ -2481,7 +2499,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     }
     return Http::Http3::allocateConnPool(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info,
+        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, quic_info,
         network_observer_registry, context_.overloadManager(), false);
 #else
     UNREFERENCED_PARAMETER(source);

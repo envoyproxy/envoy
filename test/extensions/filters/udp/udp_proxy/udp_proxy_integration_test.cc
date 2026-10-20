@@ -6,6 +6,8 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.h"
@@ -130,7 +132,23 @@ typed_config:
 
     config_helper_.addListenerFilter(listener_filter_config);
 
+    initialize();
+  }
+
+  // Whether the stats store derives tags with the explicit-tags logic rather than the legacy
+  // tag-extraction rules. Both modes must produce identical stat names, tag-extracted names and
+  // tags, so the two IP versions run the server in different modes.
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    // The mode is read during server initialization, before the runtime loader exists, so it has
+    // to be set directly rather than with addRuntimeOverride().
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
     BaseIntegrationTest::initialize();
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->useExplicitTags(), explicitTags());
   }
 
   struct DrainFilterConfig {
@@ -247,7 +265,7 @@ typed_config:
   "@type": type.googleapis.com/google.protobuf.Struct
 )EOF");
 
-    BaseIntegrationTest::initialize();
+    initialize();
   }
 
   void requestResponseWithListenerAddress(
@@ -885,6 +903,23 @@ TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterBasicLoopback) {
   // Although the default cluster is cluster_1 which does not exist, the per session cluster setter
   // filter will set the session cluster to cluster_0 .
   requestResponseWithListenerAddress(*listener_address);
+}
+
+// The stat prefix is an explicit tag of the stats in both stats modes.
+TEST_P(UdpProxyIntegrationTest, StatsAreTagged) {
+  setup(1);
+
+  const auto total = test_server_->counter("udp.foo.downstream_sess_total");
+  ASSERT_NE(total.get(), nullptr);
+  EXPECT_EQ("udp.downstream_sess_total", total->tagExtractedName());
+  EXPECT_THAT(total->tags(),
+              testing::UnorderedElementsAreArray(Stats::TagVector{{"envoy.udp_prefix", "foo"}}));
+
+  const auto active = test_server_->gauge("udp.foo.downstream_sess_active");
+  ASSERT_NE(active.get(), nullptr);
+  EXPECT_EQ("udp.downstream_sess_active", active->tagExtractedName());
+  EXPECT_THAT(active->tags(),
+              testing::UnorderedElementsAreArray(Stats::TagVector{{"envoy.udp_prefix", "foo"}}));
 }
 
 } // namespace

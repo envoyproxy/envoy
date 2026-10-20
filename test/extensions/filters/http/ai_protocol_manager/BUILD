@@ -84,6 +84,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_adapters_lib",
         "//source/extensions/filters/http/ai_protocol_manager:transcoding_engine_lib",
         "//source/extensions/filters/http/ai_protocol_manager/sse:sse_event_lib",
@@ -211,6 +212,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "llm_binding_test",
+    srcs = ["llm_binding_test.cc"],
+    extension_names = ["envoy.filters.http.ai_protocol_manager"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
+        "//test/test_common:status_utility_lib",
+        "@nlohmann_json//:json",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "uri_pattern_test",
     srcs = ["uri_pattern_test.cc"],
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
@@ -230,8 +243,15 @@ envoy_extension_cc_test(
         "//envoy/registry",
         "//envoy/router:string_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/extensions/filters/common/set_filter_state:filter_config_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -353,6 +373,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/ai_protocol_manager/external_buffer/in_memory/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ai_protocol_manager/v3:pkg_cc_proto",

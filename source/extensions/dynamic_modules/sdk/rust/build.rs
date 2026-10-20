@@ -67,14 +67,12 @@ fn bazel_clang_args() -> Vec<String> {
       continue;
     }
     if let Ok(sysroot_anchor) = env::var(env_var) {
-      if let Some(anchor) = resolve_bazel_location(&sysroot_anchor) {
-        // The anchor is `<sysroot>/usr/include/stdio.h`, so its parent is `usr/include`.
-        if let Some(include_dir) = anchor.parent() {
-          args.push("-isystem".to_string());
-          args.push(format!("{}", include_dir.display()));
-          args.push("-isystem".to_string());
-          args.push(format!("{}/{}", include_dir.display(), triple));
-        }
+      if let Some(sysroot_dir) = resolve_bazel_location(&sysroot_anchor) {
+        let include_dir = sysroot_dir.join("usr/include");
+        args.push("-isystem".to_string());
+        args.push(format!("{}", include_dir.display()));
+        args.push("-isystem".to_string());
+        args.push(format!("{}/{}", include_dir.display(), triple));
       }
     }
   }
