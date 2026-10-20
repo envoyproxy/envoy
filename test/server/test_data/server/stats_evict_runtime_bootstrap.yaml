@@ -15,3 +15,5 @@ layered_runtime:
     static_layer:
       stats:
         eviction_interval_ms: 10000
+  - name: admin
+    admin_layer: {}

@@ -1063,16 +1063,28 @@ TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
   EXPECT_EQ(1, stats_store_.evictionCount());
 
   // A value that is not a multiple of the flush interval disables eviction.
-  server_->dispatcher().post(
-      [&] { server_->runtime().mergeValues({{"stats.eviction_interval_ms", "7500"}}); });
+  {
+    absl::Notification updated;
+    server_->dispatcher().post([&] {
+      EXPECT_OK(server_->runtime().mergeValues({{"stats.eviction_interval_ms", "7500"}}));
+      updated.Notify();
+    });
+    updated.WaitForNotification();
+  }
   time_system_.advanceTimeWait(std::chrono::seconds(6));
   time_system_.advanceTimeWait(std::chrono::seconds(6));
   EXPECT_EQ(4L, counter->value());
   EXPECT_EQ(1, stats_store_.evictionCount());
 
   // A 5s interval evicts on every flush.
-  server_->dispatcher().post(
-      [&] { server_->runtime().mergeValues({{"stats.eviction_interval_ms", "5000"}}); });
+  {
+    absl::Notification updated;
+    server_->dispatcher().post([&] {
+      EXPECT_OK(server_->runtime().mergeValues({{"stats.eviction_interval_ms", "5000"}}));
+      updated.Notify();
+    });
+    updated.WaitForNotification();
+  }
   time_system_.advanceTimeWait(std::chrono::seconds(6));
   EXPECT_EQ(5L, counter->value());
   EXPECT_EQ(2, stats_store_.evictionCount());
