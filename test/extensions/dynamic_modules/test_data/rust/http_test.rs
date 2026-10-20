@@ -120,6 +120,31 @@ fn test_header_callbacks_filter_on_request_headers() {
     .returning(|_| None)
     .once();
 
+  envoy_filter
+    .expect_get_attribute_bool()
+    .withf(|id| {
+      *id == abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion
+    })
+    .returning(|_| Some(false))
+    .once();
+
+  envoy_filter
+    .expect_set_attribute_bool()
+    .withf(|id, value| {
+      *id == abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion
+        && *value
+    })
+    .return_const(true)
+    .once();
+
+  envoy_filter
+    .expect_get_attribute_bool()
+    .withf(|id| {
+      *id == abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion
+    })
+    .returning(|_| Some(true))
+    .once();
+
   assert_eq!(
     f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue

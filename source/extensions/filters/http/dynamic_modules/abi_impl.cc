@@ -2168,6 +2168,16 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
   return ok;
 }
 
+bool envoy_dynamic_module_callback_http_filter_set_attribute_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, bool value) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (auto stream_info = filter->streamInfo(); stream_info != nullptr) {
+    return ContextAccessor::setAttributeBool(*stream_info, attribute_id, value);
+  }
+  return false;
+}
+
 void envoy_dynamic_module_callback_http_get_timing_info(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_timing_info_v2* timing_out) {

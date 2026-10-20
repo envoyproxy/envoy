@@ -203,6 +203,8 @@ const (
 	AttributeIDXdsVirtualClusterName
 	// upstream.protocol
 	AttributeIDUpstreamProtocol
+	// should_drain_connection_upon_completion
+	AttributeIDShouldDrainConnectionUponCompletion
 )
 
 // LogLevel is the log level for messages logged via the host environment's logging mechanism.

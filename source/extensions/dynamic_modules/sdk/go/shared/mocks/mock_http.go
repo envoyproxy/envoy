@@ -1573,6 +1573,20 @@ func (mr *MockHttpFilterHandleMockRecorder) SendResponseTrailers(trailers any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendResponseTrailers", reflect.TypeOf((*MockHttpFilterHandle)(nil).SendResponseTrailers), trailers)
 }
 
+// SetAttributeBool mocks base method.
+func (m *MockHttpFilterHandle) SetAttributeBool(attributeID shared.AttributeID, value bool) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetAttributeBool", attributeID, value)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetAttributeBool indicates an expected call of SetAttributeBool.
+func (mr *MockHttpFilterHandleMockRecorder) SetAttributeBool(attributeID, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetAttributeBool", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetAttributeBool), attributeID, value)
+}
+
 // SetBufferLimit mocks base method.
 func (m *MockHttpFilterHandle) SetBufferLimit(limit uint64) {
 	m.ctrl.T.Helper()

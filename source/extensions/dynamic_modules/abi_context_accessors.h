@@ -73,6 +73,11 @@ public:
   static bool getAttributeBool(const StreamInfo::StreamInfo& stream_info,
                                envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
 
+  // Set a boolean attribute on the stream info. Returns false when the attribute is not mutable
+  // or not a boolean.
+  static bool setAttributeBool(StreamInfo::StreamInfo& stream_info,
+                               envoy_dynamic_module_type_attribute_id attribute_id, bool value);
+
   // fill timing_out with the stream's timing snapshot, using -1 for unavailable values
   static void getTimingInfo(const StreamInfo::StreamInfo* stream_info,
                             envoy_dynamic_module_type_timing_info* timing_out);

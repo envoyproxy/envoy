@@ -3319,6 +3319,10 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_filter_get_attribute_bool, fa
           envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
           bool*)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_http_filter_set_attribute_bool, false,
+          envoy_dynamic_module_type_http_filter_envoy_ptr, envoy_dynamic_module_type_attribute_id,
+          bool)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_get_timing_info,
                envoy_dynamic_module_type_http_filter_envoy_ptr,
                envoy_dynamic_module_type_timing_info_v2*)
