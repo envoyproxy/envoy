@@ -2,6 +2,7 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
@@ -17,8 +18,14 @@ public:
   MockHotRestartingBase(const std::string& socket_path) : HotRestartingBase(0) {
     main_rpc_stream_.bindDomainSocket(1, "parent", socket_path, 0644);
   }
-  void sendMessage(sockaddr_un& address, const envoy::HotRestartMessage& message) {
-    main_rpc_stream_.sendHotRestartMessage(address, message);
+  bool sendMessage(sockaddr_un& address, const envoy::HotRestartMessage& message) {
+    return main_rpc_stream_.sendHotRestartMessage(address, message);
+  }
+  std::unique_ptr<envoy::HotRestartMessage> receiveBlocking() {
+    return main_rpc_stream_.receiveHotRestartMessage(RpcStream::Blocking::Yes);
+  }
+  bool socketIsNonBlocking() const {
+    return (fcntl(main_rpc_stream_.domain_socket_, F_GETFL) & O_NONBLOCK) != 0;
   }
 };
 
@@ -77,6 +84,84 @@ TEST_F(HotRestartingBaseTest, SendMsgRetrySucceedsEventually) {
   base_.sendMessage(sun, message);
 
   EXPECT_TRUE(retried);
+}
+
+// A blocking send that the socket's send timeout cuts short (the peer is not draining its
+// socket) fails instead of asserting, and leaves the socket non-blocking.
+TEST_F(HotRestartingBaseTest, SendMsgTimeoutFailsWithoutAsserting) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Invoke([&](os_fd_t, const msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  }));
+
+  std::string dst_path = "/tmp/dst";
+  sockaddr_un sun;
+  sun.sun_family = AF_UNIX;
+  StringUtil::strlcpy(&sun.sun_path[1], dst_path.data(), dst_path.size());
+  sun.sun_path[0] = '\0';
+
+  HotRestartMessage request;
+  request.mutable_request()->mutable_stats();
+
+  EXPECT_LOG_CONTAINS("error", "hot restart sendmsg() timed out",
+                      EXPECT_FALSE(base_.sendMessage(sun, request)));
+  EXPECT_TRUE(base_.socketIsNonBlocking());
+}
+
+// A blocking receive that the socket's receive timeout cuts short returns no message instead of
+// asserting, and leaves the socket non-blocking for the caller to come back later.
+TEST_F(HotRestartingBaseTest, BlockingReceiveReturnsNothingOnTimeout) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Invoke([&](os_fd_t, msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EAGAIN};
+  }));
+
+  EXPECT_EQ(base_.receiveBlocking(), nullptr);
+  EXPECT_TRUE(base_.socketIsNonBlocking());
+}
+
+// With a send timeout set on the socket, a signal interrupts a blocking sendmsg() with EINTR
+// even for handlers installed with SA_RESTART. The send is retried instead of asserting.
+TEST_F(HotRestartingBaseTest, SendMsgRetriesWhenInterruptedBySignal) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t, const msghdr*, int) { return Api::SysCallSizeResult{-1, EINTR}; }))
+      .WillOnce(Invoke([&](os_fd_t, const msghdr* msg, int) {
+        return Api::SysCallSizeResult{static_cast<ssize_t>(msg->msg_iov[0].iov_len), 0};
+      }));
+
+  std::string dst_path = "/tmp/dst";
+  sockaddr_un sun;
+  sun.sun_family = AF_UNIX;
+  StringUtil::strlcpy(&sun.sun_path[1], dst_path.data(), dst_path.size());
+  sun.sun_path[0] = '\0';
+
+  HotRestartMessage request;
+  request.mutable_request()->mutable_stats();
+
+  EXPECT_TRUE(base_.sendMessage(sun, request));
+  EXPECT_TRUE(base_.socketIsNonBlocking());
+}
+
+// Likewise, a blocking recvmsg() interrupted by a signal returns no message, as on the receive
+// timeout, instead of asserting.
+TEST_F(HotRestartingBaseTest, BlockingReceiveReturnsNothingWhenInterruptedBySignal) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Invoke([&](os_fd_t, msghdr*, int) {
+    return Api::SysCallSizeResult{-1, EINTR};
+  }));
+
+  EXPECT_EQ(base_.receiveBlocking(), nullptr);
+  EXPECT_TRUE(base_.socketIsNonBlocking());
 }
 
 } // namespace
