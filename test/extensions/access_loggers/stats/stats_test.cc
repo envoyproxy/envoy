@@ -1538,7 +1538,7 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
 
     // After destruction, there should be no leaks. We allow 4096 bytes for allocator caches.
     // We use EXPECT_LE directly here to bypass the strict EXPECT_GT constraint of EXPECT_MEMORY_LE.
-    EXPECT_LE(memory_test.consumedBytes(), 4096);
+    EXPECT_LE(static_cast<int64_t>(memory_test.consumedBytes()), 4096);
   }
 }
 
