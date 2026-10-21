@@ -240,23 +240,22 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           makeHandler("/ready", "print server state, return 200 if LIVE, otherwise return 503",
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false),
           stats_handler_.statsHandler(false /* not active mode */),
-          {"/stats/prometheus",
-           "print server stats in prometheus format",
-           [this](AdminStream& stream) { return stats_handler_.makeRequest(stream, true); },
-           false,
-           false,
-           {{ParamDescriptor::Type::Boolean, "usedonly",
-             "Only include stats that have been written by system since restart"},
-            {ParamDescriptor::Type::Boolean, "text_readouts",
-             "Render text_readouts as new gaugues with value 0 (increases Prometheus "
-             "data size)"},
-            {ParamDescriptor::Type::String, "filter",
-             "Regular expression (Google re2) for filtering stats"},
-            {ParamDescriptor::Type::Boolean, "invert_filter", "Invert the filter regex"},
-            {ParamDescriptor::Type::Enum,
-             "histogram_buckets",
-             "Histogram bucket display mode",
-             {"cumulative", "summary"}}}},
+          makeHandler(
+              "/stats/prometheus", "print server stats in prometheus format",
+              [this](AdminStream& stream) { return stats_handler_.makeRequest(stream, true); },
+              false, false,
+              {{ParamDescriptor::Type::Boolean, "usedonly",
+                "Only include stats that have been written by system since restart"},
+               {ParamDescriptor::Type::Boolean, "text_readouts",
+                "Render text_readouts as new gaugues with value 0 (increases Prometheus "
+                "data size)"},
+               {ParamDescriptor::Type::String, "filter",
+                "Regular expression (Google re2) for filtering stats"},
+               {ParamDescriptor::Type::Boolean, "invert_filter", "Invert the filter regex"},
+               {ParamDescriptor::Type::Enum,
+                "histogram_buckets",
+                "Histogram bucket display mode",
+                {"cumulative", "summary"}}}),
           makeHandler("/stats/recentlookups", "Show recent stat-name lookups",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false),
           makeHandler("/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
@@ -495,6 +494,13 @@ AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
                                              const ParamDescriptorVec& params) {
   return UrlHandler{prefix,    help_text,     RequestGasket::makeGen(callback),
                     removable, mutates_state, params};
+}
+
+AdminImpl::UrlHandler AdminImpl::makeHandler(const std::string& prefix,
+                                             const std::string& help_text, GenRequestFn callback,
+                                             bool removable, bool mutates_state,
+                                             const ParamDescriptorVec& params) {
+  return UrlHandler{prefix, help_text, std::move(callback), removable, mutates_state, params};
 }
 
 bool AdminImpl::addStreamingHandler(const std::string& prefix, const std::string& help_text,

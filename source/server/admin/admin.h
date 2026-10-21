@@ -273,6 +273,10 @@ private:
                          HandlerCb callback, bool removable, bool mutates_state,
                          const ParamDescriptorVec& params = {});
 
+  UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
+                         GenRequestFn callback, bool removable, bool mutates_state,
+                         const ParamDescriptorVec& params = {});
+
   /**
    * Creates a URL prefix bound to chunked handler. Handler is expected to
    * supply a method makeRequest(AdminStream&).
