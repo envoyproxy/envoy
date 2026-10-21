@@ -274,31 +274,6 @@ TEST_P(NewGrpcMuxImplTest, SkipSubsequentNode_SendNodeOnGrpcStreamReset) {
       {.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}, .with_node = false});
 }
 
-TEST_P(NewGrpcMuxImplTest, SkipSubsequentNodeFeatureFlagDisabled) {
-  if (isUnifiedMuxTest()) {
-    delete async_client_;
-    GTEST_SKIP() << "This test is only relevant for the legacy mux.";
-  }
-  if (!skip_subsequent_node_) {
-    delete async_client_;
-    GTEST_SKIP() << "This test requires skip_subsequent_node to be true.";
-  }
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node", "false"}});
-  setup();
-  InSequence s;
-  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
-  auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}, .with_node = true});
-  // Though skip_subsequent_node is true, the feature flag is disabled, so the node will be sent
-  // again.
-  expectSendMessage({.type_url = "bar", .with_node = true});
-  grpc_mux_->start();
-  expectSendMessage(
-      {.type_url = "foo", .resource_names_unsubscribe = {"x", "y"}, .with_node = true});
-}
-
 INSTANTIATE_TEST_SUITE_P(NewGrpcMuxImplTest, NewGrpcMuxImplTest,
                          testing::Combine(testing::ValuesIn({LegacyOrUnified::Legacy,
                                                              LegacyOrUnified::Unified}),

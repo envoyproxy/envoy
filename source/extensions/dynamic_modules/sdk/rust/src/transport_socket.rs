@@ -61,6 +61,8 @@ fn copy_write_buffer_slices(
 pub enum PostIoAction {
   KeepOpen,
   Close,
+  /// Closes the connection as reset by the peer.
+  Reset,
 }
 
 /// Result of a transport socket read or write operation.
@@ -92,6 +94,15 @@ impl IoResult {
       end_stream_read,
     }
   }
+
+  /// Builds a result that closes the connection as reset by the peer.
+  pub fn reset(bytes_processed: usize) -> Self {
+    Self {
+      action: PostIoAction::Reset,
+      bytes_processed,
+      end_stream_read: false,
+    }
+  }
 }
 
 impl From<IoResult> for abi::envoy_dynamic_module_type_transport_socket_io_result {
@@ -121,6 +132,7 @@ impl From<PostIoAction> for abi::envoy_dynamic_module_type_transport_socket_post
         abi::envoy_dynamic_module_type_transport_socket_post_io_action::KeepOpen
       },
       PostIoAction::Close => abi::envoy_dynamic_module_type_transport_socket_post_io_action::Close,
+      PostIoAction::Reset => abi::envoy_dynamic_module_type_transport_socket_post_io_action::Reset,
     }
   }
 }
@@ -132,16 +144,16 @@ impl From<abi::envoy_dynamic_module_type_transport_socket_post_io_action> for Po
         PostIoAction::KeepOpen
       },
       abi::envoy_dynamic_module_type_transport_socket_post_io_action::Close => PostIoAction::Close,
+      abi::envoy_dynamic_module_type_transport_socket_post_io_action::Reset => PostIoAction::Reset,
     }
   }
 }
 
-/// Outcome of a raw socket read or write performed via [`EnvoyTransportSocket::io_read`] and
-/// [`EnvoyTransportSocket::io_write`].
+/// Outcome of a raw socket read or write performed via an [`EnvoyTransportSocket`] I/O method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IoStatus {
-  /// Bytes were transferred. For a read with a non-empty buffer, zero bytes means the peer closed
-  /// the read side.
+  /// Bytes were transferred. For a read of a non-zero length, zero bytes means the peer closed the
+  /// read side.
   Success,
   /// The socket would block. The caller should stop and retry later.
   Again,
@@ -216,6 +228,18 @@ pub trait EnvoyTransportSocket {
   /// Writes raw bytes to the underlying socket from `data`. Returns the status and the number of
   /// bytes written.
   fn io_write(&self, data: &[u8]) -> (IoStatus, usize);
+  /// Reads at most `max_length` raw bytes from the underlying socket into the read buffer without
+  /// an intermediate copy. Returns the status and the number of bytes read. When `max_length` is
+  /// non-zero, a `Success` status with zero bytes means the peer closed the read side. When the
+  /// peer reset the connection, the status is `Error` and a `Close` returned afterwards closes the
+  /// connection as reset by the peer. This is only valid within [`TransportSocket::on_do_read`].
+  fn io_read_to_read_buffer(&self, max_length: usize) -> (IoStatus, usize);
+  /// Writes bytes from the write buffer to the underlying socket and drains the bytes written.
+  /// Returns the status and the number of bytes written, which is zero with a `Success` status
+  /// when the write buffer is empty. When the peer reset the connection, the status is `Error` and
+  /// a `Close` returned afterwards closes the connection as reset by the peer. This is only valid
+  /// within [`TransportSocket::on_do_write`].
+  fn io_write_from_write_buffer(&self) -> (IoStatus, usize);
   /// Shuts down the write side of the underlying socket so the peer observes end of stream.
   fn io_shutdown_write(&self);
   /// Returns the native OS file descriptor of the underlying socket, or `None` when unavailable.
@@ -234,11 +258,21 @@ pub trait EnvoyTransportSocket {
   fn raise_event(&self, event: ConnectionEvent);
   /// Returns whether Envoy expects the read buffer to be drained for flow-control reasons.
   fn should_drain_read_buffer(&self) -> bool;
-  /// Requests that a future event-loop iteration schedules a read.
+  /// Requests that a future event-loop iteration schedules a read. It is a no-op while the
+  /// connection is connecting or once it is closed.
   fn set_is_readable(&self);
   /// Schedules a write on a future event-loop iteration. A module calls this when it defers
-  /// buffered bytes for its own reasons rather than because the socket reported it would block.
+  /// buffered bytes for its own reasons rather than because the socket reported it would block. It
+  /// is a no-op while the connection is connecting or once it is closed.
   fn set_is_writable(&self);
+  /// Hands this socket and `peer`, the Envoy pointer of its paired transport socket on the other
+  /// side of the proxy, to an engine-run splice pump. The engine splices the upload and reads the
+  /// download of a kernel TLS upstream with recvmsg. Both connections need empty Envoy buffers, and
+  /// the module must hold no pending bytes. After this returns `true` neither socket receives
+  /// `on_do_read` or `on_do_write`, and the module must not do I/O on either socket, including in
+  /// `on_close`. It returns `false` and leaves both connections on their buffered path when the
+  /// splice cannot start.
+  fn start_splice(&self, peer: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr) -> bool;
   /// Requests that the connection flush its write buffer, for example after queuing handshake
   /// bytes outside of a write step.
   fn flush_write_buffer(&self);
@@ -246,6 +280,21 @@ pub trait EnvoyTransportSocket {
   fn get_remote_address(&self) -> (String, u32);
   /// Returns the local address as `(address, port)`. The address is empty when unavailable.
   fn get_local_address(&self) -> (String, u32);
+  /// Returns the unique ID of the connection, or `None` when unavailable.
+  fn get_connection_id(&self) -> Option<u64>;
+  /// Returns the ID of the upstream connection recorded in the stream info of the connection, or
+  /// `None` when none is recorded. The TCP proxy records it on the downstream connection once the
+  /// upstream connection is ready. When the TCP proxy tunnels over HTTP, that connection also
+  /// carries HTTP framing and other streams. When it races several upstream addresses, the ID
+  /// belongs to the connection that wraps the attempts.
+  fn get_upstream_connection_id(&self) -> Option<u64>;
+  /// Adds bytes that the module moved through the underlying socket outside the read and write
+  /// buffers, for example with splice(2), to the stream info of the connection. On a TCP proxy
+  /// downstream connection they also count as downstream wire bytes and, in the other direction,
+  /// as upstream wire bytes, like the bytes the TCP proxy relays. A module also reports these
+  /// bytes in `bytes_processed`, which feeds the connection stats and, for writes, resets the TCP
+  /// proxy idle timer.
+  fn add_wire_bytes(&self, bytes_received: u64, bytes_sent: u64);
 }
 
 /// Envoy transport socket handle implemented with ABI callbacks into Envoy.
@@ -257,6 +306,12 @@ impl EnvoyTransportSocketImpl {
   /// Wraps an Envoy-provided transport socket pointer.
   pub fn new(raw: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr) -> Self {
     Self { raw }
+  }
+
+  /// Returns the wrapped Envoy transport socket pointer. It stays valid on this worker thread until
+  /// the transport socket is destroyed.
+  pub fn envoy_ptr(&self) -> abi::envoy_dynamic_module_type_transport_socket_envoy_ptr {
+    self.raw
   }
 
   /// Shared body for the local and remote address callbacks.
@@ -281,6 +336,22 @@ impl EnvoyTransportSocketImpl {
       unsafe { crate::ffi_helpers::str_lossy_from_raw(address.ptr as *const u8, address.length) };
     (address.into_owned(), port)
   }
+
+  /// Shared body for the connection ID callbacks.
+  fn get_connection_id_with(
+    &self,
+    callback: unsafe extern "C" fn(
+      abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+      *mut u64,
+    ) -> bool,
+  ) -> Option<u64> {
+    let mut connection_id: u64 = 0;
+    if unsafe { callback(self.raw, &mut connection_id) } {
+      Some(connection_id)
+    } else {
+      None
+    }
+  }
 }
 
 impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
@@ -304,6 +375,29 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
         self.raw,
         data.as_ptr().cast(),
         data.len(),
+        &mut bytes_written,
+      )
+    };
+    (status.into(), bytes_written)
+  }
+
+  fn io_read_to_read_buffer(&self, max_length: usize) -> (IoStatus, usize) {
+    let mut bytes_read: usize = 0;
+    let status = unsafe {
+      abi::envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(
+        self.raw,
+        max_length,
+        &mut bytes_read,
+      )
+    };
+    (status.into(), bytes_read)
+  }
+
+  fn io_write_from_write_buffer(&self) -> (IoStatus, usize) {
+    let mut bytes_written: usize = 0;
+    let status = unsafe {
+      abi::envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(
+        self.raw,
         &mut bytes_written,
       )
     };
@@ -381,6 +475,12 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
     }
   }
 
+  // `peer` is an opaque Envoy handle passed back to Envoy, never dereferenced in Rust.
+  #[allow(clippy::not_unsafe_ptr_arg_deref)]
+  fn start_splice(&self, peer: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr) -> bool {
+    unsafe { abi::envoy_dynamic_module_callback_transport_socket_start_splice(self.raw, peer) }
+  }
+
   fn flush_write_buffer(&self) {
     unsafe {
       abi::envoy_dynamic_module_callback_transport_socket_flush_write_buffer(self.raw);
@@ -393,6 +493,27 @@ impl EnvoyTransportSocket for EnvoyTransportSocketImpl {
 
   fn get_local_address(&self) -> (String, u32) {
     self.get_address(abi::envoy_dynamic_module_callback_transport_socket_get_local_address)
+  }
+
+  fn get_connection_id(&self) -> Option<u64> {
+    self
+      .get_connection_id_with(abi::envoy_dynamic_module_callback_transport_socket_get_connection_id)
+  }
+
+  fn get_upstream_connection_id(&self) -> Option<u64> {
+    self.get_connection_id_with(
+      abi::envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id,
+    )
+  }
+
+  fn add_wire_bytes(&self, bytes_received: u64, bytes_sent: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_transport_socket_add_wire_bytes(
+        self.raw,
+        bytes_received,
+        bytes_sent,
+      );
+    }
   }
 }
 

@@ -104,6 +104,16 @@ TEST_F(MergeStatPrefixTest, ClusterParentWithSelfTag) {
                            std::make_pair(Envoy::Config::TagNames::get().EXT_AUTHZ_PREFIX, "waf")));
 }
 
+// Redis-scoped parent "redis.<prefix>." extracted as REDIS_PREFIX tag.
+TEST_F(MergeStatPrefixTest, RedisParent) {
+  const auto p = mergeStatPrefix(symbol_table_, "redis.foo.", "splitter", {}, "splitter");
+  EXPECT_EQ(taggedName(p), "redis.foo.splitter.name");
+  EXPECT_EQ(taggedName(p), legacyName("redis.foo.splitter."));
+  EXPECT_EQ(base(p), "redis.splitter");
+  EXPECT_THAT(tags(p), testing::ElementsAre(
+                           std::make_pair(Envoy::Config::TagNames::get().REDIS_PREFIX, "foo")));
+}
+
 // A parent passed without a trailing dot will not be recognized as a tag because we assume
 // the caller should handle the dot correctly.
 TEST_F(MergeStatPrefixTest, ParentWithoutTrailingDot) {

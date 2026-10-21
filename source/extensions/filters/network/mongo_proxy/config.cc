@@ -46,11 +46,11 @@ Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromP
   const uint32_t max_bson_depth =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_bson_depth, 100);
 
-  return [stat_prefix, &context, access_log, fault_config, emit_dynamic_metadata, stats,
+  return [&context, access_log, fault_config, emit_dynamic_metadata, stats,
           max_bson_depth](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ProdProxyFilter>(
-        stat_prefix, context.scope(), context.serverFactoryContext().runtime(), access_log,
-        fault_config, context.drainDecision(), context.serverFactoryContext(),
+        context.serverFactoryContext().runtime(), access_log, fault_config, context.drainDecision(),
+        context.serverFactoryContext(),
         context.serverFactoryContext().mainThreadDispatcher().timeSource(), emit_dynamic_metadata,
         stats, max_bson_depth));
   };

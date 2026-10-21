@@ -400,16 +400,135 @@ end, still receives ``data: [DONE]``. A response or event that cannot be convert
 untranslated, since part of the response may already be on its way to the client, and is
 counted by ``transcoder.failed``.
 
-.. note::
+.. _config_http_filters_ai_protocol_manager_transcoder_instructions:
 
-  Gemini carries the model and the streaming mode in the request path rather than the
-  body. The ``TO_IR`` leg lifts both out of the path into the canonical ``model`` and
-  ``stream`` fields, and a ``FROM_IR`` leg targeting Gemini moves them back, setting the
-  path to ``/v1beta/models/{model}:generateContent`` or
-  ``/v1beta/models/{model}:streamGenerateContent?alt=sse``. A route in front of another
-  endpoint layout rewrites that prefix, for example Vertex AI's with ``regex_rewrite``.
-  Other vendor paths and authentication headers are left to the route, for example through
-  ``prefix_rewrite`` and ``request_headers_to_add``.
+Per-request transcoding instructions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The route decides the backend for every request it matches. A filter ahead of the transcoder --
+a model router, ext_proc, or :ref:`set_filter_state <config_http_filters_set_filter_state>` --
+can override that decision for one request by leaving instructions in filter state. Each key is
+independent, and a key that is not set leaves today's behavior in place.
+
+``envoy.ai.llm_protocol.response``
+  The backend's wire API, replacing the route's ``response`` declaration. An :ref:`LLMProtocol
+  <envoy_v3_api_enum_type.ai.v3.LLMProtocol>` enum-value name, e.g. ``GEMINI_GENERATE_CONTENT``.
+  Response token-usage extraction follows it too, so the two never disagree about the backend.
+
+``envoy.ai.binding.request``
+  How the client's request carries its API on HTTP. The ``TO_IR`` leg reads the client's path
+  and body under it; the path itself is not rewritten. Without it, the route's binding applies,
+  and without that, the client API's own binding and those Envoy knows for it are tried: Gemini's
+  ``/v1beta/models/{model}:generateContent`` and its Vertex AI form, and Claude on Vertex AI's
+  ``rawPredict`` and ``streamRawPredict`` for Anthropic Messages. A gateway that serves an API
+  under its own prefix names the prefix here.
+
+``envoy.ai.binding.response``
+  How the backend expects its API on HTTP. The ``FROM_IR`` leg renders its path into ``:path``
+  and applies its edits, in place of the route's binding and the backend API's own; a Gemini
+  backend on Vertex AI, for example, names Vertex's path here. When neither it nor the route
+  names one and the backend speaks the client's API, the request leaves in the binding it
+  arrived in.
+
+``envoy.ai.model.resolved``
+  The model to send upstream in place of the one the client asked for. It reaches the body and
+  the rendered path alike. The response still reports the model the client asked for; which
+  backend served it stays with the gateway.
+
+A route declares its bindings beside each ``llm_protocol``, in :ref:`request.binding
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.binding>` and
+:ref:`response.binding
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponsePerRoute.binding>`,
+which are checked when the configuration loads. A route's binding is how that side carries the
+route's API, so it lapses when filter state names another API for the side: a router that sends a
+request to another backend API names that backend's binding too, or the API's own applies. A
+route's binding that no AI filter of the chain applies is counted by ``route_binding_unused``.
+
+A binding is written as a URI pattern, starting with ``/``, or as an :ref:`LLMBinding
+<envoy_v3_api_msg_type.ai.v3.LLMBinding>` in JSON, starting with ``{``. A part the binding leaves
+empty is the API's own: a pattern alone keeps the edits of the API's own binding, such as Gemini
+removing ``model`` and ``stream`` from the body.
+
+A URI pattern is a path in the :ref:`URI template syntax
+<envoy_v3_api_msg_extensions.path.match.uri_template.v3.UriTemplateMatchConfig>` of
+``path_match_policy``, with one addition: ``{unary|stream}`` spells out, once, the part of the
+path that differs between a unary and a streaming request; either side may be empty, and a side
+may end in a fixed query string, which rendering appends and matching ignores. Several layouts
+may be listed separated by spaces: a path matches the first that fits it entirely, and rendering
+writes the first.
+
+Every named variable, written ``{name}`` or ``{name=*}``, matches one path segment and reads its
+value, which must hold only letters, digits and ``-``, ``.``, ``_``, ``@``, and start with a letter
+or a digit; a fixed segment is written as text. ``{model}`` is the request's ``model``, and the
+choice its ``stream`` where the two sides differ in the path; a choice between queries alone leaves
+the streaming mode to the body. Any other variable, such as ``{project}``, is a path variable: it
+never enters the body, and the ``envoy.ai.binding.read`` object the transcoder sets for the stream
+keeps it for field access, e.g. ``%FILTER_STATE(envoy.ai.binding.read:FIELD:location)%``.
+Rendering takes ``{model}`` from the body and every other variable from the client's path; unnamed
+wildcards match on the way in but cannot be rendered.
+
+.. code-block:: text
+
+  /v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}
+  /{version}/projects/{project}/locations/{location}/publishers/google/models/{model}:{generateContent|streamGenerateContent?alt=sse}
+  /gateway/{model}/{chat|chat-stream}
+  /v1/messages
+
+On the way in, the path's value wins for a field the binding removes from the body, and the
+body's wins otherwise; the body fields the binding writes are taken out, so Vertex AI's
+``anthropic_version`` never reaches another API. On the way out, the body is validated against
+the backend API's schema first, then the binding's edits apply in order. A request that leaves
+in the binding it arrived in gets those fields back as the client sent them.
+
+A binding that does not parse, or one that needs a path variable the client's path did not hold,
+is a misconfiguration of the proxy, not of the client: the request fails with a 500, counted by
+``transcoder.unresolved``. A request binding that does not match the path reads nothing and is
+logged at debug.
+
+The instructions are read once, when the transcoder's request leg runs, so the filter that
+writes them must run before that instance of the transcoder; a model router placed between the
+two instances in the example above writes them in time for the backend-boundary one. Writes
+during the response have no effect.
+
+The example pins a route to Claude on an illustrative gateway, statically, with
+``set_filter_state``; a model router would write the same keys per request.
+
+.. code-block:: yaml
+
+  routes:
+  - match: { prefix: /anthropic/ }
+    route: { cluster: claude_gateway }
+    typed_per_filter_config:
+      envoy.filters.http.set_filter_state:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+        on_request_headers:
+        - object_key: envoy.ai.llm_protocol.response
+          format_string:
+            text_format_source:
+              inline_string: "ANTHROPIC_MESSAGES"
+        - object_key: envoy.ai.binding.response
+          format_string:
+            text_format_source:
+              inline_string: "/gateway/anthropic/{model}/{messages|messages-stream}"
+        - object_key: envoy.ai.model.resolved
+          format_string:
+            text_format_source:
+              inline_string: "claude-sonnet-4-5"
+
+A binding in JSON also edits the body. Claude on Vertex AI takes the model in the path alone and
+the Vertex AI API version in the body:
+
+.. code-block:: json
+
+  {
+    "uri_pattern": "/v1/projects/my-project/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
+    "mutations": [
+      {"body_field": "model"},
+      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    ]
+  }
+
+Credentials stay with the route, for example through ``request_headers_to_add``.
 
 Response token-usage extraction
 -------------------------------
@@ -690,6 +809,7 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_parsed, Counter, A held request payload was parsed into a document.
   request_parse_error, Counter, A declared AI endpoint's payload was not well-formed JSON and was rejected with a 400.
   request_passthrough, Counter, "A payload on an unconfigured route failed to parse under :ref:`parse_unconfigured_routes <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>` and was forwarded unchanged; never a request failure."
+  route_binding_unused, Counter, "A request on a route that declares a :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>` no AI filter of the chain applies, such as a ``response.binding`` with no transcoder running a request ``FROM_IR`` leg."
   request_external_buffer_error, Counter, The external buffer failed irrecoverably on the request path and the stream was answered with a 500.
   response_external_buffer_error, Counter, The external buffer failed irrecoverably on the response path and the stream was answered with a 500.
   token_usage_found, Counter, A response yielded token usage and metadata was written (includes ``PARTIAL`` records).

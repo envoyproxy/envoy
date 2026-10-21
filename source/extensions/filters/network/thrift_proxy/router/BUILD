@@ -31,6 +31,7 @@ envoy_cc_library(
         "//envoy/tcp:conn_pool_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "//source/common/stats:prefix_utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
