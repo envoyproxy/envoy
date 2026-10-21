@@ -63,6 +63,8 @@ areas:
 
   basic_auth:
     title: basic_auth
+  bootstrap:
+    title: bootstrap
   build:
     title: build
 
