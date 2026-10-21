@@ -23,7 +23,10 @@ and :ref:`response_handling
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.response_handling>`.
 
 The filter acts only on requests it has a reason to inspect. A request on a
-route that is not a declared AI endpoint -- and, unless
+route that is not a declared AI endpoint -- by an entry of its own or by the
+filter's :ref:`default_per_route
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.default_per_route>`
+-- and, unless
 :ref:`parse_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
 is set, every request -- passes straight through: its headers are not held, its
@@ -168,6 +171,28 @@ does not parse is forwarded unchanged.
       "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
       request_handling:
         parse_unconfigured_routes: true
+
+A listener can instead declare every route an AI endpoint at once, with
+:ref:`default_per_route
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.default_per_route>`:
+the per-route configuration a route without an entry of its own gets, held to
+the same standard as one it carries -- its payload is parsed strictly and the AI
+filters run. A route's own entry, or its virtual host's, still takes precedence,
+and a route that disables the filter is left alone. With it, a gateway whose
+backend a filter ahead of this one chooses per request needs no
+``typed_per_filter_config`` entry on any route: the client API here, and
+everything about the backend in filter state.
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.ai_protocol_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+      request_handling: {}
+      default_per_route:
+        request:
+          llm_protocol: OPENAI_CHAT_COMPLETIONS
 
 .. _config_http_filters_ai_protocol_manager_ai_filters:
 

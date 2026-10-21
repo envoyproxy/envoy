@@ -57,6 +57,16 @@ message AiProtocolManager {
   // is used, which does not bound the size of the payload it holds.
   // [#extension-category: envoy.ai_protocol_manager.external_buffer]
   config.core.v3.TypedExtensionConfig external_buffer_config = 4;
+
+  // The per-route configuration of a route that carries none of its own. It declares every
+  // route of the listener an AI endpoint at once, with the APIs and bindings it names, so a
+  // gateway whose backend a filter chooses per request needs no ``typed_per_filter_config``
+  // entry on any route. A route's own entry, or its virtual host's, still takes precedence,
+  // and a route that disables the filter is left alone. When unset, a route without an entry
+  // is passed through, or parsed on a best-effort basis under
+  // :ref:`parse_unconfigured_routes
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`.
+  AiProtocolManagerPerRoute default_per_route = 5;
 }
 
 // Request-side processing configuration. A route that carries a

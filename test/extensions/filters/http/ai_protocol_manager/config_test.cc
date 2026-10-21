@@ -294,6 +294,50 @@ response:
                   testing::Property(&RouteConfig::requestBinding, testing::IsNull())));
 }
 
+// The filter's `default_per_route` is checked as a route's own entry is, when the configuration
+// loads, and is what a route without an entry gets.
+TEST(AiProtocolManagerConfigTest, DefaultPerRouteIsCheckedWhenTheConfigLoads) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Stats::MockIsolatedStatsStore> stats;
+  const auto create = [&](const std::string& yaml) {
+    envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+    return FilterConfig::create(proto_config, context, *stats.rootScope(),
+                                std::make_shared<InMemoryExternalBufferFactory>());
+  };
+
+  const absl::StatusOr<FilterConfigSharedPtr> without = create("request_handling: {}");
+  ASSERT_TRUE(without.ok()) << without.status();
+  EXPECT_EQ((*without)->defaultRouteConfig(), nullptr);
+
+  const absl::StatusOr<FilterConfigSharedPtr> with = create(R"EOF(
+request_handling: {}
+default_per_route:
+  request:
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+  response:
+    llm_protocol: ANTHROPIC_MESSAGES
+    binding: {uri_pattern: "/gateway/{model}/{messages|messages-stream}"}
+)EOF");
+  ASSERT_TRUE(with.ok()) << with.status();
+  const RouteConfig* defaults = (*with)->defaultRouteConfig();
+  ASSERT_NE(defaults, nullptr);
+  EXPECT_TRUE(defaults->hasRequest());
+  EXPECT_EQ(defaults->requestProtocol(), LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(defaults->responseProtocol(), LLMProtocol::AnthropicMessages);
+  ASSERT_NE(defaults->responseBinding(), nullptr);
+
+  EXPECT_THAT(create(R"EOF(
+request_handling: {}
+default_per_route:
+  request:
+    llm_protocol: ANTHROPIC_MESSAGES
+    binding: {uri_pattern: "/v1/{model"}
+)EOF"),
+              StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                       testing::HasSubstr("default_per_route")));
+}
+
 // The route config proto the factory hands the config subsystem is the per-route
 // message, not the filter-level one.
 TEST(AiProtocolManagerConfigTest, EmptyRouteConfigProtoIsPerRouteMessage) {
