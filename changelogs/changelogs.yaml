@@ -165,6 +165,8 @@ areas:
     title: mcp_router
   mcp_transcoder:
     title: mcp_transcoder
+  memory:
+    title: memory
   mysql_proxy:
     title: mysql_proxy
 
