@@ -22,15 +22,16 @@ public:
   // Creates an incremental text response, capturing metric values and query filtering decisions
   // before returning. Worker threads can update values during capture, so this is not an atomic
   // store snapshot. Subsequent chunks serialize only captured values; metric references retain
-  // immutable names and tags for the request's lifetime.
-  static Admin::RequestPtr
-  makeTextRequest(const std::vector<Stats::CounterSharedPtr>& counters,
-                  const std::vector<Stats::GaugeSharedPtr>& gauges,
-                  const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
-                  const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
-                  const Stats::CustomStatNamespaces& custom_namespaces,
-                  uint64_t chunk_size = 64 * 1024);
+  // immutable names and tags until their family has been serialized.
+  // Takes ownership of the vectors so collected metric references can be moved into snapshots.
+  static Admin::RequestPtr makeTextRequest(std::vector<Stats::CounterSharedPtr> counters,
+                                           std::vector<Stats::GaugeSharedPtr> gauges,
+                                           std::vector<Stats::ParentHistogramSharedPtr> histograms,
+                                           std::vector<Stats::TextReadoutSharedPtr> text_readouts,
+                                           const Upstream::ClusterManager& cluster_manager,
+                                           const StatsParams& params,
+                                           const Stats::CustomStatNamespaces& custom_namespaces,
+                                           uint64_t chunk_size = 64 * 1024);
 
   static bool useProtobufFormat(const StatsParams& params, const Http::RequestHeaderMap& headers);
 

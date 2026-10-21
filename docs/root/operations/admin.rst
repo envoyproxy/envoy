@@ -798,7 +798,9 @@ modify different aspects of the server:
 
   Text responses capture metric values before generating response chunks, so delays consuming
   chunks do not change the sampled values. Collection is not an atomic snapshot across worker
-  threads. Histogram bucket counts or summary quantiles are copied into a flat value array.
+  threads. Histogram bucket counts or summary quantiles are captured in bulk arrays.
+  Snapshot storage and metric references are released as each metric family is serialized.
+  Incremental serialization alone does not bound HTTP transport buffering.
 
   The output will either be the protobuf format or the v0.0.4 text format, depending on the value
   of the ``Accept`` header. A prometheus scrape configuration specifies the desired protocol:

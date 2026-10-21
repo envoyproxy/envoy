@@ -1,3 +1,4 @@
+#include <array>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -199,6 +200,193 @@ protected:
   std::vector<std::unique_ptr<Stats::TagVector>> endpoints_tags_;
 };
 
+TEST_F(PrometheusStatsFormatterTest, TransferredReferencesRemainOwnedWithoutRefcountChurn) {
+  class CountingCounter : public Stats::MockCounter {
+  public:
+    CountingCounter(uint32_t& increments, uint32_t& decrements)
+        : increments_(increments), decrements_(decrements) {}
+    void incRefCount() override {
+      ++increments_;
+      Stats::MockCounter::incRefCount();
+    }
+    bool decRefCount() override {
+      ++decrements_;
+      return Stats::MockCounter::decRefCount();
+    }
+
+    uint32_t& increments_;
+    uint32_t& decrements_;
+  };
+
+  uint32_t increments = 0;
+  uint32_t decrements = 0;
+  auto* counter = new NiceMock<CountingCounter>(increments, decrements);
+  counter->name_ = "requests";
+  counter->setTagExtractedName("requests");
+  EXPECT_CALL(*counter, value()).WillOnce(testing::Return(42));
+  std::vector<Stats::CounterSharedPtr> counters;
+  counters.emplace_back(counter);
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  auto request = PrometheusStatsFormatter::makeTextRequest(
+      std::move(counters), {}, {}, {}, endpoints_helper_->cm_, StatsParams(), custom_namespaces, 1);
+  Http::TestResponseHeaderMapImpl headers;
+  EXPECT_EQ(Http::Code::OK, request->start(headers));
+  EXPECT_EQ("# TYPE envoy_requests counter\nenvoy_requests{} 42\n", drainRequest(*request, 1));
+  EXPECT_EQ(1, increments);
+  EXPECT_EQ(1, decrements);
+  request.reset();
+  EXPECT_EQ(1, decrements);
+}
+
+TEST_F(PrometheusStatsFormatterTest, FamilyMembersAreSortedOnlyWhenRendered) {
+  class CountingCounter : public Stats::MockCounter {
+  public:
+    Stats::StatName statName() const override {
+      ++name_reads_;
+      return Stats::MockCounter::statName();
+    }
+    mutable uint32_t name_reads_{0};
+  };
+  std::vector<Stats::RefcountPtr<NiceMock<CountingCounter>>> metrics;
+  for (const auto& family : {"second", "first"}) {
+    for (const auto& tag : {"z", "a"}) {
+      auto metric = Stats::RefcountPtr<NiceMock<CountingCounter>>(new NiceMock<CountingCounter>());
+      metric->name_ = absl::StrCat(family, ".", tag);
+      metric->setTagExtractedName(family);
+      metric->setTags(Stats::TagVector{{"caller", tag}});
+      EXPECT_CALL(*metric, value()).WillOnce(testing::Return(metrics.size() + 10));
+      counters_.push_back(metric);
+      metrics.push_back(std::move(metric));
+    }
+  }
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  auto request = PrometheusStatsFormatter::makeTextRequest(
+      counters_, {}, {}, {}, endpoints_helper_->cm_, StatsParams(), custom_namespaces, 1);
+  for (auto& metric : metrics) {
+    metric->name_reads_ = 0;
+  }
+  Buffer::OwnedImpl first;
+  ASSERT_TRUE(request->nextChunk(first));
+  EXPECT_GT(metrics[2]->name_reads_ + metrics[3]->name_reads_, 0);
+  EXPECT_EQ(0, metrics[0]->name_reads_ + metrics[1]->name_reads_);
+  const std::string expected = "# TYPE envoy_first counter\n"
+                               "envoy_first{caller=\"a\"} 13\n"
+                               "envoy_first{caller=\"z\"} 12\n"
+                               "# TYPE envoy_second counter\n"
+                               "envoy_second{caller=\"a\"} 11\n"
+                               "envoy_second{caller=\"z\"} 10\n";
+  EXPECT_EQ(expected, first.toString() + drainRequest(*request, 1));
+  EXPECT_GT(metrics[0]->name_reads_ + metrics[1]->name_reads_, 0);
+}
+
+TEST_F(PrometheusStatsFormatterTest, CompletedFamiliesReleaseSnapshotsBeforeLaterChunks) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("first", {{makeStat("caller"), makeStat("a")}});
+  counters_.back()->add(10);
+  addCounter("first", {{makeStat("caller"), makeStat("z")}});
+  counters_.back()->add(20);
+  addCounter("second", {});
+  counters_.back()->add(30);
+  addGauge("active", {});
+  gauges_.back()->set(40);
+  Buffer::OwnedImpl expected;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, expected, StatsParams(),
+                                                  custom_namespaces);
+  const uint32_t counter_refs = counters_[0]->use_count();
+  const uint32_t gauge_refs = gauges_[0]->use_count();
+  auto request = PrometheusStatsFormatter::makeTextRequest(counters_, gauges_, histograms_,
+                                                           textReadouts_, endpoints_helper_->cm_,
+                                                           StatsParams(), custom_namespaces, 1);
+  const std::string first_metric = "# TYPE envoy_first counter\nenvoy_first{caller=\"a\"} 10\n";
+  std::string output;
+  while (output.size() < first_metric.size()) {
+    Buffer::OwnedImpl chunk;
+    ASSERT_TRUE(request->nextChunk(chunk));
+    ASSERT_EQ(1, chunk.length());
+    output.append(chunk.toString());
+  }
+  EXPECT_EQ(first_metric, output);
+  // The first family still has an unrendered member, so it retains both references.
+  EXPECT_EQ(counter_refs + 1, counters_[0]->use_count());
+  EXPECT_EQ(counter_refs + 1, counters_[1]->use_count());
+  Buffer::OwnedImpl chunk;
+  ASSERT_TRUE(request->nextChunk(chunk));
+  ASSERT_EQ(1, chunk.length());
+  output.append(chunk.toString());
+  // Its last member has now been serialized, but almost all its bytes are still pending.
+  EXPECT_EQ(counter_refs, counters_[0]->use_count());
+  EXPECT_EQ(counter_refs, counters_[1]->use_count());
+  EXPECT_EQ(counter_refs + 1, counters_[2]->use_count());
+  EXPECT_EQ(gauge_refs + 1, gauges_[0]->use_count());
+  counters_[2]->add(100);
+  gauges_[0]->set(200);
+  EXPECT_EQ(expected.toString(), output + drainRequest(*request, 1));
+  EXPECT_EQ(counter_refs, counters_[2]->use_count());
+  EXPECT_EQ(gauge_refs, gauges_[0]->use_count());
+}
+
+TEST_F(PrometheusStatsFormatterTest, HistogramFamiliesReleaseReferencesWithPendingOutput) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  for (const auto mode :
+       {Utility::HistogramBucketsMode::Cumulative, Utility::HistogramBucketsMode::Summary}) {
+    histograms_.clear();
+    HistogramWrapper values;
+    values.setHistogramValues({10, 20});
+    Stats::HistogramStatisticsImpl statistics(values.getHistogram());
+    auto first = makeHistogram("first", {});
+    auto second = makeHistogram("second", {});
+    for (auto& histogram : {first, second}) {
+      ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(statistics));
+      ON_CALL(*histogram, intervalStatistics()).WillByDefault(ReturnRef(statistics));
+      addHistogram(histogram);
+    }
+    StatsParams params;
+    params.histogram_buckets_mode_ = mode;
+    Buffer::OwnedImpl expected;
+    PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                    endpoints_helper_->cm_, expected, params,
+                                                    custom_namespaces);
+    const uint32_t first_refs = first->use_count();
+    const uint32_t second_refs = second->use_count();
+    auto request = PrometheusStatsFormatter::makeTextRequest(counters_, gauges_, histograms_,
+                                                             textReadouts_, endpoints_helper_->cm_,
+                                                             params, custom_namespaces, 1);
+    Buffer::OwnedImpl chunk;
+    ASSERT_TRUE(request->nextChunk(chunk));
+    ASSERT_EQ(1, chunk.length());
+    EXPECT_EQ(first_refs, first->use_count());
+    EXPECT_EQ(second_refs + 1, second->use_count());
+    values.setHistogramValues({1000});
+    statistics.refresh(values.getHistogram());
+    EXPECT_EQ(expected.toString(), chunk.toString() + drainRequest(*request, 1));
+    EXPECT_EQ(second_refs, second->use_count());
+  }
+}
+
+TEST_F(PrometheusStatsFormatterTest, CancellationReleasesUnserializedFamilies) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("first", {{makeStat("caller"), makeStat("a")}});
+  addCounter("first", {{makeStat("caller"), makeStat("z")}});
+  addCounter("second", {});
+  addGauge("active", {});
+  const uint32_t counter_refs = counters_[0]->use_count();
+  const uint32_t gauge_refs = gauges_[0]->use_count();
+  auto request = PrometheusStatsFormatter::makeTextRequest(counters_, gauges_, histograms_,
+                                                           textReadouts_, endpoints_helper_->cm_,
+                                                           StatsParams(), custom_namespaces, 1);
+  Buffer::OwnedImpl chunk;
+  ASSERT_TRUE(request->nextChunk(chunk));
+  EXPECT_EQ(counter_refs + 1, counters_[0]->use_count());
+  EXPECT_EQ(counter_refs + 1, counters_[2]->use_count());
+  EXPECT_EQ(gauge_refs + 1, gauges_[0]->use_count());
+  request.reset();
+  for (const auto& counter : counters_) {
+    EXPECT_EQ(counter_refs, counter->use_count());
+  }
+  EXPECT_EQ(gauge_refs, gauges_[0]->use_count());
+}
+
 TEST_F(PrometheusStatsFormatterTest, LargeFamilySpansChunks) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
   std::string expected = "# TYPE envoy_requests counter\n";
@@ -365,8 +553,9 @@ TEST_F(PrometheusStatsFormatterTest, HistogramSnapshotsSurviveMergesBeforeAndBet
     ON_CALL(*z, cumulativeStatistics()).WillByDefault(ReturnRef(stats_z));
     ON_CALL(*a, intervalStatistics()).WillByDefault(ReturnRef(stats_a));
     ON_CALL(*z, intervalStatistics()).WillByDefault(ReturnRef(stats_z));
-    addHistogram(a);
+    // Capture in reverse output order to verify sorting preserves each snapshot's value offset.
     addHistogram(z);
+    addHistogram(a);
     StatsParams params;
     params.histogram_buckets_mode_ = mode;
     if (mode == Utility::HistogramBucketsMode::Summary) {

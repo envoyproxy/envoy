@@ -825,7 +825,7 @@ private:
 template <class StatType, class Visit>
 uint64_t visitStatType(const StatsParams& params, const std::vector<StatType>& metrics,
                        const Stats::CustomStatNamespaces& custom_namespaces, Visit visit,
-                       bool filter_metrics = true) {
+                       bool filter_metrics = true, bool sort_metrics = true) {
 
   /*
    * From
@@ -892,9 +892,11 @@ uint64_t visitStatType(const StatsParams& params, const std::vector<StatType>& m
     // Sort before producing the final output to satisfy the "preferred" ordering from the
     // prometheus spec: metrics will be sorted by their tags' textual representation, which will
     // be consistent across calls.
-    std::sort(group.begin(), group.end(), [](const auto* a, const auto* b) {
-      return MetricLessThan()(&statMetadata(a), &statMetadata(b));
-    });
+    if (sort_metrics) {
+      std::sort(group.begin(), group.end(), [](const auto* a, const auto* b) {
+        return MetricLessThan()(&statMetadata(a), &statMetadata(b));
+      });
+    }
 
     visit(std::move(group), prefixed_tag_extracted_name.value());
   }
@@ -973,19 +975,45 @@ public:
 
 template <class StatType> class TextStatCursorImpl : public TextStatCursor {
 public:
-  void addFamily(std::vector<StatType*>&& metrics, const std::string& name) {
-    families_.push_back({std::move(metrics), name});
+  void addFamily(std::vector<StatType>&& metrics, const std::string& name,
+                 std::vector<uint64_t>&& buckets = {}, std::vector<double>&& quantiles = {}) {
+    families_.push_back(Family{std::move(metrics), name, std::move(buckets), std::move(quantiles)});
   }
 
   bool next(Buffer::Instance& output, TextFormat& format) override {
     if (family_ == families_.size()) {
       return false;
     }
-    const auto& family = families_[family_];
+    auto& family = *families_[family_];
+    if constexpr (!std::is_same_v<StatType, Stats::PrimitiveCounterSnapshot> &&
+                  !std::is_same_v<StatType, Stats::PrimitiveGaugeSnapshot>) {
+      if (metric_ == 0) {
+        // Sort just before rendering this family, rather than sorting all families up front.
+        // Captured values (including histogram offsets) move together with their metric references.
+        std::sort(family.metrics_.begin(), family.metrics_.end(), [](const auto& a, const auto& b) {
+          return MetricLessThan()(&statMetadata(statPointer(a)), &statMetadata(statPointer(b)));
+        });
+      }
+    }
     format.setEmitType(metric_ == 0);
-    auto* metric = family.metrics_[metric_++];
-    format.generateOutput(output, std::span<StatType* const>(&metric, 1), family.name_);
+    if constexpr (std::is_same_v<StatType, TextHistogramSnapshot>) {
+      format.setHistogramValues(family.buckets_, family.quantiles_);
+    }
+    if constexpr (std::is_same_v<StatType, Stats::PrimitiveCounterSnapshot> ||
+                  std::is_same_v<StatType, Stats::PrimitiveGaugeSnapshot>) {
+      auto* metric = &family.metrics_[metric_++];
+      format.generateOutput(output, std::span<StatType* const>(&metric, 1), family.name_);
+    } else {
+      const auto* metric = &family.metrics_[metric_++];
+      format.generateOutput(output, std::span<const StatType* const>(&metric, 1), family.name_);
+    }
     if (metric_ == family.metrics_.size()) {
+      // Serialized bytes own their contents, even when pending output spans later chunks.
+      // Destroy the family, including its vector allocations, rather than just clearing it.
+      if constexpr (std::is_same_v<StatType, TextHistogramSnapshot>) {
+        format.setHistogramValues({}, {});
+      }
+      families_[family_].reset();
       metric_ = 0;
       ++family_;
     }
@@ -994,10 +1022,12 @@ public:
 
 private:
   struct Family {
-    std::vector<StatType*> metrics_;
+    std::vector<StatType> metrics_;
     std::string name_;
+    std::vector<uint64_t> buckets_;
+    std::vector<double> quantiles_;
   };
-  std::vector<Family> families_;
+  std::vector<std::optional<Family>> families_;
   size_t family_{0};
   size_t metric_{0};
 };
@@ -1007,22 +1037,22 @@ private:
 // Worker threads can still update counters during capture; this is not an atomic store snapshot.
 class PrometheusTextRequest : public Admin::Request {
 public:
-  PrometheusTextRequest(const std::vector<Stats::CounterSharedPtr>& counters,
-                        const std::vector<Stats::GaugeSharedPtr>& gauges,
-                        const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                        const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+  PrometheusTextRequest(std::vector<Stats::CounterSharedPtr>&& counters,
+                        std::vector<Stats::GaugeSharedPtr>&& gauges,
+                        std::vector<Stats::ParentHistogramSharedPtr>&& histograms,
+                        std::vector<Stats::TextReadoutSharedPtr>&& text_readouts,
                         const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
                         const Stats::CustomStatNamespaces& custom_namespaces, uint64_t chunk_size)
-      : counters_(captureValues(counters, params)), gauges_(captureValues(gauges, params)),
-        text_readouts_(captureValues(text_readouts, params)), params_(params),
+      : counters_(captureValues(std::move(counters), params)),
+        gauges_(captureValues(std::move(gauges), params)),
+        text_readouts_(captureValues(std::move(text_readouts), params)), params_(params),
         custom_namespaces_(custom_namespaces), chunk_size_(chunk_size) {
     ASSERT(chunk_size_ > 0);
     format_.setHistogramType(
         params.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary
             ? PrometheusStatsFormatter::OutputFormat::HistogramType::Summary
             : PrometheusStatsFormatter::OutputFormat::HistogramType::ClassicHistogram);
-    captureHistograms(histograms);
-    format_.setHistogramValues(histogram_buckets_, histogram_quantiles_);
+    captureHistograms(std::move(histograms));
     Upstream::HostUtility::forEachHostMetric(
         cluster_manager,
         [&](Stats::PrimitiveCounterSnapshot&& metric) {
@@ -1055,24 +1085,24 @@ private:
 
   template <class StatType>
   static std::vector<TextMetricSnapshot<StatType, decltype(std::declval<StatType>().value())>>
-  captureValues(const std::vector<Stats::RefcountPtr<StatType>>& metrics,
-                const StatsParams& params) {
+  captureValues(std::vector<Stats::RefcountPtr<StatType>>&& metrics, const StatsParams& params) {
     using Value = decltype(metrics.front()->value());
     std::vector<TextMetricSnapshot<StatType, Value>> snapshots;
     snapshots.reserve(metrics.size());
-    for (const auto& metric : metrics) {
+    for (auto& metric : metrics) {
       if (params.shouldShowMetric(*metric)) {
-        snapshots.push_back({metric, metric->value()});
+        auto value = metric->value();
+        snapshots.push_back({std::move(metric), std::move(value)});
       }
     }
     return snapshots;
   }
 
-  void captureHistograms(const std::vector<Stats::ParentHistogramSharedPtr>& histograms) {
+  void captureHistograms(std::vector<Stats::ParentHistogramSharedPtr>&& histograms) {
     const bool summary = params_.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary;
     size_t values_size = 0;
     histograms_.reserve(histograms.size());
-    for (const auto& histogram : histograms) {
+    for (auto& histogram : histograms) {
       if (!params_.shouldShowMetric(*histogram)) {
         continue;
       }
@@ -1083,7 +1113,7 @@ private:
           summary ? histogram_quantiles_.max_size() : histogram_buckets_.max_size();
       RELEASE_ASSERT(bounds.size() <= max_size - values_size, "histogram snapshot is too large");
       histograms_.push_back(
-          {histogram, {stats.sampleCount(), stats.sampleSum(), &bounds, values_size}});
+          {std::move(histogram), {stats.sampleCount(), stats.sampleSum(), &bounds, values_size}});
       values_size += bounds.size();
     }
 
@@ -1111,21 +1141,73 @@ private:
     }
   }
 
-  template <class StatType> void prepare(const std::vector<StatType>& metrics) {
-    using Sample = std::remove_pointer_t<decltype(statPointer(metrics.front()))>;
-    auto cursor = std::make_unique<TextStatCursorImpl<Sample>>();
+  template <class StatType> static void releaseStorage(std::vector<StatType>& metrics) {
+    std::vector<StatType>().swap(metrics);
+  }
+
+  template <class StatType> void prepare(std::vector<StatType>& metrics) {
+    auto cursor = std::make_unique<TextStatCursorImpl<StatType>>();
     visitStatType(
         params_, metrics, custom_namespaces_,
-        [&](auto&& group, const auto& name) { cursor->addFamily(std::move(group), name); },
-        false); // Inclusion was captured with the values, not re-evaluated between chunks.
+        [&](auto&& group, const auto& name) {
+          std::vector<StatType> family;
+          family.reserve(group.size());
+          std::vector<uint64_t> buckets;
+          std::vector<double> quantiles;
+          if constexpr (std::is_same_v<StatType, TextHistogramSnapshot>) {
+            size_t values_size = 0;
+            for (const auto* metric : group) {
+              values_size += metric->value_.bounds_->size();
+            }
+            if (params_.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary) {
+              quantiles.reserve(values_size);
+            } else {
+              buckets.reserve(values_size);
+            }
+          }
+          for (const auto* metric : group) {
+            auto& snapshot = metrics[metric - metrics.data()];
+            if constexpr (std::is_same_v<StatType, TextHistogramSnapshot>) {
+              auto& value = snapshot.value_;
+              const size_t size = value.bounds_->size();
+              if (params_.histogram_buckets_mode_ == Utility::HistogramBucketsMode::Summary) {
+                const auto begin = histogram_quantiles_.begin() + value.offset_;
+                value.offset_ = quantiles.size();
+                quantiles.insert(quantiles.end(), begin, begin + size);
+              } else {
+                const auto begin = histogram_buckets_.begin() + value.offset_;
+                value.offset_ = buckets.size();
+                buckets.insert(buckets.end(), begin, begin + size);
+              }
+            }
+            family.push_back(std::move(snapshot));
+          }
+          cursor->addFamily(std::move(family), name, std::move(buckets), std::move(quantiles));
+        },
+        false, false); // Inclusion is captured; member sorting is deferred until rendering.
+    // Grouping pointers are no longer needed: each family now owns its captured values.
+    releaseStorage(metrics);
+    if constexpr (std::is_same_v<StatType, TextHistogramSnapshot>) {
+      releaseStorage(histogram_buckets_);
+      releaseStorage(histogram_quantiles_);
+    }
     cursor_ = std::move(cursor);
   }
 
   template <class StatType> void preparePrimitive(std::vector<StatType>& metrics) {
+    // Primitive snapshots have const value fields and cannot be sorted in place. Keep sorting
+    // their borrowed pointers before transferring ownership to the family.
     auto cursor = std::make_unique<TextStatCursorImpl<StatType>>();
-    visitPrimitiveStatType(
-        params_, metrics, custom_namespaces_,
-        [&](auto&& group, const auto& name) { cursor->addFamily(std::move(group), name); });
+    visitPrimitiveStatType(params_, metrics, custom_namespaces_,
+                           [&](auto&& group, const auto& name) {
+                             std::vector<StatType> family;
+                             family.reserve(group.size());
+                             for (auto* metric : group) {
+                               family.push_back(std::move(*metric));
+                             }
+                             cursor->addFamily(std::move(family), name);
+                           });
+    releaseStorage(metrics);
     cursor_ = std::move(cursor);
   }
 
@@ -1161,9 +1243,9 @@ private:
     return true;
   }
 
-  const std::vector<TextCounterSnapshot> counters_;
-  const std::vector<TextGaugeSnapshot> gauges_;
-  const std::vector<TextReadoutSnapshot> text_readouts_;
+  std::vector<TextCounterSnapshot> counters_;
+  std::vector<TextGaugeSnapshot> gauges_;
+  std::vector<TextReadoutSnapshot> text_readouts_;
   std::vector<TextHistogramSnapshot> histograms_;
   std::vector<uint64_t> histogram_buckets_;
   std::vector<double> histogram_quantiles_;
@@ -1174,9 +1256,8 @@ private:
   std::vector<Stats::PrimitiveGaugeSnapshot> host_gauges_;
   std::unique_ptr<TextStatCursor> cursor_;
   TextFormat format_;
-  // A histogram is serialized once, including all bucket/sum/count lines, before it is drained
-  // across chunks. One unusually large metric can exceed the chunk size; an entire family is
-  // never materialized here.
+  // Staging is bounded by a chunk plus one metric. Histograms are serialized once, including
+  // every bucket/sum/count line, even when an individual metric spans multiple chunks.
   Buffer::OwnedImpl pending_;
   Phase phase_{Phase::Counters};
 };
@@ -1205,15 +1286,14 @@ uint64_t outputPrimitiveStatType(Buffer::Instance& response, const StatsParams& 
 } // namespace
 
 Admin::RequestPtr PrometheusStatsFormatter::makeTextRequest(
-    const std::vector<Stats::CounterSharedPtr>& counters,
-    const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+    std::vector<Stats::CounterSharedPtr> counters, std::vector<Stats::GaugeSharedPtr> gauges,
+    std::vector<Stats::ParentHistogramSharedPtr> histograms,
+    std::vector<Stats::TextReadoutSharedPtr> text_readouts,
     const Upstream::ClusterManager& cluster_manager, const StatsParams& params,
     const Stats::CustomStatNamespaces& custom_namespaces, uint64_t chunk_size) {
-  return std::make_unique<PrometheusTextRequest>(counters, gauges, histograms, text_readouts,
-                                                 cluster_manager, params, custom_namespaces,
-                                                 chunk_size);
+  return std::make_unique<PrometheusTextRequest>(
+      std::move(counters), std::move(gauges), std::move(histograms), std::move(text_readouts),
+      cluster_manager, params, custom_namespaces, chunk_size);
 }
 
 // Determine the format based on Accept header, using first-match priority.
