@@ -52,7 +52,7 @@ protected:
     scope_.reset();
     pool_.clear();
     store_.reset();
-    EXPECT_EQ(0, symbol_table_->numSymbols());
+    EXPECT_EQ(num_base_symbols_, symbol_table_->numSymbols());
   }
 
   void init(MakeStatFn make_stat) {
@@ -160,6 +160,8 @@ protected:
   }
 
   SymbolTablePtr symbol_table_;
+  // Symbols pre-encoded by the table itself (the well-known stat names).
+  const uint64_t num_base_symbols_{symbol_table_->numSymbols()};
   StatNamePool pool_;
   std::unique_ptr<Allocator> alloc_;
   std::unique_ptr<Store> store_;

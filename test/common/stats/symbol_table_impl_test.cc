@@ -3,8 +3,10 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/memory/stats.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/stats/well_known_stat_names.h"
 
 #include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
@@ -28,7 +30,7 @@ protected:
 
   void clearStorage() {
     pool_.clear();
-    EXPECT_EQ(0, table_.numSymbols());
+    EXPECT_EQ(num_base_symbols_, table_.numSymbols());
   }
 
   SymbolVec getSymbols(StatName stat_name) {
@@ -65,6 +67,8 @@ protected:
   }
 
   SymbolTableImpl table_;
+  // Symbols pre-encoded by the table itself (the well-known stat names).
+  const uint64_t num_base_symbols_{table_.numSymbols()};
   StatNamePool pool_;
 };
 
@@ -358,8 +362,10 @@ public:
 
 TEST_F(StatNameDeathTest, TestBadDecodes) {
   {
-    // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
-    SymbolVec bad_symbol_vec = {1}; // symbol 0 is the empty symbol.
+    // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash. Every symbol
+    // up to monotonicCounter() may be taken (the table pre-encodes the well-known stat names),
+    // so pick one past it.
+    SymbolVec bad_symbol_vec = {static_cast<Symbol>(monotonicCounter() + 1)};
     EXPECT_DEATH(decodeSymbolVec(bad_symbol_vec), "");
   }
 
@@ -420,18 +426,20 @@ TEST_F(StatNameTest, FreePoolTest) {
   //   b) the monotonically increasing counter has not risen to more than the maximum number of
   //   coexisting symbols during the life of the table.
 
+  // The table pre-encodes the well-known stat names, so count relative to the fresh-table state.
+  const Symbol counter_base = monotonicCounter();
   {
     makeStat("1a");
     makeStat("2a");
     makeStat("3a");
     makeStat("4a");
     makeStat("5a");
-    EXPECT_EQ(monotonicCounter(), 6);
-    EXPECT_EQ(table_.numSymbols(), 5);
+    EXPECT_EQ(monotonicCounter(), counter_base + 5);
+    EXPECT_EQ(table_.numSymbols(), num_base_symbols_ + 5);
     clearStorage();
   }
-  EXPECT_EQ(monotonicCounter(), 6);
-  EXPECT_EQ(table_.numSymbols(), 0);
+  EXPECT_EQ(monotonicCounter(), counter_base + 5);
+  EXPECT_EQ(table_.numSymbols(), num_base_symbols_);
 
   // These are different strings being encoded, but they should recycle through the same symbols as
   // the stats above.
@@ -440,12 +448,12 @@ TEST_F(StatNameTest, FreePoolTest) {
   makeStat("3b");
   makeStat("4b");
   makeStat("5b");
-  EXPECT_EQ(monotonicCounter(), 6);
-  EXPECT_EQ(table_.numSymbols(), 5);
+  EXPECT_EQ(monotonicCounter(), counter_base + 5);
+  EXPECT_EQ(table_.numSymbols(), num_base_symbols_ + 5);
 
   makeStat("6");
-  EXPECT_EQ(monotonicCounter(), 7);
-  EXPECT_EQ(table_.numSymbols(), 6);
+  EXPECT_EQ(monotonicCounter(), counter_base + 6);
+  EXPECT_EQ(table_.numSymbols(), num_base_symbols_ + 6);
 }
 
 TEST_F(StatNameTest, TestShrinkingExpectation) {
@@ -952,39 +960,43 @@ TEST_F(StatNameTest, StatNameEqualityFastPaths) {
 }
 
 TEST_F(StatNameTest, EqualityWithMultiByteVarint) {
-  // Sweep segment counts around the varint boundary to catch off-by-one
-  // errors in decodeNumber's fast-path vs slow-path. Each segment gets a
-  // unique symbol assigned sequentially. Symbols 1-127 encode as 1 byte
-  // each; symbol 128+ encodes as 2 bytes. Pre-allocating throwaway symbols
-  // shifts the numbering so that different padding values produce different
-  // dataSizes for the same segment count. We verify that the sweep covers
-  // both sides of the 128 boundary (the fast-path/slow-path transition in
-  // the length-prefix varint).
-  bool seen[150] = {};
-
-  // Sweep a few potential padding numbers just to make sure we cover. This
-  // is over-testing but that's ok.
+  // Sweep dataSizes across the varint boundary to catch off-by-one errors in
+  // decodeNumber's fast-path vs slow-path (the 1-byte vs 2-byte transition of
+  // the length-prefix varint at SpilloverMask). Symbol values can't be chosen
+  // directly: each fresh table pre-encodes the well-known stat names, so new
+  // symbols start past them, encode as 1 byte up to symbol 127 and as 2 bytes
+  // beyond. Instead of computing segment counts, grow a name one segment at a
+  // time until its dataSize crosses the boundary window; the padding sweep
+  // shifts the symbol numbering by one per pass, flipping the parity of the
+  // dataSizes seen in the 2-bytes-per-symbol region so every size in the
+  // window gets hit.
   constexpr int lower_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) - 5;
   constexpr int upper_bound = static_cast<int>(SymbolTable::Encoding::SpilloverMask) + 5;
+  bool seen[2 * upper_bound + 2] = {};
+
   for (int padding = 0; padding <= 10; ++padding) {
-    for (int num_segments = lower_bound; num_segments <= upper_bound; ++num_segments) {
-      clearStorage();
+    SymbolTableImpl table;
+    StatNamePool pool(table);
 
-      // Pre-allocate throwaway symbols to shift symbol numbering.
-      for (int p = 0; p < padding; ++p) {
-        makeStat(absl::StrCat("pad", p));
-      }
+    // Pre-allocate throwaway symbols to shift symbol numbering.
+    for (int p = 0; p < padding; ++p) {
+      pool.add(absl::StrCat("pad", p));
+    }
 
-      std::string long_name = "s0";
-      for (int i = 1; i < num_segments; ++i) {
-        absl::StrAppend(&long_name, ".s", i);
-      }
+    // With N segments the encoded data is at most 2N bytes, so this starting
+    // segment count is guaranteed to begin below the window.
+    std::string long_name = "s0";
+    int num_segments = 1;
+    for (; num_segments < lower_bound / 2; ++num_segments) {
+      absl::StrAppend(&long_name, ".s", num_segments);
+    }
 
+    while (true) {
       // Two pool entries for the same name: distinct backing storage, identical content.
-      StatName x = makeStat(long_name);
-      StatName y = makeStat(long_name);
-      size_t ds = x.dataSize();
-      ASSERT_LT(ds, 150);
+      StatName x = pool.add(long_name);
+      StatName y = pool.add(long_name);
+      const size_t ds = x.dataSize();
+      ASSERT_LT(ds, sizeof(seen));
       seen[ds] = true;
       EXPECT_NE(x.dataIncludingSize(), y.dataIncludingSize())
           << "padding=" << padding << " segments=" << num_segments;
@@ -996,8 +1008,14 @@ TEST_F(StatNameTest, EqualityWithMultiByteVarint) {
       for (int i = 2; i < num_segments + 1; ++i) {
         absl::StrAppend(&long_name_alt, ".s", i);
       }
-      StatName z = makeStat(long_name_alt);
+      StatName z = pool.add(long_name_alt);
       EXPECT_NE(x, z) << "padding=" << padding << " segments=" << num_segments;
+
+      if (ds > static_cast<size_t>(upper_bound)) {
+        break;
+      }
+      absl::StrAppend(&long_name, ".s", num_segments);
+      ++num_segments;
     }
   }
   // Confirm every dataSize across the varint boundary was exercised.
@@ -1215,6 +1233,39 @@ TEST_F(StatNameTest, InlineJoinDefaultIsEmpty) {
   const SymbolTable::InlineStorage storage{};
   EXPECT_TRUE(storage.statName().empty());
   EXPECT_EQ("", table_.toString(storage.statName()));
+}
+
+// Guards the single-byte symbol budget: 2 bytes per token (length + symbol), 3 per tag name.
+TEST(WellKnownStatNamesTest, SingleByteSymbols) {
+  SymbolTable table;
+  const WellKnownStatNames& names = table.wellKnownStatNames();
+#define EXPECT_TOKEN_SIZE(name) EXPECT_EQ(2, names.name##_.size()) << #name;
+  WELL_KNOWN_STAT_TOKENS(EXPECT_TOKEN_SIZE)
+#undef EXPECT_TOKEN_SIZE
+#define EXPECT_TAG_SIZE(name) EXPECT_EQ(3, names.tag_##name##_.size()) << #name;
+  WELL_KNOWN_STAT_TAGS(EXPECT_TAG_SIZE)
+#undef EXPECT_TAG_SIZE
+}
+
+// The tag strings are duplicated from Config::TagNames to avoid a dependency cycle.
+TEST(WellKnownStatNamesTest, TagStringsMatchConfigTagNames) {
+  SymbolTable table;
+  const WellKnownStatNames& names = table.wellKnownStatNames();
+  const auto& tags = Config::TagNames::get();
+  EXPECT_EQ(tags.CLUSTER_NAME, table.toString(names.tag_cluster_name_));
+  EXPECT_EQ(tags.HEALTH_CHECK_NAME, table.toString(names.tag_health_check_name_));
+  EXPECT_EQ(tags.HTTP_CONN_MANAGER_PREFIX, table.toString(names.tag_http_conn_manager_prefix_));
+  EXPECT_EQ(tags.LISTENER_ADDRESS, table.toString(names.tag_listener_address_));
+  EXPECT_EQ(tags.RDS_ROUTE_CONFIG, table.toString(names.tag_rds_route_config_));
+  EXPECT_EQ(tags.RESPONSE_CODE, table.toString(names.tag_response_code_));
+  EXPECT_EQ(tags.RESPONSE_CODE_CLASS, table.toString(names.tag_response_code_class_));
+  EXPECT_EQ(tags.ROUTE, table.toString(names.tag_route_));
+  EXPECT_EQ(tags.SCOPED_RDS_CONFIG, table.toString(names.tag_scoped_rds_config_));
+  EXPECT_EQ(tags.SSL_CIPHER, table.toString(names.tag_ssl_cipher_));
+  EXPECT_EQ(tags.SSL_VERSION, table.toString(names.tag_ssl_version_));
+  EXPECT_EQ(tags.VIRTUAL_CLUSTER, table.toString(names.tag_virtual_cluster_));
+  EXPECT_EQ(tags.VIRTUAL_HOST, table.toString(names.tag_virtual_host_));
+  EXPECT_EQ(tags.WORKER_ID, table.toString(names.tag_worker_id_));
 }
 
 } // namespace Stats
