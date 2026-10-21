@@ -779,6 +779,15 @@ TEST_P(WasmCommonTest, VmCacheVmConfigChange) {
         ->insert({"proxy_log", envoy::extensions::wasm::v3::SanitizationConfig()});
     EXPECT_NE(create(config), base_handle);
   }
+
+  // Custom metrics are created in a scope that is set up with the VM.
+  {
+    auto config = plugin_config;
+    config.mutable_vm_config()->mutable_custom_metrics()->set_enable_eviction(true);
+    auto evictable_handle = create(config);
+    EXPECT_NE(evictable_handle, base_handle);
+    EXPECT_EQ(create(config), evictable_handle);
+  }
   proxy_wasm::clearWasmCachesForTesting();
 }
 
