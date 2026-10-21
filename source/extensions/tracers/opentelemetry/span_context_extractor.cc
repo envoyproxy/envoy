@@ -8,6 +8,7 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/tracing/trace_context_impl.h"
+#include "source/common/tracing/tracing_validation.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
 
 #include "absl/status/status.h"
@@ -23,12 +24,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 namespace {
 
-// See https://www.w3.org/TR/trace-context/#traceparent-header
-constexpr int kTraceparentHeaderSize = 55; // 2 + 1 + 32 + 1 + 16 + 1 + 2
-constexpr int kVersionHexSize = 2;
-constexpr int kTraceIdHexSize = 32;
-constexpr int kParentIdHexSize = 16;
-constexpr int kTraceFlagsHexSize = 2;
+using Tracing::W3cTraceConstants;
 
 constexpr int kFlagMaskSampled = 1;
 
@@ -76,7 +72,7 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
 
 absl::StatusOr<SpanContext> SpanContextExtractor::parseTraceparent(absl::string_view traceparent,
                                                                    std::string tracestate) {
-  if (traceparent.size() != kTraceparentHeaderSize) {
+  if (traceparent.size() != W3cTraceConstants::kTraceparentHeaderSize) {
     return absl::InvalidArgumentError("Invalid traceparent header length");
   }
   // Try to split it into its component parts:
@@ -89,8 +85,10 @@ absl::StatusOr<SpanContext> SpanContextExtractor::parseTraceparent(absl::string_
   absl::string_view trace_id = propagation_header_components[1];
   absl::string_view span_id = propagation_header_components[2];
   absl::string_view trace_flags = propagation_header_components[3];
-  if (version.size() != kVersionHexSize || trace_id.size() != kTraceIdHexSize ||
-      span_id.size() != kParentIdHexSize || trace_flags.size() != kTraceFlagsHexSize) {
+  if (version.size() != W3cTraceConstants::kVersionHexSize ||
+      trace_id.size() != W3cTraceConstants::kTraceIdHexSize ||
+      span_id.size() != W3cTraceConstants::kParentIdHexSize ||
+      trace_flags.size() != W3cTraceConstants::kTraceFlagsHexSize) {
     return absl::InvalidArgumentError("Invalid traceparent field sizes");
   }
   if (!isValidHex(version) || !isValidHex(trace_id) || !isValidHex(span_id) ||
