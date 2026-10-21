@@ -1079,9 +1079,6 @@ void ExtProcIntegrationTest::prependExtProcCompositeFilter(const Protobuf::Messa
 }
 
 void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
-  if (!proto_config_.has_message_timeout()) {
-    proto_config_.mutable_message_timeout()->set_seconds(5);
-  }
   config_helper_.addConfigModifier([&](ConfigHelper::HttpConnectionManager& cm) {
     auto* access_log = cm.add_access_log();
     access_log->set_name("accesslog");
