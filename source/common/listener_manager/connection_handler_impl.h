@@ -38,6 +38,7 @@ public:
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index);
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, std::optional<uint32_t> worker_index,
                         OverloadManager& overload_manager, OverloadManager& null_overload_manager);
+  ~ConnectionHandlerImpl() override;
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
