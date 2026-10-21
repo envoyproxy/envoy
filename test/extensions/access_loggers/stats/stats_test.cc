@@ -1540,7 +1540,7 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
     // We use EXPECT_LE directly here to bypass the strict EXPECT_GT constraint of EXPECT_MEMORY_LE.
     // Cast to signed: consumedBytes() is unsigned and can underflow. Under jemalloc, bytes freed
     // into thread caches before MemoryTest was constructed still count in stats.allocated until
-    // the tcache is flushed; flushes during the churn above can push the post-destruction value
+    // the `tcache` is flushed; flushes during the churn above can push the post-destruction value
     // below the baseline, giving a legitimately negative delta.
     EXPECT_LE(static_cast<int64_t>(memory_test.consumedBytes()), 4096);
   }
