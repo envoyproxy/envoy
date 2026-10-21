@@ -1,5 +1,5 @@
 {
-  "checksum": "ad4bb2bb3828b4dc88738d1eef9ac7f6a5a727b839ccc52863f8c5564d87e956",
+  "checksum": "381dbb62ff203d83f038d485e1da1d113a7a9618cb865d993867264e73881640",
   "conditions": {
     "aarch64-apple-darwin": [
       "aarch64-apple-darwin"
@@ -2282,7 +2282,7 @@
               "target": "url"
             },
             {
-              "id": "webpki-roots 1.0.6",
+              "id": "webpki-roots 1.0.10",
               "target": "webpki_roots"
             }
           ],
@@ -2512,7 +2512,7 @@
               "target": "tracing"
             },
             {
-              "id": "webpki-roots 1.0.6",
+              "id": "webpki-roots 1.0.10",
               "target": "webpki_roots"
             }
           ],
@@ -5477,7 +5477,7 @@
             "target": "rustls_pki_types"
           },
           {
-            "id": "rustls-webpki 0.103.15",
+            "id": "rustls-webpki 0.103.16",
             "target": "webpki"
           },
           {
@@ -5566,7 +5566,7 @@
       ],
       "version": "1.14.0"
     },
-    "rustls-webpki 0.103.15": {
+    "rustls-webpki 0.103.16": {
       "common_attrs": {
         "crate_features": [
           "alloc",
@@ -5600,8 +5600,8 @@
       "package_url": "https://github.com/rustls/webpki",
       "repository": {
         "Http": {
-          "sha256": "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2",
-          "url": "https://static.crates.io/crates/rustls-webpki/0.103.15/download"
+          "sha256": "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281",
+          "url": "https://static.crates.io/crates/rustls-webpki/0.103.16/download"
         }
       },
       "targets": [
@@ -5612,7 +5612,7 @@
           }
         }
       ],
-      "version": "0.103.15"
+      "version": "0.103.16"
     },
     "rustversion 1.0.22": {
       "build_script_attrs": {},
@@ -7963,7 +7963,7 @@
       ],
       "version": "0.244.0"
     },
-    "webpki-roots 1.0.6": {
+    "webpki-roots 1.0.10": {
       "common_attrs": {
         "deps": [
           {
@@ -7984,8 +7984,8 @@
       "package_url": "https://github.com/rustls/webpki-roots",
       "repository": {
         "Http": {
-          "sha256": "22cfaf3c063993ff62e73cb4311efde4db1efb31ab78a3e5c457939ad5cc0bed",
-          "url": "https://static.crates.io/crates/webpki-roots/1.0.6/download"
+          "sha256": "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9",
+          "url": "https://static.crates.io/crates/webpki-roots/1.0.10/download"
         }
       },
       "targets": [
@@ -7996,7 +7996,7 @@
           }
         }
       ],
-      "version": "1.0.6"
+      "version": "1.0.10"
     },
     "widestring 1.2.1": {
       "common_attrs": {
