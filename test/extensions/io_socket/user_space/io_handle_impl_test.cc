@@ -777,7 +777,8 @@ TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggerReadEvent) {
   }
   {
     SCOPED_TRACE("clean up.");
-    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
+    // Read, for the end of the stream, and Write, for the destruction of the peer.
+    EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(2);
     // Important: close before peer.
     io_handle_->close();
   }
@@ -829,7 +830,8 @@ TEST_F(IoHandleImplTest, Close) {
   // Not closed yet.
   ASSERT_FALSE(should_close);
 
-  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration());
+  // Read, for the end of the stream, and Write, for the destruction of the peer.
+  EXPECT_CALL(*schedulable_cb_, scheduleCallbackNextIteration()).Times(2);
   io_handle_peer_->close();
 
   ASSERT_TRUE(schedulable_cb_->enabled());
@@ -1056,6 +1058,43 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   schedulable_cb->invokeCallback();
 
   io_handle_peer_->close();
+}
+
+TEST_F(IoHandleImplTest, PeerCloseDoesNotActivateDisabledWrite) {
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  io_handle_->initializeFileEvent(
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  ASSERT_FALSE(schedulable_cb->enabled_);
+  ASSERT_TRUE(io_handle_peer_->close().ok());
+  ASSERT_TRUE(schedulable_cb->enabled_);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
+  schedulable_cb->invokeCallback();
+}
+
+TEST_F(IoHandleImplTest, PeerCloseCombinesReadAndBlockedWriteNotifications) {
+  io_handle_peer_->setWatermarks(128);
+  Buffer::OwnedImpl buf(std::string(256, 'a'));
+  ASSERT_TRUE(io_handle_->write(buf).ok());
+  ASSERT_FALSE(io_handle_peer_->isWritable());
+
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  io_handle_->initializeFileEvent(
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+  ASSERT_FALSE(schedulable_cb->enabled_);
+  ASSERT_TRUE(io_handle_peer_->close().ok());
+  ASSERT_TRUE(schedulable_cb->enabled_);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  schedulable_cb->invokeCallback();
 }
 
 TEST_F(IoHandleImplTest, ReturnValidInternalAddress) {
