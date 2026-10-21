@@ -1756,8 +1756,16 @@ filter_chains: {}
   Init::ExpectableWatcherImpl server_init_watcher("server-init-watcher");
   { // Add and remove a listener before starting workers.
     ListenerHandle* listener_foo = expectListenerCreate(true, true);
-    EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    // With "envoy.restart_features.defer_worker_routing_init" the init target is registered with
+    // the server init manager after socket creation, otherwise at the end of the ListenerImpl
+    // constructor.
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+      EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+    } else {
+      EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    }
     EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1"));
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
@@ -9085,6 +9093,64 @@ TEST_P(ListenerManagerImplTest, TcpBacklogCustomConfig) {
   EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());
 }
 
+// Regression test: tcp_backlog_size updated via xDS must be applied to the kernel socket.
+// When a listener update shares the same address, cloneSocketFactoryFrom() is called instead of
+// creating a new socket. Before the fix the copy constructor carried the old factory's
+// tcp_backlog_size_, so doFinalPreWorkerInit() would call listen() with the stale value.
+TEST_P(ListenerManagerImplTest, TcpBacklogSizeAppliedOnListenerUpdate) {
+  // Add a listener with tcp_backlog_size: 100. Workers have not started yet.
+  const std::string listener_v1_yaml = TestEnvironment::substitute(R"EOF(
+    name: foo
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    tcp_backlog_size: 100
+    filter_chains:
+    - filters: []
+  )EOF",
+                                                                   Network::Address::IpVersion::v4);
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_v1_yaml)));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());
+
+  // Update with tcp_backlog_size: 200 (same address). Workers are still not started so
+  // supportUpdateFilterChain() returns false and the standard path is taken:
+  // setupSocketFactoryForListener -> cloneSocketFactoryFrom. The fix ensures the cloned
+  // factory is created with the new backlog value (200) rather than the old one (100).
+  const std::string listener_v2_yaml = TestEnvironment::substitute(R"EOF(
+    name: foo
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    tcp_backlog_size: 200
+    filter_chains:
+    - filters: []
+  )EOF",
+                                                                   Network::Address::IpVersion::v4);
+
+  auto* duplicated_socket = new NiceMock<Network::MockListenSocket>();
+  EXPECT_CALL(*listener_factory_.socket_, duplicate())
+      .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
+  ListenerHandle* listener_foo_update = expectListenerCreate(false, true);
+  EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_v2_yaml)));
+  EXPECT_EQ(1UL, manager_->listeners().size());
+  EXPECT_EQ(200U, manager_->listeners().back().get().tcpBacklogSize());
+
+  // Starting workers triggers doFinalPreWorkerInit() on the updated listener, which calls
+  // listen() on the duplicated socket. Verify the new backlog (200) reaches the kernel —
+  // this is the observable behavior the fix enables.
+  EXPECT_CALL(*duplicated_socket->io_handle_, listen(200))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*worker_, start(_, _, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+  worker_->callAddCompletion();
+
+  EXPECT_CALL(*listener_foo_update, onDestroy());
+}
+
 TEST_P(ListenerManagerImplTest, WorkersStartedCallbackCalled) {
   InSequence s;
 
@@ -10008,13 +10074,14 @@ filter_chains:
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest,
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersTest,
-                         ::testing::Values(false, true));
+                         ::testing::Combine(::testing::Bool(), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplForInPlaceFilterChainUpdateTest,
-                         ::testing::Values(false));
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithDispatcherStatsTest,
-                         ::testing::Values(false));
+                         ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 
 } // namespace
 } // namespace Server

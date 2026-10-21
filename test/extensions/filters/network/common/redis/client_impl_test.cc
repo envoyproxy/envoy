@@ -801,6 +801,161 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   EXPECT_EQ(1UL, host_->stats_.rq_error_.value());
 }
 
+// The upstream sends an unsolicited reply when no request is outstanding. The client drops it and
+// keeps the connection open, and the next request is paired with its own reply.
+TEST_F(RedisClientImplTest, UnsolicitedReplyIsDropped) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue request1;
+  MockClientCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->makeRequest(request1, callbacks1);
+
+  onConnected();
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+    callbacks_->onRespValue(std::move(response1));
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  Buffer::OwnedImpl unsolicited_data;
+  EXPECT_CALL(*decoder_, decode(Ref(unsolicited_data)))
+      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
+        callbacks_->onRespValue(std::make_unique<Common::Redis::RespValue>());
+      }));
+  upstream_read_filter_->onData(unsolicited_data, false);
+
+  EXPECT_EQ(Network::Connection::State::Open, upstream_connection_->state());
+  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
+
+  Common::Redis::RespValue request2;
+  MockClientCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  client_->makeRequest(request2, callbacks2);
+
+  Buffer::OwnedImpl fake_data2;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data2))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+    callbacks_->onRespValue(std::move(response2));
+  }));
+  upstream_read_filter_->onData(fake_data2, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// Two replies for one request arrive in the same buffer. The client drops the surplus reply and
+// keeps the connection open, and the next request is paired with its own reply.
+TEST_F(RedisClientImplTest, SurplusReplyInSameBufferIsDropped) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue request1;
+  MockClientCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->makeRequest(request1, callbacks1);
+
+  onConnected();
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+    callbacks_->onRespValue(std::move(response1));
+
+    callbacks_->onRespValue(std::make_unique<Common::Redis::RespValue>());
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_EQ(Network::Connection::State::Open, upstream_connection_->state());
+  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
+
+  Common::Redis::RespValue request2;
+  MockClientCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+  client_->makeRequest(request2, callbacks2);
+
+  Buffer::OwnedImpl fake_data2;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data2))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+    callbacks_->onRespValue(std::move(response2));
+  }));
+  upstream_read_filter_->onData(fake_data2, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+// A callback for the first reply closes the client while the decoder still holds a second reply
+// from the same buffer. The second reply is dropped without touching the cleared request list.
+TEST_F(RedisClientImplTest, ReplyAfterCloseInSameBufferIsDropped) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue request1;
+  MockClientCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->makeRequest(request1, callbacks1);
+
+  Common::Redis::RespValue request2;
+  MockClientCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  client_->makeRequest(request2, callbacks2);
+
+  onConnected();
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)))
+        .WillOnce(Invoke([&](Common::Redis::RespValuePtr&) { client_->close(); }));
+    EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+    EXPECT_CALL(callbacks2, onFailure());
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+    callbacks_->onRespValue(std::move(response1));
+
+    // Dropped: the closed client has no outstanding request.
+    callbacks_->onRespValue(std::make_unique<Common::Redis::RespValue>());
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
+}
+
 TEST_F(RedisClientImplTest, ConnectFail) {
   InSequence s;
 

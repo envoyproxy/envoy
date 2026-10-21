@@ -16,6 +16,7 @@
 #include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
@@ -93,8 +94,13 @@ Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::ge
 }
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  return {
-      ALL_REDIS_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
+  // The prefix is the flat prefix, "redis.(<stat_prefix>.)*": the stat prefix is the tag of
+  // every stat.
+  const Stats::TaggedStatName tagged_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix,
+                                                                     /*base_name=*/"");
+  Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
+                                tagged_prefix.name());
+  return {ALL_REDIS_PROXY_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,

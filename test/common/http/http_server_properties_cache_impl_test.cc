@@ -577,6 +577,20 @@ TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCa
   EXPECT_EQ(protocols2_, protocols.ref());
 }
 
+TEST_P(HttpServerPropertiesCacheImplTest, SetConcurrencyOnExistingOrigin) {
+  initialize();
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate("https://hostname1:1", "clear|5|0", kNoTtl));
+  protocols_->setSrtt(origin1_, std::chrono::microseconds(5));
+  // The concurrency update must be applied and persisted when the origin already has an entry.
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate("https://hostname1:1", "clear|5|7", kNoTtl));
+  protocols_->setConcurrentStreams(origin1_, 7);
+  EXPECT_EQ(7, protocols_->getConcurrentStreams(origin1_));
+  // A later update replaces the previously stored value.
+  EXPECT_CALL_WHEN_STORE_VALID(addOrUpdate("https://hostname1:1", "clear|5|3", kNoTtl));
+  protocols_->setConcurrentStreams(origin1_, 3);
+  EXPECT_EQ(3, protocols_->getConcurrentStreams(origin1_));
+}
+
 // Execute all tests when key value store is nullptr and when it is valid.
 INSTANTIATE_TEST_SUITE_P(HttpServerPropertiesCacheImplTestSuite, HttpServerPropertiesCacheImplTest,
                          testing::Bool());

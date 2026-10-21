@@ -78,6 +78,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_id_provider_lib",
+        "//source/common/version:version_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",

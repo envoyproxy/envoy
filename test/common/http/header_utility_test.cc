@@ -1597,5 +1597,16 @@ TEST(ValidateHeaders, ModifyAcceptEncodingHeader) {
   EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("", "one"), "one");
 }
 
+TEST(HeaderIsValidTest, IsSpecial1xx) {
+  // A response map without a :status header must not crash and must return false.
+  EXPECT_FALSE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{}));
+
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "100"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "102"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "103"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "104"}}));
+  EXPECT_FALSE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "200"}}));
+}
+
 } // namespace Http
 } // namespace Envoy

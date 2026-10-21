@@ -10,25 +10,59 @@ import (
 
 func init() {
 	sdk.RegisterHttpFilterConfigFactories(map[string]shared.HttpFilterConfigFactory{
-		"stats_callbacks":            &statsCallbacksConfigFactory{},
-		"header_callbacks":           &headerCallbacksConfigFactory{},
-		"local_reply_callbacks":      &localReplyCallbacksConfigFactory{},
-		"reset_stream":               &resetStreamConfigFactory{},
-		"send_go_away_and_close":     &sendGoAwayAndCloseConfigFactory{},
-		"recreate_stream":            &recreateStreamConfigFactory{},
-		"socket_option_callbacks":    &socketOptionCallbacksConfigFactory{},
-		"span_callbacks":             &spanCallbacksConfigFactory{},
-		"span_across_callbacks":      &spanAcrossCallbacksConfigFactory{},
-		"cluster_callbacks":          &clusterCallbacksConfigFactory{},
-		"send_response":              &sendResponseConfigFactory{},
-		"dynamic_metadata_callbacks": &dynamicMetadataCallbacksConfigFactory{},
-		"filter_state_callbacks":     &filterStateCallbacksConfigFactory{},
-		"body_callbacks":             &bodyCallbacksConfigFactory{},
-		"config_init_failure":        &configInitFailureConfigFactory{},
+		"downstream_direct_remote_address": &downstreamDirectRemoteAddressConfigFactory{},
+		"stats_callbacks":                  &statsCallbacksConfigFactory{},
+		"header_callbacks":                 &headerCallbacksConfigFactory{},
+		"local_reply_callbacks":            &localReplyCallbacksConfigFactory{},
+		"reset_stream":                     &resetStreamConfigFactory{},
+		"send_go_away_and_close":           &sendGoAwayAndCloseConfigFactory{},
+		"recreate_stream":                  &recreateStreamConfigFactory{},
+		"socket_option_callbacks":          &socketOptionCallbacksConfigFactory{},
+		"span_callbacks":                   &spanCallbacksConfigFactory{},
+		"span_across_callbacks":            &spanAcrossCallbacksConfigFactory{},
+		"cluster_callbacks":                &clusterCallbacksConfigFactory{},
+		"send_response":                    &sendResponseConfigFactory{},
+		"dynamic_metadata_callbacks":       &dynamicMetadataCallbacksConfigFactory{},
+		"filter_state_callbacks":           &filterStateCallbacksConfigFactory{},
+		"body_callbacks":                   &bodyCallbacksConfigFactory{},
+		"config_init_failure":              &configInitFailureConfigFactory{},
 	})
 }
 
 func main() {}
+
+type downstreamDirectRemoteAddressConfigFactory struct {
+	shared.EmptyHttpFilterConfigFactory
+}
+
+func (f *downstreamDirectRemoteAddressConfigFactory) Create(shared.HttpFilterConfigHandle,
+	[]byte) (shared.HttpFilterFactory, error) {
+	return &downstreamDirectRemoteAddressFilterFactory{}, nil
+}
+
+type downstreamDirectRemoteAddressFilterFactory struct {
+	shared.EmptyHttpFilterFactory
+}
+
+func (f *downstreamDirectRemoteAddressFilterFactory) Create(h shared.HttpFilterHandle) shared.HttpFilter {
+	return &downstreamDirectRemoteAddressFilter{handle: h}
+}
+
+type downstreamDirectRemoteAddressFilter struct {
+	shared.EmptyHttpFilter
+	handle shared.HttpFilterHandle
+}
+
+func (f *downstreamDirectRemoteAddressFilter) OnRequestHeaders(headers shared.HeaderMap,
+	_ bool) shared.HeadersStatus {
+	address, ok := f.handle.GetDownstreamDirectRemoteAddress()
+	if ok {
+		headers.Set("x-downstream-peer", address.ToUnsafeString())
+	} else {
+		headers.Set("x-downstream-peer", "unavailable")
+	}
+	return shared.HeadersStatusContinue
+}
 
 // --- config_init_failure ---
 type configInitFailureConfigFactory struct {
@@ -764,6 +798,14 @@ func (p *filterStateCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	if val, ok := p.handle.GetFilterStateTyped("envoy.test.http_typed_object_for_rust"); !ok ||
 		val.ToUnsafeString() != "typed_value" {
 		panic(fmt.Sprintf("typed filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
+	}
+	if !p.handle.SetFilterStateValue("shared_filter_state_key", []byte("shared_filter_state_value"),
+		shared.FilterStateLifeSpanConnection, shared.FilterStateStreamSharingSharedWithUpstreamConnection) {
+		panic("failed to set filter state value")
+	}
+	if val, ok := p.handle.GetFilterState("shared_filter_state_key"); !ok ||
+		val.ToUnsafeString() != "shared_filter_state_value" {
+		panic(fmt.Sprintf("shared filter state mismatch: ok=%v val=%q", ok, val.ToUnsafeString()))
 	}
 	if !p.handle.HasFilterState("envoy.test.http_typed_object_for_rust") {
 		panic("expected HasFilterState to return true for existing key")

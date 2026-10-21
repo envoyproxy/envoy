@@ -55,6 +55,20 @@ public:
   }
 };
 
+// Factory for creating InMemoryExternalBufferFactory from typed configuration.
+class InMemoryExternalBufferConfigFactory : public ExternalBufferConfigFactory {
+public:
+  ExternalBufferFactorySharedPtr
+  createExternalBufferFactory(const Protobuf::Message& config,
+                              Server::Configuration::ServerFactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
+  std::string name() const override {
+    return "envoy.ai_protocol_manager.external_buffer.in_memory";
+  }
+};
+
 } // namespace AiProtocolManager
 } // namespace HttpFilters
 } // namespace Extensions

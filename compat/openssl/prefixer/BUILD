@@ -16,8 +16,8 @@ cc_binary(
         # -isystem paths for the LLVM headers and the libstdc++ headers from the
         # sysroot. These reference external repositories by their on-disk
         # (canonical) name as materialised by bzlmod.
-        "-isystem external/envoy_toolshed++sysroot_extension+sysroot_linux_amd64/usr/include/c++/13",
-        "-isystem external/envoy_toolshed++sysroot_extension+sysroot_linux_amd64/usr/include/x86_64-linux-gnu/c++/13",
+        "-isystem external/envoy_toolshed++sysroot_extension+sysroot_linux_amd64/sysroot/usr/include/c++/13",
+        "-isystem external/envoy_toolshed++sysroot_extension+sysroot_linux_amd64/sysroot/usr/include/x86_64-linux-gnu/c++/13",
     ],
     linkopts = [
         "$(location " + LIBCLANG_CPP + ")",

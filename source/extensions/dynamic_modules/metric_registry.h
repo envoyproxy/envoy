@@ -12,6 +12,8 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -145,58 +147,49 @@ public:
   Stats::StatNamePool& statNamePool() { return stat_name_pool_; }
 
   // The ABI uses 1-based ids so 0 can mean unset. Storage is 0-based, so an id maps to index id-1.
-  size_t addCounter(CounterHandle&& counter) {
-    counters_.push_back(std::move(counter));
-    return counters_.size();
-  }
-  size_t addCounterVec(CounterVecHandle&& counter_vec) {
-    counter_vecs_.push_back(std::move(counter_vec));
-    return counter_vecs_.size();
-  }
-  size_t addGauge(GaugeHandle&& gauge) {
-    gauges_.push_back(std::move(gauge));
-    return gauges_.size();
-  }
-  size_t addGaugeVec(GaugeVecHandle&& gauge_vec) {
-    gauge_vecs_.push_back(std::move(gauge_vec));
-    return gauge_vecs_.size();
-  }
-  size_t addHistogram(HistogramHandle&& histogram) {
-    histograms_.push_back(std::move(histogram));
-    return histograms_.size();
-  }
+  // Metrics of every type and form share the ids, so an id resolves only to the metric it was
+  // returned for.
+  size_t addCounter(CounterHandle&& counter) { return add(std::move(counter)); }
+  size_t addCounterVec(CounterVecHandle&& counter_vec) { return add(std::move(counter_vec)); }
+  size_t addGauge(GaugeHandle&& gauge) { return add(std::move(gauge)); }
+  size_t addGaugeVec(GaugeVecHandle&& gauge_vec) { return add(std::move(gauge_vec)); }
+  size_t addHistogram(HistogramHandle&& histogram) { return add(std::move(histogram)); }
   size_t addHistogramVec(HistogramVecHandle&& histogram_vec) {
-    histogram_vecs_.push_back(std::move(histogram_vec));
-    return histogram_vecs_.size();
+    return add(std::move(histogram_vec));
   }
 
-  OptRef<const CounterHandle> getCounterById(size_t id) const { return byId(counters_, id); }
+  OptRef<const CounterHandle> getCounterById(size_t id) const { return byId<CounterHandle>(id); }
   OptRef<const CounterVecHandle> getCounterVecById(size_t id) const {
-    return byId(counter_vecs_, id);
+    return byId<CounterVecHandle>(id);
   }
-  OptRef<const GaugeHandle> getGaugeById(size_t id) const { return byId(gauges_, id); }
-  OptRef<const GaugeVecHandle> getGaugeVecById(size_t id) const { return byId(gauge_vecs_, id); }
-  OptRef<const HistogramHandle> getHistogramById(size_t id) const { return byId(histograms_, id); }
+  OptRef<const GaugeHandle> getGaugeById(size_t id) const { return byId<GaugeHandle>(id); }
+  OptRef<const GaugeVecHandle> getGaugeVecById(size_t id) const { return byId<GaugeVecHandle>(id); }
+  OptRef<const HistogramHandle> getHistogramById(size_t id) const {
+    return byId<HistogramHandle>(id);
+  }
   OptRef<const HistogramVecHandle> getHistogramVecById(size_t id) const {
-    return byId(histogram_vecs_, id);
+    return byId<HistogramVecHandle>(id);
   }
 
 private:
-  template <class T> static OptRef<const T> byId(const std::vector<T>& store, size_t id) {
-    if (id == 0 || id > store.size()) {
+  using Handle = absl::variant<CounterHandle, CounterVecHandle, GaugeHandle, GaugeVecHandle,
+                               HistogramHandle, HistogramVecHandle>;
+
+  template <class T> size_t add(T&& handle) {
+    handles_.emplace_back(std::forward<T>(handle));
+    return handles_.size();
+  }
+
+  template <class T> OptRef<const T> byId(size_t id) const {
+    if (id == 0 || id > handles_.size()) {
       return {};
     }
-    return store[id - 1];
+    return makeOptRefFromPtr(absl::get_if<T>(&handles_[id - 1]));
   }
 
   Stats::Scope& scope_;
   Stats::StatNamePool stat_name_pool_;
-  std::vector<CounterHandle> counters_;
-  std::vector<CounterVecHandle> counter_vecs_;
-  std::vector<GaugeHandle> gauges_;
-  std::vector<GaugeVecHandle> gauge_vecs_;
-  std::vector<HistogramHandle> histograms_;
-  std::vector<HistogramVecHandle> histogram_vecs_;
+  std::vector<Handle> handles_;
 };
 
 } // namespace DynamicModules

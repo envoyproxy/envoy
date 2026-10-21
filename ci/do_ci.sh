@@ -888,6 +888,11 @@ case $CI_TARGET in
         fi
         ;;
 
+    modules.version)
+        module_versions_update
+        lockfiles_generate
+        ;;
+
     msan)
         echo "bazel MSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"

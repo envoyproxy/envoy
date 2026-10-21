@@ -22,8 +22,10 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/strip.h"
 #include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -49,15 +51,17 @@ class TestHttpFilterFactory : public TestFilterFactory,
                               public Server::Configuration::UpstreamHttpFilterConfigFactory {
 public:
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext&) override {
     created_ = true;
+    stat_prefix_ = stat_prefix;
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
   absl::StatusOr<Http::FilterFactoryCb>
-  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
                                Server::Configuration::UpstreamFactoryContext&) override {
     created_ = true;
+    stat_prefix_ = stat_prefix;
     return [](Http::FilterChainFactoryCallbacks&) -> void {};
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -68,6 +72,8 @@ public:
                                Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
+
+  std::string stat_prefix_;
 };
 
 class TestNetworkFilterFactory
@@ -223,8 +229,8 @@ public:
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
         config_source, name, server_factory_context_, factory_context_,
-        server_factory_context_.cluster_manager_, last_filter_config, getFilterType(),
-        getMatcher());
+        server_factory_context_.cluster_manager_, last_filter_config, getFilterType(), getMatcher(),
+        "parent.");
   }
 
   void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
@@ -644,7 +650,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
           config_source, "foo", config_discovery_test.server_factory_context_,
           config_discovery_test.factory_context_,
           config_discovery_test.server_factory_context_.cluster_manager_, true,
-          config_discovery_test.getFilterType(), config_discovery_test.getMatcher()),
+          config_discovery_test.getFilterType(), config_discovery_test.getMatcher(), "parent."),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "
       "configuration with type URL "
@@ -764,6 +770,56 @@ TEST_F(FilterConfigDiscoveryShutdownTest, ShutdownDuringInFlightUpdate) {
   // invoking ~FilterConfigSubscription().
   // Ensure clean exit because the manager is kept alive by the subscription's shared_ptr.
   pending_completion_callback();
+}
+
+// HTTP filter stats prefix test.
+template <typename HttpFilterConfigDiscoveryTestType>
+class HttpFilterConfigStatPrefixTest : public testing::Test {};
+
+using HttpFilterConfigDiscoveryTestTypes =
+    ::testing::Types<HttpFilterConfigDiscoveryImplTest, HttpUpstreamFilterConfigDiscoveryImplTest>;
+
+TYPED_TEST_SUITE(HttpFilterConfigStatPrefixTest, HttpFilterConfigDiscoveryTestTypes);
+
+// The filter factory uses the stats prefix of the parent and the subscription keeps using the
+// ECDS stats prefix.
+TYPED_TEST(HttpFilterConfigStatPrefixTest, ParentStatPrefix) {
+  TypeParam config_discovery_test;
+  config_discovery_test.setup();
+
+  const auto response = config_discovery_test.createResponse("1", "foo");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(config_discovery_test.init_watcher_, ready());
+  ASSERT_OK(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                             response.version_info()));
+
+  EXPECT_EQ("parent.", config_discovery_test.filter_factory_.stat_prefix_);
+  EXPECT_EQ(
+      1UL,
+      config_discovery_test.store_.counter(config_discovery_test.getConfigReloadCounter()).value());
+}
+
+// The filter factory uses the ECDS stats prefix if the runtime guard is disabled.
+TYPED_TEST(HttpFilterConfigStatPrefixTest, ParentStatPrefixDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.ecds_filter_use_parent_stats_prefix", "false"}});
+
+  TypeParam config_discovery_test;
+  config_discovery_test.setup();
+
+  const auto response = config_discovery_test.createResponse("1", "foo");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(config_discovery_test.init_watcher_, ready());
+  ASSERT_OK(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
+                                                             response.version_info()));
+
+  const std::string reload_counter = config_discovery_test.getConfigReloadCounter();
+  EXPECT_EQ(absl::StripSuffix(reload_counter, "config_reload"),
+            config_discovery_test.filter_factory_.stat_prefix_);
+  EXPECT_EQ(1UL, config_discovery_test.store_.counter(reload_counter).value());
 }
 
 } // namespace

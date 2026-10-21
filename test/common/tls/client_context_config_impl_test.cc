@@ -41,8 +41,6 @@
 #include "openssl/crypto.h"
 #include "openssl/x509v3.h"
 
-using Envoy::Protobuf::util::MessageDifferencer;
-using testing::EndsWith;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -396,6 +394,49 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
+}
+
+// A configuration that fails before its custom certificate selector is created does not create
+// the selector, which could otherwise build TLS contexts from the partly created configuration.
+TEST_F(ClientContextConfigImplTest, InvalidConfigDoesNotCreateCustomTlsCertSelector) {
+  class TestUpstreamTlsCertificateSelectorConfigFactory
+      : public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
+  public:
+    absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+    createUpstreamTlsCertificateSelectorFactory(const Protobuf::Message&,
+                                                Server::Configuration::GenericFactoryContext&,
+                                                const Ssl::ClientContextConfig&) override {
+      ADD_FAILURE() << "the selector factory is created for an invalid configuration";
+      return nullptr;
+    }
+
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Protobuf::StringValue>();
+    }
+
+    std::string name() const override { return "test-tls-context-provider"; }
+  };
+
+  TestUpstreamTlsCertificateSelectorConfigFactory provider_factory;
+  Registry::InjectFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory> registered_factory(
+      provider_factory);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    key_log:
+      path: /dev/null
+      local_address_range:
+      - address_prefix: not-an-ip
+        prefix_len: 8
+    custom_tls_certificate_selector:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+  )EOF";
+  TestUtility::loadFromYaml(tls_context_yaml, tls_context);
+  EXPECT_EQ(ClientContextConfigImpl::create(tls_context, factory_context_).status().message(),
+            "invalid ip/mask combo 'not-an-ip/8' (format is <ip>/<# mask bits>)");
 }
 
 // Validate context config does not support handling both static TLS certificate and dynamic TLS

@@ -66,6 +66,7 @@ envoy_extension_cc_test(
         # The filter builds %REQ%/%RESP%-style formatters (e.g. redirect_uri) at config load time,
         # so it needs the built-in HTTP command parsers registered.
         "//source/common/formatter:http_speicific_formatter_extension_lib",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )
 

@@ -43,7 +43,7 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
-        "//source/extensions/filters/common/mcp:filter_state_lib",
+        "//source/extensions/filters/common/mcp:constants_lib",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:variant",
         "@envoy_api//envoy/extensions/clusters/mcp_multicluster/v3:pkg_cc_proto",
