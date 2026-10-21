@@ -410,7 +410,7 @@ bool CompactProtocolImpl::readString(Buffer::Instance& buffer, std::string& valu
     return true;
   }
 
-  if (buffer.length() < static_cast<uint64_t>(str_len + len_size)) {
+  if (buffer.length() < static_cast<uint64_t>(str_len) + static_cast<uint64_t>(len_size)) {
     return false;
   }
 
