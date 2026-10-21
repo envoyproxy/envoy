@@ -197,6 +197,19 @@ TEST_P(BindingFactoryTest, BuildsFromAPatternOrJson) {
   EXPECT_TRUE((*binding->binding())->removesModel());
   EXPECT_EQ(binding->asString(), json);
   EXPECT_EQ(object->serializeAsString(), json);
+
+  // A header mutation is a binding too.
+  constexpr absl::string_view header_json =
+      R"({"mutations": [{"header": "anthropic-version", "value": "2023-06-01",)"
+      R"( "keep_existing": true}]})";
+  object = build(header_json);
+  binding = dynamic_cast<const LlmBindingObject*>(object.get());
+  ASSERT_NE(binding, nullptr);
+  ASSERT_TRUE(binding->binding().ok()) << binding->binding().status();
+  ASSERT_EQ((*binding->binding())->mutations().size(), 1);
+  EXPECT_TRUE((*binding->binding())->mutations()[0].isHeader());
+  EXPECT_EQ((*binding->binding())->mutations()[0].header, "anthropic-version");
+  EXPECT_EQ(binding->asString(), header_json);
 }
 
 // Only an empty value leaves the key unset. Any other value sets it, so one that does not parse
@@ -205,7 +218,9 @@ TEST_P(BindingFactoryTest, KeepsTheErrorOfAValueThatDoesNotParse) {
   EXPECT_EQ(build(""), nullptr);
   for (absl::string_view value :
        {"gateway/{model}", "/v1/{model", R"({"uri_pattern": 1})", R"({"unknown": true})",
-        R"({"mutations": [{}]})", R"({"mutations": [{"header": "x-a", "value": "b"}]})"}) {
+        R"({"mutations": [{}]})", R"({"mutations": [{"header": "X-A", "value": "b"}]})",
+        R"({"mutations": [{"header": "host", "value": "b"}]})",
+        R"({"mutations": [{"header": "x-a", "value": 1}]})"}) {
     std::unique_ptr<StreamInfo::FilterState::Object> object = build(value);
     const auto* binding = dynamic_cast<const LlmBindingObject*>(object.get());
     ASSERT_NE(binding, nullptr) << value;
