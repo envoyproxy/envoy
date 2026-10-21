@@ -749,6 +749,7 @@ key:
                              Eq(13237225503670494420UL));
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 // Scoped RDS end to end (real Envoy server, real SRDS gRPC stream, real HTTP traffic and admin
 // config dump), verifying the fix behind envoy.reloadable_features.srds_partial_acceptance.
 //
@@ -944,6 +945,7 @@ TEST_P(ScopedRdsPartiallyRejectedPushIntegrationTest,
        PartialAcceptanceAppliesValidScopesToWorkers) {
   testPartiallyRejectedSrdsPush(/*partial_acceptance=*/true);
 }
+#endif
 
 } // namespace
 } // namespace Envoy
