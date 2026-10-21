@@ -64,6 +64,15 @@ public:
 
   /**
    * @param headers the headers to parse.
+   * @return bool indicating whether the headers are a gRPC request as defined by the gRPC over
+   * HTTP/2 protocol, which requires the POST method in addition to a path and a gRPC content type.
+   * Unlike isGrpcRequestHeaders(), a GET or HEAD request that carries a gRPC content type is not
+   * considered a gRPC request.
+   */
+  static bool isGrpcPostRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
    * @return bool indicating whether the header is a Connect request header.
    * This is determined by checking for the connect protocol version header and a path header.
    */
