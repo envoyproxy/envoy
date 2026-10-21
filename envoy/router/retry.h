@@ -348,11 +348,12 @@ public:
    * @param stream_info optional stream info for the request.
    * @return the RetryState to use, or nullptr if retries are disabled for this request.
    */
-  virtual RetryStatePtr
-  createRetryState(Http::RequestHeaderMap& request_headers, const Upstream::ClusterInfo& cluster,
-                   Server::Configuration::CommonFactoryContext& context,
-                   Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
-                   OptRef<StreamInfo::StreamInfo> stream_info = std::nullopt) const PURE;
+  virtual RetryStatePtr createRetryState(Http::RequestHeaderMap& request_headers,
+                                         const Upstream::ClusterInfo& cluster,
+                                         Server::Configuration::CommonFactoryContext& context,
+                                         Event::Dispatcher& dispatcher,
+                                         Upstream::ResourcePriority priority,
+                                         OptRef<StreamInfo::StreamInfo> stream_info) const PURE;
 };
 
 using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;

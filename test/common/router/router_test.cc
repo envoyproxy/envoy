@@ -8926,11 +8926,10 @@ TEST_F(RouterTest, RemoteResetNoErrorBeforeResponseStarted) {
 
 class CustomRetryStateTestPolicy : public TestRetryPolicy {
 public:
-  RetryStatePtr
-  createRetryState(Http::RequestHeaderMap&, const Upstream::ClusterInfo&,
-                   Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
-                   Upstream::ResourcePriority,
-                   OptRef<StreamInfo::StreamInfo> stream_info = std::nullopt) const override {
+  RetryStatePtr createRetryState(Http::RequestHeaderMap&, const Upstream::ClusterInfo&,
+                                 Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
+                                 Upstream::ResourcePriority,
+                                 OptRef<StreamInfo::StreamInfo> stream_info) const override {
     create_called_ = true;
     received_stream_info_ = stream_info.ptr();
     auto state = std::make_unique<NiceMock<MockRetryState>>();

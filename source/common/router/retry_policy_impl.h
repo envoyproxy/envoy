@@ -56,11 +56,11 @@ public:
   }
   std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
   bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
-  RetryStatePtr
-  createRetryState(Http::RequestHeaderMap& request_headers, const Upstream::ClusterInfo& cluster,
-                   Server::Configuration::CommonFactoryContext& context,
-                   Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
-                   OptRef<StreamInfo::StreamInfo> stream_info = std::nullopt) const override;
+  RetryStatePtr createRetryState(Http::RequestHeaderMap& request_headers,
+                                 const Upstream::ClusterInfo& cluster,
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
+                                 OptRef<StreamInfo::StreamInfo> stream_info) const override;
 
 protected:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
