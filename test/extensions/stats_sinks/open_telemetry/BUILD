@@ -36,6 +36,9 @@ envoy_extension_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -68,7 +71,11 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "resource_conversion_integration_test",
     srcs = ["resource_conversion_integration_test.cc"],
-    extension_names = ["envoy.stat_sinks.open_telemetry"],
+    extension_names = [
+        "envoy.access_loggers.stats",
+        "envoy.formatter.metadata",
+        "envoy.stat_sinks.open_telemetry",
+    ],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/access_loggers/stats:config",
@@ -90,6 +97,7 @@ envoy_cc_benchmark_binary(
     ],
     deps = [
         "//envoy/stats:tag_interface",
+        "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -97,6 +105,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/stats:stats_mocks",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/strings",
         "@benchmark",
     ],
 )

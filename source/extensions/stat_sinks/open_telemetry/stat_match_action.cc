@@ -1,6 +1,8 @@
 #include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 
-#include <algorithm>
+#include "absl/container/flat_hash_set.h"
+#include "absl/strings/str_cat.h"
+#include "opentelemetry/proto/common/v1/common.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,43 +11,60 @@ namespace OpenTelemetry {
 
 namespace {
 
-// Sets `key` to `value` in `attributes`, overriding any attribute with the same key.
-void upsertAttribute(std::vector<std::pair<std::string, std::string>>& attributes,
-                     absl::string_view key, absl::string_view value) {
-  for (auto& [existing_key, existing_value] : attributes) {
-    if (existing_key == key) {
-      existing_value = std::string(value);
-      return;
-    }
+// Records `error` as the creation status of `context`, unless an earlier error was recorded.
+void recordError(ActionContext& context, absl::string_view error) {
+  if (context.creation_status.ok()) {
+    context.creation_status =
+        absl::InvalidArgumentError(absl::StrCat("resource_conversion: ", error));
   }
-  attributes.emplace_back(std::string(key), std::string(value));
 }
 
 } // namespace
 
 ConversionAction::ConversionAction(
     const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction& config,
-    const ActionContext& context)
+    ActionContext& context)
     : config_(config) {
   if (!config_.has_resource_conversion()) {
     return;
   }
   const auto& resource_conversion = config_.resource_conversion();
   ResourceConversion& resolved = resource_conversion_.emplace();
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(resource_conversion, inherit_resource_attributes, true) &&
-      context.resource_attributes != nullptr) {
-    for (const auto& attribute : *context.resource_attributes) {
-      upsertAttribute(resolved.base_attributes, attribute.key(), attribute.value().string_value());
+
+  // Each attribute of the resource is set once, either statically or by a tag, so that no
+  // attribute depends on the order in which they are set.
+  absl::flat_hash_set<absl::string_view> keys;
+  const auto add_key = [&keys, &context](absl::string_view key) {
+    if (keys.insert(key).second) {
+      return true;
+    }
+    recordError(context, absl::StrCat("resource attribute '", key, "' is set more than once"));
+    return false;
+  };
+
+  for (const auto& attribute : resource_conversion.static_resource_attributes()) {
+    if (attribute.key().empty()) {
+      recordError(context, "the keys of static_resource_attributes must not be empty");
+    } else if (!attribute.value().has_string_value()) {
+      recordError(context, absl::StrCat("the value of static resource attribute '", attribute.key(),
+                                        "' must be a string"));
+    } else if (add_key(attribute.key())) {
+      resolved.static_attributes.emplace_back(attribute.key(), attribute.value().string_value());
     }
   }
-  for (const auto& attribute : resource_conversion.static_resource_attributes()) {
-    upsertAttribute(resolved.base_attributes, attribute.key(), attribute.value().string_value());
-  }
-  std::sort(resolved.base_attributes.begin(), resolved.base_attributes.end());
 
   for (const auto& tag : resource_conversion.tags_to_resource_attributes()) {
-    resolved.tag_to_attribute_keys[tag.tag_name()].push_back(
-        tag.resource_attribute_key().empty() ? tag.tag_name() : tag.resource_attribute_key());
+    const std::string& key =
+        tag.resource_attribute_key().empty() ? tag.tag_name() : tag.resource_attribute_key();
+    if (!add_key(key)) {
+      continue;
+    }
+    const auto [it, inserted] = resolved.tag_indexes.try_emplace(
+        tag.tag_name(), static_cast<uint32_t>(resolved.tags.size()));
+    if (inserted) {
+      resolved.tags.push_back({tag.tag_name(), {}});
+    }
+    resolved.tags[it->second].attribute_keys.push_back(key);
   }
 }
 

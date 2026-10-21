@@ -15,7 +15,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/inlined_vector.h"
-#include "opentelemetry/proto/common/v1/common.pb.h"
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,10 +23,8 @@ namespace StatSinks {
 namespace OpenTelemetry {
 
 struct ActionContext {
-  // The attributes of the sink-wide resource, which resource conversions may inherit. Null if
-  // there are none.
-  const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>* resource_attributes{
-      nullptr};
+  // The first error found in the config of an action.
+  absl::Status creation_status;
 };
 
 class ConversionAction
@@ -35,16 +33,31 @@ class ConversionAction
 public:
   // The resource conversion of the action, resolved when the config is loaded.
   struct ResourceConversion {
-    // The attributes that the resource starts with, sorted by key: the inherited sink-wide
-    // attributes overridden by the static ones.
-    std::vector<std::pair<std::string, std::string>> base_attributes;
-    // Maps the name of each tag to move to the resource to the keys of the attributes it sets.
-    absl::flat_hash_map<std::string, absl::InlinedVector<std::string, 1>> tag_to_attribute_keys;
+    // A stat tag that sets resource attributes.
+    struct Tag {
+      std::string name;
+      // The keys of the resource attributes that the tag sets.
+      absl::InlinedVector<std::string, 1> attribute_keys;
+    };
+
+    // The static attributes of the resource.
+    std::vector<std::pair<std::string, std::string>> static_attributes;
+    // The tags that set the other attributes of the resource, in the order in which they are first
+    // listed. A stat is only reported under the resource if it has all of them, with non-empty
+    // values.
+    std::vector<Tag> tags;
+    // Maps the name of each tag in `tags` to its index.
+    absl::flat_hash_map<std::string, uint32_t> tag_indexes;
   };
 
+  /**
+   * @param config supplies the config of the action.
+   * @param context supplies the context of the action, whose creation status is set if the config
+   *        is invalid.
+   */
   ConversionAction(
       const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction& config,
-      const ActionContext& context);
+      ActionContext& context);
 
   const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction*
   config() const {

@@ -3,6 +3,7 @@
 #include "envoy/grpc/async_client.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
@@ -12,9 +13,11 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/utility.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -68,7 +71,7 @@ public:
       std::ignore = Protobuf::TextFormat::ParseFromString(
           metric_conversion_pbtext, sink_config.mutable_custom_metric_conversions());
     }
-    return std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+    return OtlpOptions::create(sink_config, resource, server_factory_context_).value();
   }
 
   int64_t getGaugeValueByName(const MetricsExportRequestSharedPtr& request,
@@ -701,7 +704,7 @@ TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestNoLimits) {
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
   sink_config.set_max_data_points_per_request(0);
   Tracers::OpenTelemetry::Resource resource;
-  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  auto options = OtlpOptions::create(sink_config, resource, server_factory_context_).value();
   OtlpMetricsFlusherImpl flusher(options);
 
   for (int i = 0; i < 10; ++i) {
@@ -721,7 +724,7 @@ TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestEmptyMetrics) {
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
   sink_config.set_max_data_points_per_request(10);
   Tracers::OpenTelemetry::Resource resource;
-  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  auto options = OtlpOptions::create(sink_config, resource, server_factory_context_).value();
   OtlpMetricsFlusherImpl flusher(options);
 
   std::vector<MetricsExportRequestPtr> requests;
@@ -750,7 +753,7 @@ TEST_F(OtlpMetricsFlusherTests, MaxDatapointsPerRequestWithLimits) {
   envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
   sink_config.set_max_data_points_per_request(2);
   Tracers::OpenTelemetry::Resource resource;
-  auto options = std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
+  auto options = OtlpOptions::create(sink_config, resource, server_factory_context_).value();
   OtlpMetricsFlusherImpl flusher(options);
 
   for (int i = 0; i < 5; ++i) {
@@ -1350,19 +1353,20 @@ findResourceMetrics(const MetricsExportRequest& request, absl::string_view key,
   return nullptr;
 }
 
-// The sink-wide resource of a node proxy container.
-const absl::flat_hash_map<std::string, std::string> kProxyResource = {
-    {"gcp.resource_type", "k8s_container"},
-    {"location", "us-central1"},
-    {"namespace_name", "proxy-ns"},
-    {"pod_name", "proxy-pod"},
-    {"container_name", "proxy"},
-};
+// Returns the attributes of the sink resource of a gateway container.
+absl::flat_hash_map<std::string, std::string> proxyResource() {
+  return {
+      {"gcp.resource_type", "k8s_container"},
+      {"location", "us-central1"},
+      {"namespace_name", "proxy-ns"},
+      {"pod_name", "proxy-pod"},
+      {"container_name", "proxy"},
+  };
+}
 
-// Returns a matcher that converts the stat named `stat_name` to `metric_name`, under the resource
-// that `resource_conversion_pbtext` defines.
-std::string conversionMatcher(absl::string_view stat_name, absl::string_view metric_name,
-                              absl::string_view resource_conversion_pbtext) {
+// Returns a matcher of a matcher list, which converts the stats whose names start with
+// `stat_prefix` by the ConversionAction that `action_pbtext` defines.
+std::string conversionMatcher(absl::string_view stat_prefix, absl::string_view action_pbtext) {
   return absl::StrReplaceAll(R"pb(
     matchers {
       predicate {
@@ -1374,7 +1378,7 @@ std::string conversionMatcher(absl::string_view stat_name, absl::string_view met
                envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
             }
           }
-          value_match { exact: "{STAT}" }
+          value_match { prefix: "{PREFIX}" }
         }
       }
       on_match {
@@ -1383,65 +1387,49 @@ std::string conversionMatcher(absl::string_view stat_name, absl::string_view met
           typed_config {
             [type.googleapis.com/
              envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction] {
-              metric_name: "{METRIC}"
-              resource_conversion { {RESOURCE} }
+              {ACTION}
             }
           }
         }
       }
     }
   )pb",
-                             {{"{STAT}", stat_name},
-                              {"{METRIC}", metric_name},
-                              {"{RESOURCE}", resource_conversion_pbtext}});
+                             {{"{PREFIX}", stat_prefix}, {"{ACTION}", action_pbtext}});
 }
 
-// Converts the stats prefixed by "workload_counter" to "workload.network.io", reported under the
-// k8s_pod resource that the "namespace" and "pod" tags name.
-constexpr absl::string_view kPodResourceConversion = R"pb(
-  matcher_list {
-    matchers {
-      predicate {
-        single_predicate {
-          input {
-            name: "stat_full_name_match_input"
-            typed_config {
-              [type.googleapis.com/
-               envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-            }
-          }
-          value_match { prefix: "workload_counter" }
-        }
-      }
-      on_match {
-        action {
-          name: "otlp_metric_conversion"
-          typed_config {
-            [type.googleapis.com/
-             envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction] {
-              metric_name: "workload.network.io"
-              resource_conversion {
-                static_resource_attributes {
-                  key: "gcp.resource_type"
-                  value { string_value: "k8s_pod" }
-                }
-                tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
-                tags_to_resource_attributes {
-                  tag_name: "namespace"
-                  resource_attribute_key: "namespace_name"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+// Returns custom metric conversions that consist of a matcher list with the given matchers.
+std::string matcherList(const std::vector<std::string>& matchers) {
+  return absl::StrCat("matcher_list {", absl::StrJoin(matchers, ""), "}");
+}
+
+// Returns a ConversionAction that converts a stat to `metric_name`, reported under the resource
+// that `resource_conversion_pbtext` defines.
+std::string conversionAction(absl::string_view metric_name,
+                             absl::string_view resource_conversion_pbtext) {
+  return absl::StrCat("metric_name: \"", metric_name, "\" resource_conversion {",
+                      resource_conversion_pbtext, "}");
+}
+
+// The k8s_pod resource that the "namespace" and "pod" tags of a stat name.
+constexpr absl::string_view PodResourceConversion = R"pb(
+  static_resource_attributes {
+    key: "gcp.resource_type"
+    value { string_value: "k8s_pod" }
   }
+  tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
+  tags_to_resource_attributes { tag_name: "namespace" resource_attribute_key: "namespace_name" }
 )pb";
+
+// Converts the stats prefixed by "workload_counter" to "workload.network.io", reported under
+// PodResourceConversion.
+std::string podConversions() {
+  return matcherList({conversionMatcher(
+      "workload_counter", conversionAction("workload.network.io", PodResourceConversion))});
+}
 
 TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionGroupsMetricsByResource) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(/*report_counters_as_deltas=*/true, false, true, true,
-                                             "", kProxyResource, kPodResourceConversion));
+                                             "", proxyResource(), podConversions()));
   // Two stats of pod-a whose other tags are the same are aggregated into one data point.
   addCounterToSnapshot("workload_counter.1", /*delta=*/1, /*value=*/1, true,
                        {{"pod", "pod-a"}, {"namespace", "ns"}, {"direction", "sent"}});
@@ -1449,7 +1437,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionGroupsMetricsByReso
                        {{"direction", "sent"}, {"namespace", "ns"}, {"pod", "pod-a"}});
   addCounterToSnapshot("workload_counter.3", /*delta=*/5, /*value=*/5, true,
                        {{"pod", "pod-b"}, {"namespace", "ns"}, {"direction", "sent"}});
-  // A stat of the proxy itself stays on the sink-wide resource.
+  // A stat of the proxy itself stays on the sink resource.
   addCounterToSnapshot("proxy_counter", /*delta=*/7, /*value=*/7, true, {{"key", "val"}});
 
   auto request = flushToSingleRequest(flusher);
@@ -1458,8 +1446,9 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionGroupsMetricsByReso
 
   const auto* proxy = findResourceMetrics(*request, "pod_name", "proxy-pod");
   ASSERT_NE(proxy, nullptr);
+  const auto proxy_resource = proxyResource();
   EXPECT_EQ(attributesMap(proxy->resource().attributes()),
-            (std::map<std::string, std::string>(kProxyResource.begin(), kProxyResource.end())));
+            (std::map<std::string, std::string>(proxy_resource.begin(), proxy_resource.end())));
   ASSERT_EQ(1, proxy->scope_metrics_size());
   ASSERT_EQ(1, proxy->scope_metrics(0).metrics_size());
   EXPECT_EQ(getTagExtractedName("proxy_counter"), proxy->scope_metrics(0).metrics(0).name());
@@ -1469,37 +1458,33 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionGroupsMetricsByReso
     SCOPED_TRACE(pod);
     const auto* workload = findResourceMetrics(*request, "pod_name", pod);
     ASSERT_NE(workload, nullptr);
-    // The resource inherits the sink-wide attributes, overridden by the static attribute and the
-    // moved tags.
+    // The resource has the static resource type and the attributes that the tags set, but none of
+    // the attributes of the sink resource.
     EXPECT_EQ(attributesMap(workload->resource().attributes()),
-              (std::map<std::string, std::string>{{"gcp.resource_type", "k8s_pod"},
-                                                  {"location", "us-central1"},
-                                                  {"namespace_name", "ns"},
-                                                  {"pod_name", pod},
-                                                  {"container_name", "proxy"}}));
+              (std::map<std::string, std::string>{
+                  {"gcp.resource_type", "k8s_pod"}, {"namespace_name", "ns"}, {"pod_name", pod}}));
     ASSERT_EQ(1, workload->scope_metrics_size());
     ASSERT_EQ(1, workload->scope_metrics(0).metrics_size());
     const auto& metric = workload->scope_metrics(0).metrics(0);
     EXPECT_EQ("workload.network.io", metric.name());
     ASSERT_EQ(1, metric.sum().data_points_size());
     EXPECT_EQ(value, metric.sum().data_points(0).as_int());
-    // The moved tags are not data point attributes.
+    // The tags that set resource attributes are not data point attributes.
     EXPECT_EQ(attributesMap(metric.sum().data_points(0).attributes()),
               (std::map<std::string, std::string>{{"direction", "sent"}}));
   }
 }
 
 TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionGaugesAndHistograms) {
-  constexpr absl::string_view kResourceConversion = R"pb(
+  constexpr absl::string_view PodNameConversion = R"pb(
     tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
   )pb";
   OtlpMetricsFlusherImpl flusher(otlpOptions(
-      false, /*report_histograms_as_deltas=*/false, true, true, "", kProxyResource,
-      absl::StrCat(
-          "matcher_list {",
-          conversionMatcher("workload_gauge", "workload.gauge", kResourceConversion),
-          conversionMatcher("workload_histogram", "workload.histogram", kResourceConversion),
-          "}")));
+      false, /*report_histograms_as_deltas=*/false, true, true, "", proxyResource(),
+      matcherList({conversionMatcher("workload_gauge",
+                                     conversionAction("workload.gauge", PodNameConversion)),
+                   conversionMatcher("workload_histogram",
+                                     conversionAction("workload.histogram", PodNameConversion))})));
   addGaugeToSnapshot("workload_gauge", /*value=*/4, true, {{"pod", "pod-a"}});
   addHistogramToSnapshot("workload_histogram", /*is_delta=*/false, true,
                          {{"pod", "pod-a"}, {"role", "client"}});
@@ -1508,7 +1493,8 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionGaugesAndHistograms
   ASSERT_NE(request, nullptr);
   ASSERT_EQ(1, request->resource_metrics_size());
   auto& workload = *request->mutable_resource_metrics(0);
-  EXPECT_EQ("pod-a", attributesMap(workload.resource().attributes())["pod_name"]);
+  EXPECT_EQ(attributesMap(workload.resource().attributes()),
+            (std::map<std::string, std::string>{{"pod_name", "pod-a"}}));
   ASSERT_EQ(1, workload.scope_metrics_size());
   auto& metrics = *workload.mutable_scope_metrics(0)->mutable_metrics();
   sortMetrics(metrics);
@@ -1526,96 +1512,100 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionGaugesAndHistograms
             (std::map<std::string, std::string>{{"role", "client"}}));
 }
 
-TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionWithoutInheritance) {
-  OtlpMetricsFlusherImpl flusher(
-      otlpOptions(/*report_counters_as_deltas=*/true, false, true, true, "", kProxyResource, R"pb(
-    matcher_list {
-      matchers {
-        predicate {
-          single_predicate {
-            input {
-              name: "stat_full_name_match_input"
-              typed_config {
-                [type.googleapis.com/
-                 envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-              }
-            }
-            value_match { prefix: "workload_counter" }
-          }
+TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionWithoutTags) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, false, true, true, "", proxyResource(),
+      matcherList({conversionMatcher("node_counter", conversionAction("node.network.io", R"pb(
+        static_resource_attributes {
+          key: "gcp.resource_type"
+          value { string_value: "k8s_node" }
         }
-        on_match {
-          action {
-            name: "otlp_metric_conversion"
-            typed_config {
-              [type.googleapis.com/
-               envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction] {
-                metric_name: "workload.network.io"
-                resource_conversion {
-                  inherit_resource_attributes { value: false }
-                  static_resource_attributes {
-                    key: "gcp.resource_type"
-                    value { string_value: "k8s_pod" }
-                  }
-                  static_resource_attributes {
-                    key: "location"
-                    value { string_value: "us-east1" }
-                  }
-                  tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
-                }
-              }
-            }
-          }
+        static_resource_attributes {
+          key: "node_name"
+          value { string_value: "node-1" }
         }
-      }
-    }
-  )pb"));
-  addCounterToSnapshot("workload_counter", /*delta=*/1, /*value=*/1, true,
-                       {{"pod", "pod-a"}, {"direction", "sent"}});
+      )pb"))})));
+  addCounterToSnapshot("node_counter", /*delta=*/1, /*value=*/1, true, {{"direction", "sent"}});
 
   auto request = flushToSingleRequest(flusher);
   ASSERT_NE(request, nullptr);
   ASSERT_EQ(1, request->resource_metrics_size());
   EXPECT_EQ(attributesMap(request->resource_metrics(0).resource().attributes()),
-            (std::map<std::string, std::string>{{"gcp.resource_type", "k8s_pod"},
-                                                {"location", "us-east1"},
-                                                {"pod_name", "pod-a"}}));
-}
-
-TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionIgnoresEmptyTags) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(/*report_counters_as_deltas=*/true, false, true, true,
-                                             "", kProxyResource, kPodResourceConversion));
-  // The "pod" tag is empty and the "namespace" tag is missing.
-  addCounterToSnapshot("workload_counter", /*delta=*/1, /*value=*/1, true,
-                       {{"pod", ""}, {"direction", "sent"}});
-
-  auto request = flushToSingleRequest(flusher);
-  ASSERT_NE(request, nullptr);
-  ASSERT_EQ(1, request->resource_metrics_size());
-  const auto& workload = request->resource_metrics(0);
-  // The inherited pod and namespace names stay.
-  EXPECT_EQ(attributesMap(workload.resource().attributes()),
-            (std::map<std::string, std::string>{{"gcp.resource_type", "k8s_pod"},
-                                                {"location", "us-central1"},
-                                                {"namespace_name", "proxy-ns"},
-                                                {"pod_name", "proxy-pod"},
-                                                {"container_name", "proxy"}}));
-  // The empty tag is not a data point attribute either.
-  EXPECT_EQ(attributesMap(workload.scope_metrics(0).metrics(0).sum().data_points(0).attributes()),
+            (std::map<std::string, std::string>{{"gcp.resource_type", "k8s_node"},
+                                                {"node_name", "node-1"}}));
+  EXPECT_EQ(attributesMap(request->resource_metrics(0)
+                              .scope_metrics(0)
+                              .metrics(0)
+                              .sum()
+                              .data_points(0)
+                              .attributes()),
             (std::map<std::string, std::string>{{"direction", "sent"}}));
 }
 
+TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionSkippedWithoutTagValues) {
+  // The static metric label of the conversion applies whether the resource conversion does or not.
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, false, true, true, "", proxyResource(),
+      matcherList({conversionMatcher(
+          "workload_counter",
+          absl::StrCat(conversionAction("workload.network.io", PodResourceConversion), R"pb(
+            static_metric_labels {
+              key: "source"
+              value { string_value: "envoy" }
+            }
+          )pb"))})));
+  addCounterToSnapshot("workload_counter.converted", /*delta=*/1, /*value=*/1, true,
+                       {{"pod", "pod-a"}, {"namespace", "ns"}});
+  // The stats below lack a tag of the conversion, or have it with an empty value.
+  addCounterToSnapshot("workload_counter.no_namespace", /*delta=*/2, /*value=*/2, true,
+                       {{"pod", "pod-a"}});
+  addCounterToSnapshot("workload_counter.empty_namespace", /*delta=*/4, /*value=*/4, true,
+                       {{"pod", "pod-a"}, {"namespace", ""}});
+  addCounterToSnapshot("workload_counter.no_tags", /*delta=*/8, /*value=*/8, true,
+                       {{"direction", "sent"}});
+
+  auto request = flushToSingleRequest(flusher);
+  ASSERT_NE(request, nullptr);
+  ASSERT_EQ(2, request->resource_metrics_size());
+
+  const auto* workload = findResourceMetrics(*request, "pod_name", "pod-a");
+  ASSERT_NE(workload, nullptr);
+  ASSERT_EQ(1, workload->scope_metrics(0).metrics_size());
+  const auto& converted = workload->scope_metrics(0).metrics(0);
+  EXPECT_EQ("workload.network.io", converted.name());
+  ASSERT_EQ(1, converted.sum().data_points_size());
+  EXPECT_EQ(1, converted.sum().data_points(0).as_int());
+  EXPECT_EQ(attributesMap(converted.sum().data_points(0).attributes()),
+            (std::map<std::string, std::string>{{"source", "envoy"}}));
+
+  // The other stats are reported under the sink resource with all of their tags, as if they had
+  // no resource conversion, but with the metric name and the static label of the conversion.
+  const auto* proxy = findResourceMetrics(*request, "pod_name", "proxy-pod");
+  ASSERT_NE(proxy, nullptr);
+  ASSERT_EQ(1, proxy->scope_metrics(0).metrics_size());
+  const auto& skipped = proxy->scope_metrics(0).metrics(0);
+  EXPECT_EQ("workload.network.io", skipped.name());
+  std::map<std::map<std::string, std::string>, int64_t> points;
+  for (const auto& point : skipped.sum().data_points()) {
+    points[attributesMap(point.attributes())] = point.as_int();
+  }
+  EXPECT_EQ(points, (std::map<std::map<std::string, std::string>, int64_t>{
+                        {{{"pod", "pod-a"}, {"source", "envoy"}}, 2},
+                        {{{"namespace", ""}, {"pod", "pod-a"}, {"source", "envoy"}}, 4},
+                        {{{"direction", "sent"}, {"source", "envoy"}}, 8}}));
+}
+
 TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionSharedAcrossActions) {
-  // "a_counter" and "c_counter" are both converted to "m1", and "b_counter" to "m2", all under
-  // the same resource conversion.
-  constexpr absl::string_view kResourceConversion = R"pb(
+  // "a_counter" and "c_counter" are both converted to "m1", and "b_counter" to "m2", each by an
+  // action with the same resource conversion.
+  constexpr absl::string_view PodNameConversion = R"pb(
     tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
   )pb";
-  const std::string matchers =
-      absl::StrCat("matcher_list {", conversionMatcher("a_counter", "m1", kResourceConversion),
-                   conversionMatcher("b_counter", "m2", kResourceConversion),
-                   conversionMatcher("c_counter", "m1", kResourceConversion), "}");
-  OtlpMetricsFlusherImpl flusher(otlpOptions(/*report_counters_as_deltas=*/true, false, true, true,
-                                             "", kProxyResource, matchers));
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, false, true, true, "", proxyResource(),
+      matcherList({conversionMatcher("a_counter", conversionAction("m1", PodNameConversion)),
+                   conversionMatcher("b_counter", conversionAction("m2", PodNameConversion)),
+                   conversionMatcher("c_counter", conversionAction("m1", PodNameConversion))})));
   addCounterToSnapshot("a_counter", /*delta=*/1, /*value=*/1, true, {{"pod", "pod-a"}});
   addCounterToSnapshot("b_counter", /*delta=*/2, /*value=*/2, true, {{"pod", "pod-a"}});
   addCounterToSnapshot("c_counter", /*delta=*/4, /*value=*/4, true, {{"pod", "pod-a"}});
@@ -1638,51 +1628,48 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionSharedAcrossActions
   EXPECT_EQ(2, metrics[1].sum().data_points(0).as_int());
 }
 
+TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionToSinkResource) {
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, false, true, true, "",
+      {{"location", "us-central1"}, {"pod_name", "proxy-pod"}},
+      matcherList(
+          {conversionMatcher("workload_counter", conversionAction("workload.network.io", R"pb(
+        static_resource_attributes {
+          key: "location"
+          value { string_value: "us-central1" }
+        }
+        tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
+      )pb"))})));
+  // The resource of this stat has the same attributes as the sink resource.
+  addCounterToSnapshot("workload_counter", /*delta=*/1, /*value=*/1, true, {{"pod", "proxy-pod"}});
+  addCounterToSnapshot("proxy_counter", /*delta=*/2, /*value=*/2, true, {{"key", "val"}});
+
+  auto request = flushToSingleRequest(flusher);
+  ASSERT_NE(request, nullptr);
+  // So both metrics are reported under the same ResourceMetrics.
+  ASSERT_EQ(1, request->resource_metrics_size());
+  EXPECT_EQ(
+      attributesMap(request->resource_metrics(0).resource().attributes()),
+      (std::map<std::string, std::string>{{"location", "us-central1"}, {"pod_name", "proxy-pod"}}));
+  EXPECT_EQ(2, request->resource_metrics(0).scope_metrics(0).metrics_size());
+}
+
 TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionTagToSeveralAttributes) {
-  OtlpMetricsFlusherImpl flusher(
-      otlpOptions(/*report_counters_as_deltas=*/true, false, true, true, "", {}, R"pb(
-    matcher_list {
-      matchers {
-        predicate {
-          single_predicate {
-            input {
-              name: "stat_full_name_match_input"
-              typed_config {
-                [type.googleapis.com/
-                 envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-              }
-            }
-            value_match { prefix: "workload_counter" }
-          }
-        }
-        on_match {
-          action {
-            name: "otlp_metric_conversion"
-            typed_config {
-              [type.googleapis.com/
-               envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction] {
-                metric_name: "workload.network.io"
-                resource_conversion {
-                  tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
-                  tags_to_resource_attributes {
-                    tag_name: "pod"
-                    resource_attribute_key: "k8s.pod.name"
-                  }
-                  tags_to_resource_attributes { tag_name: "zone" }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )pb"));
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, false, true, true, "", {},
+      matcherList(
+          {conversionMatcher("workload_counter", conversionAction("workload.network.io", R"pb(
+        tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
+        tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "k8s.pod.name" }
+        tags_to_resource_attributes { tag_name: "zone" }
+      )pb"))})));
   addCounterToSnapshot("workload_counter", /*delta=*/1, /*value=*/1, true,
                        {{"pod", "pod-a"}, {"zone", "us-central1-a"}});
 
   auto request = flushToSingleRequest(flusher);
   ASSERT_NE(request, nullptr);
   ASSERT_EQ(1, request->resource_metrics_size());
+  // The resource attribute key of "zone" is the tag name.
   EXPECT_EQ(attributesMap(request->resource_metrics(0).resource().attributes()),
             (std::map<std::string, std::string>{
                 {"k8s.pod.name", "pod-a"}, {"pod_name", "pod-a"}, {"zone", "us-central1-a"}}));
@@ -1698,23 +1685,26 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionTagToSeveralAttribu
 TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionWithoutEmittingTags) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(/*report_counters_as_deltas=*/true, false,
                                              /*emit_tags_as_attributes=*/false, true, "",
-                                             kProxyResource, kPodResourceConversion));
-  addCounterToSnapshot("workload_counter", /*delta=*/1, /*value=*/1, true,
+                                             proxyResource(), podConversions()));
+  addCounterToSnapshot("workload_counter.1", /*delta=*/1, /*value=*/1, true,
                        {{"pod", "pod-a"}, {"namespace", "ns"}, {"direction", "sent"}});
+  // Lacks the "namespace" tag, so it is reported under the sink resource.
+  addCounterToSnapshot("workload_counter.2", /*delta=*/2, /*value=*/2, true,
+                       {{"pod", "pod-a"}, {"direction", "sent"}});
 
   auto request = flushToSingleRequest(flusher);
   ASSERT_NE(request, nullptr);
-  ASSERT_EQ(1, request->resource_metrics_size());
-  // The tags are still moved to the resource, but no other tag is emitted.
-  EXPECT_EQ("pod-a",
-            attributesMap(request->resource_metrics(0).resource().attributes())["pod_name"]);
-  EXPECT_TRUE(request->resource_metrics(0)
-                  .scope_metrics(0)
-                  .metrics(0)
-                  .sum()
-                  .data_points(0)
-                  .attributes()
-                  .empty());
+  ASSERT_EQ(2, request->resource_metrics_size());
+  // The tags still set the resource attributes, but no tag is a data point attribute.
+  for (const auto& [pod, value] :
+       std::vector<std::pair<std::string, int>>{{"pod-a", 1}, {"proxy-pod", 2}}) {
+    SCOPED_TRACE(pod);
+    const auto* resource_metrics = findResourceMetrics(*request, "pod_name", pod);
+    ASSERT_NE(resource_metrics, nullptr);
+    const auto& point = resource_metrics->scope_metrics(0).metrics(0).sum().data_points(0);
+    EXPECT_EQ(value, point.as_int());
+    EXPECT_TRUE(point.attributes().empty());
+  }
 }
 
 TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionWithMaxDataPointsPerRequest) {
@@ -1722,11 +1712,11 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionWithMaxDataPointsPe
   sink_config.set_report_counters_as_deltas(true);
   sink_config.set_max_data_points_per_request(2);
   ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(
-      kPodResourceConversion, sink_config.mutable_custom_metric_conversions()));
+      podConversions(), sink_config.mutable_custom_metric_conversions()));
   Tracers::OpenTelemetry::Resource resource;
-  resource.attributes_ = kProxyResource;
+  resource.attributes_ = proxyResource();
   OtlpMetricsFlusherImpl flusher(
-      std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_));
+      OtlpOptions::create(sink_config, resource, server_factory_context_).value());
   for (int i = 0; i < 3; ++i) {
     addCounterToSnapshot(absl::StrCat("workload_counter.", i), /*delta=*/1, /*value=*/1, true,
                          {{"pod", absl::StrCat("pod-", i)}, {"namespace", "ns"}});
@@ -1758,6 +1748,175 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ResourceConversionWithMaxDataPointsPe
   }
   EXPECT_EQ(points_by_pod, (absl::flat_hash_map<std::string, int>{
                                {"pod-0", 2}, {"pod-1", 2}, {"pod-2", 2}, {"proxy-pod", 1}}));
+}
+
+TEST_F(OtlpMetricsFlusherAggregationTests,
+       ResourceConversionGaugesAndHistogramsWithMaxDataPointsPerRequest) {
+  constexpr absl::string_view PodNameConversion = R"pb(
+    tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
+  )pb";
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+  sink_config.set_max_data_points_per_request(1);
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(
+      matcherList({conversionMatcher("workload_gauge",
+                                     conversionAction("workload.gauge", PodNameConversion)),
+                   conversionMatcher("workload_histogram",
+                                     conversionAction("workload.histogram", PodNameConversion))}),
+      sink_config.mutable_custom_metric_conversions()));
+  OtlpMetricsFlusherImpl flusher(
+      OtlpOptions::create(sink_config, Tracers::OpenTelemetry::Resource(), server_factory_context_)
+          .value());
+  for (const std::string& pod : std::vector<std::string>{"pod-a", "pod-b"}) {
+    addGaugeToSnapshot(absl::StrCat("workload_gauge.", pod), /*value=*/1, true, {{"pod", pod}});
+    addHistogramToSnapshot(absl::StrCat("workload_histogram.", pod), /*is_delta=*/false, true,
+                           {{"pod", pod}});
+  }
+
+  std::vector<MetricsExportRequestPtr> requests;
+  flusher.flush(snapshot_, delta_start_time_ns_, cumulative_start_time_ns_,
+                [&requests](MetricsExportRequestPtr req) { requests.push_back(std::move(req)); });
+
+  // One data point per request, under the resource of its pod.
+  ASSERT_EQ(4, requests.size());
+  std::map<std::pair<std::string, std::string>, int> points;
+  for (const auto& request : requests) {
+    ASSERT_EQ(1, request->resource_metrics_size());
+    const auto& resource_metrics = request->resource_metrics(0);
+    ASSERT_EQ(1, resource_metrics.scope_metrics(0).metrics_size());
+    const auto& metric = resource_metrics.scope_metrics(0).metrics(0);
+    points[{attributesMap(resource_metrics.resource().attributes())["pod_name"], metric.name()}] +=
+        metric.gauge().data_points_size() + metric.histogram().data_points_size();
+  }
+  EXPECT_EQ(points, (std::map<std::pair<std::string, std::string>, int>{
+                        {{"pod-a", "workload.gauge"}, 1},
+                        {{"pod-a", "workload.histogram"}, 1},
+                        {{"pod-b", "workload.gauge"}, 1},
+                        {{"pod-b", "workload.histogram"}, 1}}));
+}
+
+TEST_F(OtlpMetricsFlusherAggregationTests, ConversionWithoutMetricNameKeepsStatNames) {
+  // The action has no metric name, so it doesn't merge the stats that it matches into one metric.
+  OtlpMetricsFlusherImpl flusher(otlpOptions(
+      /*report_counters_as_deltas=*/true, false, true, true, "prefix", {},
+      matcherList({conversionMatcher("workload_counter", R"pb(
+        resource_conversion {
+          tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
+        }
+      )pb")})));
+  addCounterToSnapshot("workload_counter.sent", /*delta=*/1, /*value=*/1, true, {{"pod", "pod-a"}});
+  addCounterToSnapshot("workload_counter.received", /*delta=*/2, /*value=*/2, true,
+                       {{"pod", "pod-a"}});
+
+  auto request = flushToSingleRequest(flusher);
+  ASSERT_NE(request, nullptr);
+  ASSERT_EQ(1, request->resource_metrics_size());
+  auto& metrics =
+      *request->mutable_resource_metrics(0)->mutable_scope_metrics(0)->mutable_metrics();
+  sortMetrics(metrics);
+  ASSERT_EQ(2, metrics.size());
+  EXPECT_EQ(absl::StrCat("prefix.", getTagExtractedName("workload_counter.received")),
+            metrics[0].name());
+  EXPECT_EQ(2, metrics[0].sum().data_points(0).as_int());
+  EXPECT_EQ(absl::StrCat("prefix.", getTagExtractedName("workload_counter.sent")),
+            metrics[1].name());
+  EXPECT_EQ(1, metrics[1].sum().data_points(0).as_int());
+}
+
+class ResourceConversionConfigTests : public OpenTelemetryStatsSinkTests {
+public:
+  // Returns the status of creating the options of a sink with a conversion whose resource
+  // conversion `resource_conversion_pbtext` defines.
+  absl::Status createStatus(absl::string_view resource_conversion_pbtext) {
+    envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
+    EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(
+        matcherList({conversionMatcher(
+            "workload", conversionAction("workload.network.io", resource_conversion_pbtext))}),
+        sink_config.mutable_custom_metric_conversions()));
+    Tracers::OpenTelemetry::Resource resource;
+    resource.attributes_ = proxyResource();
+    return OtlpOptions::create(sink_config, resource, server_factory_context_).status();
+  }
+};
+
+TEST_F(ResourceConversionConfigTests, ValidConfig) {
+  EXPECT_TRUE(createStatus(PodResourceConversion).ok());
+}
+
+TEST_F(ResourceConversionConfigTests, RejectsResourceAttributeSetMoreThanOnce) {
+  for (const auto& [resource_conversion, key] : std::vector<std::pair<std::string, std::string>>{
+           // Static and set by a tag.
+           {R"pb(
+              static_resource_attributes {
+                key: "pod_name"
+                value { string_value: "pod-a" }
+              }
+              tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
+            )pb",
+            "pod_name"},
+           // Static and set by a tag, whose resource attribute key is its name.
+           {R"pb(
+              static_resource_attributes {
+                key: "pod"
+                value { string_value: "pod-a" }
+              }
+              tags_to_resource_attributes { tag_name: "pod" }
+            )pb",
+            "pod"},
+           // Static twice.
+           {R"pb(
+              static_resource_attributes {
+                key: "gcp.resource_type"
+                value { string_value: "k8s_pod" }
+              }
+              static_resource_attributes {
+                key: "gcp.resource_type"
+                value { string_value: "k8s_container" }
+              }
+            )pb",
+            "gcp.resource_type"},
+           // Set by two tags.
+           {R"pb(
+              tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "name" }
+              tags_to_resource_attributes { tag_name: "service" resource_attribute_key: "name" }
+            )pb",
+            "name"},
+           // Set by the same tag twice.
+           {R"pb(
+              tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
+              tags_to_resource_attributes { tag_name: "pod" resource_attribute_key: "pod_name" }
+            )pb",
+            "pod_name"},
+       }) {
+    SCOPED_TRACE(resource_conversion);
+    const absl::Status status = createStatus(resource_conversion);
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_EQ(
+        absl::StrCat("resource_conversion: resource attribute '", key, "' is set more than once"),
+        status.message());
+  }
+}
+
+TEST_F(ResourceConversionConfigTests, RejectsInvalidStaticAttributes) {
+  {
+    const absl::Status status = createStatus(R"pb(
+      static_resource_attributes {
+        key: ""
+        value { string_value: "k8s_pod" }
+      }
+    )pb");
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_EQ("resource_conversion: the keys of static_resource_attributes must not be empty",
+              status.message());
+  }
+  for (const absl::string_view value : {"value { int_value: 3 }", ""}) {
+    SCOPED_TRACE(value);
+    const absl::Status status =
+        createStatus(absl::StrCat("static_resource_attributes { key: \"replicas\" ", value, " }"));
+    EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.code());
+    EXPECT_EQ("resource_conversion: the value of static resource attribute 'replicas' must be a "
+              "string",
+              status.message());
+  }
 }
 
 TEST_F(OtlpMetricsFlusherTests, DropMetrics) {
@@ -1944,6 +2103,17 @@ public:
     metric_aggregator_ = std::make_unique<MetricAggregator>(counter_temp, hist_temp);
   }
 
+  // Returns the aggregation result of the sink resource, which is expected to be the only
+  // resource that data points were added under.
+  MetricAggregator::AggregationResult releaseSinkResourceResult() {
+    std::vector<MetricAggregator::AggregationResult> results = metric_aggregator_->releaseResults();
+    EXPECT_LE(results.size(), 1);
+    if (results.empty()) {
+      return {};
+    }
+    return std::move(results[ResourceRegistry::SinkResourceIndex]);
+  }
+
   class CustomMockHistogramStatistics : public Stats::HistogramStatistics {
   public:
     std::string quantileSummary() const override { return ""; }
@@ -2036,7 +2206,7 @@ TEST_F(MetricAggregatorTests, GaugeAggregation) {
   metric_aggregator_->addGauge("metric4", /*value=*/60,
                                MetricAggregator::SortedAttributesVector{{"key1", ""}});
 
-  auto metrics = metric_aggregator_->releaseResult();
+  auto metrics = releaseSinkResourceResult();
   EXPECT_EQ(metrics.gauge_data_.size(), 5);
   EXPECT_EQ(getGaugeValue(metrics, "metric1", attr1), 40); // Aggregated
   EXPECT_EQ(getGaugeValue(metrics, "metric2", attr1), 20);
@@ -2061,7 +2231,7 @@ TEST_F(MetricAggregatorTests, CounterAggregationDelta) {
   metric_aggregator_->addCounter("metric1", /*value=*/20,
                                  MetricAggregator::SortedAttributesVector{{"key1", ""}});
 
-  auto metrics = metric_aggregator_->releaseResult();
+  auto metrics = releaseSinkResourceResult();
   EXPECT_EQ(metrics.counter_data_.size(), 3);
   EXPECT_EQ(getCounterValue(metrics, "metric1", attr1), 25); // 5 + 20 (delta)
   EXPECT_EQ(getCounterValue(metrics, "metric2", attr1), 15);
@@ -2084,7 +2254,7 @@ TEST_F(MetricAggregatorTests, CounterAggregationCumulative) {
       "metric1", /*value=*/25,
       MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Collides with first
 
-  auto metrics = metric_aggregator_->releaseResult();
+  auto metrics = releaseSinkResourceResult();
   EXPECT_EQ(metrics.counter_data_.size(), 3);
   EXPECT_EQ(getCounterValue(metrics, "metric1", attr1), 35); // 10 + 25 (value)
   EXPECT_EQ(getCounterValue(metrics, "metric2", attr1), 20);
@@ -2107,7 +2277,7 @@ TEST_F(MetricAggregatorTests, CounterAggregationDifferentTagOrders) {
       "metric_perm", /*value=*/2,
       MetricAggregator::SortedAttributesVector{{"a", "1"}, {"b", "2"}, {"c", "3"}});
 
-  auto metrics = metric_aggregator_->releaseResult();
+  auto metrics = releaseSinkResourceResult();
   EXPECT_EQ(metrics.counter_data_.size(), 1);
   EXPECT_EQ(getCounterValue(metrics, "metric_perm", attr1), 3); // 1 + 2 = 3
 }
@@ -2136,7 +2306,7 @@ TEST_F(MetricAggregatorTests, HistogramAggregationCumulative) {
       "metric1", custom_stats_,
       MetricAggregator::SortedAttributesVector{{"key1", ""}}); // Aggregates with first
 
-  auto metrics = metric_aggregator_->releaseResult();
+  auto metrics = releaseSinkResourceResult();
   EXPECT_EQ(metrics.histogram_data_.size(), 3);
 
   auto* dp1 = getHistogramPoint(metrics, "metric1", attr1);
@@ -2167,7 +2337,7 @@ TEST_F(MetricAggregatorTests, HistogramAggregationDelta) {
     metric_aggregator_->addHistogram("metric1", custom_stats_,
                                      MetricAggregator::SortedAttributesVector{{"key1", ""}});
 
-    auto metrics = metric_aggregator_->releaseResult();
+    auto metrics = releaseSinkResourceResult();
     EXPECT_TRUE(metrics.histogram_data_.empty());
   }
 
@@ -2192,7 +2362,7 @@ TEST_F(MetricAggregatorTests, HistogramAggregationDelta) {
     metric_aggregator_->addHistogram("metric1", custom_stats_,
                                      MetricAggregator::SortedAttributesVector{{"key1", ""}});
 
-    auto metrics = metric_aggregator_->releaseResult();
+    auto metrics = releaseSinkResourceResult();
     EXPECT_EQ(metrics.histogram_data_.size(), 3);
 
     auto* dp1 = getHistogramPoint(metrics, "metric1", attr1);
@@ -2232,7 +2402,7 @@ TEST_F(MetricAggregatorTests, HistogramAggregationBoundariesMismatch) {
                                      MetricAggregator::SortedAttributesVector{{"key1", ""}});
   });
 
-  auto metrics = metric_aggregator_->releaseResult();
+  auto metrics = releaseSinkResourceResult();
   EXPECT_EQ(metrics.histogram_data_.size(),
             1); // Should not aggregate, so only 1 entry (the first one)
 
@@ -2252,15 +2422,41 @@ public:
     opentelemetry::proto::metrics::v1::AggregationTemporality hist_temp = opentelemetry::proto::
         metrics::v1::AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
 
+    resources_ = std::make_unique<ResourceRegistry>(resource_attributes_);
     streamer_ = std::make_unique<RequestStreamer>(
-        max_data_point, resource_attributes_, counter_temp, hist_temp,
+        max_data_point, *resources_, counter_temp, hist_temp,
         [this](MetricsExportRequestPtr request) { requests_.push_back(std::move(request)); },
         /*snapshot_time_ns=*/0, /*delta_start_time_ns=*/0, /*cumulative_start_time_ns=*/0,
         enable_metric_aggregation);
   }
 
+  // Returns the index of the resource of the given pod.
+  uint32_t podResource(absl::string_view pod) {
+    return resources_->findOrAdd(pod_conversion_, {pod});
+  }
+
+  // Returns the value of the "pod" attribute of the given resource.
+  static std::string podOf(const opentelemetry::proto::resource::v1::Resource& resource) {
+    for (const auto& attribute : resource.attributes()) {
+      if (attribute.key() == "pod") {
+        return attribute.value().string_value();
+      }
+    }
+    return "";
+  }
+
+  // A resource conversion whose resource only has the "pod" attribute, set by the "pod" tag.
+  static ConversionAction::ResourceConversion podConversion() {
+    ConversionAction::ResourceConversion conversion;
+    conversion.tags.push_back({"pod", {"pod"}});
+    conversion.tag_indexes.emplace("pod", 0);
+    return conversion;
+  }
+
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
+  const ConversionAction::ResourceConversion pod_conversion_ = podConversion();
   std::vector<MetricsExportRequestPtr> requests_;
+  std::unique_ptr<ResourceRegistry> resources_;
   std::unique_ptr<RequestStreamer> streamer_;
 };
 
@@ -2459,94 +2655,276 @@ TEST_F(RequestStreamerTests, TestMaxDatapointsPerRequestNoAggregationHistogram) 
   EXPECT_EQ(requests_[1]->resource_metrics(0).scope_metrics(0).metrics_size(), 1);
 }
 
+TEST_F(RequestStreamerTests, TestResourcesWithoutAggregation) {
+  setupStreamer(/*max_data_point=*/0, /*enable_metric_aggregation=*/false);
+  const uint32_t pod_a = podResource("a");
+
+  streamer_->addGauge("metric1", 1, {}, pod_a);
+  streamer_->addGauge("metric1", 2, {});
+  streamer_->addGauge("metric2", 3, {}, pod_a);
+  streamer_->send();
+
+  // Each resource has one ResourceMetrics, added along with its first data point.
+  ASSERT_EQ(requests_.size(), 1);
+  ASSERT_EQ(requests_[0]->resource_metrics_size(), 2);
+  const auto& pod_a_metrics = requests_[0]->resource_metrics(0);
+  ASSERT_EQ(pod_a_metrics.resource().attributes_size(), 1);
+  EXPECT_EQ(pod_a_metrics.resource().attributes(0).key(), "pod");
+  EXPECT_EQ(pod_a_metrics.resource().attributes(0).value().string_value(), "a");
+  ASSERT_EQ(pod_a_metrics.scope_metrics(0).metrics_size(), 2);
+  EXPECT_EQ(pod_a_metrics.scope_metrics(0).metrics(0).gauge().data_points(0).as_int(), 1);
+  EXPECT_EQ(pod_a_metrics.scope_metrics(0).metrics(1).gauge().data_points(0).as_int(), 3);
+
+  const auto& sink_metrics = requests_[0]->resource_metrics(1);
+  ASSERT_EQ(sink_metrics.resource().attributes_size(), 1);
+  EXPECT_EQ(sink_metrics.resource().attributes(0).key(), "resource_key");
+  ASSERT_EQ(sink_metrics.scope_metrics(0).metrics_size(), 1);
+  EXPECT_EQ(sink_metrics.scope_metrics(0).metrics(0).gauge().data_points(0).as_int(), 2);
+}
+
+TEST_F(RequestStreamerTests, TestResourcesWithAggregation) {
+  setupStreamer(/*max_data_point=*/0);
+  const uint32_t pod_a = podResource("a");
+
+  streamer_->addCounter("metric", 1, {});
+  streamer_->addCounter("metric", 2, {}, pod_a);
+  streamer_->addCounter("metric", 3, MetricAggregator::SortedAttributesVector{{"key", "value"}},
+                        pod_a);
+  streamer_->send();
+
+  // The data points of a metric under different resources are reported in different metrics.
+  ASSERT_EQ(requests_.size(), 1);
+  ASSERT_EQ(requests_[0]->resource_metrics_size(), 2);
+  const auto& sink_metrics = requests_[0]->resource_metrics(0);
+  ASSERT_EQ(sink_metrics.scope_metrics(0).metrics_size(), 1);
+  EXPECT_EQ(sink_metrics.scope_metrics(0).metrics(0).sum().data_points_size(), 1);
+  const auto& pod_a_metrics = requests_[0]->resource_metrics(1);
+  ASSERT_EQ(pod_a_metrics.scope_metrics(0).metrics_size(), 1);
+  EXPECT_EQ(pod_a_metrics.scope_metrics(0).metrics(0).sum().data_points_size(), 2);
+}
+
 TEST_F(RequestStreamerTests, TestResourcesHaveOneResourceMetricsPerRequest) {
   setupStreamer(/*max_data_point=*/3);
-  const MetricAggregator::SortedAttributesVector pod_a = {{"pod_name", "a"}};
+  const uint32_t pod_a = podResource("a");
 
-  streamer_->addGauge("metric1", 1, {}, MetricAggregator::SortedAttributesVector(pod_a));
+  streamer_->addGauge("metric1", 1, {}, pod_a);
   streamer_->addGauge("metric1", 2, {});
   // The same resource as the first point, in the same request.
-  streamer_->addGauge("metric1", 3, {{"key", "val"}},
-                      MetricAggregator::SortedAttributesVector(pod_a));
+  streamer_->addGauge("metric1", 3, MetricAggregator::SortedAttributesVector{{"key", "val"}},
+                      pod_a);
   // The request is full, so the point goes to a new request.
-  streamer_->addGauge("metric1", 4, {}, MetricAggregator::SortedAttributesVector(pod_a));
+  streamer_->addGauge("metric1", 4, {}, pod_a);
   streamer_->send();
 
   ASSERT_EQ(requests_.size(), 2);
   ASSERT_EQ(requests_[0]->resource_metrics_size(), 2);
   const auto& pod_a_metrics = requests_[0]->resource_metrics(0);
-  ASSERT_EQ(pod_a_metrics.resource().attributes_size(), 1);
-  EXPECT_EQ(pod_a_metrics.resource().attributes(0).key(), "pod_name");
-  EXPECT_EQ(pod_a_metrics.resource().attributes(0).value().string_value(), "a");
+  EXPECT_EQ(podOf(pod_a_metrics.resource()), "a");
   // Both points of the resource are under the same metric.
   ASSERT_EQ(pod_a_metrics.scope_metrics(0).metrics_size(), 1);
   EXPECT_EQ(pod_a_metrics.scope_metrics(0).metrics(0).gauge().data_points_size(), 2);
-  // The sink-wide resource.
-  const auto& default_metrics = requests_[0]->resource_metrics(1);
-  ASSERT_EQ(default_metrics.resource().attributes_size(), 1);
-  EXPECT_EQ(default_metrics.resource().attributes(0).key(), "resource_key");
-  EXPECT_EQ(default_metrics.scope_metrics(0).metrics(0).gauge().data_points(0).as_int(), 2);
+  const auto& sink_metrics = requests_[0]->resource_metrics(1);
+  ASSERT_EQ(sink_metrics.resource().attributes_size(), 1);
+  EXPECT_EQ(sink_metrics.resource().attributes(0).key(), "resource_key");
+  EXPECT_EQ(sink_metrics.scope_metrics(0).metrics(0).gauge().data_points(0).as_int(), 2);
 
   ASSERT_EQ(requests_[1]->resource_metrics_size(), 1);
-  EXPECT_EQ(requests_[1]->resource_metrics(0).resource().attributes(0).value().string_value(), "a");
+  EXPECT_EQ(podOf(requests_[1]->resource_metrics(0).resource()), "a");
   EXPECT_EQ(
       requests_[1]->resource_metrics(0).scope_metrics(0).metrics(0).gauge().data_points(0).as_int(),
       4);
 }
 
-TEST_F(RequestStreamerTests, TestAggregationResultIsGroupedByResource) {
+TEST_F(RequestStreamerTests, TestResourceWithoutAttributes) {
+  resource_attributes_.Clear();
   setupStreamer(/*max_data_point=*/0);
-  MetricAggregator aggregator(AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
-                              AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
-  for (int i = 0; i < 10; ++i) {
-    const std::string pod = absl::StrCat("pod-", i % 3);
-    aggregator.addCounter(absl::StrCat("metric", i), 1, {},
-                          MetricAggregator::SortedAttributesVector({{"pod_name", pod}}));
-    aggregator.addGauge(absl::StrCat("metric", i), 1, {});
-  }
-  streamer_->addAggregationResult(aggregator.releaseResult());
+
+  streamer_->addGauge("metric", 1, {});
   streamer_->send();
 
   ASSERT_EQ(requests_.size(), 1);
-  // One ResourceMetrics for the sink-wide resource and for each pod.
-  ASSERT_EQ(requests_[0]->resource_metrics_size(), 4);
-  EXPECT_EQ(requests_[0]->resource_metrics(0).scope_metrics(0).metrics_size(), 10);
-  int pod_points = 0;
-  for (int i = 1; i < 4; ++i) {
-    for (const auto& metric : requests_[0]->resource_metrics(i).scope_metrics(0).metrics()) {
-      pod_points += metric.sum().data_points_size();
-    }
-  }
-  EXPECT_EQ(pod_points, 10);
+  ASSERT_EQ(requests_[0]->resource_metrics_size(), 1);
+  EXPECT_FALSE(requests_[0]->resource_metrics(0).has_resource());
 }
 
-TEST_F(MetricAggregatorTests, ResourcesAreIdentifiedByAttributes) {
+TEST_F(RequestStreamerTests, TestAddAggregationResultsByResource) {
+  setupStreamer(/*max_data_point=*/2);
+  const uint32_t pod_a = podResource("a");
+  const uint32_t pod_b = podResource("b");
+
+  MetricAggregator aggregator(AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
+                              AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
+  for (int i = 0; i < 3; ++i) {
+    for (const uint32_t pod : {pod_a, pod_b}) {
+      aggregator.addCounter(
+          "metric", 1, MetricAggregator::SortedAttributesVector{{"key", absl::StrCat(i)}}, pod);
+    }
+  }
+  streamer_->addAggregationResults(aggregator.releaseResults());
+  streamer_->send();
+
+  // The data points are added one resource after another.
+  ASSERT_EQ(requests_.size(), 3);
+  ASSERT_EQ(requests_[0]->resource_metrics_size(), 1);
+  EXPECT_EQ(podOf(requests_[0]->resource_metrics(0).resource()), "a");
+  ASSERT_EQ(requests_[1]->resource_metrics_size(), 2);
+  EXPECT_EQ(podOf(requests_[1]->resource_metrics(0).resource()), "a");
+  EXPECT_EQ(podOf(requests_[1]->resource_metrics(1).resource()), "b");
+  ASSERT_EQ(requests_[2]->resource_metrics_size(), 1);
+  EXPECT_EQ(podOf(requests_[2]->resource_metrics(0).resource()), "b");
+}
+
+TEST_F(MetricAggregatorTests, AggregationByResource) {
   setupAggregator(/*counter_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE,
                   /*hist_temp=*/AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE);
-  const MetricAggregator::SortedAttributesVector attrs = {{"key", "val"}};
-  const MetricAggregator::SortedAttributesVector pod_a = {{"pod_name", "a"}};
-  const MetricAggregator::SortedAttributesVector pod_b = {{"pod_name", "b"}};
+  MetricAggregator::SortedAttributesVector attr = {{"key", "value"}};
 
-  metric_aggregator_->addCounter("metric", 1, MetricAggregator::SortedAttributesVector(attrs),
-                                 MetricAggregator::SortedAttributesVector(pod_a));
-  metric_aggregator_->addCounter("metric", 2, MetricAggregator::SortedAttributesVector(attrs),
-                                 MetricAggregator::SortedAttributesVector(pod_a));
-  metric_aggregator_->addCounter("metric", 4, MetricAggregator::SortedAttributesVector(attrs),
-                                 MetricAggregator::SortedAttributesVector(pod_b));
-  metric_aggregator_->addCounter("metric", 8, MetricAggregator::SortedAttributesVector(attrs));
+  metric_aggregator_->addCounter("metric", /*value=*/1,
+                                 MetricAggregator::SortedAttributesVector{{"key", "value"}});
+  metric_aggregator_->addCounter("metric", /*value=*/2,
+                                 MetricAggregator::SortedAttributesVector{{"key", "value"}},
+                                 /*resource_index=*/2);
+  metric_aggregator_->addGauge("metric", /*value=*/3,
+                               MetricAggregator::SortedAttributesVector{{"key", "value"}},
+                               /*resource_index=*/2);
+  mockHistogram({10}, {1}, 1, 5);
+  metric_aggregator_->addHistogram("metric", custom_stats_,
+                                   MetricAggregator::SortedAttributesVector{{"key", "value"}},
+                                   /*resource_index=*/2);
+  metric_aggregator_->addCounter("metric", /*value=*/4,
+                                 MetricAggregator::SortedAttributesVector{{"key", "value"}},
+                                 /*resource_index=*/2);
 
-  auto result = metric_aggregator_->releaseResult();
-  ASSERT_EQ(result.resources_.size(), 2);
-  EXPECT_EQ(result.resources_[0], pod_a);
-  EXPECT_EQ(result.resources_[1], pod_b);
-  ASSERT_EQ(result.counter_data_.size(), 3);
-  EXPECT_EQ(result.counter_data_.at(MetricAggregator::MetricKey(
-                "metric", MetricAggregator::SortedAttributesVector(attrs), /*resource_id=*/1)),
-            3);
-  EXPECT_EQ(result.counter_data_.at(MetricAggregator::MetricKey(
-                "metric", MetricAggregator::SortedAttributesVector(attrs), /*resource_id=*/2)),
-            4);
-  EXPECT_EQ(getCounterValue(result, "metric", attrs), 8);
+  // The data points of each resource are aggregated separately.
+  std::vector<MetricAggregator::AggregationResult> results = metric_aggregator_->releaseResults();
+  ASSERT_EQ(results.size(), 3);
+  EXPECT_EQ(results[0].counter_data_.size(), 1);
+  EXPECT_EQ(getCounterValue(results[0], "metric", attr), 1);
+  EXPECT_TRUE(results[0].gauge_data_.empty());
+  EXPECT_TRUE(results[0].histogram_data_.empty());
+  EXPECT_TRUE(results[1].counter_data_.empty());
+  EXPECT_TRUE(results[1].gauge_data_.empty());
+  EXPECT_TRUE(results[1].histogram_data_.empty());
+  EXPECT_EQ(getCounterValue(results[2], "metric", attr), 6);
+  EXPECT_EQ(getGaugeValue(results[2], "metric", attr), 3);
+  ASSERT_NE(getHistogramPoint(results[2], "metric", attr), nullptr);
+  EXPECT_EQ(getHistogramPoint(results[2], "metric", attr)->count_, 1);
+}
+
+class ResourceRegistryTests : public testing::Test {
+public:
+  using Attributes = std::vector<std::pair<std::string, std::string>>;
+
+  ResourceRegistryTests() {
+    addSinkAttribute("pod_name", "envoy");
+    addSinkAttribute("location", "us-central1");
+  }
+
+  void addSinkAttribute(const std::string& key, const std::string& value) {
+    auto* attribute = sink_attributes_.Add();
+    attribute->set_key(key);
+    attribute->mutable_value()->set_string_value(value);
+  }
+
+  // Returns a resource conversion with the given static attributes, whose tags set the resource
+  // attributes with the given keys.
+  static ConversionAction::ResourceConversion
+  resourceConversion(Attributes static_attributes,
+                     const std::vector<std::pair<std::string, std::vector<std::string>>>& tags) {
+    ConversionAction::ResourceConversion conversion;
+    conversion.static_attributes = std::move(static_attributes);
+    for (const auto& [name, attribute_keys] : tags) {
+      conversion.tag_indexes.emplace(name, static_cast<uint32_t>(conversion.tags.size()));
+      conversion.tags.push_back({name, absl::InlinedVector<std::string, 1>(attribute_keys.begin(),
+                                                                           attribute_keys.end())});
+    }
+    return conversion;
+  }
+
+  // Returns the attributes of `resource`, in order.
+  static Attributes attributesOf(const opentelemetry::proto::resource::v1::Resource& resource) {
+    Attributes attributes;
+    for (const auto& attribute : resource.attributes()) {
+      attributes.emplace_back(attribute.key(), attribute.value().string_value());
+    }
+    return attributes;
+  }
+
+  Protobuf::RepeatedPtrField<KeyValue> sink_attributes_;
+};
+
+TEST_F(ResourceRegistryTests, SinkResource) {
+  ResourceRegistry resources(sink_attributes_);
+
+  // The sink resource keeps the order of its attributes.
+  EXPECT_EQ(attributesOf(resources.get(ResourceRegistry::SinkResourceIndex)),
+            (Attributes{{"pod_name", "envoy"}, {"location", "us-central1"}}));
+}
+
+TEST_F(ResourceRegistryTests, FindOrAdd) {
+  const ConversionAction::ResourceConversion conversion =
+      resourceConversion({{"gcp.resource_type", "k8s_pod"}},
+                         {{"pod", {"pod_name"}}, {"namespace", {"namespace_name"}}});
+  ResourceRegistry resources(sink_attributes_);
+
+  const uint32_t pod_a = resources.findOrAdd(conversion, {"a", "ns"});
+  const uint32_t pod_b = resources.findOrAdd(conversion, {"b", "ns"});
+  EXPECT_EQ(pod_a, 1);
+  EXPECT_EQ(pod_b, 2);
+  EXPECT_EQ(resources.findOrAdd(conversion, {"a", "ns"}), pod_a);
+
+  // A resource has the static attributes of the conversion and the attributes that its tags set,
+  // sorted by key.
+  EXPECT_EQ(
+      attributesOf(resources.get(pod_a)),
+      (Attributes{{"gcp.resource_type", "k8s_pod"}, {"namespace_name", "ns"}, {"pod_name", "a"}}));
+  EXPECT_EQ(
+      attributesOf(resources.get(pod_b)),
+      (Attributes{{"gcp.resource_type", "k8s_pod"}, {"namespace_name", "ns"}, {"pod_name", "b"}}));
+}
+
+TEST_F(ResourceRegistryTests, TagToSeveralAttributes) {
+  const ConversionAction::ResourceConversion conversion =
+      resourceConversion({}, {{"pod", {"pod_name", "k8s.pod.name"}}});
+  ResourceRegistry resources(sink_attributes_);
+
+  EXPECT_EQ(attributesOf(resources.get(resources.findOrAdd(conversion, {"a"}))),
+            (Attributes{{"k8s.pod.name", "a"}, {"pod_name", "a"}}));
+}
+
+TEST_F(ResourceRegistryTests, ResourcesWithTheSameAttributes) {
+  const ConversionAction::ResourceConversion pod_conversion =
+      resourceConversion({}, {{"pod", {"pod_name"}}});
+  const ConversionAction::ResourceConversion name_conversion =
+      resourceConversion({}, {{"name", {"pod_name"}}});
+  const ConversionAction::ResourceConversion located_pod_conversion =
+      resourceConversion({{"location", "us-central1"}}, {{"pod", {"pod_name"}}});
+  ResourceRegistry resources(sink_attributes_);
+
+  // Resources that different conversions resolve to are the same resource if they have the same
+  // attributes.
+  const uint32_t pod_a = resources.findOrAdd(pod_conversion, {"a"});
+  EXPECT_EQ(resources.findOrAdd(name_conversion, {"a"}), pod_a);
+  EXPECT_NE(resources.findOrAdd(located_pod_conversion, {"a"}), pod_a);
+  // Including the sink resource.
+  EXPECT_EQ(resources.findOrAdd(located_pod_conversion, {"envoy"}),
+            ResourceRegistry::SinkResourceIndex);
+}
+
+TEST_F(ResourceRegistryTests, OwnsTagValues) {
+  const ConversionAction::ResourceConversion conversion =
+      resourceConversion({}, {{"pod", {"pod_name"}}});
+  ResourceRegistry resources(sink_attributes_);
+
+  uint32_t index;
+  {
+    std::string pod = "a";
+    index = resources.findOrAdd(conversion, {pod});
+    pod = "overwritten";
+  }
+  const std::string pod = "a";
+  EXPECT_EQ(resources.findOrAdd(conversion, {pod}), index);
+  EXPECT_EQ(attributesOf(resources.get(index)), (Attributes{{"pod_name", "a"}}));
 }
 
 } // namespace

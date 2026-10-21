@@ -1,7 +1,6 @@
-// End-to-end test of reporting the metrics of a shared proxy on behalf of the workloads that it
-// serves, as a node proxy does for the pods of its node: each listener carries the metadata of the
-// pod that it serves, a stats access logger tags its stats with that metadata, and the OTLP stats
-// sink moves the tags to the resource of each pod.
+// End-to-end test of reporting the metrics of a gateway on behalf of the pods that it serves: each
+// listener carries the metadata of the pod that it serves, a stats access logger tags its stats
+// with that metadata, and the OTLP stats sink reports the stats under the resource of each pod.
 
 #include <string>
 #include <utility>
@@ -25,7 +24,8 @@ using ::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceReques
 using ::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse;
 
 // Counts the requests of each listener, tagged with the pod that the listener's metadata names.
-constexpr absl::string_view kStatsAccessLogConfig = R"EOF(
+// The tags of a listener without metadata are empty.
+constexpr absl::string_view StatsAccessLogConfig = R"EOF(
 stats_scope:
   prefix: workload
 counters:
@@ -43,7 +43,7 @@ counters:
 
 // Converts the request counts to "workload.requests", reported under the k8s_pod resource that
 // their tags name.
-constexpr absl::string_view kCustomMetricConversions = R"EOF(
+constexpr absl::string_view CustomMetricConversions = R"EOF(
 matcher_tree:
   input:
     name: stat_full_name_match_input
@@ -85,15 +85,18 @@ public:
           auto* access_log = hcm.add_access_log();
           access_log->set_name("envoy.access_loggers.stats");
           envoy::extensions::access_loggers::stats::v3::Config stats_config;
-          TestUtility::loadFromYaml(std::string(kStatsAccessLogConfig), stats_config);
-          access_log->mutable_typed_config()->PackFrom(stats_config);
+          TestUtility::loadFromYaml(std::string(StatsAccessLogConfig), stats_config);
+          std::ignore = access_log->mutable_typed_config()->PackFrom(stats_config);
         });
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
-      // A copy of the listener, which serves another pod.
+      // Copies of the listener, which serve another pod and no pod.
       auto* pod_b_listener = static_resources->add_listeners();
       pod_b_listener->MergeFrom(static_resources->listeners(0));
       pod_b_listener->set_name("pod_b");
+      auto* no_pod_listener = static_resources->add_listeners();
+      no_pod_listener->MergeFrom(static_resources->listeners(0));
+      no_pod_listener->set_name("no_pod");
       setPodMetadata(*static_resources->mutable_listeners(0), "pod-a", "ns-a");
       setPodMetadata(*pod_b_listener, "pod-b", "ns-b");
 
@@ -105,11 +108,11 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       sink_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("otlp_collector");
       sink_config.set_report_counters_as_deltas(true);
-      TestUtility::loadFromYaml(std::string(kCustomMetricConversions),
+      TestUtility::loadFromYaml(std::string(CustomMetricConversions),
                                 *sink_config.mutable_custom_metric_conversions());
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.stat_sinks.open_telemetry");
-      metrics_sink->mutable_typed_config()->PackFrom(sink_config);
+      std::ignore = metrics_sink->mutable_typed_config()->PackFrom(sink_config);
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     });
@@ -132,11 +135,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ResourceConversionIntegrationTest,
 TEST_P(ResourceConversionIntegrationTest, ReportsMetricsUnderEachPodResource) {
   initialize();
 
-  // Two requests through the listener of pod-a and one through the listener of pod-b.
+  // Two requests through the listener of pod-a, and one through each of the other listeners.
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   for (const auto& [port_name, requests] :
-       std::vector<std::pair<std::string, int>>{{"http", 2}, {"pod_b", 1}}) {
+       std::vector<std::pair<std::string, int>>{{"http", 2}, {"pod_b", 1}, {"no_pod", 1}}) {
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort(port_name)));
     for (int i = 0; i < requests; ++i) {
       sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
@@ -147,8 +150,10 @@ TEST_P(ResourceConversionIntegrationTest, ReportsMetricsUnderEachPodResource) {
   FakeHttpConnectionPtr otlp_connection;
   ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, otlp_connection));
   absl::flat_hash_map<std::string, uint64_t> requests_by_pod;
+  uint64_t requests_without_pod = 0;
   bool saw_proxy_metric = false;
-  while (requests_by_pod["pod-a"] < 2 || requests_by_pod["pod-b"] < 1 || !saw_proxy_metric) {
+  while (requests_by_pod["pod-a"] < 2 || requests_by_pod["pod-b"] < 1 || requests_without_pod < 1 ||
+         !saw_proxy_metric) {
     FakeStreamPtr stream;
     ASSERT_TRUE(otlp_connection->waitForNewStream(*dispatcher_, stream));
     ExportMetricsServiceRequest request;
@@ -164,12 +169,28 @@ TEST_P(ResourceConversionIntegrationTest, ReportsMetricsUnderEachPodResource) {
       }
       for (const auto& scope_metrics : resource_metrics.scope_metrics()) {
         for (const auto& metric : scope_metrics.metrics()) {
-          if (metric.name() != "workload.requests") {
-            // The metrics of the proxy itself stay on the sink-wide resource.
-            EXPECT_FALSE(resource.contains("pod_name")) << metric.name();
-            saw_proxy_metric = true;
+          if (!resource.contains("pod_name")) {
+            // The metrics of the proxy itself, and the request counts of the listener without a
+            // pod, stay on the resource of the sink.
+            EXPECT_NE(resource["gcp.resource_type"], "k8s_pod");
+            if (metric.name() != "workload.requests") {
+              saw_proxy_metric = true;
+              continue;
+            }
+            for (const auto& data_point : metric.sum().data_points()) {
+              absl::flat_hash_map<std::string, std::string> attributes;
+              for (const auto& attr : data_point.attributes()) {
+                attributes[attr.key()] = attr.value().string_value();
+              }
+              EXPECT_EQ(attributes, (absl::flat_hash_map<std::string, std::string>{
+                                        {"k8s.pod.name", ""},
+                                        {"k8s.namespace.name", ""},
+                                        {"http.response.status_code", "200"}}));
+              requests_without_pod += data_point.as_int();
+            }
             continue;
           }
+          EXPECT_EQ(metric.name(), "workload.requests");
           EXPECT_EQ(resource["gcp.resource_type"], "k8s_pod");
           const std::string& pod = resource["pod_name"];
           ASSERT_TRUE(pod == "pod-a" || pod == "pod-b") << pod;
@@ -187,6 +208,7 @@ TEST_P(ResourceConversionIntegrationTest, ReportsMetricsUnderEachPodResource) {
   }
   EXPECT_EQ(requests_by_pod["pod-a"], 2);
   EXPECT_EQ(requests_by_pod["pod-b"], 1);
+  EXPECT_EQ(requests_without_pod, 1);
 
   ASSERT_TRUE(otlp_connection->close());
   ASSERT_TRUE(otlp_connection->waitForDisconnect());

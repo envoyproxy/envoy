@@ -30,9 +30,11 @@ message SinkConfig {
   // the metric_name and static_metric_labels will be
   // used to create the metric. This can be used to rename a
   // stat, add static labels, and aggregate multiple stats into a single metric.
-  // [#next-free-field: 5]
   message ConversionAction {
-    // The metric name to use for the stat.
+    // The metric name to use for the stat. If empty, the stat keeps the name that it has without a
+    // conversion, see :ref:`use_tag_extracted_name
+    // <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.use_tag_extracted_name>`
+    // and :ref:`prefix <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.prefix>`.
     string metric_name = 2;
 
     // Static metric labels to use for the metric.
@@ -45,11 +47,24 @@ message SinkConfig {
   }
 
   // ResourceConversion defines the OTLP resource that a converted metric is reported under. It
-  // lets one sink report metrics on behalf of several entities, e.g. a node proxy that reports
-  // the metrics of each workload on the node under that workload's resource. Metrics whose
-  // resources have the same attributes are reported under the same ``ResourceMetrics``.
+  // lets one sink report metrics on behalf of several entities, e.g. a gateway that reports the
+  // metrics of each workload that it serves under that workload's resource.
+  //
+  // Each attribute of the resource is either static or set from a stat tag. The resource doesn't
+  // inherit the attributes of the resource built from :ref:`resource_detectors
+  // <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.resource_detectors>`.
+  // The config is rejected if an attribute is set more than once.
+  //
+  // If a stat lacks one of the tags in ``tags_to_resource_attributes``, or has it with an empty
+  // value, the stat is reported as if the action had no resource conversion: under the resource
+  // built from ``resource_detectors``, with its tags as data point attributes. The metric name and
+  // the static metric labels of the action still apply.
+  //
+  // Within an export request, the metrics whose resources have the same attributes are reported
+  // under the same ``ResourceMetrics``. This includes the metrics that are reported under the
+  // resource built from ``resource_detectors``, if it has the same attributes.
   message ResourceConversion {
-    // Moves a stat tag from the data point attributes to the resource attributes.
+    // Sets a resource attribute to the value of a stat tag.
     message TagToResourceAttribute {
       // The name of the stat tag.
       string tag_name = 1 [(validate.rules).string = {min_len: 1}];
@@ -58,20 +73,15 @@ message SinkConfig {
       string resource_attribute_key = 2;
     }
 
-    // If true, the resource starts with the attributes of the resource built from
-    // :ref:`resource_detectors
-    // <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.resource_detectors>`.
-    // Otherwise, it only has the attributes below. Default value is true.
-    google.protobuf.BoolValue inherit_resource_attributes = 1;
+    // Static attributes of the resource. Their keys must not be empty, and their values must be
+    // strings.
+    repeated opentelemetry.proto.common.v1.KeyValue static_resource_attributes = 1;
 
-    // Static attributes of the resource. Each overrides the inherited attribute with the same key.
-    repeated opentelemetry.proto.common.v1.KeyValue static_resource_attributes = 2;
-
-    // The stat tags to move to the resource. A listed tag is never emitted as a data point
-    // attribute. If its value is not empty, it sets the resource attribute, overriding the
-    // inherited or static attribute with the same key. A tag may be listed more than once to set
-    // several resource attributes.
-    repeated TagToResourceAttribute tags_to_resource_attributes = 3;
+    // The stat tags that set the other attributes of the resource. A tag may be listed more than
+    // once to set several attributes. These tags are reported as resource attributes instead of
+    // data point attributes, unless the stat is reported as if the action had no resource
+    // conversion, see above.
+    repeated TagToResourceAttribute tags_to_resource_attributes = 2;
   }
 
   // DropAction is an action that, when matched, will prevent the stat from being converted to an OTLP metric and flushed.
