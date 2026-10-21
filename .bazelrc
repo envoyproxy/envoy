@@ -85,6 +85,10 @@ build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
 build --per_file_copt=external/librdkafka.*@-Wno-unused-variable,-Wno-unused-but-set-variable,-Wno-sometimes-uninitialized,-Wno-uninitialized,-Wno-implicit-enum-enum-cast
 build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
 
+# highway 1.2.0 double-appends `evex512` to the AVX3 target string; clang rejects it per-function.
+# Only compiled from source in gcc/sanitizer builds (prebuilt wee8 elsewhere).
+build --per_file_copt=external/highway.*@-Wno-ignored-attributes
+
 
 #############################################################################
 # global: deps
