@@ -40,6 +40,11 @@ void expectDeltaUpdate(
           EXPECT_EQ(gotten_resources[i].get().version(), version);
           EXPECT_TRUE(
               TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
+          EXPECT_NE(gotten_resources[i].get().resource().GetArena(), nullptr);
+          if (i > 0) {
+            EXPECT_EQ(gotten_resources[i].get().resource().GetArena(),
+                      gotten_resources[0].get().resource().GetArena());
+          }
         }
         EXPECT_EQ(expected_removals.size(), removed_resources.size());
         for (size_t i = 0; i < expected_removals.size(); i++) {
@@ -65,6 +70,11 @@ void expectDeltaAndSotwUpdate(
         for (size_t i = 0; i < expected_resources.size(); i++) {
           EXPECT_TRUE(
               TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
+          EXPECT_NE(gotten_resources[i].get().resource().GetArena(), nullptr);
+          if (i > 0) {
+            EXPECT_EQ(gotten_resources[i].get().resource().GetArena(),
+                      gotten_resources[0].get().resource().GetArena());
+          }
         }
         return absl::OkStatus();
       }));
