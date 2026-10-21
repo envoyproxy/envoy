@@ -57,5 +57,9 @@ jobs:
         - target: compile_time_options
           name: Compile time options
           docker-ci: true
+        - target: execution_context
+          name: Execution context
+          # TODO(phlax): remove once all release branches have the transition
+          skip: ${{ fromJSON(inputs.request).request.target-branch != 'main' }}
         - target: gcc
           name: GCC
