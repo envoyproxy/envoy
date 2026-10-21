@@ -32,16 +32,12 @@ TlsBuiltinStatNames::TlsBuiltinStatNames(Stats::SymbolTable& symbol_table)
       ssl_versions_(stat_name_set_->add("ssl.versions")),
       ssl_curves_(stat_name_set_->add("ssl.curves")),
       ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")),
-      ssl_certificate_(stat_name_set_->add("ssl.certificate")),
-      expiration_unix_time_seconds_(stat_name_set_->add("expiration_unix_time_seconds")),
       ssl_cipher_tag_name_(stat_name_set_->add(Envoy::Config::TagNames::get().SSL_CIPHER)),
       ssl_cipher_suite_tag_name_(
           stat_name_set_->add(Envoy::Config::TagNames::get().SSL_CIPHER_SUITE)),
       ssl_curve_tag_name_(stat_name_set_->add(Envoy::Config::TagNames::get().SSL_CURVE)),
       ssl_sigalg_tag_name_(stat_name_set_->add(Envoy::Config::TagNames::get().SSL_SIGALG)),
-      ssl_version_tag_name_(stat_name_set_->add(Envoy::Config::TagNames::get().SSL_VERSION)),
-      tls_certificate_tag_name_(
-          stat_name_set_->add(Envoy::Config::TagNames::get().TLS_CERTIFICATE)) {
+      ssl_version_tag_name_(stat_name_set_->add(Envoy::Config::TagNames::get().SSL_VERSION)) {
   // Register stat names based on lists reported by BoringSSL. These are compile-time constant
   // tables, so the resulting set is identical for every TLS context in the process.
   std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
@@ -69,20 +65,26 @@ getTlsBuiltinStatNames(Server::Configuration::CommonFactoryContext& factory_cont
       });
 }
 
-Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name,
-                                               const TlsBuiltinStatNames& stat_names) {
-  // ssl.certificate.(<cert_name>.)expiration_unix_time_seconds: the certificate name is the tag
-  // of the stat and leaves the tag-extracted name.
+Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name) {
+  // The constant names are interned in the scope's own symbol table rather than taken from the
+  // shared TlsBuiltinStatNames: a StatName is only valid in the symbol table that encoded it, and
+  // the caller's scope is not guaranteed to share a symbol table with the factory context that
+  // owns the shared names (test harnesses wire them to separate stores). This only runs at config
+  // load time, so the extra interning is off the hot path.
   Stats::SymbolTable& symbol_table = scope.symbolTable();
+  Stats::StatNamePool pool(symbol_table);
+  const Stats::StatName ssl_certificate = pool.add("ssl.certificate");
+  const Stats::StatName expiration_unix_time_seconds = pool.add("expiration_unix_time_seconds");
   const Stats::StatNameDynamicStorage cert_stat_name(cert_name, symbol_table);
 
-  const Stats::StatNameJoiner base_name(
-      {stat_names.ssl_certificate_, stat_names.expiration_unix_time_seconds_}, symbol_table);
-  const Stats::StatNameJoiner flat_name({stat_names.ssl_certificate_, cert_stat_name.statName(),
-                                         stat_names.expiration_unix_time_seconds_},
+  // ssl.certificate.(<cert_name>.)expiration_unix_time_seconds: the certificate name is the tag
+  // of the stat and leaves the tag-extracted name.
+  const Stats::StatNameJoiner base_name({ssl_certificate, expiration_unix_time_seconds},
                                         symbol_table);
+  const Stats::StatNameJoiner flat_name(
+      {ssl_certificate, cert_stat_name.statName(), expiration_unix_time_seconds}, symbol_table);
   const Stats::StatNameTagVec tags{
-      {stat_names.tls_certificate_tag_name_, cert_stat_name.statName()}};
+      {pool.add(Envoy::Config::TagNames::get().TLS_CERTIFICATE), cert_stat_name.statName()}};
   return scope.gaugeFromTaggedName(base_name.statName(), tags, flat_name.statName(),
                                    Stats::Gauge::ImportMode::NeverImport);
 }

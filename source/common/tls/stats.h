@@ -56,9 +56,7 @@ public:
   const Stats::StatName ssl_versions_;
   const Stats::StatName ssl_curves_;
   const Stats::StatName ssl_sigalgs_;
-  const Stats::StatName ssl_certificate_;
-  const Stats::StatName expiration_unix_time_seconds_;
-  // The names of the tags of the handshake and certificate stats. The cipher tag matches the
+  // The names of the tags of the handshake stats. The cipher tag matches the
   // legacy extraction rules: "envoy.ssl_cipher" for the server (listener) side and "cipher_suite"
   // for the client (cluster) side.
   const Stats::StatName ssl_cipher_tag_name_;
@@ -66,7 +64,6 @@ public:
   const Stats::StatName ssl_curve_tag_name_;
   const Stats::StatName ssl_sigalg_tag_name_;
   const Stats::StatName ssl_version_tag_name_;
-  const Stats::StatName tls_certificate_tag_name_;
 };
 
 // Returns the server-wide shared TLS builtin stat names, creating them on first use. The set is
@@ -75,8 +72,7 @@ public:
 std::shared_ptr<TlsBuiltinStatNames>
 getTlsBuiltinStatNames(Server::Configuration::CommonFactoryContext& factory_context);
 
-Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name,
-                                               const TlsBuiltinStatNames& stat_names);
+Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name);
 
 } // namespace Tls
 } // namespace TransportSockets

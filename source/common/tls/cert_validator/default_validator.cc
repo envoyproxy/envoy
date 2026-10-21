@@ -762,8 +762,7 @@ void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
           std::min(earliest_expiration, Utility::getExpirationUnixTime(cert.get()));
     }
   }
-  Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(
-      scope, config_->caCertName(), *getTlsBuiltinStatNames(context_));
+  Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(scope, config_->caCertName());
   expiration_gauge.set(earliest_expiration.count());
 }
 

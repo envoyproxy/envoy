@@ -211,7 +211,7 @@ ContextImpl::ContextImpl(
       // Create and set the certificate expiration gauge.
       Stats::Gauge& expiration_gauge =
           Extensions::TransportSockets::Tls::createCertificateExpirationGauge(
-              scope, tls_certificate.certificateName(), *builtin_stat_names_);
+              scope, tls_certificate.certificateName());
       expiration_gauge.set(Utility::getExpirationUnixTime(ctx.cert_chain_.get()).count());
 
       // The must staple extension means the certificate promises to carry
