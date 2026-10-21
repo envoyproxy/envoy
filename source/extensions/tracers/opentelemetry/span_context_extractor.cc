@@ -23,12 +23,11 @@ namespace Tracers {
 namespace OpenTelemetry {
 namespace {
 
-// See https://www.w3.org/TR/trace-context/#traceparent-header
-constexpr int kTraceparentHeaderSize = 55; // 2 + 1 + 32 + 1 + 16 + 1 + 2
-constexpr int kVersionHexSize = 2;
-constexpr int kTraceIdHexSize = 32;
-constexpr int kParentIdHexSize = 16;
-constexpr int kTraceFlagsHexSize = 2;
+constexpr int kTraceparentHeaderSize = OpenTelemetryConstantValues::kTraceparentHeaderSize;
+constexpr int kVersionHexSize = OpenTelemetryConstantValues::kVersionHexSize;
+constexpr int kTraceIdHexSize = OpenTelemetryConstantValues::kTraceIdHexSize;
+constexpr int kParentIdHexSize = OpenTelemetryConstantValues::kParentIdHexSize;
+constexpr int kTraceFlagsHexSize = OpenTelemetryConstantValues::kTraceFlagsHexSize;
 
 constexpr int kFlagMaskSampled = 1;
 

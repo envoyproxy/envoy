@@ -22,6 +22,18 @@ class OpenTelemetryConstantValues {
 public:
   const Tracing::TraceContextHandler TRACE_PARENT{"traceparent"};
   const Tracing::TraceContextHandler TRACE_STATE{"tracestate"};
+
+  // See https://www.w3.org/TR/trace-context/#traceparent-header
+  static constexpr int kVersionHexSize = 2;
+  static constexpr int kTraceIdHexSize = 32;
+  static constexpr int kParentIdHexSize = 16;
+  static constexpr int kTraceFlagsHexSize = 2;
+
+  static constexpr int kTraceparentHeaderSize = kVersionHexSize + 1 +  //
+                                                kTraceIdHexSize + 1 +  //
+                                                kParentIdHexSize + 1 + //
+                                                kTraceFlagsHexSize;
+  static_assert(kTraceparentHeaderSize == 55);
 };
 
 using OpenTelemetryConstants = ConstSingleton<OpenTelemetryConstantValues>;
