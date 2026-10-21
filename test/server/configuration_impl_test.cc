@@ -243,15 +243,35 @@ TEST_F(ConfigurationImplTest, EvictionRuntimeKey) {
   std::string json = R"EOF(
   {
     "stats_flush_interval": "0.500s",
-    "stats_eviction_interval_runtime_key": "stats.eviction_interval_ms"
+    "runtime_stats_eviction_interval": {
+      "default_value": 1500,
+      "runtime_key": "stats.eviction_interval_ms"
+    }
   }
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   MainImpl config;
   EXPECT_OK(config.initialize(bootstrap, server_, cluster_manager_factory_));
-  EXPECT_EQ(0, config.statsConfig().evictOnFlush());
+  EXPECT_EQ(3, config.statsConfig().evictOnFlush());
   EXPECT_EQ("stats.eviction_interval_ms", config.statsConfig().evictionIntervalRuntimeKey());
+}
+
+TEST_F(ConfigurationImplTest, EvictionRuntimeKeyDefaultNotMultiple) {
+  std::string json = R"EOF(
+  {
+    "stats_flush_interval": "0.500s",
+    "runtime_stats_eviction_interval": {
+      "default_value": 750,
+      "runtime_key": "stats.eviction_interval_ms"
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  MainImpl config;
+  EXPECT_THAT(config.initialize(bootstrap, server_, cluster_manager_factory_).message(),
+              testing::HasSubstr("must be a multiple"));
 }
 
 TEST_F(ConfigurationImplTest, EvictionNotMultiple) {

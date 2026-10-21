@@ -72,7 +72,7 @@ private:
   bool flush_on_admin_{false};
   const envoy::config::bootstrap::v3::Bootstrap::DeferredStatOptions deferred_stat_options_;
   uint32_t evict_on_flush_{0};
-  std::string eviction_interval_runtime_key_;
+  const std::string eviction_interval_runtime_key_;
 };
 
 /**

@@ -8,7 +8,9 @@ stats_sinks:
 - name: envoy.custom_stats_sink
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Struct
-stats_eviction_interval_runtime_key: stats.eviction_interval_ms
+runtime_stats_eviction_interval:
+  default_value: 10000
+  runtime_key: stats.eviction_interval_ms
 layered_runtime:
   layers:
   - name: static_layer

@@ -1048,7 +1048,7 @@ TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
   auto server_thread =
       startTestServer("test/server/test_data/server/stats_evict_runtime_bootstrap.yaml", true);
-  EXPECT_EQ(0, server_->statsConfig().evictOnFlush());
+  EXPECT_EQ(2, server_->statsConfig().evictOnFlush());
   EXPECT_EQ("stats.eviction_interval_ms", server_->statsConfig().evictionIntervalRuntimeKey());
 
   auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
@@ -1062,7 +1062,7 @@ TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
   EXPECT_EQ(2L, counter->value());
   EXPECT_EQ(1, stats_store_.evictionCount());
 
-  // A value that is not a multiple of the flush interval disables eviction.
+  // A value that is not a multiple of the flush interval falls back to the 10s default.
   {
     absl::Notification updated;
     server_->dispatcher().post([&] {
@@ -1074,7 +1074,7 @@ TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
   time_system_.advanceTimeWait(std::chrono::seconds(6));
   time_system_.advanceTimeWait(std::chrono::seconds(6));
   EXPECT_EQ(4L, counter->value());
-  EXPECT_EQ(1, stats_store_.evictionCount());
+  EXPECT_EQ(2, stats_store_.evictionCount());
 
   // A 5s interval evicts on every flush. Stop at 28s to avoid racing the flush at 30s.
   {
@@ -1087,7 +1087,7 @@ TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
   }
   time_system_.advanceTimeWait(std::chrono::seconds(4));
   EXPECT_EQ(5L, counter->value());
-  EXPECT_EQ(2, stats_store_.evictionCount());
+  EXPECT_EQ(3, stats_store_.evictionCount());
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();

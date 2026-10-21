@@ -309,12 +309,13 @@ void InstanceBase::flushStatsInternal() {
   if (const auto& runtime_key = stats_config.evictionIntervalRuntimeKey();
       !runtime_key.empty() && runtime_ != nullptr) {
     const uint64_t flush_ms = stats_config.flushInterval().count();
-    const uint64_t evict_ms = runtime_->snapshot().getInteger(runtime_key, 0);
+    const uint64_t evict_ms =
+        runtime_->snapshot().getInteger(runtime_key, evict_on_flush * flush_ms);
     if (flush_ms != 0 && evict_ms % flush_ms == 0 && evict_ms / flush_ms <= UINT32_MAX) {
       evict_on_flush = evict_ms / flush_ms;
     } else {
-      evict_on_flush = 0;
-      ENVOY_LOG(debug, "ignoring invalid stats eviction interval {}ms from runtime key {}",
+      ENVOY_LOG(debug,
+                "ignoring invalid stats eviction interval {}ms from runtime key {}, using default",
                 evict_ms, runtime_key);
     }
   }
