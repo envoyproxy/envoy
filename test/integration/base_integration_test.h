@@ -614,7 +614,6 @@ protected:
     listeners_bound_timeout_ms_ = duration;
   }
 
-
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and
   // fake upstream codecs and must outlast them.
