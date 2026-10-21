@@ -72,6 +72,7 @@ public:
                absl::string_view transport_failure_reason),
               (override));
   MOCK_METHOD(void, onUpstreamSuccess, (), (override));
+
   MOCK_METHOD(void, onConnectionClose, (Network::ConnectionEvent event), (override));
   MOCK_METHOD(void, onDecodingSuccess,
               (ResponseHeaderFramePtr response_header_frame, std::optional<StartTime> start_time),
